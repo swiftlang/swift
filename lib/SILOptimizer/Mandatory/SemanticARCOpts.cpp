@@ -381,64 +381,93 @@ bool mayFunctionMutateArgument(const AccessedStorage &storage, SILFunction &f) {
   return true;
 }
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
-  auto addr = load->getOperand();
+// Then find our accessed storage to determine whether it provides a guarantee
+// for the loaded value.
+namespace {
+class StorageGuaranteesLoadVisitor
+  : public AccessUseDefChainVisitor<StorageGuaranteesLoadVisitor>
+{
+  // The outer SemanticARCOptVisitor.
+  SemanticARCOptVisitor &ARCOpt;
   
-  // Then find our accessed storage. If we can not find anything, be
-  // conservative and assume that the value is written to.
-  const auto &storage = findAccessedStorageNonNested(addr);
-  if (!storage)
-    return true;
-
-  // Then see if we ever write to this address in a flow insensitive
-  // way (ignoring stores that are obviously the only initializer to
-  // memory). We have to do this since load_borrow assumes that the
-  // underlying memory is never written to.
-  switch (storage.getKind()) {
-  case AccessedStorage::Class: {
+  // The original load instruction.
+  LoadInst *Load;
+  
+  // The current address being visited.
+  SILValue currentAddress;
+  
+  Optional<bool> isWritten;
+  
+public:
+  StorageGuaranteesLoadVisitor(SemanticARCOptVisitor &arcOpt, LoadInst *load)
+    : ARCOpt(arcOpt), Load(load), currentAddress(load->getOperand())
+  {}
+  
+  void answer(bool written) {
+    currentAddress = nullptr;
+    isWritten = written;
+  }
+  
+  void next(SILValue address) {
+    currentAddress = address;
+  }
+  
+  void visitNestedAccess(BeginAccessInst *access) {
+    // Look through nested accesses.
+    return next(access->getOperand());
+  }
+  
+  void visitArgumentAccess(SILFunctionArgument *arg) {
+    return answer(mayFunctionMutateArgument(
+                             AccessedStorage(arg, AccessedStorage::Argument),
+                             ARCOpt.F));
+  }
+  
+  void visitGlobalAccess(SILValue global) {
+    return answer(!AccessedStorage(global, AccessedStorage::Global)
+                    .isLetAccess(&ARCOpt.F));
+  }
+  
+  void visitClassAccess(RefElementAddrInst *field) {
+    currentAddress = nullptr;
+    
     // We know a let property won't be written to if the base object is
     // guaranteed for the duration of the access.
-    if (!storage.isLetAccess(&F))
-      return true;
-   
-    auto baseObject = stripCasts(storage.getObject());
+    // For non-let properties conservatively assume they may be written to.
+    if (!field->getField()->isLet()) {
+      return answer(true);
+    }
+    
+    // The lifetime of the `let` is guaranteed if it's dominated by the
+    // guarantee on the base. Check for a borrow.
+    SILValue baseObject = field->getOperand();
+    auto beginBorrow = dyn_cast<BeginBorrowInst>(baseObject);
+    if (beginBorrow)
+      baseObject = beginBorrow->getOperand();
+    baseObject = stripCasts(baseObject);
+
     // A guaranteed argument trivially keeps the base alive for the duration of
     // the projection.
     if (auto *arg = dyn_cast<SILFunctionArgument>(baseObject)) {
       if (arg->getArgumentConvention().isGuaranteedConvention()) {
-        return false;
+        return answer(false);
       }
     }
     
     // See if there's a borrow of the base object our load is based on.
     SILValue borrowInst;
-    if (isa<BeginBorrowInst>(baseObject)
-        || isa<LoadBorrowInst>(baseObject)) {
+    if (isa<LoadBorrowInst>(baseObject)) {
       borrowInst = baseObject;
     } else {
-      // TODO: We should walk the projection path again to get to the
-      // originating borrow, if any
-      
-      BeginBorrowInst *singleBorrow = nullptr;
-      for (auto *use : baseObject->getUses()) {
-        if (auto *borrow = dyn_cast<BeginBorrowInst>(use->getUser())) {
-          if (!singleBorrow) {
-            singleBorrow = borrow;
-          } else {
-            singleBorrow = nullptr;
-            break;
-          }
-        }
-      }
-      
-      borrowInst = singleBorrow;
+      borrowInst = beginBorrow;
     }
-    
+    // TODO: We could also look at a guaranteed phi argument and see whether
+    // the loaded copy is dominated by it.
+    if (!borrowInst)
+      return answer(true);
+
     // Use the linear lifetime checker to check whether the copied
     // value is dominated by the lifetime of the borrow it's based on.
-    if (!borrowInst)
-      return true;
-    
     SmallVector<BranchPropagatedUser, 4> baseEndBorrows;
     for (auto *use : borrowInst->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
@@ -447,7 +476,7 @@ bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
     }
     
     SmallVector<BranchPropagatedUser, 4> valueDestroys;
-    for (auto *use : load->getUses()) {
+    for (auto *use : Load->getUses()) {
       if (isa<DestroyValueInst>(use->getUser())) {
         valueDestroys.push_back(BranchPropagatedUser(use->getUser()));
       }
@@ -455,28 +484,44 @@ bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
     
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
     
-    return valueHasLinearLifetime(baseObject, baseEndBorrows, valueDestroys,
-                                  visitedBlocks, getDeadEndBlocks(),
-                                  ownership::ErrorBehaviorKind::ReturnFalse)
-      .getFoundError();
+    auto result = valueHasLinearLifetime(baseObject, baseEndBorrows,
+                                   valueDestroys, visitedBlocks,
+                                   ARCOpt.getDeadEndBlocks(),
+                                   ownership::ErrorBehaviorKind::ReturnFalse);
+    return answer(result.getFoundError());
   }
-  case AccessedStorage::Global:
-    // Any legal load of a global let should have happened after its
-    // initialization, at which point it can't be written to again for the
-    // lifetime of the program.
-    return !storage.isLetAccess(&F);
+  
+  // TODO: Handle other access kinds?
+  void visitBase(SILValue base, AccessedStorage::Kind kind) {
+    return answer(true);
+  }
 
-  case AccessedStorage::Box:
-  case AccessedStorage::Stack:
-  case AccessedStorage::Yield:
-  case AccessedStorage::Nested:
-  case AccessedStorage::Unidentified:
-    return true;
-      
-  case AccessedStorage::Argument:
-    return mayFunctionMutateArgument(storage, F);
+  void visitNonAccess(SILValue addr) {
+    return answer(true);
   }
-  llvm_unreachable("covered switch");
+  
+  void visitIncomplete(SILValue projectedAddr, SILValue parentAddr) {
+    return next(parentAddr);
+  }
+  
+  void visitPhi(SILPhiArgument *phi) {
+    // We shouldn't have address phis in OSSA SIL, so we don't need to recur
+    // through the predecessors here.
+    return answer(true);
+  }
+
+  bool doIt() {
+    while (currentAddress) {
+      visit(currentAddress);
+    }
+    return *isWritten;
+  }
+};
+} // namespace
+
+bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
+  StorageGuaranteesLoadVisitor visitor(*this, load);
+  return visitor.doIt();
 }
 
 // Convert a load [copy] from unique storage [read] that has all uses that can

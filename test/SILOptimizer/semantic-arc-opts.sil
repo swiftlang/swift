@@ -561,19 +561,19 @@ bb0(%x : @owned $ClassLet):
 }
 
 // CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_multi_borrowed_base_that_dominates
-// TODO:         [[OUTER:%.*]] = begin_borrow
-// TODO-NEXT:    ref_element_addr
-// TODO-NEXT:    [[INNER:%.*]] = load_borrow
-// TODO-NEXT:    apply
-// TODO-NEXT:    end_borrow [[INNER]]
-// TODO-NEXT:    end_borrow [[OUTER]]
-// TODO-NEXT:    [[OUTER:%.*]] = begin_borrow
-// TODO-NEXT:    ref_element_addr
-// TODO-NEXT:    [[INNER:%.*]] = load_borrow
-// TODO-NEXT:    apply
-// TODO-NEXT:    end_borrow [[INNER]]
-// TODO-NEXT:    end_borrow [[OUTER]]
-// TODO-NEXT:    destroy_value
+// CHECK:         [[OUTER:%.*]] = begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    [[OUTER:%.*]] = begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    destroy_value
 sil [ossa] @dont_copy_let_properties_with_multi_borrowed_base_that_dominates : $@convention(thin) (@owned ClassLet) -> () {
 bb0(%x : @owned $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
@@ -635,19 +635,19 @@ bb0(%x : @owned $ClassLet):
 
 // CHECK-LABEL: sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates
 // CHECK:         [[OUTER:%.*]] = begin_borrow
-// TODO-NEXT:    ref_element_addr
-// TODO-NEXT:    [[INNER:%.*]] = load_borrow
-// TODO-NEXT:    apply
-// TODO-NEXT:    end_borrow [[INNER]]
-// TODO-NEXT:    end_borrow [[OUTER]]
-// TODO-NEXT:    begin_borrow
-// TODO-NEXT:    ref_element_addr
-// TODO-NEXT:    load [copy]
-// TODO-NEXT:    apply
-// TODO-NEXT:    end_borrow
-// TODO-NEXT:    destroy_value
-// TODO-NEXT:    apply
-// TODO-NEXT:    destroy_value
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    load [copy]
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy_value
 sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates : $@convention(thin) (@owned ClassLet) -> () {
 bb0(%x : @owned $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
