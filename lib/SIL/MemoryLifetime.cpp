@@ -299,7 +299,7 @@ bool MemoryLocations::analyzeAddrProjection(
                                       subLocationMap)) {
     return false;
   }
-  addr2LocIdx[projection] = subLocIdx;
+  registerProjection(projection, subLocIdx);
   collectedVals.push_back(projection);
   return true;
 }
@@ -395,7 +395,7 @@ void MemoryDataflow::exitReachableAnalysis() {
   }
 }
 
-void MemoryDataflow::solveDataflowForward() {
+void MemoryDataflow::solveForward(JoinOperation join) {
   // Pretty standard data flow solving.
   bool changed = false;
   bool firstRound = true;
@@ -405,7 +405,7 @@ void MemoryDataflow::solveDataflowForward() {
       Bits bits = st.entrySet;
       assert(!bits.empty());
       for (SILBasicBlock *pred : st.block->getPredecessorBlocks()) {
-        bits &= block2State[pred]->exitSet;
+        join(bits, block2State[pred]->exitSet);
       }
       if (firstRound || bits != st.entrySet) {
         changed = true;
@@ -419,7 +419,19 @@ void MemoryDataflow::solveDataflowForward() {
   } while (changed);
 }
 
-void MemoryDataflow::solveDataflowBackward() {
+void MemoryDataflow::solveForwardWithIntersect() {
+  solveForward([](Bits &entry, const Bits &predExit){
+    entry &= predExit;
+  });
+}
+
+void MemoryDataflow::solveForwardWithUnion() {
+  solveForward([](Bits &entry, const Bits &predExit){
+    entry |= predExit;
+  });
+}
+
+void MemoryDataflow::solveBackward(JoinOperation join) {
   // Pretty standard data flow solving.
   bool changed = false;
   bool firstRound = true;
@@ -429,7 +441,7 @@ void MemoryDataflow::solveDataflowBackward() {
       Bits bits = st.exitSet;
       assert(!bits.empty());
       for (SILBasicBlock *succ : st.block->getSuccessorBlocks()) {
-        bits &= block2State[succ]->entrySet;
+        join(bits, block2State[succ]->entrySet);
       }
       if (firstRound || bits != st.exitSet) {
         changed = true;
@@ -441,6 +453,18 @@ void MemoryDataflow::solveDataflowBackward() {
     }
     firstRound = false;
   } while (changed);
+}
+
+void MemoryDataflow::solveBackwardWithIntersect() {
+  solveBackward([](Bits &entry, const Bits &predExit){
+    entry &= predExit;
+  });
+}
+
+void MemoryDataflow::solveBackwardWithUnion() {
+  solveBackward([](Bits &entry, const Bits &predExit){
+    entry |= predExit;
+  });
 }
 
 void MemoryDataflow::dump() const {
@@ -894,7 +918,7 @@ void MemoryLifetimeVerifier::verify() {
     MemoryDataflow dataFlow(function, locations.getNumLocations());
     dataFlow.entryReachabilityAnalysis();
     initDataflow(dataFlow);
-    dataFlow.solveDataflowForward();
+    dataFlow.solveForwardWithIntersect();
     checkFunction(dataFlow);
   }
   // Second step: handle single-block locations.
