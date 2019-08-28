@@ -3189,6 +3189,12 @@ static bool checkTransposingParameters(
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
+  // Skip checking implicit differentiable attributes, because they do not
+  // contain the WhereClause, and these checks assume that the WhereClause is
+  // available.
+  if (attr->isImplicit())
+    return;
+
   auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
