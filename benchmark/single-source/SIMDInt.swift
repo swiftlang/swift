@@ -20,7 +20,7 @@ public let SIMDInt = [
   BenchmarkInfo(name: "SIMDIntRem", runFunction: run_SIMDIntRem, tags: [.validation, .api]),
   BenchmarkInfo(name: "SIMDIntShl", runFunction: run_SIMDIntShl, tags: [.validation, .api]),
   BenchmarkInfo(name: "SIMDIntShr", runFunction: run_SIMDIntShr, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDBulkSum, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDIntBulkSum, tags: [.validation, .api]),
 ]
 
 @inline(never)
