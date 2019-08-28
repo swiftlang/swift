@@ -554,6 +554,12 @@ private:
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
                                llvm::BitstreamCursor &Cursor);
 
+  /// Reads a set of requirements from \c DeclTypeCursor, returns the first
+  /// error, if any.
+  llvm::Error
+  readGenericRequirementsChecked(SmallVectorImpl<Requirement> &requirements,
+                                 llvm::BitstreamCursor &Cursor);
+
   /// Populates the protocol's default witness table.
   ///
   /// Returns true if there is an error.
@@ -832,7 +838,6 @@ public:
   /// Returns the decl with the given ID, deserializing it if needed.
   ///
   /// \param DID The ID for the decl within this module.
-
   /// \sa getDeclChecked
   Decl *getDecl(serialization::DeclID DID);
 
@@ -860,14 +865,29 @@ public:
   /// Returns the generic signature for the given ID.
   GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);
 
+  /// Returns the generic signature for the given ID or the first error.
+  llvm::Expected<GenericSignature *>
+  getGenericSignatureChecked(serialization::GenericSignatureID ID);
+
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.
   SubstitutionMap getSubstitutionMap(serialization::SubstitutionMapID id);
+
+  /// Returns the substitution map for the given ID, deserializing it if
+  /// needed, or the first error.
+  llvm::Expected<SubstitutionMap>
+  getSubstitutionMapChecked(serialization::SubstitutionMapID id);
 
   /// Recursively reads a protocol conformance from the given cursor.
   ProtocolConformanceRef readConformance(llvm::BitstreamCursor &Cursor,
                                          GenericEnvironment *genericEnv =
                                            nullptr);
+
+  /// Recursively reads a protocol conformance from the given cursor,
+  /// returns the conformance or the first error.
+  llvm::Expected<ProtocolConformanceRef>
+  readConformanceChecked(llvm::BitstreamCursor &Cursor,
+                         GenericEnvironment *genericEnv = nullptr);
   
   /// Read a SILLayout from the given cursor.
   SILLayout *readSILLayout(llvm::BitstreamCursor &Cursor);
