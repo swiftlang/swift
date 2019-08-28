@@ -248,6 +248,12 @@ testSuite.test("NotPresent") {
 
   // Swift.Int is not a class type.
   expectNil(NSClassFromString("Si"))
+
+  // Mangled names with byte sequences that look like symbolic references
+  // should not be demangled.
+  expectNil(NSClassFromString("\u{1}badnews"));
+  expectNil(NSClassFromString("$s\u{1}badnews"));
+  expectNil(NSClassFromString("_T\u{1}badnews"));
 }
 
 runAllTests()

@@ -220,13 +220,6 @@ StringTests.test("Index/Hashable") {
   expectTrue(t.contains(s.startIndex))
 }
 
-var Swift_5_1_Available: Bool {
-  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
-    return true
-  }
-  return false
-}
-
 StringTests.test("ForeignIndexes/Valid") {
   // It is actually unclear what the correct behavior is.  This test is just a
   // change detector.
@@ -247,7 +240,7 @@ StringTests.test("ForeignIndexes/Valid") {
 
     // Scalar alignment fixes and checks were added in 5.1, so we don't get the
     // expected behavior on prior runtimes.
-    guard Swift_5_1_Available else { return }
+    guard _hasSwift_5_1() else { return }
 
     // Donor's second index is scalar-aligned in donor, but not acceptor. This
     // will trigger a stdlib assertion.
@@ -270,7 +263,7 @@ StringTests.test("ForeignIndexes/UnexpectedCrash") {
 
   // Grapheme stride cache under noop scalar alignment was fixed in 5.1, so we
   // get a different answer prior.
-  guard Swift_5_1_Available else { return }
+  guard _hasSwift_5_1() else { return }
 
   // `start` has a cached stride greater than 1, so subscript will trigger an
   // assertion when it makes a multi-grapheme-cluster Character.
