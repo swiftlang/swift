@@ -3189,6 +3189,9 @@ static bool checkTransposingParameters(
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
+  if (attr->isImplicit())
+    return;
+
   auto &ctx = TC.Context;
   auto lookupConformance =
       LookUpConformanceInModule(D->getDeclContext()->getParentModule());
