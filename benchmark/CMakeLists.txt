@@ -147,6 +147,7 @@ set(SWIFT_BENCH_MODULES
     single-source/RemoveWhere
     single-source/ReversedCollections
     single-source/RomanNumbers
+    single-source/SIMDInt
     single-source/SequenceAlgos
     single-source/SetTests
     single-source/SevenBoom
