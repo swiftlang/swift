@@ -61,6 +61,7 @@ namespace {
 struct IRGenContext {
   IRGenOptions IROpts;
   SILOptions SILOpts;
+  Lowering::TypeConverter TC;
   std::unique_ptr<SILModule> SILMod;
   llvm::LLVMContext LLVMContext;
   irgen::IRGenerator IRGen;
@@ -69,7 +70,8 @@ struct IRGenContext {
 private:
   IRGenContext(ASTContext &ctx, ModuleDecl *module)
     : IROpts(createIRGenOptions()),
-      SILMod(SILModule::createEmptyModule(module, SILOpts)),
+      TC(*module),
+      SILMod(SILModule::createEmptyModule(module, TC, SILOpts)),
       IRGen(IROpts, *SILMod),
       IGM(IRGen, IRGen.createTargetMachine(), LLVMContext) {}
 
