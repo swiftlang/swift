@@ -404,13 +404,14 @@ static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
         eucDiffProto->lookupDirect(C.Id_differentiableVectorView).front();
 
     SmallVector<VarDecl *, 8> diffProperties;
-    getStoredPropertiesForDifferentiation(nominal, nominal->getDeclContext(),
-                                          diffProperties);
+    getStoredPropertiesForDifferentiation(nominal, parentDC, diffProperties);
 
     // Create a reference to the memberwise initializer: `TangentVector.init`.
     auto *memberwiseInitDecl =
         context->tangentDecl->getEffectiveMemberwiseInitializer();
     assert(memberwiseInitDecl && "Memberwise initializer must exist");
+    assert(diffProperties.size() ==
+               memberwiseInitDecl->getParameters()->size());
     // `TangentVector`
     auto *tangentTypeExpr =
         TypeExpr::createImplicit(context->tangentContextualType, C);
@@ -425,9 +426,9 @@ static ValueDecl *deriveEuclideanDifferentiable_differentiableVectorView(
     // Create a call:
     //   TangentVector.init(
     //     <property_name_1...>:
-    //        self.differentiableVectorView.<property_name_1>,
+    //        self.<property_name_1>.differentiableVectorView,
     //     <property_name_2...>:
-    //        self.differentiableVectorView.<property_name_2>,
+    //        self.<property_name_2>.differentiableVectorView,
     //     ...
     //   )
     SmallVector<Identifier, 8> argLabels;
