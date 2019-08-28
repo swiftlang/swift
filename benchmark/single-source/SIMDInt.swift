@@ -96,6 +96,7 @@ public func run_SIMD4Int32Shr(N: Int) {
   blackHole(a)
 }
 
+// The wrapped sum of these integers is expected to be 1000
 let bulkSumInts = Array(repeating: SIMD4<Int32>(1, 2, 3, 4), count: 100)
 
 @inline(never)
@@ -103,6 +104,6 @@ public func run_SIMD4Int32BulkSum(N: Int) {
   for _ in 0..<N {
     let ints = identity(bulkSumInts)
     let sum = ints.reduce(SIMD4<Int32>(), &+).wrappedSum()
-    blackHole(sum)
+    CheckResults(sum == 1000)
   }
 }
