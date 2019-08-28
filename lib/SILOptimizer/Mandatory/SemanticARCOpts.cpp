@@ -16,6 +16,7 @@
 #include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -121,8 +122,23 @@ static bool isConsumed(
 
 namespace {
 
+/// A two stage visitor that optimizes ownership instructions and eliminates any
+/// trivially dead code that results after optimization. The two stages are used
+/// to avoid iterator invalidation. Specifically:
+///
+/// 1. We first process the CFG instruction by instruction, only eliminating
+/// instructions that are guaranteed to be dominated by the visited
+/// instrution. While we do that, we add the operands of any instruction that we
+/// successfully optimize to the worklist. NOTE: We do not process arguments
+/// here to get SSA guarantees around dominance.
+///
+/// 2. Once we have processed the CFG and done some initial optimization, we
+/// enter phase 2 where we process the worklist. Here we are allowed to process
+/// arbitrary values and instructions, removing things that we are erasing from
+/// the worklist before we delete them.
 struct SemanticARCOptVisitor
     : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
+  SmallSetVector<SILValue, 32> worklist;
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
   
@@ -133,16 +149,99 @@ struct SemanticARCOptVisitor
       TheDeadEndBlocks.emplace(&F);
     return *TheDeadEndBlocks;
   }
-      
+
+  /// Given a single value instruction, RAUW it with newValue, add newValue to
+  /// the worklist, and then call eraseInstruction on i.
+  void eraseAndRAUWSingleValueInstruction(SingleValueInstruction *i, SILValue newValue) {
+    worklist.insert(newValue);
+    i->replaceAllUsesWith(newValue);
+    eraseInstruction(i);
+  }
+
+  /// Add all operands of i to the worklist and then call eraseInstruction on
+  /// i. Assumes that the instruction doesnt have users.
+  void eraseInstructionAndAddOptsToWorklist(SILInstruction *i) {
+    // Then copy all operands into the worklist for future processing.
+    for (SILValue v : i->getOperandValues()) {
+      worklist.insert(v);
+    }
+    eraseInstruction(i);
+  }
+
+  /// Remove all results of the given instruction from the worklist and then
+  /// erase the instruction. Assumes that the instruction does not have any
+  /// users left.
+  void eraseInstruction(SILInstruction *i) {
+    // Remove all SILValues of the instruction from the worklist and then erase
+    // the instruction.
+    for (SILValue result : i->getResults()) {
+      worklist.remove(result);
+    }
+    i->eraseFromParent();
+  }
+
+  /// The default visitor.
   bool visitSILInstruction(SILInstruction *i) { return false; }
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
       
   bool isWrittenTo(LoadInst *li);
+
+  bool processWorklist();
+
+  bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
+  bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
 };
 
 } // end anonymous namespace
+
+bool SemanticARCOptVisitor::processWorklist() {
+  // NOTE: The madeChange here is not strictly necessary since we only have
+  // items added to the worklist today if we have already made /some/ sort of
+  // change. That being said, I think there is a low cost to including this here
+  // and makes the algorithm more correct, visually and in the face of potential
+  // refactoring.
+  bool madeChange = false;
+
+  while (!worklist.empty()) {
+    SILValue next = worklist.pop_back_val();
+
+    // First check if this is an instruction that is trivially dead. This can
+    // occur if we eliminate rr traffic resulting in dead projections and the
+    // like.
+    //
+    // If we delete, we first add all of our deleted instructions operands to
+    // the worklist and then remove all results (since we are going to delete
+    // the instruction).
+    if (auto *defInst = next->getDefiningInstruction()) {
+      if (isInstructionTriviallyDead(defInst)) {
+        madeChange = true;
+        recursivelyDeleteTriviallyDeadInstructions(
+            defInst, true/*force*/,
+            [&](SILInstruction *i) {
+              for (SILValue operand : i->getOperandValues()) {
+                worklist.insert(operand);
+              }
+              for (SILValue result : i->getResults()) {
+                worklist.remove(result);
+              }
+              ++NumEliminatedInsts;
+            });
+        continue;
+      }
+    }
+
+    // Otherwise, if we have a single value instruction (to be expanded later
+    // perhaps), try to visit that value recursively.
+    if (auto *svi = dyn_cast<SingleValueInstruction>(next)) {
+      madeChange |= visit(svi);
+      continue;
+    }
+  }
+
+  return madeChange;
+}
 
 bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   auto kind = bbi->getOperand().getOwnershipKind();
@@ -167,11 +266,11 @@ bool SemanticARCOptVisitor::visitBeginBorrowInst(BeginBorrowInst *bbi) {
   // begin borrow and end borrows.
   while (!endBorrows.empty()) {
     auto *ebi = endBorrows.pop_back_val();
-    ebi->eraseFromParent();
+    eraseInstruction(ebi);
     ++NumEliminatedInsts;
   }
-  bbi->replaceAllUsesWith(bbi->getOperand());
-  bbi->eraseFromParent();
+
+  eraseAndRAUWSingleValueInstruction(bbi, bbi->getOperand());
   ++NumEliminatedInsts;
   return true;
 }
@@ -216,7 +315,7 @@ static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
 // are within the borrow scope.
 //
 // TODO: This needs a better name.
-static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
+bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   SmallVector<SILValue, 16> borrowIntroducers;
 
   // Whitelist the operands that we know how to support and make sure
@@ -250,11 +349,11 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
   // within the guaranteed value scope. First delete the destroys/copies.
   while (!destroys.empty()) {
     auto *dvi = destroys.pop_back_val();
-    dvi->eraseFromParent();
+    eraseInstruction(dvi);
     ++NumEliminatedInsts;
   }
-  cvi->replaceAllUsesWith(cvi->getOperand());
-  cvi->eraseFromParent();
+
+  eraseAndRAUWSingleValueInstruction(cvi, cvi->getOperand());
 
   // Then change all of our guaranteed forwarding insts to have guaranteed
   // ownership kind instead of what ever they previously had (ignoring trivial
@@ -302,12 +401,12 @@ static bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi) {
 
 /// If cvi only has destroy value users, then cvi is a dead live range. Lets
 /// eliminate all such dead live ranges.
-static bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
+bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
   // See if we are lucky and have a simple case.
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
-      dvi->eraseFromParent();
-      cvi->eraseFromParent();
+      eraseInstruction(dvi);
+      eraseInstructionAndAddOptsToWorklist(cvi);
       NumEliminatedInsts += 2;
       return true;
     }
@@ -331,10 +430,10 @@ static bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) {
 
   // Now that we have a truly dead live range copy value, eliminate it!
   while (!destroys.empty()) {
-    destroys.pop_back_val()->eraseFromParent();
+    eraseInstruction(destroys.pop_back_val());
     ++NumEliminatedInsts;
   }
-  cvi->eraseFromParent();
+  eraseInstructionAndAddOptsToWorklist(cvi);
   ++NumEliminatedInsts;
   return true;
 }
@@ -513,12 +612,11 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   while (!destroyValues.empty()) {
     auto *dvi = destroyValues.pop_back_val();
     SILBuilderWithScope(dvi).createEndBorrow(dvi->getLoc(), lbi);
-    dvi->eraseFromParent();
+    eraseInstruction(dvi);
     ++NumEliminatedInsts;
   }
 
-  li->replaceAllUsesWith(lbi);
-  li->eraseFromParent();
+  eraseAndRAUWSingleValueInstruction(li, lbi);
   ++NumEliminatedInsts;
   ++NumLoadCopyConvertedToLoadBorrow;
   return true;
@@ -542,10 +640,11 @@ struct SemanticARCOpts : SILFunctionTransform {
            "Can not perform semantic arc optimization unless ownership "
            "verification is enabled");
 
-    // Iterate over all of the arguments, performing small peephole
-    // ARC optimizations.
-    //
-    // FIXME: Should we iterate or use a RPOT order here?
+    // Iterate over all of the arguments, performing small peephole ARC
+    // optimizations. We assume that the visitor will add any instructions we
+    // need to recursively to the visitor's worklist. Also, note that we assume
+    // that we do not look through /any/ sil block arguments here since our
+    // iteration here is only valid up to SSA.
     bool madeChange = false;
     
     SemanticARCOptVisitor visitor(f);
@@ -583,6 +682,15 @@ struct SemanticARCOpts : SILFunctionTransform {
       // Finally visit the first instruction of the block.
       madeChange |= visitor.visit(&*ii);
     }
+
+    // Finally drain the worklist on the visitor and process until we reach the
+    // fixpoint and thus do not have any further work to do.
+    //
+    // NOTE: At this point madeChange has already been set to true if we have
+    // anything in the worklist, so technically we do not need to do this. But I
+    // would rather represent this state to future proof the pass to be
+    // "visually" correct.
+    madeChange |= visitor.processWorklist();
 
     if (madeChange) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
