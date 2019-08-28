@@ -3240,6 +3240,9 @@ public:
     return LoadOwnershipQualifier(
       SILInstruction::Bits.LoadInst.OwnershipQualifier);
   }
+  void setOwnershipQualifier(LoadOwnershipQualifier qualifier) {
+    SILInstruction::Bits.LoadInst.OwnershipQualifier = unsigned(qualifier);
+  }
 };
 
 // *NOTE* When serializing, we can only represent up to 4 values here. If more
@@ -3278,6 +3281,9 @@ public:
   StoreOwnershipQualifier getOwnershipQualifier() const {
     return StoreOwnershipQualifier(
       SILInstruction::Bits.StoreInst.OwnershipQualifier);
+  }
+  void setOwnershipQualifier(StoreOwnershipQualifier qualifier) {
+    SILInstruction::Bits.StoreInst.OwnershipQualifier = unsigned(qualifier);
   }
 };
 
