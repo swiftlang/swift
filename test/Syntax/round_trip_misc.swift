@@ -4,6 +4,8 @@ class C {
   // Erroneous typealias decl.
   typealias Inner: Foo = Int
 
+  typealias Inner: Foo2 = [Generic<Int
+
   // Implict accessor with attribute at the top of its body.
   var x: Int {
     @objc

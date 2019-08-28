@@ -32,6 +32,9 @@ bool isTokenTextDetermined(tok kind);
 /// If a token kind has determined text, return the text; otherwise assert.
 StringRef getTokenText(tok kind);
 
+/// True if the token is any keyword.
+bool isTokenKeyword(tok kind);
+
 void dumpTokenKind(llvm::raw_ostream &os, tok kind);
 } // end namespace swift
 
