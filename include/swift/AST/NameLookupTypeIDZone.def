@@ -14,11 +14,13 @@
 //  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest)
-SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest)
-SWIFT_REQUEST(NameLookup, SuperclassDeclRequest)
-SWIFT_REQUEST(NameLookup, ExtendedNominalRequest)
-SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest)
-SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest)
+
 SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest)
+SWIFT_REQUEST(NameLookup, ExtendedNominalRequest)
 SWIFT_REQUEST(NameLookup, GetDestructorRequest)
+SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest)
+SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest)
+SWIFT_REQUEST(NameLookup, SuperclassDeclRequest)
+SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest)
+SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest)
+
