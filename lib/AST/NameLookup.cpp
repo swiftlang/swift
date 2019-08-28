@@ -1644,12 +1644,6 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     }
   }
 
-  llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
-  decls.erase(std::remove_if(decls.begin(), decls.end(),
-                             [&](ValueDecl *vd) -> bool {
-    return !knownDecls.insert(vd).second;
-  }), decls.end());
-
   pruneLookupResultSet(this, options, decls);
 
   if (auto *debugClient = this->getParentModule()->getDebugClient()) {
