@@ -43,11 +43,11 @@ Swift Next
   adder(10) // returns 13, same as `adder.callAsFunction(10)`
   ```
 
-  `func callAsFunction` argument labels are required at call sites.
-  Multiple `func callAsFunction` methods on a single type are supported.
-  `mutating func callAsFunction` is supported.
-  `func callAsFunction` works with `throws` and `rethrows`.
-  `func callAsFunction` works with trailing closures.
+  * `func callAsFunction` argument labels are required at call sites.
+  * Multiple `func callAsFunction` methods on a single type are supported.
+  * `mutating func callAsFunction` is supported.
+  * `func callAsFunction` works with `throws` and `rethrows`.
+  * `func callAsFunction` works with trailing closures.
 
 * [SR-4206][]:
 
