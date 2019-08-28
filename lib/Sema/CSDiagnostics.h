@@ -574,9 +574,6 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  void fixItChangeInoutArgType(const Expr *arg, Type actualType,
-                               Type neededType) const;
-
   /// Given an expression that has a non-lvalue type, dig into it until
   /// we find the part of the expression that prevents the entire subexpression
   /// from being mutable.  For example, in a sequence like "x.v.v = 42" we want
@@ -1507,6 +1504,24 @@ public:
   }
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose a conversion mismatch between object types of `inout`
+/// argument/parameter e.g. `'inout S' argument conv 'inout P'`.
+///
+/// Even if `S` conforms to `P` there is no subtyping rule for
+/// argument type of `inout` parameter, they have to be equal.
+class InOutConversionFailure final : public ContextualFailure {
+public:
+  InOutConversionFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                         Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Suggest to change a type of the argument if possible.
+  void fixItChangeArgumentType() const;
 };
 
 /// Diagnose generic argument omission e.g.

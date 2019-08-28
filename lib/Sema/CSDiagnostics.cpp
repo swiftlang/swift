@@ -1567,17 +1567,7 @@ bool AssignmentFailure::diagnoseAsError() {
     Type neededType = contextualType->getInOutObjectType();
     Type actualType = getType(immInfo.first)->getInOutObjectType();
     if (!neededType->isEqual(actualType)) {
-      if (DeclDiagnostic.ID == diag::cannot_pass_rvalue_inout_subelement.ID) {
-        // We have a special diagnostic with tailored wording for this
-        // common case.
-        emitDiagnostic(Loc, diag::cannot_pass_rvalue_inout_converted,
-                       actualType, neededType)
-            .highlight(immInfo.first->getSourceRange());
-
-        if (auto inoutExpr = dyn_cast<InOutExpr>(immInfo.first))
-          fixItChangeInoutArgType(inoutExpr->getSubExpr(), actualType,
-                                  neededType);
-      } else {
+      if (DeclDiagnostic.ID != diag::cannot_pass_rvalue_inout_subelement.ID) {
         emitDiagnostic(Loc, DeclDiagnostic,
                        "implicit conversion from '" + actualType->getString() +
                            "' to '" + neededType->getString() +
@@ -1599,68 +1589,6 @@ bool AssignmentFailure::diagnoseAsError() {
   emitDiagnostic(Loc, TypeDiagnostic, getType(destExpr))
       .highlight(immInfo.first->getSourceRange());
   return true;
-}
-
-void AssignmentFailure::fixItChangeInoutArgType(const Expr *arg,
-                                                Type actualType,
-                                                Type neededType) const {
-  auto *DC = getDC();
-  auto *DRE = dyn_cast<DeclRefExpr>(arg);
-  if (!DRE)
-    return;
-
-  auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-  if (!VD)
-    return;
-
-  // Don't emit for non-local variables.
-  // (But in script-mode files, we consider module-scoped
-  // variables in the same file to be local variables.)
-  auto VDC = VD->getDeclContext();
-  bool isLocalVar = VDC->isLocalContext();
-  if (!isLocalVar && VDC->isModuleScopeContext()) {
-    auto argFile = DC->getParentSourceFile();
-    auto varFile = VDC->getParentSourceFile();
-    isLocalVar = (argFile == varFile && argFile->isScriptMode());
-  }
-  if (!isLocalVar)
-    return;
-
-  SmallString<32> scratch;
-  SourceLoc endLoc;   // Filled in if we decide to diagnose this
-  SourceLoc startLoc; // Left invalid if we're inserting
-
-  auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
-    if (auto VP = dyn_cast_or_null<VarPattern>(P))
-      P = VP->getSubPattern();
-    return P && isa<NamedPattern>(P);
-  };
-
-  auto typeRange = VD->getTypeSourceRangeForDiagnostics();
-  if (typeRange.isValid()) {
-    startLoc = typeRange.Start;
-    endLoc = typeRange.End;
-  } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
-    endLoc = VD->getNameLoc();
-    scratch += ": ";
-  }
-
-  if (endLoc.isInvalid())
-    return;
-
-  scratch += neededType.getString();
-
-  // Adjust into the location where we actually want to insert
-  endLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, endLoc);
-
-  // Since we already adjusted endLoc, this will turn an insertion
-  // into a zero-character replacement.
-  if (!startLoc.isValid())
-    startLoc = endLoc;
-
-  emitDiagnostic(VD->getLoc(), diag::inout_change_var_type_if_possible,
-                 actualType, neededType)
-      .fixItReplaceChars(startLoc, endLoc, scratch);
 }
 
 std::pair<Expr *, Optional<OverloadChoice>>
@@ -4347,4 +4275,80 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   emitDiagnostic(anchor->getLoc(), diag::throws_functiontype_mismatch,
                  getFromType(), getToType());
   return true;
+}
+
+bool InOutConversionFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_pass_rvalue_inout_converted,
+                 getFromType(), getToType());
+  fixItChangeArgumentType();
+  return true;
+}
+
+void InOutConversionFailure::fixItChangeArgumentType() const {
+  auto *argExpr = getAnchor();
+  auto *DC = getDC();
+
+  if (auto *IOE = dyn_cast<InOutExpr>(argExpr))
+    argExpr = IOE->getSubExpr();
+
+  auto *DRE = dyn_cast<DeclRefExpr>(argExpr);
+  if (!DRE)
+    return;
+
+  auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+  if (!VD)
+    return;
+
+  // Don't emit for non-local variables.
+  // (But in script-mode files, we consider module-scoped
+  // variables in the same file to be local variables.)
+  auto VDC = VD->getDeclContext();
+  bool isLocalVar = VDC->isLocalContext();
+  if (!isLocalVar && VDC->isModuleScopeContext()) {
+    auto argFile = DC->getParentSourceFile();
+    auto varFile = VDC->getParentSourceFile();
+    isLocalVar = (argFile == varFile && argFile->isScriptMode());
+  }
+  if (!isLocalVar)
+    return;
+
+  auto actualType = getFromType();
+  auto neededType = getToType();
+
+  SmallString<32> scratch;
+  SourceLoc endLoc;   // Filled in if we decide to diagnose this
+  SourceLoc startLoc; // Left invalid if we're inserting
+
+  auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
+    if (auto VP = dyn_cast_or_null<VarPattern>(P))
+      P = VP->getSubPattern();
+    return P && isa<NamedPattern>(P);
+  };
+
+  auto typeRange = VD->getTypeSourceRangeForDiagnostics();
+  if (typeRange.isValid()) {
+    startLoc = typeRange.Start;
+    endLoc = typeRange.End;
+  } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
+    endLoc = VD->getNameLoc();
+    scratch += ": ";
+  }
+
+  if (endLoc.isInvalid())
+    return;
+
+  scratch += neededType.getString();
+
+  // Adjust into the location where we actually want to insert
+  endLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, endLoc);
+
+  // Since we already adjusted endLoc, this will turn an insertion
+  // into a zero-character replacement.
+  if (!startLoc.isValid())
+    startLoc = endLoc;
+
+  emitDiagnostic(VD->getLoc(), diag::inout_change_var_type_if_possible,
+                 actualType, neededType)
+      .fixItReplaceChars(startLoc, endLoc, scratch);
 }

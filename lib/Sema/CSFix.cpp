@@ -775,7 +775,10 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
 }
 
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
-  return false;
+  auto &cs = getConstraintSystem();
+  InOutConversionFailure failure(root, cs, getFromType(), getToType(),
+                                 getLocator());
+  return failure.diagnose(asNote);
 }
 
 AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
