@@ -160,6 +160,22 @@ FRONTEND_STATISTIC(AST, NumUnqualifiedLookup)
 /// AnyObject lookup.
 FRONTEND_STATISTIC(AST, NumModuleLookupClassMember)
 
+/// Number of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopes)
+
+/// Number of expansions of body scopes for iterable types
+FRONTEND_STATISTIC(AST, NumIterableTypeBodyASTScopeExpansions)
+
+/// Number of brace statment scopes for iterable types
+FRONTEND_STATISTIC(AST, NumBraceStmtASTScopes)
+
+/// Number of expansions of brace statement scopes for iterable types
+FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
+
+/// Number of ASTScope lookups
+FRONTEND_STATISTIC(AST, NumASTScopeLookups)
+
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
@@ -252,13 +268,13 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 /// Number of lookups into a module and its imports.
 
 /// All type check requests go into the Sema area.
-#define SWIFT_TYPEID(NAME) FRONTEND_STATISTIC(Sema, NAME)
+#define SWIFT_REQUEST(ZONE, NAME) FRONTEND_STATISTIC(Sema, NAME)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 /// The next 10 statistics count 5 kinds of SIL entities present
 /// after the SILGen and SILOpt phases. The entities are functions,

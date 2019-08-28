@@ -8,8 +8,29 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
-// These utilities live in SIL/ so they be used by SIL verification.
-//
+//===----------------------------------------------------------------------===//
+///
+/// These utilities model formal memory access locations as marked by
+/// begin_access and end_access instructions. The formal memory locations
+/// identified here must be consistent with language rules for exclusity
+/// enforcement. This is not meant to be a utility to reason about other general
+/// properties of SIL memory operations such as reference count identity,
+/// ownership, or aliasing. Code that queries the properties of arbitrary memory
+/// operations independent of begin_access instructions should use a different
+/// interface.
+///
+/// SIL memory addresses used for formal access need to meet special
+/// requirements. In particular, it must be possible to identifiy the storage by
+/// following the pointer's provenance. This is *not* true for SIL memory
+/// operations in general. The utilities cannot simply bailout on unrecognized
+/// patterns. Doing so would lead to undefined program behavior, which isn't
+/// something that can be directly tested (i.e. if this breaks, we won't see
+/// test failures).
+///
+/// These utilities are mainly meant to be used by AccessEnforcement passes,
+/// which optimize exclusivity enforcement. They live in SIL so they can be used
+/// by SIL verification.
+///
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_MEMACCESSUTILS_H
@@ -30,6 +51,23 @@ inline bool accessKindMayConflict(SILAccessKind a, SILAccessKind b) {
 }
 
 /// Represents the identity of a storage object being accessed.
+///
+/// AccessedStorage is carefully designed to solve three problems:
+///
+/// 1. Full specification and verification of SIL's model for exclusive
+///    formal memory access, as enforced by "access markers". It is not a
+///    model to encompass all SIL memory operations.
+///
+/// 2. A bitwise comparable encoding and hash key to identify each location
+///    being formally accessed. Any two accesses of uniquely identified storage
+///    must have the same key if they access the same storage and distinct keys
+///    if they access distinct storage. Accesses to non-uniquely identified
+///    storage should ideally have the same key if they may point to the same
+///    storage.
+///
+/// 3. Complete identification of all class or global accesses. Failing to
+///    identify a class or global access will introduce undefined program
+///    behavior which can't be tested.
 ///
 /// AccessedStorage may be one of several kinds of "identified" storage
 /// objects, or may be valid, but Unidentified storage. An identified object
@@ -220,7 +258,8 @@ public:
   /// Return true if the given storage objects have identical storage locations.
   ///
   /// This compares only the AccessedStorage base class bits, ignoring the
-  /// subclass bits. It is used for hash lookup equality.
+  /// subclass bits. It is used for hash lookup equality, so it should not
+  /// perform any additional lookups or dereference memory outside itself.
   bool hasIdenticalBase(const AccessedStorage &other) const {
     if (getKind() != other.getKind())
       return false;
@@ -259,6 +298,8 @@ public:
     llvm_unreachable("unhandled kind");
   }
 
+  bool isLetAccess(SILFunction *F) const;
+  
   bool isUniquelyIdentified() const {
     switch (getKind()) {
     case Box:

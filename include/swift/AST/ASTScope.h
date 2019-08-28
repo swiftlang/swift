@@ -74,6 +74,11 @@ class IterableTypeScope;
 class TypeAliasScope;
 class ScopeCreator;
 
+struct AnnotatedInsertionPoint {
+  ASTScopeImpl *insertionPoint;
+  const char *explanation;
+};
+
 #pragma mark the root ASTScopeImpl class
 
 /// Describes a lexical scope within a source file.
@@ -96,7 +101,7 @@ class ScopeCreator;
 /// -dump-scope-maps expanded
 /// \endcode
 class ASTScopeImpl {
-  friend class ASTVisitorForScopeCreation;
+  friend class NodeAdder;
   friend class Portion;
   friend class GenericTypeOrExtensionWholePortion;
   friend class NomExtDeclPortion;
@@ -198,22 +203,22 @@ public:
 #pragma mark - source range queries
 
 public:
-  SourceRange getSourceRange(bool omitAssertions = false) const;
+  SourceRange getSourceRangeOfScope(bool omitAssertions = false) const;
 
   /// InterpolatedStringLiteralExprs and EditorPlaceHolders respond to
   /// getSourceRange with the starting point. But we might be asked to lookup an
   /// identifer within one of them. So, find the real source range of them here.
-  ///
-  /// FIXME: Alter how these are parsed so getSourceRange is enough.
   SourceRange getEffectiveSourceRange(ASTNode) const;
 
-  void cacheSourceRangeOfMeAndDescendants(bool omitAssertions = false) const;
+  void computeAndCacheSourceRangeOfScope(bool omitAssertions = false) const;
   bool isSourceRangeCached(bool omitAssertions = false) const;
 
-  bool checkChildlessSourceRange() const;
+  bool checkSourceRangeOfThisASTNode() const;
 
 private:
-  SourceRange getUncachedSourceRange(bool omitAssertions = false) const;
+  SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
+  SourceRange
+  computeSourceRangeOfScopeWithChildASTNodes(bool omitAssertions = false) const;
   bool ensureNoAncestorsSourceRangeIsCached() const;
 
 #pragma mark - source range adjustments
@@ -245,7 +250,7 @@ public:
 
 public: // public for debugging
   virtual SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const = 0;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const = 0;
 
 protected:
   SourceManager &getSourceManager() const;
@@ -255,7 +260,11 @@ protected:
   bool verifyThatChildrenAreContainedWithin(SourceRange) const;
   bool verifyThatThisNodeComeAfterItsPriorSibling() const;
 
-  virtual SourceRange getSourceRangeOfEnclosedParams(bool omitAssertions) const;
+  virtual SourceRange
+  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const;
+
+private:
+  bool checkSourceRangeAfterExpansion() const;
 
 #pragma mark common queries
 public:
@@ -306,6 +315,12 @@ protected:
   virtual void beCurrent();
   virtual bool isCurrent() const;
 
+private:
+  /// Compare the pre-expasion range with the post-expansion range and return
+  /// false if lazyiness couild miss lookups.
+  bool checkLazySourceRange() const;
+
+protected:
   /// Some scopes can be expanded lazily.
   /// Such scopes must: not change their source ranges after expansion, and
   /// their expansion must return an insertion point outside themselves.
@@ -493,7 +508,7 @@ public:
 
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -501,7 +516,7 @@ protected:
 public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
-  void addNewDeclsToTree();
+  void addNewDeclsToScopeTree();
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
@@ -667,11 +682,12 @@ public:
   NullablePtr<const void> getReferrent() const override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
   virtual GenericContext *getGenericContext() const = 0;
   std::string getClassName() const override;
@@ -739,6 +755,8 @@ public:
   bool isBodyCurrent() const;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
   SourceRange sourceRangeForDeferredExpansion() const override;
+
+  void countBodies(ScopeCreator &) const;
 };
 
 class NominalTypeScope final : public IterableTypeScope {
@@ -843,7 +861,7 @@ public:
   NullablePtr<const void> getReferrent() const override;
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -881,7 +899,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -901,10 +919,10 @@ public:
 
 protected:
   SourceRange
-  getSourceRangeOfEnclosedParams(bool omitAssertions) const override;
+  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
 
 private:
-  static SourceLoc getParamsSourceLoc(AbstractFunctionDecl *);
+  static SourceLoc getParmsSourceLocOfAFD(AbstractFunctionDecl *);
 
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
@@ -931,13 +949,14 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
   SourceLoc fixupEndForBadInput(SourceRange) const;
 
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   NullablePtr<AbstractStorageDecl>
@@ -968,7 +987,7 @@ private:
 
 public:
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override {
     return decl;
   }
@@ -1020,7 +1039,7 @@ public:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
   virtual NullablePtr<Decl> getDeclIfAny() const override { return decl; }
   Decl *getDecl() const { return decl; }
@@ -1051,7 +1070,7 @@ public:
   const SourceRange sourceRangeWhenCreated;
 
   AttachedPropertyWrapperScope(VarDecl *e)
-      : decl(e), sourceRangeWhenCreated(getSourceRangeFor(e)) {
+      : decl(e), sourceRangeWhenCreated(getSourceRangeOfVarDecl(e)) {
     assert(sourceRangeWhenCreated.isValid());
   }
   virtual ~AttachedPropertyWrapperScope() {}
@@ -1062,11 +1081,11 @@ protected:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<const void> addressForPrinting() const override { return decl; }
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
-  static SourceRange getSourceRangeFor(const VarDecl *);
+  static SourceRange getSourceRangeOfVarDecl(const VarDecl *);
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -1132,12 +1151,13 @@ protected:
   bool isCurrent() const override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
   NullablePtr<const void> getReferrent() const override;
 
@@ -1162,12 +1182,13 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   Optional<NullablePtr<DeclContext>> computeSelfDCForParent() const override;
@@ -1200,7 +1221,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1210,7 +1232,7 @@ protected:
 
 public:
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 private:
   ArrayRef<StmtConditionElement> getCond() const;
@@ -1230,7 +1252,7 @@ public:
       : pattern(pattern), startLoc(startLoc) {}
 
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
 
 protected:
@@ -1259,7 +1281,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<DeclContext> getDeclContext() const override;
   NullablePtr<Expr> getExprIfAny() const override { return expr; }
   Expr *getExpr() const { return expr; }
@@ -1308,7 +1330,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<Expr> getExprIfAny() const override { return closureExpr; }
   Expr *getExpr() const { return closureExpr; }
   NullablePtr<const void> getReferrent() const override;
@@ -1325,7 +1347,7 @@ public:
 
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1353,7 +1375,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   Optional<bool> resolveIsCascadingUseForThisScope(
@@ -1374,13 +1396,14 @@ protected:
   bool isCurrent() const override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
   std::vector<ASTScopeImpl *> rescueBodyScopesToReuse();
 
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override {
     return decl;
   }
@@ -1405,7 +1428,7 @@ public:
 
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   NullablePtr<const void> addressForPrinting() const override {
     return specializeAttr;
   }
@@ -1440,7 +1463,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -1455,7 +1478,7 @@ public:
 
 protected:
   SourceRange
-  getSourceRangeOfEnclosedParams(bool omitAssertions) const override;
+  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
 
   NullablePtr<const GenericParamList> genericParams() const override;
   NullablePtr<AbstractStorageDecl>
@@ -1482,7 +1505,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   void printSpecifics(llvm::raw_ostream &out) const override;
@@ -1505,7 +1528,7 @@ public:
   EnumElementScope(EnumElementDecl *e) : decl(e) {}
 
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
   std::string getClassName() const override;
   ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
@@ -1515,7 +1538,7 @@ public:
 
 protected:
   SourceRange
-  getSourceRangeOfEnclosedParams(bool omitAssertions) const override;
+  getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -1524,7 +1547,7 @@ private:
 class AbstractStmtScope : public ASTScopeImpl {
 public:
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual Stmt *getStmt() const = 0;
   NullablePtr<Stmt> getStmtIfAny() const override { return getStmt(); }
   NullablePtr<const void> getReferrent() const override;
@@ -1589,7 +1612,8 @@ protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
@@ -1613,7 +1637,7 @@ public:
       : lookupParent(lookupParent), startLoc(startLoc) {}
 
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   std::string getClassName() const override;
 
 protected:
@@ -1706,7 +1730,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
@@ -1728,7 +1752,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   Stmt *getStmt() const override { return stmt; }
 
 protected:
@@ -1751,7 +1775,7 @@ private:
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   Stmt *getStmt() const override { return stmt; }
 
 protected:
@@ -1763,21 +1787,20 @@ class BraceStmtScope final : public AbstractStmtScope {
 
 public:
   BraceStmt *const stmt;
-  BraceStmtScope(BraceStmt *e) : stmt(e) { assert(shouldCreateScope(e)); }
+  BraceStmtScope(BraceStmt *e) : stmt(e) {}
   virtual ~BraceStmtScope() {}
-
-  static bool shouldCreateScope(const BraceStmt *);
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
 
 private:
-  ASTScopeImpl *expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 
 public:
   std::string getClassName() const override;
   SourceRange
-  getChildlessSourceRange(bool omitAssertions = false) const override;
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
   virtual NullablePtr<DeclContext> getDeclContext() const override;
 
   NullablePtr<ClosureExpr> parentClosureIfAny() const; // public??

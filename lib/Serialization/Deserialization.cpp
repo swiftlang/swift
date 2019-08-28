@@ -807,8 +807,7 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
 }
 
 void ModuleFile::configureGenericEnvironment(
-             GenericContext *genericDecl,
-             serialization::GenericEnvironmentID envID) {
+    GenericContext *genericDecl, serialization::GenericSignatureID envID) {
   if (envID == 0) return;
 
   auto sigOrEnv = getGenericSignatureOrEnvironment(envID);
@@ -829,23 +828,26 @@ void ModuleFile::configureGenericEnvironment(
 }
 
 GenericSignature *ModuleFile::getGenericSignature(
-                                      serialization::GenericSignatureID ID) {
+    serialization::GenericSignatureID ID) {
   using namespace decls_block;
 
   // Zero is a sentinel for having no generic signature.
   if (ID == 0) return nullptr;
 
-  assert(ID <= GenericSignatures.size() && "invalid GenericSignature ID");
-  auto &sigOrOffset = GenericSignatures[ID-1];
+  assert(ID <= GenericSignaturesAndEnvironments.size() &&
+         "invalid GenericSignature ID");
+  auto &sigOrEnvOrOffset = GenericSignaturesAndEnvironments[ID-1];
 
   // If we've already deserialized this generic signature, return it.
-  if (sigOrOffset.isComplete()) {
-    return sigOrOffset.get();
+  if (sigOrEnvOrOffset.isComplete()) {
+    if (auto *env = sigOrEnvOrOffset.get().dyn_cast<GenericEnvironment *>())
+      return env->getGenericSignature();
+    return sigOrEnvOrOffset.get().get<GenericSignature *>();
   }
 
   // Read the generic signature.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(sigOrOffset);
+  DeclTypeCursor.JumpToBit(sigOrEnvOrOffset);
 
   // Read the parameter types.
   SmallVector<GenericTypeParamType *, 4> paramTypes;
@@ -857,90 +859,20 @@ GenericSignature *ModuleFile::getGenericSignature(
     fatal();
 
   unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-  if (recordID != GENERIC_SIGNATURE)
-    fatal();
-
-  ArrayRef<uint64_t> rawParamIDs;
-  GenericSignatureLayout::readRecord(scratch, rawParamIDs);
-
-  for (unsigned i = 0, n = rawParamIDs.size(); i != n; ++i) {
-    auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
-    paramTypes.push_back(paramTy);
-  }
-
-  // Read the generic requirements.
-  SmallVector<Requirement, 4> requirements;
-  readGenericRequirements(requirements, DeclTypeCursor);
-
-  // Construct the generic signature from the loaded parameters and
-  // requirements.
-  auto signature = GenericSignature::get(paramTypes, requirements);
-
-  // If we've already deserialized this generic signature, return it.
-  if (sigOrOffset.isComplete()) {
-    return sigOrOffset.get();
-  }
-
-  sigOrOffset = signature;
-  return signature;
-}
-
-llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-ModuleFile::getGenericSignatureOrEnvironment(
-                                         serialization::GenericEnvironmentID ID,
-                                         bool wantEnvironment) {
-  // The empty result with the type the caller expects.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *> result;
-  if (wantEnvironment)
-    result = static_cast<GenericEnvironment *>(nullptr);
-
-  // Zero is a sentinel for having no generic environment.
-  if (ID == 0) return result;
-
-  assert(ID <= GenericEnvironments.size() && "invalid GenericEnvironment ID");
-  auto &envOrOffset = GenericEnvironments[ID-1];
-
-  // If we've already deserialized this generic environment, return it.
-  if (envOrOffset.isComplete()) {
-    return envOrOffset.get();
-  }
-
-  // Extract the bit offset or generic signature ID.
-  uint64_t bitOffset = envOrOffset;
-  GenericSignature *signature = nullptr;
-  if (bitOffset & 0x01) {
-    // We have a generic signature ID.
-    signature = getGenericSignature(bitOffset >> 1);
-  } else {
-    bitOffset = bitOffset >> 1;
-
-    // Read the generic environment.
-    BCOffsetRAII restoreOffset(DeclTypeCursor);
-    DeclTypeCursor.JumpToBit(bitOffset);
-
-    SmallVector<GenericTypeParamType *, 4> paramTypes;
-    using namespace decls_block;
-
-    StringRef blobData;
-    SmallVector<uint64_t, 8> scratch;
-
-    // we only want to be tracking the offset for this part of the function,
-    // since loading the generic signature (a) may read the record we reject,
-    // and (b) shouldn't have its progress erased. (That function also does its
-    // own internal tracking.)
-    BCOffsetRAII lastRecordOffset(DeclTypeCursor);
-
-    auto entry = DeclTypeCursor.advance(AF_DontPopBlockAtEnd);
-    if (entry.Kind != llvm::BitstreamEntry::Record)
-      return result;
-
-    unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-    if (recordID != SIL_GENERIC_ENVIRONMENT)
-      fatal();
-
+  switch (recordID) {
+  case GENERIC_SIGNATURE: {
     ArrayRef<uint64_t> rawParamIDs;
-    SILGenericEnvironmentLayout::readRecord(scratch, rawParamIDs);
-    lastRecordOffset.reset();
+    GenericSignatureLayout::readRecord(scratch, rawParamIDs);
+
+    for (unsigned i = 0, n = rawParamIDs.size(); i != n; ++i) {
+      auto paramTy = getType(rawParamIDs[i])->castTo<GenericTypeParamType>();
+      paramTypes.push_back(paramTy);
+    }
+    break;
+  }
+  case SIL_GENERIC_SIGNATURE: {
+    ArrayRef<uint64_t> rawParamIDs;
+    SILGenericSignatureLayout::readRecord(scratch, rawParamIDs);
 
     if (rawParamIDs.size() % 2 != 0)
       fatal();
@@ -962,42 +894,61 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
       paramTypes.push_back(paramTy);
     }
-
-    // If there are no parameters, the environment is empty.
-    if (paramTypes.empty()) {
-      if (wantEnvironment)
-        envOrOffset = nullptr;
-
-      return result;
-    }
-
-    // Read the generic requirements.
-    SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements, DeclTypeCursor);
-
-    // Construct the generic signature from the loaded parameters and
-    // requirements.
-    signature = GenericSignature::get(paramTypes, requirements);
+    break;
+  }
+  default:
+    // Not a generic signature; no way to recover.
+    fatal();
   }
 
-  // If we only want the signature, return it now.
-  if (!wantEnvironment) return signature;
+  // Read the generic requirements.
+  SmallVector<Requirement, 4> requirements;
+  readGenericRequirements(requirements, DeclTypeCursor);
 
-  // If we've already deserialized this generic environment, return it.
-  if (envOrOffset.isComplete()) {
-    return envOrOffset.get();
-  }
+  // If we've already deserialized this generic signature, start over to return
+  // it directly.
+  // FIXME: Is this kind of re-entrancy actually possible?
+  if (sigOrEnvOrOffset.isComplete())
+    return getGenericSignature(ID);
 
-  // Form the generic environment. Record it now so that deserialization of
-  // the archetypes in the environment can refer to this environment.
-  auto genericEnv = signature->createGenericEnvironment();
-  envOrOffset = genericEnv;
-
-  return genericEnv;
+  // Construct the generic signature from the loaded parameters and
+  // requirements.
+  auto signature = GenericSignature::get(paramTypes, requirements);
+  sigOrEnvOrOffset = signature;
+  return signature;
 }
 
-GenericEnvironment *ModuleFile::getGenericEnvironment(
-                                       serialization::GenericEnvironmentID ID) {
+ModuleFile::GenericSignatureOrEnvironment
+ModuleFile::getGenericSignatureOrEnvironment(
+    serialization::GenericSignatureID ID,
+    bool wantEnvironment) {
+  // The empty result with the type the caller expects.
+  GenericSignatureOrEnvironment result;
+  if (wantEnvironment)
+    result = static_cast<GenericEnvironment *>(nullptr);
+
+  // Zero is a sentinel for having no generic environment.
+  if (ID == 0) return result;
+
+  assert(ID <= GenericSignaturesAndEnvironments.size() &&
+         "invalid GenericEnvironment ID");
+  auto &sigOrEnvOrOffset = GenericSignaturesAndEnvironments[ID-1];
+
+  if (!sigOrEnvOrOffset.isComplete()) {
+    // Force the loading process by fetching the generic signature.
+    (void)getGenericSignature(ID);
+    assert(sigOrEnvOrOffset.isComplete());
+  }
+
+  if (wantEnvironment)
+    if (auto *sig = sigOrEnvOrOffset.get().dyn_cast<GenericSignature *>())
+      sigOrEnvOrOffset.uncheckedOverwrite(sig->createGenericEnvironment());
+
+  return sigOrEnvOrOffset.get();
+}
+
+GenericEnvironment *
+ModuleFile::getGenericEnvironment(serialization::GenericSignatureID ID) {
   return getGenericSignatureOrEnvironment(ID, /*wantEnvironment=*/true)
            .get<GenericEnvironment *>();
 }
@@ -1805,7 +1756,7 @@ StringRef ModuleFile::getIdentifierText(IdentifierID IID) {
   return rawStrPtr.slice(0, terminatorOffset);
 }
 
-DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
+DeclContext *ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) {
   assert(DCID != 0 && "invalid local DeclContext ID 0");
   auto &declContextOrOffset = LocalDeclContexts[DCID-1];
 
@@ -1893,56 +1844,24 @@ DeclContext *ModuleFile::getLocalDeclContext(DeclContextID DCID) {
 }
 
 DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
-  if (DCID == 0)
+  if (!DCID)
     return FileContext;
 
-  assert(DCID <= DeclContexts.size() && "invalid DeclContext ID");
-  auto &declContextOrOffset = DeclContexts[DCID-1];
+  if (Optional<LocalDeclContextID> contextID = DCID.getAsLocalDeclContextID())
+    return getLocalDeclContext(contextID.getValue());
 
-  if (declContextOrOffset.isComplete())
-    return declContextOrOffset;
+  auto D = getDecl(DCID.getAsDeclID().getValue());
 
-  BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(declContextOrOffset);
-  auto entry = DeclTypeCursor.advance();
+  if (auto GTD = dyn_cast<GenericTypeDecl>(D))
+    return GTD;
+  if (auto ED = dyn_cast<ExtensionDecl>(D))
+    return ED;
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D))
+    return AFD;
+  if (auto SD = dyn_cast<SubscriptDecl>(D))
+    return SD;
 
-  if (entry.Kind != llvm::BitstreamEntry::Record)
-    fatal();
-
-  SmallVector<uint64_t, 64> scratch;
-  StringRef blobData;
-
-  unsigned recordID = DeclTypeCursor.readRecord(entry.ID, scratch, &blobData);
-
-  if (recordID != decls_block::DECL_CONTEXT)
-    llvm_unreachable("Expected a DECL_CONTEXT record");
-
-  DeclContextID declOrDeclContextId;
-  bool isDecl;
-
-  decls_block::DeclContextLayout::readRecord(scratch, declOrDeclContextId,
-                                             isDecl);
-
-  if (!isDecl)
-    return getLocalDeclContext(declOrDeclContextId);
-
-  auto D = getDecl(declOrDeclContextId);
-
-  if (auto ND = dyn_cast<NominalTypeDecl>(D)) {
-    declContextOrOffset = ND;
-  } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
-    declContextOrOffset = ED;
-  } else if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    declContextOrOffset = AFD;
-  } else if (auto SD = dyn_cast<SubscriptDecl>(D)) {
-    declContextOrOffset = SD;
-  } else if (auto TAD = dyn_cast<TypeAliasDecl>(D)) {
-    declContextOrOffset = TAD;
-  } else {
-    llvm_unreachable("Unknown Decl : DeclContext kind");
-  }
-  
-  return declContextOrOffset;
+  llvm_unreachable("Unknown Decl : DeclContext kind");
 }
 
 ModuleDecl *ModuleFile::getModule(ModuleID MID) {
@@ -2254,7 +2173,7 @@ class swift::DeclDeserializer {
 
   Identifier privateDiscriminator;
   unsigned localDiscriminator = 0;
-  Identifier filenameForPrivate;
+  StringRef filenameForPrivate;
 
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
@@ -2308,10 +2227,8 @@ public:
       if (localDiscriminator != 0)
         value->setLocalDiscriminator(localDiscriminator);
 
-      if (!filenameForPrivate.empty()) {
-        auto *loadedFile = cast<LoadedFile>(MF.getFile());
-        loadedFile->addFilenameForPrivateDecl(value, filenameForPrivate);
-      }
+      if (!filenameForPrivate.empty())
+        MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
 
     decl->setValidationToChecked();
@@ -2330,7 +2247,7 @@ public:
     DeclContextID contextID;
     TypeID underlyingTypeID, interfaceTypeID;
     bool isImplicit;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     uint8_t rawAccessLevel;
     ArrayRef<uint64_t> dependencyIDs;
 
@@ -2458,7 +2375,7 @@ public:
     DeclContextID contextID;
     bool isImplicit;
     bool isObjC;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     uint8_t rawAccessLevel;
     unsigned numConformances, numInheritedTypes;
     ArrayRef<uint64_t> rawInheritedAndDependencyIDs;
@@ -2525,7 +2442,7 @@ public:
     DeclContextID contextID;
     bool isIUO, isFailable;
     bool isImplicit, isObjC, hasStubImplementation, throws;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     uint8_t storedInitKind, rawAccessLevel;
     DeclID overriddenID;
     bool needsNewVTableEntry, firstTimeRequired;
@@ -2884,7 +2801,7 @@ public:
     uint8_t rawAccessorKind;
     bool isObjC, hasForcedStaticDispatch, throws;
     unsigned numNameComponentsBiased;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     TypeID resultInterfaceTypeID;
     bool isIUO;
     DeclID associatedDeclID;
@@ -3060,7 +2977,8 @@ public:
     if (!isAccessor) {
       if (Decl *associated = MF.getDecl(associatedDeclID)) {
         if (auto op = dyn_cast<OperatorDecl>(associated)) {
-          fn->setOperatorDecl(op);
+          ctx.evaluator.cacheOutput(FunctionOperatorRequest{fn},
+                                    std::move(op));
 
           if (isa<PrefixOperatorDecl>(op))
             fn->getAttrs().add(new (ctx) PrefixAttr(/*implicit*/false));
@@ -3121,7 +3039,7 @@ public:
     DeclContextID contextID;
     GenericSignatureID interfaceSigID;
     TypeID interfaceTypeID;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     SubstitutionMapID underlyingTypeID;
     
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
@@ -3197,8 +3115,10 @@ public:
       }
 
       patterns.emplace_back(pattern.get(), DeclContextID());
-      if (!initContextIDs.empty())
-        patterns.back().second = initContextIDs[i];
+      if (!initContextIDs.empty()) {
+        patterns.back().second =
+            DeclContextID::getFromOpaqueValue(initContextIDs[i]);
+      }
     }
 
     auto binding =
@@ -3425,7 +3345,7 @@ public:
     DeclContextID contextID;
     bool isImplicit, isObjC;
     bool inheritsSuperclassInitializers;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     TypeID superclassID;
     uint8_t rawAccessLevel;
     unsigned numConformances, numInheritedTypes;
@@ -3498,7 +3418,7 @@ public:
     DeclContextID contextID;
     bool isImplicit;
     bool isObjC;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     TypeID rawTypeID;
     uint8_t rawAccessLevel;
     unsigned numConformances, numInherited;
@@ -3648,7 +3568,7 @@ public:
                                         StringRef blobData) {
     DeclContextID contextID;
     bool isImplicit, isObjC, isGetterMutating, isSetterMutating;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     TypeID elemInterfaceTypeID;
     bool isIUO;
     ModuleFile::AccessorRecord accessors;
@@ -3771,7 +3691,7 @@ public:
     TypeID baseID;
     DeclContextID contextID;
     bool isImplicit;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
     unsigned numConformances, numInherited;
     ArrayRef<uint64_t> inheritedAndDependencyIDs;
 
@@ -3793,7 +3713,7 @@ public:
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    auto extension = ExtensionDecl::create(ctx, SourceLoc(), TypeLoc(), { },
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(), nullptr, { },
                                            DC, nullptr);
     declOrOffset = extension;
 
@@ -3813,7 +3733,8 @@ public:
     MF.configureGenericEnvironment(extension, genericEnvID);
 
     auto baseTy = MF.getType(baseID);
-    extension->getExtendedTypeLoc().setType(baseTy);
+    ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
+                              std::move(baseTy));
     auto nominal = extension->getExtendedNominal();
 
     if (isImplicit)
@@ -3851,7 +3772,7 @@ public:
                                          StringRef blobData) {
     DeclContextID contextID;
     bool isImplicit, isObjC;
-    GenericEnvironmentID genericEnvID;
+    GenericSignatureID genericEnvID;
 
     decls_block::DestructorLayout::readRecord(scratch, contextID,
                                               isImplicit, isObjC,
@@ -4098,20 +4019,20 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         unsigned exported;
         SpecializeAttr::SpecializationKind specializationKind;
         unsigned specializationKindVal;
-        SmallVector<Requirement, 8> requirements;
+        GenericSignatureID specializedSigID;
 
         serialization::decls_block::SpecializeDeclAttrLayout::readRecord(
-          scratch, exported, specializationKindVal);
+          scratch, exported, specializationKindVal, specializedSigID);
 
         specializationKind = specializationKindVal
                                  ? SpecializeAttr::SpecializationKind::Partial
                                  : SpecializeAttr::SpecializationKind::Full;
 
-        MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
-
+        auto specializedSig = MF.getGenericSignature(specializedSigID);
         Attr = SpecializeAttr::create(ctx, SourceLoc(), SourceRange(),
-                                      requirements, exported != 0,
-                                      specializationKind);
+                                      nullptr, exported != 0,
+                                      specializationKind,
+                                      specializedSig);
         break;
       }
 
@@ -4202,7 +4123,7 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
     } else if (recordID == decls_block::FILENAME_FOR_PRIVATE) {
       IdentifierID filenameID;
       decls_block::FilenameForPrivateLayout::readRecord(scratch, filenameID);
-      filenameForPrivate = MF.getIdentifier(filenameID);
+      filenameForPrivate = MF.getIdentifierText(filenameID);
     } else {
       return llvm::Error::success();
     }
@@ -4801,7 +4722,7 @@ public:
 
   Expected<Type> deserializePrimaryArchetypeType(ArrayRef<uint64_t> scratch,
                                                  StringRef blobData) {
-    GenericEnvironmentID envID;
+    GenericSignatureID envID;
     unsigned depth, index;
 
     decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, envID,

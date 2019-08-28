@@ -449,8 +449,14 @@ static void formatDiagnosticArgument(StringRef Modifier,
     break;
 
   case DiagnosticArgumentKind::String:
-    assert(Modifier.empty() && "Improper modifier for string argument");
-    Out << Arg.getAsString();
+    if (Modifier == "select") {
+      formatSelectionArgument(ModifierArguments, Args,
+                              Arg.getAsString().empty() ? 0 : 1, FormatOpts,
+                              Out);
+    } else {
+      assert(Modifier.empty() && "Improper modifier for string argument");
+      Out << Arg.getAsString();
+    }
     break;
 
   case DiagnosticArgumentKind::Identifier:

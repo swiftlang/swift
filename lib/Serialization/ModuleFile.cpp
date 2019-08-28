@@ -38,6 +38,9 @@ using namespace swift::serialization;
 using namespace llvm::support;
 using llvm::Expected;
 
+static_assert(IsTriviallyDestructible<SerializedASTFile>::value,
+              "SerializedASTFiles are BumpPtrAllocated; d'tors are not called");
+
 static bool checkModuleSignature(llvm::BitstreamCursor &cursor,
                                  ArrayRef<unsigned char> signature) {
   for (unsigned char byte : signature)
@@ -871,10 +874,6 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(Decls, scratch);
         break;
-      case index_block::DECL_CONTEXT_OFFSETS:
-        assert(blobData.empty());
-        allocateBuffer(DeclContexts, scratch);
-        break;
       case index_block::TYPE_OFFSETS:
         assert(blobData.empty());
         allocateBuffer(Types, scratch);
@@ -929,11 +928,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
-        allocateBuffer(GenericSignatures, scratch);
-        break;
-      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
-        assert(blobData.empty());
-        allocateBuffer(GenericEnvironments, scratch);
+        allocateBuffer(GenericSignaturesAndEnvironments, scratch);
         break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());
@@ -1352,8 +1347,7 @@ ModuleFile::ModuleFile(
           break;
         }
         case input_block::PARSEABLE_INTERFACE_PATH: {
-          if (extInfo)
-            extInfo->setParseableInterface(blobData);
+          ModuleInterfacePath = blobData;
           break;
         }
         default:
@@ -2357,7 +2351,7 @@ bool SerializedASTFile::hasEntryPoint() const {
 bool SerializedASTFile::getAllGenericSignatures(
                        SmallVectorImpl<GenericSignature*> &genericSignatures) {
   genericSignatures.clear();
-  for (unsigned index : indices(File.GenericSignatures)) {
+  for (unsigned index : indices(File.GenericSignaturesAndEnvironments)) {
     if (auto genericSig = File.getGenericSignature(index + 1))
       genericSignatures.push_back(genericSig);
   }

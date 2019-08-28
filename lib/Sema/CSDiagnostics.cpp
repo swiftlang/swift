@@ -310,7 +310,12 @@ Type RequirementFailure::getOwnerType() const {
 const GenericContext *RequirementFailure::getGenericContext() const {
   if (auto *genericCtx = AffectedDecl->getAsGenericContext())
     return genericCtx;
-  return AffectedDecl->getDeclContext()->getAsDecl()->getAsGenericContext();
+
+  auto parentDecl = AffectedDecl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return nullptr;
+
+  return parentDecl->getAsGenericContext();
 }
 
 const Requirement &RequirementFailure::getRequirement() const {
@@ -2858,18 +2863,6 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (!anchor || !baseExpr)
     return false;
 
-  if (auto *typeVar = getBaseType()->getAs<TypeVariableType>()) {
-    auto &CS = getConstraintSystem();
-    auto *memberLoc = typeVar->getImpl().getLocator();
-    // Don't try to diagnose anything besides first missing
-    // member in the chain. e.g. `x.foo().bar()` let's make
-    // sure to diagnose only `foo()` as missing because we
-    // don't really know much about what `bar()` is supposed
-    // to be.
-    if (CS.MissingMembers.count(memberLoc))
-      return false;
-  }
-
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(anchor->getStartLoc());
@@ -2935,6 +2928,27 @@ bool MissingMemberFailure::diagnoseAsError() {
       diagnostic.highlight(baseExpr->getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
+    } else if (instanceTy->getAnyNominal() &&
+               getName().getBaseName() == DeclBaseName::createConstructor()) {
+      auto &cs = getConstraintSystem();
+
+      auto memberName = getName().getBaseName();
+      auto result = cs.performMemberLookup(
+          ConstraintKind::ValueMember, memberName, metatypeTy,
+          FunctionRefKind::DoubleApply, getLocator(),
+          /*includeInaccessibleMembers=*/true);
+
+      // If there are no `init` members at all produce a tailored
+      // diagnostic for that, otherwise fallback to generic
+      // "no such member" one.
+      if (result.ViableCandidates.empty() &&
+          result.UnviableCandidates.empty()) {
+        emitDiagnostic(anchor->getLoc(), diag::no_accessible_initializers,
+                       instanceTy)
+            .highlight(baseExpr->getSourceRange());
+      } else {
+        emitBasicError(baseType);
+      }
     } else {
       emitBasicError(baseType);
     }

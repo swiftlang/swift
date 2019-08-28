@@ -466,7 +466,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  GenericEnvironmentID genericEnvID;
+  GenericSignatureID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
@@ -627,17 +627,19 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     unsigned exported;
     unsigned specializationKindVal;
-    SILSpecializeAttrLayout::readRecord(scratch, exported, specializationKindVal);
+    GenericSignatureID specializedSigID;
+    SILSpecializeAttrLayout::readRecord(scratch, exported,
+                                        specializationKindVal,
+                                        specializedSigID);
     SILSpecializeAttr::SpecializationKind specializationKind =
         specializationKindVal ? SILSpecializeAttr::SpecializationKind::Partial
                               : SILSpecializeAttr::SpecializationKind::Full;
 
-    SmallVector<Requirement, 8> requirements;
-    MF->readGenericRequirements(requirements, SILCursor);
+    auto specializedSig = MF->getGenericSignature(specializedSigID);
 
     // Read the substitution list and construct a SILSpecializeAttr.
     fn->addSpecializeAttr(SILSpecializeAttr::create(
-        SILMod, requirements, exported != 0, specializationKind));
+        SILMod, specializedSig, exported != 0, specializationKind));
   }
 
   GenericEnvironment *genericEnv = nullptr;
@@ -1666,6 +1668,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                    (Atomicity)Attr);          \
     break;
 
+#define UNCHECKED_REF_STORAGE(Name, ...) UNARY_INSTRUCTION(Copy##Name##Value)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   REFCOUNTING_INSTRUCTION(Name##Retain) \
   REFCOUNTING_INSTRUCTION(Name##Release) \
@@ -2532,7 +2535,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  GenericEnvironmentID genericEnvID;
+  GenericSignatureID genericEnvID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,

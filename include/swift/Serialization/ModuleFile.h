@@ -78,6 +78,11 @@ class ModuleFile
   /// The target the module was built for.
   StringRef TargetTriple;
 
+  /// The name of the module interface this module was compiled from.
+  ///
+  /// Empty if this module didn't come from an interface file.
+  StringRef ModuleInterfacePath;
+
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
 
@@ -205,14 +210,13 @@ public:
       return Value.template get<serialization::BitOffset>();
     }
 
-    template <typename Derived>
-    Serialized &operator=(Derived deserialized) {
+    Serialized &operator=(T deserialized) {
       assert(!isComplete() || ImplTy(deserialized) == Value);
       Value = deserialized;
       return *this;
     }
 
-    void unsafeOverwrite(T t) {
+    void uncheckedOverwrite(T t) {
       Value = t;
     }
   };
@@ -300,9 +304,6 @@ private:
   /// Decls referenced by this module.
   MutableArrayRef<Serialized<Decl*>> Decls;
 
-  /// DeclContexts referenced by this module.
-  MutableArrayRef<Serialized<DeclContext*>> DeclContexts;
-
   /// Local DeclContexts referenced by this module.
   MutableArrayRef<Serialized<DeclContext*>> LocalDeclContexts;
 
@@ -315,11 +316,17 @@ private:
   /// Types referenced by this module.
   MutableArrayRef<Serialized<Type>> Types;
 
-  /// Generic signatures referenced by this module.
-  MutableArrayRef<Serialized<GenericSignature *>> GenericSignatures;
+  using GenericSignatureOrEnvironment =
+      llvm::PointerUnion<GenericSignature *, GenericEnvironment *>;
 
-  /// Generic environments referenced by this module.
-  MutableArrayRef<Serialized<GenericEnvironment *>> GenericEnvironments;
+  /// Generic signatures and environments referenced by this module.
+  ///
+  /// Technically only the GenericSignatures are encoded, but storing the
+  /// environment here too allows caching them.
+  // FIXME: That caching should be done at the AST level; it's not specific to
+  // Serialization.
+  MutableArrayRef<Serialized<GenericSignatureOrEnvironment>>
+      GenericSignaturesAndEnvironments;
 
   /// Substitution maps referenced by this module.
   MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
@@ -391,6 +398,7 @@ private:
   std::unique_ptr<SerializedObjCMethodTable> ObjCMethods;
 
   llvm::DenseMap<const ValueDecl *, Identifier> PrivateDiscriminatorsByValue;
+  llvm::DenseMap<const ValueDecl *, StringRef> FilenamesForPrivateValues;
 
   TinyPtrVector<Decl *> ImportDecls;
 
@@ -557,9 +565,8 @@ private:
 
   /// Set up a (potentially lazy) generic environment for the given type,
   /// function or extension.
-  void configureGenericEnvironment(
-                   GenericContext *genericDecl,
-                   serialization::GenericEnvironmentID envID);
+  void configureGenericEnvironment(GenericContext *genericDecl,
+                                   serialization::GenericSignatureID envID);
 
   /// Populates the protocol's default witness table.
   ///
@@ -762,6 +769,8 @@ public:
   void getDisplayDecls(SmallVectorImpl<Decl*> &results);
 
   StringRef getModuleFilename() const {
+    if (!ModuleInterfacePath.empty())
+      return ModuleInterfacePath;
     // FIXME: This seems fragile, maybe store the filename separately ?
     return ModuleInputBuffer->getBufferIdentifier();
   }
@@ -854,7 +863,7 @@ public:
   DeclContext *getDeclContext(serialization::DeclContextID DID);
 
   /// Returns the local decl context with the given ID, deserializing it if needed.
-  DeclContext *getLocalDeclContext(serialization::DeclContextID DID);
+  DeclContext *getLocalDeclContext(serialization::LocalDeclContextID DID);
 
   /// Returns the appropriate module for the given ID.
   ModuleDecl *getModule(serialization::ModuleID MID);
@@ -874,14 +883,14 @@ public:
   /// \param wantEnvironment If true, always return the full generic
   /// environment. Otherwise, only return the generic environment if it's
   /// already been constructed, and the signature in other cases.
-  llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-  getGenericSignatureOrEnvironment(serialization::GenericEnvironmentID ID,
+  GenericSignatureOrEnvironment
+  getGenericSignatureOrEnvironment(serialization::GenericSignatureID ID,
                                    bool wantEnvironment = false);
 
   /// Returns the generic environment for the given ID, deserializing it if
   /// needed.
-  GenericEnvironment *getGenericEnvironment(
-                                        serialization::GenericEnvironmentID ID);
+  GenericEnvironment *
+  getGenericEnvironment(serialization::GenericSignatureID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.

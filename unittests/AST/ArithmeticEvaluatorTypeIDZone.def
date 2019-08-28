@@ -14,6 +14,6 @@
 //  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_TYPEID(UncachedEvaluationRule)
-SWIFT_TYPEID(InternallyCachedEvaluationRule)
-SWIFT_TYPEID(ExternallyCachedEvaluationRule)
+SWIFT_REQUEST(ArithmeticEvaluator, UncachedEvaluationRule)
+SWIFT_REQUEST(ArithmeticEvaluator, InternallyCachedEvaluationRule)
+SWIFT_REQUEST(ArithmeticEvaluator, ExternallyCachedEvaluationRule)

@@ -229,6 +229,7 @@ function(_compile_swift_files
   # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-enable-library-evolution")
+    list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)

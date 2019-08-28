@@ -1123,19 +1123,18 @@ public:
   
   void visitKeyPathInst(KeyPathInst *I);
 
-
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitRefTo##Name##Inst(RefTo##Name##Inst *i); \
-  void visit##Name##ToRefInst(Name##ToRefInst *i);
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
+  void visit##Name##ToRefInst(Name##ToRefInst *i);                             \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *i); \
   void visitStore##Name##Inst(Store##Name##Inst *i);
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i); \
-  void visit##Name##RetainInst(Name##RetainInst *i); \
-  void visit##Name##ReleaseInst(Name##ReleaseInst *i); \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i);             \
+  void visit##Name##RetainInst(Name##RetainInst *i);                           \
+  void visit##Name##ReleaseInst(Name##ReleaseInst *i);
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
@@ -3878,6 +3877,31 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
+  void IRGenSILFunction::visitCopy##Name##ValueInst(                           \
+      swift::Copy##Name##ValueInst *i) {                                       \
+    Explosion in = getLoweredExplosion(i->getOperand());                       \
+    auto silTy = i->getOperand()->getType();                                   \
+    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
+    auto &ti = getReferentTypeInfo(*this, silTy);                              \
+    /* Since we are unchecked, we just use strong retain here. We do not       \
+     * perform any checks */                                                   \
+    ti.strongRetain(*this, in, irgen::Atomicity::Atomic);                      \
+    /* Semantically we are just passing through the input parameter but as a   \
+     */                                                                        \
+    /* strong reference... at LLVM IR level these type differences don't */    \
+    /* matter. So just set the lowered explosion appropriately. */             \
+    Explosion output = getLoweredExplosion(i->getOperand());                   \
+    if (isOptional) {                                                          \
+      auto values = output.claimAll();                                         \
+      output.reset();                                                          \
+      for (auto value : values) {                                              \
+        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
+      }                                                                        \
+    }                                                                          \
+    setLoweredExplosion(i, output);                                            \
+  }
 #include "swift/AST/ReferenceStorage.def"
 #undef COMMON_CHECKED_REF_STORAGE
 

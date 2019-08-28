@@ -193,21 +193,13 @@ class Serializer : public SerializerBase {
                        index_block::TYPE_OFFSETS>
   TypesToSerialize;
 
-  ASTBlockRecordKeeper<const DeclContext *, DeclContextID,
-                       index_block::DECL_CONTEXT_OFFSETS>
-  DeclContextsToSerialize;
-
-  ASTBlockRecordKeeper<const DeclContext *, DeclContextID,
+  ASTBlockRecordKeeper<const DeclContext *, LocalDeclContextID,
                        index_block::LOCAL_DECL_CONTEXT_OFFSETS>
   LocalDeclContextsToSerialize;
 
   ASTBlockRecordKeeper<const GenericSignature *, GenericSignatureID,
                        index_block::GENERIC_SIGNATURE_OFFSETS>
   GenericSignaturesToSerialize;
-
-  ASTBlockRecordKeeper<const GenericEnvironment *, GenericEnvironmentID,
-                       index_block::GENERIC_ENVIRONMENT_OFFSETS>
-  GenericEnvironmentsToSerialize;
 
   ASTBlockRecordKeeper<SubstitutionMap, SubstitutionMapID,
                        index_block::SUBSTITUTION_MAP_OFFSETS>
@@ -303,13 +295,10 @@ private:
   void writeCrossReference(const Decl *D);
 
   /// Writes the given decl.
-  void writeDecl(const Decl *D);
-
-  /// Writes the given decl context.
-  void writeDeclContext(const DeclContext *DC);
+  void writeASTBlockEntity(const Decl *D);
 
   /// Write a DeclContext as a local DeclContext at the current offset.
-  void writeLocalDeclContext(const DeclContext *DC);
+  void writeASTBlockEntity(const DeclContext *DC);
 
   /// Write the components of a PatternBindingInitializer as a local context.
   void writePatternBindingInitializer(PatternBindingDecl *binding,
@@ -322,22 +311,13 @@ private:
   void writeAbstractClosureExpr(const DeclContext *parentContext, Type Ty, bool isImplicit, unsigned discriminator);
 
   /// Writes the given type.
-  void writeType(Type ty);
+  void writeASTBlockEntity(Type ty);
 
   /// Writes a generic signature.
-  void writeGenericSignature(const GenericSignature *sig);
-
-  /// Writes the next generic environment in #GenericEnvironmentsToSerialize.
-  ///
-  /// This needs special handling due to the alternate encoding for some
-  /// generic environments.
-  void writeNextGenericEnvironment();
-
-  /// Writes a generic environment.
-  void writeGenericEnvironment(const GenericEnvironment *env);
+  void writeASTBlockEntity(const GenericSignature *sig);
 
   /// Writes a substitution map.
-  void writeSubstitutionMap(const SubstitutionMap substitutions);
+  void writeASTBlockEntity(const SubstitutionMap substitutions);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -347,6 +327,12 @@ private:
                   "layout has invalid record code");
     DeclTypeAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
   }
+
+  /// Writes all queued \p entities until there are no more.
+  ///
+  /// \returns true if any entities were written
+  template <typename SpecificASTBlockRecordKeeper>
+  bool writeASTBlockEntitiesIfNeeded(SpecificASTBlockRecordKeeper &entities);
 
   /// Writes all decls and types in the DeclsToWrite queue.
   ///
@@ -436,7 +422,7 @@ public:
   /// Records the use of the given local DeclContext.
   ///
   /// The DeclContext will be scheduled for serialization if necessary.
-  DeclContextID addLocalDeclContextRef(const DeclContext *DC);
+  LocalDeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
   /// Records the use of the given generic signature.
   ///
@@ -446,7 +432,7 @@ public:
   /// Records the use of the given generic environment.
   ///
   /// The GenericEnvironment will be scheduled for serialization if necessary.
-  GenericEnvironmentID addGenericEnvironmentRef(const GenericEnvironment *env);
+  GenericSignatureID addGenericEnvironmentRef(const GenericEnvironment *env);
 
   /// Records the use of the given substitution map.
   ///
@@ -477,10 +463,10 @@ public:
   IdentifierID addContainingModuleRef(const DeclContext *DC);
 
   /// Write a normal protocol conformance.
-  void writeNormalConformance(const NormalProtocolConformance *conformance);
+  void writeASTBlockEntity(const NormalProtocolConformance *conformance);
 
   /// Write a SILLayout.
-  void writeSILLayout(const SILLayout *layout);
+  void writeASTBlockEntity(const SILLayout *layout);
 
   /// Writes a protocol conformance.
   ///

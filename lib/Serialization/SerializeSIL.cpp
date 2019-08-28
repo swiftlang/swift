@@ -391,7 +391,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // If we have a body, we might have a generic environment.
-  GenericEnvironmentID genericEnvID = 0;
+  GenericSignatureID genericEnvID = 0;
   if (!NoBody)
     genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
 
@@ -425,10 +425,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-    SILSpecializeAttrLayout::emitRecord(Out, ScratchRecord, specAttrAbbrCode,
-                                        (unsigned)SA->isExported(),
-                                        (unsigned)SA->getSpecializationKind());
-    S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
+    SILSpecializeAttrLayout::emitRecord(
+        Out, ScratchRecord, specAttrAbbrCode,
+        (unsigned)SA->isExported(),
+        (unsigned)SA->getSpecializationKind(),
+        S.addGenericSignatureRef(SA->getSpecializedSignature()));
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
@@ -1223,6 +1224,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst:
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

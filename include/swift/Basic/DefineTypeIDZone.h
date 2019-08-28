@@ -33,9 +33,10 @@
 
 // Define a TypeID where the type name and internal name are the same.
 #define SWIFT_TYPEID(Type) SWIFT_TYPEID_NAMED(Type, Type)
+#define SWIFT_REQUEST(Zone, Type) SWIFT_TYPEID_NAMED(Type, Type)
 
 // First pass: put all of the names into an enum so we get values for them.
-template<> struct TypeIDZoneTypes<SWIFT_TYPEID_ZONE> {
+template<> struct TypeIDZoneTypes<Zone::SWIFT_TYPEID_ZONE> {
   enum Types : uint8_t {
 #define SWIFT_TYPEID_NAMED(Type, Name) Name,
 #define SWIFT_TYPEID_TEMPLATE1_NAMED(Template, Name, Param1, Arg1) Name,
@@ -48,9 +49,10 @@ template<> struct TypeIDZoneTypes<SWIFT_TYPEID_ZONE> {
 // Second pass: create specializations of TypeID for these types.
 #define SWIFT_TYPEID_NAMED(Type, Name)                       \
 template<> struct TypeID<Type> {                             \
-  static const uint8_t zoneID = SWIFT_TYPEID_ZONE;           \
+  static const uint8_t zoneID =                              \
+    static_cast<uint8_t>(Zone::SWIFT_TYPEID_ZONE);           \
   static const uint8_t localID =                             \
-    TypeIDZoneTypes<SWIFT_TYPEID_ZONE>::Name;                \
+    TypeIDZoneTypes<Zone::SWIFT_TYPEID_ZONE>::Name;          \
                                                              \
   static const uint64_t value = formTypeID(zoneID, localID); \
                                                              \
@@ -61,8 +63,8 @@ template<> struct TypeID<Type> {                             \
 template<Param1> struct TypeID<Template<Arg1>> {                      \
 private:                                                              \
   static const uint64_t templateID =                                  \
-    formTypeID(SWIFT_TYPEID_ZONE,                                     \
-               TypeIDZoneTypes<SWIFT_TYPEID_ZONE>::Name);             \
+    formTypeID(static_cast<uint8_t>(Zone::SWIFT_TYPEID_ZONE),         \
+               TypeIDZoneTypes<Zone::SWIFT_TYPEID_ZONE>::Name);       \
                                                                       \
 public:                                                               \
   static const uint64_t value =                                       \
@@ -76,6 +78,9 @@ public:                                                               \
 template<Param1> const uint64_t TypeID<Template<Arg1>>::value;
 
 #include SWIFT_TYPEID_HEADER
+
+#undef SWIFT_REQUEST
+
 #undef SWIFT_TYPEID_NAMED
 #undef SWIFT_TYPEID_TEMPLATE1_NAMED
 

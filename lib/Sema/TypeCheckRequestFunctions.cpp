@@ -234,13 +234,13 @@ FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
 
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name)                      \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/TypeCheckerTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 void swift::registerTypeCheckerRequestFunctions(Evaluator &evaluator) {
-  evaluator.registerRequestFunctions(SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE,
+  evaluator.registerRequestFunctions(Zone::TypeChecker,
                                      typeCheckerRequestFunctions);
 }

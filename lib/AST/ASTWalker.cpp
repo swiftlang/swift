@@ -131,8 +131,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitExtensionDecl(ExtensionDecl *ED) {
-    if (doIt(ED->getExtendedTypeLoc()))
-      return true;
+    if (auto *typeRepr = ED->getExtendedTypeRepr())
+      if (doIt(typeRepr))
+        return true;
     for (auto &Inherit : ED->getInherited()) {
       if (doIt(Inherit))
         return true;

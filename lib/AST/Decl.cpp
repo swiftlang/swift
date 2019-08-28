@@ -26,7 +26,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
@@ -1054,7 +1053,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
-                             TypeLoc extendedType,
+                             TypeRepr *extendedType,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
@@ -1062,7 +1061,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
-    ExtendedType(extendedType),
+    ExtendedTypeRepr(extendedType),
     Inherited(inherited)
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
@@ -1071,7 +1070,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
-                                     TypeLoc extendedType,
+                                     TypeRepr *extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
@@ -1151,6 +1150,13 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
   return evaluateOrDefault(ctx.evaluator,
     DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
     {AccessLevel::Private, AccessLevel::Private}).second;
+}
+      
+Type ExtensionDecl::getExtendedType() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
+    ErrorType::get(ctx));
 }
 
 /// Clone the given generic parameters in the given list. We don't need any
@@ -6881,6 +6887,18 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
   FD->getBodyResultTypeLoc() = FnRetType;
   return FD;
 }
+      
+OperatorDecl *FuncDecl::getOperatorDecl() const {
+  // Fast-path: Most functions are not operators.
+  if (!isOperator()) {
+    return nullptr;
+  }
+  return evaluateOrDefault(getASTContext().evaluator,
+                           FunctionOperatorRequest{
+                             const_cast<FuncDecl *>(this)
+                           },
+                           nullptr);
+ }
 
 AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,
@@ -7020,6 +7038,10 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
   return evaluateOrDefault(ctx.evaluator,
                            SelfAccessKindRequest{const_cast<FuncDecl *>(this)},
                            SelfAccessKind::NonMutating);
+}
+
+bool FuncDecl::isCallAsFunctionMethod() const {
+  return getName() == getASTContext().Id_callAsFunction && isInstanceMember();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -7619,7 +7641,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
     simple_display(out, value);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     out << "extension of ";
-    if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
+    if (auto typeRepr = ext->getExtendedTypeRepr())
       typeRepr->print(out);
     else
       ext->getSelfNominalTypeDecl()->dumpRef(out);

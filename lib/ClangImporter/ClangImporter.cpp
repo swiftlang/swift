@@ -715,7 +715,7 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
       invocationArgStrs.push_back("-mcpu=cyclone");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {
-    invocationArgStrs.push_back("-march=z196");
+    invocationArgStrs.push_back("-march=z13");
   }
 
   if (!importerOpts.Optimization.empty()) {
@@ -3167,6 +3167,9 @@ void ClangImporter::verifyAllModules() {
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
+
+static_assert(IsTriviallyDestructible<ClangModuleUnit>::value,
+              "ClangModuleUnits are BumpPtrAllocated; the d'tor is not called");
 
 ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
                                  ClangImporter::Implementation &owner,

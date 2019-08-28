@@ -1,5 +1,7 @@
 // RUN: not --crash %target-swift-emit-silgen %s
 
+// REQUIRES: asserts
+
 protocol Pub {
   associatedtype Other
   associatedtype Failure: Error

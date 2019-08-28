@@ -17,9 +17,9 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
@@ -429,7 +429,6 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  SmallVector<ProtocolDecl *, 1> protos;
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
@@ -469,13 +468,17 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      GenericSignatureBuilder Builder(ctx);
+      SmallVector<GenericTypeParamType *, 2> genericParamTypes;
       for (auto gp : GenericTypeParams) {
-        Builder.addGenericParameter(gp);
+        genericParamTypes.push_back(
+            gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
 
-      auto GenericSig =
-        std::move(Builder).computeGenericSignature(SourceLoc());
+      auto GenericSig = evaluateOrDefault(
+          ctx.evaluator,
+          AbstractGenericSignatureRequest{
+            nullptr, std::move(genericParamTypes), { }},
+          nullptr);
       GenericEnv = GenericSig->createGenericEnvironment();
     }
 

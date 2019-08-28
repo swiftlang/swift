@@ -1671,7 +1671,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   SourceRange Braces;
 
   /// The type being extended.
-  TypeLoc ExtendedType;
+  TypeRepr *ExtendedTypeRepr;
 
   /// The nominal type being extended.
   NominalTypeDecl *ExtendedNominal = nullptr;
@@ -1694,7 +1694,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class ConformanceLookupTable;
   friend class IterableDeclContext;
 
-  ExtensionDecl(SourceLoc extensionLoc, TypeLoc extendedType,
+  ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
                 MutableArrayRef<TypeLoc> inherited,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
@@ -1718,7 +1718,7 @@ public:
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
-                               TypeLoc extendedType,
+                               TypeRepr *extendedType,
                                MutableArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
@@ -1738,7 +1738,7 @@ public:
   /// Only use this entry point when the complete type, as spelled in the source,
   /// is required. For most clients, \c getExtendedNominal(), which provides
   /// only the \c NominalTypeDecl, will suffice.
-  Type getExtendedType() const { return ExtendedType.getType(); }
+  Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
   NominalTypeDecl *getExtendedNominal() const;
@@ -1747,12 +1747,9 @@ public:
   /// type declaration.
   bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
-  /// Retrieve the extended type location.
-  TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
-
-  /// Retrieve the extended type location.
-  const TypeLoc &getExtendedTypeLoc() const { return ExtendedType; }
-
+  /// Retrieve the extended type definition as written in the source, if it exists.
+  TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
+                              
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
@@ -5929,7 +5926,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  OperatorDecl *Operator = nullptr;
   OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
@@ -6018,6 +6014,7 @@ public:
   bool isConsuming() const {
     return getSelfAccessKind() == SelfAccessKind::Consuming;
   }
+  bool isCallAsFunctionMethod() const;
 
   SelfAccessKind getSelfAccessKind() const;
 
@@ -6075,13 +6072,7 @@ public:
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
 
-  OperatorDecl *getOperatorDecl() const {
-    return Operator;
-  }
-  void setOperatorDecl(OperatorDecl *o) {
-    assert(isOperator() && "can't set an OperatorDecl for a non-operator");
-    Operator = o;
-  }
+  OperatorDecl *getOperatorDecl() const;
   
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
     return OpaqueReturn;

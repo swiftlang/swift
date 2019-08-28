@@ -28,25 +28,16 @@
 using namespace swift;
 using namespace Lowering;
 
-ArrayRef<Requirement> SILSpecializeAttr::getRequirements() const {
-  return {const_cast<SILSpecializeAttr *>(this)->getRequirementsData(),
-          numRequirements};
-}
-
-SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Requirement> requirements,
-                                     bool exported, SpecializationKind kind)
-    : numRequirements(requirements.size()), kind(kind), exported(exported) {
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
+SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
+                                     GenericSignature *specializedSig)
+    : kind(kind), exported(exported), specializedSignature(specializedSig) { }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             ArrayRef<Requirement> requirements,
+                                             GenericSignature *specializedSig,
                                              bool exported,
                                              SpecializationKind kind) {
-  unsigned size =
-      sizeof(SILSpecializeAttr) + sizeof(Requirement) * requirements.size();
-  void *buf = M.allocate(size, alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(requirements, exported, kind);
+  void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
+  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig);
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {

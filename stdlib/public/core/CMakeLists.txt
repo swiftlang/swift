@@ -229,6 +229,8 @@ set(swift_core_private_link_libraries)
 set(swift_stdlib_compile_flags "${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}")
 if(SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
   list(APPEND swift_core_link_flags "-all_load")
+  list(APPEND swift_core_framework_depends Foundation)
+  list(APPEND swift_core_framework_depends CoreFoundation)
   list(APPEND swift_core_private_link_libraries icucore)
 else()
   # With the GNU linker the equivalent of -all_load is to tell the linker
@@ -285,8 +287,6 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
-
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

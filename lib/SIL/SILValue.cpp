@@ -188,20 +188,23 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   }
 }
 
-llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     ValueOwnershipKind Kind) {
-  switch (Kind) {
+StringRef ValueOwnershipKind::asString() const {
+  switch (Value) {
   case ValueOwnershipKind::Unowned:
-    return os << "unowned";
+    return "unowned";
   case ValueOwnershipKind::Owned:
-    return os << "owned";
+    return "owned";
   case ValueOwnershipKind::Guaranteed:
-    return os << "guaranteed";
+    return "guaranteed";
   case ValueOwnershipKind::Any:
-    return os << "any";
+    return "any";
   }
-
   llvm_unreachable("Unhandled ValueOwnershipKind in switch.");
+}
+
+llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
+                                     ValueOwnershipKind kind) {
+  return os << kind.asString();
 }
 
 Optional<ValueOwnershipKind>

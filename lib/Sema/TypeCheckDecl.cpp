@@ -3430,19 +3430,19 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
 }
 
 
-/// Bind the given function declaration, which declares an operator, to
-/// the corresponding operator declaration.
-void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
-  OperatorDecl *op = nullptr;
+/// Bind the given function declaration, which declares an operator, to the corresponding operator declaration.
+llvm::Expected<OperatorDecl *>
+FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
+  auto &C = FD->getASTContext();
+  auto &diags = C.Diags;
   auto operatorName = FD->getFullName().getBaseIdentifier();
 
   // Check for static/final/class when we're in a type.
   auto dc = FD->getDeclContext();
   if (dc->isTypeContext()) {
     if (!FD->isStatic()) {
-      TC.diagnose(FD->getLoc(), diag::nonstatic_operator_in_type,
-                  operatorName,
-                  dc->getDeclaredInterfaceType())
+      FD->diagnose(diag::nonstatic_operator_in_type,
+                   operatorName, dc->getDeclaredInterfaceType())
         .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                      "static ");
 
@@ -3451,17 +3451,18 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
       // For a class, we also need the function or class to be 'final'.
       if (!classDecl->isFinal() && !FD->isFinal() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
-        TC.diagnose(FD->getLoc(), diag::nonfinal_operator_in_class,
-                    operatorName, dc->getDeclaredInterfaceType())
+        FD->diagnose(diag::nonfinal_operator_in_class,
+                     operatorName, dc->getDeclaredInterfaceType())
           .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
                        "final ");
-        FD->getAttrs().add(new (TC.Context) FinalAttr(/*IsImplicit=*/true));
+        FD->getAttrs().add(new (C) FinalAttr(/*IsImplicit=*/true));
       }
     }
   } else if (!dc->isModuleScopeContext()) {
-    TC.diagnose(FD, diag::operator_in_local_scope);
+    FD->diagnose(diag::operator_in_local_scope);
   }
 
+  OperatorDecl *op = nullptr;
   SourceFile &SF = *FD->getDeclContext()->getParentSourceFile();
   if (FD->isUnaryOperator()) {
     if (FD->getAttrs().hasAttribute<PrefixAttr>()) {
@@ -3485,13 +3486,13 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
       // If we found both prefix and postfix, or neither prefix nor postfix,
       // complain. We can't fix this situation.
       if (static_cast<bool>(prefixOp) == static_cast<bool>(postfixOp)) {
-        TC.diagnose(FD, diag::declared_unary_op_without_attribute);
+        diags.diagnose(FD, diag::declared_unary_op_without_attribute);
 
         // If we found both, point at them.
         if (prefixOp) {
-          TC.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
+          diags.diagnose(prefixOp, diag::unary_operator_declaration_here, false)
             .fixItInsert(FD->getLoc(), "prefix ");
-          TC.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
+          diags.diagnose(postfixOp, diag::unary_operator_declaration_here, true)
             .fixItInsert(FD->getLoc(), "postfix ");
         } else {
           // FIXME: Introduce a Fix-It that adds the operator declaration?
@@ -3499,7 +3500,7 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
 
         // FIXME: Errors could cascade here, because name lookup for this
         // operator won't find this declaration.
-        return;
+        return nullptr;
       }
 
       // We found only one operator declaration, so we know whether this
@@ -3519,10 +3520,10 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
       }
 
       // Emit diagnostic with the Fix-It.
-      TC.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
+      diags.diagnose(FD->getFuncLoc(), diag::unary_op_missing_prepos_attribute,
                   static_cast<bool>(postfixOp))
         .fixItInsert(FD->getFuncLoc(), insertionText);
-      TC.diagnose(op, diag::unary_operator_declaration_here,
+      diags.diagnose(op, diag::unary_operator_declaration_here,
                   static_cast<bool>(postfixOp));
     }
   } else if (FD->isBinaryOperator()) {
@@ -3530,18 +3531,22 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
                                 FD->isCascadingContextForLookup(false),
                                 FD->getLoc());
   } else {
-    TC.diagnose(FD, diag::invalid_arg_count_for_operator);
-    return;
+    diags.diagnose(FD, diag::invalid_arg_count_for_operator);
+    return nullptr;
   }
 
   if (!op) {
     SourceLoc insertionLoc;
     if (isa<SourceFile>(FD->getParent())) {
-      // Parent context is SourceFile, insertion location is start of func declaration
-      // or unary operator
-      insertionLoc = FD->isUnaryOperator() ? FD->getAttrs().getStartLoc() : FD->getStartLoc();
+      // Parent context is SourceFile, insertion location is start of func
+      // declaration or unary operator
+      if (FD->isUnaryOperator()) {
+        insertionLoc = FD->getAttrs().getStartLoc();
+      } else {
+        insertionLoc = FD->getStartLoc();
+      }
     } else {
-      // Finding top-level decl context before SourceFile and inserting before it
+      // Find the topmost non-file decl context and insert there.
       for (DeclContext *CurContext = FD->getLocalContext();
            !isa<SourceFile>(CurContext);
            CurContext = CurContext->getParent()) {
@@ -3552,25 +3557,28 @@ void bindFuncDeclToOperator(TypeChecker &TC, FuncDecl *FD) {
     }
 
     SmallString<128> insertion;
-    auto numOfParams = FD->getParameters()->size();
-    if (numOfParams == 1) {
-      if (FD->getAttrs().hasAttribute<PrefixAttr>())
-        insertion += "prefix operator ";
-      else
-        insertion += "postfix operator ";
-    } else if (numOfParams == 2) {
-      insertion += "infix operator ";
-    }
+    {
+      llvm::raw_svector_ostream str(insertion);
+      assert(FD->isUnaryOperator() || FD->isBinaryOperator());
+      if (FD->isUnaryOperator()) {
+        if (FD->getAttrs().hasAttribute<PrefixAttr>())
+          str << "prefix operator ";
+        else
+          str << "postfix operator ";
+      } else {
+        str << "infix operator ";
+      }
 
-    insertion += operatorName.str();
-    insertion += " : <# Precedence Group #>\n";
-    InFlightDiagnostic opDiagnostic = TC.diagnose(FD, diag::declared_operator_without_operator_decl);
+       str << operatorName.str() << " : <# Precedence Group #>\n";
+    }
+    InFlightDiagnostic opDiagnostic =
+        diags.diagnose(FD, diag::declared_operator_without_operator_decl);
     if (insertionLoc.isValid())
       opDiagnostic.fixItInsert(insertionLoc, insertion);
-    return;
+    return nullptr;
   }
 
-  FD->setOperatorDecl(op);
+  return op;
 }
 
 bool swift::isMemberOperator(FuncDecl *decl, Type type) {
@@ -3868,10 +3876,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(FD);
 
-    // Bind operator functions to the corresponding operator declaration.
-    if (FD->isOperator())
-      bindFuncDeclToOperator(*this, FD);
-
+    // Force computing the operator decl in case it emits diagnostics.
+    (void) FD->getOperatorDecl();
+    
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
     if (StaticSpelling != StaticSpellingKind::None &&
@@ -4414,23 +4421,23 @@ static bool isNonGenericTypeAliasType(Type type) {
   return false;
 }
 
-static Type validateExtendedType(ExtensionDecl *ext) {
+llvm::Expected<Type>
+ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
     ext->setInvalid();
     return ErrorType::get(ext->getASTContext());
   };
 
   // If we didn't parse a type, fill in an error type and bail out.
-  if (!ext->getExtendedTypeLoc().getTypeRepr())
+  auto *extendedRepr = ext->getExtendedTypeRepr();
+  if (!extendedRepr)
     return error();
 
   // Compute the extended type.
   TypeResolutionOptions options(TypeResolverContext::ExtensionBinding);
   options |= TypeResolutionFlags::AllowUnboundGenerics;
   auto tr = TypeResolution::forStructural(ext->getDeclContext());
-  auto extendedType = tr.resolveType(ext->getExtendedTypeLoc().getTypeRepr(),
-                                     options);
-  ext->getExtendedTypeLoc().setType(extendedType);
+  auto extendedType = tr.resolveType(extendedRepr, options);
 
   if (extendedType->hasError())
     return error();
@@ -4451,14 +4458,14 @@ static Type validateExtendedType(ExtensionDecl *ext) {
   // Cannot extend a metatype.
   if (extendedType->is<AnyMetatypeType>()) {
     diags.diagnose(ext->getLoc(), diag::extension_metatype, extendedType)
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
   // Cannot extend function types, tuple types, etc.
   if (!extendedType->getAnyNominal()) {
     diags.diagnose(ext->getLoc(), diag::non_nominal_extension, extendedType)
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
@@ -4468,7 +4475,7 @@ static Type validateExtendedType(ExtensionDecl *ext) {
       !isNonGenericTypeAliasType(extendedType)) {
     diags.diagnose(ext->getLoc(), diag::extension_specialization,
                    extendedType->getAnyNominal()->getName())
-         .highlight(ext->getExtendedTypeLoc().getSourceRange());
+         .highlight(extendedRepr->getSourceRange());
     return error();
   }
 
@@ -4483,7 +4490,9 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  auto extendedType = validateExtendedType(ext);
+  auto extendedType = evaluateOrDefault(Context.evaluator,
+                                        ExtendedTypeRequest{ext},
+                                        ErrorType::get(ext->getASTContext()));
 
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
@@ -4495,8 +4504,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
-
-    ext->getExtendedTypeLoc().setType(extendedType);
 
     if (auto *genericParams = ext->getGenericParams()) {
       GenericEnvironment *env =

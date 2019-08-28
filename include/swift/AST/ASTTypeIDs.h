@@ -21,11 +21,14 @@
 namespace swift {
 
 class CustomAttr;
+class GenericSignature;
+class GenericTypeParamType;
 class NominalTypeDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
 struct PropertyWrapperMutability;
+class Requirement;
 class Type;
 class VarDecl;
 class TypeAliasDecl;
@@ -33,10 +36,8 @@ class Type;
 struct TypePair;
 enum class AncestryFlags : uint8_t;
 
-#define SWIFT_AST_TYPEID_ZONE 1
-
 // Define the AST type zone (zone 1)
-#define SWIFT_TYPEID_ZONE SWIFT_AST_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AST
 #define SWIFT_TYPEID_HEADER "swift/AST/ASTTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
