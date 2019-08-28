@@ -280,7 +280,11 @@ static bool canHandleOperand(SILValue operand, SmallVectorImpl<SILValue> &out) {
     return false;
 
   /// TODO: Add support for begin_borrow, load_borrow.
-  return all_of(out, [](SILValue v) { return isa<SILFunctionArgument>(v); });
+  auto canHandleValue = [](SILValue v) -> bool {
+    return isa<SILFunctionArgument>(v) || isa<LoadBorrowInst>(v) ||
+           isa<BeginBorrowInst>(v);
+  };
+  return all_of(out, canHandleValue);
 }
 
 // Eliminate a copy of a borrowed value, if:
@@ -328,6 +332,9 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // make sure all of them are destroy_value. For our non-destroying
   // instructions, make sure that they accept a guaranteed value. After that,
   // make sure that our destroys are within the lifetime of our borrowed values.
+  //
+  // TODO: Change isConsumed to return branch propagated users for destroys, so
+  // we do not need to construct another array.
   SmallVector<DestroyValueInst *, 16> destroys;
   SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
   if (isConsumed(cvi, destroys, &guaranteedForwardingInsts))
@@ -339,11 +346,38 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   // post-dominated by the end_borrow set. If they do not, then the
   // copy_value is lifetime extending the guaranteed value, we can not
   // eliminate it.
-  //
-  // TODO: When we support begin_borrow/load_borrow a linear linfetime
-  // check will be needed here.
-  assert(all_of(borrowIntroducers,
-                [](SILValue v) { return isa<SILFunctionArgument>(v); }));
+  {
+    SmallVector<BranchPropagatedUser, 8> destroysForLinearLifetimeCheck(
+        destroys.begin(), destroys.end());
+    SmallVector<BranchPropagatedUser, 8> endBorrowInsts;
+    SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
+    for (SILValue v : borrowIntroducers) {
+      if (isa<SILFunctionArgument>(v)) {
+        continue;
+      }
+
+      SWIFT_DEFER {
+        endBorrowInsts.clear();
+        visitedBlocks.clear();
+      };
+
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(v)) {
+        llvm::copy(lbi->getEndBorrows(), std::back_inserter(endBorrowInsts));
+      } else if (auto *bbi = dyn_cast<BeginBorrowInst>(v)) {
+        llvm::copy(bbi->getEndBorrows(), std::back_inserter(endBorrowInsts));
+      } else {
+        llvm_unreachable("Unhandled borrow introducer?!");
+      }
+
+      // Make sure that our destroys are properly nested within our end
+      // borrows. Otherwise, we can not optimize.
+      auto result = valueHasLinearLifetime(
+          v, endBorrowInsts, destroysForLinearLifetimeCheck, visitedBlocks,
+          getDeadEndBlocks(), ownership::ErrorBehaviorKind::ReturnFalse);
+      if (result.getFoundError())
+        return false;
+    }
+  }
 
   // Otherwise, we know that our copy_value/destroy_values are all completely
   // within the guaranteed value scope. First delete the destroys/copies.
