@@ -22,7 +22,8 @@ public let SIMDInt = [
   BenchmarkInfo(name: "SIMDIntRem",     runFunction: run_SIMDIntRem,     tags: t),
   BenchmarkInfo(name: "SIMDIntShl",     runFunction: run_SIMDIntShl,     tags: t),
   BenchmarkInfo(name: "SIMDIntShr",     runFunction: run_SIMDIntShr,     tags: t),
-  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDIntBulkSum, tags: t),
+  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDIntBulkSum, tags: t,
+                setUpFunction: { blackHole(bulkSumInts) }),
 ]
 
 @inline(never)
