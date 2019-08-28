@@ -510,6 +510,7 @@ public:
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
   bool isExternal() const { return IsExternal; }
+  bool isExtension() const { return isExternal(); }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
@@ -747,8 +748,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
                             const CompilerInvocation &InitInvok,
-                            const llvm::StringSet<> &ModuleNames,
-                            CheckerOptions Opts);
+                            const llvm::StringSet<> &ModuleNames);
+
+SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
+
+void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,

@@ -408,6 +408,10 @@ def enable_function_builder_one_way_constraints : Flag<["-"],
   "enable-function-builder-one-way-constraints">,
   HelpText<"Enable one-way constraints in the function builder transformation">;
 
+def disable_function_builder_one_way_constraints : Flag<["-"],
+  "disable-function-builder-one-way-constraints">,
+  HelpText<"Disable one-way constraints in the function builder transformation">;
+
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,
   HelpText<"Disable the shrink phase of expression type checking">;

@@ -376,7 +376,8 @@ public:
   /// Create a new constraint.
   static Constraint *create(ConstraintSystem &cs, ConstraintKind Kind, 
                             Type First, Type Second, Type Third,
-                            ConstraintLocator *locator);
+                            ConstraintLocator *locator,
+                            ArrayRef<TypeVariableType *> extraTypeVars = { });
 
   /// Create a new member constraint, or a disjunction of that with the outer
   /// alternatives.

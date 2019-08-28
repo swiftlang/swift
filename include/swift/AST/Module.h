@@ -193,7 +193,7 @@ public:
 
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
-    void printForward(raw_ostream &out) const;
+    void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
 
 private:
@@ -537,10 +537,10 @@ public:
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<bool(ImportedModule)> fn);
+                            llvm::function_ref<bool(ImportedModule)> fn) const;
 
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<void(ImportedModule)> fn) {
+                            llvm::function_ref<void(ImportedModule)> fn) const {
     return forAllVisibleModules(topLevelAccessPath,
                                 [=](const ImportedModule &import) -> bool {
       fn(import);
@@ -550,7 +550,7 @@ public:
 
   template <typename Fn>
   bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            Fn &&fn) {
+                            Fn &&fn) const {
     using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
     llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
     return forAllVisibleModules(topLevelAccessPath, wrapped);
@@ -562,7 +562,7 @@ public:
 
   /// Generate the list of libraries needed to link this module, based on its
   /// imports.
-  void collectLinkLibraries(LinkLibraryCallback callback);
+  void collectLinkLibraries(LinkLibraryCallback callback) const;
 
   /// Returns true if the two access paths contain the same chain of
   /// identifiers.
@@ -826,10 +826,12 @@ public:
   /// \return True if the traversal ran to completion, false if it ended early
   ///         due to the callback.
   bool
-  forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn);
+  forAllVisibleModules(
+      llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) const;
 
   bool
-  forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
+  forAllVisibleModules(
+      llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) const {
     return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
       fn(import);
       return true;
@@ -837,7 +839,7 @@ public:
   }
   
   template <typename Fn>
-  bool forAllVisibleModules(Fn &&fn) {
+  bool forAllVisibleModules(Fn &&fn) const {
     using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
     llvm::function_ref<RetTy(ModuleDecl::ImportedModule)> wrapped{
       std::forward<Fn>(fn)

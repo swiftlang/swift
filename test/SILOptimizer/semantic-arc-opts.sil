@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 

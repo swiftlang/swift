@@ -968,12 +968,8 @@ public:
           Overridden->dump(Out);
           abort();
         }
-      }
-      
-      if (D->didEarlyAttrValidation() &&
-          D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!D->isInvalid() && D->hasInterfaceType() &&
-            !isa<ClassDecl>(D->getDeclContext()) &&
+
+        if (!isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ProtocolDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
@@ -983,7 +979,6 @@ public:
         }
       }
 
-      
       verifyCheckedAlwaysBase(D);
     }
 
@@ -3651,7 +3646,9 @@ public:
         if (D->isImplicit())
           return;
         // FIXME: This is not working well for decl parents.
-        return;
+        // But it must work when using lazy ASTScopes for IterableDeclContexts
+        if (!isa<IterableDeclContext>(D))
+          return;
       } else if (Stmt *S = Parent.getAsStmt()) {
         Enclosing = S->getSourceRange();
         if (S->isImplicit())

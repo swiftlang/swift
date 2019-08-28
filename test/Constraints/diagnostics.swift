@@ -504,6 +504,7 @@ func test(_ a : B) {
   B.f1(nil)              // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
   a.function(42, a: nil) // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
   a.function(42, nil)    // expected-error {{missing argument label 'a:' in call}}
+  // expected-error@-1 {{'nil' is not compatible with expected argument type 'AOpts'}}
   a.f2(nil)              // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
 
   func foo1(_ arg: Bool) -> Int {return nil}
@@ -833,8 +834,9 @@ struct rdar27891805 {
 }
 
 try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
-// expected-error@-1 {{argument labels '(contentsOfURL:, usedEncoding:)' do not match any available overloads}}
-// expected-note@-2 {{overloads for 'rdar27891805' exist with these partially matching parameter lists: (contentsOf: String, encoding: String), (contentsOf: String, usedEncoding: inout String)}}
+// expected-error@-1 {{incorrect argument labels in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:encoding:')}}
+// expected-error@-2 {{'nil' is not compatible with expected argument type 'String'}}
+// expected-error@-3 {{'nil' is not compatible with expected argument type 'String'}}
 
 // Make sure RawRepresentable fix-its don't crash in the presence of type variables
 class NSCache<K, V> {
@@ -1002,7 +1004,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note {{found this candidate}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {
@@ -1196,7 +1198,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{ambiguous use of operator '+'}}
+    // expected-error@-1 {{'nil' cannot be used in context expecting type 'Bool'}}
   }
 }
 

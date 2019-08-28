@@ -52,10 +52,33 @@ func testFunc() {
   let _: (S) -> Int = f // expected-error {{cannot convert value of type 'KeyPath<S, Int>' to specified type '(S) -> Int'}}
 }
 
+
 // SR-11234
 public extension Array {
     func sorted<C: Comparable, K: KeyPath<Element, C>>(by keyPath: K) -> Array<Element> {
         let sortedA = self.sorted(by: { $0[keyPath: keyPath] < $1[keyPath: keyPath] })
         return sortedA
     }
+}
+
+// rdar://problem/54322807
+struct X<T> {
+  init(foo: KeyPath<T, Bool>) { }
+  init(foo: KeyPath<T, Bool?>) { }
+}
+
+struct Wibble {
+  var boolProperty = false
+}
+
+struct Bar {
+  var optWibble: Wibble? = nil
+}
+
+class Foo {
+  var optBar: Bar? = nil
+}
+
+func testFoo<T: Foo>(_: T) {
+  let _: X<T> = .init(foo: \.optBar!.optWibble?.boolProperty)
 }

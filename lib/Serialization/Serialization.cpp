@@ -430,20 +430,6 @@ namespace {
   };
 } // end anonymous namespace
 
-namespace llvm {
-  template<> struct DenseMapInfo<Serializer::DeclTypeUnion> {
-    using DeclTypeUnion = Serializer::DeclTypeUnion;
-    static inline DeclTypeUnion getEmptyKey() { return nullptr; }
-    static inline DeclTypeUnion getTombstoneKey() { return swift::Type(); }
-    static unsigned getHashValue(const DeclTypeUnion &val) {
-      return DenseMapInfo<const void *>::getHashValue(val.getOpaqueValue());
-    }
-    static bool isEqual(const DeclTypeUnion &lhs, const DeclTypeUnion &rhs) {
-      return lhs == rhs;
-    }
-  };
-} // namespace llvm
-
 static ModuleDecl *getModule(ModuleOrSourceFile DC) {
   if (auto M = DC.dyn_cast<ModuleDecl *>())
     return M;
@@ -457,36 +443,6 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
         !isa<SubscriptDecl>(DC);
-}
-
-static const Decl *getDeclForContext(const DeclContext *DC) {
-  switch (DC->getContextKind()) {
-  case DeclContextKind::Module:
-    // Use a null decl to represent the module.
-    return nullptr;
-  case DeclContextKind::FileUnit:
-    return getDeclForContext(DC->getParent());
-  case DeclContextKind::SerializedLocal:
-    llvm_unreachable("Serialized local contexts should only come from deserialization");
-  case DeclContextKind::Initializer:
-  case DeclContextKind::AbstractClosureExpr:
-    // FIXME: What about default functions?
-    llvm_unreachable("shouldn't serialize decls from anonymous closures");
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(DC);
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(DC);
-  case DeclContextKind::TopLevelCodeDecl:
-    llvm_unreachable("shouldn't serialize the main module");
-  case DeclContextKind::AbstractFunctionDecl:
-    return cast<AbstractFunctionDecl>(DC);
-  case DeclContextKind::SubscriptDecl:
-    return cast<SubscriptDecl>(DC);
-  case DeclContextKind::EnumElementDecl:
-    return cast<EnumElementDecl>(DC);
-  }
-
-  llvm_unreachable("Unhandled DeclContextKind in switch.");
 }
 
 namespace {
@@ -572,52 +528,22 @@ static Accessors getAccessors(const AbstractStorageDecl *storage) {
 
 DeclID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
   assert(DC->isLocalContext() && "Expected a local DeclContext");
-  auto &id = LocalDeclContextIDs[DC];
-  if (id != 0)
-    return id;
-
-  id = ++LastLocalDeclContextID;
-  LocalDeclContextsToWrite.push(DC);
-  return id;
+  return LocalDeclContextsToSerialize.addRef(DC);
 }
 
-GenericSignatureID Serializer::addGenericSignatureRef(
-                                                const GenericSignature *env) {
-  if (!env) return 0;
-
-  auto &id = GenericSignatureIDs[env];
-  if (id != 0)
-    return id;
-
-  id = ++LastGenericSignatureID;
-  GenericSignaturesToWrite.push(env);
-  return id;
+GenericSignatureID
+Serializer::addGenericSignatureRef(const GenericSignature *env) {
+  return GenericSignaturesToSerialize.addRef(env);
 }
 
-GenericEnvironmentID Serializer::addGenericEnvironmentRef(
-                                                const GenericEnvironment *env) {
-  if (!env) return 0;
-
-  auto &id = GenericEnvironmentIDs[env];
-  if (id != 0)
-    return id;
-
-  id = ++LastGenericEnvironmentID;
-  GenericEnvironmentsToWrite.push(env);
-  return id;
+GenericEnvironmentID
+Serializer::addGenericEnvironmentRef(const GenericEnvironment *env) {
+  return GenericEnvironmentsToSerialize.addRef(env);
 }
 
-SubstitutionMapID Serializer::addSubstitutionMapRef(
-                                              SubstitutionMap substitutions) {
-  if (!substitutions) return 0;
-
-  auto &id = SubstitutionMapIDs[substitutions];
-  if (id != 0)
-    return id;
-
-  id = ++LastSubstitutionMapID;
-  SubstitutionMapsToWrite.push(substitutions);
-  return id;
+SubstitutionMapID
+Serializer::addSubstitutionMapRef(SubstitutionMap substitutions) {
+  return SubstitutionMapsToSerialize.addRef(substitutions);
 }
 
 DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
@@ -634,59 +560,34 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (shouldSerializeAsLocalContext(DC))
     addLocalDeclContextRef(DC);
   else
-    addDeclRef(getDeclForContext(DC));
+    addDeclRef(DC->getAsDecl());
 
-  auto &id = DeclContextIDs[DC];
-  if (id)
-    return id;
-
-  id = ++LastDeclContextID;
-  DeclContextsToWrite.push(DC);
-
-  return id;
+  return DeclContextsToSerialize.addRef(DC);
 }
 
 DeclID Serializer::addDeclRef(const Decl *D, bool allowTypeAliasXRef) {
-  if (!D)
-    return 0;
-
-  DeclID &id = DeclAndTypeIDs[D];
-  if (id != 0)
-    return id;
-
-  assert((!isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
+  assert((!D || !isDeclXRef(D) || isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
           isa<PrecedenceGroupDecl>(D)) &&
          "cannot cross-reference this decl");
 
-  assert((!isDeclXRef(D) ||
+  assert((!D || !isDeclXRef(D) ||
           !D->getAttrs().hasAttribute<ForbidSerializingReferenceAttr>()) &&
          "cannot cross-reference this decl");
 
-  assert((allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
+  assert((!D || allowTypeAliasXRef || !isa<TypeAliasDecl>(D) ||
           D->getModuleContext() == M) &&
          "cannot cross-reference typealiases directly (use the TypeAliasType)");
 
-  id = ++LastDeclID;
-  DeclsAndTypesToWrite.push(D);
-  return id;
+  return DeclsToSerialize.addRef(D);
 }
 
 serialization::TypeID Serializer::addTypeRef(Type ty) {
-  if (!ty)
-    return 0;
-
 #ifndef NDEBUG
   PrettyStackTraceType trace(M->getASTContext(), "serializing", ty);
-  assert(!ty->hasError() && "Serializing error type");
+  assert((!ty || !ty->hasError()) && "Serializing error type");
 #endif
 
-  auto &id = DeclAndTypeIDs[ty];
-  if (id != 0)
-    return id;
-
-  id = ++LastTypeID;
-  DeclsAndTypesToWrite.push(ty);
-  return id;
+  return TypesToSerialize.addRef(ty);
 }
 
 IdentifierID Serializer::addDeclBaseNameRef(DeclBaseName ident) {
@@ -760,28 +661,15 @@ IdentifierID Serializer::addContainingModuleRef(const DeclContext *DC) {
   return addDeclBaseNameRef(exportedModuleID);
 }
 
-SILLayoutID Serializer::addSILLayoutRef(SILLayout *layout) {
-  auto &id = SILLayouts[layout];
-  if (id != 0)
-    return id;
-  
-  id = ++LastSILLayoutID;
-  SILLayoutsToWrite.push(layout);
-  return id;
+SILLayoutID Serializer::addSILLayoutRef(const SILLayout *layout) {
+  return SILLayoutsToSerialize.addRef(layout);
 }
 
-NormalConformanceID Serializer::addConformanceRef(
-                      const NormalProtocolConformance *conformance) {
+NormalConformanceID
+Serializer::addConformanceRef(const NormalProtocolConformance *conformance) {
   assert(conformance->getDeclContext()->getParentModule() == M &&
          "cannot reference conformance from another module");
-  auto &conformanceID = NormalConformances[conformance];
-  if (conformanceID)
-    return conformanceID;
-
-  conformanceID = ++LastNormalConformanceID;
-  NormalConformancesToWrite.push(conformance);
-
-  return conformanceID;
+  return NormalConformancesToSerialize.addRef(conformance);
 }
 
 /// Record the name of a block.
@@ -1023,23 +911,19 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
-                              ImportPathBlob &out) {
-  SmallVector<StringRef, 4> reverseSubmoduleNames(
-      import.second->getReverseFullModuleName(), {});
-
-  interleave(reverseSubmoduleNames.rbegin(), reverseSubmoduleNames.rend(),
-             [&out](StringRef next) { out.append(next); },
-             [&out] { out.push_back('\0'); });
+                              SmallVectorImpl<char> &out) {
+  llvm::raw_svector_ostream outStream(out);
+  import.second->getReverseFullModuleName().printForward(outStream,
+                                                         StringRef("\0", 1));
 
   if (import.first.empty())
     return;
 
-  out.push_back('\0');
+  outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  out.append(accessPathElem.first.str());
+  outStream << accessPathElem.first.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -1152,7 +1036,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       continue;
     }
 
-    ImportPathBlob importPath;
+    SmallString<64> importPath;
     flattenImportPath(import, importPath);
 
     serialization::ImportControl stableImportControl;
@@ -1298,15 +1182,8 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
 void Serializer::writeGenericSignature(const GenericSignature *sig) {
   using namespace decls_block;
 
-  // Record the offset of this generic environment.
-  auto id = GenericSignatureIDs[sig];
-  assert(id != 0 && "generic signature not referenced properly");
-  (void)id;
-
-  assert((id - 1) == GenericSignatureOffsets.size());
-  GenericSignatureOffsets.push_back(Out.GetCurrentBitNo());
-
   assert(sig != nullptr);
+  assert(GenericSignaturesToSerialize.hasRef(sig) && "not referenced properly");
 
   // Record the generic parameters.
   SmallVector<uint64_t, 4> rawParamIDs;
@@ -1320,16 +1197,9 @@ void Serializer::writeGenericSignature(const GenericSignature *sig) {
   writeGenericRequirements(sig->getRequirements(), DeclTypeAbbrCodes);
 }
 
-void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
-  using namespace decls_block;
-
-  // Record the offset of this generic environment.
-  auto id = GenericEnvironmentIDs[env];
-  assert(id != 0 && "generic environment not referenced properly");
-  (void)id;
-
-  assert((id - 1) == GenericEnvironmentOffsets.size());
-  assert(env != nullptr);
+void Serializer::writeNextGenericEnvironment() {
+  const GenericEnvironment *env =
+      GenericEnvironmentsToSerialize.peekNext().getValue();
 
   // Determine whether we must use SIL mode, because one of the generic
   // parameters has a declaration with module context.
@@ -1348,12 +1218,23 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
   if (!SILMode) {
     // Record the generic signature directly.
     auto genericSigID = addGenericSignatureRef(env->getGenericSignature());
-    GenericEnvironmentOffsets.push_back((genericSigID << 1) | 0x01);
+    (void)GenericEnvironmentsToSerialize.popNext((genericSigID << 1) | 0x01);
     return;
   }
 
   // Record the current bit.
-  GenericEnvironmentOffsets.push_back((Out.GetCurrentBitNo() << 1));
+  // FIXME: This shrinks the effective range of a ModuleFile to 2^30 bits
+  // instead of 2^31.
+  (void)GenericEnvironmentsToSerialize.popNext(Out.GetCurrentBitNo() << 1);
+  writeGenericEnvironment(env);
+}
+
+void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
+  using namespace decls_block;
+
+  assert(env != nullptr);
+  assert(GenericEnvironmentsToSerialize.hasRef(env) &&
+         "not referenced properly");
 
   // Record the generic parameters.
   SmallVector<uint64_t, 4> rawParamIDs;
@@ -1381,15 +1262,7 @@ void Serializer::writeGenericEnvironment(const GenericEnvironment *env) {
 void Serializer::writeSubstitutionMap(const SubstitutionMap substitutions) {
   using namespace decls_block;
   assert(substitutions);
-
-  // Record the offset of this substitution map.
-  auto id = SubstitutionMapIDs[substitutions];
-  assert(id != 0 && "generic environment not referenced properly");
-  (void)id;
-
-  // Record the current bit.
-  assert((id - 1) == SubstitutionMapOffsets.size());
-  SubstitutionMapOffsets.push_back(Out.GetCurrentBitNo());
+  assert(SubstitutionMapsToSerialize.hasRef(substitutions));
 
   // Collect the replacement types.
   SmallVector<uint64_t, 4> rawReplacementTypes;
@@ -1406,14 +1279,10 @@ void Serializer::writeSubstitutionMap(const SubstitutionMap substitutions) {
   writeConformances(substitutions.getConformances(), DeclTypeAbbrCodes);
 }
 
-void Serializer::writeSILLayout(SILLayout *layout) {
+void Serializer::writeSILLayout(const SILLayout *layout) {
   using namespace decls_block;
-  auto foundLayoutID = SILLayouts.find(layout);
-  assert(foundLayoutID != SILLayouts.end() && "layout not referenced properly");
-  assert(foundLayoutID->second - 1 == SILLayoutOffsets.size());
-  (void) foundLayoutID;
-  SILLayoutOffsets.push_back(Out.GetCurrentBitNo());
-  
+  assert(SILLayoutsToSerialize.hasRef(layout));
+
   SmallVector<unsigned, 16> data;
   // Save field types.
   for (auto &field : layout->getFields()) {
@@ -1435,18 +1304,12 @@ void Serializer::writeSILLayout(SILLayout *layout) {
 }
 
 void Serializer::writeNormalConformance(
-       const NormalProtocolConformance *conformance) {
+    const NormalProtocolConformance *conformance) {
   using namespace decls_block;
 
   // The conformance must be complete, or we can't serialize it.
   assert(conformance->isComplete());
-
-  auto conformanceID = NormalConformances[conformance];
-  assert(conformanceID != 0 && "normal conformance not referenced properly");
-  (void)conformanceID;
-
-  assert((conformanceID - 1) == NormalConformanceOffsets.size());
-  NormalConformanceOffsets.push_back(Out.GetCurrentBitNo());
+  assert(NormalConformancesToSerialize.hasRef(conformance));
 
   auto protocol = conformance->getProtocol();
 
@@ -1538,7 +1401,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
-    if (!isDeclXRef(getDeclForContext(normal->getDeclContext()))
+    if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
       // A normal conformance in this module file.
@@ -2006,12 +1869,6 @@ static void verifyAttrSerializable(const KIND ## Decl *D) {\
 static void verifyAttrSerializable(const Decl *D) {}
 #endif
 
-static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
-  if (X.hasValue())
-    return X.getValue();
-  return 0;
-}
-
 bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
   if (topLevel->getParentModule() != M)
@@ -2029,16 +1886,11 @@ bool Serializer::isDeclXRef(const Decl *D) const {
 
 void Serializer::writeDeclContext(const DeclContext *DC) {
   using namespace decls_block;
-  auto isDecl = false;
-  auto id = DeclContextIDs[DC];
-  assert(id != 0 && "decl context not referenced properly");
-  (void)id;
-
-  assert((id - 1) == DeclContextOffsets.size());
-  DeclContextOffsets.push_back(Out.GetCurrentBitNo());
+  assert(DeclContextsToSerialize.hasRef(DC) && "not referenced properly");
 
   auto abbrCode = DeclTypeAbbrCodes[DeclContextLayout::Code];
   DeclContextID declOrDeclContextID = 0;
+  auto isDecl = false;
 
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:
@@ -2046,7 +1898,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::EnumElementDecl:
-    declOrDeclContextID = addDeclRef(getDeclForContext(DC));
+    declOrDeclContextID = addDeclRef(DC->getAsDecl());
     isDecl = true;
     break;
 
@@ -2111,13 +1963,7 @@ void Serializer::writeLocalDeclContext(const DeclContext *DC) {
 
   assert(shouldSerializeAsLocalContext(DC) &&
          "Can't serialize as local context");
-
-  auto id = LocalDeclContextIDs[DC];
-  assert(id != 0 && "decl context not referenced properly");
-  (void)id;
-
-  assert((id - 1)== LocalDeclContextOffsets.size());
-  LocalDeclContextOffsets.push_back(Out.GetCurrentBitNo());
+  assert(LocalDeclContextsToSerialize.hasRef(DC));
 
   switch (DC->getContextKind()) {
   case DeclContextKind::AbstractClosureExpr: {
@@ -2416,8 +2262,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (X##_Val.hasValue()) {\
       const auto &Y = X##_Val.getValue();\
       X##_Major = Y.getMajor();\
-      X##_Minor = getOptionalOrZero(Y.getMinor());\
-      X##_Subminor = getOptionalOrZero(Y.getSubminor());\
+      X##_Minor = Y.getMinor().getValueOr(0);\
+      X##_Subminor = Y.getSubminor().getValueOr(0);\
       X##_HasMinor = Y.getMinor().hasValue();\
       X##_HasSubminor = Y.getSubminor().hasValue();\
     }
@@ -2848,13 +2694,6 @@ public:
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(Attr);
 
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      // Hack: synthesize a 'final' attribute if finality was inferred.
-      if (VD->isFinal() && !D->getAttrs().hasAttribute<FinalAttr>())
-        writeDeclAttribute(
-            new (D->getASTContext()) FinalAttr(/*Implicit=*/false));
-    }
-
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
@@ -2935,8 +2774,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    std::reverse(allGenericParams.begin(), allGenericParams.end());
-    for (auto *genericParams : allGenericParams)
+    for (auto *genericParams : swift::reversed(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);
@@ -3775,18 +3613,12 @@ void Serializer::writeDecl(const Decl *D) {
   using namespace decls_block;
 
   PrettyStackTraceDecl trace("serializing", D);
+  assert(DeclsToSerialize.hasRef(D));
 
-  auto id = DeclAndTypeIDs[D];
-  assert(id != 0 && "decl or type not referenced properly");
-  (void)id;
-
-  assert((id - 1) == DeclOffsets.size());
-  assert((TypeOffsets.empty() || TypeOffsets.back() != Out.GetCurrentBitNo()) &&
-         "encoding Decl and Type to the same offset");
-  DeclOffsets.push_back(Out.GetCurrentBitNo());
+  BitOffset initialOffset = Out.GetCurrentBitNo();
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
-    if (DeclOffsets.back() == Out.GetCurrentBitNo()) {
+    if (initialOffset == Out.GetCurrentBitNo()) {
       llvm::PrettyStackTraceString message("failed to serialize anything");
       abort();
     }
@@ -3800,7 +3632,7 @@ void Serializer::writeDecl(const Decl *D) {
 
   assert(!D->hasClangNode() && "imported decls should use cross-references");
 
-  DeclSerializer(*this, id).visit(D);
+  DeclSerializer(*this, DeclsToSerialize.addRef(D)).visit(D);
 }
 
 #define SIMPLE_CASE(TYPENAME, VALUE) \
@@ -4306,18 +4138,12 @@ public:
 void Serializer::writeType(Type ty) {
   using namespace decls_block;
   PrettyStackTraceType traceRAII(ty->getASTContext(), "serializing", ty);
+  assert(TypesToSerialize.hasRef(ty));
 
-  auto id = DeclAndTypeIDs[ty];
-  assert(id != 0 && "type not referenced properly");
-  (void)id;
-
-  assert((id - 1) == TypeOffsets.size());
-  assert((DeclOffsets.empty() || DeclOffsets.back() != Out.GetCurrentBitNo()) &&
-         "encoding Decl and Type to the same offset");
-  TypeOffsets.push_back(Out.GetCurrentBitNo());
+  BitOffset initialOffset = Out.GetCurrentBitNo();
   SWIFT_DEFER {
     // This is important enough to leave on in Release builds.
-    if (TypeOffsets.back() == Out.GetCurrentBitNo()) {
+    if (initialOffset == Out.GetCurrentBitNo()) {
       llvm::PrettyStackTraceString message("failed to serialize anything");
       abort();
     }
@@ -4435,71 +4261,68 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<NAME##DeclAttrLayout>();
 #include "swift/AST/Attr.def"
 
+  bool wroteSomething;
   do {
     // Each of these loops can trigger the others to execute again, so repeat
     // until /all/ of the pending lists are empty.
-    while (!DeclsAndTypesToWrite.empty()) {
-      auto next = DeclsAndTypesToWrite.front();
-      DeclsAndTypesToWrite.pop();
+    wroteSomething = false;
 
-      if (next.isDecl())
-        writeDecl(next.getDecl());
-      else
-        writeType(next.getType());
+    while (auto next = DeclsToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeDecl(next.getValue());
+      wroteSomething = true;
     }
 
-    while (!LocalDeclContextsToWrite.empty()) {
-      auto next = LocalDeclContextsToWrite.front();
-      LocalDeclContextsToWrite.pop();
-      writeLocalDeclContext(next);
+    while (auto next = TypesToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeType(next.getValue());
+      wroteSomething = true;
     }
 
-    while (!DeclContextsToWrite.empty()) {
-      auto next = DeclContextsToWrite.front();
-      DeclContextsToWrite.pop();
-      writeDeclContext(next);
+    while (auto next =
+            LocalDeclContextsToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeLocalDeclContext(next.getValue());
+      wroteSomething = true;
     }
 
-    while (!GenericSignaturesToWrite.empty()) {
-      auto next = GenericSignaturesToWrite.front();
-      GenericSignaturesToWrite.pop();
-      writeGenericSignature(next);
+    while (auto next = DeclContextsToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeDeclContext(next.getValue());
+      wroteSomething = true;
     }
 
-    while (!GenericEnvironmentsToWrite.empty()) {
-      auto next = GenericEnvironmentsToWrite.front();
-      GenericEnvironmentsToWrite.pop();
-      writeGenericEnvironment(next);
+    while (auto next =
+            GenericSignaturesToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeGenericSignature(next.getValue());
+      wroteSomething = true;
     }
 
-    while (!SubstitutionMapsToWrite.empty()) {
-      auto next = SubstitutionMapsToWrite.front();
-      SubstitutionMapsToWrite.pop();
-      writeSubstitutionMap(next);
+    while (GenericEnvironmentsToSerialize.hasMoreToSerialize()) {
+      writeNextGenericEnvironment();
+      wroteSomething = true;
     }
 
-    while (!NormalConformancesToWrite.empty()) {
-      auto next = NormalConformancesToWrite.front();
-      NormalConformancesToWrite.pop();
-      writeNormalConformance(next);
+    while (auto next =
+            SubstitutionMapsToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeSubstitutionMap(next.getValue());
+      wroteSomething = true;
     }
-    
-    while (!SILLayoutsToWrite.empty()) {
-      auto next = SILLayoutsToWrite.front();
-      SILLayoutsToWrite.pop();
-      writeSILLayout(next);
+
+    while (auto next =
+            NormalConformancesToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeNormalConformance(next.getValue());
+      wroteSomething = true;
     }
-  } while (!DeclsAndTypesToWrite.empty() ||
-           !LocalDeclContextsToWrite.empty() ||
-           !DeclContextsToWrite.empty() ||
-           !SILLayoutsToWrite.empty() ||
-           !GenericSignaturesToWrite.empty() ||
-           !GenericEnvironmentsToWrite.empty() ||
-           !SubstitutionMapsToWrite.empty() ||
-           !NormalConformancesToWrite.empty());
+
+    while (auto next = SILLayoutsToSerialize.popNext(Out.GetCurrentBitNo())) {
+      writeSILLayout(next.getValue());
+      wroteSomething = true;
+    }
+
+  } while (wroteSomething);
 }
 
-void Serializer::writeAllIdentifiers() {
+std::vector<CharOffset> Serializer::writeAllIdentifiers() {
+  assert(!DeclsToSerialize.hasMoreToSerialize() &&
+         "did not call Serializer::writeAllDeclsAndTypes?");
+
   BCBlockRAII restoreBlock(Out, IDENTIFIER_DATA_BLOCK_ID, 3);
   identifier_block::IdentifierDataLayout IdentifierData(Out);
 
@@ -4508,18 +4331,22 @@ void Serializer::writeAllIdentifiers() {
   // Make sure no identifier has an offset of 0.
   stringData.push_back('\0');
 
+  std::vector<CharOffset> identifierOffsets;
   for (StringRef str : StringsToWrite) {
-    IdentifierOffsets.push_back(stringData.size());
+    identifierOffsets.push_back(stringData.size());
     stringData.append(str);
     stringData.push_back('\0');
   }
 
   IdentifierData.emit(ScratchRecord, stringData.str());
+  return identifierOffsets;
 }
 
+template <typename SpecificASTBlockRecordKeeper>
 void Serializer::writeOffsets(const index_block::OffsetsLayout &Offsets,
-                              const std::vector<BitOffset> &values) {
-  Offsets.emit(ScratchRecord, getOffsetRecordCode(values), values);
+                              const SpecificASTBlockRecordKeeper &entities) {
+  Offsets.emit(ScratchRecord, SpecificASTBlockRecordKeeper::RecordCode,
+               entities.getOffsets());
 }
 
 /// Writes an in-memory decl table to an on-disk representation, using the
@@ -4923,22 +4750,24 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
   }
 
   writeAllDeclsAndTypes();
-  writeAllIdentifiers();
+  std::vector<CharOffset> identifierOffsets = writeAllIdentifiers();
 
   {
     BCBlockRAII restoreBlock(Out, INDEX_BLOCK_ID, 4);
 
     index_block::OffsetsLayout Offsets(Out);
-    writeOffsets(Offsets, DeclOffsets);
-    writeOffsets(Offsets, TypeOffsets);
-    writeOffsets(Offsets, IdentifierOffsets);
-    writeOffsets(Offsets, DeclContextOffsets);
-    writeOffsets(Offsets, LocalDeclContextOffsets);
-    writeOffsets(Offsets, GenericSignatureOffsets);
-    writeOffsets(Offsets, GenericEnvironmentOffsets);
-    writeOffsets(Offsets, SubstitutionMapOffsets);
-    writeOffsets(Offsets, NormalConformanceOffsets);
-    writeOffsets(Offsets, SILLayoutOffsets);
+    writeOffsets(Offsets, DeclsToSerialize);
+    writeOffsets(Offsets, TypesToSerialize);
+    writeOffsets(Offsets, DeclContextsToSerialize);
+    writeOffsets(Offsets, LocalDeclContextsToSerialize);
+    writeOffsets(Offsets, GenericSignaturesToSerialize);
+    writeOffsets(Offsets, GenericEnvironmentsToSerialize);
+    writeOffsets(Offsets, SubstitutionMapsToSerialize);
+    writeOffsets(Offsets, NormalConformancesToSerialize);
+    writeOffsets(Offsets, SILLayoutsToSerialize);
+
+    Offsets.emit(ScratchRecord, index_block::IDENTIFIER_OFFSETS,
+                 identifierOffsets);
 
     index_block::DeclListLayout DeclList(Out);
     writeDeclTable(DeclList, index_block::TOP_LEVEL_DECLS, topLevelDecls);
@@ -5035,7 +4864,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
   const SILModule *M) {
 
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
   {
     SharedTimer timer("Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
@@ -5054,7 +4883,7 @@ void swift::serializeToBuffers(
                         std::move(buf), options.OutputPath);
   }
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     SharedTimer timer("Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
@@ -5074,12 +4903,12 @@ void swift::serializeToBuffers(
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
 
-  if (strcmp("-", options.OutputPath) == 0) {
+  if (StringRef(options.OutputPath) == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options);
-    assert(!options.DocOutputPath || options.DocOutputPath[0] == '\0');
+    assert(StringRef::withNullAsEmpty(options.DocOutputPath).empty());
     return;
   }
 
@@ -5093,7 +4922,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {

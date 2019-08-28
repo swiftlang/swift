@@ -1851,7 +1851,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   return { 4, func->getFullName() };
 }
 
-bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                DeclName targetName) {
   if (decl->isImplicit()) return false;
   if (decl->getFullName() == targetName) return false;
@@ -1919,7 +1919,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
   return false;
 }
 
-bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                    Optional<ObjCSelector> nameOpt,
                                    Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {

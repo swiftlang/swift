@@ -2227,14 +2227,11 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
     if (parent->hasTypeVariable())
       storedProperties |= RecursiveTypeProperties::HasTypeVariable;
   }
-  auto genericSig = substitutions.getGenericSignature();
-  if (genericSig) {
-    for (Type gp : genericSig->getGenericParams()) {
-      auto substGP = gp.subst(substitutions, SubstFlags::UseErrorType);
-      properties |= substGP->getRecursiveProperties();
-      if (substGP->hasTypeVariable())
-        storedProperties |= RecursiveTypeProperties::HasTypeVariable;
-    }
+
+  for (auto substGP : substitutions.getReplacementTypes()) {
+    properties |= substGP->getRecursiveProperties();
+    if (substGP->hasTypeVariable())
+      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
   }
 
   // Figure out which arena this type will go into.
@@ -2252,6 +2249,7 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
     return result;
 
   // Build a new type.
+  auto *genericSig = substitutions.getGenericSignature();
   auto size = totalSizeToAlloc<Type, SubstitutionMap>(parent ? 1 : 0,
                                                       genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(TypeAliasType), arena);

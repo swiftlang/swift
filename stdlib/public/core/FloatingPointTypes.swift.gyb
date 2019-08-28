@@ -755,7 +755,7 @@ extension ${Self}: BinaryFloatingPoint {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
-    self = _swift_stdlib_remainder${cFuncSuffix}(self, other)
+    self = _stdlib_remainder${cFuncSuffix}(self, other)
   }
 
   @inlinable // FIXME(inline-always)
@@ -766,7 +766,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
-    self = _swift_stdlib_squareRoot${cFuncSuffix}(self)
+    self = _stdlib_squareRoot${cFuncSuffix}(self)
   }
 
   @_transparent

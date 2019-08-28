@@ -576,8 +576,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
             // because the requirements might look like `T: P, T.U: Q`, where
             // U is an associated type of protocol P.
             return type.subst(QuerySubstitutionMap{contextSubMap},
-                              LookUpConformanceInSubstitutionMap(subMap),
-                              SubstFlags::UseErrorType);
+                              LookUpConformanceInSubstitutionMap(subMap));
           });
     }
   }
@@ -2254,8 +2253,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
         auto subs = SubstitutionMap::getProtocolSubstitutions(
           proto, lookupBaseType, *conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
-
-        if (result && !result->hasError())
+        if (!result->hasError())
           return result;
       }
 

@@ -24,6 +24,43 @@ public func usePair<T, V>(_ t: T, _ v: V) {
   print(p)
 }
 
+protocol P { }
+
+struct C<S : Hashable> {
+    struct Inner {}
+
+    init(_ s: S) { }
+
+    func getInner() -> Inner {
+      return Inner()
+    }
+}
+
+struct O<T> {
+  var t: T
+
+  init(_ t: T) {
+    self.t = t
+  }
+}
+
+struct M<T, V> : P {
+  init(_ f: T, _ s: V) {
+  }
+
+  func foobar() -> some P {
+    return self
+  }
+}
+
+public func test2<S : Hashable, T, V>(_ s: S, _ t: T, _ v: V) {
+  var x = M(C(s).getInner(), t)
+  let q = x.foobar()
+  let u = x.foobar()
+  let y = O(q)
+  print(y)
+}
+
 // CHECK-LABEL: define{{.*}} swiftcc void @"$s31opaque_result_type_substitution7usePairyyx_q_tr0_lF"({{.*}}, %swift.type* %T, %swift.type* %V)
 // CHECK:  [[PAIR_TV:%.*]] = call swiftcc %swift.metadata_response @"$s31opaque_result_type_substitution4PairVMa"({{.*}}, %swift.type* %T, %swift.type* %V)
 // CHECK:  [[MD:%.*]] = extractvalue %swift.metadata_response [[PAIR_TV]], 0

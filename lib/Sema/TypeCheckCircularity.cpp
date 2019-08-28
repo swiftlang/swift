@@ -255,8 +255,7 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
         continue;
     }
 
-    auto fieldType =field->getInterfaceType().subst(
-      subMap, SubstFlags::UseErrorType);
+    auto fieldType =field->getInterfaceType().subst(subMap);
     if (addMember(type, field, fieldType, depth))
       return true;
   }
@@ -293,8 +292,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
         continue;
     }
 
-    auto eltType = elt->getArgumentInterfaceType().subst(
-      subMap, SubstFlags::UseErrorType);
+    auto eltType = elt->getArgumentInterfaceType().subst(subMap);
     if (addMember(type, elt, eltType, depth))
       return true;
   }

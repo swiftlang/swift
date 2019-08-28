@@ -21,11 +21,11 @@ void DWARFImporterDelegate::anchor() {}
 /// loading of types is done on demand, this class is effectively empty.
 class DWARFModuleUnit final : public LoadedFile {
   ~DWARFModuleUnit() = default;
-  ClangImporter::Implementation &owner;
+  ClangImporter::Implementation &Owner;
 
 public:
   DWARFModuleUnit(ModuleDecl &M, ClangImporter::Implementation &owner)
-      : LoadedFile(FileUnitKind::DWARFModule, M), owner(owner) {}
+      : LoadedFile(FileUnitKind::DWARFModule, M), Owner(owner) {}
 
   virtual bool isSystemModule() const override { return false; }
 
@@ -35,7 +35,8 @@ public:
   lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
               NLKind lookupKind,
               SmallVectorImpl<ValueDecl *> &results) const override {
-    owner.lookupValueDWARF(accessPath, name, lookupKind, results);
+    Owner.lookupValueDWARF(accessPath, name, lookupKind,
+                           getParentModule()->getName(), results);
   }
 
   virtual TypeDecl *
@@ -110,7 +111,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   auto *decl = ModuleDecl::create(name, SwiftContext);
   decl->setIsNonSwiftModule();
   decl->setHasResolvedImports();
-  auto wrapperUnit = new (SwiftContext) DWARFModuleUnit(*decl, *this);
+  auto *wrapperUnit = new (SwiftContext) DWARFModuleUnit(*decl, *this);
   DWARFModuleUnits.insert({name, wrapperUnit});
   decl->addFile(*wrapperUnit);
 
@@ -127,7 +128,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
 
 void ClangImporter::Implementation::lookupValueDWARF(
     ModuleDecl::AccessPathTy accessPath, DeclName name, NLKind lookupKind,
-    SmallVectorImpl<ValueDecl *> &results) {
+    Identifier inModule, SmallVectorImpl<ValueDecl *> &results) {
   if (!swift::ModuleDecl::matchesAccessPath(accessPath, name))
     return;
 
@@ -138,7 +139,8 @@ void ClangImporter::Implementation::lookupValueDWARF(
     return;
 
   SmallVector<clang::Decl *, 4> decls;
-  DWARFImporter->lookupValue(name.getBaseIdentifier().str(), None, decls);
+  DWARFImporter->lookupValue(name.getBaseIdentifier().str(), None,
+                             inModule.str(), decls);
   for (auto *clangDecl : decls) {
     auto *namedDecl = dyn_cast<clang::NamedDecl>(clangDecl);
     if (!namedDecl)
@@ -160,8 +162,9 @@ void ClangImporter::Implementation::lookupTypeDeclDWARF(
   if (!DWARFImporter)
     return;
 
+  /// This function is invoked by ASTDemangler, which doesn't filter by module.
   SmallVector<clang::Decl *, 1> decls;
-  DWARFImporter->lookupValue(rawName, kind, decls);
+  DWARFImporter->lookupValue(rawName, kind, {}, decls);
   for (auto *clangDecl : decls) {
     if (!isa<clang::TypeDecl>(clangDecl) &&
         !isa<clang::ObjCContainerDecl>(clangDecl) &&

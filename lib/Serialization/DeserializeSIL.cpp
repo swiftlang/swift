@@ -454,8 +454,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in readSILFunction.\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
 
   SmallVector<uint64_t, 64> scratch;
@@ -483,8 +482,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   if (funcTyID == 0) {
     LLVM_DEBUG(llvm::dbgs() << "SILFunction typeID is 0.\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
   auto astType = MF->getTypeChecked(funcTyID);
   if (!astType) {
@@ -498,8 +496,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   auto ty = getSILType(astType.get(), SILValueCategory::Object);
   if (!ty.is<SILFunctionType>()) {
     LLVM_DEBUG(llvm::dbgs() << "not a function type for SILFunction\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
 
   SILFunction *replacedFunction = nullptr;
@@ -517,8 +514,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (!linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                             << " for SILFunction\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
 
   ValueDecl *clangNodeOwner = nullptr;
@@ -526,8 +522,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     clangNodeOwner = dyn_cast_or_null<ValueDecl>(MF->getDecl(clangNodeOwnerID));
     if (!clangNodeOwner) {
       LLVM_DEBUG(llvm::dbgs() << "invalid clang node owner for SILFunction\n");
-      MF->error();
-      return nullptr;
+      MF->fatal();
     }
   }
 
@@ -551,8 +546,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   if (fn) {
     if (fn->getLoweredType() != ty) {
       LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
-      MF->error();
-      return nullptr;
+      MF->fatal();
     }
 
     fn->setSerialized(IsSerialized_t(isSerialized));
@@ -572,8 +566,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     if (fn->isDynamicallyReplaceable() != isDynamic) {
       LLVM_DEBUG(llvm::dbgs() << "SILFunction type mismatch.\n");
-      MF->error();
-      return nullptr;
+      MF->fatal();
     }
 
   } else {
@@ -734,8 +727,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       // Handle a SILInstruction record.
       if (readSILInstruction(fn, CurrentBB, Builder, kind, scratch)) {
         LLVM_DEBUG(llvm::dbgs() << "readSILInstruction returns error.\n");
-        MF->error();
-        return fn;
+        MF->fatal();
       }
     }
 
@@ -2525,8 +2517,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   auto entry = SILCursor.advance(AF_DontPopBlockAtEnd);
   if (entry.Kind == llvm::BitstreamEntry::Error) {
     LLVM_DEBUG(llvm::dbgs() << "Cursor advance error in hasSILFunction.\n");
-    MF->error();
-    return false;
+    MF->fatal();
   }
 
   SmallVector<uint64_t, 64> scratch;
@@ -2957,8 +2948,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   if (!Linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
                             << " for SILFunction\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
 
   // Deserialize Conformance.
@@ -2978,8 +2968,7 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
   if (wT) {
     if (wT->getConformance() != theConformance) {
       LLVM_DEBUG(llvm::dbgs() << "Conformance mismatch.\n");
-      MF->error();
-      return nullptr;
+      MF->fatal();
     }
 
     // Don't override the linkage of a witness table with an existing
@@ -3101,15 +3090,13 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   if (!Linkage) {
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << RawLinkage
                             << " for SILFunction\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
 
   ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
   if (proto == nullptr) {
     LLVM_DEBUG(llvm::dbgs() << "invalid protocol code " << protoId << "\n");
-    MF->error();
-    return nullptr;
+    MF->fatal();
   }
 
   PrettyStackTraceDecl trace("deserializing default witness table for", proto);
@@ -3123,8 +3110,7 @@ readDefaultWitnessTable(DeclID WId, SILDefaultWitnessTable *existingWt) {
   if (wT) {
     if (wT->getProtocol() != proto) {
       LLVM_DEBUG(llvm::dbgs() << "Protocol mismatch.\n");
-      MF->error();
-      return nullptr;
+      MF->fatal();
     }
 
     // Don't override the linkage of a default witness table with an existing
