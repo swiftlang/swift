@@ -12,13 +12,19 @@
 
 import NamedLazyMembers
 
-public func bar(d: SimpleDoerSubclass) {
-    let _ = d.simplyDoVeryImportantWork(speed: 10, motivation: 42)
+public func bar() {
+  let d = SimpleDoerSubclass(value: 123)!
+  let _ = d.simplyDoVeryImportantWork(speed: 10, motivation: 42)
 }
 
-public func foo(d: SimpleDoer) {
+public func foo() {
+  let d = SimpleDoer(value: 123)!
   let _ = d.simplyDoSomeWork()
   let _ = d.simplyDoSomeWork(withSpeed:10)
   let _ = d.simplyDoVeryImportantWork(speed:10, thoroughness:12)
   let _ = d.simplyDoSomeWorkWithSpeed(speed:10, levelOfAlacrity:12)
 }
+
+// Make sure that simply subclassing an imported subclass doesn't page in all
+// members.
+class MostDoerSubclass : SimpleDoerSubclass {}

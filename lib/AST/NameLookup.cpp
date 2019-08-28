@@ -1168,13 +1168,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   bool includeAttrImplements =
       flags.contains(LookupDirectFlags::IncludeAttrImplements);
 
-  // FIXME: At present, lazy member is not able to find inherited constructors
-  // in imported classes, because SwiftDeclConverter::importInheritedConstructors()
-  // is only called via ClangImporter::Implementation::loadAllMembers().
-  if (hasClangNode() &&
-      name.getBaseName() == DeclBaseName::createConstructor())
-    useNamedLazyMemberLoading = false;
-
   LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect("
              << name << ", " << ignoreNewExtensions << ")"
         << ", isLookupTablePopulated()=" << isLookupTablePopulated()
