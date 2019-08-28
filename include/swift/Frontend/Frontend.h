@@ -297,7 +297,6 @@ public:
   /// Called from lldb, see rdar://53971116
   void disableASTScopeLookup() {
     LangOpts.EnableASTScopeLookup = false;
-    LangOpts.LazyASTScopes = false;
   }
 
   CodeCompletionCallbacksFactory *getCodeCompletionFactory() const {
