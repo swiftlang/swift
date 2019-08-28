@@ -3189,9 +3189,12 @@ static bool checkTransposingParameters(
 
 // SWIFT_ENABLE_TENSORFLOW
 void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
-  // Skip checking implicit differentiable attributes, because they do not
-  // contain the WhereClause, and these checks assume that the WhereClause is
-  // available.
+  // Skip checking implicit `@differentiable` attributes. We currently assume
+  // that all implicit `@differentiable` attributes are valid.
+  // Motivation: some implicit attributes do not contain a where clause, and
+  // this function assumes that the where clauses are available. Propagating
+  // where clauses and requirements consistently is a larger problem, to be
+  // revisited.
   if (attr->isImplicit())
     return;
 
