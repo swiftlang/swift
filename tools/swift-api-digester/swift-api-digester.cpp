@@ -845,7 +845,7 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   // Diagnose generic signature change
   if (getGenericSignature() != RD->getGenericSignature()) {
     // Prefer sugared signature in diagnostics to be more user-friendly.
-    if (versionAtLeast(2) && RD->versionAtLeast(2) &&
+    if (Ctx.commonVersionAtLeast(2) &&
         getSugaredGenericSignature() != RD->getSugaredGenericSignature()) {
       emitDiag(diag::generic_sig_change,
                getSugaredGenericSignature(), RD->getSugaredGenericSignature());
@@ -854,6 +854,14 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
                getGenericSignature(), RD->getGenericSignature());
     }
   }
+
+  // ObjC name changes are considered breakage
+  if (getObjCName() != RD->getObjCName()) {
+    if (Ctx.commonVersionAtLeast(4)) {
+      emitDiag(diag::objc_name_change, getObjCName(), RD->getObjCName());
+    }
+  }
+
   if (isOptional() != RD->isOptional()) {
     if (Ctx.checkingABI()) {
       // Both adding/removing optional is ABI-breaking.
@@ -2178,6 +2186,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     std::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
 
   Ctx.getDiags().addConsumer(*pConsumer);
+  Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
+                                RightModule->getJsonFormatVersion()));
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
   PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
@@ -2259,7 +2269,8 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   llvm::errs() << "Finished deserializing" << "\n";
   auto LeftModule = LeftCollector.getSDKRoot();
   auto RightModule = RightCollector.getSDKRoot();
-
+  Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
+                                RightModule->getJsonFormatVersion()));
   // Structural diffs: not merely name changes but changes in SDK tree
   // structure.
   llvm::errs() << "Detecting type member diffs" << "\n";

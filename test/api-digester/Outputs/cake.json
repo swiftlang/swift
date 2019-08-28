@@ -1281,6 +1281,58 @@
     },
     {
       "kind": "TypeDecl",
+      "name": "SwiftObjcClass",
+      "printedName": "SwiftObjcClass",
+      "children": [
+        {
+          "kind": "Function",
+          "name": "foo",
+          "printedName": "foo(a:b:c:)",
+          "children": [
+            {
+              "kind": "TypeNominal",
+              "name": "Void",
+              "printedName": "()"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Swift.Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Swift.Int",
+              "usr": "s:Si"
+            },
+            {
+              "kind": "TypeNominal",
+              "name": "Int",
+              "printedName": "Swift.Int",
+              "usr": "s:Si"
+            }
+          ],
+          "declKind": "Func",
+          "usr": "c:@M@cake@objc(cs)NewObjCClass(im)ObjCFool:ObjCA:ObjCB:",
+          "moduleName": "cake",
+          "objc_name": "ObjCFool:ObjCA:ObjCB:",
+          "declAttributes": [
+            "ObjC"
+          ],
+          "funcSelfKind": "NonMutating"
+        }
+      ],
+      "declKind": "Class",
+      "usr": "c:@M@cake@objc(cs)NewObjCClass",
+      "moduleName": "cake",
+      "objc_name": "NewObjCClass",
+      "declAttributes": [
+        "ObjC"
+      ]
+    },
+    {
+      "kind": "TypeDecl",
       "name": "Int",
       "printedName": "Int",
       "children": [
@@ -1622,5 +1674,5 @@
       ]
     }
   ],
-  "json_format_version": 3
+  "json_format_version": 4
 }
