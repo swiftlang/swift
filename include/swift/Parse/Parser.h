@@ -624,6 +624,12 @@ public:
     return consumeTokenSyntax();
   }
 
+  llvm::Optional<ParsedTokenSyntax> consumeTokenSyntaxIfAny(tok K1, tok K2) {
+    if (Tok.is(K1) || Tok.is(K2))
+      return consumeTokenSyntax();
+    return llvm::None;
+  }
+
   /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
   bool consumeIf(tok K) {
@@ -1398,6 +1404,9 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
+
+  using ExprResult = ParsedSyntaxResult<ParsedExprSyntax>;
+
   ParserResult<Expr> parseExpr(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/false);
   }
@@ -1405,9 +1414,12 @@ public:
     return parseExprImpl(ID, /*isExprBasic=*/true);
   }
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic);
-  ParserResult<Expr> parseExprIs();
-  ParserResult<Expr> parseExprAs();
-  ParserResult<Expr> parseExprArrow();
+  ExprResult parseExprIs();
+  ExprResult parseExprAs();
+  ExprResult parseExprArrow();
+  ParserResult<Expr> parseExprIsAST();
+  ParserResult<Expr> parseExprAsAST();
+  ParserResult<Expr> parseExprArrowAST();
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isForConditionalDirective = false);
@@ -1423,7 +1435,8 @@ public:
   ParserResult<Expr> parseExprKeyPathObjC();
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
-  ParserResult<Expr> parseExprSuper();
+  ParsedResult<ParsedExprSyntax> parseExprSuper();
+  ParserResult<Expr> parseExprSuperAST();
   ParserResult<Expr> parseExprStringLiteral();
 
   // todo [gsoc]: create new result type for ParsedSyntax
@@ -1538,15 +1551,16 @@ public:
                                             bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
-  ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
+  ParsedResult<ParsedExprSyntax> parseExprCollection();
+  ParsedResult<> parseExprCollectionElement(Optional<bool> &IsDict, bool &SeenComma);
+  ParserResult<Expr> parseExprCollectionAST();
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
-  void validateCollectionElement(ParserResult<Expr> element);
+  void validateCollectionElement(ParsedArrayElementSyntax Element, SourceLoc Loc);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing

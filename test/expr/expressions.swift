@@ -732,13 +732,13 @@ func dictionaryLiterals() {
 func invalidDictionaryLiteral() {
   // FIXME: lots of unnecessary diagnostics.
 
-  var a = [1: ; // expected-error {{expected value in dictionary literal}}
-  var b = [1: ;] // expected-error {{expected value in dictionary literal}}
-  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{20-20=,}}
-  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}}
-  var e = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
-  var f = [1: "one", 2 ;] // expected-error {{expected ':' in dictionary literal}}
-  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
+  var _ = [1: ; // expected-error {{expected value in dictionary literal}}
+  var _ = [1: ;] // expected-error {{expected value in dictionary literal}}
+  var _ = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{20-20=,}}
+  var _ = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}}
+  var _ = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
+  var _ = [1: "one", 2 ;] // expected-error {{expected ':' in dictionary literal}}
+  var _ = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
 }
 
 

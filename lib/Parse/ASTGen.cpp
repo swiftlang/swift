@@ -12,12 +12,59 @@
 
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/ASTGen.h"
+#include "swift/Parse/Parser.h"
 
 using namespace swift;
 using namespace swift::syntax;
 
 SourceLoc ASTGen::generate(TokenSyntax Tok, SourceLoc &Loc) {
   return advanceLocBegin(Loc, Tok);
+}
+
+Expr *ASTGen::generate(ExprSyntax &Expr, SourceLoc &Loc) {
+  swift::Expr *ExprAST = nullptr;
+
+  if (auto IntegerLiteralExpr = Expr.getAs<IntegerLiteralExprSyntax>())
+    ExprAST = generate(*IntegerLiteralExpr, Loc);
+  else if(auto FloatLiteralExpr = Expr.getAs<FloatLiteralExprSyntax>())
+    ExprAST = generate(*FloatLiteralExpr, Loc);
+  else if (auto NilLiteralExpr = Expr.getAs<NilLiteralExprSyntax>())
+    ExprAST = generate(*NilLiteralExpr, Loc);
+  else if (auto BooleanLiteralExpr = Expr.getAs<BooleanLiteralExprSyntax>())
+    ExprAST = generate(*BooleanLiteralExpr, Loc);
+  else if (auto IsExpr = Expr.getAs<IsExprSyntax>())
+    ExprAST = generate(*IsExpr, Loc);
+  else if (auto AsExpr = Expr.getAs<AsExprSyntax>())
+    ExprAST = generate(*AsExpr, Loc);
+  else if (auto ArrowExpr = Expr.getAs<ArrowExprSyntax>())
+    ExprAST = generate(*ArrowExpr, Loc);
+  else if (auto ArrayExpr = Expr.getAs<ArrayExprSyntax>())
+    ExprAST = generate(*ArrayExpr, Loc);
+  else if (auto DictionaryExpr = Expr.getAs<DictionaryExprSyntax>())
+    ExprAST = generate(*DictionaryExpr, Loc);
+  else if (auto PoundFileExpr = Expr.getAs<PoundFileExprSyntax>())
+    ExprAST = generate(*PoundFileExpr, Loc);
+  else if (auto PoundLineExpr = Expr.getAs<PoundLineExprSyntax>())
+    ExprAST = generate(*PoundLineExpr, Loc);
+  else if (auto PoundColumnExpr = Expr.getAs<PoundColumnExprSyntax>())
+    ExprAST = generate(*PoundColumnExpr, Loc);
+  else if (auto PoundFunctionExpr = Expr.getAs<PoundFunctionExprSyntax>())
+    ExprAST = generate(*PoundFunctionExpr, Loc);
+  else if (auto PoundDsohandleExpr = Expr.getAs<PoundDsohandleExprSyntax>())
+    ExprAST = generate(*PoundDsohandleExpr, Loc);
+  else if (auto UnknownExpr = Expr.getAs<UnknownExprSyntax>())
+    ExprAST = generate(*UnknownExpr, Loc);
+
+  auto AdvancedLoc = advanceLocBegin(Loc, Expr);
+  if (!ExprAST && hasExpr(AdvancedLoc))
+    ExprAST = getExpr(AdvancedLoc);
+
+  if (!ExprAST)
+    ExprAST = new (Context) ErrorExpr({advanceLocBegin(Loc, Expr), advanceLocBegin(Loc, Expr)});
+
+  assert(ExprAST != nullptr && "Could not generate expression.");
+
+  return ExprAST;
 }
 
 Expr *ASTGen::generate(IntegerLiteralExprSyntax &Expr, SourceLoc &Loc) {
@@ -47,6 +94,110 @@ Expr *ASTGen::generate(BooleanLiteralExprSyntax &Expr, SourceLoc &Loc) {
   return new (Context) BooleanLiteralExpr(Value, BooleanLoc);
 }
 
+Expr *ASTGen::generate(IsExprSyntax &Expr, SourceLoc &Loc) {
+  auto IsLoc = advanceLocBegin(Loc, Expr.getIsTok());
+  auto Type = generate(Expr.getTypeName(), Loc);
+  return new (Context) IsExpr(IsLoc, Type);
+}
+
+Expr *ASTGen::generate(AsExprSyntax &Expr, SourceLoc &Loc) {
+  auto AsLoc = advanceLocBegin(Loc, Expr.getAsTok());
+  auto Punctuation = Expr.getQuestionOrExclamationMark();
+  auto Type = generate(Expr.getTypeName(), Loc);  
+
+  if (!Punctuation)
+    return new (Context) CoerceExpr(AsLoc, Type);
+  auto PunctuationLoc = advanceLocBegin(Loc, *Punctuation);
+  if (Punctuation->getTokenKind() == tok::question_postfix)
+    return new (Context) ConditionalCheckedCastExpr(AsLoc, PunctuationLoc, Type);
+  if (Punctuation->getTokenKind() == tok::exclaim_postfix)
+    return new (Context) ForcedCheckedCastExpr(AsLoc, PunctuationLoc, Type);
+
+  llvm_unreachable("wrong kind of token used as QuestionOrExclamation mark");
+}
+
+Expr *ASTGen::generate(ArrowExprSyntax &Expr, SourceLoc &Loc) {
+  auto Throws = Expr.getThrowsToken();
+  auto Arrow = Expr.getArrowToken();
+  auto ThrowsLoc = Throws ? advanceLocBegin(Loc, *Throws) : SourceLoc();
+  auto ArrowLoc = advanceLocBegin(Loc, Arrow);
+  return new (Context) ArrowExpr(ThrowsLoc, ArrowLoc);
+}
+
+void ASTGen::addArrayElement(syntax::ArrayElementSyntax Element, SourceLoc &Loc,
+                     llvm::SmallVectorImpl<Expr *> &ElementExprs,
+                     llvm::SmallVectorImpl<SourceLoc> &CommaLocs) {
+  auto ElementExpr = Element.getExpression();
+  auto ElementAST = generate(ElementExpr, Loc);
+  ElementExprs.push_back(ElementAST);
+  
+  if (auto Comma = Element.getTrailingComma()) {
+    auto CommaLoc = advanceLocBegin(Loc, *Comma);
+    CommaLocs.push_back(CommaLoc);
+  }
+}
+
+void ASTGen::addDictionaryElement(syntax::DictionaryElementSyntax Element,
+                                  SourceLoc &Loc,
+                                  llvm::SmallVectorImpl<Expr *> &ElementExprs,
+                                  llvm::SmallVectorImpl<SourceLoc> &CommaLocs) {
+  auto KeyExpr = Element.getKeyExpression();
+  auto ValueExpr = Element.getValueExpression();
+  auto KeyExprAST = generate(KeyExpr, Loc);
+  auto ValueExprAST = generate(ValueExpr, Loc);
+  auto ElementAST =
+      TupleExpr::createImplicit(Context, {KeyExprAST, ValueExprAST}, {});
+  ElementExprs.push_back(ElementAST);
+
+  if (auto Comma = Element.getTrailingComma()) {
+    auto CommaLoc = advanceLocBegin(Loc, *Comma);
+    CommaLocs.push_back(CommaLoc);
+  }
+}
+
+Expr *ASTGen::generate(ArrayExprSyntax &Expr, SourceLoc &Loc) {
+  SmallVector<swift::Expr *, 8> ElementExprs;
+  SmallVector<SourceLoc, 8> CommaLocs;
+
+  auto LSquareLoc = advanceLocBegin(Loc, Expr.getLeftSquare());
+  auto RSquareLoc = advanceLocBegin(Loc, Expr.getRightSquare());
+
+  for (auto &&Element : Expr.getElements())
+    addArrayElement(Element, Loc, ElementExprs, CommaLocs);
+
+  return ArrayExpr::create(Context, LSquareLoc, ElementExprs, CommaLocs,
+                           RSquareLoc);
+}
+
+Expr *ASTGen::generate(DictionaryExprSyntax &Expr, SourceLoc &Loc) {
+  SmallVector<swift::Expr *, 8> ElementExprs;
+  SmallVector<SourceLoc, 8> CommaLocs;
+
+  auto LSquareLoc = advanceLocBegin(Loc, Expr.getLeftSquare());
+  auto RSquareLoc = advanceLocBegin(Loc, Expr.getRightSquare());
+
+  if (auto Token = Expr.getContent().getAs<TokenSyntax>()) {
+    assert(Token->getTokenKind() == tok::colon);
+    return DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc);
+  }
+
+  for (auto &&Element : Expr.getContent().castTo<DictionaryElementListSyntax>())
+    addDictionaryElement(Element, Loc, ElementExprs, CommaLocs);
+
+  return DictionaryExpr::create(Context, LSquareLoc, ElementExprs, CommaLocs,
+                                RSquareLoc);
+}
+
+Expr *ASTGen::generate(SuperRefExprSyntax &Expr, SourceLoc &Loc) {
+  auto SuperLoc = advanceLocBegin(Loc, Expr.getSuperKeyword());
+  auto SelfDecl = getImplicitSelfDeclForSuperContext(SuperLoc);
+
+  if (!SelfDecl)
+    return new (Context) ErrorExpr(SuperLoc);
+
+  return new (Context) SuperRefExpr(SelfDecl, SuperLoc, /*Implicit=*/false);
+}
+
 Expr *ASTGen::generate(PoundFileExprSyntax &Expr, SourceLoc &Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundFile(), Loc);
 }
@@ -68,21 +219,102 @@ Expr *ASTGen::generate(PoundDsohandleExprSyntax &Expr, SourceLoc &Loc) {
 }
 
 Expr *ASTGen::generate(UnknownExprSyntax &Expr, SourceLoc &Loc) {
-  if (Expr.getNumChildren() == 1 && Expr.getChild(0)->isToken()) {
-    Syntax Token = *Expr.getChild(0);
-    tok Kind = Token.getRaw()->getTokenKind();
-    switch (Kind) {
-    case tok::kw___FILE__:
-    case tok::kw___LINE__:
-    case tok::kw___COLUMN__:
-    case tok::kw___FUNCTION__:
-    case tok::kw___DSO_HANDLE__: {
-      auto MagicKind = getMagicIdentifierLiteralKind(Kind);
-      auto KindLoc = advanceLocBegin(Loc, Token);
-      return new (Context) MagicIdentifierLiteralExpr(MagicKind, KindLoc);
+  auto ChildrenCount = Expr.getNumChildren();
+  
+  if (ChildrenCount == 1) {
+    if (auto Token = Expr.getChild(0)->getAs<TokenSyntax>()) {
+      tok Kind = Token->getTokenKind();
+      switch (Kind) {
+      case tok::kw___FILE__:
+      case tok::kw___LINE__:
+      case tok::kw___COLUMN__:
+      case tok::kw___FUNCTION__:
+      case tok::kw___DSO_HANDLE__: {
+        auto MagicKind = getMagicIdentifierLiteralKind(Kind);
+        auto KindLoc = advanceLocBegin(Loc, *Token);
+        return new (Context) MagicIdentifierLiteralExpr(MagicKind, KindLoc);
+      }
+      default:;
+      }
     }
-    default:
-      return nullptr;
+  }
+  if (ChildrenCount == 2) {
+    auto Arrow = Expr.getChild(0)->getAs<TokenSyntax>();
+    auto Throws = Expr.getChild(1)->getAs<TokenSyntax>();
+    if (Arrow && Arrow->getTokenKind() == tok::arrow && Throws &&
+        Throws->getTokenKind() == tok::kw_throws) {
+      auto ArrowLoc = advanceLocBegin(Loc, *Arrow);
+      auto ThrowsLoc = advanceLocBegin(Loc, *Throws);
+      return new (Context) ArrowExpr(ThrowsLoc, ArrowLoc);
+    }
+  }
+  if (ChildrenCount == 3) {
+    auto Throws = Expr.getChild(0)->getAs<TokenSyntax>();
+    auto Arrow = Expr.getChild(1)->getAs<TokenSyntax>();
+    auto ExtraThrows = Expr.getChild(2)->getAs<TokenSyntax>();
+    if (Throws && Throws->getTokenKind() == tok::kw_throws && Arrow &&
+        Arrow->getTokenKind() == tok::arrow && ExtraThrows &&
+        ExtraThrows->getTokenKind() == tok::kw_throws) {
+      auto ThrowsLoc = advanceLocBegin(Loc, *Throws);
+      auto ArrowLoc = advanceLocBegin(Loc, *Arrow);
+      return new (Context) ArrowExpr(ThrowsLoc, ArrowLoc);
+    }
+  }
+  if (ChildrenCount == 4) {
+    auto LSquare = Expr.getChild(0)->getAs<TokenSyntax>();
+    auto Pound1 = Expr.getChild(1)->getAs<TokenSyntax>();
+    auto Pound2 = Expr.getChild(2)->getAs<TokenSyntax>();
+    auto RSquare = Expr.getChild(3)->getAs<TokenSyntax>();
+    if (LSquare && LSquare->getTokenKind() == tok::l_square && 
+        Pound1 && Pound1->getTokenKind() == tok::pound && 
+        Pound2 && Pound2->getTokenKind() == tok::pound && 
+        RSquare && RSquare->getTokenKind() == tok::r_square) {
+      auto LSquareLoc = advanceLocBegin(Loc, *LSquare);
+      auto RSquareLoc = advanceLocBegin(Loc, *RSquare);
+      return new (Context) ErrorExpr({LSquareLoc, RSquareLoc});
+    }
+  }
+  if (ChildrenCount >= 1) {
+    auto LSquare = Expr.getChild(0)->getAs<TokenSyntax>();
+    if (LSquare && LSquare->getTokenKind() == tok::l_square) {
+      auto LSquareLoc = advanceLocBegin(Loc, *LSquare);
+
+      SmallVector<swift::Expr *, 8> ElementExprs;
+      SmallVector<SourceLoc, 8> CommaLocs;
+      Optional<bool> IsDictionary;
+      for (unsigned i = 1; i < ChildrenCount; i++) {
+        auto Element = Expr.getChild(i);
+        if (auto DictElement = Element->getAs<DictionaryElementSyntax>()) {
+          if (!IsDictionary.hasValue())
+            IsDictionary = true;
+          else if (!*IsDictionary)
+            continue;
+          addDictionaryElement(*DictElement, Loc, ElementExprs, CommaLocs);
+        } else if (auto ArrayElement = Element->getAs<ArrayElementSyntax>()) {
+          if (!IsDictionary.hasValue())
+            IsDictionary = false;
+          else if (*IsDictionary)
+            continue;
+          addArrayElement(*ArrayElement, Loc, ElementExprs, CommaLocs);
+        } else if (auto ElementExpr = Element->getAs<ExprSyntax>()) {
+          if (!IsDictionary.hasValue())
+            IsDictionary = false;
+          else if (*IsDictionary)
+            continue;
+          auto ElementAST = generate(*ElementExpr, Loc);
+          ElementExprs.push_back(ElementAST);
+        }
+      }
+
+      auto LastChild = Expr.getChild(ChildrenCount - 1);
+      auto LastChildLoc = advanceLocBegin(Loc, *LastChild);
+
+      if (IsDictionary.getValueOr(false))
+        return DictionaryExpr::create(Context, LSquareLoc, ElementExprs,
+                                      CommaLocs, LastChildLoc);
+
+      return ArrayExpr::create(Context, LSquareLoc, ElementExprs, CommaLocs,
+                               LastChildLoc);
     }
   }
   return nullptr;
@@ -584,7 +816,28 @@ MagicIdentifierLiteralExpr::Kind ASTGen::getMagicIdentifierLiteralKind(tok Kind)
 ValueDecl *ASTGen::lookupInScope(DeclName Name) {
   return Context.LangOpts.EnableASTScopeLookup
              ? nullptr
-             : (*ParserState)->getScopeInfo().lookupValueName(Name);
+             : P.State->getScopeInfo().lookupValueName(Name);
+}
+
+VarDecl *ASTGen::getImplicitSelfDeclForSuperContext(SourceLoc Loc) {
+  auto *methodContext = P.CurDeclContext->getInnermostMethodContext();
+  if (!methodContext) {
+    P.diagnose(Loc, diag::super_not_in_class_method);
+    return nullptr;
+  }
+
+  // Do an actual lookup for 'self' in case it shows up in a capture list.
+  auto *methodSelf = methodContext->getImplicitSelfDecl();
+  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  if (lookupSelf && lookupSelf != methodSelf) {
+    // FIXME: This is the wrong diagnostic for if someone manually declares a
+    // variable named 'self' using backticks.
+    P.diagnose(Loc, diag::super_in_closure_with_capture);
+    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
+    return nullptr;
+  }
+
+  return methodSelf;
 }
 
 TypeRepr *ASTGen::cacheType(TypeSyntax Type, TypeRepr *TypeAST) {
@@ -607,4 +860,16 @@ bool ASTGen::hasType(const SourceLoc &Loc) const {
 
 TypeRepr *ASTGen::getType(const SourceLoc &Loc) const {
   return Types.find(Loc)->second;
+}
+
+Expr *ASTGen::addExpr(Expr* E, const SourceLoc &Loc) {
+  return Exprs.insert({Loc.getOpaquePointerValue(), E}).first->second;
+}
+
+bool ASTGen::hasExpr(const SourceLoc &Loc) const {
+  return Exprs.find(Loc.getOpaquePointerValue()) != Exprs.end();
+}
+
+Expr *ASTGen::getExpr(const SourceLoc &Loc) const {
+  return Exprs.find(Loc.getOpaquePointerValue())->second;
 }

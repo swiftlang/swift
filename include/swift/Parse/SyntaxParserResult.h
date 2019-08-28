@@ -13,8 +13,9 @@
 #ifndef SWIFT_PARSE_SYNTAXPARSERRESULT_H
 #define SWIFT_PARSE_SYNTAXPARSERRESULT_H
 
-#include "llvm/ADT/Optional.h"
 #include "swift/Parse/ParserResult.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
+#include "llvm/ADT/Optional.h"
 
 namespace swift {
 
@@ -22,6 +23,83 @@ enum class ResultDataKind : uint8_t {
   Success,
   Error,
   CodeCompletion,
+};
+
+template <typename NodeType = ParsedSyntax>
+class ParsedResult {
+private:
+  SmallVector<ParsedSyntax, 8> Nodes;
+  ParserStatus Status;
+
+  template <typename O>
+  friend class ParsedResult;
+
+public:
+  ParsedResult() {
+    Status.setIsParseError();
+  }
+
+  bool isSuccess() const { return Status.isSuccess(); }
+  bool isError() const { return Status.isError(); }
+  bool hasCodeCompletion() const { return Status.hasCodeCompletion(); }
+  ParserStatus getStatus() const { return Status; }
+  SmallVectorImpl<ParsedSyntax>& getStorage() { return Nodes; }
+
+  template <typename T = NodeType>
+  T get(std::size_t i = 0) const {
+    return Nodes[i].template castTo<T>();
+  }
+
+  template <typename T = NodeType>
+  llvm::Optional<T> maybeGet(std::size_t i = 0) const {
+    if (Nodes.size() <= i)
+      return None;
+    return Nodes[i].template getAs<T>();
+  }
+
+  ArrayRef<ParsedSyntax> getNodes() const {
+    return Nodes;
+  }
+
+  template <typename T>
+  void add(T Node) {
+    Nodes.push_back(Node);
+  }
+
+  template <typename T>
+  void add(Optional<T> Node) {
+    if (Node)
+      Nodes.push_back(*Node);
+  }
+
+  template <typename O>
+  ParsedResult<NodeType> &append(ParsedResult<O> &Other) {
+    Nodes.insert(Nodes.end(), Other.Nodes.begin(), Other.Nodes.end());
+    return *this;
+  }
+
+  ParsedResult<NodeType> &with(NodeType Node, ParserStatus NewStatus = ParserStatus()) {
+    Nodes = {Node};
+    Status = NewStatus;
+    return *this;
+  }
+
+  ParsedResult<NodeType> &withUnknownExpr(SyntaxParsingContext *Ctx) {
+    Nodes = {ParsedSyntaxRecorder::makeUnknownExpr(Nodes, *Ctx)};
+    Status.setIsParseError();
+    return *this;
+  }
+
+  ParsedResult<NodeType> &withUnknownExpr(SyntaxParsingContext *Ctx, ParserStatus NewStatus) {
+    Nodes = {ParsedSyntaxRecorder::makeUnknownExpr(Nodes, *Ctx)};
+    Status = NewStatus;
+    return *this;
+  }
+  
+  ParsedResult<NodeType> &as(ParserStatus NewStatus) {
+    Status = NewStatus;
+    return *this;
+  }
 };
 
 template <typename ParsedSyntaxNode> class ParsedSyntaxResult {

@@ -258,7 +258,7 @@ func testFunctionCollectionTypes() {
   _ = [(inout Int) throws -> (inout () -> Void) -> Void]().count
   _ = [String: (@autoclosure (Int) -> Int32) -> Void]().keys // expected-error {{argument type of @autoclosure parameter must be '()'}}
   let _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
-  let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}} expected-error {{consecutive statements on a line must be separated by ';'}}
+  let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}}
 }
 
 protocol P1 {}
