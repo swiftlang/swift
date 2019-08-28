@@ -62,7 +62,7 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 3; // Use fully qualifed type names for all json outputs
+const uint8_t DIGESTER_JSON_VERSION = 4; // Add objc_name field
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 
 class SDKNode;
@@ -172,7 +172,8 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
-
+  // The common version of two ABI/API descriptors under comparison.
+  Optional<uint8_t> CommonVersion;
 public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
@@ -204,8 +205,19 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  void setCommonVersion(uint8_t Ver) {
+    assert(!CommonVersion.hasValue());
+    CommonVersion = Ver;
+  }
+  uint8_t getCommonVersion() const {
+    return *CommonVersion;
+  }
+  bool commonVersionAtLeast(uint8_t Ver) const {
+    return getCommonVersion() >= Ver;
+  }
   StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
   StringRef getLanguageIntroVersion(Decl *D);
+  StringRef getObjcName(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -343,6 +355,7 @@ class SDKNodeDecl: public SDKNode {
   StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
+  StringRef ObjCName;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -379,6 +392,7 @@ public:
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
+  StringRef getObjCName() const { return ObjCName; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 
