@@ -96,6 +96,8 @@ ERROR(decl_new_witness_table_entry,none,"%0 now requires %select{|no}1 new witne
 
 ERROR(new_decl_without_intro,none,"%0 is a new API without @available attribute", (StringRef))
 
+ERROR(objc_name_change,none,"%0 has ObjC name change from %1 to %2", (StringRef, StringRef, StringRef))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
