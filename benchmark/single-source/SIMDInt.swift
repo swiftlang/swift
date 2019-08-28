@@ -18,6 +18,8 @@ public let SIMDInt = [
   BenchmarkInfo(name: "SIMDIntMul", runFunction: run_SIMDIntMul, tags: [.validation, .api]),
   BenchmarkInfo(name: "SIMDIntDiv", runFunction: run_SIMDIntDiv, tags: [.validation, .api]),
   BenchmarkInfo(name: "SIMDIntRem", runFunction: run_SIMDIntRem, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SIMDIntShl", runFunction: run_SIMDIntShl, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SIMDIntShr", runFunction: run_SIMDIntShr, tags: [.validation, .api]),
 ]
 
 @inline(never)
@@ -66,6 +68,26 @@ public func run_SIMDIntRem(N: Int) {
   let b = identity(SIMD4<Int32>(5, 6, 7, 8))
   for _ in 0..<N {
     a = a % b
+  }
+  blackHole(a)
+}
+
+@inline(never)
+public func run_SIMDIntShl(N: Int) {
+  var a = identity(SIMD4<Int32>(1, 2, 3, 4))
+  let b = identity(SIMD4<Int32>(5, 6, 7, 8))
+  for _ in 0..<N {
+    a = a &<< b
+  }
+  blackHole(a)
+}
+
+@inline(never)
+public func run_SIMDIntShr(N: Int) {
+  var a = identity(SIMD4<Int32>(1, 2, 3, 4))
+  let b = identity(SIMD4<Int32>(5, 6, 7, 8))
+  for _ in 0..<N {
+    a = a &>> b
   }
   blackHole(a)
 }
