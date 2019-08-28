@@ -773,3 +773,14 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
+
+bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
+  return false;
+}
+
+AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
+                                                   Type argType, Type paramType,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInOutConversion(cs, argType, paramType, locator);
+}
