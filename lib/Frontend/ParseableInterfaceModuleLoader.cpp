@@ -1431,7 +1431,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
                 CacheDir, PrebuiltCacheDir, ModuleID.second,
                 RemarkOnRebuildFromInterface, dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
-                                   ModuleName)?
+                                   ModuleName) ?
                   ModuleLoadingMode::PreferParseable : LoadMode);
 
   // Ask the impl to find us a module that we can load or give us an error
