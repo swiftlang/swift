@@ -56,6 +56,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_3 | %FileCheck %s -check-prefix=IN_IIFE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_IIFE_4 | %FileCheck %s -check-prefix=IN_IIFE_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ERROR_IN_CLOSURE_IN_INITIALIZER | %FileCheck %s -check-prefix=ERROR_IN_CLOSURE_IN_INITIALIZER
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DECL_IN_CLOSURE_IN_TOPLEVEL_INIT | %FileCheck %s -check-prefix=DECL_IN_CLOSURE_IN_TOPLEVEL_INIT
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -389,3 +390,14 @@ class C {
   }()
 }
 
+var foo = {
+  let x = "Siesta:\(3)".#^DECL_IN_CLOSURE_IN_TOPLEVEL_INIT^#
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: Begin completions
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Keyword[self]/CurrNominal:          self[#String#]; name=self
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal:      unicodeScalars[#String.UnicodeScalarView#]; name=unicodeScalars
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/CurrNominal:   hasPrefix({#(prefix): String#})[#Bool#]; name=hasPrefix(prefix: String)
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]; name=utf16
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT-DAG: Decl[InstanceMethod]/Super:         dropFirst()[#Substring#]; name=dropFirst()
+  // DECL_IN_CLOSURE_IN_TOPLEVEL_INIT: End completions
+}
