@@ -928,11 +928,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
-        allocateBuffer(GenericSignatures, scratch);
-        break;
-      case index_block::GENERIC_ENVIRONMENT_OFFSETS:
-        assert(blobData.empty());
-        allocateBuffer(GenericEnvironments, scratch);
+        allocateBuffer(GenericSignaturesAndEnvironments, scratch);
         break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());
@@ -2355,7 +2351,7 @@ bool SerializedASTFile::hasEntryPoint() const {
 bool SerializedASTFile::getAllGenericSignatures(
                        SmallVectorImpl<GenericSignature*> &genericSignatures) {
   genericSignatures.clear();
-  for (unsigned index : indices(File.GenericSignatures)) {
+  for (unsigned index : indices(File.GenericSignaturesAndEnvironments)) {
     if (auto genericSig = File.getGenericSignature(index + 1))
       genericSignatures.push_back(genericSig);
   }
