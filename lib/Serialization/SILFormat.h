@@ -293,7 +293,7 @@ namespace sil_block {
                      BCFixed<1>,  // exact self class
                      TypeIDField, // SILFunctionType
                      DeclIDField,  // SILFunction name or 0 (replaced function)
-                     GenericEnvironmentIDField,
+                     GenericSignatureIDField,
                      DeclIDField, // ClangNode owner
                      BCArray<IdentifierIDField> // Semantics Attribute
                      // followed by specialize attributes
