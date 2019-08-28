@@ -3621,7 +3621,6 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
   case ReferenceOwnership::Name: {                                             \
     /* For static reference storage types, we need to strip the box and */     \
     /* then do an (unsafe) retain. */                                          \
-    auto type = storageType.castTo<Name##StorageType>();                       \
     return B.createCopy##Name##Value(loc, src);                                \
   }
 #include "swift/AST/ReferenceStorage.def"
@@ -3702,7 +3701,6 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case ReferenceOwnership::Name: {                                             \
     /* For static reference storage types, we need to strip the box. */        \
-    auto type = storageType.castTo<Name##StorageType>();                       \
     auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial);  \
     return SGF.B.createCopy##Name##Value(loc, value);                          \
   }
