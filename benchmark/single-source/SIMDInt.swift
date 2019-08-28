@@ -20,6 +20,7 @@ public let SIMDInt = [
   BenchmarkInfo(name: "SIMDIntRem", runFunction: run_SIMDIntRem, tags: [.validation, .api]),
   BenchmarkInfo(name: "SIMDIntShl", runFunction: run_SIMDIntShl, tags: [.validation, .api]),
   BenchmarkInfo(name: "SIMDIntShr", runFunction: run_SIMDIntShr, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDBulkSum, tags: [.validation, .api]),
 ]
 
 @inline(never)
@@ -90,4 +91,15 @@ public func run_SIMDIntShr(N: Int) {
     a = a &>> b
   }
   blackHole(a)
+}
+
+let bulkSumInts = Array(repeating: SIMD4<Int32>(1, 2, 3, 4), count: 100)
+
+@inline(never)
+public func run_SIMDIntBulkSum(N: Int) {
+  for _ in 0..<N {
+    let ints = identity(bulkSumInts)
+    let sum = ints.reduce(SIMD4<Int32>(), &+).wrappedSum()
+    blackHole(sum)
+  }
 }
