@@ -139,9 +139,8 @@ extension VectorSpacesEqualSelf : Equatable, AdditiveArithmetic {
 */
 
 // Test generic type with vector space types to `Self`.
-// FIXME(TF-783): Uncomment `EuclideanDifferentiable` conformance once crasher is fixed.
-class GenericVectorSpacesEqualSelf<T> : Differentiable//, EuclideanDifferentiable
-  where T : Differentiable, T == T.TangentVector
+class GenericVectorSpacesEqualSelf<T> : Differentiable, EuclideanDifferentiable
+  where T : EuclideanDifferentiable, T == T.TangentVector
 {
   var w: T
   var b: T
