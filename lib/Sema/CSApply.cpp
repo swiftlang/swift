@@ -2266,6 +2266,18 @@ namespace {
       if (!choice.isImplicitlyUnwrappedValueOrReturnValue())
         return false;
 
+      // If we have an IUO function call and don't have a disjunction choice,
+      // then it means we didn't create a disjunction because the call was
+      // wrapped in parens (i.e. '(s.returnsAnIUO)()') and so there's no
+      // need to force unwrap.
+      if (!solution.DisjunctionChoices.count(
+              cs.getConstraintLocator(locator))) {
+        auto type = choice.getDecl()->getInterfaceType();
+        assert((type && type->is<AnyFunctionType>()) &&
+               "expected a function type");
+        return false;
+      }
+
       auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
           ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
 
