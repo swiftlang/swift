@@ -69,6 +69,10 @@ public enum BenchmarkCategory : String {
   // significant optimization.
   case cpubench
 
+  // SIMD benchmarks that reflect the performance of using Swift's SIMD types
+  // from the standard library directly.
+  case simd
+
   // Explicit skip marker
   case skip
 }

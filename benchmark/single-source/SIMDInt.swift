@@ -12,15 +12,17 @@
 
 import TestsUtils
 
+let t: [BenchmarkCategory] = [.validation, .api, .simd]
+
 public let SIMDInt = [
-  BenchmarkInfo(name: "SIMDIntAdd", runFunction: run_SIMDIntAdd, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntSub", runFunction: run_SIMDIntSub, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntMul", runFunction: run_SIMDIntMul, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntDiv", runFunction: run_SIMDIntDiv, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntRem", runFunction: run_SIMDIntRem, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntShl", runFunction: run_SIMDIntShl, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntShr", runFunction: run_SIMDIntShr, tags: [.validation, .api]),
-  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDIntBulkSum, tags: [.validation, .api]),
+  BenchmarkInfo(name: "SIMDIntAdd",     runFunction: run_SIMDIntAdd,     tags: t),
+  BenchmarkInfo(name: "SIMDIntSub",     runFunction: run_SIMDIntSub,     tags: t),
+  BenchmarkInfo(name: "SIMDIntMul",     runFunction: run_SIMDIntMul,     tags: t),
+  BenchmarkInfo(name: "SIMDIntDiv",     runFunction: run_SIMDIntDiv,     tags: t),
+  BenchmarkInfo(name: "SIMDIntRem",     runFunction: run_SIMDIntRem,     tags: t),
+  BenchmarkInfo(name: "SIMDIntShl",     runFunction: run_SIMDIntShl,     tags: t),
+  BenchmarkInfo(name: "SIMDIntShr",     runFunction: run_SIMDIntShr,     tags: t),
+  BenchmarkInfo(name: "SIMDIntBulkSum", runFunction: run_SIMDIntBulkSum, tags: t),
 ]
 
 @inline(never)
