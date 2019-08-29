@@ -412,14 +412,6 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
   }
 }
 
-static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  return fn->getParameters()->get(index);
-}
-
-static VarDecl *getFirstParamDecl(FuncDecl *fn) {
-  return getParamDeclAtIndex(fn, 0);
-};
-
 /// Build a parameter list which can forward the formal index parameters of a
 /// declaration.
 ///
@@ -1307,7 +1299,7 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
                                        ASTContext &ctx) {
   SourceLoc loc = setter->getStorage()->getLoc();
 
-  VarDecl *valueParamDecl = getFirstParamDecl(setter);
+  VarDecl *valueParamDecl = setter->getParameters()->get(0);
 
   auto *valueDRE =
     new (ctx) DeclRefExpr(valueParamDecl, DeclNameLoc(), /*IsImplicit=*/true);
