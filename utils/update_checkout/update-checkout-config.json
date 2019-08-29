@@ -322,15 +322,15 @@
                 "sourcekit-lsp": "swift-5.1-branch"
             }
         },
-        "swift-5.1-branch-06-12-2019" : {
-            "aliases": ["swift-5.1-branch-06-12-2019"],
+        "swift-5.1-branch-08-28-2019" : {
+            "aliases": ["swift-5.1-branch-08-28-2019"],
             "repos": {
                 "llvm": "swift-5.1-branch",
                 "clang": "swift-5.1-branch",
                 "compiler-rt": "swift-5.1-branch",
-                "swift": "swift-5.1-branch-06-12-2019",
+                "swift": "swift-5.1-branch-08-28-2019",
                 "lldb": "swift-5.1-branch",
-                "cmark": "master",
+                "cmark": "swift-5.1-branch",
                 "llbuild": "swift-5.1-branch",
                 "swiftpm": "swift-5.1-branch",
                 "swift-syntax": "swift-5.1-branch",
