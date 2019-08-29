@@ -295,7 +295,7 @@ void NameBinder::addImport(
     // FIXME: Doesn't handle scoped testable imports correctly.
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
+    lookupInModule(topLevelModule, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                    &SF);
 
