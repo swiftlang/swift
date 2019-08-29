@@ -781,10 +781,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.AssertConfig = SILOptions::Unchecked;
     } else if (A->getOption().matches(OPT_Oplayground)) {
       // For now -Oplayground is equivalent to -Onone.
-      // SWIFT_ENABLE_TENSORFLOW
-      // FIXME(rxwei): Change back to NoOptimization when deabstraction runs
-      // optimizations before partitioning.
-      Opts.OptMode = OptimizationMode::ForSpeed;
+      Opts.OptMode = OptimizationMode::NoOptimization;
     } else if (A->getOption().matches(OPT_Osize)) {
       Opts.OptMode = OptimizationMode::ForSize;
     } else {
