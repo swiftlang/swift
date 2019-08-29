@@ -2011,6 +2011,8 @@ void swift::gatherWrittenGenericArgs(
                              const TypeContextDescriptor *description,
                              SmallVectorImpl<const Metadata *> &allGenericArgs,
                              Demangler &BorrowFrom) {
+  if (!description)
+    return;
   auto generics = description->getGenericContext();
   if (!generics)
     return;
