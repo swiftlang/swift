@@ -206,6 +206,17 @@ static void recordShadowedDeclsAfterSignatureMatch(
       if (firstModule != secondModule &&
           firstDecl->getDeclContext()->isModuleScopeContext() &&
           secondDecl->getDeclContext()->isModuleScopeContext()) {
+        // First, scoped imports shadow unscoped imports.
+        bool firstScoped = imports.isScopedImport(firstModule, name, dc);
+        bool secondScoped = imports.isScopedImport(secondModule, name, dc);
+        if (!firstScoped && secondScoped) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (firstScoped && !secondScoped) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
         // Now check if one module shadows the other.
         if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
           shadowed.insert(firstDecl);
@@ -261,22 +272,19 @@ static void recordShadowedDeclsAfterSignatureMatch(
           isa<ProtocolDecl>(secondDecl->getDeclContext()))
         continue;
 
-      // Prefer declarations in the current module over those in another
-      // module.
-      // FIXME: This is a hack. We should query a (lazily-built, cached)
-      // module graph to determine shadowing.
-      if ((firstModule == curModule) != (secondModule == curModule)) {
-        // If the first module is the current module, the second declaration
-        // is shadowed by the first.
-        if (firstModule == curModule) {
+      // [Backward compatibility] For members of types, the general module
+      // shadowing check is performed after unavailable candidates have
+      // already been dropped.
+      if (firstModule != secondModule &&
+          !firstDecl->getDeclContext()->isModuleScopeContext() &&
+          !secondDecl->getDeclContext()->isModuleScopeContext()) {
+        if (imports.isShadowedBy(firstModule, secondModule, dc)) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (imports.isShadowedBy(secondModule, firstModule, dc)) {
           shadowed.insert(secondDecl);
           continue;
         }
-
-        // Otherwise, the first declaration is shadowed by the second. There is
-        // no point in continuing to compare the first declaration to others.
-        shadowed.insert(firstDecl);
-        break;
       }
 
       // Prefer declarations in the any module over those in the standard
@@ -1645,7 +1653,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     if (tracker) {
       recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
     }
-    lookupInModule(module, /*accessPath=*/{}, member, decls,
+    lookupInModule(module, member, decls,
                    NLKind::QualifiedLookup, kind, topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
@@ -1660,7 +1668,7 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                      [&](ModuleDecl::AccessPathTy accessPath) {
                        return ModuleDecl::matchesAccessPath(accessPath, member);
                      })) {
-      lookupInModule(module, {}, member, decls,
+      lookupInModule(module, member, decls,
                      NLKind::QualifiedLookup, kind, topLevelScope);
     }
   }
