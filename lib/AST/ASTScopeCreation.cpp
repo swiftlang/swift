@@ -1608,11 +1608,11 @@ void ScopeCreator::forEachClosureIn(
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         foundClosure(nullptr, closure);
-        return {false, E};
+        return {true, E};
       }
       if (auto *capture = dyn_cast<CaptureListExpr>(E)) {
         foundClosure(capture, capture->getClosureBody());
-        return {false, E};
+        return {true, E};
       }
       return {true, E};
     }
