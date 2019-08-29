@@ -340,6 +340,62 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   if (isConsumed(cvi, destroys, &guaranteedForwardingInsts))
     return false;
 
+  // Next check if we have any destroys at all of our copy_value and an operand
+  // that is not a function argument. Otherwise, due to the way we ignore dead
+  // end blocks, we may eliminate the copy_value, creating a use of the borrowed
+  // value after the end_borrow.
+  //
+  // DISCUSSION: Consider the following SIL:
+  //
+  // ```
+  //   %1 = begin_borrow %0 : $KlassPair                            (1)
+  //   %2 = struct_extract %1 : $KlassPair, #KlassPair.firstKlass
+  //   %3 = copy_value %2 : $Klass
+  //   ...
+  //   end_borrow %1 : $LintCommand                                 (2)
+  //   cond_br ..., bb1, bb2
+  //
+  //   ...
+  //
+  //   bbN:
+  //     // Never return type implies dead end block.
+  //     apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> Never (3)
+  //     unreachable
+  // ```
+  //
+  // For simplicity, note that if bbN post-dominates %3, given that when we
+  // compute linear lifetime errors we ignore dead end blocks, we would not
+  // register that the copy_values only use is outside of the begin_borrow
+  // region defined by (1), (2) and thus would eliminate the copy. This would
+  // result in %2 being used by %f, causing the linear lifetime checker to
+  // error.
+  //
+  // Naively one may assume that the solution to this is to just check if %3 has
+  // /any/ destroy_values at all and if it doesn't have any reachable
+  // destroy_values, then we are in this case. But is this correct in
+  // general. We prove this below:
+  //
+  // The only paths along which the copy_value can not be destroyed or consumed
+  // is along paths to dead end blocks. Trivially, we know that such a dead end
+  // block, can not be reachable from the end_borrow since by their nature dead
+  // end blocks end in unreachables.
+  //
+  // So we know that we can only run into this bug if we have a dead end block
+  // reachable from the end_borrow, meaning that the bug can not occur if we
+  // branch before the end_borrow since in that case, the borrow scope would
+  // last over the dead end block's no return meaning that we will not use the
+  // borrowed value after its lifetime is ended by the end_borrow.
+  //
+  // With that in hand, we note again that if we have exactly one consumed,
+  // destroy_value /after/ the end_borrow we will not optimize here. This means
+  // that this bug can only occur if the copy_value is only post-dominated by
+  // dead end blocks that use the value in a non-consuming way.
+  if (destroys.empty() && llvm::any_of(borrowIntroducers, [](SILValue v) {
+        return !isa<SILFunctionArgument>(v);
+      })) {
+    return false;
+  }
+
   // If we reached this point, then we know that all of our users can
   // accept a guaranteed value and our owned value is destroyed only
   // by destroy_value. Check if all of our destroys are joint
