@@ -4606,12 +4606,13 @@ public:
                attr->getIndices().parameters->getNumIndices());
     auto origParamArgs = original->getArgumentsWithoutIndirectResults();
 
-    // Check if result is not varied.
+    // TODO(TF-788): Re-enable non-varied result warning.
+    /*
+    // Emit a warning and fixit if original result is not varied, because it
+    // will always have a zero derivative.
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(*original, origFormalResults);
     auto origResult = origFormalResults[getIndices().source];
-    // Emit warning if original result is not varied, because it will always
-    // have a zero derivative.
     if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
       auto startLoc = origResult.getLoc().getStartSourceLoc();
@@ -4622,6 +4623,7 @@ public:
             .fixItInsertAfter(endLoc, ")");
       }
     }
+    */
 
     auto *diffEntry = getDifferential().getEntryBlock();
     diffBuilder.setInsertionPoint(
@@ -5636,8 +5638,10 @@ public:
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
     auto origResult = origFormalResults[getIndices().source];
-    // Emit warning if original result is not varied, because it will always
-    // have a zero derivative.
+    // TODO(TF-788): Re-enable non-varied result warning.
+    /*
+    // Emit a warning and fixit if original result is not varied, because it
+    // will always have a zero derivative.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
       auto startLoc = origResult.getLoc().getStartSourceLoc();
@@ -5648,6 +5652,7 @@ public:
             .fixItInsertAfter(endLoc, ")");
       }
     }
+    */
     builder.setInsertionPoint(
         pullbackEntry, getNextFunctionLocalAllocationInsertionPoint());
     if (seed->getType().isAddress()) {
