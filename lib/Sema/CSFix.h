@@ -192,6 +192,10 @@ enum class FixKind : uint8_t {
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
+
+  /// Allow a single argument type mismatch. This is the most generic
+  /// failure related to argument-to-parameter conversions.
+  AllowArgumentTypeMismatch,
 };
 
 class ConstraintFix {
@@ -1311,7 +1315,8 @@ public:
 class AllowArgumentMismatch : public ContextualMismatch {
   AllowArgumentMismatch(ConstraintSystem &cs, Type argType, Type paramType,
                         ConstraintLocator *locator)
-      : ContextualMismatch(cs, argType, paramType, locator) {}
+      : ContextualMismatch(cs, FixKind::AllowArgumentTypeMismatch, argType,
+                           paramType, locator) {}
 
 public:
   std::string getName() const override {

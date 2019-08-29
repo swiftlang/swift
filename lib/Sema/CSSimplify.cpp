@@ -2564,6 +2564,16 @@ bool ConstraintSystem::repairFailures(
     if (rhs->isAny())
       break;
 
+    // If there are any other argument mismatches already detected
+    // for this call, we can consider overload unrelated.
+    if (llvm::any_of(getFixes(), [&](const ConstraintFix *fix) {
+          auto *locator = fix->getLocator();
+          return locator->findLast<LocatorPathElt::ApplyArgToParam>()
+                     ? locator->getAnchor() == anchor
+                     : false;
+        }))
+      break;
+
     conversionsOrFixes.push_back(AllowArgumentMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;
@@ -7431,6 +7441,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue: {
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::AllowArgumentTypeMismatch: {
+    increaseScore(SK_Fix);
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 
