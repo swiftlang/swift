@@ -8,9 +8,12 @@ import Builtin
 // Declarations //
 //////////////////
 
+enum MyNever {}
+
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+sil @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
@@ -775,4 +778,63 @@ bb0(%0 : $*NativeObjectPair):
   destroy_addr %0 : $*NativeObjectPair
   %9999 = tuple()
   return %9999 : $()
+}
+
+// Make sure we do not eliminate the copy_value below to ensure that all uses of
+// %2 are before %2's end_borrow.
+//
+// We used to eliminate the copy_value and change %func to use %2.
+//
+// CHECK-LABEL: sil [ossa] @begin_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+// CHECK: copy_value
+// CHECK: } // end sil function 'begin_borrow_used_by_postdominating_no_return_function'
+sil [ossa] @begin_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
+}
+
+// Make sure we do not eliminate the copy_value below to ensure that all uses of
+// %2 are before %2's end_borrow.
+//
+// We used to eliminate the copy_value and change %func to use %2.
+//
+// CHECK-LABEL: sil [ossa] @load_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+// CHECK: copy_value
+// CHECK: } // end sil function 'load_borrow_used_by_postdominating_no_return_function'
+sil [ossa] @load_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %stackSlot = alloc_stack $NativeObjectPair
+  store %1 to [init] %stackSlot : $*NativeObjectPair
+  %2 = load_borrow %stackSlot : $*NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
+}
+
+// Make sure we do perform the optimization if our borrowed value is an
+// argument.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_arg_used_by_postdominating_no_return_function : $@convention(thin) (@guaranteed NativeObjectPair) -> MyNever {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'guaranteed_arg_used_by_postdominating_no_return_function'
+sil [ossa] @guaranteed_arg_used_by_postdominating_no_return_function : $@convention(thin) (@guaranteed NativeObjectPair) -> MyNever {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %3 = struct_extract %0 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
 }
