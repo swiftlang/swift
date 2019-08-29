@@ -102,8 +102,8 @@ namespace {
       switch (key.getKind()) {
         case DeclBaseName::Kind::Normal:
           assert(!key.empty());
-          // FIXME: DJB seed=0, audit whether the default seed could be used.
-          return llvm::djbHash(key.getIdentifier().str(), 0);
+          return llvm::djbHash(key.getIdentifier().str(),
+                               SWIFTMODULE_HASH_SEED);
         case DeclBaseName::Kind::Subscript:
           return static_cast<uint8_t>(DeclNameKind::Subscript);
         case DeclBaseName::Kind::Constructor:
@@ -179,8 +179,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key.str(), 0);
+      return llvm::djbHash(key.str(), SWIFTMODULE_HASH_SEED);
     }
 
     int32_t getNameDataForBase(const NominalTypeDecl *nominal,
@@ -244,8 +243,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key, 0);
+      return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -286,8 +284,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key.str(), 0);
+      return llvm::djbHash(key.str(), SWIFTMODULE_HASH_SEED);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -332,8 +329,7 @@ namespace {
       switch (key.getKind()) {
       case DeclBaseName::Kind::Normal:
         assert(!key.empty());
-        // FIXME: DJB seed=0, audit whether the default seed could be used.
-        return llvm::djbHash(key.getIdentifier().str(), 0);
+        return llvm::djbHash(key.getIdentifier().str(), SWIFTMODULE_HASH_SEED);
       case DeclBaseName::Kind::Subscript:
         return static_cast<uint8_t>(DeclNameKind::Subscript);
       case DeclBaseName::Kind::Constructor:
@@ -4402,8 +4398,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       llvm::SmallString<32> scratch;
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key.getString(scratch), 0);
+      return llvm::djbHash(key.getString(scratch), SWIFTMODULE_HASH_SEED);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,

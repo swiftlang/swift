@@ -1090,8 +1090,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(key_type_ref key) {
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second, 0);
+      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -1340,8 +1339,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(internal_key_type key) {
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second, 0);
+      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
     }
 
     static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
