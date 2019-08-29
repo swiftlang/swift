@@ -97,8 +97,8 @@ namespace {
       removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      removeShadowedDecls(FoundDecls, DC->getParentModule());
-      removeShadowedDecls(FoundOuterDecls, DC->getParentModule());
+      removeShadowedDecls(FoundDecls, DC);
+      removeShadowedDecls(FoundOuterDecls, DC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.

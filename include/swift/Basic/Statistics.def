@@ -175,6 +175,19 @@ FRONTEND_STATISTIC(AST, NumBraceStmtASTScopeExpansions)
 /// Number of ASTScope lookups
 FRONTEND_STATISTIC(AST, NumASTScopeLookups)
 
+/// Number of lookups of the cached import graph for a module or
+/// source file.
+FRONTEND_STATISTIC(AST, ImportSetFoldHit)
+FRONTEND_STATISTIC(AST, ImportSetFoldMiss)
+
+FRONTEND_STATISTIC(AST, ImportSetCacheHit)
+FRONTEND_STATISTIC(AST, ImportSetCacheMiss)
+
+FRONTEND_STATISTIC(AST, ModuleVisibilityCacheHit)
+FRONTEND_STATISTIC(AST, ModuleVisibilityCacheMiss)
+
+FRONTEND_STATISTIC(AST, ModuleShadowCacheHit)
+FRONTEND_STATISTIC(AST, ModuleShadowCacheMiss)
 
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
