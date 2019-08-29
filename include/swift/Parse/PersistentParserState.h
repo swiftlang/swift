@@ -153,7 +153,7 @@ public:
   void delayTopLevel(TopLevelCodeDecl *TLCD, SourceRange BodyRange,
                      SourceLoc PreviousLoc);
 
-  void parseMembers(IterableDeclContext *IDC) override;
+  std::vector<Decl *> parseMembers(IterableDeclContext *IDC) override;
 
   bool hasDelayedDecl() {
     return CodeCompletionDelayedDeclState.get() != nullptr;

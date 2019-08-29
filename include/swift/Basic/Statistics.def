@@ -195,6 +195,10 @@ FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 /// Number of full braced decl list parsed.
 FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 
+#define SWIFT_REQUEST(ZONE, NAME) FRONTEND_STATISTIC(Parse, NAME)
+#include "swift/AST/ParseTypeIDZone.def"
+#undef SWIFT_REQUEST
+
 /// Number of conformances that were deserialized by this frontend job.
 FRONTEND_STATISTIC(Sema, NumConformancesDeserialized)
 

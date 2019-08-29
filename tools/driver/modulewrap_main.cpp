@@ -171,6 +171,7 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   LangOpts.Target = Invocation.getTargetTriple();
   ASTContext &ASTCtx = *ASTContext::get(LangOpts, SearchPathOpts, SrcMgr,
                                         Instance.getDiags());
+  registerParseRequestFunctions(ASTCtx.evaluator);
   registerTypeCheckerRequestFunctions(ASTCtx.evaluator);
   
   ClangImporterOptions ClangImporterOpts;
