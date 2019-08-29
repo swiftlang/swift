@@ -3025,7 +3025,7 @@ public:
       // Record the body.
       TC.definedFunctions.push_back(FD);
     }
-
+    
     checkExplicitAvailability(FD);
 
     if (FD->getDeclContext()->getSelfClassDecl())

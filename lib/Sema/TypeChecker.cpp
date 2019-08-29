@@ -312,6 +312,9 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
       assert(!AFD->getDeclContext()->isLocalContext());
 
       TC.typeCheckAbstractFunctionBody(AFD);
+      
+      // Force computing capture info in case it emits diagnostics.
+      (void)AFD->getCaptureInfo();
     }
 
     // Type check synthesized functions and their bodies.
