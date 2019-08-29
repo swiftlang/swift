@@ -257,20 +257,12 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
   ParsedRawSyntaxNode EOFToken = Parts.back();
   Parts = Parts.drop_back();
 
-  for (auto RawNode : Parts) {
-    if (RawNode.getKind() != SyntaxKind::CodeBlockItem) {
-      // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
-      // the first place.
-      if (RawNode.isRecorded())
-        getSyntaxCreator().finalizeNode(RawNode.getOpaqueNode());
-      continue;
-    }
-
-    AllTopLevel.push_back(RawNode);
-  }
+  assert(llvm::all_of(Parts, [](const ParsedRawSyntaxNode& node) {
+    return node.getKind() == SyntaxKind::CodeBlockItem;
+  }) && "all top level element must be 'CodeBlockItem'");
 
   auto itemList = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList,
-                                           AllTopLevel);
+                                           Parts);
   return Recorder.recordRawSyntax(SyntaxKind::SourceFile,
                                   { itemList, EOFToken });
 }
@@ -304,7 +296,7 @@ void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
 void SyntaxParsingContext::dumpStorage() const  {
   llvm::errs() << "======================\n";
   for (auto Node : getStorage()) {
-    Node.dump();
+    Node.dump(llvm::errs());
     llvm::errs() << "\n--------------\n";
   }
 }
