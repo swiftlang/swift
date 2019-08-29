@@ -1211,14 +1211,6 @@ public:
   void cacheResult(CaptureInfo value) const;
 };
 
-// Allow AnyValue to compare two AnyFunctionRef values.
-template<>
-inline bool AnyValue::Holder<AnyFunctionRef>::equals(const HolderBase &other) const {
-  assert(typeID == other.typeID && "Caller should match type IDs");
-  return llvm::DenseMapInfo<swift::AnyFunctionRef>::isEqual(
-            value, static_cast<const Holder<AnyFunctionRef> &>(other).value);
-}
-
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
