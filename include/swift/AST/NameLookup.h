@@ -378,11 +378,11 @@ bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
 /// other declarations in that set.
 ///
 /// \param decls The set of declarations being considered.
-/// \param curModule The current module.
+/// \param dc The DeclContext from which the lookup was performed.
 ///
 /// \returns true if any shadowed declarations were removed.
 bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                         const ModuleDecl *curModule);
+                         const DeclContext *dc);
 
 /// Finds decls visible in the given context and feeds them to the given
 /// VisibleDeclConsumer.  If the current DeclContext is nested in a function,
