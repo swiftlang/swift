@@ -1668,15 +1668,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (!exprType)
     return CS.TC.Diags.hadAnyError();
 
-  // If we contextually had an inout type, and got a non-lvalue result, then
-  // we fail with a mutability error.
-  if (contextualType->is<InOutType>() && !exprType->is<LValueType>()) {
-    AssignmentFailure failure(recheckedExpr, CS, recheckedExpr->getLoc(),
-                              diag::cannot_pass_rvalue_inout_subelement,
-                              diag::cannot_pass_rvalue_inout);
-    return failure.diagnose();
-  }
-
   // If we don't have a type for the expression, then we cannot use it in
   // conversion constraint diagnostic generation.  If the types match, then it
   // must not be the contextual type that is the problem.
