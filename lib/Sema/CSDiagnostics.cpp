@@ -3943,12 +3943,16 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
 
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
-    assert(isa<AssignExpr>(anchor));
-    if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
-      diagnostic =
-          getDiagnosticFor(CTP_SubscriptAssignSource, /*forProtocol=*/true);
+    if (getParentExpr() && isa<CallExpr>(getParentExpr())) {
+      diagnostic = getDiagnosticFor(CTP_CallArgument, /*forProtocol=*/true);
     } else {
-      diagnostic = getDiagnosticFor(CTP_AssignSource, /*forProtocol=*/true);
+      assert(isa<AssignExpr>(anchor));
+      if (isa<SubscriptExpr>(cast<AssignExpr>(anchor)->getDest())) {
+        diagnostic =
+            getDiagnosticFor(CTP_SubscriptAssignSource, /*forProtocol=*/true);
+      } else {
+        diagnostic = getDiagnosticFor(CTP_AssignSource, /*forProtocol=*/true);
+      }
     }
   } else {
     const auto &last = path.back();
