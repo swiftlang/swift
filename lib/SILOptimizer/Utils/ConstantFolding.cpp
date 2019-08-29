@@ -1166,6 +1166,18 @@ static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
   return B.createFloatLiteral(Loc, BI->getType(), truncVal);
 }
 
+static SILValue constantFoldIsConcrete(BuiltinInst *BI) {
+  if (BI->getOperand(0)->getType().hasArchetype()) {
+    return SILValue();
+  }
+  SILBuilderWithScope builder(BI);
+  auto *inst = builder.createIntegerLiteral(
+      BI->getLoc(), SILType::getBuiltinIntegerType(1, builder.getASTContext()),
+      true);
+  BI->replaceAllUsesWith(inst);
+  return inst;
+}
+
 static SILValue constantFoldBuiltin(BuiltinInst *BI,
                                     Optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
@@ -1563,7 +1575,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
-      if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer)) {
+      if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer) ||
+          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete)) {
         WorkList.insert(inst);
         continue;
       }
@@ -1777,6 +1790,17 @@ ConstantFolder::processWorkList() {
               [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
           InvalidateInstructions = true;
         }
+      }
+      continue;
+    }
+
+    if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
+      if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
+        // Here, the bulitin instruction got folded, so clean it up.
+        recursivelyDeleteTriviallyDeadInstructions(
+            I, /*force*/ true,
+            [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
+        InvalidateInstructions = true;
       }
       continue;
     }
