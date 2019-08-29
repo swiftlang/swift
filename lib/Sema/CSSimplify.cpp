@@ -1926,6 +1926,10 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
             return getTypeMatchFailure(locator);
         }
 
+        if (locator.hasEmptyPath()) {
+          return getTypeMatchFailure(locator);
+        }
+
         auto *fix = MissingConformance::forContextual(
             *this, type1, proto, getConstraintLocator(locator));
 
