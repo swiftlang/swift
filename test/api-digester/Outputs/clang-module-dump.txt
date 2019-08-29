@@ -33,7 +33,8 @@
           "protocolReq": true,
           "objc_name": "anotherFunctionFromProt",
           "declAttributes": [
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ],
           "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
@@ -44,7 +45,8 @@
       "moduleName": "Foo",
       "objc_name": "AnotherObjcProt",
       "declAttributes": [
-        "ObjC"
+        "ObjC",
+        "Dynamic"
       ]
     },
     {
@@ -76,7 +78,8 @@
           "isOpen": true,
           "objc_name": "someFunction",
           "declAttributes": [
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ],
           "funcSelfKind": "NonMutating"
         },
@@ -100,7 +103,8 @@
           "objc_name": "init",
           "declAttributes": [
             "Override",
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ]
         }
       ],
@@ -110,7 +114,8 @@
       "isOpen": true,
       "objc_name": "ClangInterface",
       "declAttributes": [
-        "ObjC"
+        "ObjC",
+        "Dynamic"
       ],
       "superclassUsr": "c:objc(cs)NSObject",
       "superclassNames": [
@@ -161,7 +166,8 @@
           "protocolReq": true,
           "objc_name": "someFunctionFromProt",
           "declAttributes": [
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ],
           "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
@@ -172,9 +178,10 @@
       "moduleName": "Foo",
       "objc_name": "ObjcProt",
       "declAttributes": [
-        "ObjC"
+        "ObjC",
+        "Dynamic"
       ]
     }
   ],
-  "json_format_version": 4
+  "json_format_version": 5
 }

@@ -122,6 +122,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
+    SyntaxParsingContext CCCtxt(SyntaxContext, SyntaxContextKind::Decl);
     consumeToken();
     if (CodeCompletion)
       CodeCompletion->completeAfterPoundDirective();
