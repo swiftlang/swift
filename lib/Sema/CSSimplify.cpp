@@ -2512,6 +2512,19 @@ bool ConstraintSystem::repairFailures(
     if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
       conversionsOrFixes.push_back(
           ForceOptional::create(*this, lhs, lhs->getOptionalObjectType(), loc));
+      break;
+    }
+
+    // There is no subtyping between object types of inout argument/parameter.
+    if (elt.getKind() == ConstraintLocator::LValueConversion) {
+      auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
+                               TMF_ApplyingFix, locator);
+
+      if (!result.isFailure()) {
+        conversionsOrFixes.push_back(
+            AllowInOutConversion::create(*this, lhs, rhs, loc));
+        break;
+      }
     }
 
     if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
