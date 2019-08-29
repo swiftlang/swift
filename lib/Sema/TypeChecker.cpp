@@ -329,16 +329,6 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
-  // Compute captures for functions and closures we visited.
-  for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    (void)closure->getCaptureInfo();
-  }
-  TC.ClosuresWithUncomputedCaptures.clear();
-
-  for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
-    (void)FD->getCaptureInfo();
-  }
-
   TC.definedFunctions.clear();
 }
 

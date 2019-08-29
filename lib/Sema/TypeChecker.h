@@ -556,10 +556,6 @@ public:
                  bool>
       specializedOverloadComparisonCache;
 
-  /// A list of closures for the most recently type-checked function, which we
-  /// will need to compute captures for.
-  std::vector<AbstractClosureExpr *> ClosuresWithUncomputedCaptures;
-
 private:
   /// The # of times we have performed typo correction.
   unsigned NumTypoCorrections = 0;

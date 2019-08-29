@@ -861,6 +861,8 @@ Optional<CaptureInfo> ComputeCaptureInfoRequest::getCachedResult() const {
 }
 
 void ComputeCaptureInfoRequest::cacheResult(CaptureInfo value) const {
+  // FIXME: This is quite messy.  The layout of CaptureInfo could use some
+  // spring cleaning.
   auto AFR = std::get<0>(getStorage());
   if (auto *AFD = AFR.getAbstractFunctionDecl()) {
     AFD->Captures = value;

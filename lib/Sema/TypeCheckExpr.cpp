@@ -624,8 +624,6 @@ Expr *TypeChecker::buildAutoClosureExpr(DeclContext *DC, Expr *expr,
 
   closure->setParameterList(ParameterList::createEmpty(Context));
 
-  ClosuresWithUncomputedCaptures.push_back(closure);
-
   if (!newClosureType->isEqual(closureType)) {
     assert(isInDefaultArgumentContext);
     assert(newClosureType
