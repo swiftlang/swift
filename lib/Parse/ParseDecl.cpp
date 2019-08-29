@@ -3186,12 +3186,71 @@ Parser::parseDecl(ParseDeclOptions Flags,
   return DeclResult;
 }
 
+/// Determine the declaration parsing options to use when parsing the members
+/// of the given context.
+static Parser::ParseDeclOptions getMemberParseDeclOptions(
+                                                    IterableDeclContext *idc) {
+  using ParseDeclOptions = Parser::ParseDeclOptions;
+
+  auto decl = idc->getDecl();
+  switch (decl->getKind()) {
+  case DeclKind::Extension:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_InExtension);
+  case DeclKind::Enum:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_AllowEnumElement |
+        Parser::PD_InEnum);
+
+  case DeclKind::Protocol:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_DisallowInit |
+        Parser::PD_InProtocol);
+
+  case DeclKind::Class:
+    return ParseDeclOptions(
+        Parser::PD_HasContainerType | Parser::PD_AllowDestructor |
+        Parser::PD_InClass);
+
+  case DeclKind::Struct:
+    return ParseDeclOptions(Parser::PD_HasContainerType | Parser::PD_InStruct);
+
+  default:
+    llvm_unreachable("Bad iterable decl context kinds.");
+  }
+}
+
+static ScopeKind getMemberParseScopeKind(IterableDeclContext *idc) {
+  auto decl = idc->getDecl();
+  switch (decl->getKind()) {
+  case DeclKind::Extension: return ScopeKind::Extension;
+  case DeclKind::Enum: return ScopeKind::EnumBody;
+  case DeclKind::Protocol: return ScopeKind::ProtocolBody;
+  case DeclKind::Class: return ScopeKind::ClassBody;
+  case DeclKind::Struct: return ScopeKind::StructBody;
+
+  default:
+    llvm_unreachable("Bad iterable decl context kinds.");
+  }
+}
+
 std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   auto DelayedState = State->takeDelayedDeclListState(IDC);
   assert(DelayedState.get() && "should have delayed state");
+  (void)DelayedState;
 
-  auto BeginParserPosition = getParserPosition(DelayedState->BodyPos);
-  auto EndLexerState = L->getStateForEndOfTokenLoc(DelayedState->BodyEnd);
+  Decl *D = const_cast<Decl*>(IDC->getDecl());
+  DeclContext *DC = cast<DeclContext>(D);
+  SourceRange BodyRange;
+  if (auto ext = dyn_cast<ExtensionDecl>(IDC)) {
+    BodyRange = ext->getBraces();
+  } else {
+    auto *ntd = cast<NominalTypeDecl>(IDC);
+    BodyRange = ntd->getBraces();
+  }
+
+  auto BeginParserPosition = getParserPosition({BodyRange.Start,BodyRange.End});
+  auto EndLexerState = L->getStateForEndOfTokenLoc(BodyRange.End);
 
   // ParserPositionRAII needs a primed parser to restore to.
   if (Tok.is(tok::NUM_TOKENS))
@@ -3209,11 +3268,16 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   // Rewind to the beginning of the decl.
   restoreParserPosition(BeginParserPosition);
 
-  // Re-enter the lexical scope.
-  Scope S(this, DelayedState->takeScope());
-  ContextChange CC(*this, DelayedState->ParentContext);
-  Decl *D = const_cast<Decl*>(IDC->getDecl());
+  // Re-enter the lexical scope. The top-level scope is needed because
+  // delayed parsing of members happens with a fresh parser, where there is
+  // no context.
+  Scope TopLevelScope(this, ScopeKind::TopLevel);
+
+  Scope S(this, getMemberParseScopeKind(IDC));
+  ContextChange CC(*this, DC);
   SourceLoc LBLoc = consumeToken(tok::l_brace);
+  (void)LBLoc;
+  assert(LBLoc == BodyRange.Start);
   SourceLoc RBLoc;
   Diag<> Id;
   switch (D->getKind()) {
@@ -3226,21 +3290,8 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
     llvm_unreachable("Bad iterable decl context kinds.");
   }
   bool hadError = false;
-  std::vector<Decl *> decls;
-  if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
-    decls = parseDeclList(ext->getBraces().Start, RBLoc, Id,
-                          ParseDeclOptions(DelayedState->Flags),
-                          ext, hadError);
-    ext->setBraces({LBLoc, RBLoc});
-  } else {
-    auto *ntd = cast<NominalTypeDecl>(D);
-    decls = parseDeclList(ntd->getBraces().Start, RBLoc, Id,
-                          ParseDeclOptions(DelayedState->Flags),
-                          ntd, hadError);
-    ntd->setBraces({LBLoc, RBLoc});
-  }
-
-  return decls;
+  ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
+  return parseDeclList(LBLoc, RBLoc, Id, Options, IDC, hadError);
 }
 
 void Parser::parseDeclDelayed() {
@@ -3657,10 +3708,10 @@ ParserStatus Parser::parseDeclItem(bool &PreviousHadSemi,
 bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                                  SourceLoc PosBeforeLB,
                                  Diag<> ErrorDiag,
-                                 ParseDeclOptions Options,
                                  IterableDeclContext *IDC) {
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
+  ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
 
   if (canDelayMemberDeclParsing(HasOperatorDeclarations,
                                 HasNestedClassDeclarations)) {
@@ -3834,11 +3885,10 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   } else {
     ContextChange CC(*this, ext);
     Scope S(this, ScopeKind::Extension);
-    ParseDeclOptions Options(PD_HasContainerType | PD_InExtension);
 
     if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
                             diag::expected_rbrace_extension,
-                            Options, ext))
+                            ext))
       status.setIsParseError();
 
     // Don't propagate the code completion bit from members: we cannot help
@@ -5759,11 +5809,10 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
     Status.setIsParseError();
   } else {
     Scope S(this, ScopeKind::EnumBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowEnumElement | PD_InEnum);
 
     if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
                             diag::expected_rbrace_enum,
-                            Options, ED))
+                            ED))
       Status.setIsParseError();
   }
 
@@ -6046,11 +6095,10 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   } else {
     // Parse the body.
     Scope S(this, ScopeKind::StructBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_InStruct);
 
     if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
                             diag::expected_rbrace_struct,
-                            Options, SD))
+                            SD))
       Status.setIsParseError();
   }
 
@@ -6160,12 +6208,10 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   } else {
     // Parse the body.
     Scope S(this, ScopeKind::ClassBody);
-    ParseDeclOptions Options(PD_HasContainerType | PD_AllowDestructor |
-                             PD_InClass);
 
     if (parseMemberDeclList(LBLoc, RBLoc, PosBeforeLB,
                             diag::expected_rbrace_class,
-                            Options, CD))
+                            CD))
       Status.setIsParseError();
   }
 
@@ -6255,13 +6301,9 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       Status.setIsParseError();
     } else {
       // Parse the members.
-      ParseDeclOptions Options(PD_HasContainerType |
-                               PD_DisallowInit |
-                               PD_InProtocol);
-
       if (parseMemberDeclList(LBraceLoc, RBraceLoc, PosBeforeLB,
                               diag::expected_rbrace_protocol,
-                              Options, Proto))
+                              Proto))
         Status.setIsParseError();
     }
 

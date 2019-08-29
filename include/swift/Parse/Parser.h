@@ -976,7 +976,6 @@ public:
   bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            SourceLoc PosBeforeLB,
                            Diag<> ErrorDiag,
-                           ParseDeclOptions Options,
                            IterableDeclContext *IDC);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
