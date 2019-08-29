@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify -enable-opaque-result-types %s
+// RUN: %target-swift-frontend -disable-availability-checking -typecheck -verify -enable-opaque-result-types %s -swift-version 5
 
 protocol P {
   func paul()
@@ -472,4 +472,17 @@ func invoke_52528543<T: P_52528543, U: P_52528543>(x: T, y: U) {
   let y2 = opaque_52528543(x: y)
   var xab = f_52528543(x: x2)
   xab = f_52528543(x: y2) // expected-error{{cannot assign}}
+}
+
+protocol Proto {}
+
+struct I : Proto {}
+
+dynamic func foo<S>(_ s: S) -> some Proto {
+  return I()
+}
+
+@_dynamicReplacement(for: foo)
+func foo_repl<S>(_ s: S) -> some Proto {
+ return   I()
 }
