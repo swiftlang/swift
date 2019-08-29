@@ -4452,6 +4452,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseConversionToBool())
     return true;
 
+  if (diagnoseArchetypeMismatch())
+    return true;
+
   emitDiagnostic(getLoc(), diag::cannot_convert_argument_value, getFromType(),
                  getToType());
   return true;
@@ -4471,4 +4474,81 @@ bool ArgumentMismatchFailure::diagnoseAsNote() {
   }
 
   return false;
+}
+
+bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
+  auto *argTy = getFromType()->getAs<ArchetypeType>();
+  auto *paramTy = getToType()->getAs<ArchetypeType>();
+
+  if (!(argTy && paramTy))
+    return false;
+
+  // Produce this diagnostic only if the names
+  // of the generic parameters are the same.
+  if (argTy->getName() != paramTy->getName())
+    return false;
+
+  auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
+    auto paramType = archetype->getInterfaceType();
+
+    if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
+      return GTPT->getDecl();
+
+    if (auto *DMT = paramType->getAs<DependentMemberType>())
+      return DMT->getAssocType();
+
+    return nullptr;
+  };
+
+  auto *argDecl = getGenericTypeDecl(argTy);
+  auto *paramDecl = getGenericTypeDecl(paramTy);
+
+  if (!(paramDecl && argDecl))
+    return false;
+
+  auto describeGenericType = [&](ValueDecl *genericParam,
+                                 bool includeName = false) -> std::string {
+    if (!genericParam)
+      return "";
+
+    Decl *parent = nullptr;
+    if (auto *AT = dyn_cast<AssociatedTypeDecl>(genericParam)) {
+      parent = AT->getProtocol();
+    } else {
+      auto *dc = genericParam->getDeclContext();
+      parent = dc->getInnermostDeclarationDeclContext();
+    }
+
+    if (!parent)
+      return "";
+
+    llvm::SmallString<64> result;
+    llvm::raw_svector_ostream OS(result);
+
+    OS << Decl::getDescriptiveKindName(genericParam->getDescriptiveKind());
+
+    if (includeName && genericParam->hasName())
+      OS << " '" << genericParam->getBaseName() << "'";
+
+    OS << " of ";
+    OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
+    if (auto *decl = dyn_cast<ValueDecl>(parent)) {
+      if (decl->hasName())
+        OS << " '" << decl->getFullName() << "'";
+    }
+
+    return OS.str();
+  };
+
+  emitDiagnostic(
+      getAnchor()->getLoc(), diag::cannot_convert_argument_value_generic, argTy,
+      describeGenericType(argDecl), paramTy, describeGenericType(paramDecl));
+
+  emitDiagnostic(argDecl, diag::descriptive_generic_type_declared_here,
+                 describeGenericType(argDecl, true));
+
+  emitDiagnostic(paramDecl, diag::descriptive_generic_type_declared_here,
+                 describeGenericType(paramDecl, true));
+
+  return true;
 }

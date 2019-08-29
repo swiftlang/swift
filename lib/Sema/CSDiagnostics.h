@@ -1615,6 +1615,10 @@ public:
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
 
+  /// If both argument and parameter are represented by `ArchetypeType`
+  /// produce a special diagnostic in case their names match.
+  bool diagnoseArchetypeMismatch() const;
+
 protected:
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 };
