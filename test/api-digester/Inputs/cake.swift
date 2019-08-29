@@ -130,3 +130,12 @@ public class SwiftObjcClass {
   @objc(ObjCFool:ObjCA:ObjCB:)
   public func foo(a:Int, b:Int, c: Int) {}
 }
+
+@available(iOS 10.2, tvOS 10.3, watchOS 3.4, *)
+@available(macOS, unavailable)
+public class UnavailableOnMac {}
+
+@available(macOS, unavailable)
+extension SwiftObjcClass {
+  public func functionUnavailableOnMac() {}
+}
