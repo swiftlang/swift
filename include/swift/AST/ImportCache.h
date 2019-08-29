@@ -51,12 +51,14 @@ class ImportSet final :
     public llvm::FoldingSetNode,
     private llvm::TrailingObjects<ImportSet, ModuleDecl::ImportedModule> {
   friend TrailingObjects;
-  friend ImportCache;
+  friend class ImportCache;
 
-  unsigned NumTopLevelImports;
+  unsigned HasHeaderImportModule : 1;
+  unsigned NumTopLevelImports : 31;
   unsigned NumTransitiveImports;
 
-  ImportSet(ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
+  ImportSet(bool hasHeaderImportModule,
+            ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
             ArrayRef<ModuleDecl::ImportedModule> transitiveImports);
 
   ImportSet(const ImportSet &) = delete;
@@ -72,6 +74,13 @@ public:
 
   size_t numTrailingObjects(OverloadToken<ModuleDecl::ImportedModule>) const {
     return NumTopLevelImports + NumTransitiveImports;
+  }
+
+  /// This is a bit of a hack to make module name lookup work properly.
+  /// If our import set includes the ClangImporter's special header import
+  /// module, we have to check it first, before any other imported module.
+  bool hasHeaderImportModule() const {
+    return HasHeaderImportModule;
   }
 
   ArrayRef<ModuleDecl::ImportedModule> getTopLevelImports() const {
@@ -183,6 +192,8 @@ public:
     ImportSetForDC.clear();
   }
 };
+
+ArrayRef<ModuleDecl::ImportedModule> getAllImports(const DeclContext *dc);
 
 }  // namespace namelookup
 

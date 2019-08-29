@@ -35,9 +35,6 @@ enum class ResolutionKind {
   /// If non-overloadable decls are returned, this indicates ambiguous lookup.
   Overloadable,
 
-  /// Lookup should match a single decl.
-  Exact,
-
   /// Lookup should match a single decl that declares a type.
   TypesOnly
 };
@@ -61,16 +58,6 @@ void lookupInModule(const DeclContext *moduleOrFile,
                     DeclName name, SmallVectorImpl<ValueDecl *> &decls,
                     NLKind lookupKind, ResolutionKind resolutionKind,
                     const DeclContext *moduleScopeContext);
-
-template <typename Fn>
-void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
-  DeclContext *moduleScope = DC->getModuleScopeContext();
-  if (auto file = dyn_cast<FileUnit>(moduleScope))
-    file->forAllVisibleModules(fn);
-  else
-    cast<ModuleDecl>(moduleScope)
-        ->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn);
-}
 
 /// Performs a qualified lookup into the given module and, if necessary, its
 /// reexports, observing proper shadowing rules.

@@ -23,9 +23,11 @@
 using namespace swift;
 using namespace namelookup;
 
-ImportSet::ImportSet(ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
+ImportSet::ImportSet(bool hasHeaderImportModule,
+                     ArrayRef<ModuleDecl::ImportedModule> topLevelImports,
                      ArrayRef<ModuleDecl::ImportedModule> transitiveImports)
-  : NumTopLevelImports(topLevelImports.size()),
+  : HasHeaderImportModule(hasHeaderImportModule),
+    NumTopLevelImports(topLevelImports.size()),
     NumTransitiveImports(transitiveImports.size()) {
   auto buffer = getTrailingObjects<ModuleDecl::ImportedModule>();
   std::uninitialized_copy(topLevelImports.begin(), topLevelImports.end(),
@@ -78,6 +80,11 @@ static void collectExports(ModuleDecl::ImportedModule next,
 ImportSet &
 ImportCache::getImportSet(ASTContext &ctx,
                           ArrayRef<ModuleDecl::ImportedModule> imports) {
+  bool hasHeaderImportModule = false;
+  ModuleDecl *headerImportModule = nullptr;
+  if (auto *loader = ctx.getClangModuleLoader())
+    headerImportModule = loader->getImportedHeaderModule();
+
   SmallVector<ModuleDecl::ImportedModule, 4> topLevelImports;
 
   SmallVector<ModuleDecl::ImportedModule, 4> transitiveImports;
@@ -88,6 +95,8 @@ ImportCache::getImportSet(ASTContext &ctx,
       continue;
 
     topLevelImports.push_back(next);
+    if (next.second == headerImportModule)
+      hasHeaderImportModule = true;
   }
 
   void *InsertPos = nullptr;
@@ -116,6 +125,9 @@ ImportCache::getImportSet(ASTContext &ctx,
       continue;
 
     transitiveImports.push_back(next);
+    if (next.second == headerImportModule)
+      hasHeaderImportModule = true;
+
     collectExports(next, stack);
   }
 
@@ -131,7 +143,9 @@ ImportCache::getImportSet(ASTContext &ctx,
     sizeof(ModuleDecl::ImportedModule) * transitiveImports.size(),
     alignof(ImportSet), AllocationArena::Permanent);
 
-  auto *result = new (mem) ImportSet(topLevelImports, transitiveImports);
+  auto *result = new (mem) ImportSet(hasHeaderImportModule,
+                                     topLevelImports,
+                                     transitiveImports);
   ImportSets.InsertNode(result, InsertPos);
 
   return *result;
@@ -278,3 +292,9 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
   ShadowCache[key] = result;
   return result;
 };
+
+ArrayRef<ModuleDecl::ImportedModule>
+swift::namelookup::getAllImports(const DeclContext *dc) {
+  return dc->getASTContext().getImportCache().getImportSet(dc)
+    .getAllImports();
+}

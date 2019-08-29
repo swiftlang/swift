@@ -14,13 +14,14 @@
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -2665,7 +2666,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
     }
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
-    M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
+    for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.second->getName();
       if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
@@ -2684,7 +2685,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
-    });
+    }
   }
 
   return ExitCode;

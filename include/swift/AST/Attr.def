@@ -362,8 +362,7 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(frozen, Frozen,
-  OnEnum | OnStruct |
-  UserInaccessible,
+  OnEnum | OnStruct,
   76)
 DECL_ATTR_ALIAS(_frozen, Frozen)
 SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,

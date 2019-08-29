@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -364,10 +365,9 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
 
   DynamicLookupConsumer ConsumerWrapper(Consumer, LS, CurrDC);
 
-  CurrDC->getParentSourceFile()->forAllVisibleModules(
-      [&](ModuleDecl::ImportedModule Import) {
-        Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
-      });
+  for (auto Import : namelookup::getAllImports(CurrDC)) {
+    Import.second->lookupClassMembers(Import.first, ConsumerWrapper);
+  }
 }
 
 namespace {
