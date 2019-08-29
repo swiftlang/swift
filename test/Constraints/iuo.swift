@@ -235,3 +235,14 @@ let sr_10492_int1: Int = (sr_10492_s.foo)() // expected-error {{value of optiona
 // expected-note@-1 {{coalesce}}{{44-44= ?? <#default value#>}}
 // expected-note@-2 {{force-unwrap}}{{44-44=!}}
 let sr_10492_int2: Int? = (sr_10492_s.foo)() // Okay
+
+
+class SR_10492_C1 {
+  init!() {}
+}
+
+class SR_10492_C2 {
+  init(_ foo: SR_10492_C1) {}
+}
+
+let bar = SR_10492_C2(SR_10492_C1()) // Okay

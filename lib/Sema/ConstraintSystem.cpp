@@ -2199,9 +2199,14 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     if (!type || !type->is<AnyFunctionType>())
       return false;
 
-    auto paren = getParentExpr(locator->getAnchor());
-    auto result = paren ? isa<ParenExpr>(paren) : false;
-    return result;
+    if (auto call = dyn_cast<CallExpr>(locator->getAnchor()))
+      return call->getSemanticFn() != call->getFn();
+
+    if (auto paren = getParentExpr(locator->getAnchor())) {
+      return isa<ParenExpr>(paren);
+    }
+
+    return false;
   };
 
   // In some cases we already created the appropriate bind constraints.
