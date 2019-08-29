@@ -52,7 +52,13 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 516; // encode GenericSignature and GenericEnvironment together
+const uint16_t SWIFTMODULE_VERSION_MINOR = 517; // better string hash seed
+
+/// A standard hash seed used for all string hashes in a serialized module.
+///
+/// This is the same as the default used by llvm::djbHash, just provided
+/// explicitly here to note that it's part of the format.
+const uint32_t SWIFTMODULE_HASH_SEED = 5381;
 
 using DeclIDField = BCFixed<31>;
 
