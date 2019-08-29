@@ -826,7 +826,7 @@ public:
   /// of the given decl context.
   ///
   /// \param IDC The context whose member decls should be lazily parsed.
-  void parseMembers(IterableDeclContext *IDC);
+  std::vector<Decl *> parseMembers(IterableDeclContext *IDC);
 
   /// Get the lazy function data for the given generic context.
   ///

@@ -2015,12 +2015,14 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   return entry;
 }
 
-void ASTContext::parseMembers(IterableDeclContext *IDC) {
+std::vector<Decl *> ASTContext::parseMembers(IterableDeclContext *IDC) {
   assert(IDC->hasUnparsedMembers());
   for (auto *p: getImpl().lazyParsers) {
     if (p->hasUnparsedMembers(IDC))
-      p->parseMembers(IDC);
+      return p->parseMembers(IDC);
   }
+
+  return { };
 }
 
 LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(

@@ -19,6 +19,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceManager.h"
@@ -804,15 +805,39 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
     ++s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
   }
 }
+bool IterableDeclContext::hasUnparsedMembers() const {
+  if (AddedParsedMembers)
+    return false;
+
+  if (!getDecl()->getDeclContext()->getParentSourceFile()) {
+    // There will never be any parsed members to add, so set the flag to say
+    // we are done so we can short-circuit next time.
+    const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
+    return false;
+  }
+
+  return true;
+}
 
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
-  // Lazily parse members.
-  if (HasUnparsedMembers) {
-    auto *IDC = const_cast<IterableDeclContext *>(this);
-    ctx.parseMembers(IDC);
-    IDC->HasUnparsedMembers = 0;
+  // For contexts within a source file, get the list of parsed members.
+  if (getDecl()->getDeclContext()->getParentSourceFile()) {
+    // Retrieve the parsed members. Even if we've already added the parsed
+    // members to this context, this call is important for recording the
+    // dependency edge.
+    auto mutableThis = const_cast<IterableDeclContext *>(this);
+    auto members = evaluateOrDefault(
+        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
+
+    // If we haven't already done so, add these members to this context.
+    if (!AddedParsedMembers) {
+      mutableThis->AddedParsedMembers = 1;
+      for (auto member : members) {
+        mutableThis->addMember(member);
+      }
+    }
   }
 
   if (!hasLazyMembers())
@@ -1072,3 +1097,12 @@ static void verify_DeclContext_is_start_of_node() {
 #include "swift/AST/ExprNodes.def"
 }
 #endif
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const IterableDeclContext *idc) {
+  simple_display(out, idc->getDecl());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const IterableDeclContext *idc) {
+  return extractNearestSourceLoc(idc->getDecl());
+}

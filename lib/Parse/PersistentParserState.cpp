@@ -89,7 +89,7 @@ void PersistentParserState::parseAllDelayedDeclLists() {
     AllDelayed.push_back(P.first);
   }
   for (auto *D: AllDelayed) {
-    parseMembers(D);
+    D->loadAllMembers();
   }
 }
 

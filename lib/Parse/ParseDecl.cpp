@@ -29,6 +29,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -180,7 +181,8 @@ namespace {
   };
 } // end anonymous namespace
 
-void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
+std::vector<Decl *> PersistentParserState::parseMembers(
+    IterableDeclContext *IDC) {
   SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
   assert(!SF.hasInterfaceHash() &&
     "Cannot delay parsing if we care about the interface hash.");
@@ -198,7 +200,7 @@ void PersistentParserState::parseMembers(IterableDeclContext *IDC) {
   Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
   // Disable libSyntax creation in the delayed parsing.
   TheParser.SyntaxContext->setDiscard();
-  TheParser.parseDeclListDelayed(IDC);
+  return TheParser.parseDeclListDelayed(IDC);
 }
 
 /// Main entrypoint for the parser.
@@ -3184,7 +3186,7 @@ Parser::parseDecl(ParseDeclOptions Flags,
   return DeclResult;
 }
 
-void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
+std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   auto DelayedState = State->takeDelayedDeclListState(IDC);
   assert(DelayedState.get() && "should have delayed state");
 
@@ -3223,18 +3225,22 @@ void Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   default:
     llvm_unreachable("Bad iterable decl context kinds.");
   }
+  bool hadError = false;
+  std::vector<Decl *> decls;
   if (auto *ext = dyn_cast<ExtensionDecl>(D)) {
-    parseDeclList(ext->getBraces().Start, RBLoc, Id,
-                  ParseDeclOptions(DelayedState->Flags),
-                  ext);
+    decls = parseDeclList(ext->getBraces().Start, RBLoc, Id,
+                          ParseDeclOptions(DelayedState->Flags),
+                          ext, hadError);
     ext->setBraces({LBLoc, RBLoc});
   } else {
     auto *ntd = cast<NominalTypeDecl>(D);
-    parseDeclList(ntd->getBraces().Start, RBLoc, Id,
-                  ParseDeclOptions(DelayedState->Flags),
-                  ntd);
+    decls = parseDeclList(ntd->getBraces().Start, RBLoc, Id,
+                          ParseDeclOptions(DelayedState->Flags),
+                          ntd, hadError);
     ntd->setBraces({LBLoc, RBLoc});
   }
+
+  return decls;
 }
 
 void Parser::parseDeclDelayed() {
@@ -3658,7 +3664,6 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 
   if (canDelayMemberDeclParsing(HasOperatorDeclarations,
                                 HasNestedClassDeclarations)) {
-    IDC->setHasUnparsedMembers();
     if (HasOperatorDeclarations)
       IDC->setMaybeHasOperatorDeclarations();
     if (HasNestedClassDeclarations)
@@ -3667,7 +3672,18 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, IDC))
       return true;
   } else {
-    if (parseDeclList(LBLoc, RBLoc, ErrorDiag, Options, IDC))
+    // When forced to eagerly parse, do so and cache the results in the
+    // evaluator.
+    bool hadError = false;
+    auto members = parseDeclList(
+        LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
+    IDC->setMaybeHasOperatorDeclarations();
+    IDC->setMaybeHasNestedClassDeclarations();
+    Context.evaluator.cacheOutput(
+        ParseMembersRequest{IDC},
+        Context.AllocateCopy(llvm::makeArrayRef(members)));
+
+    if (hadError)
       return true;
   }
 
@@ -3679,16 +3695,18 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
 /// \verbatim
 ///    decl* '}'
 /// \endverbatim
-bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                           Diag<> ErrorDiag, ParseDeclOptions Options,
-                           IterableDeclContext *IDC) {
+std::vector<Decl *> Parser::parseDeclList(
+    SourceLoc LBLoc, SourceLoc &RBLoc, Diag<> ErrorDiag,
+    ParseDeclOptions Options, IterableDeclContext *IDC,
+    bool &hadError) {
+  std::vector<Decl *> decls;
   ParserStatus Status;
   bool PreviousHadSemi = true;
   {
     SyntaxParsingContext ListContext(SyntaxContext, SyntaxKind::MemberDeclList);
     while (Tok.isNot(tok::r_brace)) {
       Status |= parseDeclItem(PreviousHadSemi, Options,
-                              [&](Decl *D) { IDC->addMember(D); });
+                              [&](Decl *D) { decls.push_back(D); });
       if (Tok.isAny(tok::eof, tok::pound_endif, tok::pound_else,
                     tok::pound_elseif)) {
         IsInputIncomplete = true;
@@ -3707,7 +3725,9 @@ bool Parser::parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
   }
   // If we found the closing brace, then the caller should not care if there
   // were errors while parsing inner decls, because we recovered.
-  return !RBLoc.isValid();
+  if (RBLoc.isInvalid())
+    hadError = true;
+  return decls;
 }
 
 bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
