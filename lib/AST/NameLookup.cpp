@@ -1225,7 +1225,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       // We still have to parse any unparsed extensions.
       if (!ignoreNewExtensions) {
         for (auto *e : getExtensions()) {
-          if (e->hasUnparsedMembers())
+          if (e->getParentSourceFile() != nullptr)
             e->loadAllMembers();
         }
       }

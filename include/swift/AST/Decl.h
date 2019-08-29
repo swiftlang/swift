@@ -7248,6 +7248,17 @@ void simple_display(llvm::raw_ostream &out, const Decl *decl);
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);
 
+/// Display ExtensionDecls.
+inline void simple_display(llvm::raw_ostream &out, const ExtensionDecl *decl) {
+  simple_display(out, static_cast<const Decl *>(decl));
+}
+
+/// Display NominalTypeDecls.
+inline void simple_display(llvm::raw_ostream &out,
+                           const NominalTypeDecl *decl) {
+  simple_display(out, static_cast<const Decl *>(decl));
+}
+
 /// Extract the source location from the given declaration.
 SourceLoc extractNearestSourceLoc(const Decl *decl);
 
@@ -7258,6 +7269,11 @@ inline SourceLoc extractNearestSourceLoc(const ExtensionDecl *ext) {
 
 /// Extract the source location from the given declaration.
 inline SourceLoc extractNearestSourceLoc(const GenericTypeDecl *type) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(type));
+}
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const NominalTypeDecl *type) {
   return extractNearestSourceLoc(static_cast<const Decl *>(type));
 }
 

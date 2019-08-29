@@ -35,6 +35,7 @@ enum class Zone : uint8_t {
   IDE                     = 137,
   IDETypeChecking         = 97,
   NameLookup              = 9,
+  Parse                   = 8,
   TypeChecker             = 10,
   // N.B. This is not a formal zone and exists solely to support the unit tests.
   ArithmeticEvaluator     = 255,

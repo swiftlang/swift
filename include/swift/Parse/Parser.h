@@ -971,7 +971,7 @@ public:
 
   void parseDeclDelayed();
 
-  void parseDeclListDelayed(IterableDeclContext *IDC);
+  std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                            SourceLoc PosBeforeLB,
@@ -1080,9 +1080,10 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              Parser::ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                     Diag<> ErrorDiag, ParseDeclOptions Options,
-                     IterableDeclContext *IDC);
+  std::vector<Decl *> parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                                    Diag<> ErrorDiag, ParseDeclOptions Options,
+                                    IterableDeclContext *IDC,
+                                    bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,

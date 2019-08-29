@@ -186,6 +186,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   Context.reset(ASTContext::get(Invocation.getLangOptions(),
                                 Invocation.getSearchPathOptions(), SourceMgr,
                                 Diagnostics));
+  registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.

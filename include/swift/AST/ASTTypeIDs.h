@@ -17,19 +17,26 @@
 #ifndef SWIFT_AST_ASTTYPEIDS_H
 #define SWIFT_AST_ASTTYPEIDS_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
 class CustomAttr;
+class Decl;
 class GenericSignature;
 class GenericTypeParamType;
+class IterableDeclContext;
 class NominalTypeDecl;
+class OperatorDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;
 enum class CtorInitializerKind;
 struct PropertyWrapperMutability;
+class ProtocolDecl;
 class Requirement;
+enum class ResilienceExpansion : unsigned;
 class Type;
+class ValueDecl;
 class VarDecl;
 class TypeAliasDecl;
 class Type;
