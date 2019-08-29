@@ -257,6 +257,17 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   return pat;
 }
 
+/// Build a type-checked integer literal.
+static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
+  Type intType = C.getIntDecl()->getDeclaredType();
+
+  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
+  literal->setType(intType);
+  literal->setBuiltinInitializer(C.getIntBuiltinInitDecl(C.getIntDecl()));
+
+  return literal;
+}
+
 /// Create AST statements which convert from an enum to an Int with a switch.
 /// \p stmts The generated statements are appended to this vector.
 /// \p parentDC Either an extension or the enum itself.
@@ -298,15 +309,20 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                           SourceLoc(), SourceLoc(),
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
+    pat->setType(enumType);
 
     auto labelItem = CaseLabelItem(pat);
 
     // generate: indexVar = <index>
-    auto indexExpr = IntegerLiteralExpr::createFromUnsigned(C, index++);
+    auto indexExpr = buildIntegerLiteral(C, index++);
+
     auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
-                                        /*implicit*/true);
+                                        /*implicit*/true,
+                                        AccessSemantics::Ordinary,
+                                        LValueType::get(intType));
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
                                          indexExpr, /*implicit*/ true);
+    assignExpr->setType(TupleType::getEmpty(C));
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
@@ -316,7 +332,9 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 
   // generate: switch enumVar { }
   auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
-                                     /*implicit*/true);
+                                     /*implicit*/true,
+                                     AccessSemantics::Ordinary,
+                                     enumVarDecl->getType());
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
 
@@ -445,16 +463,20 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                       fnType);
   }
 
+  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true);
+                                         /*Implicit*/ true,
+                                         TupleType::get(abTupleElts, C));
 
-  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true);
+  auto *cmpExpr = new (C) BinaryExpr(
+      cmpFuncExpr, abTuple, /*implicit*/ true,
+      fnType->castTo<FunctionType>()->getResult());
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/false };
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
