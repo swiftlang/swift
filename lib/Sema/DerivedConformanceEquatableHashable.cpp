@@ -1132,19 +1132,47 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   ASTContext &C = parentDC->getASTContext();
 
   // return _hashValue(for: self)
-  auto *hashFunc = C.getHashValueForDecl();
-  auto hashExpr = new (C) DeclRefExpr(hashFunc, DeclNameLoc(),
-                                      /*implicit*/ true);
+
+  // 'self'
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
+  Type selfType = selfDecl->getType();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/ true);
+                                     /*implicit*/ true,
+                                     AccessSemantics::Ordinary,
+                                     selfType);
+
+  // _hashValue(for:)
+  auto *hashFunc = C.getHashValueForDecl();
+  auto substitutions = SubstitutionMap::get(
+      hashFunc->getGenericSignature(),
+      [&](SubstitutableType *dependentType) {
+        if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+          if (gp->getDepth() == 0 && gp->getIndex() == 0)
+            return selfType;
+        }
+
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+  ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
+
+
+  Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
+  auto hashExpr = new (C) DeclRefExpr(hashFuncRef, DeclNameLoc(),
+                                      /*implicit*/ true,
+                                      AccessSemantics::Ordinary,
+                                      hashFuncType);
+  Type hashFuncResultType =
+      hashFuncType->castTo<AnyFunctionType>()->getResult();
   auto callExpr = CallExpr::createImplicit(C, hashExpr,
                                            { selfRef }, { C.Id_for });
+  callExpr->setType(hashFuncResultType);
+
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
-  return { body, /*isTypeChecked=*/false };
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive a 'hashValue' implementation.
