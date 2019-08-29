@@ -1094,6 +1094,8 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       } else {
         if (!Backtracking)
           diagnose(Tok, diag::expected_parameter_colon);
+        NameLoc = SourceLoc();
+        SecondNameLoc = SourceLoc();
       }
     } else if (InOut) {
       // If we don't have labels, 'inout' is not a obsoleted use.

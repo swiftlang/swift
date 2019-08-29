@@ -5,13 +5,19 @@ class C {
   typealias Inner: Foo = Int
 
   typealias Alias1 = [Generic<Int
-  typealias Alias2 = () -> (a b: [Generic<Int
+
 
   // Implict accessor with attribute at the top of its body.
   var x: Int {
     @objc
     func f() {}
   }
+}
+do {
+  typealias Alias2 = () -> (a b: [Generic<Int
+}
+do {
+  typealias Alias3 = (a b C, 
 }
 
 // Orphan '}' at top level
