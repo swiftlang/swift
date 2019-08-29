@@ -240,10 +240,6 @@ private:
     if (!TC.typeCheckExpression(FinalExpr, getCurrentDeclContext()))
       llvm::report_fatal_error("Could not type-check instrumentation");
 
-    // Captures have to be computed after the closure is type-checked. This
-    // ensures that the type checker can infer <noescape> for captured values.
-    (void)Closure->getCaptureInfo();
-
     return {false, FinalExpr};
   }
 };
