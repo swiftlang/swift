@@ -30,6 +30,8 @@
 namespace swift {
 
 class AbstractStorageDecl;
+class AccessorDecl;
+enum class AccessorKind;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
@@ -38,8 +40,8 @@ class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
 class ValueDecl;
-class AbstractStorageDecl;
 enum class OpaqueReadOwnership: uint8_t;
+class StorageImplInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -1052,6 +1054,91 @@ public:
   void cacheResult(bool value) const;
 };
 
+class ClassAncestryFlagsRequest :
+    public SimpleRequest<ClassAncestryFlagsRequest,
+                         AncestryFlags (ClassDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<AncestryFlags>
+  evaluate(Evaluator &evaluator, ClassDecl *value) const;
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, AncestryFlags value);
+
+class AbstractGenericSignatureRequest :
+    public SimpleRequest<AbstractGenericSignatureRequest,
+                         GenericSignature *(GenericSignature *,
+                                            SmallVector<GenericTypeParamType *, 2>,
+                                            SmallVector<Requirement, 2>),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator,
+           GenericSignature *baseSignature,
+           SmallVector<GenericTypeParamType *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+
+  /// Abstract generic signature requests never have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+};
+
+class ExtendedTypeRequest
+    : public SimpleRequest<ExtendedTypeRequest,
+                           Type(ExtensionDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, ExtensionDecl *) const;
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class FunctionOperatorRequest :
+    public SimpleRequest<FunctionOperatorRequest,
+                         OperatorDecl *(FuncDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<OperatorDecl *>
+  evaluate(Evaluator &evaluator, FuncDecl *value) const;
+  
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1063,24 +1150,21 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
 
 void simple_display(llvm::raw_ostream &out, Type value);
 
-/// The zone number for the type checker.
-#define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
-
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
+#define SWIFT_REQUEST(Zone, RequestType)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
 #include "swift/AST/TypeCheckerTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

@@ -462,15 +462,15 @@ AccessedStorage swift::findAccessedStorageNonNested(SILValue sourceAddr) {
 }
 
 // Return true if the given access is on a 'let' lvalue.
-static bool isLetAccess(const AccessedStorage &storage, SILFunction *F) {
-  if (auto *decl = dyn_cast_or_null<VarDecl>(storage.getDecl()))
+bool AccessedStorage::isLetAccess(SILFunction *F) const {
+  if (auto *decl = dyn_cast_or_null<VarDecl>(getDecl()))
     return decl->isLet();
 
   // It's unclear whether a global will ever be missing it's varDecl, but
   // technically we only preserve it for debug info. So if we don't have a decl,
   // check the flag on SILGlobalVariable, which is guaranteed valid, 
-  if (storage.getKind() == AccessedStorage::Global)
-    return storage.getGlobal()->isLet();
+  if (getKind() == AccessedStorage::Global)
+    return getGlobal()->isLet();
 
   return false;
 }
@@ -560,7 +560,7 @@ bool swift::isPossibleFormalAccessBase(const AccessedStorage &storage,
   // Additional checks that apply to anything that may fall through.
 
   // Immutable values are only accessed for initialization.
-  if (isLetAccess(storage, F))
+  if (storage.isLetAccess(F))
     return false;
 
   return true;
@@ -598,7 +598,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     switch (kind.getValue()) {
     default:
       builtin->dump();
-      llvm_unreachable("unexpected bulitin memory access.");
+      llvm_unreachable("unexpected builtin memory access.");
 
       // WillThrow exists for the debugger, does nothing.
     case BuiltinValueKind::WillThrow:
@@ -746,6 +746,8 @@ void swift::visitAccessedAddress(SILInstruction *I,
   }
   // Non-access cases: these are marked with memory side effects, but, by
   // themselves, do not access formal memory.
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Copy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"

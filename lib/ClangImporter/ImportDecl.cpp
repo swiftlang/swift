@@ -19,7 +19,6 @@
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -4546,9 +4545,13 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getBeginLoc());
       auto result = ExtensionDecl::create(
                       Impl.SwiftContext, loc,
-                      TypeLoc::withoutLoc(objcClass->getDeclaredType()),
+                      nullptr,
                       { }, dc, nullptr, decl);
-
+      Impl.SwiftContext
+          .evaluator
+          .cacheOutput(ExtendedTypeRequest{result},
+                       objcClass->getDeclaredType());
+      
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
         result->createGenericParamsIfMissing(objcClass);
@@ -5412,8 +5415,7 @@ namespace {
 
 static bool conformsToProtocolInOriginalModule(NominalTypeDecl *nominal,
                                                const ProtocolDecl *proto,
-                                               ModuleDecl *foundationModule,
-                                               LazyResolver *resolver) {
+                                               ModuleDecl *foundationModule) {
   auto &ctx = nominal->getASTContext();
 
   if (inheritanceListContainsProtocol(nominal, proto))
@@ -5534,8 +5536,7 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
     // Break circularity by only looking for declared conformances in the
     // original module, or possibly its overlay.
     if (conformsToProtocolInOriginalModule(computedNominal, proto,
-                                           Impl.tryLoadFoundationModule(),
-                                           Impl.getTypeResolver())) {
+                                           Impl.tryLoadFoundationModule())) {
       synthesizedProtocols.push_back(kind);
       return true;
     }
@@ -6270,7 +6271,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
     // Resolve the type of the constructor.
     if (!ctor->hasInterfaceType())
-      Impl.getTypeResolver()->resolveDeclSignature(ctor);
+      Impl.SwiftContext.getLazyResolver()->resolveDeclSignature(ctor);
 
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
@@ -8027,17 +8028,40 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
 
 GenericSignature *ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
-  GenericSignatureBuilder builder(SwiftContext);
+  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
   for (auto param : *genericParams) {
-    builder.addGenericParameter(param);
-  }
-  for (auto param : *genericParams) {
-    bool result = builder.addGenericParameterRequirements(param);
-    assert(!result);
-    (void) result;
+    genericParamTypes.push_back(
+        param->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
   }
 
-  return std::move(builder).computeGenericSignature(SourceLoc());
+  SmallVector<Requirement, 2> requirements;
+  for (auto param : *genericParams) {
+    Type paramType = param->getDeclaredInterfaceType();
+    for (const auto &inherited : param->getInherited()) {
+      Type inheritedType = inherited.getType();
+      if (inheritedType->isAnyObject()) {
+        requirements.push_back(
+            Requirement(
+              RequirementKind::Layout, paramType,
+              LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Class)));
+        continue;
+      }
+      if (inheritedType->getClassOrBoundGenericClass()) {
+        requirements.push_back(
+            Requirement(RequirementKind::Superclass, paramType, inheritedType));
+        continue;
+      }
+      assert(inheritedType->isExistentialType());
+      requirements.push_back(
+          Requirement(RequirementKind::Conformance, paramType, inheritedType));
+    }
+  }
+
+  return evaluateOrDefault(
+      SwiftContext.evaluator,
+      AbstractGenericSignatureRequest{
+        nullptr, std::move(genericParamTypes), std::move(requirements)},
+      nullptr);
 }
 
 // Calculate the generic environment from an imported generic param list.
@@ -8123,9 +8147,10 @@ ClangImporter::Implementation::importDeclContextOf(
     return knownExtension->second;
 
   // Create a new extension for this nominal type/Clang submodule pair.
-  auto swiftTyLoc = TypeLoc::withoutLoc(nominal->getDeclaredType());
-  auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), swiftTyLoc, {},
+  auto ext = ExtensionDecl::create(SwiftContext, SourceLoc(), nullptr, {},
                                    getClangModuleForDecl(decl), nullptr);
+  SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{ext},
+                                     nominal->getDeclaredType());
   ext->setValidationToChecked();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 

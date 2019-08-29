@@ -1604,10 +1604,7 @@ void TempRValueOptPass::run() {
       ++II;
 
       // Remove identity copies which are a result of this optimization.
-      if (CopyInst && CopyInst->getSrc() == CopyInst->getDest() &&
-          // Identity copies cannot take the source. This check is just here
-          // to be on the safe side.
-          !CopyInst->isTakeOfSrc()) {
+      if (CopyInst && CopyInst->getSrc() == CopyInst->getDest()) {
         // This is either the CopyInst which just got optimized or it is a
         // follow-up from an earlier iteration, where another copy_addr copied
         // the temporary back to the source location.
@@ -1725,9 +1722,8 @@ bool TempRValueOptPass::collectLoads(
 
   case SILInstructionKind::CopyAddrInst: {
     // copy_addr which read from the temporary are like loads.
-    // TODO: Handle copy_addr [take]. But this doesn't seem to be important.
     auto *copyFromTmp = cast<CopyAddrInst>(user);
-    if (copyFromTmp->getDest() == address || copyFromTmp->isTakeOfSrc()) {
+    if (copyFromTmp->getDest() == address) {
       LLVM_DEBUG(llvm::dbgs() << "  Temp written or taken" << *user);
       return false;
     }
@@ -1774,7 +1770,7 @@ bool TempRValueOptPass::checkNoSourceModification(CopyAddrInst *copyInst,
 
 /// Tries to perform the temporary rvalue copy elimination for \p copyInst
 bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
-  if (copyInst->isTakeOfSrc() || !copyInst->isInitializationOfDest())
+  if (!copyInst->isInitializationOfDest())
     return false;
 
   auto *tempObj = dyn_cast<AllocStackInst>(copyInst->getDest());
@@ -1818,10 +1814,25 @@ bool TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
     SILInstruction *user = use->getUser();
     switch (user->getKind()) {
     case SILInstructionKind::DestroyAddrInst:
+      if (copyInst->isTakeOfSrc()) {
+        use->set(copyInst->getSrc());
+      } else {
+        user->eraseFromParent();
+      }
+      break;
     case SILInstructionKind::DeallocStackInst:
       user->eraseFromParent();
       break;
-    case SILInstructionKind::CopyAddrInst:
+    case SILInstructionKind::CopyAddrInst: {
+      auto *CAI = cast<CopyAddrInst>(user);
+      if (CAI != copyInst) {
+        assert(CAI->getSrc() == tempObj);
+        if (CAI->isTakeOfSrc() && !copyInst->isTakeOfSrc())
+          CAI->setIsTakeOfSrc(IsNotTake);
+      }
+      use->set(copyInst->getSrc());
+      break;
+    }
     case SILInstructionKind::StructElementAddrInst:
     case SILInstructionKind::TupleElementAddrInst:
     case SILInstructionKind::LoadInst:

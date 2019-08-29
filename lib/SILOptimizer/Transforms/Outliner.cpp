@@ -737,7 +737,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // release_value %17 : $Optional<NSString>
   //
   auto *Enum = dyn_cast<EnumInst>(Arg);
-  if (!Enum)
+  if (!Enum || !Enum->hasOperand())
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())

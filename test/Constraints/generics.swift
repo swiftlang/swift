@@ -714,7 +714,7 @@ protocol Q {
 }
 
 struct SR10694 {
-  init<T : P>(_ x: T) {} // expected-note 2{{where 'T' = 'T'}}
+  init<T : P>(_ x: T) {} // expected-note 3{{where 'T' = 'T'}}
   func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
     SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
 
@@ -725,6 +725,10 @@ struct SR10694 {
     // expected-error@-1 {{protocol type 'Q' cannot be instantiated}}
 
     type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+
+    var srTy = SR10694.self
+    srTy(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
   }
 }

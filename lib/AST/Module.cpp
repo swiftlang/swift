@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
@@ -54,6 +55,11 @@
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
+
+static_assert(IsTriviallyDestructible<FileUnit>::value,
+              "FileUnits are BumpPtrAllocated; the d'tor may not be called");
+static_assert(IsTriviallyDestructible<LoadedFile>::value,
+              "LoadedFiles are BumpPtrAllocated; the d'tor may not be called");
 
 //===----------------------------------------------------------------------===//
 // Builtin Module Name lookup
@@ -1249,10 +1255,6 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
-    Result = F->getParseableInterface();
-    if (!Result.empty())
-      return Result;
-
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
@@ -1375,7 +1377,8 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
 
 template<bool respectVisibility>
 static bool
-forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
+forAllImportedModules(const ModuleDecl *topLevel,
+                      ModuleDecl::AccessPathTy thisPath,
                       llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
   using ImportedModule = ModuleDecl::ImportedModule;
   using AccessPathTy = ModuleDecl::AccessPathTy;
@@ -1396,7 +1399,7 @@ forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
   AccessPathTy overridingPath;
   if (respectVisibility)
     overridingPath = thisPath;
-  stack.push_back(ImportedModule(overridingPath, topLevel));
+  stack.emplace_back(overridingPath, const_cast<ModuleDecl *>(topLevel));
 
   while (!stack.empty()) {
     auto next = stack.pop_back_val();
@@ -1430,12 +1433,12 @@ forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
 
 bool
 ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                 llvm::function_ref<bool(ImportedModule)> fn) {
+                                 llvm::function_ref<bool(ImportedModule)> fn) const {
   return forAllImportedModules<true>(this, thisPath, fn);
 }
 
 bool FileUnit::forAllVisibleModules(
-    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
+    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) const {
   if (!getParentModule()->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn))
     return false;
 
@@ -1454,7 +1457,7 @@ bool FileUnit::forAllVisibleModules(
   return true;
 }
 
-void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
+void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
   // FIXME: The proper way to do this depends on the decls used.
   FORWARD(collectLinkLibraries, (callback));
 }
@@ -1608,20 +1611,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   if (!hasImplementationOnlyImports())
     return false;
 
-  auto isImportedBy = [](const ModuleDecl *dest, const ModuleDecl *src) {
-    // Fast path.
-    if (dest == src) return true;
-
-    // Walk the transitive imports, respecting visibility.
-    // This return true if the search *didn't* short-circuit, and it short
-    // circuits if we found `dest`, so we need to invert the sense before
-    // returning.
-    return !const_cast<ModuleDecl*>(src)
-              ->forAllVisibleModules({}, [dest](ModuleDecl::ImportedModule im) {
-      // Continue searching as long as we haven't found `dest` yet.
-      return im.second != dest;
-    });
-  };
+  auto &imports = getASTContext().getImportCache();
 
   // Look at the imports of this source file.
   for (auto &desc : Imports) {
@@ -1631,15 +1621,17 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
     // If the module is imported this way, it's not imported
     // implementation-only.
-    if (isImportedBy(module, desc.module.second))
+    if (imports.isImportedBy(module, desc.module.second))
       return false;
   }
 
   // Now check this file's enclosing module in case there are re-exports.
-  return !isImportedBy(module, getParentModule());
+  return !imports.isImportedBy(module, getParentModule());
 }
 
 void ModuleDecl::clearLookupCache() {
+  getASTContext().getImportCache().clear();
+
   if (!Cache)
     return;
 

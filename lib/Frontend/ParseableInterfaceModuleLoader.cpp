@@ -1435,11 +1435,14 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
   }
 
   // Create an instance of the Impl to do the heavy lifting.
+  auto ModuleName = ModuleID.first.str();
   ParseableInterfaceModuleLoaderImpl Impl(
-                Ctx, ModPath, InPath, ModuleID.first.str(),
+                Ctx, ModPath, InPath, ModuleName,
                 CacheDir, PrebuiltCacheDir, ModuleID.second,
                 RemarkOnRebuildFromInterface, dependencyTracker,
-                LoadMode);
+                llvm::is_contained(PreferInterfaceForModules,
+                                   ModuleName) ?
+                  ModuleLoadingMode::PreferParseable : LoadMode);
 
   // Ask the impl to find us a module that we can load or give us an error
   // telling us that we couldn't load it.

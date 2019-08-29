@@ -1,0 +1,2 @@
+// We shouldn't see this. rdar://54797231
+cake: Class C4 is now with @objc

@@ -39,8 +39,6 @@ class ClangModuleUnit final : public LoadedFile {
   /// The metadata of the underlying Clang module.
   clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
 
-  ~ClangModuleUnit() = default;
-
 public:
   /// True if the given Module contains an imported Clang module unit.
   static bool hasClangModule(ModuleDecl *M);

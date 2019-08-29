@@ -103,7 +103,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!objcTypeReq) return None;
 
   Type objcType = conformance->getTypeWitness(objcTypeReq);
-  assert(objcType);
 
   // Create a reference to the witness.
   SILDeclRef witnessConstant(witness);
@@ -192,7 +191,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
 
   // Retrieve the _ObjectiveCType witness.
   auto objcType = conformance->getTypeWitness(objcTypeRequirement);
-  assert(objcType);
 
   // Create a reference to the witness.
   SILDeclRef witnessConstant(witness.getDecl());

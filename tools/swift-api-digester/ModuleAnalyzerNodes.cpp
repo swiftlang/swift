@@ -22,6 +22,18 @@ static StringRef getAttrName(DeclAttrKind Kind) {
   }
   llvm_unreachable("covered switch");
 }
+
+static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
+  PrintOptions Opts;
+  Opts.SynthesizeSugarOnTypes = true;
+  if (!CheckerOpts.Migrator) {
+    // We should always print fully qualified type names for checking either
+    // API or ABI stability.
+    Opts.FullyQualifiedTypes = true;
+  }
+  return Opts;
+}
+
 } // End of anonymous namespace.
 
 struct swift::ide::api::SDKNodeInitInfo {
@@ -93,9 +105,12 @@ SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
         IsOpen(Info.IsOpen),
         IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
         ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig), FixedBinaryOrder(Info.FixedBinaryOrder),
+        GenericSig(Info.GenericSig),
+        SugaredGenericSig(Info.SugaredGenericSig),
+        FixedBinaryOrder(Info.FixedBinaryOrder),
         introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.Introswift}){}
+                       Info.IntrowatchOS, Info.Introswift}),
+        ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -213,11 +228,22 @@ SDKNode* SDKNode::getOnlyChild() const {
 }
 
 SDKNodeRoot *SDKNode::getRootNode() const {
-  for (auto *Root = const_cast<SDKNode*>(this); ; Root = Root->getParent()) {
+  for (auto *Root = const_cast<SDKNode*>(this); Root;) {
     if (auto Result = dyn_cast<SDKNodeRoot>(Root))
       return Result;
+    if (auto *Conf = dyn_cast<SDKNodeConformance>(Root)) {
+      Root = Conf->getNominalTypeDecl();
+    } else if (auto *Acc = dyn_cast<SDKNodeDeclAccessor>(Root)) {
+      Root = Acc->getStorage();
+    } else {
+      Root = Root->getParent();
+    }
   }
   llvm_unreachable("Unhandled SDKNodeKind in switch.");
+}
+
+uint8_t SDKNode::getJsonFormatVersion() const {
+  return getRootNode()->getJsonFormatVersion();
 }
 
 void SDKNode::addChild(SDKNode *Child) {
@@ -890,6 +916,8 @@ static bool isSDKNodeEqual(SDKContext &Ctx, const SDKNode &L, const SDKNode &R) 
         return false;
       if (Left->isInternal() != Right->isInternal())
         return false;
+      if (Left->getObjCName() != Right->getObjCName())
+        return false;
       if (Left->hasFixedBinaryOrder() != Right->hasFixedBinaryOrder())
         return false;
       if (Left->hasFixedBinaryOrder()) {
@@ -941,7 +969,7 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
                                 bool IsImplicitlyUnwrappedOptional = false) {
   std::string S;
   llvm::raw_string_ostream OS(S);
-  PrintOptions PO;
+  PrintOptions PO = getTypePrintOpts(Ctx.getOpts());
   PO.SkipAttributes = true;
   if (IsImplicitlyUnwrappedOptional)
     PO.PrintOptionalAsImplicitlyUnwrapped = true;
@@ -1087,23 +1115,22 @@ Requirement getCanonicalRequirement(Requirement &Req) {
 }
 
 static
-StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) {
+StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs,
+                                bool Canonical) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (AllReqs.empty())
     return StringRef();
   OS << "<";
   bool First = true;
-  PrintOptions Opts = PrintOptions::printInterface();
-  // We should always print fully qualified type names here
-  Opts.FullyQualifiedTypes = true;
+  PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   for (auto Req: AllReqs) {
     if (!First) {
       OS << ", ";
     } else {
       First = false;
     }
-    if (Ctx.checkingABI())
+    if (Canonical)
       getCanonicalRequirement(Req).print(OS, Opts);
     else
       Req.print(OS, Opts);
@@ -1112,19 +1139,19 @@ StringRef printGenericSignature(SDKContext &Ctx, ArrayRef<Requirement> AllReqs) 
   return Ctx.buffer(OS.str());
 }
 
-static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
+static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical) {
   llvm::SmallString<32> Result;
   llvm::raw_svector_ostream OS(Result);
   if (auto *PD = dyn_cast<ProtocolDecl>(D)) {
-    return printGenericSignature(Ctx, PD->getRequirementSignature());
+    return printGenericSignature(Ctx, PD->getRequirementSignature(), Canonical);
   }
-
+  PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
     if (auto *Sig = GC->getGenericSignature()) {
-      if (Ctx.checkingABI())
-        Sig->getCanonicalSignature()->print(OS);
+      if (Canonical)
+        Sig->getCanonicalSignature()->print(OS, Opts);
       else
-        Sig->print(OS);
+        Sig->print(OS, Opts);
       return Ctx.buffer(OS.str());
     }
   }
@@ -1132,8 +1159,8 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D) {
 }
 
 static
-StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf) {
-  return printGenericSignature(Ctx, Conf->getConditionalRequirements());
+StringRef printGenericSignature(SDKContext &Ctx, ProtocolConformance *Conf, bool Canonical) {
+  return printGenericSignature(Ctx, Conf->getConditionalRequirements(), Canonical);
 }
 
 static Optional<uint8_t> getSimilarMemberCount(NominalTypeDecl *NTD,
@@ -1228,6 +1255,16 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   return getLanguageIntroVersion(D->getDeclContext()->getAsDecl());
 }
 
+StringRef SDKContext::getObjcName(Decl *D) {
+  if (auto *OC = D->getAttrs().getAttribute<ObjCAttr>()) {
+    if (OC->getName().hasValue()) {
+      SmallString<32> Buffer;
+      return buffer(OC->getName()->getString(Buffer));
+    }
+  }
+  return StringRef();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Type Ty, TypeInitInfo Info) :
     Ctx(Ctx), Name(getTypeName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
     PrintedName(getPrintedName(Ctx, Ty, Info.IsImplicitlyUnwrappedOptional)),
@@ -1245,12 +1282,16 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()),
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
-      GenericSig(printGenericSignature(Ctx, D)),
+      GenericSig(printGenericSignature(Ctx, D, /*Canonical*/Ctx.checkingABI())),
+      SugaredGenericSig(Ctx.checkingABI()?
+                        printGenericSignature(Ctx, D, /*Canonical*/false):
+                        StringRef()),
       IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::OSX)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
+      ObjCName(Ctx.getObjcName(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)) {
@@ -1281,7 +1322,9 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformance *Conform):
     SDKNodeInitInfo(Ctx, Conform->getProtocol()) {
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
-  GenericSig = printGenericSignature(Ctx, Conform);
+  GenericSig = printGenericSignature(Ctx, Conform, Ctx.checkingABI());
+  SugaredGenericSig = Ctx.checkingABI() ?
+    printGenericSignature(Ctx, Conform, false): StringRef();
   // Whether this conformance is ABI placeholder depends on the decl context
   // of this conformance.
   IsABIPlaceholder = isABIPlaceholderRecursive(Conform->getDeclContext()->
@@ -1527,9 +1570,9 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
   } else {
     if (D->isPrivateStdlibDecl(false))
       return true;
-    if (AvailableAttr::isUnavailable(D))
-      return true;
   }
+  if (AvailableAttr::isUnavailable(D))
+     return true;
   if (auto VD = dyn_cast<ValueDecl>(D)) {
     switch (getAccessLevel(VD)) {
     case AccessLevel::Internal:
@@ -1858,6 +1901,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_location, Location);
   output(out, KeyKind::KK_moduleName, ModuleName);
   output(out, KeyKind::KK_genericSig, GenericSig);
+  output(out, KeyKind::KK_sugared_genericSig, SugaredGenericSig);
   output(out, KeyKind::KK_static, IsStatic);
   output(out, KeyKind::KK_deprecated,IsDeprecated);
   output(out, KeyKind::KK_protocolReq, IsProtocolReq);
@@ -1871,6 +1915,7 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
   output(out, KeyKind::KK_intro_watchOS, introVersions.watchos);
   output(out, KeyKind::KK_intro_swift, introVersions.swift);
+  output(out, KeyKind::KK_objc_name, ObjCName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);
   // Strong reference is implied, no need for serialization.

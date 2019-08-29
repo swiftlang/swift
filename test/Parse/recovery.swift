@@ -489,7 +489,7 @@ struct ErrorInFunctionSignatureResultArrayType1 {
 
 struct ErrorInFunctionSignatureResultArrayType2 {
   func foo() -> Int[0 { // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
-    return [0]  // expected-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0]
   }
 }
 
@@ -756,7 +756,7 @@ let curlyQuotes2 = “hello world!"
 
 
 // <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
-let ￼tryx  = 123        // expected-error 2 {{invalid character in source file}}  {{5-8= }}
+let ￼tryx  = 123        // expected-error {{invalid character in source file}}  {{5-8= }}
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service

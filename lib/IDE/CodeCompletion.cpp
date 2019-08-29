@@ -2086,9 +2086,7 @@ public:
 
         // Pass in DesugarMemberTypes so that we see the actual
         // concrete type witnesses instead of type alias types.
-        T = T.subst(Subs,
-                    (SubstFlags::DesugarMemberTypes |
-                     SubstFlags::UseErrorType));
+        T = T.subst(Subs, SubstFlags::DesugarMemberTypes);
       }
     }
 
@@ -4147,7 +4145,7 @@ public:
     // type.
     auto substMap = currTy->getMemberSubstitutionMap(
         CurrDeclContext->getParentModule(), VD);
-    ResultT = ResultT.subst(substMap, SubstFlags::UseErrorType);
+    ResultT = ResultT.subst(substMap);
     if (!ResultT || !ResultT->is<DependentMemberType>())
       // If resolved print it.
       return nullptr;

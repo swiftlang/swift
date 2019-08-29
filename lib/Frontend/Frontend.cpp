@@ -186,6 +186,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   Context.reset(ASTContext::get(Invocation.getLangOptions(),
                                 Invocation.getSearchPathOptions(), SourceMgr,
                                 Diagnostics));
+  registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
@@ -373,7 +374,8 @@ bool CompilerInstance::setUpModuleLoaders() {
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
     auto PIML = ParseableInterfaceModuleLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
-        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
+        getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
+        FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));

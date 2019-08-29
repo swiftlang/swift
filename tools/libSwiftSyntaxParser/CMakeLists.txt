@@ -46,6 +46,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   target_link_libraries(libSwiftSyntaxParser PRIVATE BlocksRuntime)
 endif()
 
+add_dependencies(parser-lib libSwiftSyntaxParser)
 swift_install_in_component(FILES "${SWIFT_LIBRARY_OUTPUT_INTDIR}/${CMAKE_SHARED_LIBRARY_PREFIX}${SYNTAX_PARSER_LIB_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}"
                            PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
                            DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}"

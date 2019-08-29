@@ -562,6 +562,9 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
   SINGLE_VALUE_INST(CopyValueInst, copy_value,
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
+#define UNCHECKED_REF_STORAGE(Name, name, ...) \
+  SINGLE_VALUE_INST(Copy##Name##ValueInst, copy_##name##_value, \
+                    SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   SINGLE_VALUE_INST(Copy##Name##ValueInst, copy_##name##_value, \
                     SingleValueInstruction, MayHaveSideEffects, DoesNotRelease)

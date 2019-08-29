@@ -978,8 +978,33 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   cs.addConstraint(ConstraintKind::Bind, TypeVar, type, locator);
 
   // If this was from a defaultable binding note that.
-  if (Binding.isDefaultableBinding())
-    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
+  if (Binding.isDefaultableBinding()) {
+    auto *locator = Binding.DefaultableBinding;
+    // If this default binding comes from a "hole"
+    // in the constraint system, we have to propagate
+    // this information and mark this type variable
+    // as well as mark everything adjacent to it as
+    // a potential "hole".
+    //
+    // Consider this example:
+    //
+    // func foo<T: BinaryInteger>(_: T) {}
+    // foo(.bar) <- Since `.bar` can't be inferred due to
+    //              luck of information about its base type,
+    //              it's member type is going to get defaulted
+    //              to `Any` which has to be propaged to type
+    //              variable associated with `T` and vice versa.
+    if (cs.shouldAttemptFixes() && cs.isHoleAt(locator)) {
+      auto &CG = cs.getConstraintGraph();
+      for (auto *constraint : CG.gatherConstraints(
+               TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
+        for (auto *typeVar : constraint->getTypeVariables())
+          cs.recordHole(typeVar);
+      }
+    }
+
+    cs.DefaultedConstraints.push_back(locator);
+  }
 
   return !cs.failedConstraint && !cs.simplify();
 }

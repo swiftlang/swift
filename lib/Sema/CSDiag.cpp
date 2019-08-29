@@ -1668,15 +1668,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(
   if (!exprType)
     return CS.TC.Diags.hadAnyError();
 
-  // If we contextually had an inout type, and got a non-lvalue result, then
-  // we fail with a mutability error.
-  if (contextualType->is<InOutType>() && !exprType->is<LValueType>()) {
-    AssignmentFailure failure(recheckedExpr, CS, recheckedExpr->getLoc(),
-                              diag::cannot_pass_rvalue_inout_subelement,
-                              diag::cannot_pass_rvalue_inout);
-    return failure.diagnose();
-  }
-
   // If we don't have a type for the expression, then we cannot use it in
   // conversion constraint diagnostic generation.  If the types match, then it
   // must not be the contextual type that is the problem.
@@ -3785,9 +3776,19 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
 
     auto arg = callExpr->getArg();
+    auto isDynamicCallable =
+        CS.DynamicCallableCache[fnType->getCanonicalType()].isValid();
+
+    // Note: Consider caching `hasCallAsFunctionMethods` in `NominalTypeDecl`.
+    auto *nominal = fnType->getAnyNominal();
+    auto hasCallAsFunctionMethods = nominal &&
+      llvm::any_of(nominal->getMembers(), [](Decl *member) {
+          auto funcDecl = dyn_cast<FuncDecl>(member);
+          return funcDecl && funcDecl->isCallAsFunctionMethod();
+        });
 
     // Diagnose @dynamicCallable errors.
-    if (CS.DynamicCallableCache[fnType->getCanonicalType()].isValid()) {
+    if (isDynamicCallable) {
       auto dynamicCallableMethods =
         CS.DynamicCallableCache[fnType->getCanonicalType()];
 
@@ -3843,7 +3844,8 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
         }
       }
 
-    return true;
+    if (!isDynamicCallable && !hasCallAsFunctionMethods)
+      return true;
   }
   
   bool hasTrailingClosure = callArgHasTrailingClosure(callExpr->getArg());

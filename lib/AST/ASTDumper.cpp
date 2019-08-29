@@ -760,9 +760,9 @@ namespace {
       auto VarD = dyn_cast<VarDecl>(VD);
       if (VD->isFinal() && !(VarD && VarD->isLet()))
         OS << " final";
-      if (VD->isObjC())
+      if (VD->getAttrs().hasAttribute<ObjCAttr>())
         OS << " @objc";
-      if (VD->isDynamic())
+      if (VD->getAttrs().hasAttribute<DynamicAttr>())
         OS << " dynamic";
       if (auto *attr =
               VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
@@ -2945,6 +2945,13 @@ public:
       printRec(elem.Type);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("implicitly_unwrapped_optional");
+    OS << "\n";
+    printRec(T->getBase());
   }
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {

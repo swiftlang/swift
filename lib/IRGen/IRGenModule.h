@@ -823,7 +823,7 @@ public:
   
   CanType getRuntimeReifiedType(CanType type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
-  SILType substOpaqueTypesWithUnderlyingTypes(SILType type);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
   std::pair<CanType, ProtocolConformanceRef>
   substOpaqueTypesWithUnderlyingTypes(CanType type,
                                       ProtocolConformanceRef conformance);
@@ -1071,7 +1071,11 @@ public:
   
   std::pair<llvm::Constant *, unsigned>
   getTypeRef(CanType type, MangledTypeRefRole role);
-  
+
+  std::pair<llvm::Constant *, unsigned>
+  getLoweredTypeRef(SILType loweredType, CanGenericSignature genericSig,
+                    MangledTypeRefRole role);
+
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
                                             GenericSignature *genericSig,
@@ -1109,7 +1113,8 @@ public:
                                              CanSILFunctionType substCalleeType,
                                              SubstitutionMap subs,
                                              const HeapLayout &layout);
-  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+  llvm::Constant *getAddrOfBoxDescriptor(SILType boxedType,
+                                         CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
   llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);

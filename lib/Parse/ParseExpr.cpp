@@ -1100,7 +1100,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (canParseAsGenericArgumentList()) {
         SmallVector<TypeRepr *, 8> args;
         SourceLoc LAngleLoc, RAngleLoc;
-        auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+        auto argStat = parseGenericArgumentsAST(args, LAngleLoc, RAngleLoc);
         if (argStat.isError())
           diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
 
@@ -1409,16 +1409,17 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundDsohandleExprSyntax>() {
 
 template <typename SyntaxNode>
 ParserResult<Expr> Parser::parseExprAST() {
+  auto Loc = leadingTriviaLoc();
   auto ParsedExpr = parseExprSyntax<SyntaxNode>();
   SyntaxContext->addSyntax(ParsedExpr);
   // todo [gsoc]: improve this somehow
-  if (SyntaxContext->isTopNode<SyntaxKind::UnknownExpr>()) {
+  if (SyntaxContext->isTopNode<UnknownExprSyntax>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
-    auto ExprAST = Generator.generate(Expr);
+    auto ExprAST = Generator.generate(Expr, Loc);
     return makeParserResult(ExprAST);
   }
   auto Expr = SyntaxContext->topNode<SyntaxNode>();
-  auto ExprAST = Generator.generate(Expr);
+  auto ExprAST = Generator.generate(Expr, Loc);
   return makeParserResult(ExprAST);
 }
 
@@ -1528,7 +1529,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
-    auto TyR = parseAnyType();
+    auto TyR = parseAnyTypeAST();
     return makeParserResult(new (Context) TypeExpr(TypeLoc(TyR.get())));
   }
 
@@ -1992,6 +1993,9 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
   llvm::SaveAndRestore<Token> SavedTok(Tok);
   llvm::SaveAndRestore<ParsedTrivia> SavedLeadingTrivia(LeadingTrivia);
   llvm::SaveAndRestore<ParsedTrivia> SavedTrailingTrivia(TrailingTrivia);
+  // For errors, we need the real PreviousLoc, i.e. the start of the
+  // whole InterpolatedStringLiteral.
+  llvm::SaveAndRestore<SourceLoc> SavedPreviousLoc(PreviousLoc);
 
   // We're not in a place where an interpolation would be valid.
   if (!CurLocalContext) {
@@ -2225,7 +2229,7 @@ Expr *Parser::parseExprIdentifier() {
   if (canParseAsGenericArgumentList()) {
     SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
     SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
-    auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
+    auto argStat = parseGenericArgumentsAST(args, LAngleLoc, RAngleLoc);
     if (argStat.isError())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     
@@ -3426,7 +3430,8 @@ ParserResult<Expr> Parser::parseExprCollection() {
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RSquareLoc = Tok.is(tok::r_square) ? consumeToken() : PreviousLoc;
+    RSquareLoc = Tok.is(tok::r_square) ? consumeToken()
+                                       : getLocForMissingMatchingToken();
   } else if (parseMatchingToken(tok::r_square, RSquareLoc,
                                 diag::expected_rsquare_array_expr,
                                 LSquareLoc)) {

@@ -1,4 +1,3 @@
-
 //===--- DiagnosticsParse.def - Diagnostics Text ----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -221,7 +220,7 @@ ERROR(expected_keyword_in_decl,none,
 ERROR(number_cant_start_decl_name,none,
       "%0 name can only start with a letter or underscore, not a number",
       (StringRef))
-ERROR(expected_identifier_after_case_comma,none,
+ERROR(expected_identifier_after_case_comma, PointsToFirstBadToken,
       "expected identifier after comma in enum 'case' declaration", ())
 ERROR(decl_redefinition,none,
       "definition conflicts with previous value", ())
@@ -485,6 +484,10 @@ ERROR(referenced_value_no_accessor,none,
       "referenced declaration has no %select{getter|setter}0", (unsigned))
 ERROR(expected_sil_value_ownership_kind,none,
       "expected value ownership kind in SIL code", ())
+ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
+      "SILFunction and SILArgument have mismatching ValueOwnershipKinds. "
+      "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
+      (StringRef, StringRef))
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
 ERROR(expected_sil_tuple_index,none,

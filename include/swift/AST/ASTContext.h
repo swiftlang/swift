@@ -112,6 +112,10 @@ namespace swift {
 
   enum class KnownProtocolKind : uint8_t;
 
+namespace namelookup {
+  class ImportCache;
+}
+
 namespace syntax {
   class SyntaxArena;
 }
@@ -413,13 +417,6 @@ public:
     return true;
   }
 
-  /// Remove the lazy resolver, if there is one.
-  ///
-  /// FIXME: We probably don't ever want to do this.
-  void removeLazyResolver() {
-    setLazyResolver(nullptr);
-  }
-
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -690,7 +687,9 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
-  
+
+  namelookup::ImportCache &getImportCache() const;
+
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
   /// Does nothing in non-asserts (NDEBUG) builds.
@@ -827,7 +826,7 @@ public:
   /// of the given decl context.
   ///
   /// \param IDC The context whose member decls should be lazily parsed.
-  void parseMembers(IterableDeclContext *IDC);
+  std::vector<Decl *> parseMembers(IterableDeclContext *IDC);
 
   /// Get the lazy function data for the given generic context.
   ///

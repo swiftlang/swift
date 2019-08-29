@@ -554,13 +554,7 @@ protected:
     RawForeignKind : 2,
 
     /// \see ClassDecl::getEmittedMembers()
-    HasForcedEmittedMembers : 1,
-
-    /// Information about the class's ancestry.
-    Ancestry : 7,
-
-    /// Whether we have computed the above field or not.
-    AncestryComputed : 1,
+    HasForcedEmittedMembers : 1,     
 
     HasMissingDesignatedInitializers : 1,
     HasMissingVTableEntries : 1,
@@ -1677,7 +1671,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   SourceRange Braces;
 
   /// The type being extended.
-  TypeLoc ExtendedType;
+  TypeRepr *ExtendedTypeRepr;
 
   /// The nominal type being extended.
   NominalTypeDecl *ExtendedNominal = nullptr;
@@ -1700,7 +1694,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   friend class ConformanceLookupTable;
   friend class IterableDeclContext;
 
-  ExtensionDecl(SourceLoc extensionLoc, TypeLoc extendedType,
+  ExtensionDecl(SourceLoc extensionLoc, TypeRepr *extendedType,
                 MutableArrayRef<TypeLoc> inherited,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
@@ -1724,7 +1718,7 @@ public:
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
-                               TypeLoc extendedType,
+                               TypeRepr *extendedType,
                                MutableArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
@@ -1744,7 +1738,7 @@ public:
   /// Only use this entry point when the complete type, as spelled in the source,
   /// is required. For most clients, \c getExtendedNominal(), which provides
   /// only the \c NominalTypeDecl, will suffice.
-  Type getExtendedType() const { return ExtendedType.getType(); }
+  Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
   NominalTypeDecl *getExtendedNominal() const;
@@ -1753,12 +1747,9 @@ public:
   /// type declaration.
   bool alreadyBoundToNominal() const { return NextExtension.getInt(); }
 
-  /// Retrieve the extended type location.
-  TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
-
-  /// Retrieve the extended type location.
-  const TypeLoc &getExtendedTypeLoc() const { return ExtendedType; }
-
+  /// Retrieve the extended type definition as written in the source, if it exists.
+  TypeRepr *getExtendedTypeRepr() const { return ExtendedTypeRepr; }
+                              
   /// Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).
   MutableArrayRef<TypeLoc> getInherited() { return Inherited; }
@@ -3319,7 +3310,6 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
 
 protected:
   Type DeclaredTy;
-  Type DeclaredTyInContext;
   Type DeclaredInterfaceTy;
 
   NominalTypeDecl(DeclKind K, DeclContext *DC, Identifier name,
@@ -3377,10 +3367,6 @@ public:
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;
-
-  /// getDeclaredTypeInContext - Retrieve the type declared by this entity, with
-  /// context archetypes bound if this is a generic type.
-  Type getDeclaredTypeInContext() const;
 
   /// getDeclaredInterfaceType - Retrieve the type declared by this entity, with
   /// generic parameters bound if this is a generic type.
@@ -5169,6 +5155,7 @@ public:
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   Identifier ArgumentName;
+  SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
 
@@ -5219,7 +5206,9 @@ public:
   /// The resulting source location will be valid if the argument name
   /// was specified separately from the parameter name.
   SourceLoc getArgumentNameLoc() const { return ArgumentNameLoc; }
-  
+
+  SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
+
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
     
   bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
@@ -5937,7 +5926,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  OperatorDecl *Operator = nullptr;
   OpaqueTypeDecl *OpaqueReturn = nullptr;
 
 protected:
@@ -6026,6 +6014,7 @@ public:
   bool isConsuming() const {
     return getSelfAccessKind() == SelfAccessKind::Consuming;
   }
+  bool isCallAsFunctionMethod() const;
 
   SelfAccessKind getSelfAccessKind() const;
 
@@ -6083,13 +6072,7 @@ public:
     return cast_or_null<FuncDecl>(AbstractFunctionDecl::getOverriddenDecl());
   }
 
-  OperatorDecl *getOperatorDecl() const {
-    return Operator;
-  }
-  void setOperatorDecl(OperatorDecl *o) {
-    assert(isOperator() && "can't set an OperatorDecl for a non-operator");
-    Operator = o;
-  }
+  OperatorDecl *getOperatorDecl() const;
   
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
     return OpaqueReturn;
@@ -7265,6 +7248,17 @@ void simple_display(llvm::raw_ostream &out, const Decl *decl);
 /// Display ValueDecl subclasses.
 void simple_display(llvm::raw_ostream &out, const ValueDecl *decl);
 
+/// Display ExtensionDecls.
+inline void simple_display(llvm::raw_ostream &out, const ExtensionDecl *decl) {
+  simple_display(out, static_cast<const Decl *>(decl));
+}
+
+/// Display NominalTypeDecls.
+inline void simple_display(llvm::raw_ostream &out,
+                           const NominalTypeDecl *decl) {
+  simple_display(out, static_cast<const Decl *>(decl));
+}
+
 /// Extract the source location from the given declaration.
 SourceLoc extractNearestSourceLoc(const Decl *decl);
 
@@ -7275,6 +7269,11 @@ inline SourceLoc extractNearestSourceLoc(const ExtensionDecl *ext) {
 
 /// Extract the source location from the given declaration.
 inline SourceLoc extractNearestSourceLoc(const GenericTypeDecl *type) {
+  return extractNearestSourceLoc(static_cast<const Decl *>(type));
+}
+
+/// Extract the source location from the given declaration.
+inline SourceLoc extractNearestSourceLoc(const NominalTypeDecl *type) {
   return extractNearestSourceLoc(static_cast<const Decl *>(type));
 }
 

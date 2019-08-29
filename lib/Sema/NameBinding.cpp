@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Statistic.h"
@@ -294,7 +295,7 @@ void NameBinder::addImport(
     // FIXME: Doesn't handle scoped testable imports correctly.
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
+    lookupInModule(topLevelModule, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                    &SF);
 

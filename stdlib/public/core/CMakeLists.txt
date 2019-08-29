@@ -184,6 +184,7 @@ set(SWIFTLIB_ESSENTIAL
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   AtomicInt.swift.gyb
+  BuiltinMath.swift.gyb
   Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
@@ -218,7 +219,6 @@ set(SWIFTLIB_SOURCES
 set(SWIFTLIB_GYB_SOURCES
   ${SWIFTLIB_ESSENTIAL_GYB_SOURCES}
   ExistentialCollection.swift.gyb
-  MathFunctions.swift.gyb
   SIMDVectorTypes.swift.gyb
   Tuple.swift.gyb
   )
@@ -287,8 +287,6 @@ list(APPEND swift_stdlib_compile_flags "-Xllvm" "-sil-partial-specialization")
 if(SWIFT_STDLIB_ENABLE_STDLIBCORE_EXCLUSIVITY_CHECKING)
   list(APPEND swift_stdlib_compile_flags "-enforce-exclusivity=checked")
 endif()
-
-list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
 
 if(SWIFT_CHECK_ESSENTIAL_STDLIB)
   add_swift_target_library(swift_stdlib_essential ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IS_STDLIB_CORE

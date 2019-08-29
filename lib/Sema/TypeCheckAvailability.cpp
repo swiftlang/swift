@@ -1956,8 +1956,9 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
   if (Attr->Message.empty() && Attr->Rename.empty()) {
     diagnose(ReferenceRange.Start, diag::availability_deprecated,
              RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-             Attr->Deprecated.hasValue(), DeprecatedVersion)
-      .highlight(Attr->getRange());
+             Attr->Deprecated.hasValue(), DeprecatedVersion,
+             /*message*/ StringRef())
+        .highlight(Attr->getRange());
     return;
   }
 
@@ -1968,11 +1969,11 @@ void TypeChecker::diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   if (!Attr->Message.empty()) {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diagnose(ReferenceRange.Start, diag::availability_deprecated_msg,
+    diagnose(ReferenceRange.Start, diag::availability_deprecated,
              RawAccessorKind, Name, Attr->hasPlatform(), Platform,
              Attr->Deprecated.hasValue(), DeprecatedVersion,
              EncodedMessage.Message)
-      .highlight(Attr->getRange());
+        .highlight(Attr->getRange());
   } else {
     unsigned rawReplaceKind = static_cast<unsigned>(
         replacementDeclKind.getValueOr(ReplacementDeclKind::None));
@@ -1999,12 +2000,9 @@ void swift::diagnoseUnavailableOverride(ValueDecl *override,
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
   if (attr->Rename.empty()) {
-    if (attr->Message.empty())
-      diags.diagnose(override, diag::override_unavailable,
-                     override->getBaseName());
-    else
-      diags.diagnose(override, diag::override_unavailable_msg,
-                     override->getBaseName(), attr->Message);
+    EncodedDiagnosticMessage EncodedMessage(attr->Message);
+    diags.diagnose(override, diag::override_unavailable,
+                   override->getBaseName(), EncodedMessage.Message);
 
     DeclName name;
     unsigned rawAccessorKind;
@@ -2186,22 +2184,12 @@ bool swift::diagnoseExplicitUnavailability(
     unsigned rawReplaceKind = static_cast<unsigned>(
         replaceKind.getValueOr(ReplacementDeclKind::None));
     StringRef newName = replaceKind ? newNameBuf.str() : Attr->Rename;
-
-    if (Attr->Message.empty()) {
-      auto diag = diags.diagnose(Loc,
-                                 diag::availability_decl_unavailable_rename,
-                                 RawAccessorKind, Name,
-                                 replaceKind.hasValue(),
-                                 rawReplaceKind, newName);
-      attachRenameFixIts(diag);
-    } else {
       EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       auto diag =
-        diags.diagnose(Loc, diag::availability_decl_unavailable_rename_msg,
-                       RawAccessorKind, Name, replaceKind.hasValue(),
-                       rawReplaceKind, newName, EncodedMessage.Message);
+          diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
+                         RawAccessorKind, Name, replaceKind.hasValue(),
+                         rawReplaceKind, newName, EncodedMessage.Message);
       attachRenameFixIts(diag);
-    }
   } else if (isSubscriptReturningString(D, ctx)) {
     diags.diagnose(Loc, diag::availabilty_string_subscript_migration)
       .highlight(R)
@@ -2210,16 +2198,12 @@ bool swift::diagnoseExplicitUnavailability(
 
     // Skip the note emitted below.
     return true;
-  } else if (Attr->Message.empty()) {
-    diags.diagnose(Loc, diag::availability_decl_unavailable,
-                   RawAccessorKind, Name, platform.empty(), platform)
-      .highlight(R);
   } else {
     EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-    diags.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                   RawAccessorKind, Name, platform.empty(), platform,
-                   EncodedMessage.Message)
-      .highlight(R);
+    diags
+        .diagnose(Loc, diag::availability_decl_unavailable, RawAccessorKind,
+                  Name, platform.empty(), platform, EncodedMessage.Message)
+        .highlight(R);
   }
 
   switch (Attr->getVersionAvailability(ctx)) {
@@ -2696,7 +2680,7 @@ AvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R,
     std::tie(RawAccessorKind, Name) = getAccessorKindAndNameForDiagnostics(D);
 
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
-    auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
+    auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable,
                             RawAccessorKind, Name, true, "",
                             "it has been removed in Swift 3");
     if (isa<PrefixUnaryExpr>(call)) {
@@ -2747,9 +2731,9 @@ AvailabilityWalker::diagnoseMemoryLayoutMigration(const ValueDecl *D,
   std::tie(RawAccessorKind, Name) = getAccessorKindAndNameForDiagnostics(D);
 
   EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-  auto diag = TC.diagnose(R.Start, diag::availability_decl_unavailable_msg,
-                          RawAccessorKind, Name, true, "",
-                          EncodedMessage.Message);
+  auto diag =
+      TC.diagnose(R.Start, diag::availability_decl_unavailable, RawAccessorKind,
+                  Name, true, "", EncodedMessage.Message);
   diag.highlight(R);
 
   auto subject = args->getSubExpr();
@@ -2838,7 +2822,9 @@ void swift::checkExplicitAvailability(Decl *decl) {
   // Warn on decls without an introduction version.
   auto &ctx = decl->getASTContext();
   auto safeRangeUnderApprox = AvailabilityInference::availableRange(decl, ctx);
-  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint()) {
+  if (!safeRangeUnderApprox.getOSVersion().hasLowerEndpoint() &&
+      !decl->getAttrs().isUnavailable(ctx)) {
+
     auto diag = decl->diagnose(diag::public_decl_needs_availability);
 
     auto suggestPlatform = decl->getASTContext().LangOpts.RequireExplicitAvailabilityTarget;

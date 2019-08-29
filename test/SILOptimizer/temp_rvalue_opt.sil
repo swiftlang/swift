@@ -102,14 +102,10 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>):
   return %9999 : $()
 }
 
-// Currently not supported
 // CHECK-LABEL: sil @take_from_temp
 // CHECK:      bb0(%0 : $*B, %1 : $*GS<B>):
-// CHECK-NEXT:   alloc_stack
-// CHECK-NEXT:   copy_addr
 // CHECK-NEXT:   struct_element_addr
-// CHECK-NEXT:   copy_addr
-// CHECK-NEXT:   dealloc_stack
+// CHECK-NEXT:   copy_addr [take]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
 sil @take_from_temp : $@convention(thin) <B> (@inout B, @inout GS<B>) -> () {
@@ -416,13 +412,17 @@ bb0(%0 : $*Klass):
   return %9 : $()
 }
 
-// Make sure that we do not optimize this case.
-//
 // CHECK-LABEL: sil @non_overlapping_lifetime : $@convention(thin) (@in Klass) -> () {
-// CHECK: destroy_addr
-// CHECK: destroy_addr
-// CHECK: destroy_addr
-// CHECK: } // end sil function 'non_overlapping_lifetime'
+// CHECK:      bb0([[ARG:%.*]] : $*Klass):
+// CHECK-NEXT:   [[TMP:%.*]] = alloc_stack $Klass
+// CHECK-NEXT:   copy_addr [[ARG]] to [initialization] [[TMP]]
+// CHECK-NEXT:   destroy_addr [[ARG]]
+// CHECK:        apply %{{[0-9]*}}([[TMP]])
+// CHECK-NEXT:   destroy_addr [[TMP]]
+// CHECK-NEXT:   dealloc_stack [[TMP]]
+// CHECK-NEXT:   tuple
+// CHECK-NEXT:   return
+// CHECK-NEXT: } // end sil function 'non_overlapping_lifetime'
 sil @non_overlapping_lifetime : $@convention(thin) (@in Klass) -> () {
 bb0(%0 : $*Klass):
   %1a = alloc_stack $Klass
