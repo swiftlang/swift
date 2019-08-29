@@ -3832,8 +3832,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
                                  TypeMatchOptions flags) {
+  auto *typeVar = type->getAs<TypeVariableType>();
   if (shouldAttemptFixes()) {
-    auto *typeVar = type->getAs<TypeVariableType>();
     // If type variable, associated with this conformance check,
     // has been determined to be a "hole" in constraint system,
     // let's consider this check a success without recording
@@ -3983,6 +3983,23 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return SolutionKind::Error;
 
     if (path.back().is<LocatorPathElt::AnyRequirement>()) {
+      // If this is a requirement associated with `Self` which is bound
+      // to `Any`, let's consider this "too incorrect" to continue.
+      //
+      // This helps us to filter out cases like operator overloads where
+      // `Self` type comes from e.g. default for collection element -
+      // `[1, "hello"].map { $0 + 1 }`. Main problem here is that
+      // collection type couldn't be determined without unification to
+      // `Any` and `+` failing for all numeric overloads is just a consequence.
+      if (typeVar && type->isAny()) {
+        auto *GP = typeVar->getImpl().getGenericParameter();
+        if (auto *GPD = GP->getDecl()) {
+          auto *DC = GPD->getDeclContext();
+          if (DC->isTypeContext() && DC->getSelfInterfaceType()->isEqual(GP))
+            return SolutionKind::Error;
+        }
+      }
+
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
         if (!recordFix(fix)) {
