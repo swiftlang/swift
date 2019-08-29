@@ -389,6 +389,13 @@ namespace swift {
   /// The ASTContext will automatically call these upon construction.
   void registerNameLookupRequestFunctions(Evaluator &evaluator);
 
+  /// Register Parse-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any parsing queries
+  /// using Parse-level logic should call these functions after forming the
+  /// ASTContext.
+  void registerParseRequestFunctions(Evaluator &evaluator);
+
   /// Register Sema-level request functions with the evaluator.
   ///
   /// Clients that form an ASTContext and will perform any semantic queries
