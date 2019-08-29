@@ -381,17 +381,23 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   SmallVector<ASTNode, 0> cases;
 
   // switch (a, b) { }
-  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true);
-  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true);
+  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  aParam->getType());
+  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  bParam->getType());
+  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
   auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+                                  /*implicit*/ true,
+                                  TupleType::get(abTupleElts, C));
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
                                        SourceLoc(), cases, SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/false };
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
