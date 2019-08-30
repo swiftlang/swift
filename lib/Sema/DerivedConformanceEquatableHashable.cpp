@@ -1171,6 +1171,9 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // _hashValue(for:)
   auto *hashFunc = C.getHashValueForDecl();
+  if (!hashFunc->hasInterfaceType())
+    static_cast<TypeChecker *>(C.getLazyResolver())->validateDecl(hashFunc);
+
   auto substitutions = SubstitutionMap::get(
       hashFunc->getGenericSignature(),
       [&](SubstitutableType *dependentType) {
@@ -1183,7 +1186,6 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
       },
       LookUpConformanceInModule(hashValueDecl->getModuleContext()));
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
-
 
   Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
   auto hashExpr = new (C) DeclRefExpr(hashFuncRef, DeclNameLoc(),
