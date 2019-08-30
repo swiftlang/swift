@@ -2929,9 +2929,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      auto elementAssocType =
-        cast<AssociatedTypeDecl>(
-          sequenceProto->lookupDirect(tc.Context.Id_Element).front());
+      auto elementAssocType = sequenceProto->getAssociatedType(
+        tc.Context.Id_Element);
 
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),

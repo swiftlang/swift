@@ -4195,6 +4195,14 @@ public:
   /// a protocol having nested types (ObjC protocols).
   llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
 
+  /// Returns a protocol requirement with the given name, or nullptr if the
+  /// name has multiple overloads, or no overloads at all.
+  ValueDecl *getSingleRequirement(DeclName name) const;
+
+  /// Returns an associated type with the given name, or nullptr if one does
+  /// not exist.
+  AssociatedTypeDecl *getAssociatedType(Identifier name) const;
+
   /// Walk this protocol and all of the protocols inherited by this protocol,
   /// transitively, invoking the callback function for each protocol.
   ///

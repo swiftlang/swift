@@ -4364,6 +4364,34 @@ ProtocolDecl::getAssociatedTypeMembers() const {
   return result;
 }
 
+ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  ValueDecl *result = nullptr;
+  for (auto candidate : results) {
+    if (candidate->getDeclContext() != this ||
+        !candidate->isProtocolRequirement())
+      continue;
+    if (result) {
+      // Multiple results.
+      return nullptr;
+    }
+    result = candidate;
+  }
+
+  return result;
+}
+
+AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  for (auto candidate : results) {
+    if (candidate->getDeclContext() == this &&
+        isa<AssociatedTypeDecl>(candidate)) {
+      return cast<AssociatedTypeDecl>(candidate);
+    }
+  }
+  return nullptr;
+}
+
 Type ProtocolDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
