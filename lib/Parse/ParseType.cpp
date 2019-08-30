@@ -209,11 +209,9 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
   }
 
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
-  while (Result->isSuccess() || !Result->getUnknownNodes().empty()) {
-    auto PrevType = Result->isSuccess()
-                        ? Result->getResult()
-                        : ParsedSyntaxRecorder::makeUnknownType(
-                              Result->getUnknownNodes(), *SyntaxContext);
+  while (Result->isSuccess()) {
+    auto PrevType = Result->getResult();
+
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isContextualKeyword("Type") ||
          peekToken().isContextualKeyword("Protocol"))) {
@@ -236,9 +234,6 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
         continue;
       }
     }
-    if (!Result->isSuccess())
-      Result =
-          makeParsedResult<ParsedTypeSyntax>({PrevType}, Result->getStatus());
     break;
   }
 
