@@ -1788,7 +1788,7 @@ void PatternEntryDeclScope::beCurrent() {
   unsigned varCount = 0;
   getPatternEntry().getPattern()->forEachVariable(
       [&](VarDecl *) { ++varCount; });
-  varCountWhenLastExpanded = 0;
+  varCountWhenLastExpanded = varCount;
 }
 bool PatternEntryDeclScope::isCurrent() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())

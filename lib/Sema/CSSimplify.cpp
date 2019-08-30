@@ -1924,6 +1924,10 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
           // with overloaded declarations.
           if (last->getKind() == ConstraintLocator::ApplyArgToParam)
             return getTypeMatchFailure(locator);
+        } else { // There are no elements in the path
+          auto *anchor = locator.getAnchor();
+          if (!(anchor && isa<AssignExpr>(anchor)))
+            return getTypeMatchFailure(locator);
         }
 
         auto *fix = MissingConformance::forContextual(
