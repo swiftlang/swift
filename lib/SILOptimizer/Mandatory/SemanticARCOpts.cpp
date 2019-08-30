@@ -186,8 +186,10 @@ struct SemanticARCOptVisitor
   bool visitCopyValueInst(CopyValueInst *cvi);
   bool visitBeginBorrowInst(BeginBorrowInst *bbi);
   bool visitLoadInst(LoadInst *li);
-      
-  bool isWrittenTo(LoadInst *li);
+
+  /// Return true if all of load insts destroy_value users are within the
+  /// guaranteed lifetime of the storage that is being loaded from.
+  bool isLoadGuaranteedByStorage(LoadInst *li);
 
   bool processWorklist();
 
@@ -713,7 +715,7 @@ public:
 };
 } // namespace
 
-bool SemanticARCOptVisitor::isWrittenTo(LoadInst *load) {
+bool SemanticARCOptVisitor::isLoadGuaranteedByStorage(LoadInst *load) {
   StorageGuaranteesLoadVisitor visitor(*this, load);
   return visitor.doIt();
 }
@@ -735,9 +737,10 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (isConsumed(li, destroyValues))
     return false;
 
-  // Then check if our address is ever written to. If it is, then we
-  // can not use the load_borrow.
-  if (isWrittenTo(li))
+  // Then check if our address is guaranteed to never be written to within the
+  // lifetime of our loaded value. If so, we can convert the loaded value to be
+  // at +0 instead of +1.
+  if (isLoadGuaranteedByStorage(li))
     return false;
 
   // Ok, we can perform our optimization. Convert the load [copy] into a
