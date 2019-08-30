@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignatureBuilder.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -1612,15 +1613,13 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   auto KitModule = C.getLoadedModule(Id_Kit);
   ProtocolDecl *ApplicationDelegateProto = nullptr;
   if (KitModule) {
-    auto lookupOptions = defaultUnqualifiedLookupOptions;
-    lookupOptions |= NameLookupFlags::KnownPrivate;
-
-    auto lookup = TC.lookupUnqualifiedType(KitModule, Id_ApplicationDelegate,
-                                           SourceLoc(),
-                                           lookupOptions);
-    if (lookup.size() == 1)
-      ApplicationDelegateProto = dyn_cast<ProtocolDecl>(
-        lookup[0].getValueDecl());
+    SmallVector<ValueDecl *, 1> decls;
+    namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
+                               decls, NLKind::QualifiedLookup,
+                               namelookup::ResolutionKind::TypesOnly,
+                               KitModule);
+    if (decls.size() == 1)
+      ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
 
   if (!ApplicationDelegateProto ||

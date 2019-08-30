@@ -519,45 +519,6 @@ public:
   /// shadowed clang module.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
 
-  /// @{
-
-  /// Perform an action for every module visible from this module.
-  ///
-  /// This only includes modules with at least one declaration visible: if two
-  /// import access paths are incompatible, the indirect module will be skipped.
-  /// Modules that can't be used for lookup (including Clang submodules at the
-  /// time this comment was written) are also skipped under certain
-  /// circumstances.
-  ///
-  /// \param topLevelAccessPath If present, include the top-level module in the
-  ///        results, with the given access path.
-  /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
-  ///        Return \c false to abort iteration.
-  ///
-  /// \return True if the traversal ran to completion, false if it ended early
-  ///         due to the callback.
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<bool(ImportedModule)> fn) const;
-
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<void(ImportedModule)> fn) const {
-    return forAllVisibleModules(topLevelAccessPath,
-                                [=](const ImportedModule &import) -> bool {
-      fn(import);
-      return true;
-    });
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            Fn &&fn) const {
-    using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
-    llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
-    return forAllVisibleModules(topLevelAccessPath, wrapped);
-  }
-
-  /// @}
-
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
   /// Generate the list of libraries needed to link this module, based on its
@@ -816,39 +777,6 @@ public:
   /// imports.
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
-
-  /// @{
-
-  /// Perform an action for every module visible from this file.
-  ///
-  /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
-  ///           Return \c false to abort iteration.
-  ///
-  /// \return True if the traversal ran to completion, false if it ended early
-  ///         due to the callback.
-  bool
-  forAllVisibleModules(
-      llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) const;
-
-  bool
-  forAllVisibleModules(
-      llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) const {
-    return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
-      fn(import);
-      return true;
-    });
-  }
-  
-  template <typename Fn>
-  bool forAllVisibleModules(Fn &&fn) const {
-    using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
-    llvm::function_ref<RetTy(ModuleDecl::ImportedModule)> wrapped{
-      std::forward<Fn>(fn)
-    };
-    return forAllVisibleModules(wrapped);
-  }
-
-  /// @}
 
   /// True if this file contains the main class for the module.
   bool hasMainClass() const {

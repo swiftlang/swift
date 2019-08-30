@@ -1706,9 +1706,9 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
 
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
-  forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(this)) {
     import.second->lookupClassMember(import.first, member, allDecls);
-  });
+  }
 
   // For each declaration whose context is not something we've
   // already visited above, add it to the list of declarations.
@@ -1750,9 +1750,9 @@ void DeclContext::lookupAllObjCMethods(
        ObjCSelector selector,
        SmallVectorImpl<AbstractFunctionDecl *> &results) const {
   // Collect all of the methods with this selector.
-  forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(this)) {
     import.second->lookupObjCMethods(selector, results);
-  });
+  }
 
   // Filter out duplicates.
   llvm::SmallPtrSet<AbstractFunctionDecl *, 8> visited;

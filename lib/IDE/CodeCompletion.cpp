@@ -16,6 +16,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/LazyResolver.h"
@@ -3357,8 +3358,7 @@ public:
   std::vector<OperatorDecl *> collectOperators() {
     std::vector<OperatorDecl *> results;
     assert(CurrDeclContext);
-    CurrDeclContext->getParentSourceFile()->forAllVisibleModules(
-    [&](ModuleDecl::ImportedModule import) {
+    for (auto import : namelookup::getAllImports(CurrDeclContext)) {
       for (auto fileUnit : import.second->getFiles()) {
         switch (fileUnit->getKind()) {
         case FileUnitKind::Builtin:
@@ -3373,7 +3373,7 @@ public:
           break;
         }
       }
-    });
+    }
     return results;
   }
 
@@ -3960,15 +3960,14 @@ public:
             addPrecedenceGroupRef(PG);
       }
     }
-    CurrDeclContext->getParentSourceFile()
-      ->forAllVisibleModules([&](ModuleDecl::ImportedModule Import) {
+    for (auto Import : namelookup::getAllImports(CurrDeclContext)) {
       auto Module = Import.second;
       if (Module == CurrModule)
-        return;
+        continue;
 
       RequestedCachedResults.push_back(
         RequestedResultsTy::fromModule(Module).onlyPrecedenceGroups());
-    });
+    }
   }
 
   void getPrecedenceGroupCompletions(SyntaxKind SK) {
@@ -5536,8 +5535,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
     if (Request.TheModule) {
       // FIXME: actually check imports.
-      const_cast<ModuleDecl*>(Request.TheModule)
-          ->forAllVisibleModules({}, handleImport);
+      for (auto Import : namelookup::getAllImports(Request.TheModule)) {
+        handleImport(Import);
+      }
     } else {
       // Add results from current module.
       Lookup.getToplevelCompletions(Request.OnlyTypes);
@@ -5552,9 +5552,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       SF->getImportedModules(Imports, ImportFilter);
 
       for (auto Imported : Imports) {
-        ModuleDecl *TheModule = Imported.second;
-        ModuleDecl::AccessPathTy AccessPath = Imported.first;
-        TheModule->forAllVisibleModules(AccessPath, handleImport);
+        for (auto Import : namelookup::getAllImports(Imported.second))
+          handleImport(Import);
       }
     }
   }
