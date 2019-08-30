@@ -106,6 +106,7 @@ private:
 public:
   swift::ScopeInfo &getScopeInfo() { return ScopeInfo; }
   PersistentParserState();
+  PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
 
   void delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
