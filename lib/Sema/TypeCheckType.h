@@ -66,6 +66,9 @@ enum class TypeResolutionFlags : uint16_t {
 
   /// Whether we should not produce diagnostics if the type is invalid.
   SilenceErrors = 1 << 10,
+
+  /// Whether the name is known to be fully qualified.
+  FullyQualified = 1 << 11,
 };
 
 /// Type resolution contexts that require special handling.

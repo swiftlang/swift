@@ -312,6 +312,9 @@ enum class NameLookupFlags {
   IncludeOuterResults = 0x20,
   /// Whether to consider synonyms declared through @_implements().
   IncludeAttributeImplements = 0x40,
+  /// Whether to only look up modules visible at this location, not other kinds
+  /// of visible names.
+  IncludeOnlyModules = 0x80,
 };
 
 /// A set of options that control name lookup.

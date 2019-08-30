@@ -260,6 +260,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookup::Flags::IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IncludeOuterResults))
     newOptions |= UnqualifiedLookup::Flags::IncludeOuterResults;
+  if (options.contains(NameLookupFlags::IncludeOnlyModules))
+    newOptions |= UnqualifiedLookup::Flags::IncludeOnlyModules;
 
   return newOptions;
 }

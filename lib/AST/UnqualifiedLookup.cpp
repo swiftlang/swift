@@ -476,6 +476,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 #endif
   SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
 
+  if (options.contains(UnqualifiedLookup::Flags::IncludeOnlyModules)) {
+    lookForAModuleWithTheGivenName(DC);
+    recordCompletionOfAScope();
+    return;
+  }
+
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
   ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUse{

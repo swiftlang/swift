@@ -136,6 +136,8 @@ public:
     /// This lookup should include results from outside the innermost scope with
     /// results.
     IncludeOuterResults = 0x10,
+    /// Look up only modules visible at this location, not other kinds of names.
+    IncludeOnlyModules = 0x20,
   };
   using Options = OptionSet<Flags>;
 
