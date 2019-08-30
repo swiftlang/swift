@@ -656,6 +656,7 @@ adjustOptionsForGenericArgs(TypeResolutionOptions options) {
   options.setContext(None);
   options -= TypeResolutionFlags::SILType;
   options -= TypeResolutionFlags::AllowUnavailableProtocol;
+  options -= TypeResolutionFlags::FullyQualified;
 
   return options;
 }
@@ -1325,6 +1326,9 @@ resolveTopLevelIdentTypeComponent(TypeResolution resolution,
   NameLookupOptions lookupOptions = defaultUnqualifiedLookupOptions;
   if (options.contains(TypeResolutionFlags::KnownNonCascadingDependency))
     lookupOptions |= NameLookupFlags::KnownPrivate;
+  if (options.contains(TypeResolutionFlags::FullyQualified))
+    lookupOptions |= NameLookupFlags::IncludeOnlyModules;
+
   auto globals = TypeChecker::lookupUnqualifiedType(DC,
                                                     id,
                                                     comp->getIdLoc(),
@@ -2057,6 +2061,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   // The type we're working with, in case we want to build it differently
   // based on the attributes we see.
   Type ty;
+
+  if (attrs.has(TAK_qualified)) {
+    TypeResolutionOptions innerOptions = options;
+    innerOptions |= TypeResolutionFlags::FullyQualified;
+    return resolveType(repr, innerOptions);
+  }
   
   // If this is a reference to an opaque return type, resolve it.
   if (auto &opaque = attrs.OpaqueReturnTypeOf) {
