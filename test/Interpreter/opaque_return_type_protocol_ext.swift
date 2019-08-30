@@ -79,3 +79,16 @@ if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   print("i'm getting way too old for this sh")
   print("way too old")
 }
+
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
+dynamic func opaqueAssocTypeUnderlyingType() -> some Any {
+  return g().f()
+}
+
+if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
+  let x = opaqueAssocTypeUnderlyingType()
+  // CHECK: {{[1, 2, 3]|too old}}
+  print(x)
+} else {
+  print("nope, still too old")
+}
