@@ -529,7 +529,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     Generator(SF.getASTContext(), &State) {
   State = PersistentState;
   if (!State) {
-    OwnedState.reset(new PersistentParserState(Context));
+    OwnedState.reset(new PersistentParserState());
     State = OwnedState.get();
   }
 

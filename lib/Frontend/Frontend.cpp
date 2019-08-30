@@ -779,7 +779,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
       computeDelayedParsingCallback()};
 
-  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+  PersistentState = llvm::make_unique<PersistentParserState>();
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, DelayedCB.get());
@@ -1050,7 +1050,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID);
   }
 
-  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+  PersistentState = llvm::make_unique<PersistentParserState>();
 
   SWIFT_DEFER {
     if (ParseDelayedBodyOnEnd)
