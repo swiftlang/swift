@@ -6255,20 +6255,16 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   SmallVector<AnyFunctionType::Param, 4> allocParams;
   bodyParams->getParams(allocParams);
 
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  if (isa<ClassDecl>(dc))
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
-                                               flags)) {
-    auto ctor = dyn_cast<ConstructorDecl>(other);
-    if (!ctor || ctor->isInvalid() ||
+  TinyPtrVector<ConstructorDecl *> ctors;
+  auto found = Impl.ConstructorsForNominal.find(ownerNominal);
+  if (found != Impl.ConstructorsForNominal.end())
+    ctors = found->second;
+
+  for (auto ctor : ctors) {
+    if (ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
         !ctor->getClangDecl())
       continue;
-
-    // Resolve the type of the constructor.
-    if (!ctor->hasInterfaceType())
-      Impl.SwiftContext.getLazyResolver()->resolveDeclSignature(ctor);
 
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
@@ -6340,10 +6336,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
       /*GenericParams=*/nullptr, dc);
 
-  // Make the constructor declaration immediately visible in its
-  // class or protocol type.
-  ownerNominal->makeMemberVisible(result);
-
   addObjCAttribute(result, selector);
 
   // Calculate the function type of the result.
@@ -6406,6 +6398,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Record the constructor for future re-use.
   Impl.Constructors[std::make_tuple(objcMethod, dc, getVersion())] = result;
+  Impl.ConstructorsForNominal[ownerNominal].push_back(result);
 
   // If this constructor overrides another constructor, mark it as such.
   recordObjCOverride(result);
