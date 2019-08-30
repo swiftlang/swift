@@ -39,11 +39,12 @@ STATISTIC(NumLoadCopyConvertedToLoadBorrow,
 //                                  Utility
 //===----------------------------------------------------------------------===//
 
-/// Return true if v only has invalidating uses that are destroy_value.
+/// Return true if v only has invalidating uses that are destroy_value. Such an
+/// owned value is said to represent a dead "live range".
 ///
 /// Semantically this implies that a value is never passed off as +1 to memory
 /// or another function implying it can be used everywhere at +0.
-static bool isConsumed(
+static bool isDeadLiveRange(
     SILValue v, SmallVectorImpl<DestroyValueInst *> &destroys,
     NullablePtr<SmallVectorImpl<SILInstruction *>> forwardingInsts = nullptr) {
   assert(v.getOwnershipKind() == ValueOwnershipKind::Owned);
@@ -99,8 +100,9 @@ static bool isConsumed(
         continue;
       }
 
-      // Otherwise be conservative and assume that we /may consume/ the value.
-      return true;
+      // Otherwise be conservative and assume that we /may consume/ the value,
+      // so the live range must not be eliminated.
+      return false;
     }
     case UseLifetimeConstraint::MustBeLive:
       // Ok, this constraint can take something owned as live. Assert that it
@@ -114,7 +116,9 @@ static bool isConsumed(
     }
   }
 
-  return false;
+  // We visited all of our users and were able to prove that all of them were
+  // benign. Return true.
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -334,17 +338,14 @@ bool SemanticARCOptVisitor::performGuaranteedCopyValueOptimization(CopyValueInst
   if (!canHandleOperand(cvi->getOperand(), borrowIntroducers))
     return false;
 
-  // Then go over all of our uses. Find our destroying instructions (ignoring
-  // forwarding instructions that can forward both owned and guaranteed) and
-  // make sure all of them are destroy_value. For our non-destroying
-  // instructions, make sure that they accept a guaranteed value. After that,
-  // make sure that our destroys are within the lifetime of our borrowed values.
-  //
-  // TODO: Change isConsumed to return branch propagated users for destroys, so
-  // we do not need to construct another array.
+  // Then go over all of our uses and see if the value returned by our copy
+  // value forms a dead live range. If we do not have a dead live range, there
+  // must be some consuming use that we either do not understand is /actually/
+  // forwarding or a user that truly represents a necessary consume of the
+  // value (e.x. storing into memory).
   SmallVector<DestroyValueInst *, 16> destroys;
   SmallVector<SILInstruction *, 16> guaranteedForwardingInsts;
-  if (isConsumed(cvi, destroys, &guaranteedForwardingInsts))
+  if (!isDeadLiveRange(cvi, destroys, &guaranteedForwardingInsts))
     return false;
 
   // Next check if we have any destroys at all of our copy_value and an operand
@@ -726,15 +727,15 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return false;
 
-  // Ok, we have our load [copy]. Make sure its value is never
-  // consumed. If it is consumed, we need to pass off a +1 value, so
-  // bail.
+  // Ok, we have our load [copy]. Make sure its value is truly a dead live range
+  // implying it is only ever consumed by destroy_value instructions. If it is
+  // consumed, we need to pass off a +1 value, so bail.
   //
   // FIXME: We should consider if it is worth promoting a load [copy]
   // -> load_borrow if we can put a copy_value on a cold path and thus
   // eliminate RR traffic on a hot path.
   SmallVector<DestroyValueInst *, 32> destroyValues;
-  if (isConsumed(li, destroyValues))
+  if (!isDeadLiveRange(li, destroyValues))
     return false;
 
   // Then check if our address is guaranteed to never be written to within the
