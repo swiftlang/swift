@@ -20,6 +20,7 @@
 #include "ClangDiagnosticConsumer.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ImportCache.h"

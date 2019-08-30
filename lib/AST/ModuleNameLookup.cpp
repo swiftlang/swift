@@ -12,6 +12,7 @@
 
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/Support/raw_ostream.h"

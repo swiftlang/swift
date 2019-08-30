@@ -21,6 +21,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"

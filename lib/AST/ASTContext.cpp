@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
