@@ -4465,7 +4465,8 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (paramType->isExistentialType())
     diagnostic = diag::cannot_convert_argument_value_protocol;
 
-  emitDiagnostic(getLoc(), diagnostic, argType, paramType);
+  auto diag = emitDiagnostic(getLoc(), diagnostic, argType, paramType);
+  tryFixIts(diag);
   return true;
 }
 
