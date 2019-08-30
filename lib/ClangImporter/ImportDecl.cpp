@@ -4736,6 +4736,7 @@ namespace {
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
+        result->setHasMissingVTableEntries(false);
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
         return result;
       };
@@ -4903,6 +4904,7 @@ namespace {
       if (decl->isArcWeakrefUnavailable())
         result->setIsIncompatibleWithWeakReferences();
 
+      result->setHasMissingVTableEntries(false);
       result->setMemberLoader(&Impl, 0);
 
       return result;
@@ -5314,6 +5316,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
+  theClass->setHasMissingVTableEntries(false);
   theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
   addObjCAttribute(theClass, None);
 

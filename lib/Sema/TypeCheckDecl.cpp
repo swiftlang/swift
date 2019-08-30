@@ -2756,6 +2756,9 @@ public:
     // we're doing here.
     CD->walkSuperclasses(
       [&](ClassDecl *superclass) {
+        if (!superclass->getParentSourceFile())
+          return TypeWalker::Action::Stop;
+
         for (auto *member : superclass->getMembers()) {
           if (auto *vd = dyn_cast<ValueDecl>(member)) {
             if (vd->isPotentiallyOverridable()) {

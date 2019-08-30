@@ -543,7 +543,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
@@ -557,7 +557,10 @@ protected:
     HasForcedEmittedMembers : 1,     
 
     HasMissingDesignatedInitializers : 1,
+    ComputedHasMissingDesignatedInitializers : 1,
+
     HasMissingVTableEntries : 1,
+    ComputedHasMissingVTableEntries : 1,
 
     /// Whether instances of this class are incompatible
     /// with weak and unowned references.
@@ -3879,6 +3882,7 @@ public:
   bool hasMissingDesignatedInitializers() const;
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
+    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
     Bits.ClassDecl.HasMissingDesignatedInitializers = newValue;
   }
 
@@ -3889,6 +3893,7 @@ public:
   bool hasMissingVTableEntries() const;
 
   void setHasMissingVTableEntries(bool newValue = true) {
+    Bits.ClassDecl.ComputedHasMissingVTableEntries = 1;
     Bits.ClassDecl.HasMissingVTableEntries = newValue;
   }
 
