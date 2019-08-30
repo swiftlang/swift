@@ -209,16 +209,16 @@ class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
 func sr_6400_4() {
   do {
     throw SR_6400_E.castError
-  } catch let error as SR_6400_A { // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
-    print("Foo")
+  } catch let error as SR_6400_A { // Okay
+    print(error)
   } catch {
     print("Bar")
   }
   
   do {
     throw SR_6400_E.castError
-  } catch let error as SR_6400_B { // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
-    print("Foo")
+  } catch let error as SR_6400_B { // Okay
+    print(error)
   } catch {
     print("Bar")
   }
@@ -230,10 +230,16 @@ protocol SR_11402_P {}
 class SR_11402_Superclass {}
 class SR_11402_Subclass: SR_11402_Superclass, SR_11402_P {}
 
-func sr_11402_func(_ x: SR_11402_P) {
+func sr_11402_func1(_ x: SR_11402_P) {
   if let y = x as? SR_11402_Superclass { // Okay
     print(y)
   }
 }
 
-sr_11402_func(SR_11402_Subclass())
+final class SR_11402_Final {}
+
+func sr_11402_func2(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Final { // expected-error {{cast from 'SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
+    print(y)
+  }
+}
