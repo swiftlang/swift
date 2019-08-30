@@ -97,7 +97,7 @@ def create_directory(path):
 
 
 class DumpConfig:
-    def __init__(self, tool_path, platform, platform_alias):
+    def __init__(self, tool_path, platform, platform_alias, verbose):
         target_map = {
             'iphoneos': 'arm64-apple-ios13.0',
             'macosx': 'x86_64-apple-macosx10.15',
@@ -120,30 +120,45 @@ class DumpConfig:
             iOSSupport = self.sdk + \
                 '/System/iOSSupport/System/Library/Frameworks'
             self.frameworks.extend([iOSSupport])
+        self._environ = dict(os.environ)
+        self._environ['SWIFT_FORCE_MODULE_LOADING'] = 'prefer-interface'
+        self.verbose = verbose
 
-    def run(self, output, module, swift_ver, opts, verbose,
+    def dumpZipperedContent(self, cmd, output, module):
+        dir_path = os.path.realpath(output + '/' + module)
+        file_path = os.path.realpath(dir_path + '/' + self.platform_alias +
+                                     '.json')
+        create_directory(dir_path)
+        current_cmd = list(cmd)
+        current_cmd.extend(['-module', module])
+        current_cmd.extend(['-o', file_path])
+        check_call(current_cmd, env=self._environ, verbose=self.verbose)
+
+    def run(self, output, module, swift_ver, opts,
             module_filter_flags, include_fixed_clang_modules,
-            separate_by_module):
+            separate_by_module, zippered):
         cmd = [self.tool_path, '-sdk', self.sdk, '-target',
                self.target, '-dump-sdk', '-module-cache-path',
                '/tmp/ModuleCache', '-swift-version',
                swift_ver, '-abort-on-module-fail']
-        _environ = dict(os.environ)
-        _environ['SWIFT_FORCE_MODULE_LOADING'] = 'prefer-interface'
         for path in self.frameworks:
             cmd.extend(['-iframework', path])
         for path in self.inputs:
             cmd.extend(['-I', path])
         cmd.extend(['-' + o for o in opts])
-        if verbose:
+        if self.verbose:
             cmd.extend(['-v'])
         if module:
-            cmd.extend(['-module', module])
-            cmd.extend(['-o', output])
-            check_call(cmd, env=_environ, verbose=verbose)
+            if zippered:
+                create_directory(output)
+                self.dumpZipperedContent(cmd, output, module)
+            else:
+                cmd.extend(['-module', module])
+                cmd.extend(['-o', output])
+                check_call(cmd, env=self._environ, verbose=self.verbose)
         else:
             with tempfile.NamedTemporaryFile() as tmp:
-                prepare_module_list(self.platform, tmp, verbose,
+                prepare_module_list(self.platform, tmp, self.verbose,
                                     module_filter_flags,
                                     include_fixed_clang_modules)
                 if separate_by_module:
@@ -153,19 +168,11 @@ class DumpConfig:
                         # Skip comments
                         if module.startswith('//'):
                             continue
-                        dir_path = os.path.realpath(output + '/' + module)
-                        file_path = os.path.realpath(dir_path + '/' +
-                                                     self.platform_alias +
-                                                     '.json')
-                        create_directory(dir_path)
-                        current_cmd = list(cmd)
-                        current_cmd.extend(['-module', module])
-                        current_cmd.extend(['-o', file_path])
-                        check_call(current_cmd, env=_environ, verbose=verbose)
+                        self.dumpZipperedContent(cmd, output, module)
                 else:
                     cmd.extend(['-o', output])
                     cmd.extend(['-module-list-file', tmp.name])
-                    check_call(cmd, env=_environ, verbose=verbose)
+                    check_call(cmd, env=self._environ, verbose=self.verbose)
 
 
 class DiagnoseConfig:
@@ -246,6 +253,11 @@ A convenient wrapper for swift-api-digester.
                              help='When importing entire SDK, dump content '
                                   'seprately by module names')
 
+    basic_group.add_argument('--zippered',
+                             action='store_true',
+                             help='dump module content to a dir with files for'
+                                  'seprately targets')
+
     basic_group.add_argument('--platform-alias', default='', help='''
         Specify a file name to use if using a platform name in json file isn't
         optimal
@@ -272,13 +284,14 @@ A convenient wrapper for swift-api-digester.
         if args.platform_alias == '':
             args.platform_alias = args.target
         runner = DumpConfig(tool_path=args.tool_path, platform=args.target,
-                            platform_alias=args.platform_alias)
+                            platform_alias=args.platform_alias,
+                            verbose=args.v)
         runner.run(output=args.output, module=args.module,
                    swift_ver=args.swift_version, opts=args.opts,
-                   verbose=args.v,
                    module_filter_flags=module_filter_flags,
                    include_fixed_clang_modules=include_fixed_clang_modules,
-                   separate_by_module=args.separate_by_module)
+                   separate_by_module=args.separate_by_module,
+                   zippered=args.zippered)
     elif args.action == 'diagnose':
         if not args.dump_before:
             fatal_error("Need to specify --dump-before")
