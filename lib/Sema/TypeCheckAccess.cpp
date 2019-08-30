@@ -779,6 +779,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    DescriptiveDeclKind declKind = DescriptiveDeclKind::Protocol;
 
     // FIXME: Hack to ensure that we've computed the types involved here.
     ASTContext &ctx = proto->getASTContext();
@@ -788,6 +789,15 @@ public:
                                 proto, i, TypeResolutionStage::Interface},
                               Type());
     }
+
+    auto declKindForType = [](Type type) {
+      if (isa<TypeAliasType>(type.getPointer()))
+        return DescriptiveDeclKind::TypeAlias;
+      else if (auto nominal = type->getAnyNominal())
+        return nominal->getDescriptiveKind();
+      else
+        return DescriptiveDeclKind::Type;
+    };
 
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
@@ -803,29 +813,31 @@ public:
           complainRepr = thisComplainRepr;
           protocolControlErrorKind = PCEK_Refine;
           downgradeToWarning = downgradeDiag;
+          declKind = declKindForType(requirement.getType());
         }
       });
     });
 
-    checkRequirementAccess(proto,
-                           proto->getFormalAccessScope(),
-                           proto->getDeclContext(),
-                           [&](AccessScope typeAccessScope,
-                               const TypeRepr *thisComplainRepr,
-                               DowngradeToWarning downgradeDiag) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        protocolControlErrorKind = PCEK_Requirement;
-        downgradeToWarning = downgradeDiag;
-
-        // Swift versions before 5.0 did not check requirements on the
-        // protocol's where clause, so emit a warning.
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          downgradeToWarning = DowngradeToWarning::Yes;
-      }
+    forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
+      checkTypeAccess(
+          type, typeRepr, proto,
+          /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+              DowngradeToWarning downgradeDiag) {
+            if (typeAccessScope.isChildOf(minAccessScope) ||
+                (!complainRepr &&
+                 typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+              minAccessScope = typeAccessScope;
+              complainRepr = thisComplainRepr;
+              protocolControlErrorKind = PCEK_Requirement;
+              downgradeToWarning = downgradeDiag;
+              declKind = declKindForType(type);
+              // Swift versions before 5.0 did not check requirements on the
+              // protocol's where clause, so emit a warning.
+              if (!TC.Context.isSwiftVersionAtLeast(5))
+                downgradeToWarning = DowngradeToWarning::Yes;
+            }
+          });
     });
 
     if (!minAccessScope.isPublic()) {
@@ -837,10 +849,9 @@ public:
       auto diagID = diag::protocol_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::protocol_access_warn;
-      auto diag = TC.diagnose(proto, diagID,
-                              isExplicit, protoAccess,
+      auto diag = TC.diagnose(proto, diagID, isExplicit, protoAccess,
                               protocolControlErrorKind, minAccess,
-                              isa<FileUnit>(proto->getDeclContext()));
+                              isa<FileUnit>(proto->getDeclContext()), declKind);
       highlightOffendingType(TC, diag, complainRepr);
     }
   }
