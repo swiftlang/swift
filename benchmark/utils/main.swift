@@ -75,6 +75,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
+import FindStringNaive
 import FlattenList
 import FloatingPointParsing
 import FloatingPointPrinting
@@ -253,6 +254,7 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
+registerBenchmark(FindStringNaive)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointParsing)
