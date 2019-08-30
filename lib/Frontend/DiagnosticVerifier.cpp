@@ -565,12 +565,14 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID,
 
       llvm::SMFixIt fixIt(llvm::SMRange{StartLoc, EndLoc}, I->getMessage());
       addError(expected.MessageRange.begin(), "incorrect message found", fixIt);
-    } else {
+    } else if (I->getColumnNo() + 1 != (int)*expected.ColumnNo) {
       // The difference must be only in the column
       addError(expected.MessageRange.begin(),
                llvm::formatv("message found at column {0} but was expected to "
                              "appear at column {1}",
                              I->getColumnNo() + 1, *expected.ColumnNo));
+    } else {
+      llvm_unreachable("unhandled difference from expected diagnostic");
     }
     CapturedDiagnostics.erase(I);
     ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
