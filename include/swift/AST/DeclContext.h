@@ -51,7 +51,6 @@ namespace swift {
   class GenericParamList;
   class LazyResolver;
   class LazyMemberLoader;
-  class LazyMemberParser;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
