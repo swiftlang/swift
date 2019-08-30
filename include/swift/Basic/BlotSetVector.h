@@ -125,6 +125,15 @@ public:
     return true;
   }
 
+  /// Return the last element of the blot map vector. Will be None if blotted.
+  Optional<ValueT> pop_back_val() {
+    auto result = Vector.pop_back_val();
+    if (!result)
+      return result;
+    Map.erase(*result);
+    return result;
+  }
+
   /// Attempt to lookup the index of \p V. Returns None upon failure and the
   /// value on success.
   Optional<unsigned> getIndex(const ValueT &V) {

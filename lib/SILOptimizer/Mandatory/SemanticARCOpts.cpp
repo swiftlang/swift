@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-semantic-arc-opts"
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
@@ -24,6 +24,7 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -138,7 +139,7 @@ namespace {
 /// the worklist before we delete them.
 struct SemanticARCOptVisitor
     : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
-  SmallSetVector<SILValue, 32> worklist;
+  SmallBlotSetVector<SILValue, 32> worklist;
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
   
@@ -175,7 +176,7 @@ struct SemanticARCOptVisitor
     // Remove all SILValues of the instruction from the worklist and then erase
     // the instruction.
     for (SILValue result : i->getResults()) {
-      worklist.remove(result);
+      worklist.erase(result);
     }
     i->eraseFromParent();
   }
@@ -205,7 +206,11 @@ bool SemanticARCOptVisitor::processWorklist() {
   bool madeChange = false;
 
   while (!worklist.empty()) {
-    SILValue next = worklist.pop_back_val();
+    // Pop the last element off the list. If we were returned None, we blotted
+    // this element, so skip it.
+    SILValue next = worklist.pop_back_val().getValueOr(SILValue());
+    if (!next)
+      continue;
 
     // First check if this is an instruction that is trivially dead. This can
     // occur if we eliminate rr traffic resulting in dead projections and the
@@ -224,7 +229,7 @@ bool SemanticARCOptVisitor::processWorklist() {
                 worklist.insert(operand);
               }
               for (SILValue result : i->getResults()) {
-                worklist.remove(result);
+                worklist.erase(result);
               }
               ++NumEliminatedInsts;
             });
