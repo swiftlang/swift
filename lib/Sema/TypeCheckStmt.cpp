@@ -1990,8 +1990,8 @@ static bool checkSuperInit(TypeChecker &tc, ConstructorDecl *fromCtor,
     lookupOptions -= NameLookupFlags::ProtocolMembers;
     lookupOptions -= NameLookupFlags::PerformConformanceCheck;
 
-    for (auto member : tc.lookupConstructors(fromCtor, superclassTy,
-                                             lookupOptions)) {
+    for (auto member : TypeChecker::lookupConstructors(fromCtor, superclassTy,
+                                                       lookupOptions)) {
       auto superclassCtor = dyn_cast<ConstructorDecl>(member.getValueDecl());
       if (!superclassCtor || !superclassCtor->isDesignatedInit() ||
           superclassCtor == ctor)

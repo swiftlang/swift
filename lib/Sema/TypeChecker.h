@@ -1172,7 +1172,7 @@ private:
 
 public:
   /// Define the default constructor for the given struct or class.
-  void defineDefaultConstructor(NominalTypeDecl *decl);
+  static void defineDefaultConstructor(NominalTypeDecl *decl);
 
   /// Fold the given sequence expression into an (unchecked) expression
   /// tree.
@@ -1657,9 +1657,9 @@ public:
   /// \param options Options that control name lookup.
   ///
   /// \returns the constructors found for this type.
-  LookupResult lookupConstructors(DeclContext *dc, Type type,
-                                  NameLookupOptions options
-                                    = defaultConstructorLookupOptions);
+  static LookupResult lookupConstructors(DeclContext *dc, Type type,
+                                         NameLookupOptions options
+                                           = defaultConstructorLookupOptions);
 
   /// Given an expression that's known to be an infix operator,
   /// look up its precedence group.
