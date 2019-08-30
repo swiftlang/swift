@@ -4508,6 +4508,20 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
         checkExtensionGenericParams(*this, ext, extendedType, genericParams);
       ext->setGenericEnvironment(env);
     }
+  } else if (auto extType = ext->getExtendedType()) {
+    if (!ext->isInvalid()) {
+      // If we've got here, then we have some kind of extension of a prima
+      // fascie non-nominal type.  This can come up when we're projecting
+      // typealiases out of bound generic types.
+      //
+      // struct Array<T> { typealias Indices = Range<Int> }
+      // extension Array.Indices.Bound {}
+      //
+      // FIXME: This diagnostic is bogus, but will do for testing.
+      ext->setInvalid();
+      ext->getASTContext().Diags.diagnose(ext,
+                                          diag::non_nominal_extension, extType);
+    }
   }
 }
 
