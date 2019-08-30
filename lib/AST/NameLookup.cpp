@@ -1128,16 +1128,6 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   }
 }
 
-void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
-  if (!LookupTable.getPointer()) {
-    auto &ctx = getASTContext();
-    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
-  }
-  
-  LookupTable.getPointer()->addMember(member);
-}
-
-
 static TinyPtrVector<ValueDecl *>
 maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
                              DeclName name,

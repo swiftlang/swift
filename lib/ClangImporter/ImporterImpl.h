@@ -493,6 +493,11 @@ public:
       std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
       ConstructorDecl *> Constructors;
 
+  /// Keep track of all initializers that have been imported into a
+  /// nominal type.
+  llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
+      ConstructorsForNominal;
+
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
   ArrayRef<ValueDecl *> getAlternateDecls(Decl *decl) {

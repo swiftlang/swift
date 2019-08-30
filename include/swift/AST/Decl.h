@@ -3381,16 +3381,6 @@ public:
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
 
-  /// Make a member of this nominal type, or one of its extensions,
-  /// immediately visible in the lookup table.
-  ///
-  /// A member of a nominal type or extension thereof will become
-  /// visible to name lookup as soon as it is added. However, if the
-  /// addition of a member is delayed---for example, because it's
-  /// being introduced in response to name lookup---this method can be
-  /// called to make it immediately visible.
-  void makeMemberVisible(ValueDecl *member);
-
   /// Special-behaviour flags passed to lookupDirect()
   enum class LookupDirectFlags {
     /// Whether to avoid loading any new extension.
