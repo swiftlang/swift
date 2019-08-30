@@ -437,6 +437,28 @@ bb0(%x : @guaranteed $ClassLet):
   return undef : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses :
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    unchecked_ref_cast
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+// CHECK: } // end sil function 'dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses'
+sil [ossa] @dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%x : @guaranteed $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %c = unchecked_ref_cast %v : $Klass to $Klass
+  %b = begin_borrow %c : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %c : $Klass
+  return undef : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_upcast_base
 // CHECK:         ref_element_addr
 // CHECK-NEXT:    load_borrow
