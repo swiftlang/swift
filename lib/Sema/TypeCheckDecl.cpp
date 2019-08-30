@@ -3054,8 +3054,27 @@ public:
 
     auto nominal = ED->getExtendedNominal();
     if (nominal == nullptr) {
+	  const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
-      ED->diagnose(diag::non_nominal_extension, extType);
+      if (extType && !extType->hasError() && extType->getAnyNominal()) {
+        // If we've got here, then we have some kind of extension of a prima
+        // fascie non-nominal type.  This can come up when we're projecting
+        // typealiases out of bound generic types.
+        //
+        // struct Array<T> { typealias Indices = Range<Int> }
+        // extension Array.Indices.Bound {}
+        //
+        // Offer to rewrite it to the underlying nominal type.
+        auto canExtType = extType->getCanonicalType();
+        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+          .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_nominal_extension_rewrite, canExtType)
+          .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                        canExtType->getString());
+      } else if (!wasAlreadyInvalid) {
+		// If nothing else applies, fall back to a generic diagnostic.
+        ED->diagnose(diag::non_nominal_extension, extType);
+      }
       return;
     }
 
@@ -3073,11 +3092,10 @@ public:
     // Only generic and protocol types are permitted to have
     // trailing where clauses.
     if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-      if (!ED->getGenericParams() &&
-          !ED->isInvalid()) {
+      if (!ED->getGenericParams() && !ED->isInvalid()) {
         ED->diagnose(diag::extension_nongeneric_trailing_where,
-                      nominal->getFullName())
-        .highlight(trailingWhereClause->getSourceRange());
+                     nominal->getFullName())
+          .highlight(trailingWhereClause->getSourceRange());
       }
     }
 
