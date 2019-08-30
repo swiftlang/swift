@@ -968,17 +968,13 @@ bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
     for (auto proto : paramArchetype->getConformsTo()) {
       if (!TypeChecker::conformsToProtocol(substitution, proto, CS.DC,
                                            ConformanceCheckFlags::InExpression)) {
-        if (substitution->isEqual(argType)) {
-          CS.TC.diagnose(badArgExpr->getLoc(),
-                         diag::cannot_convert_argument_value_protocol,
-                         substitution, proto->getDeclaredType());
-        } else {
+        if (!substitution->isEqual(argType)) {
           CS.TC.diagnose(badArgExpr->getLoc(),
                          diag::cannot_convert_partial_argument_value_protocol,
                          argType, substitution, proto->getDeclaredType());
+          foundFailure = true;
+          break;
         }
-        foundFailure = true;
-        break;
       }
     }
   }

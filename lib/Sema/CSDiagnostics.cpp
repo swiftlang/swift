@@ -4455,8 +4455,17 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseArchetypeMismatch())
     return true;
 
-  emitDiagnostic(getLoc(), diag::cannot_convert_argument_value, getFromType(),
-                 getToType());
+  auto argType = getFromType();
+  auto paramType = getToType();
+
+  Diag<Type, Type> diagnostic = diag::cannot_convert_argument_value;
+
+  // If parameter type is a protocol value, let's says that
+  // argument doesn't conform to a give protocol.
+  if (paramType->isExistentialType())
+    diagnostic = diag::cannot_convert_argument_value_protocol;
+
+  emitDiagnostic(getLoc(), diagnostic, argType, paramType);
   return true;
 }
 
