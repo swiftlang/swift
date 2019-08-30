@@ -77,24 +77,24 @@ where Rest.Element: UnsignedInteger {
 internal func _parseASCII<
   CodeUnits: IteratorProtocol, Result: FixedWidthInteger
 >(
-  codeUnits: inout CodeUnits, radix: Result
+  codeUnits: inout CodeUnits, radix: Int
 ) -> Result?
 where CodeUnits.Element: UnsignedInteger {
   let c0_ = codeUnits.next()
   guard _fastPath(c0_ != nil), let c0 = c0_ else { return nil }
   if _fastPath(c0 != _ascii16("+") && c0 != _ascii16("-")) {
     return _parseUnsignedASCII(
-      first: c0, rest: &codeUnits, radix: radix, positive: true)
+      first: c0, rest: &codeUnits, radix: radix, positive: true) as? Result
   }
   let c1_ = codeUnits.next()
   guard _fastPath(c1_ != nil), let c1 = c1_ else { return nil }
   if _fastPath(c0 == _ascii16("-")) {
     return _parseUnsignedASCII(
-      first: c1, rest: &codeUnits, radix: radix, positive: false)
+      first: c1, rest: &codeUnits, radix: radix, positive: false) as? Result
   }
   else {
     return _parseUnsignedASCII(
-      first: c1, rest: &codeUnits, radix: radix, positive: true)
+      first: c1, rest: &codeUnits, radix: radix, positive: true) as? Result
   }
 }
 
@@ -111,7 +111,7 @@ extension FixedWidthInteger {
     codeUnits: inout CodeUnits, radix: Result
   ) -> Result?
   where CodeUnits.Element: UnsignedInteger {
-    return _parseASCII(codeUnits: &codeUnits, radix: radix)
+    return _parseASCII(codeUnits: &codeUnits, radix: Int(radix))
   }
 
   /// Creates a new integer value from the given string and radix.
@@ -154,7 +154,7 @@ extension FixedWidthInteger {
     if let str = text as? String, str._guts.isFastUTF8 {
       guard let ret = str._guts.withFastUTF8 ({ utf8 -> Self? in
         var iter = utf8.makeIterator()
-        return _parseASCII(codeUnits: &iter, radix: Self(radix))
+        return _parseASCII(codeUnits: &iter, radix: radix)
       }) else {
         return nil
       }
