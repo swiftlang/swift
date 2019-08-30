@@ -4298,7 +4298,11 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //     print("Caught bar error")
     //   }
     // }
-    if (fromExistential) {
+    //
+    // Note: we relax the restriction if the type we're casting to is a class
+    // because it's possible that we might have a subclass that conforms to
+    // the protocol.
+    if (fromExistential && !toType->hasReferenceSemantics()) {
       if (auto NTD = toType->getAnyNominal()) {
         if (!isa<ProtocolDecl>(NTD)) {
           auto protocolDecl =
