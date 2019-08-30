@@ -17,6 +17,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Module.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -33,8 +35,18 @@ namespace swift {
 ArrayRef<Decl *>
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
+  SourceFile &sf = *idc->getDecl()->getDeclContext()->getParentSourceFile();
+  assert(sf.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
+  unsigned bufferID = *sf.getBufferID();
+
+  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // diagnostic engine here.
+  Parser parser(bufferID, sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
+  // Disable libSyntax creation in the delayed parsing.
+  parser.SyntaxContext->setDiscard();
   ASTContext &ctx = idc->getDecl()->getASTContext();
-  return ctx.AllocateCopy(llvm::makeArrayRef(ctx.parseMembers(idc)));
+  return ctx.AllocateCopy(
+      llvm::makeArrayRef(parser.parseDeclListDelayed(idc)));
 }
 
 // Define request evaluation functions for each of the type checker requests.

@@ -207,7 +207,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
-  PersistentParserState PersistentState(Ctx);
+  PersistentParserState PersistentState;
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
       new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;

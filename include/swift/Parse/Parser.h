@@ -982,8 +982,6 @@ public:
                                  bool &HasNestedClassDeclarations);
 
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                            SourceLoc PosBeforeLB,
-                            ParseDeclOptions Options,
                             IterableDeclContext *IDC);
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,

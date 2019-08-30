@@ -181,28 +181,6 @@ namespace {
   };
 } // end anonymous namespace
 
-std::vector<Decl *> PersistentParserState::parseMembers(
-    IterableDeclContext *IDC) {
-  SourceFile &SF = *IDC->getDecl()->getDeclContext()->getParentSourceFile();
-  assert(!SF.hasInterfaceHash() &&
-    "Cannot delay parsing if we care about the interface hash.");
-  assert(SF.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
-  unsigned BufferID = *SF.getBufferID();
-
-  // MarkedPos is not useful for delayed parsing because we know where we should
-  // jump the parser to. However, we should recover the MarkedPos here in case
-  // the PersistentParserState will be used to continuously parse the rest of
-  // the file linearly.
-  llvm::SaveAndRestore<ParserPosition> Pos(MarkedPos, ParserPosition());
-
-  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
-  // diagnostic engine here.
-  Parser TheParser(BufferID, SF, /*No Lexer Diags*/nullptr, nullptr, this);
-  // Disable libSyntax creation in the delayed parsing.
-  TheParser.SyntaxContext->setDiscard();
-  return TheParser.parseDeclListDelayed(IDC);
-}
-
 /// Main entrypoint for the parser.
 ///
 /// \verbatim
@@ -3235,10 +3213,6 @@ static ScopeKind getMemberParseScopeKind(IterableDeclContext *idc) {
 }
 
 std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
-  auto DelayedState = State->takeDelayedDeclListState(IDC);
-  assert(DelayedState.get() && "should have delayed state");
-  (void)DelayedState;
-
   Decl *D = const_cast<Decl*>(IDC->getDecl());
   DeclContext *DC = cast<DeclContext>(D);
   SourceRange BodyRange;
@@ -3247,6 +3221,11 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   } else {
     auto *ntd = cast<NominalTypeDecl>(IDC);
     BodyRange = ntd->getBraces();
+  }
+
+  if (BodyRange.isInvalid()) {
+    assert(D->isImplicit());
+    return { };
   }
 
   auto BeginParserPosition = getParserPosition({BodyRange.Start,BodyRange.End});
@@ -3265,8 +3244,14 @@ std::vector<Decl *> Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   // Temporarily swap out the parser's current lexer with our new one.
   llvm::SaveAndRestore<Lexer *> T(L, &LocalLex);
 
-  // Rewind to the beginning of the decl.
+  // Rewind to the start of the member list, which is a '{' in well-formed
+  // code.
   restoreParserPosition(BeginParserPosition);
+
+  // If there is no left brace, then return an empty list of declarations;
+  // we will have already diagnosed this.
+  if (!Tok.is(tok::l_brace))
+    return { };
 
   // Re-enter the lexical scope. The top-level scope is needed because
   // delayed parsing of members happens with a fresh parser, where there is
@@ -3711,7 +3696,6 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                                  IterableDeclContext *IDC) {
   bool HasOperatorDeclarations;
   bool HasNestedClassDeclarations;
-  ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
 
   if (canDelayMemberDeclParsing(HasOperatorDeclarations,
                                 HasNestedClassDeclarations)) {
@@ -3720,12 +3704,13 @@ bool Parser::parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     if (HasNestedClassDeclarations)
       IDC->setMaybeHasNestedClassDeclarations();
 
-    if (delayParsingDeclList(LBLoc, RBLoc, PosBeforeLB, Options, IDC))
+    if (delayParsingDeclList(LBLoc, RBLoc, IDC))
       return true;
   } else {
     // When forced to eagerly parse, do so and cache the results in the
     // evaluator.
     bool hadError = false;
+    ParseDeclOptions Options = getMemberParseDeclOptions(IDC);
     auto members = parseDeclList(
         LBLoc, RBLoc, ErrorDiag, Options, IDC, hadError);
     IDC->setMaybeHasOperatorDeclarations();
@@ -3806,8 +3791,6 @@ bool Parser::canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
 }
 
 bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                                  SourceLoc PosBeforeLB,
-                                  ParseDeclOptions Options,
                                   IterableDeclContext *IDC) {
   bool error = false;
 
@@ -3818,8 +3801,7 @@ bool Parser::delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
     error = true;
   }
 
-  State->delayDeclList(IDC, Options.toRaw(), CurDeclContext, { LBLoc, RBLoc },
-                       PosBeforeLB);
+  State->delayDeclList(IDC);
   return error;
 }
 

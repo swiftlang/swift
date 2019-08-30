@@ -21,10 +21,9 @@
 
 using namespace swift;
 
-PersistentParserState::PersistentParserState(ASTContext &Ctx):
-  Ctx(Ctx) { Ctx.addLazyParser(this); }
+PersistentParserState::PersistentParserState() { }
 
-PersistentParserState::~PersistentParserState() { Ctx.removeLazyParser(this); }
+PersistentParserState::~PersistentParserState() { }
 
 void PersistentParserState::delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
                                                      SourceRange BodyRange,
@@ -51,15 +50,6 @@ bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
   return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
 }
 
-std::unique_ptr<PersistentParserState::DelayedDeclListState>
-PersistentParserState::takeDelayedDeclListState(IterableDeclContext *IDC) {
-  auto I = DelayedDeclListStates.find(IDC);
-  assert(I != DelayedDeclListStates.end() && "State should be saved");
-  auto State = std::move(I->second);
-  DelayedDeclListStates.erase(I);
-  return State;
-}
-
 void PersistentParserState::delayDecl(DelayedDeclKind Kind,
                                       unsigned Flags,
                                       DeclContext *ParentContext,
@@ -72,25 +62,13 @@ void PersistentParserState::delayDecl(DelayedDeclKind Kind,
       ScopeInfo.saveCurrentScope()));
 }
 
-void PersistentParserState::delayDeclList(IterableDeclContext *D,
-                                          unsigned Flags,
-                                          DeclContext *ParentContext,
-                                          SourceRange BodyRange,
-                                          SourceLoc PreviousLoc) {
-  assert(D->hasUnparsedMembers());
-  DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
-    ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
+void PersistentParserState::delayDeclList(IterableDeclContext *D) {
+  DelayedDeclLists.push_back(D);
 }
 
 void PersistentParserState::parseAllDelayedDeclLists() {
-  std::vector<IterableDeclContext*> AllDelayed;
-  AllDelayed.reserve(DelayedDeclListStates.size());
-  for (auto &P: DelayedDeclListStates) {
-    AllDelayed.push_back(P.first);
-  }
-  for (auto *D: AllDelayed) {
-    D->loadAllMembers();
-  }
+  for (auto IDC : DelayedDeclLists)
+    IDC->loadAllMembers();
 }
 
 void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,
