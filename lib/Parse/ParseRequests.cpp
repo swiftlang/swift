@@ -36,7 +36,6 @@ ArrayRef<Decl *>
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
   SourceFile &sf = *idc->getDecl()->getDeclContext()->getParentSourceFile();
-  assert(sf.Kind != SourceFileKind::SIL && "cannot delay parsing SIL");
   unsigned bufferID = *sf.getBufferID();
 
   // Lexer diaganostics have been emitted during skipping, so we disable lexer's
