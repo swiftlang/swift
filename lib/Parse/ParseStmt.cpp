@@ -26,6 +26,7 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
