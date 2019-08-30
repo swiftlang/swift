@@ -25,6 +25,8 @@ class Sema;
 namespace swift {
 
 class DeclContext;
+class EnumDecl;
+class StructDecl;
 class VisibleDeclConsumer;
 
 /// Represents the different namespaces for types in C.
@@ -76,6 +78,9 @@ public:
   ///
   /// \param name The name we're searching for.
   virtual void lookupValue(DeclName name, VisibleDeclConsumer &consumer) = 0;
+
+  /// Look up the nested 'Code' enum for an error wrapper struct.
+  virtual EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) = 0;
 
   /// Look up a type declaration by its Clang name.
   ///

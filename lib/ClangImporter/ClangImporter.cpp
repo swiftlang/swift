@@ -2171,21 +2171,10 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
     case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
     case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon: {
       ASTContext &Ctx = ContainingUnit->getASTContext();
-      auto LookupFlags =
-          NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
+      auto *Importer = Ctx.getClangModuleLoader();
       auto WrapperStruct = cast<StructDecl>(VD);
-      TinyPtrVector<ValueDecl *> LookupResults =
-          WrapperStruct->lookupDirect(Ctx.Id_Code, LookupFlags);
-      assert(!LookupResults.empty() && "imported error enum without Code");
-
-      auto CodeEnumIter = llvm::find_if(LookupResults,
-                                        [&](ValueDecl *Member) -> bool {
-        return Member->getDeclContext() == WrapperStruct;
-      });
-      assert(CodeEnumIter != LookupResults.end() &&
-             "could not find Code enum in wrapper struct");
-      assert((*CodeEnumIter)->hasClangNode());
-      ClangNode = (*CodeEnumIter)->getClangNode();
+      auto *CodeEnum = Importer->lookupErrorCodeEnum(WrapperStruct);
+      ClangNode = CodeEnum->getClangNode();
       break;
     }
     }
@@ -2496,6 +2485,10 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer) {
   });
 }
 
+EnumDecl *ClangImporter::lookupErrorCodeEnum(const StructDecl *errorWrapper) {
+  return Impl.lookupErrorCodeEnum(errorWrapper);
+}
+
 void ClangImporter::lookupTypeDecl(
     StringRef rawName, ClangTypeKind kind,
     llvm::function_ref<void(TypeDecl *)> receiver) {
@@ -2794,20 +2787,13 @@ ClangModuleUnit::lookupNestedType(Identifier name,
                                   const NominalTypeDecl *baseType) const {
   // Special case for error code enums: try looking directly into the struct
   // first. But only if it looks like a synthesized error wrapped struct.
-  if (name == getASTContext().Id_Code && !baseType->hasClangNode() &&
-      isa<StructDecl>(baseType) && !baseType->hasLazyMembers() &&
-      baseType->isChildContextOf(this)) {
-    auto *mutableBase = const_cast<NominalTypeDecl *>(baseType);
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    auto codeEnum = mutableBase->lookupDirect(name, flags);
-    // Double-check that we actually have a good result. It's possible what we
-    // found is /not/ a synthesized error struct, but just something that looks
-    // like it. But if we still found a good result we should return that.
-    if (codeEnum.size() == 1 && isa<TypeDecl>(codeEnum.front()))
-      return cast<TypeDecl>(codeEnum.front());
-    if (codeEnum.size() > 1)
-      return nullptr;
+  if (name == getASTContext().Id_Code &&
+      !baseType->hasClangNode() &&
+      isa<StructDecl>(baseType)) {
+    auto *wrapperStruct = cast<StructDecl>(baseType);
+    if (auto *codeEnum = owner.lookupErrorCodeEnum(wrapperStruct))
+      return codeEnum;
+
     // Otherwise, fall back and try via lookup table.
   }
 

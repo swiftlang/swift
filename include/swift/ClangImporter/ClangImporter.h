@@ -192,6 +192,9 @@ public:
   /// \param name The name we're searching for.
   void lookupValue(DeclName name, VisibleDeclConsumer &consumer) override;
 
+  /// Look up the nested 'Code' enum for an error wrapper struct.
+  EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) override;
+
   /// Look up a type declaration by its Clang name.
   ///
   /// Note that this method does no filtering. If it finds the type in a loaded

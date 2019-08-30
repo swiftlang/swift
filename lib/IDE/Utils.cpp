@@ -959,15 +959,13 @@ ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
     return clangNode;
 
   // Or via the nested "Code" enum.
-  if (auto nominal =
-      const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
-    auto &ctx = nominal->getASTContext();
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
-      if (auto clangDecl = code->getClangDecl())
-        return clangDecl;
-    }
+  if (auto *errorWrapper = dyn_cast<StructDecl>(decl)) {
+    auto &ctx = errorWrapper->getASTContext();
+    auto *loader = ctx.getClangModuleLoader();
+    if (loader)
+      if (auto *code = loader->lookupErrorCodeEnum(errorWrapper))
+        if (auto clangDecl = code->getClangDecl())
+          return clangDecl;
   }
 
   return ClangNode();
