@@ -400,6 +400,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNBOUND_DOT | %FileCheck %s -check-prefix=UNBOUND_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNBOUND_DOT_2 | %FileCheck %s -check-prefix=UNBOUND_DOT_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICARG_OPTIONAL | %FileCheck %s -check-prefix=GENERICARG_OPTIONAL
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -1129,3 +1131,6 @@ func testUnbound2(x: OuterStruct<Int>.Inner.#^UNBOUND_DOT_2^#) {}
 // UNBOUND_DOT_2: Begin completions
 // UNBOUND_DOT_2-DAG: Keyword/None:                       Type[#OuterStruct<Int>.Inner.Type#]; name=Type
 // UNBOUND_DOT_2: End completions
+
+func testGenericArgForOptional() -> Set<#^GENERICARG_OPTIONAL^#>? {}
+// GENERICARG_OPTIONAL: Begin completions
