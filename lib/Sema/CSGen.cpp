@@ -3023,6 +3023,8 @@ namespace {
         }
 
         case KeyPathExpr::Component::Kind::TupleElement: {
+          // Note: If implemented, the logic in `getAnchormostCalleeLocator`
+          // will need updating to return the correct callee locator for this.
           llvm_unreachable("not implemented");
           break;
         }
@@ -3256,7 +3258,9 @@ namespace {
       // Record the labels.
       if (!labelsArePermanent)
         info.Labels = CS.allocateCopy(info.Labels);
-      CS.ArgumentInfos[CS.getArgumentInfoLocator(expr)] = info;
+
+      auto *locator = CS.getConstraintLocator(expr);
+      CS.ArgumentInfos[CS.getArgumentInfoLocator(locator)] = info;
     }
   };
 

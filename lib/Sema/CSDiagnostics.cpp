@@ -123,7 +123,8 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
 
 Optional<SelectedOverload> FailureDiagnostic::getChoiceFor(Expr *expr) const {
   auto &cs = getConstraintSystem();
-  return getOverloadChoiceIfAvailable(cs.getCalleeLocator(expr));
+  auto *loc = cs.getConstraintLocator(expr);
+  return getOverloadChoiceIfAvailable(cs.getAnchormostCalleeLocator(loc));
 }
 
 Type FailureDiagnostic::resolveInterfaceType(Type type,

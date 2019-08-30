@@ -1579,9 +1579,10 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
 
-  /// Form a locator with given anchor which then could be used
-  /// to retrieve argument information cached in the constraint system.
-  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+  /// Form a locator that can be used to retrieve argument information cached in
+  /// the constraint system for the callee described by the anchor of the
+  /// passed locator.
+  ConstraintLocator *getArgumentInfoLocator(ConstraintLocator *locator);
 
   /// Retrieve the argument info that is associated with a member
   /// reference at the given locator.
@@ -2008,10 +2009,21 @@ public:
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
 
-  /// Returns a locator describing the callee for a given expression. For
-  /// a function application, this is a locator describing the function expr.
-  /// For an unresolved dot/member, this is a locator to the member.
-  ConstraintLocator *getCalleeLocator(Expr *expr);
+  /// Returns a locator describing the callee for the anchor of a given locator.
+  ///
+  /// - For an unresolved dot/member anchor, this will be a locator describing
+  /// the member.
+  ///
+  /// - For a subscript anchor, this will be a locator describing the subscript
+  /// member.
+  ///
+  /// - For a key path anchor with a property/subscript component path element,
+  /// this will be a locator describing the decl referenced by the component.
+  ///
+  /// - For a function application anchor, this will be a locator describing the
+  /// 'direct callee' of the call. For example, for the expression \c x.foo?()
+  /// the returned locator will describe the member \c foo.
+  ConstraintLocator *getAnchormostCalleeLocator(ConstraintLocator *locator);
 
 public:
 
