@@ -833,7 +833,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
 
   // Bail out if we're validating one of our constructors or stored properties
   // already; we'll revisit the issue later.
-  if (isa<ClassDecl>(decl)) {
+  if (isa<ClassDecl>(decl) && !decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         validateDecl(ctor);

@@ -3909,6 +3909,10 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
+  // Only deserialized classes can have missing vtable entries.
+  if (hasClangNode() || getParentSourceFile())
+    return false;
+
   (void)getMembers();
   return Bits.ClassDecl.HasMissingVTableEntries;
 }
