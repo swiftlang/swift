@@ -62,8 +62,8 @@ static llvm::cl::opt<bool> AbortOnFailure(
                               "verify-abort-on-failure",
                               llvm::cl::init(true));
 
-static llvm::cl::opt<bool> VerifyLineTable(
-                              "verify-line-table",
+static llvm::cl::opt<bool> VerifyLinetableMonotonicity(
+                              "verify-linetable-monotonicity",
                               llvm::cl::init(false));
 
 static llvm::cl::opt<bool> VerifyDIHoles(
@@ -4851,21 +4851,23 @@ public:
     }
   }
 
-  void verifyLineTable(SILBasicBlock *BB) {
-    if (!VerifyLineTable)
+  void verifyLinetable(SILBasicBlock *BB) {
+    if (!VerifyLinetableMonotonicity)
       return;
 
     SILFunction *F = BB->getParent();
+
+    // This check only makes sense at -Onone. Optimizations, e.g. inlining,
+    // can move instructions around violate the monotonicity.
     if (F->getEffectiveOptimizationMode() != OptimizationMode::NoOptimization)
       return;
 
+    // Transparent functions don't have debug info.
     if (F->isTransparent())
       return;
 
     auto &SrcMgr = BB->getParent()->getModule().getSourceManager();
-    uint64_t LastLine = 0;
-    uint64_t LastColumn = 0;
-    std::string LastFilename = "";
+    SILDebugLocation LastLoc;
 
     using UUSTuple = std::pair<std::pair<unsigned, unsigned>, StringRef>;
     struct DebugLocKey : public UUSTuple {
@@ -4891,17 +4893,9 @@ public:
       auto DL = SI.getDebugLocation().getLocation().decodeDebugLoc(SrcMgr);
       if (DL.Line == 0)
         continue;
-      if (std::tie(LastLine, LastColumn, LastFilename) ==
-          std::tie(DL.Line, DL.Column, DL.Filename))
-        continue;
-
       auto ItNew = DebugLocKey(DL);
-
       require(!VisitedLocations.count(ItNew), "Incorrect location at -Onone");
-      VisitedLocations.insert(ItNew);
-      LastLine = DL.Line;
-      LastColumn = DL.Column;
-      LastFilename = DL.Filename;
+      LastLoc = SI.getDebugLocation();
     }
   }
 
@@ -4993,7 +4987,7 @@ public:
     
     SILInstructionVisitor::visitSILBasicBlock(BB);
     verifyDebugScopeHoles(BB);
-    verifyLineTable(BB);
+    verifyLinetable(BB);
   }
 
   void visitBasicBlockArguments(SILBasicBlock *BB) {
