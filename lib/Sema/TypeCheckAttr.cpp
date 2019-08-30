@@ -1061,6 +1061,18 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+// TODO(TF-789): Figure out the proper way to typecheck these.
+void TypeChecker::checkDeclDifferentiableAttributes(Decl *D) {
+  AttributeChecker Checker(*this, D);
+  for (auto attr : D->getAttrs()) {
+    if (!isa<DifferentiableAttr>(attr) || !attr->isValid() ||
+        !attr->canAppearOnDecl(D))
+      continue;
+    Checker.visit(attr);
+  }
+}
+
 /// Returns true if the given method is an valid implementation of a
 /// @dynamicCallable attribute requirement. The method is given to be defined
 /// as one of the following: `dynamicallyCall(withArguments:)` or

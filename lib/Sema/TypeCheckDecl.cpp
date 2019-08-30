@@ -3965,6 +3965,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // as it has a valid interface type.
     FD->setSignatureIsValidated();
 
+    // TODO(TF-789): Figure out the proper way to typecheck these.
+    checkDeclDifferentiableAttributes(FD);
+
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
       if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {

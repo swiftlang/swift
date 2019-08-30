@@ -988,6 +988,10 @@ public:
   void checkParameterAttributes(ParameterList *params);
   static ValueDecl *findReplacedDynamicFunction(const ValueDecl *d);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // TODO(TF-789): Figure out the proper way to typecheck these.
+  void checkDeclDifferentiableAttributes(Decl *D);
+
   Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                    ReferenceOwnershipAttr *attr);
 
