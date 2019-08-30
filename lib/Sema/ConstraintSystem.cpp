@@ -2190,9 +2190,34 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
+  // If we have something like '(s.foo)()', where 's.foo()' returns an IUO,
+  // then we need to only create a single constraint that binds the
+  // type to an optional.
+  auto isIUOCallWrappedInParens = [&]() {
+    auto decl = choice.getDecl();
+    auto type = decl ? decl->getInterfaceType() : nullptr;
+    if (!type || !type->is<AnyFunctionType>())
+      return false;
+
+    auto expr = locator->getAnchor();
+    if (!expr)
+      return false;
+
+    if (isa<CallExpr>(expr)) {
+      return false;
+    }
+
+    auto parentExpr = getParentExpr(expr);
+    if (parentExpr && isa<ParenExpr>(parentExpr))
+      return true;
+
+    return false;
+  };
+
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {
-    if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+    if (choice.isImplicitlyUnwrappedValueOrReturnValue() &&
+        !isIUOCallWrappedInParens()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
       buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
