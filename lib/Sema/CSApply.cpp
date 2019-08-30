@@ -2272,6 +2272,17 @@ namespace {
       auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
           ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
 
+      // We won't have a disjunction choice if we have an IUO function call
+      // wrapped in parens (i.e. '(s.foo)()'), because we only create a
+      // single constraint to bind to an optional type. So, we can just return
+      // false here as there's no need to force unwrap.
+      if (!solution.DisjunctionChoices.count(choiceLocator)) {
+        auto type = choice.getDecl()->getInterfaceType();
+        assert((type && type->is<AnyFunctionType>()) &&
+               "expected a function type");
+        return false;
+      }
+
       return solution.getDisjunctionChoice(choiceLocator);
     }
 
