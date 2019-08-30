@@ -2948,6 +2948,9 @@ namespace {
           // Add the 'Code' enum to the error wrapper.
           errorWrapper->addMember(enumDecl);
           Impl.addAlternateDecl(enumDecl, errorWrapper);
+
+          // Stash the 'Code' enum so we can find it later.
+          Impl.ErrorCodeEnums[errorWrapper] = enumDecl;
         }
 
         // The enumerators go into this enumeration.

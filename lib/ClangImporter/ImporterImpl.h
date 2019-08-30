@@ -498,6 +498,10 @@ public:
   llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
       ConstructorsForNominal;
 
+  /// Keep track of the nested 'Code' enum for imported error wrapper
+  /// structs.
+  llvm::DenseMap<const StructDecl *, EnumDecl *> ErrorCodeEnums;
+
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
   ArrayRef<ValueDecl *> getAlternateDecls(Decl *decl) {
@@ -1218,6 +1222,13 @@ public:
     }
 
     return result;
+  }
+
+  EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) {
+    auto found = ErrorCodeEnums.find(errorWrapper);
+    if (found == ErrorCodeEnums.end())
+      return nullptr;
+    return found->second;
   }
 
   virtual void
