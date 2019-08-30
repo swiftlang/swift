@@ -5323,10 +5323,10 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
   assert(constrName);
-  auto constrs = protocol->lookupDirect(constrName);
-  if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
+  auto *constr = dyn_cast_or_null<ConstructorDecl>(
+      protocol->getProtocolRequirement(constrName));
+  if (!constr)
     return false;
-  auto *constr = cast<ConstructorDecl>(constrs.front());
   auto paramType = TC.getObjectLiteralParameterType(E, constr);
   if (!typeCheckChildIndependently(
         E->getArg(), paramType, CTP_CallArgument))

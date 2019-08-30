@@ -177,8 +177,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // Retrieve the requirement.
-    auto results = proto->lookupDirect(name);
-    return results.empty() ? nullptr : results.front();
+    return proto->getProtocolRequirement(name);
   };
 
   // Properties.

@@ -4363,6 +4363,28 @@ ProtocolDecl::getAssociatedTypeMembers() const {
   return result;
 }
 
+ValueDecl *ProtocolDecl::getProtocolRequirement(DeclName name) const {
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  ValueDecl *result = nullptr;
+  for (auto candidate : results) {
+    if (candidate->getDeclContext() != this ||
+        !candidate->isProtocolRequirement())
+      continue;
+    if (result) {
+      // Multiple results.
+      return nullptr;
+    }
+    result = candidate;
+  }
+
+  return result;
+}
+
+AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
+  return dyn_cast_or_null<AssociatedTypeDecl>(
+    getProtocolRequirement(name));
+}
+
 Type ProtocolDecl::getSuperclass() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

@@ -2127,16 +2127,15 @@ namespace {
         return witness;
       };
 
-      auto associatedTypeArray = 
+      auto *interpolationProto = 
         tc.getProtocol(expr->getLoc(),
-             KnownProtocolKind::ExpressibleByStringInterpolation)
-          ->lookupDirect(tc.Context.Id_StringInterpolation);
-      if (associatedTypeArray.empty()) {
+             KnownProtocolKind::ExpressibleByStringInterpolation);
+      auto associatedTypeDecl = interpolationProto->getAssociatedType(
+          tc.Context.Id_StringInterpolation);
+      if (associatedTypeDecl == nullptr) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
         return nullptr;
       }
-      auto associatedTypeDecl =
-        cast<AssociatedTypeDecl>(associatedTypeArray.front());
       auto interpolationType =
         simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
 

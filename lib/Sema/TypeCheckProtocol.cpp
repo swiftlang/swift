@@ -111,10 +111,8 @@ swift::getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
 
         // Check whether there is an associated type of the same name in
         // this protocol.
-        for (auto member : proto->lookupDirect(assocType->getFullName())) {
-          if (auto protoAssoc = dyn_cast<AssociatedTypeDecl>(member))
-            return protoAssoc;
-        }
+        if (auto *found = proto->getAssociatedType(assocType->getName()))
+          return found;
       }
     }
   }

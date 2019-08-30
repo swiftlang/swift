@@ -6884,16 +6884,15 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
       ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
                   arrayLitProto->getDeclaredType(), locator);
-    auto elementAssocType = cast<AssociatedTypeDecl>(
-      arrayLitProto->lookupDirect(ctx.Id_ArrayLiteralElement).front());
+    auto elementAssocType = arrayLitProto->getAssociatedType(
+        ctx.Id_ArrayLiteralElement);
     argumentType = DependentMemberType::get(tvParam, elementAssocType);
   } else {
     auto dictLitProto =
       ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral);
     addConstraint(ConstraintKind::ConformsTo, tvParam,
                   dictLitProto->getDeclaredType(), locator);
-    auto valueAssocType = cast<AssociatedTypeDecl>(
-      dictLitProto->lookupDirect(ctx.Id_Value).front());
+    auto valueAssocType = dictLitProto->getAssociatedType(ctx.Id_Value);
     argumentType = DependentMemberType::get(tvParam, valueAssocType);
   }
 

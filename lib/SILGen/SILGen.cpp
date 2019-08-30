@@ -219,16 +219,9 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getProtocolRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -251,17 +244,10 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getProtocolRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -284,19 +270,9 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  AssociatedTypeDecl *found = nullptr;
-  DeclName name(ctx.Id_ObjectiveCType);
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      found = assocType;
-      break;
-    }
-  }
-
+  auto *found = proto->getAssociatedType(ctx.Id_ObjectiveCType);
   if (!found)
-    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+    diagnose(loc, diag::bridging_objcbridgeable_broken, ctx.Id_ObjectiveCType);
 
   BridgedObjectiveCType = found;
   return found;
@@ -337,15 +313,8 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
 
   // Look for _nsError.
   auto &ctx = getASTContext();
-  VarDecl *found = nullptr;
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(ctx.Id_nsError, flags)) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      found = var;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<VarDecl>(
+      proto->getProtocolRequirement(ctx.Id_nsError));
 
   NSErrorRequirement = found;
   return found;

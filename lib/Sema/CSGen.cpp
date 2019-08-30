@@ -1184,14 +1184,13 @@ namespace {
                        locator);
 
       if (auto appendingExpr = expr->getAppendingExpr()) {
-        auto associatedTypeArray = 
-          interpolationProto->lookupDirect(tc.Context.Id_StringInterpolation);
-        if (associatedTypeArray.empty()) {
+        auto associatedTypeDecl = interpolationProto->getAssociatedType(
+          tc.Context.Id_StringInterpolation);
+        if (associatedTypeDecl == nullptr) {
           tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
           return nullptr;
         }
-        auto associatedTypeDecl =
-          cast<AssociatedTypeDecl>(associatedTypeArray.front());
+
         auto interpolationTV = DependentMemberType::get(tv, associatedTypeDecl);
 
         auto appendingExprType = CS.getType(appendingExpr);
@@ -1261,12 +1260,12 @@ namespace {
       // use the right labels before forming the call to the initializer.
       DeclName constrName = tc.getObjectLiteralConstructorName(expr);
       assert(constrName);
-      auto constrs = protocol->lookupDirect(constrName);
-      if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front())) {
+      auto *constr = dyn_cast_or_null<ConstructorDecl>(
+          protocol->getProtocolRequirement(constrName));
+      if (!constr) {
         tc.diagnose(protocol, diag::object_literal_broken_proto);
         return nullptr;
       }
-      auto *constr = cast<ConstructorDecl>(constrs.front());
       auto constrParamType = tc.getObjectLiteralParameterType(expr, constr);
 
       // Extract the arguments.
@@ -1850,12 +1849,8 @@ namespace {
       }
 
       // FIXME: Protect against broken standard library.
-      auto keyAssocTy = cast<AssociatedTypeDecl>(
-                          dictionaryProto->lookupDirect(
-                            C.getIdentifier("Key")).front());
-      auto valueAssocTy = cast<AssociatedTypeDecl>(
-                            dictionaryProto->lookupDirect(
-                              C.getIdentifier("Value")).front());
+      auto keyAssocTy = dictionaryProto->getAssociatedType(C.Id_Key);
+      auto valueAssocTy = dictionaryProto->getAssociatedType(C.Id_Value);
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
