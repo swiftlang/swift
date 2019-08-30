@@ -74,8 +74,9 @@ static bool isDeadLiveRange(
       }
 
       // Otherwise, see if we have a forwarding value that has a single
-      // non-trivial operand that can accept a guaranteed value. If so, at its
-      // users to the worklist and continue.
+      // non-trivial operand that can accept a guaranteed value. If not, we can
+      // not recursively process it, so be conservative and assume that we /may
+      // consume/ the value, so the live range must not be eliminated.
       //
       // DISCUSSION: For now we do not support forwarding instructions with
       // multiple non-trivial arguments since we would need to optimize all of
@@ -83,26 +84,27 @@ static bool isDeadLiveRange(
       //
       // NOTE: Today we do not support TermInsts for simplicity... we /could/
       // support it though if we need to.
-      if (forwardingInsts.isNonNull() && !isa<TermInst>(user) &&
-          isGuaranteedForwardingInst(user) &&
-          1 == count_if(user->getOperandValues(
+      if (forwardingInsts.isNull() || isa<TermInst>(user) ||
+          !isGuaranteedForwardingInst(user) ||
+          1 != count_if(user->getOperandValues(
                             true /*ignore type dependent operands*/),
                         [&](SILValue v) {
                           return v.getOwnershipKind() ==
                                  ValueOwnershipKind::Owned;
                         })) {
-        forwardingInsts.get()->push_back(user);
-        for (SILValue v : user->getResults()) {
-          if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
-            continue;
-          llvm::copy(v->getUses(), std::back_inserter(worklist));
-        }
-        continue;
+        return false;
       }
 
-      // Otherwise be conservative and assume that we /may consume/ the value,
-      // so the live range must not be eliminated.
-      return false;
+      // Ok, this is a forwarding instruction whose ownership we can flip from
+      // owned -> guaranteed. Visit its users recursively to see if the the
+      // users force the live range to be alive.
+      forwardingInsts.get()->push_back(user);
+      for (SILValue v : user->getResults()) {
+        if (v.getOwnershipKind() != ValueOwnershipKind::Owned)
+          continue;
+        llvm::copy(v->getUses(), std::back_inserter(worklist));
+      }
+      continue;
     }
     case UseLifetimeConstraint::MustBeLive:
       // Ok, this constraint can take something owned as live. Assert that it
