@@ -3049,29 +3049,35 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    // Produce any diagnostics for the extended type.
+    auto extType = ED->getExtendedType();
+
+    auto nominal = ED->getExtendedNominal();
+    if (nominal == nullptr) {
+      ED->setInvalid();
+      ED->diagnose(diag::non_nominal_extension, extType);
+      return;
+    }
+
     TC.validateExtension(ED);
 
     checkInheritanceClause(ED);
 
-    if (auto nominal = ED->getExtendedNominal()) {
-      TC.validateDecl(nominal);
+    // Check the raw values of an enum, since we might synthesize
+    // RawRepresentable while checking conformances on this extension.
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      if (enumDecl->hasRawType())
+        checkEnumRawValues(TC, enumDecl);
+    }
 
-      // Check the raw values of an enum, since we might synthesize
-      // RawRepresentable while checking conformances on this extension.
-      if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-        if (enumDecl->hasRawType())
-          checkEnumRawValues(TC, enumDecl);
-      }
-
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-        if (!ED->getGenericParams() &&
-            !ED->isInvalid()) {
-          ED->diagnose(diag::extension_nongeneric_trailing_where,
-                       nominal->getFullName())
-          .highlight(trailingWhereClause->getSourceRange());
-        }
+    // Only generic and protocol types are permitted to have
+    // trailing where clauses.
+    if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
+      if (!ED->getGenericParams() &&
+          !ED->isInvalid()) {
+        ED->diagnose(diag::extension_nongeneric_trailing_where,
+                      nominal->getFullName())
+        .highlight(trailingWhereClause->getSourceRange());
       }
     }
 
@@ -4371,13 +4377,14 @@ static Type formExtensionInterfaceType(
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
 static GenericEnvironment *
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
 
   // Form the interface type of the extension.
   bool mustInferRequirements = false;
   SmallVector<std::pair<Type, Type>, 4> sameTypeReqs;
+  auto type = ext->getExtendedType();
   Type extInterfaceType =
     formExtensionInterfaceType(tc, ext, type, genericParams, sameTypeReqs,
                                mustInferRequirements);
@@ -4488,10 +4495,6 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  auto extendedType = evaluateOrDefault(Context.evaluator,
-                                        ExtendedTypeRequest{ext},
-                                        ErrorType::get(ext->getASTContext()));
-
   if (auto *nominal = ext->getExtendedNominal()) {
     // If this extension was not already bound, it means it is either in an
     // inactive conditional compilation block, or otherwise (incorrectly)
@@ -4504,8 +4507,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     validateDecl(nominal);
 
     if (auto *genericParams = ext->getGenericParams()) {
-      GenericEnvironment *env =
-        checkExtensionGenericParams(*this, ext, extendedType, genericParams);
+      auto *env = checkExtensionGenericParams(*this, ext, genericParams);
       ext->setGenericEnvironment(env);
     }
   }
