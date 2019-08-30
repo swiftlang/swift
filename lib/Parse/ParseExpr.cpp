@@ -411,9 +411,13 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     }
     if (isType) {
       ParserResult<TypeRepr> ty = parseType();
-      if (ty.isNonNull())
-        return makeParserResult(
-            new (Context) TypeExpr(TypeLoc(ty.get(), Type())));
+      if (ty.isNonNull()) {
+        auto E = new (Context) TypeExpr(TypeLoc(ty.get(), Type()));
+        ParserResult<Expr> Result = makeParserResult(static_cast<Expr*>(E));
+        if (Tok.isFollowingLParen())
+          Result = parseExprCallSuffix(Result, false);
+        return Result;
+      }
       checkForInputIncomplete();
       return nullptr;
     }
