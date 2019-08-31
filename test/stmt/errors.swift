@@ -239,7 +239,7 @@ func sr_11402_func1(_ x: SR_11402_P) {
 final class SR_11402_Final {}
 
 func sr_11402_func2(_ x: SR_11402_P) {
-  if let y = x as? SR_11402_Final { // expected-error {{cast from 'SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
+  if let y = x as? SR_11402_Final { // expected-warning {{cast from 'SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
     print(y)
   }
 }
