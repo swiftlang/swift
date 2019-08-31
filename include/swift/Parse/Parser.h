@@ -1164,8 +1164,8 @@ public:
   using TypeErrorResult = ParsedSyntaxResult<ParsedUnknownTypeSyntax>;
 
   enum class ParseTypeFlags : uint8_t {
-    HandleCodeCompletion = 1 << 0,
     IsSILFuncDecl = 1 << 1
+    IgnoreCodeCompletion = 1 << 0,
   };
   using ParseTypeOptions = OptionSet<ParseTypeFlags>;
   
@@ -1173,7 +1173,7 @@ public:
 
   TypeASTResult parseType();
   TypeASTResult parseType(Diag<> MessageID,
-                          ParseTypeOptions Flags = ParseTypeFlags::HandleCodeCompletion);
+                          ParseTypeOptions Flags = {});
   ParserStatus
   parseGenericArgumentsAST(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
                            SourceLoc &LAngleLoc, SourceLoc &RAngleLoc);
@@ -1181,16 +1181,16 @@ public:
                                 const TypeAttributes &attrs,
                                 Optional<Scope> &GenericsScope);
   TypeASTResult parseTypeSimpleOrCompositionAST(Diag<> MessageID,
-                                                ParseTypeOptions Flags = ParseTypeFlags::HandleCodeCompletion);
+                                                ParseTypeOptions Flags = {});
   TypeASTResult parseAnyTypeAST();
 
   ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
   parseGenericArgumentClauseSyntax();
 
   TypeResult parseTypeSimple(Diag<> MessageID,
-                             ParseTypeOptions Flags = ParseTypeFlags::HandleCodeCompletion);
+                             ParseTypeOptions Flags = {});
   TypeResult parseTypeSimpleOrComposition(Diag<> MessageID,
-                                          ParseTypeOptions Flags = ParseTypeFlags::HandleCodeCompletion);
+                                          ParseTypeOptions Flags = {});
   TypeResult parseTypeIdentifier();
   TypeResult parseAnyType();
   TypeResult parseTypeTupleBody();

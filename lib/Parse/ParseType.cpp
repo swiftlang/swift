@@ -174,7 +174,7 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
     Result = parseTypeTupleBody();
     break;
   case tok::code_complete: {
-    if (!Flags.contains(ParseTypeFlags::HandleCodeCompletion))
+    if (Flags.contains(ParseTypeFlags::IgnoreCodeCompletion))
       break;
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
