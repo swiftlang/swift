@@ -2574,6 +2574,12 @@ bool ConstraintSystem::repairFailures(
         }))
       break;
 
+    // If this is something like `[A] argument conv [B]` where `A` and `B`
+    // are unrelated types, let's give `matchTypes` a chance to consider
+    // element types.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
     conversionsOrFixes.push_back(AllowArgumentMismatch::create(
         *this, lhs, rhs, getConstraintLocator(locator)));
     break;

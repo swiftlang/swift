@@ -4466,6 +4466,19 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
     diagnostic = diag::cannot_convert_argument_value_protocol;
 
   auto diag = emitDiagnostic(getLoc(), diagnostic, argType, paramType);
+
+  // If argument is an l-value type and parameter is a pointer type,
+  // let's match up its element type to the argument to see whether
+  // it would be appropriate to suggest adding `&`.
+  auto *argExpr = getAnchor();
+  if (getType(argExpr)->is<LValueType>()) {
+    auto elementTy = paramType->getAnyPointerElementType();
+    if (elementTy && argType->isEqual(elementTy)) {
+      diag.fixItInsert(argExpr->getStartLoc(), "&");
+      return true;
+    }
+  }
+
   tryFixIts(diag);
   return true;
 }
