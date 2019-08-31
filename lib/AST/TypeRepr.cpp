@@ -311,6 +311,9 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     Printer << " ";
   }
+
+  if (hasAttr(TAK_qualified))
+    Printer.printSimpleAttr("@qualified") << " ";
 }
 
 IdentTypeRepr *IdentTypeRepr::create(ASTContext &C,
