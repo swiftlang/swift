@@ -939,6 +939,10 @@ namespace {
     /// The expressions that are direct arguments of call expressions.
     llvm::SmallPtrSet<Expr *, 4> CallArgs;
 
+    /// Simplify TypeExprs which represent a fully-qualified module name only
+    /// into a DeclRefExpr.
+    DeclRefExpr *simplifyQualifiedModuleRef(Expr *TE);
+
     /// Simplify expressions which are type sugar productions that got parsed
     /// as expressions due to the parser not knowing which identifiers are
     /// type names.
@@ -1329,6 +1333,11 @@ namespace {
           return DAE;
       }
 
+      // Turn qualified references to modules into DeclRefExprs.
+      if (auto DRE = simplifyQualifiedModuleRef(expr)) {
+        return DRE;
+      }
+
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.
       if (auto *simplified = simplifyTypeExpr(expr))
@@ -1395,6 +1404,36 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
       "Decl context isn't correct");
   DC = closure;
   return true;
+}
+
+static TypeRepr *skipParens(TypeRepr *TR) {
+  assert(TR);
+  while (isa<TupleTypeRepr>(TR) && cast<TupleTypeRepr>(TR)->isParenType())
+    TR = cast<TupleTypeRepr>(TR)->getElement(0).Type;
+  return TR;
+}
+
+DeclRefExpr *PreCheckExpression::simplifyQualifiedModuleRef(Expr *E) {
+  auto TE = dyn_cast<TypeExpr>(E);
+  if (!TE || !TE->getTypeRepr()) return nullptr;
+
+  TypeRepr * Repr = skipParens(TE->getTypeRepr());
+
+  auto ATR = dyn_cast<AttributedTypeRepr>(Repr);
+  if (!ATR || !ATR->getAttrs().has(TAK_qualified)) return nullptr;
+
+  Repr = skipParens(ATR->getTypeRepr());
+
+  auto SITR = dyn_cast<SimpleIdentTypeRepr>(Repr);
+  if (!SITR) return nullptr;
+
+  auto modules = TC.lookupUnqualified(DC, SITR->getIdentifier(), SITR->getLoc(),
+                                      NameLookupFlags::IncludeOnlyModules);
+  if (modules.size() != 1) return nullptr;
+
+  ConcreteDeclRef concreteRef(modules.front().getValueDecl());
+  return new (TC.Context) DeclRefExpr(concreteRef, DeclNameLoc(TE->getLoc()),
+                                      /*Implicit=*/false);
 }
 
 TypeExpr *PreCheckExpression::simplifyNestedTypeExpr(UnresolvedDotExpr *UDE) {
