@@ -1272,9 +1272,10 @@ bool SILParser::parseSILType(SILType &Result,
     attrs.convention = "thin";
   }
 
-  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type,
-                                           /*handleCodeCompletion*/ true,
-                                           /*isSILFuncDecl*/ IsFuncDecl);
+  Parser::ParseTypeOptions Flags = Parser::ParseTypeFlags::HandleCodeCompletion;
+  if (IsFuncDecl)
+    Flags |= Parser::ParseTypeFlags::IsSILFuncDecl;
+  ParserResult<TypeRepr> TyR = P.parseType(diag::expected_sil_type, Flags);
 
   if (TyR.isNull())
     return true;

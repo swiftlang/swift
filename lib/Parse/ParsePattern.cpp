@@ -337,7 +337,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
       }
 
       if (isBareType && paramContext == ParameterContextKind::EnumElement) {
-        auto type = parseType(diag::expected_parameter_type, false);
+        auto type = parseType(diag::expected_parameter_type, {});
         status |= type;
         param.Type = type.getPtrOrNull();
         param.FirstName = Identifier();
@@ -348,7 +348,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         // Otherwise, if this is a bare type, then the user forgot to name the
         // parameter, e.g. "func foo(Int) {}"
         SourceLoc typeStartLoc = Tok.getLoc();
-        auto type = parseType(diag::expected_parameter_type, false);
+        auto type = parseType(diag::expected_parameter_type, {});
         status |= type;
         param.Type = type.getPtrOrNull();
 

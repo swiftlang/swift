@@ -151,7 +151,7 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-collection
 ///     type-array
 Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
-                                           bool HandleCodeCompletion) {
+                                           ParseTypeOptions Flags) {
   if (Tok.is(tok::kw_inout) ||
       (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
                                    Tok.getRawText().equals("__owned")))) {
@@ -174,7 +174,7 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
     Result = parseTypeTupleBody();
     break;
   case tok::code_complete: {
-    if (!HandleCodeCompletion)
+    if (!Flags.contains(ParseTypeFlags::HandleCodeCompletion))
       break;
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
@@ -325,8 +325,7 @@ Parser::TypeASTResult Parser::parseSILBoxType(GenericParamList *generics,
 ///     type-composition 'throws'? '->' type
 ///
 Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
-                                        bool HandleCodeCompletion,
-                                        bool IsSILFuncDecl) {
+                                        ParseTypeOptions Flags) {
   // Start a context for creating type syntax.
   SyntaxParsingContext TypeParsingContext(SyntaxContext,
                                           SyntaxContextKind::Type);
@@ -345,7 +344,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   if (isInSILMode()) {
     // If this is part of a sil function decl, generic parameters are visible in
     // the function body; otherwise, they are visible when parsing the type.
-    if (!IsSILFuncDecl)
+    if (!Flags.contains(ParseTypeFlags::IsSILFuncDecl))
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
   }
@@ -360,7 +359,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   auto RealTypeLoc = leadingTriviaLoc();
 
   ParserResult<TypeRepr> ty =
-    parseTypeSimpleOrCompositionAST(MessageID, HandleCodeCompletion);
+    parseTypeSimpleOrCompositionAST(MessageID, Flags);
   if (ty.hasCodeCompletion())
     return makeParserCodeCompletionResult<TypeRepr>();
   if (ty.isNull())
@@ -747,11 +746,11 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
 
 Parser::TypeASTResult
 Parser::parseTypeSimpleOrCompositionAST(Diag<> MessageID,
-                                        bool HandleCodeCompletion) {
+                                        ParseTypeOptions Flags) {
   auto Loc = leadingTriviaLoc();
 
   auto CompositionResult =
-      parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
+      parseTypeSimpleOrComposition(MessageID, Flags);
 
   if (!CompositionResult.isSuccess()) {
     auto nodes = CompositionResult.getUnknownNodes();
@@ -786,7 +785,7 @@ Parser::parseTypeSimpleOrCompositionAST(Diag<> MessageID,
 ///     type-composition '&' type-simple
 Parser::TypeResult
 Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
-                                     bool HandleCodeCompletion) {
+                                     ParseTypeOptions Flags) {
   // Check for the opaque modifier.
   // This is only semantically allowed in certain contexts, but we parse it
   // generally for diagnostics and recovery.
@@ -803,7 +802,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
   };
 
   // Parse the first type
-  auto FirstTypeResult = parseTypeSimple(MessageID, HandleCodeCompletion);
+  auto FirstTypeResult = parseTypeSimple(MessageID, Flags);
 
   // todo [gsoc]: handle Junk properly here
   if (!FirstTypeResult.isSuccess())
@@ -834,7 +833,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     }
 
     auto NextTypeResult = parseTypeSimple(diag::expected_identifier_for_type,
-                                          HandleCodeCompletion);
+                                          Flags);
 
     if (!NextTypeResult.isSuccess()) {
       auto following = NextTypeResult.getUnknownNodes();
