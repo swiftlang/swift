@@ -586,8 +586,8 @@ static StringRef getKeyContent(SDKContext &Ctx, KeyKind Kind) {
 SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
                                    llvm::yaml::MappingNode *Node) {
   static auto GetScalarString = [&](llvm::yaml::Node *N) -> StringRef {
-    auto WithQuote = cast<llvm::yaml::ScalarNode>(N)->getRawValue();
-    return WithQuote.substr(1, WithQuote.size() - 2);
+    SmallString<64> Buffer;
+    return Ctx.buffer(cast<llvm::yaml::ScalarNode>(N)->getValue(Buffer));
   };
 
   static auto getAsInt = [&](llvm::yaml::Node *N) -> int {
@@ -2102,7 +2102,6 @@ static parseJsonEmit(SDKContext &Ctx, StringRef FileName) {
 // previously dumped.
 void SwiftDeclCollector::deSerialize(StringRef Filename) {
   auto Pair = parseJsonEmit(Ctx, Filename);
-  OwnedBuffers.push_back(std::move(Pair.first));
   RootNode = std::move(Pair.second);
 }
 
