@@ -168,7 +168,7 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
   case tok::kw_Self:
   case tok::kw_Any:
   case tok::identifier:
-    Result = parseTypeIdentifier();
+    Result = parseTypeIdentifier(Flags);
     break;
   case tok::l_paren:
     Result = parseTypeTupleBody();
@@ -240,8 +240,8 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
   return *Result;
 }
 
-Parser::TypeASTResult Parser::parseType() {
-  return parseType(diag::expected_type);
+Parser::TypeASTResult Parser::parseType(ParseTypeOptions Flags) {
+  return parseType(diag::expected_type, Flags);
 }
 
 Parser::TypeASTResult Parser::parseSILBoxType(GenericParamList *generics,
@@ -613,7 +613,7 @@ Parser::parseGenericArgumentsAST(SmallVectorImpl<TypeRepr *> &ArgsAST,
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
-Parser::TypeResult Parser::parseTypeIdentifier() {
+Parser::TypeResult Parser::parseTypeIdentifier(Parser::ParseTypeOptions Flags) {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
     if (Tok.is(tok::kw_Any))
@@ -701,6 +701,8 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
       }
       if (!peekToken().isContextualKeyword("Type") &&
           !peekToken().isContextualKeyword("Protocol")) {
+        if (Flags.contains(ParseTypeFlags::Minimal))
+          break;
         Period = consumeTokenSyntax();
         continue;
       }

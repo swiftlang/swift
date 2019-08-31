@@ -1164,14 +1164,15 @@ public:
   using TypeErrorResult = ParsedSyntaxResult<ParsedUnknownTypeSyntax>;
 
   enum class ParseTypeFlags : uint8_t {
-    IsSILFuncDecl = 1 << 1
     IgnoreCodeCompletion = 1 << 0,
+    IsSILFuncDecl = 1 << 1,
+    Minimal = 1 << 2
   };
   using ParseTypeOptions = OptionSet<ParseTypeFlags>;
   
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
-  TypeASTResult parseType();
+  TypeASTResult parseType(ParseTypeOptions Flags = {});
   TypeASTResult parseType(Diag<> MessageID,
                           ParseTypeOptions Flags = {});
   ParserStatus
@@ -1191,7 +1192,7 @@ public:
                              ParseTypeOptions Flags = {});
   TypeResult parseTypeSimpleOrComposition(Diag<> MessageID,
                                           ParseTypeOptions Flags = {});
-  TypeResult parseTypeIdentifier();
+  TypeResult parseTypeIdentifier(ParseTypeOptions Flags = {});
   TypeResult parseAnyType();
   TypeResult parseTypeTupleBody();
   TypeResult parseTypeCollection();
