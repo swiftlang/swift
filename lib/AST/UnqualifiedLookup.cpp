@@ -663,7 +663,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
   const bool isCascadingUse =
       AFD->isCascadingContextForLookup(false) &&
       (isCascadingUseArg.getValueOr(
-          Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
+          Loc.isInvalid() || !AFD->getBody() ||
           !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)));
 
   if (AFD->getDeclContext()->isTypeContext())
@@ -814,9 +814,7 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
   // FIXME: when we can parse and typecheck the function body partially
   // for code completion, AFD->getBody() check can be removed.
 
-  if (Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
-      !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc) ||
-      !AFD->getBody()) {
+  if (Loc.isInvalid() || !AFD->getBody()) {
     return;
   }
 
