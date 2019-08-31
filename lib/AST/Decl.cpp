@@ -7645,6 +7645,12 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   else out << "(null)";
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const GenericParamList *GPL) {
+  if (GPL) GPL->print(out);
+  else out << "(null)";
+}
+
+      
 StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \

@@ -620,10 +620,10 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->setDepth(i);
   }
 
-  return checkGenericEnvironment(nestedList.back(), DC,
-                                 /*parentSig=*/nullptr,
-                                 /*allowConcreteGenericParams=*/true,
-                                 /*ext=*/nullptr);
+  return TypeChecker::checkGenericEnvironment(
+             nestedList.back(), DC,
+             /*parentSig=*/nullptr,
+             /*allowConcreteGenericParams=*/true);
 }
 
 /// Check whether \c current is a redeclaration.
@@ -4318,7 +4318,7 @@ static Type formExtensionInterfaceType(
                          TypeChecker &tc, ExtensionDecl *ext,
                          Type type,
                          GenericParamList *genericParams,
-                         SmallVectorImpl<std::pair<Type, Type>> &sameTypeReqs,
+                         SmallVectorImpl<Requirement> &sameTypeReqs,
                          bool &mustInferRequirements) {
   if (type->is<ErrorType>())
     return type;
@@ -4367,8 +4367,8 @@ static Type formExtensionInterfaceType(
       genericArgs.push_back(gpType);
 
       if (currentBoundType) {
-        sameTypeReqs.push_back({gpType,
-                                currentBoundType->getGenericArgs()[gpIndex]});
+        sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
+                                  currentBoundType->getGenericArgs()[gpIndex]);
       }
     }
 
@@ -4392,6 +4392,17 @@ static Type formExtensionInterfaceType(
   return resultType;
 }
 
+/// Retrieve the generic parameter depth of the extended type.
+static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
+  auto nominal = ext->getSelfNominalTypeDecl();
+  if (!nominal) return static_cast<unsigned>(-1);
+
+  auto sig = nominal->getGenericSignatureOfContext();
+  if (!sig) return static_cast<unsigned>(-1);
+
+  return sig->getGenericParams().back()->getDepth();
+}
+
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
 static GenericEnvironment *
@@ -4401,39 +4412,36 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
 
   // Form the interface type of the extension.
   bool mustInferRequirements = false;
-  SmallVector<std::pair<Type, Type>, 4> sameTypeReqs;
-  auto type = ext->getExtendedType();
+  SmallVector<Requirement, 2> sameTypeReqs;
   Type extInterfaceType =
-    formExtensionInterfaceType(tc, ext, type, genericParams, sameTypeReqs,
+    formExtensionInterfaceType(tc, ext, ext->getExtendedType(),
+                               genericParams, sameTypeReqs,
                                mustInferRequirements);
 
-  // Local function used to infer requirements from the extended type.
-  auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
-
-    builder.inferRequirements(*ext->getModuleContext(),
-                              extInterfaceType,
-                              nullptr,
-                              source);
-
-    for (const auto &sameTypeReq : sameTypeReqs) {
-      builder.addRequirement(
-        Requirement(RequirementKind::SameType, sameTypeReq.first,
-                    sameTypeReq.second),
-        source, ext->getModuleContext());
-    }
+  assert(genericParams && "Missing generic parameters?");
+  
+  auto cannotReuseNominalSignature = [&]() -> bool {
+    const auto finalDepth = genericParams->getParams().back()->getDepth();
+    return mustInferRequirements
+        || !sameTypeReqs.empty()
+        || ext->getTrailingWhereClause()
+        || (getExtendedTypeGenericDepth(ext) != finalDepth);
   };
+  
+  // Re-use the signature of the type being extended by default.
+  GenericSignature *sig =
+      ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
+  if (cannotReuseNominalSignature()) {
+    return TypeChecker::checkGenericEnvironment(
+        genericParams, ext,
+        /*parent signature*/ nullptr,
+        /*allowConcreteGenericParams=*/true,
+        sameTypeReqs,
+        {TypeLoc{nullptr, extInterfaceType}});
+  }
 
-  // Validate the generic type signature.
-  auto *env = tc.checkGenericEnvironment(genericParams,
-                                         ext->getDeclContext(), nullptr,
-                                         /*allowConcreteGenericParams=*/true,
-                                         ext, inferExtendedTypeReqs,
-                                         (mustInferRequirements ||
-                                            !sameTypeReqs.empty()));
-
-  return env;
+  // Form the generic environment.
+  return sig->createGenericEnvironment();
 }
 
 static bool isNonGenericTypeAliasType(Type type) {

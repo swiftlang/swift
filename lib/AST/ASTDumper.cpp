@@ -161,7 +161,7 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
-void GenericParamList::print(llvm::raw_ostream &OS) {
+void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
              [&](const GenericTypeParamDecl *P) {

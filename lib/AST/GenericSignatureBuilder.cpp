@@ -5158,7 +5158,7 @@ ConstraintResult GenericSignatureBuilder::addInheritedRequirements(
 
   auto visitType = [&](Type inheritedType, const TypeRepr *typeRepr) {
     if (inferForModule) {
-      inferRequirements(*inferForModule, inheritedType, typeRepr,
+      inferRequirements(*inferForModule, inheritedType,
                         getFloatingSource(typeRepr, /*forInferred=*/true));
     }
 
@@ -5200,11 +5200,9 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
-                        RequirementRepr::getFirstTypeRepr(reqRepr),
                         source.asInferred(
                           RequirementRepr::getFirstTypeRepr(reqRepr)));
       inferRequirements(*inferForModule, secondType,
-                        RequirementRepr::getSecondTypeRepr(reqRepr),
                         source.asInferred(
                           RequirementRepr::getSecondTypeRepr(reqRepr)));
     }
@@ -5217,7 +5215,6 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
   case RequirementKind::Layout: {
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
-                        RequirementRepr::getFirstTypeRepr(reqRepr),
                         source.asInferred(
                           RequirementRepr::getFirstTypeRepr(reqRepr)));
     }
@@ -5231,11 +5228,9 @@ GenericSignatureBuilder::addRequirement(const Requirement &req,
 
     if (inferForModule) {
       inferRequirements(*inferForModule, firstType,
-                        RequirementRepr::getFirstTypeRepr(reqRepr),
                         source.asInferred(
                           RequirementRepr::getFirstTypeRepr(reqRepr)));
       inferRequirements(*inferForModule, secondType,
-                        RequirementRepr::getSecondTypeRepr(reqRepr),
                         source.asInferred(
                           RequirementRepr::getSecondTypeRepr(reqRepr)));
     }
@@ -5322,7 +5317,6 @@ public:
 void GenericSignatureBuilder::inferRequirements(
                                           ModuleDecl &module,
                                           Type type,
-                                          const TypeRepr *typeRepr,
                                           FloatingRequirementSource source) {
   if (!type)
     return;
@@ -5337,7 +5331,6 @@ void GenericSignatureBuilder::inferRequirements(
                                           ParameterList *params) {
   for (auto P : *params) {
     inferRequirements(module, P->getTypeLoc().getType(),
-                      P->getTypeLoc().getTypeRepr(),
                       FloatingRequirementSource::forInferred(
                           P->getTypeLoc().getTypeRepr()));
   }
@@ -7545,6 +7538,10 @@ bool AbstractGenericSignatureRequest::isCached() const {
   return true;
 }
 
+bool InferredGenericSignatureRequest::isCached() const {
+  return true;
+}
+      
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are
 /// all canonical.
 static bool isCanonicalRequest(GenericSignature *baseSignature,
@@ -7677,4 +7674,101 @@ AbstractGenericSignatureRequest::evaluate(
 
   return std::move(builder).computeGenericSignature(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
+}
+
+llvm::Expected<GenericSignature *>
+InferredGenericSignatureRequest::evaluate(
+        Evaluator &evaluator, ModuleDecl *parentModule,
+        GenericSignature *parentSig,
+        SmallVector<GenericParamList *, 2> gpLists,
+        SmallVector<Requirement, 2> addedRequirements,
+        SmallVector<TypeLoc, 2> inferenceSources,
+        bool allowConcreteGenericParams) const {
+      
+  GenericSignatureBuilder builder(parentModule->getASTContext());
+      
+  // If there is a parent context, add the generic parameters and requirements
+  // from that context.
+  builder.addGenericSignature(parentSig);
+
+  // The generic parameter lists MUST appear from innermost to outermost.
+  // We walk them backwards to order outer requirements before
+  // inner requirements.
+  for (auto &genericParams : llvm::reverse(gpLists)) {
+    assert(genericParams->size() > 0 &&
+           "Parsed an empty generic parameter list?");
+
+    // Determine where and how to perform name lookup.
+    DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
+
+    // First, add the generic parameters to the generic signature builder.
+    // Do this before checking the inheritance clause, since it may
+    // itself be dependent on one of these parameters.
+    for (auto param : *genericParams)
+      builder.addGenericParameter(param);
+
+    // Add the requirements for each of the generic parameters to the builder.
+    // Now, check the inheritance clauses of each parameter.
+    for (auto param : *genericParams)
+      builder.addGenericParameterRequirements(param);
+
+    // Add the requirements clause to the builder.
+
+    WhereClauseOwner owner(lookupDC, genericParams);
+    using FloatingRequirementSource =
+      GenericSignatureBuilder::FloatingRequirementSource;
+    RequirementRequest::visitRequirements(owner, TypeResolutionStage::Structural,
+        [&](const Requirement &req, RequirementRepr *reqRepr) {
+          auto source = FloatingRequirementSource::forExplicit(reqRepr);
+          
+          // If we're extending a protocol and adding a redundant requirement,
+          // for example, `extension Foo where Self: Foo`, then emit a
+          // diagnostic.
+          
+          if (auto decl = owner.dc->getAsDecl()) {
+            if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
+              auto extType = extDecl->getDeclaredInterfaceType();
+              auto extSelfType = extDecl->getSelfInterfaceType();
+              auto reqLHSType = req.getFirstType();
+              auto reqRHSType = req.getSecondType();
+              
+              if (extType->isExistentialType() &&
+                  reqLHSType->isEqual(extSelfType) &&
+                  reqRHSType->isEqual(extType)) {
+                
+                auto &ctx = extDecl->getASTContext();
+                ctx.Diags.diagnose(extDecl->getLoc(),
+                                   diag::protocol_extension_redundant_requirement,
+                                   extType->getString(),
+                                   extSelfType->getString(),
+                                   reqRHSType->getString());
+              }
+            }
+          }
+          
+          builder.addRequirement(req, reqRepr, source, nullptr,
+                                  lookupDC->getParentModule());
+          return false;
+        });
+  }
+      
+  /// Perform any remaining requirement inference.
+  for (auto sourcePair : inferenceSources) {
+    auto source =
+      FloatingRequirementSource::forInferred(sourcePair.getTypeRepr());
+
+    builder.inferRequirements(*parentModule,
+                              sourcePair.getType(),
+                              source);
+  }
+  
+  // Finish by adding any remaining requirements.
+  auto source =
+    FloatingRequirementSource::forInferred(nullptr);
+      
+  for (const auto &req : addedRequirements)
+    builder.addRequirement(req, source, parentModule);
+  
+  return std::move(builder).computeGenericSignature(
+      SourceLoc(), allowConcreteGenericParams);
 }

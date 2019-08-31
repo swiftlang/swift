@@ -1039,45 +1039,22 @@ public:
   /// context, if not available as part of the \c dc argument (used
   /// for SIL parsing).
   ///
-  /// \param ext The extension for which we're checking the generic
-  /// environment, or null if we're not checking an extension.
+  /// \param allowConcreteGenericParams Whether or not to allow
+  /// same-type constraints between generic parameters and concrete types.
   ///
-  /// \param inferRequirements When non-empty, callback that will be invoked
-  /// to perform any additional requirement inference that contributes to the
-  /// generic environment..
+  /// \param additionalRequirements Additional requirements to add
+  /// directly to the GSB.
+  ///
+  /// \param inferenceSources Additional types to infer requirements from.
   ///
   /// \returns the resulting generic environment.
-  GenericEnvironment *checkGenericEnvironment(
+  static GenericEnvironment *checkGenericEnvironment(
                         GenericParamList *genericParams,
                         DeclContext *dc,
                         GenericSignature *outerSignature,
                         bool allowConcreteGenericParams,
-                        ExtensionDecl *ext,
-                        llvm::function_ref<void(GenericSignatureBuilder &)>
-                          inferRequirements,
-                        bool mustInferRequirements);
-
-  /// Construct a new generic environment for the given declaration context.
-  ///
-  /// \param genericParams The generic parameters to validate.
-  ///
-  /// \param dc The declaration context in which to perform the validation.
-  ///
-  /// \param outerSignature The generic signature of the outer
-  /// context, if not available as part of the \c dc argument (used
-  /// for SIL parsing).
-  /// \returns the resulting generic environment.
-  GenericEnvironment *checkGenericEnvironment(
-                        GenericParamList *genericParams,
-                        DeclContext *dc,
-                        GenericSignature *outerSignature,
-                        bool allowConcreteGenericParams,
-                        ExtensionDecl *ext) {
-    return checkGenericEnvironment(genericParams, dc, outerSignature,
-                                   allowConcreteGenericParams, ext,
-                                   [&](GenericSignatureBuilder &) { },
-                                   /*mustInferRequirements=*/false);
-  }
+                        SmallVector<Requirement, 2> additionalRequirements = {},
+                        SmallVector<TypeLoc, 2> inferenceSources = {});
 
   /// Validate the signature of a generic type.
   ///
