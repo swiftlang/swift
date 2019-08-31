@@ -109,14 +109,6 @@ public:
   PersistentParserState(ASTContext &ctx) : PersistentParserState() { }
   ~PersistentParserState();
 
-  void delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
-                                SourceRange BodyRange,
-                                SourceLoc PreviousLoc);
-  std::unique_ptr<FunctionBodyState>
-  takeFunctionBodyState(AbstractFunctionDecl *AFD);
-
-  bool hasFunctionBodyState(AbstractFunctionDecl *AFD);
-
   void delayDecl(DelayedDeclKind Kind, unsigned Flags,
                  DeclContext *ParentContext,
                  SourceRange BodyRange, SourceLoc PreviousLoc);

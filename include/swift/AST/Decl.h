@@ -5594,6 +5594,8 @@ protected:
     SourceRange BodyRange;
   };
 
+  friend class ParseAbstractFunctionBodyRequest;
+
   CaptureInfo Captures;
 
   /// Location of the 'throws' token.
