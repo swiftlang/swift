@@ -1272,7 +1272,7 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // Create scope for the body.
   // We create body scopes when there is no body for source kit to complete
   // erroneous code in bodies. But don't let compiler synthesize one.
-  if (decl->getBodySourceRange().isValid() && decl->getBody(false)) {
+  if (decl->getBody(false) && decl->getBodySourceRange().isValid()) {
     if (AbstractFunctionBodyScope::isAMethod(decl))
       scopeCreator.constructExpandAndInsertUncheckable<MethodBodyScope>(leaf,
                                                                         decl);
@@ -1771,10 +1771,10 @@ bool IterableTypeScope::isBodyCurrent() const {
 }
 
 void AbstractFunctionBodyScope::beCurrent() {
-  bodyWhenLastExpanded = decl->getBody(false);
+  bodyWhenLastExpanded = decl->getBody();
 }
 bool AbstractFunctionBodyScope::isCurrent() const {
-  return bodyWhenLastExpanded == decl->getBody(false);
+  return bodyWhenLastExpanded == decl->getBody();
   ;
 }
 

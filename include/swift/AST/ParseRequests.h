@@ -48,28 +48,6 @@ public:
   bool isCached() const { return true; }
 };
 
-/// Parse the body of a function, initializer, or deinitializer.
-class ParseAbstractFunctionBodyRequest :
-    public SimpleRequest<ParseAbstractFunctionBodyRequest,
-                         BraceStmt *(AbstractFunctionDecl *),
-                         CacheKind::SeparatelyCached>
-{
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  // Evaluation.
-  BraceStmt *evaluate(Evaluator &evaluator, AbstractFunctionDecl *afd) const;
-
-public:
-  // Caching
-  bool isCached() const { return true; }
-  Optional<BraceStmt *> getCachedResult() const;
-  void cacheResult(BraceStmt *value) const;
-};
-
 /// The zone number for the parser.
 #define SWIFT_TYPEID_ZONE Parse
 #define SWIFT_TYPEID_HEADER "swift/AST/ParseTypeIDZone.def"

@@ -138,9 +138,6 @@ public:
 
 private:
   void parseFunctionBody(AbstractFunctionDecl *AFD) {
-    // FIXME: This duplicates the evaluation of
-    // ParseAbstractFunctionBodyRequest, but installs a code completion
-    // factory.
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
@@ -155,8 +152,8 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    auto body = TheParser.parseAbstractFunctionBodyDelayed(AFD);
-    AFD->setBodyParsed(body);
+    if (ParserState.hasFunctionBodyState(AFD))
+      TheParser.parseAbstractFunctionBodyDelayed(AFD);
 
     if (CodeCompletion)
       CodeCompletion->doneParsing();
