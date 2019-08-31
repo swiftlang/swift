@@ -402,8 +402,8 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
     consumeToken();
   }
 
-  // Try to parse '@' sign or 'inout' as a attributed typerepr.
-  if (Tok.isAny(tok::at_sign, tok::kw_inout)) {
+  // Try to parse 'inout' as a attributed typerepr.
+  if (Tok.isAny(tok::kw_inout)) {
     bool isType = false;
     {
       BacktrackingScope backtrack(*this);
@@ -413,10 +413,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       ParserResult<TypeRepr> ty = parseType();
       if (ty.isNonNull()) {
         auto E = new (Context) TypeExpr(TypeLoc(ty.get(), Type()));
-        ParserResult<Expr> Result = makeParserResult(static_cast<Expr*>(E));
-        if (Tok.isFollowingLParen())
-          Result = parseExprCallSuffix(Result, false);
-        return Result;
+        return makeParserResult(static_cast<Expr*>(E));
       }
       checkForInputIncomplete();
       return nullptr;
@@ -1484,6 +1481,24 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   SyntaxParsingContext ExprContext(SyntaxContext, SyntaxContextKind::Expr);
   switch (Tok.getKind()) {
   case tok::at_sign:
+    {
+      // Try to parse as an attributed type. This is mainly for @qualified.
+      bool isType = false;
+      {
+        BacktrackingScope backtrack(*this);
+        isType = canParseType();
+      }
+      if (isType) {
+        // Parse a TypeExpr, but make it the smallest we possibly can so we don't
+        // misinterpret references to decls as types instead.
+        ParserResult<TypeRepr> ty = parseType(ParseTypeFlags::Minimal);
+        if (ty.isNonNull()) {
+          auto E = new (Context) TypeExpr(TypeLoc(ty.get(), Type()));
+          return makeParserResult(static_cast<Expr*>(E));
+        }
+      }
+    }
+
     // Objective-C programmers habitually type @"foo", so recover gracefully
     // with a fixit.  If this isn't @"foo", just handle it like an unknown
     // input.
