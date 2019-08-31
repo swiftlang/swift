@@ -152,6 +152,9 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   assert(done && "Parser returned early?");
   (void)done;
 
+  if (SkipBodies)
+    performDelayedParsing(importMod, persistentState, nullptr);
+
   // FIXME: Support recursive definitions in immediate modes by making type
   // checking even lazier.
   if (SkipBodies)
