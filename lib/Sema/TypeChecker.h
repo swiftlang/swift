@@ -235,9 +235,6 @@ enum class TypeCheckExprFlags {
   /// that we force for style or other reasons.
   DisableStructuralChecks = 0x02,
 
-  /// Set if the client wants diagnostics suppressed.
-  SuppressDiagnostics = 0x04,
-
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
   /// not all type variables have been determined.  In this case, the constraint

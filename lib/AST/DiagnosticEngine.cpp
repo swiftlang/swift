@@ -950,6 +950,10 @@ DiagnosticSuppression::~DiagnosticSuppression() {
     diags.addConsumer(*consumer);
 }
 
+bool DiagnosticSuppression::isEnabled(const DiagnosticEngine &diags) {
+  return diags.getConsumers().empty();
+}
+
 BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
     const SourceFile &SF)
     : Diags(SF.getASTContext().Diags) {
