@@ -566,12 +566,6 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     assert(!builderType->hasTypeParameter());
   }
 
-  // If we are performing code-completion inside the closure body, supress
-  // diagnostics to workaround typechecking performance problems.
-  if (getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(
-          closure->getSourceRange()))
-    Options |= ConstraintSystemFlags::SuppressDiagnostics;
-
   BuilderClosureVisitor visitor(getASTContext(), this,
                                 /*wantExpr=*/true, builderType);
   Expr *singleExpr = visitor.visit(closure->getBody());
