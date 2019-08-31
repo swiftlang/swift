@@ -52,6 +52,9 @@ public:
   /// Treat all warnings as errors
   bool WarningsAsErrors = false;
 
+  // When printing diagnostics, include the diagnostic name at the end
+  bool PrintDiagnosticNames = false;
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {

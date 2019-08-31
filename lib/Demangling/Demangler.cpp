@@ -2138,45 +2138,6 @@ NodePointer Demangler::demangleThunkOrSpecialization() {
       addChild(Thunk, popNode(Node::Kind::Type));
       return Thunk;
     }
-    // SWIFT_ENABLE_TENSORFLOW
-    case 'z':
-    case 'Z':
-    case 'u':
-    case 'U': {
-      // Create node for autodiff associated function.
-      Node::Kind assocFnKind;
-      if (c == 'z') assocFnKind = Node::Kind::AutoDiffJVP;
-      else if (c == 'Z') assocFnKind = Node::Kind::AutoDiffVJP;
-      else if (c == 'u') assocFnKind = Node::Kind::AutoDiffDifferential;
-      else if (c == 'U') assocFnKind = Node::Kind::AutoDiffPullback;
-      else return nullptr;
-      NodePointer assocFn = createNode(assocFnKind);
-      addChild(assocFn, popNode());
-      // Demangle parameter indices.
-      auto paramIndices = createNode(Node::Kind::AutoDiffParameterIndices);
-      nextIf('p');
-      while (true) {
-        auto index = demangleNatural();
-        if (index < 0)
-          break;
-        paramIndices->addChild(createNode(Node::Kind::Index, index), *this);
-        nextIf('_');
-      }
-      addChild(assocFn, paramIndices);
-      // Demangle result index.
-      auto resultIndices = createNode(Node::Kind::AutoDiffResultIndices);
-      nextIf('r');
-      while (true) {
-        auto index = demangleNatural();
-        if (index < 0)
-          break;
-        resultIndices->addChild(createNode(Node::Kind::Index, index), *this);
-        nextIf('_');
-      }
-      addChild(assocFn, resultIndices);
-      return assocFn;
-    }
-    // SWIFT_ENABLE_TENSORFLOW END
     case 'g':
       return demangleGenericSpecialization(Node::Kind::GenericSpecialization);
     case 'G':
@@ -2756,13 +2717,15 @@ NodePointer Demangler::demangleSpecialType() {
     // SWIFT_ENABLE_TENSORFLOW
     case 'F':
       return popFunctionType(Node::Kind::DifferentiableFunctionType);
+    // SWIFT_ENABLE_TENSORFLOW
     case 'G':
       return popFunctionType(Node::Kind::EscapingDifferentiableFunctionType);
+    // SWIFT_ENABLE_TENSORFLOW
     case 'H':
       return popFunctionType(Node::Kind::LinearFunctionType);
+    // SWIFT_ENABLE_TENSORFLOW
     case 'I':
       return popFunctionType(Node::Kind::EscapingLinearFunctionType);
-    // SWIFT_ENABLE_TENSORFLOW END
     case 'o':
       return createType(createWithChild(Node::Kind::Unowned,
                                         popNode(Node::Kind::Type)));

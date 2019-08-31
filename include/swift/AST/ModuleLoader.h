@@ -35,6 +35,7 @@ class ClangImporterOptions;
 class ClassDecl;
 class ModuleDecl;
 class NominalTypeDecl;
+class TypeDecl;
 
 enum class KnownProtocolKind : uint8_t;
 

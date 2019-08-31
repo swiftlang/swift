@@ -479,8 +479,7 @@ func testProtocolClassShadowing(_ obj: ClassInHelper, p: ProtoInHelper) {
 
 func testDealloc(_ obj: NSObject) {
   // dealloc is subsumed by deinit.
-  // FIXME: Special-case diagnostic in the type checker?
-  obj.dealloc() // expected-error{{value of type 'NSObject' has no member 'dealloc'}}
+  obj.dealloc() // expected-error{{'dealloc()' is unavailable in Swift: use 'deinit' to define a de-initializer}}
 }
 
 func testConstantGlobals() {

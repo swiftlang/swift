@@ -801,32 +801,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   return hadError;
 }
 
-/// Given a type of a function parameter, request layout for any
-/// nominal types that IRGen could use as metadata sources.
-static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
-  type->getCanonicalType().visit([&tc](CanType type) {
-    // Generic types are sources for typemetadata and conformances. If a
-    // parameter is of dependent type then the body of a function with said
-    // parameter could potentially require the generic type's layout to
-    // recover them.
-    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
-      tc.requestClassLayout(classDecl);
-    }
-  });
-}
-
-/// Request nominal layout for any types that could be sources of type metadata
-/// or conformances.
-void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
-    ParameterList *PL) {
-  for (auto param : *PL) {
-    if (!param->hasInterfaceType())
-      continue;
-
-    requestLayoutForMetadataSources(*this, param->getInterfaceType());
-  }
-}
-
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL,
                                          TypeResolution resolution,
@@ -1018,6 +992,46 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     return false;
   }
   llvm_unreachable("bad pattern kind!");
+}
+
+namespace {
+
+/// We need to allow particular matches for backwards compatibility, so we
+/// "repair" the pattern if needed, so that the exhaustiveness checker receives
+/// well-formed input. Also emit diagnostics warning the user to fix their code.
+///
+/// See SR-11160 and SR-11212 for more discussion.
+//
+// type ~ (T1, ..., Tn) (n >= 2)
+//   1a. pat ~ ((P1, ..., Pm)) (m >= 2)
+//   1b. pat
+// type ~ ((T1, ..., Tn)) (n >= 2)
+//   2. pat ~ (P1, ..., Pm) (m >= 2)
+void implicitlyUntuplePatternIfApplicable(TypeChecker *TC,
+                                          Pattern *&enumElementInnerPat,
+                                          Type enumPayloadType) {
+  if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
+    if (tupleType->getNumElements() >= 2
+        && enumElementInnerPat->getKind() == PatternKind::Paren) {
+      auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
+      if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
+        if (tuplePattern->getNumElements() >= 2) {
+          TC->diagnose(tuplePattern->getLoc(),
+                       diag::matching_tuple_pattern_with_many_assoc_values);
+          enumElementInnerPat = semantic;
+        }
+      } else {
+        TC->diagnose(enumElementInnerPat->getLoc(),
+                     diag::matching_pattern_with_many_assoc_values);
+      }
+    }
+  } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
+    if (tupleType->getNumElements() >= 2
+        && enumElementInnerPat->getKind() == PatternKind::Tuple)
+      TC->diagnose(enumElementInnerPat->getLoc(),
+                   diag::matching_many_patterns_with_tupled_assoc_value);
+  }
+}
 }
 
 /// Perform top-down type coercion on the given pattern.
@@ -1513,6 +1527,9 @@ recur:
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+
+      ::implicitlyUntuplePatternIfApplicable(this, sub, elementType);
+
       if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);

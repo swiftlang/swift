@@ -243,8 +243,7 @@ static ValueDecl *deriveVectorProtocol_method(
     // The implicit memberwise constructor must be explicitly created so that
     // it can called in `VectorProtocol` methods. Normally, the memberwise
     // constructor is synthesized during SILGen, which is too late.
-    auto *initDecl = createImplicitConstructor(
-        TC, nominal, ImplicitConstructorKind::Memberwise);
+    auto *initDecl = createMemberwiseImplicitConstructor(TC, nominal);
     nominal->addMember(initDecl);
     C.addSynthesizedDecl(initDecl);
   }

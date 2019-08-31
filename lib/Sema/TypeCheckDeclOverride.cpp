@@ -13,9 +13,10 @@
 // This file implements semantic analysis for declaration overrides.
 //
 //===----------------------------------------------------------------------===//
-#include "CodeSynthesis.h"
 #include "MiscDiagnostics.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckDecl.h"
+#include "TypeCheckObjC.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Availability.h"
@@ -169,6 +170,22 @@ bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
 
   if (declIUOAttr != parentDeclIUOAttr)
     return false;
+
+  // If the generic signatures don't match, then return false because we don't
+  // want to complain if an overridden method matches multiple superclass
+  // methods which differ in generic signature.
+  //
+  // We can still succeed with a subtype match later in
+  // OverrideMatcher::match().
+  auto declGenericCtx = decl->getAsGenericContext();
+  auto &ctx = decl->getASTContext();
+  auto sig = ctx.getOverrideGenericSignature(parentDecl, decl);
+
+  if (sig && declGenericCtx &&
+      declGenericCtx->getGenericSignature()->getCanonicalSignature() !=
+          sig->getCanonicalSignature()) {
+    return false;
+  }
 
   // If this is a constructor, let's compare only parameter types.
   if (isa<ConstructorDecl>(decl)) {
@@ -2001,8 +2018,6 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     SmallVector<OverrideMatch, 2> matches;
     for (auto overridden : overridingASD->getOverriddenDecls()) {
       auto baseASD = cast<AbstractStorageDecl>(overridden);
-      addExpectedOpaqueAccessorsToStorage(baseASD);
-
       auto kind = accessor->getAccessorKind();
 
       // If the base doesn't consider this an opaque accessor,

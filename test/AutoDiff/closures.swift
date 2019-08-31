@@ -26,13 +26,11 @@ struct InoutAliasableCapture {
 
 // CHECK-LABEL: @{{.*}}InoutAliasableCapture{{.*}}foo{{.*}} : $@convention(method) (@inout InoutAliasableCapture) -> () {
 // CHECK: bb0([[SELF:%.*]] : $*InoutAliasableCapture):
-// CHECK:   // function_ref JVP wrt 0 source 0 for capturesMutableSelf #1 (t:) in InoutAliasableCapture.foo()
-// CHECK:   [[JVP:%.*]] = function_ref @$s8closures21InoutAliasableCaptureV3fooyyF19capturesMutableSelfL_1tS2f_tFTzp0r0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   [[JVP:%.*]] = function_ref @{{.*}}capturesMutableSelf{{.*}}__jvp_src_0_wrt_0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-NOT:  retain_value_addr [[SELF]]
 // CHECK-NOT:  copy_addr [[SELF]]
 // CHECK:   [[JVP_CAPTURED:%.*]] = partial_apply [callee_guaranteed] [[JVP]]([[SELF]]) : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK:   // function_ref VJP wrt 0 source 0 for capturesMutableSelf #1 (t:) in InoutAliasableCapture.foo()
-// CHECK:   [[VJP:%.*]] = function_ref @$s8closures21InoutAliasableCaptureV3fooyyF19capturesMutableSelfL_1tS2f_tFTZp0r0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   [[VJP:%.*]] = function_ref @{{.*}}capturesMutableSelf{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
 // CHECK-NOT:  retain_value_addr [[SELF]]
 // CHECK-NOT:  copy_addr [[SELF]]
 // CHECK:   [[VJP_CAPTURED:%.*]] = partial_apply [callee_guaranteed] [[VJP]]([[SELF]]) : $@convention(thin) (Float, @inout_aliasable InoutAliasableCapture) -> (Float, @owned @callee_guaranteed (Float) -> Float)
@@ -45,11 +43,10 @@ public func closureCaptureMutable() {
   }
 }
 
-// CHECK-LABEL: // VJP wrt 0 source 0 for closure #1 in closureCaptureMutable()
-// CHECK-NEXT: @$s8closures21closureCaptureMutableyyFS2fcfU_TZp0r0
+// CHECK-LABEL: @AD__{{.*}}closureCaptureMutable{{.*}}___vjp_src_0_wrt_0
 // CHECK: bb0({{%.*}} : $Float, [[INOUT_ARG:%.*]] : ${ var Float }):
-// CHECK:   [[PB:%.*]] = function_ref @$s8closures21closureCaptureMutableyyFS2fcfU_TUp0r0
-// CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[PB]]({{.*}})
+// CHECK:   [[ADJOINT:%.*]] = function_ref @AD__{{.*}}closureCaptureMutabley{{.*}}___pullback_src_0_wrt_0
+// CHECK:   {{.*}} = partial_apply [callee_guaranteed] [[ADJOINT]]({{.*}})
 
 // TF-30: VJP return value should match the return type.
 struct TF_30 : Differentiable {

@@ -308,6 +308,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
   if (Invocation.getDiagnosticOptions().WarningsAsErrors) {
     Diagnostics.setWarningsAsErrors(true);
   }
+  if (Invocation.getDiagnosticOptions().PrintDiagnosticNames) {
+    Diagnostics.setPrintDiagnosticNames(true);
+  }
 }
 
 bool CompilerInstance::setUpModuleLoaders() {
@@ -380,7 +383,7 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (Invocation.getLangOptions().EnableDWARFImporter) {
     auto dwarfImporter =
         DWARFImporter::create(*Context, Invocation.getClangImporterOptions(),
-                              getDependencyTracker());
+                              nullptr, getDependencyTracker());
     if (!dwarfImporter) {
       Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
       return true;

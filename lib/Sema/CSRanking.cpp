@@ -1104,7 +1104,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       continue;
     }
-    
+
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type

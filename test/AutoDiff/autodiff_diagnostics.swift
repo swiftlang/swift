@@ -50,11 +50,13 @@ _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
   return tmp.x
 }
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s in
-  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{13-13=)}}
+  // TODO(TF-788): Re-enable non-varied result warning.
+  // xpected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{13-13=)}}
   return s.y
 }
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) {
-  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{3-3=withoutDerivative(at:}} {{7-7=)}}
+  // TODO(TF-788): Re-enable non-varied result warning.
+  // xpected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{3-3=withoutDerivative(at:}} {{7-7=)}}
   $0.y
 }
 
@@ -277,7 +279,6 @@ func activeInoutArg(_ x: Float) -> Float {
 // expected-error @+1 {{function is not differentiable}}
 _ = pullback(at: .zero, in: activeInoutArg(_:))
 
-
 func activeInoutArgTuple(_ x: Float) -> Float {
   var tuple = (x, x)
   // expected-note @+1 {{cannot differentiate through 'inout' arguments}}
@@ -296,8 +297,18 @@ func one() -> Float {
 }
 @differentiable
 func nonVariedResult(_ x: Float) -> Float {
-  // expected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{15-15=)}}
+  // TODO(TF-788): Re-enable non-varied result warning.
+  // xpected-warning @+1 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}} {{15-15=)}}
   return one()
+}
+
+// Check that `withoutDerivative(at:)` silences the warning.
+
+struct TF_775: Differentiable {
+  @differentiable(wrt: (self))
+  func nonVariedResult(_ input: Float) -> Float {
+    withoutDerivative(at: input)
+  }
 }
 
 //===----------------------------------------------------------------------===//

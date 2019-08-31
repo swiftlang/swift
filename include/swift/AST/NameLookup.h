@@ -656,7 +656,7 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
   void print(llvm::raw_ostream &) const;
-  void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>) const;
+  void dumpOneScopeMapLocation(std::pair<unsigned, unsigned>);
 
   // Make vanilla new illegal for ASTScopes.
   void *operator new(size_t bytes) = delete;

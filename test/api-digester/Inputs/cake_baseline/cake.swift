@@ -193,3 +193,5 @@ public class Zoo {
     return Cat()
   }
 }
+
+public func returnFunctionTypeOwnershipChange() -> (C1) -> () { return { _ in } }

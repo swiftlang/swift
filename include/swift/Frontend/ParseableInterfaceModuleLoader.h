@@ -9,6 +9,7 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
 /// \file This implements the logic for loading and building parseable module
 /// interfaces.
 ///
@@ -102,22 +103,25 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+#define SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace clang {
-  class CompilerInstance;
+class CompilerInstance;
 }
 
 namespace unittest {
-  class ParseableInterfaceModuleLoaderTest;
+class ParseableInterfaceModuleLoaderTest;
 }
 
 namespace swift {
 
-  class LangOptions;
-  class SearchPathOptions;
+class LangOptions;
+class SearchPathOptions;
 
 /// A ModuleLoader that runs a subordinate \c CompilerInvocation and
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
@@ -182,3 +186,5 @@ std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 
 }
+
+#endif

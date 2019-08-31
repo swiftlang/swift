@@ -152,35 +152,91 @@ public extension VectorProtocol where VectorSpaceScalar : SignedNumeric {
 /// A type that mathematically represents a differentiable manifold whose
 /// tangent spaces are finite-dimensional.
 public protocol Differentiable {
+  /// A type representing a differentiable value’s derivatives.
+  ///
+  /// Mathematically, this is equivalent to the tangent bundle of the
+  /// differentiable manifold represented by the differentiable type.
   associatedtype TangentVector: Differentiable & AdditiveArithmetic
     where TangentVector.TangentVector == TangentVector
 
-  /// Moves `self` along the value space towards the given tangent vector. In
-  /// Riemannian geometry (mathematics), this represents an exponential map.
+  /// Moves `self` along the given direction. In Riemannian geometry, this is
+  /// equivalent to exponential map, which moves `self` on the geodesic surface
+  /// along the given tangent vector.
   mutating func move(along direction: TangentVector)
 
-  @available(*, deprecated,
-             message: "'AllDifferentiableVariables' is now equal to 'Self' and will be removed")
-  typealias AllDifferentiableVariables = Self
+  /// A tangent vector such that `move(along: zeroTangentVector)` will not
+  /// modify `self`.
+  /// - Note: `zeroTangentVector` can be `TangentVector.zero` in most cases,
+  ///   but types whose tangent vectors depend on instance properties of `self`
+  ///   need to provide a different implementation. For example, the tangent
+  ///   vector of an `Array` depends on the array’s `count`.
+  @available(*, deprecated, message: """
+      `zeroTangentVector` derivation has not been implemented; do not use \
+      this property
+      """)
+  var zeroTangentVector: TangentVector { get }
 
-  @available(*, deprecated,
-             message: "'CotangentVector' is now equal to 'TangentVector' and will be removed")
-  typealias CotangentVector = TangentVector
+  @available(*, deprecated, message: """
+    'AllDifferentiableVariables' is now equal to 'Self' and will be removed
+    """)
+  typealias AllDifferentiableVariables = Self
 }
 
 public extension Differentiable {
-  @available(*, deprecated,
-             message: "'allDifferentiableVariables' is now equal to 'self' and will be removed")
+  @available(*, deprecated, message: """
+    'allDifferentiableVariables' is now equal to 'self' and will be removed
+    """)
   var allDifferentiableVariables: AllDifferentiableVariables {
     get { return self }
     set { self = newValue }
   }
+
+  // This is a temporary solution that allows us to add `zeroTangentVector`
+  // without implementing derived conformances. This property is marked
+  // unavailable because it will produce incorrect results when tangent vectors
+  // depend on instance properties of `self`.
+  // FIXME: Implement derived conformance and remove this default
+  // implementation.
+  var zeroTangentVector: TangentVector { .zero }
 }
 
 public extension Differentiable where TangentVector == Self {
   mutating func move(along direction: TangentVector) {
     self += direction
   }
+}
+
+/// A type that is differentiable in the Euclidean space.
+/// The type may represent a vector space, or consist of a vector space and some
+/// other non-differentiable component.
+///
+/// Mathematically, this represents a product manifold that consists of
+/// a differentiable vector space and some arbitrary manifold, where the tangent
+/// bundle of the entire product manifold is equal to the vector space
+/// component.
+///
+/// This abstraction is useful for representing common differentiable data
+/// structures that contain both differentiable vector properties and other
+/// stored properties that do not have a derivative, e.g.
+///
+/// ```swift
+/// struct Perceptron: @memberwise EuclideanDifferentiable {
+///     var weight: SIMD16<Float>
+///     var bias: Float
+///     @noDerivative var useBias: Bool
+/// }
+/// ```
+///
+/// - Note: Conform a type to `EuclideanDifferentiable` if it is differentiable
+///   only with respect to its vector space component and when its
+///   `TangentVector` is equal to its vector space component.
+public protocol EuclideanDifferentiable: Differentiable {
+  /// The differentiable vector component of `self`.
+  var differentiableVectorView: TangentVector { get }
+}
+
+public extension EuclideanDifferentiable where TangentVector == Self {
+  var differentiableVectorView: TangentVector { _read { yield self } }
 }
 
 /// Returns `x` like an identity function. When used in a context where `x` is
@@ -479,7 +535,7 @@ public func pullback<T, U, V, R>(
 
 @inlinable
 public func derivative<T: FloatingPoint, R>(
-  at x: T, in f: @escaping @differentiable (T) -> R
+  at x: T, in f: @differentiable (T) -> R
 ) ->  R.TangentVector
   where T.TangentVector == T {
   return differential(at: x, in: f)(T(1))
@@ -487,7 +543,7 @@ public func derivative<T: FloatingPoint, R>(
 
 @inlinable
 public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
-  at x: T, _ y: U, in f: @escaping @differentiable (T, U) -> R
+  at x: T, _ y: U, in f: @differentiable (T, U) -> R
 ) -> R.TangentVector
   where T.TangentVector == T,
         U.TangentVector == U {
@@ -496,7 +552,7 @@ public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
 
 @inlinable
 public func derivative<T: FloatingPoint, U: FloatingPoint, V: FloatingPoint, R>(
-  at x: T, _ y: U, _ z: V, in f: @escaping @differentiable (T, U, V) -> R
+  at x: T, _ y: U, _ z: V, in f: @differentiable (T, U, V) -> R
 ) -> R.TangentVector
   where T.TangentVector == T,
         U.TangentVector == U,
@@ -723,6 +779,9 @@ internal protocol _AnyDerivativeBox {
   // `Differentiable` requirements.
   mutating func _move(along direction: _AnyDerivativeBox)
 
+  // `EuclideanDifferentiable` requirements.
+  var _differentiableVectorView: _AnyDerivativeBox { get }
+
   /// The underlying base value, type-erased to `Any`.
   var _typeErasedBase: Any { get }
 
@@ -830,6 +889,11 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
     }
     _base.move(along: directionBase)
   }
+
+  // `EuclideanDifferentiable` requirements.
+  var _differentiableVectorView: _AnyDerivativeBox {
+    return self
+  }
 }
 
 /// A type-erased derivative value.
@@ -837,7 +901,7 @@ internal struct _ConcreteDerivativeBox<T> : _AnyDerivativeBox
 /// The `AnyDerivative` type forwards its operations to an arbitrary underlying
 /// base derivative value conforming to `Differentiable` and
 /// `AdditiveArithmetic`, hiding the specifics of the underlying value.
-public struct AnyDerivative : Differentiable & AdditiveArithmetic {
+public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   internal var _box: _AnyDerivativeBox
 
   internal init(_box: _AnyDerivativeBox) {
@@ -878,7 +942,7 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
   /// Internal struct representing an opaque zero value.
   @frozen
   @usableFromInline
-  internal struct OpaqueZero : Differentiable & AdditiveArithmetic {}
+  internal struct OpaqueZero : EuclideanDifferentiable & AdditiveArithmetic {}
 
   public static var zero: AnyDerivative {
     return AnyDerivative(
@@ -920,6 +984,11 @@ public struct AnyDerivative : Differentiable & AdditiveArithmetic {
       return
     }
     _box._move(along: direction._box)
+  }
+
+  // `EuclideanDifferentiable` requirements.
+  public var differentiableVectorView: TangentVector {
+    return self
   }
 }
 
@@ -994,4 +1063,15 @@ public extension Array where Element: Differentiable {
     }
     return (value: values, pullback: pullback)
   }
+}
+
+//===----------------------------------------------------------------------===//
+// JVP Diagnostics
+//===----------------------------------------------------------------------===//
+@_silgen_name("_printJVPErrorAndExit")
+public func _printJVPErrorAndExit() -> Never {
+    fatalError("""
+        JVP does not exist. Differential-first differentiation APIs are \
+        experimental and should not be used.
+        """)
 }

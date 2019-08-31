@@ -79,7 +79,7 @@ SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(2, gradient(at: 1, in: foo_diffable))
   expectEqual(2, gradient(at: 1, in: { x in foo_diffable(x) }))
   expectEqual(1, gradient(at: 1, in: { (x: Float) -> Float in
-    foo_diffable = { x in x + 1 };
+    foo_diffable = { x in x + 1 }
     return foo_diffable(x)
   }))
   expectEqual(1, gradient(at: 1, in: foo_diffable))
@@ -313,6 +313,15 @@ SimpleMathTests.test("SubsetIndices") {
     return gradient(at: 2) { x in lossFunction(x * x, 10) }
   }
   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
+}
+
+SimpleMathTests.test("ForceUnwrapping") {
+  func bla<T: Differentiable & FloatingPoint>(_ t: T) -> (T, Float) where T == T.TangentVector {
+    gradient(at: t, Float(1)) { (x, y) in
+      (x as! Float) * y
+    }
+  }
+  expectEqual((1, 2), bla(Float(2)))
 }
 
 runAllTests()

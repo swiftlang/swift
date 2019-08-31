@@ -91,6 +91,80 @@ static void lowerAssignInstruction(SILBuilderWithScope &b, AssignInst *inst) {
   inst->eraseFromParent();
 }
 
+/// Construct the argument list for the assign_by_wrapper initializer or setter.
+///
+/// Usually this is only a single value and a single argument, but in case of
+/// a tuple, the initializer/setter expect the tuple elements as separate
+/// arguments. The purpose of this function is to recursively visit tuple
+/// elements and add them to the argument list \p arg.
+static void getAssignByWrapperArgsRecursively(SmallVectorImpl<SILValue> &args,
+    SILValue src, unsigned &argIdx, const SILFunctionConventions &convention,
+    SILBuilder &forProjections, SILBuilder &forCleanup) {
+
+  SILLocation loc = (*forProjections.getInsertionPoint()).getLoc();
+  SILType srcTy = src->getType();
+  if (auto tupleTy = srcTy.getAs<TupleType>()) {
+    // In case the source is a tuple, we have to destructure the tuple and pass
+    // the tuple elements separately.
+    if (srcTy.isAddress()) {
+      for (unsigned idx = 0, n = tupleTy->getNumElements(); idx < n; ++idx) {
+        auto *TEA = forProjections.createTupleElementAddr(loc, src, idx);
+        getAssignByWrapperArgsRecursively(args, TEA, argIdx, convention,
+          forProjections, forCleanup);
+      }
+    } else {
+      auto *DTI = forProjections.createDestructureTuple(loc, src);
+      for (SILValue elmt : DTI->getAllResults()) {
+        getAssignByWrapperArgsRecursively(args, elmt, argIdx, convention,
+          forProjections, forCleanup);
+      }
+    }
+    return;
+  }
+  assert(argIdx < convention.getNumSILArguments() &&
+         "initializer or setter has too few arguments");
+
+  SILArgumentConvention argConv = convention.getSILArgumentConvention(argIdx);
+  if (srcTy.isAddress() && !argConv.isIndirectConvention()) {
+    // In case of a tuple where one element is loadable, but the other is
+    // address only, we get the whole tuple as address.
+    // For the loadable element, the argument is passed directly, but the
+    // tuple element is in memory. For this case we have to insert a load.
+    src = forProjections.createTrivialLoadOr(loc, src,
+                                             LoadOwnershipQualifier::Take);
+  }
+  switch (argConv) {
+    case SILArgumentConvention::Indirect_In_Guaranteed:
+      forCleanup.createDestroyAddr(loc, src);
+      break;
+    case SILArgumentConvention::Direct_Guaranteed:
+      forCleanup.createDestroyValue(loc, src);
+      break;
+    case SILArgumentConvention::Direct_Unowned:
+    case SILArgumentConvention::Indirect_In:
+    case SILArgumentConvention::Indirect_In_Constant:
+    case SILArgumentConvention::Direct_Owned:
+      break;
+    case SILArgumentConvention::Indirect_Inout:
+    case SILArgumentConvention::Indirect_InoutAliasable:
+    case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Direct_Deallocating:
+      llvm_unreachable("wrong convention for setter/initializer src argument");
+  }
+  args.push_back(src);
+  ++argIdx;
+}
+
+static void getAssignByWrapperArgs(SmallVectorImpl<SILValue> &args,
+            SILValue src, const SILFunctionConventions &convention,
+            SILBuilder &forProjections, SILBuilder &forCleanup) {
+  unsigned argIdx = convention.getSILArgIndexOfFirstParam();
+  getAssignByWrapperArgsRecursively(args, src, argIdx, convention,
+                              forProjections, forCleanup);
+  assert(argIdx == convention.getNumSILArguments() &&
+         "initializer or setter has too many arguments");
+}
+
 static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
                                              AssignByWrapperInst *inst,
                             SmallVectorImpl<BeginAccessInst *> &accessMarkers) {
@@ -103,21 +177,24 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   SILValue src = inst->getSrc();
   SILValue dest = inst->getDest();
   SILLocation loc = inst->getLoc();
-  SILArgumentConvention srcConvention(SILArgumentConvention::Indirect_Inout);
+  SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
 
   switch (inst->getOwnershipQualifier()) {
     case AssignOwnershipQualifier::Init: {
       SILValue initFn = inst->getInitializer();
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
+      SmallVector<SILValue, 4> args;
       if (convention.hasIndirectSILResults()) {
-        b.createApply(loc, initFn, SubstitutionMap(), { dest, src });
-        srcConvention = convention.getSILArgumentConvention(1);
+        args.push_back(dest);
+        getAssignByWrapperArgs(args, src, convention, b, forCleanup);
+        b.createApply(loc, initFn, SubstitutionMap(), args);
       } else {
+        getAssignByWrapperArgs(args, src, convention, b, forCleanup);
         SILValue wrappedSrc = b.createApply(loc, initFn, SubstitutionMap(),
-                                            { src });
-        b.createTrivialStoreOr(loc, wrappedSrc, dest, StoreOwnershipQualifier::Init);
-        srcConvention = convention.getSILArgumentConvention(0);
+                                            args);
+        b.createTrivialStoreOr(loc, wrappedSrc, dest,
+                               StoreOwnershipQualifier::Init);
       }
       // TODO: remove the unused setter function, which usually is a dead
       // partial_apply.
@@ -129,8 +206,9 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       CanSILFunctionType fTy = setterFn->getType().castTo<SILFunctionType>();
       SILFunctionConventions convention(fTy, inst->getModule());
       assert(!convention.hasIndirectSILResults());
-      srcConvention = convention.getSILArgumentConvention(0);
-      b.createApply(loc, setterFn, SubstitutionMap(), { src });
+      SmallVector<SILValue, 4> args;
+      getAssignByWrapperArgs(args, src, convention, b, forCleanup);
+      b.createApply(loc, setterFn, SubstitutionMap(), args);
 
       // The destination address is not used. Remove it if it is a dead access
       // marker. This is important, because also the setter function contains
@@ -144,24 +222,6 @@ static void lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
     }
     case AssignOwnershipQualifier::Reinit:
       llvm_unreachable("wrong qualifier for assign_by_wrapper");
-  }
-  switch (srcConvention) {
-    case SILArgumentConvention::Indirect_In_Guaranteed:
-      b.createDestroyAddr(loc, src);
-      break;
-    case SILArgumentConvention::Direct_Guaranteed:
-      b.createDestroyValue(loc, src);
-      break;
-    case SILArgumentConvention::Direct_Unowned:
-    case SILArgumentConvention::Indirect_In:
-    case SILArgumentConvention::Indirect_In_Constant:
-    case SILArgumentConvention::Direct_Owned:
-      break;
-    case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
-    case SILArgumentConvention::Indirect_Out:
-    case SILArgumentConvention::Direct_Deallocating:
-      llvm_unreachable("wrong convention for setter/initializer src argument");
   }
   inst->eraseFromParent();
 }

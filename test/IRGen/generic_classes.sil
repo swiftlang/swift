@@ -400,5 +400,5 @@ entry(%c : $RootGeneric<Int32>):
 // CHECK:   ret %swift.metadata_response [[T1]]
 // CHECK: }
 
-// OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64, %swift.type*) [[ATTRS:#[0-9]+]] {
+// OSIZE: define hidden swiftcc %swift.metadata_response @"$s15generic_classes11RootGenericCMa"(i64, %swift.type* {{.*}}) [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
