@@ -74,14 +74,11 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
   }
 
   case BodyKind::Unparsed: {
-    // FIXME: It should be fine to delay body parsing of local functions, so
-    // the DelayBodyParsing should go away entirely
     // FIXME: How do we configure code completion?
     SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
     SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
     unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
-    Parser parser(bufferID, sf, nullptr, nullptr, nullptr,
-                 /*DelayBodyParsing=*/false);
+    Parser parser(bufferID, sf, nullptr, nullptr, nullptr);
     parser.SyntaxContext->setDiscard();
     auto body = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
