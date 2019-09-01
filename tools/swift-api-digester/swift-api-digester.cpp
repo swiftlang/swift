@@ -234,6 +234,11 @@ static llvm::cl::list<std::string>
 PreferInterfaceForModules("use-interface-for-module", llvm::cl::ZeroOrMore,
                           llvm::cl::desc("Prefer loading these modules via interface"),
                           llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BaselineFilePath("baseline-path",
+                 llvm::cl::desc("The path to the Json file that we should use as the baseline"),
+                 llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -2529,6 +2534,77 @@ static bool hasBaselineInput() {
     !options::BaselineFrameworkPaths.empty() || !options::BaselineSDK.empty();
 }
 
+enum class ComparisonInputMode: uint8_t {
+  BothJson,
+  BaselineJson,
+  BothLoad,
+};
+
+static ComparisonInputMode checkComparisonInputMode() {
+  if (options::SDKJsonPaths.size() == 2)
+    return ComparisonInputMode::BothJson;
+  else if (hasBaselineInput())
+    return ComparisonInputMode::BothLoad;
+  else
+    return ComparisonInputMode::BaselineJson;
+}
+
+static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
+  SwiftDeclCollector Collector(Ctx);
+  // If the baseline path has been given, honor that.
+  if (!options::BaselineFilePath.empty()) {
+    Collector.deSerialize(options::BaselineFilePath);
+    return Collector.getSDKRoot();
+  }
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  // We need to call prepareForDump to parse target triple.
+  if (prepareForDump(Main, Invok, Modules, true))
+    return nullptr;
+
+  assert(Modules.size() == 1 &&
+         "Cannot find builtin baseline for more than one module");
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
+    reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  llvm::SmallString<128> BaselinePath(ExePath);
+  llvm::sys::path::remove_filename(BaselinePath); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(BaselinePath); // Remove /bin
+  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline",
+                          Modules.begin()->getKey());
+  // Look for ABI or API baseline
+  if (Ctx.checkingABI())
+    llvm::sys::path::append(BaselinePath, "ABI");
+  else
+    llvm::sys::path::append(BaselinePath, "API");
+  // Look for deployment target specific baseline files.
+  auto Triple = Invok.getLangOptions().Target;
+  if (Triple.isMacCatalystEnvironment())
+    llvm::sys::path::append(BaselinePath, "iosmac.json");
+  else if (Triple.isMacOSX())
+    llvm::sys::path::append(BaselinePath, "macos.json");
+  else if (Triple.isiOS())
+    llvm::sys::path::append(BaselinePath, "iphoneos.json");
+  else if (Triple.isTvOS())
+    llvm::sys::path::append(BaselinePath, "appletvos.json");
+  else if (Triple.isWatchOS())
+    llvm::sys::path::append(BaselinePath, "watchos.json");
+  else {
+    llvm::errs() << "Unsupported triple target\n";
+    exit(1);
+  }
+  StringRef Path = BaselinePath.str();
+  if (!fs::exists(Path)) {
+    llvm::errs() << "Baseline at " << Path << " does not exist\n";
+    exit(1);
+  }
+  if (options::Verbose) {
+    llvm::errs() << "Using baseline at " << Path << "\n";
+  }
+  Collector.deSerialize(Path);
+  return Collector.getSDKRoot();
+}
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -2550,32 +2626,39 @@ int main(int argc, char *argv[]) {
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
-    bool CompareJson = options::SDKJsonPaths.size() == 2;
-    if (!CompareJson && !hasBaselineInput()) {
-      llvm::errs() << "Only two SDK versions can be compared\n";
-      llvm::cl::PrintHelpMessage();
-      return 1;
-    }
+    ComparisonInputMode Mode = checkComparisonInputMode();
     llvm::StringSet<> protocolWhitelist;
     if (!options::ProtReqWhiteList.empty()) {
       if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
           return 1;
     }
-    if (options::Action == ActionType::MigratorGen)
+    if (options::Action == ActionType::MigratorGen) {
+      assert(Mode == ComparisonInputMode::BothJson && "Only BothJson mode is supported");
       return generateMigrationScript(options::SDKJsonPaths[0],
                                      options::SDKJsonPaths[1],
                                      options::OutputFile, IgnoredUsrs, Opts);
-    else if (CompareJson)
+    }
+    switch(Mode) {
+    case ComparisonInputMode::BothJson: {
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
                                   options::OutputFile, Opts,
                                   std::move(protocolWhitelist));
-    else {
+    }
+    case ComparisonInputMode::BaselineJson: {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
+                                  getSDKRoot(argv[0], Ctx, false),
+                                  options::OutputFile,
+                                  std::move(protocolWhitelist));
+    }
+    case ComparisonInputMode::BothLoad: {
       SDKContext Ctx(Opts);
       return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
                                   getSDKRoot(argv[0], Ctx, false),
                                   options::OutputFile,
                                   std::move(protocolWhitelist));
+    }
     }
   }
   case ActionType::DeserializeSDK:
