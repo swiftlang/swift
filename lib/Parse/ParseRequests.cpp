@@ -17,6 +17,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/Module.h"
+#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 
 using namespace swift;
@@ -33,9 +35,62 @@ namespace swift {
 ArrayRef<Decl *>
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
+  SourceFile &sf = *idc->getDecl()->getDeclContext()->getParentSourceFile();
+  unsigned bufferID = *sf.getBufferID();
+
+  // Lexer diaganostics have been emitted during skipping, so we disable lexer's
+  // diagnostic engine here.
+  Parser parser(bufferID, sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
+  // Disable libSyntax creation in the delayed parsing.
+  parser.SyntaxContext->setDiscard();
   ASTContext &ctx = idc->getDecl()->getASTContext();
-  return ctx.AllocateCopy(llvm::makeArrayRef(ctx.parseMembers(idc)));
+  return ctx.AllocateCopy(
+      llvm::makeArrayRef(parser.parseDeclListDelayed(idc)));
 }
+
+BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *afd) const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+  case BodyKind::Parsed:
+    return afd->Body;
+
+  case BodyKind::Synthesize: {
+    BraceStmt *body;
+    bool isTypeChecked;
+
+    std::tie(body, isTypeChecked) = (afd->Synthesizer.Fn)(
+        afd, afd->Synthesizer.Context);
+    afd->setBodyKind(isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
+    return body;
+  }
+
+  case BodyKind::Unparsed: {
+    // FIXME: It should be fine to delay body parsing of local functions, so
+    // the DelayBodyParsing should go away entirely
+    // FIXME: How do we configure code completion?
+    SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
+    SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
+    unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
+    Parser parser(bufferID, sf, nullptr, nullptr, nullptr,
+                 /*DelayBodyParsing=*/false);
+    parser.SyntaxContext->setDiscard();
+    auto body = parser.parseAbstractFunctionBodyDelayed(afd);
+    afd->setBodyKind(BodyKind::Parsed);
+    return body;
+  }
+  }
+
+}
+
 
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *parseRequestFunctions[] = {

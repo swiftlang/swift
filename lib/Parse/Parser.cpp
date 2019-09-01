@@ -138,6 +138,9 @@ public:
 
 private:
   void parseFunctionBody(AbstractFunctionDecl *AFD) {
+    // FIXME: This duplicates the evaluation of
+    // ParseAbstractFunctionBodyRequest, but installs a code completion
+    // factory.
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
@@ -152,8 +155,8 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    if (ParserState.hasFunctionBodyState(AFD))
-      TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    auto body = TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    AFD->setBodyParsed(body);
 
     if (CodeCompletion)
       CodeCompletion->doneParsing();
@@ -529,7 +532,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
     Generator(SF.getASTContext(), &State) {
   State = PersistentState;
   if (!State) {
-    OwnedState.reset(new PersistentParserState(Context));
+    OwnedState.reset(new PersistentParserState());
     State = OwnedState.get();
   }
 

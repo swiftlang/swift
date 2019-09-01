@@ -384,6 +384,11 @@ static bool collectPossibleCalleesForApply(
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+  } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+    collectPossibleCalleesByQualifiedLookup(
+        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+    }
   }
 
   if (candidates.empty()) {

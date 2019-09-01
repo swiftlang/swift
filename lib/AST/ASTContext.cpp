@@ -159,10 +159,6 @@ struct ASTContext::Implementation {
   /// The last resolver.
   LazyResolver *Resolver = nullptr;
 
-  /// The lazy parsers for various input files. We may have separate
-  /// lazy parsers for imported module files and source files.
-  llvm::SmallPtrSet<LazyMemberParser*, 2> lazyParsers;
-
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
@@ -642,16 +638,6 @@ void ASTContext::setLazyResolver(LazyResolver *resolver) {
     delete existing;
 
   getImpl().Resolver = resolver;
-}
-
-void ASTContext::addLazyParser(LazyMemberParser *lazyParser) {
-  getImpl().lazyParsers.insert(lazyParser);
-}
-
-void ASTContext::removeLazyParser(LazyMemberParser *lazyParser) {
-  auto removed = getImpl().lazyParsers.erase(lazyParser);
-  (void)removed;
-  assert(removed && "Removing an non-existing lazy parser.");
 }
 
 /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -2013,16 +1999,6 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
 
   entry->loader = lazyLoader;
   return entry;
-}
-
-std::vector<Decl *> ASTContext::parseMembers(IterableDeclContext *IDC) {
-  assert(IDC->hasUnparsedMembers());
-  for (auto *p: getImpl().lazyParsers) {
-    if (p->hasUnparsedMembers(IDC))
-      return p->parseMembers(IDC);
-  }
-
-  return { };
 }
 
 LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(

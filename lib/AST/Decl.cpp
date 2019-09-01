@@ -33,6 +33,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -6307,37 +6308,22 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
-  switch (getBodyKind()) {
-  case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
-  case BodyKind::None:
-  case BodyKind::Skipped:
+  if ((getBodyKind() == BodyKind::Synthesize ||
+       getBodyKind() == BodyKind::Unparsed) &&
+      !canSynthesize)
     return nullptr;
 
-  case BodyKind::Parsed:
-  case BodyKind::TypeChecked:
-    return Body;
+  ASTContext &ctx = getASTContext();
 
-  case BodyKind::Unparsed:
-    // FIXME: Go parse now!
+  // Don't allow getBody() to trigger parsing of an unparsed body containing the
+  // code completion location.
+  if (getBodyKind() == BodyKind::Unparsed &&
+      ctx.SourceMgr.rangeContainsCodeCompletionLoc(getBodySourceRange())) {
     return nullptr;
-
-  case BodyKind::Synthesize: {
-    if (!canSynthesize)
-      return nullptr;
-
-    const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-    BraceStmt *body;
-    bool isTypeChecked;
-
-    auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-    std::tie(body, isTypeChecked) = (Synthesizer.Fn)(
-        mutableThis, Synthesizer.Context);
-    mutableThis->setBody(
-        body, isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
-    return body;
   }
-  }
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, ParseAbstractFunctionBodyRequest{mutableThis}, nullptr);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -6804,11 +6790,15 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   switch (getBodyKind()) {
   case BodyKind::Deserialized:
     return true;
+
+  case BodyKind::Unparsed:
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
-    return getBody() && !getBody()->isImplicit();
+    if (auto body = getBody())
+      return !body->isImplicit();
+    return false;
+
   case BodyKind::None:
-  case BodyKind::Unparsed:
   case BodyKind::Synthesize:
   case BodyKind::Skipped:
   case BodyKind::MemberwiseInitializer:
@@ -7675,4 +7665,50 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
     return loc;
 
   return extractNearestSourceLoc(decl->getDeclContext());
+}
+
+Optional<BraceStmt *>
+ParseAbstractFunctionBodyRequest::getCachedResult() const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+  case BodyKind::Parsed:
+    return afd->Body;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    return None;
+  }
+}
+
+void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    // The body is always empty, so don't cache anything.
+    assert(value == nullptr);
+    return;
+
+  case BodyKind::Parsed:
+  case BodyKind::TypeChecked:
+    afd->Body = value;
+    return;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    llvm_unreachable("evaluate() did not set the body kind");
+    return;
+  }
+
 }

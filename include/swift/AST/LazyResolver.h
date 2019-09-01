@@ -85,21 +85,6 @@ public:
   LazyMemberLoader *loader;
 };
 
-/// A class that can lazily parse members for an iterable decl context.
-class LazyMemberParser {
-public:
-  virtual ~LazyMemberParser() = default;
-
-  /// Retrieves the parsed members for the given decl context \p IDC.
-  virtual std::vector<Decl *> parseMembers(IterableDeclContext *IDC) = 0;
-
-  /// Return whether the iterable decl context needs parsing.
-  virtual bool hasUnparsedMembers(const IterableDeclContext *IDC) = 0;
-
-  /// Parse all delayed decl list members.
-  virtual void parseAllDelayedDeclLists() = 0;
-};
-
 /// Context data for generic contexts.
 class LazyGenericContextData : public LazyContextData {
 public:
