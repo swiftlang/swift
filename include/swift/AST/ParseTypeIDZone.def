@@ -15,3 +15,4 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(Parse, ParseMembersRequest)
+SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest)
