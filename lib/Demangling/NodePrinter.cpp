@@ -1704,16 +1704,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << ": ";
     print(Node->getChild(2));
     return nullptr;
-  case Node::Kind::AssociatedTypeDescriptor: {
+  case Node::Kind::AssociatedTypeDescriptor:
     Printer << "associated type descriptor for ";
-    auto assoc = Node->getChild(0);
-    if (auto parent = getFirstChildOfKind(assoc, Node::Kind::Type)) {
-      print(parent);
-      Printer << ".";
-    }
-    print(assoc);
+    print(Node->getChild(0));
     return nullptr;
-  }
   case Node::Kind::AssociatedTypeMetadataAccessor:
     Printer << "associated type metadata accessor for ";
     print(Node->getChild(1));
@@ -2148,7 +2142,9 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentAssociatedTypeRef: {
-    Printer << Node->getFirstChild()->getText();
+    print(Node->getChild(1));
+    Printer << '.';
+    print(Node->getChild(0));
     return nullptr;
   }
   case Node::Kind::ReflectionMetadataBuiltinDescriptor:
