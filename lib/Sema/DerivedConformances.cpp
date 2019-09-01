@@ -73,6 +73,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         // conformance.
       case KnownProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
+      
+      case KnownProtocolKind::Comparable:
+        return !enumDecl->hasPotentiallyUnavailableCaseValue()
+            && canDeriveComparable(DC, Nominal); // why do y’all pass wide `NominalTypeDecl*` value when u could pass downcast `EnumDecl*` value?
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -100,7 +104,7 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         }
 
         // hasOnlyCasesWithoutAssociatedValues will return true for empty enums;
-        // empty enumas are allowed to conform as well.
+        // empty enums are allowed to conform as well.
         return enumDecl->hasOnlyCasesWithoutAssociatedValues();
       }
 
@@ -143,7 +147,9 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return;
-
+  
+  // Comparable on eligible type kinds should never fail
+   
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -212,6 +218,9 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
   // Functions.
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
+    if (func->isOperator() && name.getBaseName() == "<")
+      return getRequirement(KnownProtocolKind::Comparable);
+    
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
 
@@ -388,4 +397,74 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
   }
 
   return false;
+}
+
+/// Create AST statements which convert from an enum to an Int with a switch.
+/// \p stmts The generated statements are appended to this vector.
+/// \p parentDC Either an extension or the enum itself.
+/// \p enumDecl The enum declaration.
+/// \p enumVarDecl The enum input variable.
+/// \p funcDecl The parent function.
+/// \p indexName The name of the output variable.
+/// \return A DeclRefExpr of the output variable (of type Int).
+DeclRefExpr *swift::convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
+                                       DeclContext *parentDC,
+                                       EnumDecl *enumDecl,
+                                       VarDecl *enumVarDecl,
+                                       AbstractFunctionDecl *funcDecl,
+                                       const char *indexName) {
+  ASTContext &C = enumDecl->getASTContext();
+  Type enumType = enumVarDecl->getType();
+  Type intType = C.getIntDecl()->getDeclaredType();
+
+  auto indexVar = new (C) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Var,
+                                  /*IsCaptureList*/false, SourceLoc(),
+                                  C.getIdentifier(indexName),
+                                  funcDecl);
+  indexVar->setInterfaceType(intType);
+  indexVar->setImplicit();
+
+  // generate: var indexVar
+  Pattern *indexPat = new (C) NamedPattern(indexVar, /*implicit*/ true);
+  indexPat->setType(intType);
+  indexPat = TypedPattern::createImplicit(C, indexPat, intType);
+  indexPat->setType(intType);
+  auto *indexBind = PatternBindingDecl::createImplicit(
+      C, StaticSpellingKind::None, indexPat, /*InitExpr*/ nullptr, funcDecl);
+
+  unsigned index = 0;
+  SmallVector<ASTNode, 4> cases;
+  for (auto elt : enumDecl->getAllElements()) {
+    // generate: case .<Case>:
+    auto pat = new (C) EnumElementPattern(TypeLoc::withoutLoc(enumType),
+                                          SourceLoc(), SourceLoc(),
+                                          Identifier(), elt, nullptr);
+    pat->setImplicit();
+
+    auto labelItem = CaseLabelItem(pat);
+
+    // generate: indexVar = <index>
+    auto indexExpr = IntegerLiteralExpr::createFromUnsigned(C, index++);
+    auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
+                                        /*implicit*/true);
+    auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
+                                         indexExpr, /*implicit*/ true);
+    auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
+                                  SourceLoc());
+    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+                                     SourceLoc(), body,
+                                     /*case body vardecls*/ None));
+  }
+
+  // generate: switch enumVar { }
+  auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
+                                     /*implicit*/true);
+  auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
+                                       SourceLoc(), cases, SourceLoc(), C);
+
+  stmts.push_back(indexBind);
+  stmts.push_back(switchStmt);
+
+  return new (C) DeclRefExpr(indexVar, DeclNameLoc(), /*implicit*/ true,
+                             AccessSemantics::Ordinary, intType);
 }

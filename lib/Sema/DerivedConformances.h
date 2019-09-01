@@ -121,6 +121,20 @@ public:
   /// \returns the derived member, which will also be added to the type.
   Type deriveRawRepresentable(AssociatedTypeDecl *assocType);
 
+  /// Determine if a Comparable requirement can be derived for a type.
+  ///
+  /// This is implemented for enums without associated or raw values.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveComparable(DeclContext *DC, NominalTypeDecl *type);
+  
+  /// Derive an Equatable requirement for a type.
+  ///
+  /// This is implemented for enums without associated or raw values.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveComparable(ValueDecl *requirement);
+  
   /// Determine if an Equatable requirement can be derived for a type.
   ///
   /// This is implemented for enums without associated values or all-Equatable
@@ -213,6 +227,13 @@ public:
   /// \param synthesizing The decl that is being synthesized.
   bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
 };
+
+DeclRefExpr *convertEnumToIndex( SmallVectorImpl<ASTNode> &stmts,
+  DeclContext *parentDC,
+  EnumDecl *enumDecl,
+  VarDecl *enumVarDecl,
+  AbstractFunctionDecl *funcDecl,
+  const char *indexName);
 }
 
 #endif

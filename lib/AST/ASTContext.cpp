@@ -226,6 +226,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #define FUNC_DECL(Name, Id) FuncDecl *Get##Name = nullptr;
 #include "swift/AST/KnownDecls.def"
   
+  /// func <Int, Int) -> Bool
+  FuncDecl *LessThanIntDecl = nullptr;
+  
   /// func ==(Int, Int) -> Bool
   FuncDecl *EqualIntDecl = nullptr;
 
@@ -1080,9 +1083,9 @@ ASTContext::getBuiltinInitDecl(NominalTypeDecl *decl,
   return witness;
 }
 
-FuncDecl *ASTContext::getEqualIntDecl() const {
-  if (getImpl().EqualIntDecl)
-    return getImpl().EqualIntDecl;
+FuncDecl *ASTContext::getBinaryComparisonOperatorIntDecl(StringRef op, FuncDecl **cached) const {
+  if (*cached)
+    return *cached;
 
   if (!getIntDecl() || !getBoolDecl())
     return nullptr;
@@ -1093,7 +1096,7 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
             param.getPlainType()->isEqual(intType));
   };
   auto boolType = getBoolDecl()->getDeclaredType();
-  auto decl = lookupOperatorFunc(*this, "==",
+  auto decl = lookupOperatorFunc(*this, op,
                                  intType, [=](FunctionType *type) {
     // Check for the signature: (Int, Int) -> Bool
     if (type->getParams().size() != 2) return false;
@@ -1101,8 +1104,14 @@ FuncDecl *ASTContext::getEqualIntDecl() const {
         !isIntParam(type->getParams()[1])) return false;
     return type->getResult()->isEqual(boolType);
   });
-  getImpl().EqualIntDecl = decl;
+  *cached = decl;
   return decl;
+}
+FuncDecl *ASTContext::getLessThanIntDecl() const {
+  return getBinaryComparisonOperatorIntDecl("<", &getImpl().LessThanIntDecl);
+}
+FuncDecl *ASTContext::getEqualIntDecl() const {
+  return getBinaryComparisonOperatorIntDecl("==", &getImpl().EqualIntDecl);
 }
 
 FuncDecl *ASTContext::getHashValueForDecl() const {

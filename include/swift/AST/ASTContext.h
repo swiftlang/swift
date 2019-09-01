@@ -514,6 +514,9 @@ public:
                                      KnownProtocolKind builtinProtocol,
                 llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
 
+  /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
+  FuncDecl *getLessThanIntDecl() const;
+
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
 
