@@ -80,8 +80,8 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
     SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
     SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
     unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
-    Parser parser(bufferID, sf, nullptr, nullptr, nullptr,
-                 /*DelayBodyParsing=*/false);
+    Parser parser(bufferID, sf, static_cast<SILParserTUStateBase *>(nullptr),
+                  nullptr, nullptr, /*DelayBodyParsing=*/false);
     parser.SyntaxContext->setDiscard();
     auto body = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
