@@ -315,12 +315,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
 
 bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
-    bool immediate = FrontendOptions::isActionImmediate(
-        Invocation.getFrontendOptions().RequestedAction);
     bool enableLibraryEvolution =
       Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
-                                                  !immediate,
                                                   enableLibraryEvolution,
                                                   getDependencyTracker()));
   }

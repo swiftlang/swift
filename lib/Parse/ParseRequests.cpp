@@ -48,6 +48,50 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
       llvm::makeArrayRef(parser.parseDeclListDelayed(idc)));
 }
 
+BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *afd) const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+  case BodyKind::Parsed:
+    return afd->Body;
+
+  case BodyKind::Synthesize: {
+    BraceStmt *body;
+    bool isTypeChecked;
+
+    std::tie(body, isTypeChecked) = (afd->Synthesizer.Fn)(
+        afd, afd->Synthesizer.Context);
+    afd->setBodyKind(isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
+    return body;
+  }
+
+  case BodyKind::Unparsed: {
+    // FIXME: It should be fine to delay body parsing of local functions, so
+    // the DelayBodyParsing should go away entirely
+    // FIXME: How do we configure code completion?
+    SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
+    SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
+    unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
+    Parser parser(bufferID, sf, nullptr, nullptr, nullptr,
+                 /*DelayBodyParsing=*/false);
+    parser.SyntaxContext->setDiscard();
+    auto body = parser.parseAbstractFunctionBodyDelayed(afd);
+    afd->setBodyKind(BodyKind::Parsed);
+    return body;
+  }
+  }
+
+}
+
+
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *parseRequestFunctions[] = {
 #define SWIFT_REQUEST(Zone, Name)                      \

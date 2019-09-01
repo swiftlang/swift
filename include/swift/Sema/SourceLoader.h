@@ -24,22 +24,20 @@ class ModuleDecl;
 class SourceLoader : public ModuleLoader {
 private:
   ASTContext &Ctx;
-  bool SkipBodies;
   bool EnableLibraryEvolution;
 
   explicit SourceLoader(ASTContext &ctx,
-                        bool skipBodies,
                         bool enableResilience,
                         DependencyTracker *tracker)
     : ModuleLoader(tracker), Ctx(ctx),
-      SkipBodies(skipBodies), EnableLibraryEvolution(enableResilience) {}
+      EnableLibraryEvolution(enableResilience) {}
 
 public:
   static std::unique_ptr<SourceLoader>
-  create(ASTContext &ctx, bool skipBodies, bool enableResilience,
+  create(ASTContext &ctx, bool enableResilience,
          DependencyTracker *tracker = nullptr) {
     return std::unique_ptr<SourceLoader>{
-      new SourceLoader(ctx, skipBodies, enableResilience, tracker)
+      new SourceLoader(ctx, enableResilience, tracker)
     };
   }
 
