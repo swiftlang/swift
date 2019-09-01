@@ -230,7 +230,6 @@ public:
     CIs.emplace_back(new CompilerInstance());
     return *CIs.back();
   }
-
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
@@ -707,7 +706,6 @@ struct TypeInitInfo {
 
 class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
-  std::vector<std::unique_ptr<llvm::MemoryBuffer>> OwnedBuffers;
   SDKNode *RootNode;
   llvm::SetVector<Decl*> KnownDecls;
   // Collected and sorted after we get all of them.
