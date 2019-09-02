@@ -1965,6 +1965,14 @@ extension Array where Element : Differentiable {
   }
 }
 
+extension Array.DifferentiableView : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: Array.DifferentiableView.TangentVector {
+    Array.DifferentiableView.TangentVector(
+      base.map { $0.differentiableVectorView })
+  }
+}
+
 extension Array.DifferentiableView : Equatable where Element : Equatable {
   public static func == (
     lhs: Array.DifferentiableView,
@@ -2058,6 +2066,13 @@ extension Array : Differentiable where Element : Differentiable {
     var view = DifferentiableView(self)
     view.move(along: direction)
     self = view.base
+  }
+}
+
+extension Array : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: TangentVector {
+    TangentVector(map { $0.differentiableVectorView })
   }
 }
 

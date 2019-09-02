@@ -157,6 +157,7 @@ IDENTIFIER(x)
 // Differentiable
 IDENTIFIER(TangentVector)
 IDENTIFIER(move)
+IDENTIFIER(differentiableVectorView)
 
 // Kinds of layout constraints
 IDENTIFIER_WITH_NAME(UnknownLayout, "_UnknownLayout")

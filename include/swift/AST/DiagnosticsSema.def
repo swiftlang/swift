@@ -2583,6 +2583,8 @@ ERROR(broken_vector_protocol_requirement,none,
       "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+ERROR(broken_euclidean_differentiable_requirement,none,
+      "EuclideanDifferentiable protocol is broken: unexpected requirement", ())
 ERROR(broken_key_path_iterable_requirement,none,
       "KeyPathIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_tensor_array_protocol_requirement,none,

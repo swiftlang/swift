@@ -5348,6 +5348,10 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::EuclideanDifferentiable:
+    return derived.deriveEuclideanDifferentiable(Requirement);
+
   default:
     return nullptr;
   }
