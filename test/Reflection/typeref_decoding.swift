@@ -298,7 +298,7 @@
 // CHECK: primaryArchetype: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: dependentMember1: A.Inner
+// CHECK: dependentMember1: A.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Inner)
 
