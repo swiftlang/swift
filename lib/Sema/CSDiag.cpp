@@ -820,7 +820,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
   if (auto locator = bindOverload->getLocator()) {
-    anchor = simplifyLocatorToAnchor(CS, locator);
+    anchor = simplifyLocatorToAnchor(locator);
     if (!anchor)
       return false;
   }
@@ -1002,7 +1002,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   bool resolvedAnchorToExpr = false;
   
   if (auto locator = constraint->getLocator()) {
-    anchor = simplifyLocatorToAnchor(CS, locator);
+    anchor = simplifyLocatorToAnchor(locator);
     if (anchor)
       resolvedAnchorToExpr = true;
     else
@@ -5390,7 +5390,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   Constraint *memberConstraint = nullptr;
   auto checkConstraint = [&](Constraint *C) {
     if (C->getKind() == ConstraintKind::UnresolvedValueMember &&
-        simplifyLocatorToAnchor(CS, C->getLocator()) == E)
+        simplifyLocatorToAnchor(C->getLocator()) == E)
       memberConstraint = C;
   };
 
