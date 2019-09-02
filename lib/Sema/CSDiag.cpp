@@ -4080,23 +4080,22 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                                      callExpr->getLoc()))
       return true;
 
+    // TODO(diagnostics): There are still cases not yet handled by new
+    // diagnostics framework e.g.
+    //
+    // var tuple = (1, 2, 3)
+    // switch tuple {
+    //   case (let (_, _, _)) + 1: break
+    // }
     if (callExpr->isImplicit() && overloadName == "~=") {
-      // This binop was synthesized when typechecking an expression pattern.
-      auto diag = lhsType->is<UnresolvedType>()
-        ? diagnose(lhsExpr->getLoc(),
-                   diag::cannot_match_unresolved_expr_pattern_with_value,
-                   rhsType)
-        : diagnose(lhsExpr->getLoc(),
-                   diag::cannot_match_expr_pattern_with_value,
-                   lhsType, rhsType);
-      diag.highlight(lhsExpr->getSourceRange());
-      diag.highlight(rhsExpr->getSourceRange());
-      if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
-        if (lhsType->isEqual(optUnwrappedType)) {
-          diag.fixItInsertAfter(lhsExpr->getEndLoc(), "?");
-        }
-      }
-      return true;
+      auto *locator =
+          CS.getConstraintLocator(callExpr,
+                                  {ConstraintLocator::ApplyArgument,
+                                   LocatorPathElt::ApplyArgToParam(0, 0)},
+                                  /*summaryFlags=*/0);
+
+      ArgumentMismatchFailure failure(expr, CS, lhsType, rhsType, locator);
+      return failure.diagnosePatternMatchingMismatch();
     }
 
     // Diagnose attempts to compare reference equality of certain types.

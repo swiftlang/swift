@@ -3987,6 +3987,10 @@ Expr *simplifyLocatorToAnchor(ConstraintLocator *locator);
 /// wasn't of one of the kinds listed above.
 Expr *getArgumentExpr(Expr *expr, unsigned index);
 
+/// Determine whether given locator points to one of the arguments
+/// associated with implicit `~=` (pattern-matching) operator
+bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
+
 // Check whether argument of the call at given position refers to
 // parameter marked as `@autoclosure`. This function is used to
 // maintain source compatibility with Swift versions < 5,

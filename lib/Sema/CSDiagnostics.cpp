@@ -4455,6 +4455,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnoseArchetypeMismatch())
     return true;
 
+  if (diagnosePatternMatchingMismatch())
+    return true;
+
   auto argType = getFromType();
   auto paramType = getToType();
 
@@ -4488,15 +4491,44 @@ bool ArgumentMismatchFailure::diagnoseAsNote() {
   auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
   assert(argToParam);
 
-  if (auto overload = getChoiceFor(getRawAnchor())) {
-    if (auto *decl = overload->choice.getDeclOrNull()) {
-      emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
-                     getToType(), argToParam->getParamIdx());
-      return true;
-    }
+  if (auto *decl = getDecl()) {
+    emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
+                   getToType(), argToParam->getParamIdx());
+    return true;
   }
 
   return false;
+}
+
+bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
+  if (!isArgumentOfPatternMatchingOperator(getLocator()))
+    return false;
+
+  auto *op = cast<BinaryExpr>(getRawAnchor());
+  auto *lhsExpr = op->getArg()->getElement(0);
+  auto *rhsExpr = op->getArg()->getElement(1);
+
+  auto lhsType = getType(lhsExpr)->getRValueType();
+  auto rhsType = getType(rhsExpr)->getRValueType();
+
+  auto diagnostic =
+      lhsType->is<UnresolvedType>()
+          ? emitDiagnostic(
+                getLoc(), diag::cannot_match_unresolved_expr_pattern_with_value,
+                rhsType)
+          : emitDiagnostic(getLoc(), diag::cannot_match_expr_pattern_with_value,
+                           lhsType, rhsType);
+
+  diagnostic.highlight(lhsExpr->getSourceRange());
+  diagnostic.highlight(rhsExpr->getSourceRange());
+
+  if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
+    if (lhsType->isEqual(optUnwrappedType)) {
+      diagnostic.fixItInsertAfter(lhsExpr->getEndLoc(), "?");
+    }
+  }
+
+  return true;
 }
 
 bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {

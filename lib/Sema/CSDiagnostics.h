@@ -1619,8 +1619,20 @@ public:
   /// produce a special diagnostic in case their names match.
   bool diagnoseArchetypeMismatch() const;
 
+  /// Tailored diagnostic for pattern matching with `~=` operator.
+  bool diagnosePatternMatchingMismatch() const;
+
 protected:
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+
+  ValueDecl *getDecl() const {
+    auto selectedOverload = getChoiceFor(getRawAnchor());
+    if (!selectedOverload)
+      return nullptr;
+
+    auto choice = selectedOverload->choice;
+    return choice.getDeclOrNull();
+  }
 };
 
 /// Provides information about the application of a function argument to a

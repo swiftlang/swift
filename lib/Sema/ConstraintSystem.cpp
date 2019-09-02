@@ -2898,3 +2898,35 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
          decl == ctx.getReferenceWritableKeyPathDecl() ||
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
+
+bool constraints::isArgumentOfPatternMatchingOperator(
+    ConstraintLocator *locator) {
+  Expr *anchor = nullptr;
+  if (locator->findLast<LocatorPathElt::ApplyArgToParam>()) {
+    anchor = locator->getAnchor();
+  } else {
+    return false;
+  }
+
+  auto *binaryOp = dyn_cast_or_null<BinaryExpr>(anchor);
+  if (!(binaryOp && binaryOp->isImplicit()))
+    return false;
+
+  auto *fnExpr = binaryOp->getFn()->getSemanticsProvidingExpr();
+
+  ValueDecl *choice = nullptr;
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+    choice = ODRE->getDecls().front();
+  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+    choice = DRE->getDecl();
+  } else {
+    return false;
+  }
+
+  if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice)) {
+    auto name = FD->getBaseName().userFacingName();
+    return name == "~=";
+  }
+
+  return false;
+}
