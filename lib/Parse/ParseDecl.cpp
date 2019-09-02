@@ -5387,7 +5387,7 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB &&
+  if (!DelayedParseCB ||
       DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
                                                      BodyRange)) {
     AFD->setBodyDelayed(BodyRange);
