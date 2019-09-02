@@ -17,9 +17,9 @@
 
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Subsystems.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
@@ -131,7 +131,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importMod->addFile(*importFile);
 
   bool done;
-  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, nullptr, nullptr);
+  parseIntoSourceFile(*importFile, bufferID, &done, nullptr, nullptr);
   assert(done && "Parser returned early?");
   (void)done;
 

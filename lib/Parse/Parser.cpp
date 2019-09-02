@@ -25,7 +25,6 @@
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParsedSyntaxNodes.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -112,7 +111,6 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 using namespace swift;
 using namespace swift::syntax;
 
-void DelayedParsingCallbacks::anchor() { }
 void SILParserTUStateBase::anchor() { }
 
 namespace {
