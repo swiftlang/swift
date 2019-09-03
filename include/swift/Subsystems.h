@@ -43,7 +43,6 @@ namespace swift {
   class CodeCompletionCallbacksFactory;
   class Decl;
   class DeclContext;
-  class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
   class Evaluator;
@@ -114,23 +113,29 @@ namespace swift {
   /// \param PersistentState if non-null the same PersistentState object can
   /// be used to resume parsing or parse delayed function bodies.
   ///
-  /// \param DelayedParseCB if non-null enables delayed parsing for function
-  /// bodies.
-  ///
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
                            bool DelayBodyParsing = true);
+
+  /// DEPRECATED: Only used to break LLDB/Swift dependency.
+  inline
+  bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
+                           SILParserState *SIL,
+                           PersistentParserState *PersistentState,
+                           std::nullptr_t,
+                           bool DelayBodyParsing) {
+    return parseIntoSourceFile(SF, BufferID, Done, SIL, PersistentState,
+                               DelayBodyParsing);
+  }
 
   /// Parse a single buffer into the given source file, until the full source
   /// contents are parsed.
   ///
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
-                             PersistentParserState *PersistentState = nullptr,
-                             DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                               PersistentParserState *PersistentState = nullptr,
                                bool DelayBodyParsing = true);
 
   /// Finish the parsing by going over the nodes that were delayed

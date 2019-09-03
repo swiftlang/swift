@@ -16,7 +16,6 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -4136,8 +4135,10 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   Status |= parseIdentifierDeclName(*this, Id, IdLoc, "typealias",
                                     tok::colon, tok::equal);
-  if (Status.isError())
+  if (Status.isError()) {
+    TmpCtxt->setTransparent();
     return nullptr;
+  }
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
@@ -5387,9 +5388,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB &&
-      DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
-                                                     BodyRange)) {
+  if (SourceMgr.getCodeCompletionLoc().isInvalid() ||
+      SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
     AFD->setBodyDelayed(BodyRange);
   } else {
     AFD->setBodySkipped(BodyRange);

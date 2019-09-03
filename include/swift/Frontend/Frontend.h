@@ -616,7 +616,6 @@ public: // for static functions in Frontend.cpp
 
 private:
   void createREPLFile(const ImplicitImports &implicitImports);
-  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
@@ -625,20 +624,17 @@ private:
                               SourceFile::ASTStage_t LimitStage);
 
   void parseLibraryFile(unsigned BufferID,
-                        const ImplicitImports &implicitImports,
-                        DelayedParsingCallbacks *DelayedCB);
+                        const ImplicitImports &implicitImports);
 
   /// Return true if had load error
   bool
-  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
-                                     DelayedParsingCallbacks *DelayedCB);
+  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
-                                     DelayedParsingCallbacks *DelayedParseCB,
                                      OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);
