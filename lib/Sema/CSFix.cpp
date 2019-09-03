@@ -773,3 +773,16 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
   return new (cs.getAllocator())
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
+
+AllowAssignmentMismatch *
+AllowAssignmentMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AllowAssignmentMismatch(cs, lhs, rhs, locator);
+}
+
+bool AllowAssignmentMismatch::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  AssignmentContextualFailure failure(root, cs, getFromType(), getToType(),
+                                      getLocator());
+  return failure.diagnose(asNote);
+};

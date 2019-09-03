@@ -2612,6 +2612,12 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   return None;
 }
 
+bool AssignmentContextualFailure::diagnoseAsError() {
+  emitDiagnostic(getAnchor()->getLoc(), diag::cannot_convert_assign,
+                 getFromType(), getToType());
+  return true;
+}
+
 bool TupleContextualFailure::diagnoseAsError() {
   auto diagnostic = isNumElementsMismatch()
                         ? diag::tuple_types_not_convertible_nelts
@@ -3950,6 +3956,11 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
     }
 
     default:
+      // If we're looking at an assignment expression, give a generic cannot
+      // missing conformance diagnostic.
+      if (isa<AssignExpr>(anchor)) {
+        diagnostic = diag::cannot_convert_assign_protocol;
+      }
       break;
     }
   }

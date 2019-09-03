@@ -56,7 +56,7 @@ func testEquality() {
 
   let x7 : (_ : P1 & P3) -> ()
   let x8 : (_ : P2) -> ()
-  x7 = x8 // expected-error{{cannot assign value of type '(P2) -> ()' to type '(P1 & P3) -> ()'}}
+  x7 = x8 // expected-error{{value of type 'P1 & P3' does not conform to 'P2' in assignment}}
   _ = x7
 }
 

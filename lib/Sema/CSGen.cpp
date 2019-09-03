@@ -2769,6 +2769,12 @@ namespace {
       // Handle invalid code.
       if (!expr->getDest() || !expr->getSrc())
         return Type();
+
+      // If this expression is a self assignment, emit a diagnostic then bail
+      // out.
+      if (CS.getTypeChecker().diagnoseSelfAssignment(expr))
+        return nullptr;
+
       Type destTy = genAssignDestType(expr->getDest(), CS);
       CS.addConstraint(ConstraintKind::Conversion, CS.getType(expr->getSrc()), destTy,
                        CS.getConstraintLocator(expr));

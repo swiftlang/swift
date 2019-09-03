@@ -2406,6 +2406,10 @@ bool ConstraintSystem::repairFailures(
 
       if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
         return true;
+
+      conversionsOrFixes.push_back(AllowAssignmentMismatch::create(
+          *this, lhs, rhs, getConstraintLocator(locator)));
+      return true;
     }
 
     return false;
@@ -4332,11 +4336,10 @@ allFromConditionalConformances(DeclContext *DC, Type baseTy,
 /// If includeInaccessibleMembers is set to true, this burns compile time to
 /// try to identify and classify inaccessible members that may be being
 /// referenced.
-MemberLookupResult ConstraintSystem::
-performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
-                    Type baseTy, FunctionRefKind functionRefKind,
-                    ConstraintLocator *memberLocator,
-                    bool includeInaccessibleMembers) {
+MemberLookupResult ConstraintSystem::performMemberLookup(
+    ConstraintKind constraintKind, DeclName memberName, Type baseTy,
+    FunctionRefKind functionRefKind, ConstraintLocator *memberLocator,
+    bool includeInaccessibleMembers) {
   Type baseObjTy = baseTy->getRValueType();
   Type instanceTy = baseObjTy;
 

@@ -1312,6 +1312,22 @@ public:
                                       ConstraintLocator *locator);
 };
 
+class AllowAssignmentMismatch : public ContextualMismatch {
+  AllowAssignmentMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                          ConstraintLocator *locator)
+      : ContextualMismatch(cs, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow mismatched types on lhs and rhs of assignment";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAssignmentMismatch *create(ConstraintSystem &cs, Type lhs,
+                                         Type rhs, ConstraintLocator *locator);
+};
+
 } // end namespace constraints
 } // end namespace swift
 

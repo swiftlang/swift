@@ -759,6 +759,15 @@ private:
   }
 };
 
+class AssignmentContextualFailure final : public ContextualFailure {
+public:
+  AssignmentContextualFailure(Expr *root, ConstraintSystem &cs, Type fromType,
+                              Type toType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose failures related to conversion between throwing function type
 /// and non-throwing one e.g.
 ///
