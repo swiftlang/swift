@@ -4304,15 +4304,7 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     // that conforms to the protocol.
     if (fromExistential && !toExistential) {
       if (auto NTD = toType->getAnyNominal()) {
-        bool shouldContinue = true;
-
-        // If we have a non-final class, then don't check
-        if (toType->is<ClassType>() && !NTD->isFinal()) {
-          shouldContinue = false;
-        }
-
-        // Otherwise, check the cast.
-        if (shouldContinue) {
+        if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&
