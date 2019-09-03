@@ -22,6 +22,9 @@ do {
 do {
   typealias Alias3 = () -> @objc func
 }
+do {
+  typealias
+}
 
 // Orphan '}' at top level
 }

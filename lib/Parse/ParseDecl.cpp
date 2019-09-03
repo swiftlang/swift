@@ -4135,8 +4135,10 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   Status |= parseIdentifierDeclName(*this, Id, IdLoc, "typealias",
                                     tok::colon, tok::equal);
-  if (Status.isError())
+  if (Status.isError()) {
+    TmpCtxt->setTransparent();
     return nullptr;
+  }
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
