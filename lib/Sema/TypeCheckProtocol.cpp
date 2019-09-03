@@ -2072,10 +2072,9 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
                    (unsigned)match.MissingRequirement->getKind());
     break;
 
-  case MatchKind::ThrowsConflict: {
+  case MatchKind::ThrowsConflict:
     diags.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
     break;
-  }
 
   case MatchKind::OptionalityConflict: {
     auto &adjustments = match.OptionalAdjustments;
@@ -2146,24 +2145,20 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     }
     break;
   }
-  case MatchKind::MutatingConflict: {
+  case MatchKind::MutatingConflict:
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
                    SelfAccessKind::Mutating);
     break;
-  }
-  case MatchKind::NonMutatingConflict: {
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_mutation_modifier_conflict,
-                   SelfAccessKind::NonMutating);
+  case MatchKind::NonMutatingConflict:
+    // Don't bother about this, because a non-mutating witness can satisfy
+    // a mutating requirement.
     break;
-  }
-  case MatchKind::ConsumingConflict: {
+  case MatchKind::ConsumingConflict:
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
                    SelfAccessKind::Consuming);
     break;
-  }
   case MatchKind::RethrowsConflict: {
     auto witness = match.Witness;
     auto diag =
