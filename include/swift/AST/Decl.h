@@ -3275,7 +3275,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
   /// Prepare the lookup table to make it ready for lookups.
-  void prepareLookupTable(bool ignoreNewExtensions);
+  void prepareLookupTable();
 
   /// True if the entries in \c LookupTable are complete--that is, if a
   /// name is present, it contains all members with that name.
@@ -3383,12 +3383,9 @@ public:
 
   /// Special-behaviour flags passed to lookupDirect()
   enum class LookupDirectFlags {
-    /// Whether to avoid loading any new extension.
-    /// Used by the module loader to break recursion.
-    IgnoreNewExtensions = 1 << 0,
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
-    IncludeAttrImplements = 1 << 1,
+    IncludeAttrImplements = 1 << 0,
   };
 
   /// Find all of the declarations with the given name within this nominal type

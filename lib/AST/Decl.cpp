@@ -3906,10 +3906,7 @@ bool ClassDecl::hasMissingDesignatedInitializers() const {
   if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
     auto *mutableThis = const_cast<ClassDecl *>(this);
     mutableThis->Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
-    auto flags = OptionSet<LookupDirectFlags>();
-    flags |= LookupDirectFlags::IgnoreNewExtensions;
-    (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
-                                    flags);
+    (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
   }
 
   return Bits.ClassDecl.HasMissingDesignatedInitializers;
