@@ -46,7 +46,6 @@ namespace llvm {
 namespace swift {
   class CodeCompletionCallbacks;
   class DefaultArgumentInitializer;
-  class DelayedParsingCallbacks;
   class DiagnosticEngine;
   class Expr;
   class Lexer;
@@ -165,14 +164,8 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  DelayedParsingCallbacks *DelayedParseCB = nullptr;
-
   bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || DelayedParseCB != nullptr;
-  }
-
-  void setDelayedParsingCallbacks(DelayedParsingCallbacks *DelayedParseCB) {
-    this->DelayedParseCB = DelayedParseCB;
+    return DelayBodyParsing || SourceMgr.getCodeCompletionLoc().isValid();
   }
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
