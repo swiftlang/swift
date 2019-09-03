@@ -119,17 +119,6 @@ namespace swift {
                            PersistentParserState *PersistentState = nullptr,
                            bool DelayBodyParsing = true);
 
-  /// DEPRECATED: Only used to break LLDB/Swift dependency.
-  inline
-  bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
-                           SILParserState *SIL,
-                           PersistentParserState *PersistentState,
-                           std::nullptr_t,
-                           bool DelayBodyParsing) {
-    return parseIntoSourceFile(SF, BufferID, Done, SIL, PersistentState,
-                               DelayBodyParsing);
-  }
-
   /// Parse a single buffer into the given source file, until the full source
   /// contents are parsed.
   ///
