@@ -153,3 +153,20 @@ extension DoesNotImposeClassReq_2 where Self : AnyObject {
     set { property = newValue } // Okay
   }
 }
+
+// Reject extension of nominal type via parameterized typealias
+
+struct Nest<Egg> { typealias Contents = Egg }
+struct Tree { 
+  typealias LimbContent = Nest<Int> 
+  typealias BoughPayload = Nest<Nest<Int>>
+}
+
+extension Tree.LimbContent.Contents {
+  // expected-error@-1 {{extension of type 'Tree.LimbContent.Contents' (aka 'Int') must be declared as an extension of 'Int'}}
+  // expected-note@-2 {{did you mean to extend 'Int' instead?}} {{11-36=Int}}
+}
+
+extension Tree.BoughPayload.Contents {
+ // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
+}
