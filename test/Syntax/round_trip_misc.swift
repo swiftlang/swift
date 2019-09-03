@@ -25,6 +25,9 @@ do {
 do {
   typealias
 }
+do {
+  typealias Alias = A & B & C.D<>
+}
 
 // Orphan '}' at top level
 }
