@@ -4742,6 +4742,11 @@ namespace {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
     }
 
+    Expr *visitOneWayExpr(OneWayExpr *E) {
+      auto type = simplifyType(cs.getType(E));
+      return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
+    }
+
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 

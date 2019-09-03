@@ -107,7 +107,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
-  TypeVariables.push_back(typeVar);
+  TypeVariables.insert(typeVar);
   
   // Notify the constraint graph.
   (void)CG[typeVar];
@@ -205,9 +205,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  llvm::SetVector<Constraint *> inactiveConstraints;
-  CG.gatherConstraints(
-      typeVar, inactiveConstraints, ConstraintGraph::GatheringKind::AllMentions,
+  auto inactiveConstraints = CG.gatherConstraints(
+      typeVar, ConstraintGraph::GatheringKind::AllMentions,
       [](Constraint *constraint) { return !constraint->isActive(); });
 
   // Add any constraints that aren't already active to the worklist.
@@ -863,13 +862,15 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
+#if false
   assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
                       [&](const std::pair<ConstraintLocator *,
                           ArrayRef<OpenedType>> &entry) {
                         return entry.first == locatorPtr;
                       }) == OpenedTypes.end() &&
          "already registered opened types for this locator");
-
+#endif
+  
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
@@ -2020,13 +2021,13 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         increaseScore(SK_KeyPathSubscript);
 
         auto dynamicResultTy = boundType->castTo<TypeVariableType>();
-        llvm::SetVector<Constraint *> constraints;
-        CG.gatherConstraints(dynamicResultTy, constraints,
-                             ConstraintGraph::GatheringKind::EquivalenceClass,
-                             [](Constraint *constraint) {
-                               return constraint->getKind() ==
-                                      ConstraintKind::ApplicableFunction;
-                             });
+        auto constraints = CG.gatherConstraints(
+            dynamicResultTy,
+            ConstraintGraph::GatheringKind::EquivalenceClass,
+            [](Constraint *constraint) {
+              return constraint->getKind() ==
+                     ConstraintKind::ApplicableFunction;
+            });
 
         assert(constraints.size() == 1);
         auto *applicableFn = constraints.front();
@@ -2329,7 +2330,7 @@ size_t Solution::getTotalMemory() const {
          llvm::capacity_in_bytes(Fixes) + DisjunctionChoices.getMemorySize() +
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          (DefaultedConstraints.size() * sizeof(void *)) +
-         llvm::capacity_in_bytes(Conformances);
+         Conformances.size() * sizeof(std::pair<ConstraintLocator *, ProtocolConformanceRef>);
 }
 
 DeclName OverloadChoice::getName() const {

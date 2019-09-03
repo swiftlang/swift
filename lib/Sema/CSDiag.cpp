@@ -7319,9 +7319,8 @@ bool FailureDiagnosis::diagnoseAmbiguousGenericParameters() {
     // because type B would have no constraints associated with it.
     unsigned numConstraints = 0;
     {
-      llvm::SetVector<Constraint *> constraints;
-      CS.getConstraintGraph().gatherConstraints(
-          tv, constraints, ConstraintGraph::GatheringKind::EquivalenceClass,
+      auto constraints = CS.getConstraintGraph().gatherConstraints(
+          tv, ConstraintGraph::GatheringKind::EquivalenceClass,
           [&](Constraint *constraint) -> bool {
             // We are not interested in ConformsTo constraints because
             // we can't derive any concrete type information from them.

@@ -374,3 +374,8 @@ func bridgeTupleToAnyObject() {
   let y = x as AnyObject
   _ = y
 }
+
+// Array defaulting and bridging type checking error per rdar://problem/54274245
+func rdar54274245(_ arr: [Any]?) {
+  _ = (arr ?? []) as [NSObject]
+}
