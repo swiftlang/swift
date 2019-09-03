@@ -97,7 +97,7 @@ struct S {}
 struct G<X> {}
 
 // CHECK-LABEL: interface_type_mangling.k01
-// CHECK:                                   [[K_SIGNATURE:<A where A: interface_type_mangling.P, A.interface_type_mangling.P.Assoc1 == interface_type_mangling.S, A.interface_type_mangling.P.Assoc2 == interface_type_mangling.S>\(A\) -> \(\)]]
+// CHECK:                                   [[K_SIGNATURE:<A where A: interface_type_mangling.P, A.Assoc1 == interface_type_mangling.S, A.Assoc2 == interface_type_mangling.S>\(A\) -> \(\)]]
 func k01<T>(_ x: T) where T: P, S == T.Assoc1, T.Assoc1 == T.Assoc2 {}
 // CHECK:       interface_type_mangling.k02[[K_SIGNATURE]]
 func k02<T>(_ x: T) where T: P, S == T.Assoc2, T.Assoc1 == T.Assoc2 {}
@@ -135,7 +135,7 @@ func k17<T>(_ x: T) where T: P, T.Assoc2 == T.Assoc1, T.Assoc2 == S {}
 func k18<T>(_ x: T) where T: P, S == T.Assoc1, T.Assoc2 == S {}
 
 // CHECK-LABEL: interface_type_mangling.L01
-// CHECK:                                  [[L_SIGNATURE:<A where A: interface_type_mangling.P, A.interface_type_mangling.P.Assoc1 == interface_type_mangling.G<A>, A.interface_type_mangling.P.Assoc2 == interface_type_mangling.G<A>>\(A\) -> \(\)]]
+// CHECK:                                  [[L_SIGNATURE:<A where A: interface_type_mangling.P, A.Assoc1 == interface_type_mangling.G<A>, A.Assoc2 == interface_type_mangling.G<A>>\(A\) -> \(\)]]
 func L01<T>(_ x: T) where T: P, G<T> == T.Assoc1, T.Assoc1 == T.Assoc2 {}
 // CHECK:       interface_type_mangling.L02[[L_SIGNATURE]]
 func L02<T>(_ x: T) where T: P, G<T> == T.Assoc2, T.Assoc1 == T.Assoc2 {}
@@ -175,7 +175,7 @@ func L18<T>(_ x: T) where T: P, G<T> == T.Assoc1, T.Assoc2 == G<T> {}
 struct X {}; struct Y {}
 
 // CHECK-LABEL: interface_type_mangling.m1
-// CHECK:                                 [[M_SIGNATURE:<A, B where A: interface_type_mangling.A, B: interface_type_mangling.A, A.interface_type_mangling.A.Assoc == interface_type_mangling.X, B.interface_type_mangling.A.Assoc == interface_type_mangling.Y>\(_: A, y: B\) -> \(\)]]
+// CHECK:                                 [[M_SIGNATURE:<A, B where A: interface_type_mangling.A, B: interface_type_mangling.A, A.Assoc == interface_type_mangling.X, B.Assoc == interface_type_mangling.Y>\(_: A, y: B\) -> \(\)]]
 func m1<T: A, U: A>(_ x: T, y: U) where T.Assoc == X, U.Assoc == Y {}
 // CHECK:       interface_type_mangling.m2[[M_SIGNATURE]]
 func m2<T: A, U: A>(_ x: T, y: U) where U.Assoc == Y, T.Assoc == X {}
