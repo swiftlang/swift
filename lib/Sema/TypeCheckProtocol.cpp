@@ -2073,11 +2073,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
 
   case MatchKind::ThrowsConflict: {
-    auto witness = match.Witness;
-    auto diag = diags.diagnose(witness, diag::protocol_witness_throws_conflict);
-    assert(isa<FuncDecl>(witness));
-    auto FD = cast<FuncDecl>(witness);
-    diag.fixItRemove(FD->getThrowsLoc());
+    diags.diagnose(match.Witness, diag::protocol_witness_throws_conflict);
     break;
   }
 
@@ -2099,12 +2095,16 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
                                !req->isInstanceMember());
     if (req->isInstanceMember()) {
-      assert(isa<FuncDecl>(witness) || isa<VarDecl>(witness));
-      auto loc = isa<FuncDecl>(witness)
-                     ? cast<FuncDecl>(witness)->getStaticLoc()
-                     : cast<VarDecl>(witness)
-                           ->getParentPatternBinding()
-                           ->getStaticLoc();
+      SourceLoc loc;
+      if (auto FD = dyn_cast<FuncDecl>(witness)) {
+        loc = FD->getStaticLoc();
+      } else if (auto VD = dyn_cast<VarDecl>(witness)) {
+        loc = VD->getParentPatternBinding()->getStaticLoc();
+      } else if (auto SD = dyn_cast<SubscriptDecl>(witness)) {
+        loc = SD->getStaticLoc();
+      } else {
+        llvm_unreachable("Unexpected witness");
+      }
       diag.fixItRemove(loc);
     } else {
       diag.fixItInsert(witness->getAttributeInsertionLoc(true),
@@ -2117,8 +2117,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto witness = match.Witness;
     auto diag =
         diags.diagnose(witness, diag::protocol_witness_settable_conflict);
-    auto PBD = cast<VarDecl>(witness)->getParentPatternBinding();
-    diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+    auto VD = cast<VarDecl>(witness);
+    if (VD->hasStorage()) {
+      auto PBD = VD->getParentPatternBinding();
+      diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+    }
     break;
   }
 
@@ -2127,8 +2130,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto diag = diags.diagnose(
         witness, diag::protocol_witness_prefix_postfix_conflict, false,
         witness->getAttrs().hasAttribute<PostfixAttr>() ? 2 : 0);
-    if (witness->getAttrs().hasAttribute<PostfixAttr>()) {
-      auto attr = witness->getAttrs().getAttribute<PostfixAttr>();
+    if (auto attr = witness->getAttrs().getAttribute<PostfixAttr>()) {
       diag.fixItReplace(attr->getLocation(), "prefix");
     }
     break;
@@ -2139,46 +2141,33 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto diag = diags.diagnose(
         witness, diag::protocol_witness_prefix_postfix_conflict, true,
         witness->getAttrs().hasAttribute<PrefixAttr>() ? 1 : 0);
-    if (witness->getAttrs().hasAttribute<PrefixAttr>()) {
-      auto attr = witness->getAttrs().getAttribute<PrefixAttr>();
+    if (auto attr = witness->getAttrs().getAttribute<PrefixAttr>()) {
       diag.fixItReplace(attr->getLocation(), "postfix");
     }
-
     break;
   }
   case MatchKind::MutatingConflict: {
-    auto witness = match.Witness;
-    auto diag = diags.diagnose(
-        witness, diag::protocol_witness_mutation_modifier_conflict,
-        SelfAccessKind::Mutating);
-    auto attr = witness->getAttrs().getAttribute<MutatingAttr>();
-    diag.fixItRemove(attr->getLocation());
-
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   SelfAccessKind::Mutating);
     break;
   }
   case MatchKind::NonMutatingConflict: {
-    auto witness = match.Witness;
-    auto diag = diags.diagnose(
-        witness, diag::protocol_witness_mutation_modifier_conflict,
-        SelfAccessKind::NonMutating);
-    auto attr = witness->getAttrs().getAttribute<NonMutatingAttr>();
-    diag.fixItRemove(attr->getLocation());
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   SelfAccessKind::NonMutating);
     break;
   }
   case MatchKind::ConsumingConflict: {
-    auto witness = match.Witness;
-    auto diag = diags.diagnose(
-        witness, diag::protocol_witness_mutation_modifier_conflict,
-        SelfAccessKind::Consuming);
-    auto attr = witness->getAttrs().getAttribute<ConsumingAttr>();
-    diag.fixItRemove(attr->getLocation());
+    diags.diagnose(match.Witness,
+                   diag::protocol_witness_mutation_modifier_conflict,
+                   SelfAccessKind::Consuming);
     break;
   }
   case MatchKind::RethrowsConflict: {
     auto witness = match.Witness;
     auto diag =
         diags.diagnose(match.Witness, diag::protocol_witness_rethrows_conflict);
-    assert(isa<FuncDecl>(witness));
     auto FD = cast<FuncDecl>(witness);
     diag.fixItReplace(FD->getThrowsLoc(), getTokenText(tok::kw_rethrows));
     break;
