@@ -1054,7 +1054,7 @@ static void populateLookupTableEntryFromCurrentMembers(
   }
 }
 
-static bool
+static void
 populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
                                        NominalTypeDecl *nominal,
@@ -1066,14 +1066,13 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
         assert(!e->hasUnparsedMembers());
         if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
                                                       name, e)) {
-          return true;
+          populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
         }
       } else {
         populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
       }
     }
   }
-  return false;
 }
 
 bool NominalTypeDecl::isLookupTablePopulated() const {
@@ -1241,10 +1240,11 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // false, and we fall back to loading all members during the retry.
     auto &Table = *LookupTable.getPointer();
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this) ||
-        populateLookupTableEntryFromExtensions(ctx, Table, this, name,
-                                               ignoreNewExtensions)) {
+                                                  name, this)) {
       useNamedLazyMemberLoading = false;
+    } else {
+      populateLookupTableEntryFromExtensions(ctx, Table, this, name,
+                                             ignoreNewExtensions);
     }
   }
 
