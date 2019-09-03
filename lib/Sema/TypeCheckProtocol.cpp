@@ -2129,6 +2129,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto diag = diags.diagnose(
         witness, diag::protocol_witness_prefix_postfix_conflict, false,
         witness->getAttrs().hasAttribute<PostfixAttr>() ? 2 : 0);
+    // We already emit a fix-it when we're missing the attribute, so only
+    // emit a fix-it if the attribute is there, but is not correct.
     if (auto attr = witness->getAttrs().getAttribute<PostfixAttr>()) {
       diag.fixItReplace(attr->getLocation(), "prefix");
     }
@@ -2140,6 +2142,8 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto diag = diags.diagnose(
         witness, diag::protocol_witness_prefix_postfix_conflict, true,
         witness->getAttrs().hasAttribute<PrefixAttr>() ? 1 : 0);
+    // We already emit a fix-it when we're missing the attribute, so only
+    // emit a fix-it if the attribute is there, but is not correct.
     if (auto attr = witness->getAttrs().getAttribute<PrefixAttr>()) {
       diag.fixItReplace(attr->getLocation(), "postfix");
     }
