@@ -3625,14 +3625,16 @@ ClangImporter::Implementation::loadNamedMembers(
       return None;
   }
 
-  // Also bail out if there are any global-as-member mappings for this type; we
-  // can support some of them lazily but the full set of idioms seems
+  // Also bail out if there are any global-as-member mappings for this context;
+  // we can support some of them lazily but the full set of idioms seems
   // prohibitively complex (also they're not stored in by-name lookup, for
   // reasons unclear).
-  if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
+  if (isa<ExtensionDecl>(D) && !checkedGlobalsAsMembers.insert(IDC).second) {
+    if (forEachLookupTable([&](SwiftLookupTable &table) -> bool {
         return (!table.lookupGlobalsAsMembers(effectiveClangContext).empty());
       }))
-    return None;
+      return None;
+  }
 
   // There are 3 cases:
   //
