@@ -97,7 +97,7 @@ def create_directory(path):
 
 
 class DumpConfig:
-    def __init__(self, tool_path, platform, platform_alias, verbose):
+    def __init__(self, tool_path, platform, platform_alias, abi, verbose):
         target_map = {
             'iphoneos': 'arm64-apple-ios13.0',
             'macosx': 'x86_64-apple-macosx10.15',
@@ -111,6 +111,7 @@ class DumpConfig:
         self.sdk = get_sdk_path(platform)
         self.inputs = []
         self.platform_alias = platform_alias
+        self.abi = abi
         if self.platform == 'macosx':
             # We need this input search path for CreateML
             self.inputs.extend([self.sdk + '/usr/lib/swift/'])
@@ -126,6 +127,10 @@ class DumpConfig:
 
     def dumpZipperedContent(self, cmd, output, module):
         dir_path = os.path.realpath(output + '/' + module)
+        if self.abi:
+            dir_path = os.path.join(dir_path, 'ABI')
+        else:
+            dir_path = os.path.join(dir_path, 'API')
         file_path = os.path.realpath(dir_path + '/' + self.platform_alias +
                                      '.json')
         create_directory(dir_path)
@@ -145,6 +150,8 @@ class DumpConfig:
             cmd.extend(['-iframework', path])
         for path in self.inputs:
             cmd.extend(['-I', path])
+        if self.abi:
+            cmd.extend(['-abi'])
         cmd.extend(['-' + o for o in opts])
         if self.verbose:
             cmd.extend(['-v'])
@@ -176,14 +183,17 @@ class DumpConfig:
 
 
 class DiagnoseConfig:
-    def __init__(self, tool_path):
+    def __init__(self, tool_path, abi):
         self.tool_path = get_api_digester_path(tool_path)
+        self.abi = abi
 
     def run(self, opts, before, after, output, verbose):
         cmd = [self.tool_path, '-diagnose-sdk', '-input-paths', before,
                '-input-paths', after, '-print-module']
         if output:
             cmd.extend(['-o', output])
+        if self.abi:
+            cmd.extend(['-abi'])
         cmd.extend(['-' + o for o in opts])
         if verbose:
             cmd.extend(['-v'])
@@ -258,6 +268,10 @@ A convenient wrapper for swift-api-digester.
                              help='dump module content to a dir with files for'
                                   'seprately targets')
 
+    basic_group.add_argument('--abi',
+                             action='store_true',
+                             help='Process verbosely')
+
     basic_group.add_argument('--platform-alias', default='', help='''
         Specify a file name to use if using a platform name in json file isn't
         optimal
@@ -285,6 +299,7 @@ A convenient wrapper for swift-api-digester.
             args.platform_alias = args.target
         runner = DumpConfig(tool_path=args.tool_path, platform=args.target,
                             platform_alias=args.platform_alias,
+                            abi=args.abi,
                             verbose=args.v)
         runner.run(output=args.output, module=args.module,
                    swift_ver=args.swift_version, opts=args.opts,
@@ -297,7 +312,7 @@ A convenient wrapper for swift-api-digester.
             fatal_error("Need to specify --dump-before")
         if not args.dump_after:
             fatal_error("Need to specify --dump-after")
-        runner = DiagnoseConfig(tool_path=args.tool_path)
+        runner = DiagnoseConfig(tool_path=args.tool_path, abi=args.abi)
         runner.run(opts=args.opts, before=args.dump_before,
                    after=args.dump_after, output=args.output, verbose=args.v)
     else:
