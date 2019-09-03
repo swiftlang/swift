@@ -241,12 +241,15 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
 static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
                                           StringRef loadedModuleTracePath) {
+  ASTContext &ctxt = mainModule->getASTContext();
+  assert(!ctxt.hadError()
+         && "We may not be able to emit a proper trace if there was an error.");
+
   if (loadedModuleTracePath.empty())
     return false;
   std::error_code EC;
   llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::F_Append);
 
-  ASTContext &ctxt = mainModule->getASTContext();
   if (out.has_error() || EC) {
     ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
                         loadedModuleTracePath, EC.message());
@@ -271,7 +274,9 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     if (loadedDecl == mainModule)
       continue;
     assert(!loadedDecl->getModuleFilename().empty()
-           && "Don't know how to handle modules with empty names.");
+           && ("Don't know how to handle modules with empty names."
+               " One potential reason for getting an empty module name might"
+               " be that the module could not be deserialized correctly."));
     pathToModuleDecl.insert(
       std::make_pair(loadedDecl->getModuleFilename(), loadedDecl));
   }
@@ -1089,14 +1094,14 @@ static bool performCompile(CompilerInstance &Instance,
 
   emitReferenceDependenciesForAllPrimaryInputsIfNeeded(Invocation, Instance);
 
-  (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
-      Instance.getMainModule(), Instance.getDependencyTracker(), opts);
-
   if (Context.hadError()) {
     //  Emit the index store data even if there were compiler errors.
     (void)emitIndexData(Invocation, Instance);
     return true;
   }
+
+  (void)emitLoadedModuleTraceForAllPrimariesIfNeeded(
+      Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
   // FIXME: This is still a lousy approximation of whether the module file will
   // be externally consumed.
