@@ -2529,8 +2529,15 @@ bool ConstraintSystem::repairFailures(
     // `&`.
     if (lhs->is<LValueType>() &&
         (rhs->is<InOutType>() || rhs->getAnyPointerElementType())) {
-      auto result = matchTypes(InOutType::get(lhs->getRValueType()), rhs,
-                               ConstraintKind::ArgumentConversion,
+      auto baseType = rhs->is<InOutType>() ? rhs->getInOutObjectType()
+                                           : rhs->getAnyPointerElementType();
+
+      // Let's use `BindToPointer` constraint here to match up base types
+      // of implied `inout` argument and `inout` or pointer parameter.
+      // This helps us to avoid implicit conversions associated with
+      // `ArgumentConversion` constraint.
+      auto result = matchTypes(lhs->getRValueType(), baseType,
+                               ConstraintKind::BindToPointerType,
                                TypeMatchFlags::TMF_ApplyingFix, locator);
 
       if (result.isSuccess()) {
@@ -6923,6 +6930,44 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
+  auto matchPointerBaseTypes = [&](Type baseType1,
+                                   Type baseType2) -> SolutionKind {
+    if (restriction != ConversionRestrictionKind::PointerToPointer)
+      increaseScore(ScoreKind::SK_ValueToPointerConversion);
+
+    auto result =
+        matchTypes(baseType1, baseType2, ConstraintKind::BindToPointerType,
+                   subflags, locator);
+
+    if (!(result.isFailure() && shouldAttemptFixes()))
+      return result;
+
+    BoundGenericType *ptr1 = nullptr;
+    BoundGenericType *ptr2 = nullptr;
+
+    switch (restriction) {
+    case ConversionRestrictionKind::ArrayToPointer:
+    case ConversionRestrictionKind::InoutToPointer: {
+      ptr2 = type2->lookThroughAllOptionalTypes()->castTo<BoundGenericType>();
+      ptr1 = BoundGenericType::get(ptr2->getDecl(), ptr2->getParent(),
+                                   {baseType1});
+      break;
+    }
+
+    case ConversionRestrictionKind::PointerToPointer:
+      ptr1 = type1->castTo<BoundGenericType>();
+      ptr2 = type2->castTo<BoundGenericType>();
+      break;
+
+    default:
+      return SolutionKind::Error;
+    }
+
+    auto *fix = GenericArgumentsMismatch::create(*this, ptr1, ptr2, {0},
+                                                 getConstraintLocator(locator));
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  };
+
   switch (restriction) {
   // for $< in { <, <c, <oc }:
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
@@ -7042,23 +7087,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto baseType1 = getFixedTypeRecursive(*isArrayType(obj1), false);
     auto baseType2 = getBaseTypeForPointer(*this, t2);
 
-    increaseScore(ScoreKind::SK_ValueToPointerConversion);
-    auto result = matchTypes(baseType1, baseType2,
-                             ConstraintKind::BindToPointerType,
-                             subflags, locator);
-
-    if (!(result.isFailure() && shouldAttemptFixes()))
-      return result;
-
-    auto *arrTy = obj1->getAs<BoundGenericType>();
-    // Let's dig out underlying pointer type since it could
-    // be wrapped into N (implicit) optionals.
-    auto *ptrTy =
-        type2->lookThroughAllOptionalTypes()->getAs<BoundGenericType>();
-
-    auto *fix = GenericArgumentsMismatch::create(*this, arrTy, ptrTy, {0},
-                                                 getConstraintLocator(locator));
-    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+    return matchPointerBaseTypes(baseType1, baseType2);
   }
 
   // String ===> UnsafePointer<[U]Int8>
@@ -7111,13 +7140,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     auto baseType1 = type1->getInOutObjectType();
     auto baseType2 = getBaseTypeForPointer(*this, t2);
-    
-    // Set up the disjunction for the array or scalar cases.
 
-    increaseScore(ScoreKind::SK_ValueToPointerConversion);
-    return matchTypes(baseType1, baseType2,
-                      ConstraintKind::BindToPointerType,
-                      subflags, locator);
+    return matchPointerBaseTypes(baseType1, baseType2);
   }
       
   // T <p U ===> UnsafeMutablePointer<T> <a UnsafeMutablePointer<U>
@@ -7127,10 +7151,8 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     
     Type baseType1 = getBaseTypeForPointer(*this, t1);
     Type baseType2 = getBaseTypeForPointer(*this, t2);
-    
-    return matchTypes(baseType1, baseType2,
-                      ConstraintKind::BindToPointerType,
-                      subflags, locator);
+
+    return matchPointerBaseTypes(baseType1, baseType2);
   }
     
   // T < U or T is bridged to V where V < U ===> Array<T> <c Array<U>
