@@ -4299,9 +4299,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //     print("Caught bar error")
     //   }
     // }
-    if (fromExistential) {
+    //
+    // Note: we relax the restriction if the type we're casting to is a
+    // non-final class because it's possible that we might have a subclass
+    // that conforms to the protocol.
+    if (fromExistential && !toExistential) {
       if (auto NTD = toType->getAnyNominal()) {
-        if (!isa<ProtocolDecl>(NTD)) {
+        if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&
