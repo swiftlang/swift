@@ -171,8 +171,7 @@ static void parseDelayedDecl(
   SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
-                   /*DelayBodyParsing=*/false);
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
   TheParser.SyntaxContext->setDiscard();
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
