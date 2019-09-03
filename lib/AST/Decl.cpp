@@ -6021,13 +6021,8 @@ ParamDecl::getDefaultValueStringRepresentation(
     if (!existing.empty())
       return existing;
 
-    if (!getDefaultValue()) {
-      // TypeChecker::checkDefaultArguments() nulls out the default value
-      // if it fails to type check it. This only seems to happen with an
-      // invalid/incomplete parameter list that contains a parameter with an
-      // unresolved default value.
-      return "<<empty>>";
-    }
+    assert(getDefaultValue()
+           && "Normal default argument with no default expression?!");
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
                                 scratch);
   }
