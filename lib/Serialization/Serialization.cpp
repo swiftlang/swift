@@ -2641,8 +2641,8 @@ public:
     verifyAttrSerializable(extension);
 
     auto contextID = S.addDeclContextRef(extension->getDeclContext());
-    Type baseTy = extension->getExtendedType();
-    assert(!baseTy->hasArchetype());
+    Type extendedType = extension->getExtendedType();
+    assert(!extendedType->hasArchetype());
 
     // FIXME: Use the canonical type here in order to minimize circularity
     // issues at deserialization time. A known problematic case here is
@@ -2652,12 +2652,12 @@ public:
     //
     // We could limit this to only the problematic cases, but it seems like a
     // simpler user model to just always desugar extension types.
-    baseTy = baseTy->getCanonicalType();
+    extendedType = extendedType->getCanonicalType();
 
     // Make sure the base type has registered itself as a provider of generic
     // parameters.
-    auto baseNominal = baseTy->getAnyNominal();
-    (void)S.addDeclRef(baseNominal);
+    auto firstNominalInExtendedType = extendedType->getAnyNominal();
+    (void)S.addDeclRef(firstNominalInExtendedType);
 
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All, nullptr);
@@ -2670,7 +2670,8 @@ public:
     size_t numInherited = inheritedAndDependencyTypes.size();
 
     llvm::SmallSetVector<Type, 4> dependencies;
-    collectDependenciesFromType(dependencies, baseTy, /*excluding*/nullptr);
+    collectDependenciesFromType(
+      dependencies, extendedType, /*excluding*/nullptr);
     for (Requirement req : extension->getGenericRequirements()) {
       collectDependenciesFromRequirement(dependencies, req,
                                          /*excluding*/nullptr);
@@ -2680,7 +2681,7 @@ public:
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                S.addTypeRef(baseTy),
+                                S.addTypeRef(extendedType),
                                 contextID.getOpaqueValue(),
                                 extension->isImplicit(),
                                 S.addGenericEnvironmentRef(
@@ -2690,9 +2691,9 @@ public:
                                 inheritedAndDependencyTypes);
 
     bool isClassExtension = false;
-    if (baseNominal) {
-      isClassExtension = isa<ClassDecl>(baseNominal) ||
-                         isa<ProtocolDecl>(baseNominal);
+    if (firstNominalInExtendedType) {
+      isClassExtension = isa<ClassDecl>(firstNominalInExtendedType) ||
+                         isa<ProtocolDecl>(firstNominalInExtendedType);
     }
 
     // Extensions of nested generic types have multiple generic parameter

@@ -3688,14 +3688,14 @@ public:
 
   Expected<Decl *> deserializeExtension(ArrayRef<uint64_t> scratch,
                                         StringRef blobData) {
-    TypeID baseID;
+    TypeID extendedTypeID;
     DeclContextID contextID;
     bool isImplicit;
     GenericSignatureID genericEnvID;
     unsigned numConformances, numInherited;
     ArrayRef<uint64_t> inheritedAndDependencyIDs;
 
-    decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
+    decls_block::ExtensionLayout::readRecord(scratch, extendedTypeID, contextID,
                                              isImplicit, genericEnvID,
                                              numConformances, numInherited,
                                              inheritedAndDependencyIDs);
@@ -3732,9 +3732,9 @@ public:
 
     MF.configureGenericEnvironment(extension, genericEnvID);
 
-    auto baseTy = MF.getType(baseID);
+    auto extendedType = MF.getType(extendedTypeID);
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
-                              std::move(baseTy));
+                              std::move(extendedType));
     auto nominal = extension->getExtendedNominal();
 
     if (isImplicit)
