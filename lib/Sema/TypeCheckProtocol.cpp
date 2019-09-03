@@ -2116,10 +2116,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     auto witness = match.Witness;
     auto diag =
         diags.diagnose(witness, diag::protocol_witness_settable_conflict);
-    auto VD = cast<VarDecl>(witness);
-    if (VD->hasStorage()) {
-      auto PBD = VD->getParentPatternBinding();
-      diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+    if (auto VD = dyn_cast<VarDecl>(witness)) {
+      if (VD->hasStorage()) {
+        auto PBD = VD->getParentPatternBinding();
+        diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+      }
     }
     break;
   }
@@ -2166,7 +2167,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
   case MatchKind::RethrowsConflict: {
     auto witness = match.Witness;
     auto diag =
-        diags.diagnose(match.Witness, diag::protocol_witness_rethrows_conflict);
+        diags.diagnose(witness, diag::protocol_witness_rethrows_conflict);
     auto FD = cast<FuncDecl>(witness);
     diag.fixItReplace(FD->getThrowsLoc(), getTokenText(tok::kw_rethrows));
     break;

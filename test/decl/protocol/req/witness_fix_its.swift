@@ -26,3 +26,11 @@ struct ConformsToFoo: Foo { // expected-error {{type 'ConformsToFoo' does not co
   var bar5: Int { return 0 } // expected-note {{candidate is not settable, but protocol requires it}}{{none}}
   subscript(_ pos: Int) -> Int { return 0 } // expected-note {{candidate operates on an instance, not a type as required}}{{3-3=static}}
 }
+
+protocol Foo1 {
+  subscript(value: Bool) -> Bool { get set } // expected-note {{protocol requires subscript with type '(Bool) -> Bool'; do you want to add a stub?}}
+}
+
+struct ConformsToFoo1: Foo1 { // expected-error {{type 'ConformsToFoo1' does not conform to protocol 'Foo1'}}
+  subscript(value: Bool) -> Bool { return false } // expected-note {{candidate is not settable, but protocol requires it}}{{none}}
+}
