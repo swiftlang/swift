@@ -1900,8 +1900,6 @@ void TypeChecker::checkDefaultArguments(ParameterList *params,
 
     if (resultTy) {
       param->setDefaultValue(e);
-    } else {
-      param->setDefaultValue(nullptr);
     }
 
     checkInitializerErrorHandling(initContext, e);
