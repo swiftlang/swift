@@ -559,17 +559,9 @@ private:
   /// Records those modules that we have looked up.
   llvm::DenseMap<Identifier, ModuleDecl *> checkedModules;
 
-  /// Mapping from delayed conformance IDs to the set of delayed
-  /// protocol conformances.
-  llvm::DenseMap<unsigned, SmallVector<ProtocolConformance *, 4>>
-    DelayedConformances;
-
-  /// The next delayed conformance ID to use with \c DelayedConformances.
-  unsigned NextDelayedConformanceID = 0;
-
   /// The set of imported protocols for a declaration, used only to
   /// load all members of the declaration.
-  llvm::DenseMap<const Decl *, SmallVector<ProtocolDecl *, 4>>
+  llvm::DenseMap<const Decl *, ArrayRef<ProtocolDecl *>>
     ImportedProtocols;
 
   void startedImportingEntity();
@@ -1179,24 +1171,6 @@ public:
   /// 'let' declaration as opposed to 'var'.
   bool shouldImportGlobalAsLet(clang::QualType type);
 
-  /// Allocate a new delayed conformance ID with the given set of
-  /// conformances.
-  unsigned allocateDelayedConformance(
-             SmallVector<ProtocolConformance *, 4> &&conformances) {
-    unsigned id = NextDelayedConformanceID++;
-    DelayedConformances[id] = std::move(conformances);
-    return id;
-  }
-
-  /// Take the delayed conformances associated with the given id.
-  SmallVector<ProtocolConformance *, 4> takeDelayedConformance(unsigned id) {
-    auto conformances = DelayedConformances.find(id);
-    SmallVector<ProtocolConformance *, 4> result
-      = std::move(conformances->second);
-    DelayedConformances.erase(conformances);
-    return result;
-  }
-
   /// Record the set of imported protocols for the given declaration,
   /// to be used by member loading.
   ///
@@ -1207,21 +1181,15 @@ public:
     if (protocols.empty())
       return;
 
-    auto &recorded = ImportedProtocols[decl];
-    recorded.insert(recorded.end(), protocols.begin(), protocols.end());
+    ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
   }
 
   /// Retrieve the imported protocols for the given declaration.
-  SmallVector<ProtocolDecl *, 4> takeImportedProtocols(const Decl *decl) {
-    SmallVector<ProtocolDecl *, 4> result;
-
+  ArrayRef<ProtocolDecl *> getImportedProtocols(const Decl *decl) {
     auto known = ImportedProtocols.find(decl);
-    if (known != ImportedProtocols.end()) {
-      result = std::move(known->second);
-      ImportedProtocols.erase(known);
-    }
-
-    return result;
+    if (known != ImportedProtocols.end())
+      return known->second;
+    return ArrayRef<ProtocolDecl *>();
   }
 
   EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) {

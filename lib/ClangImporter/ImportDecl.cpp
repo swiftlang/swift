@@ -6864,30 +6864,11 @@ void SwiftDeclConverter::addObjCProtocolConformances(
 
   Impl.recordImportedProtocols(decl, protocols);
 
-  // Synthesize trivial conformances for each of the protocols.
-  SmallVector<ProtocolConformance *, 4> conformances;
-
-  auto dc = decl->getInnermostDeclContext();
-  auto &ctx = Impl.SwiftContext;
-  for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
-    // FIXME: Build a superclass conformance if the superclass
-    // conforms.
-    auto conformance = ctx.getConformance(dc->getDeclaredInterfaceType(),
-                                          protocols[i], SourceLoc(), dc,
-                                          ProtocolConformanceState::Incomplete);
-    conformance->setLazyLoader(&Impl, /*context*/0);
-    conformance->setState(ProtocolConformanceState::Complete);
-    conformances.push_back(conformance);
-  }
-
-  // Set the conformances.
-  // FIXME: This could be lazier.
-  unsigned id = Impl.allocateDelayedConformance(std::move(conformances));
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    nominal->setConformanceLoader(&Impl, id);
+    nominal->setConformanceLoader(&Impl, 0);
   } else {
     auto ext = cast<ExtensionDecl>(decl);
-    ext->setConformanceLoader(&Impl, id);
+    ext->setConformanceLoader(&Impl, 0);
   }
 }
 
@@ -8690,7 +8671,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
 
   SwiftDeclConverter converter(*this, CurrentVersion);
 
-  SmallVector<ProtocolDecl *, 4> protos = takeImportedProtocols(D);
+  auto protos = getImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
     auto swiftClass = cast<ClassDecl>(D);
     objcContainer = clangClass = clangClass->getDefinition();
@@ -8713,9 +8694,22 @@ void ClangImporter::Implementation::collectMembersToAdd(
 }
 
 void ClangImporter::Implementation::loadAllConformances(
-       const Decl *D, uint64_t contextData,
+       const Decl *decl, uint64_t contextData,
        SmallVectorImpl<ProtocolConformance *> &Conformances) {
-  Conformances = takeDelayedConformance(contextData);
+  auto dc = decl->getInnermostDeclContext();
+
+  // Synthesize trivial conformances for each of the protocols.
+  for (auto *protocol : getImportedProtocols(decl)) {
+    // FIXME: Build a superclass conformance if the superclass
+    // conforms.
+    auto conformance = SwiftContext.getConformance(
+        dc->getDeclaredInterfaceType(),
+        protocol, SourceLoc(), dc,
+        ProtocolConformanceState::Incomplete);
+    conformance->setLazyLoader(this, /*context*/0);
+    conformance->setState(ProtocolConformanceState::Complete);
+    Conformances.push_back(conformance);
+  }
 }
 
 Optional<MappedTypeNameKind>
