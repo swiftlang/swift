@@ -1093,10 +1093,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
                                                   ConformanceCheckOptions());
   if (!dictConf) return false;
-  auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
-  auto keyAssocType =
-    cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
-  auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
+  auto keyType = dictConf.getValue().getTypeWitnessByName(
+      argType, TC.Context.Id_Key);
   return TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
                                          ConformanceCheckOptions()).hasValue();
 }

@@ -1831,15 +1831,9 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
 
     // Look for associated types with the same name.
     bool foundAny = false;
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto member : inheritedProto->lookupDirect(
-                                              assocType->getFullName(),
-                                              flags)) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        overriddenAssocTypes.push_back(assocType);
-        foundAny = true;
-      }
+    if (auto found = inheritedProto->getAssociatedType(assocType->getName())) {
+      overriddenAssocTypes.push_back(found);
+      foundAny = true;
     }
 
     return foundAny ? TypeWalker::Action::SkipChildren

@@ -590,8 +590,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     
     // TODO: figure out right value for isKnownPrivate
     if (instanceType->mayHaveMembers()) {
-      auto ctors = CS.TC.lookupConstructors(
-                                            CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
+      auto ctors = TypeChecker::lookupConstructors(
+          CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
         if (!ctor.getValueDecl()->hasInterfaceType())
           CS.getTypeChecker().validateDeclForNameLookup(ctor.getValueDecl());

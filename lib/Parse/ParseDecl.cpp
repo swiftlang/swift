@@ -6119,6 +6119,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   setLocalDiscriminator(CD);
   CD->getAttrs() = Attributes;
 
+  // Parsed classes never have missing vtable entries.
+  CD->setHasMissingVTableEntries(false);
+
   ContextChange CC(*this, CD);
 
   // Parse optional inheritance clause within the context of the class.
