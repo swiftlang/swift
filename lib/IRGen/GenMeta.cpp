@@ -1680,11 +1680,16 @@ namespace {
     }
     
     void addUnderlyingTypeAndConformances() {
+      auto sig = O->getOpaqueInterfaceGenericSignature();
       auto underlyingType = Type(O->getUnderlyingInterfaceType())
         .subst(*O->getUnderlyingTypeSubstitutions())
-        ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
+        ->getCanonicalType(sig);
 
-      B.addRelativeAddress(IGM.getTypeRef(underlyingType,
+      auto contextSig = O->getGenericSignature()
+        ? O->getGenericSignature()->getCanonicalSignature()
+        : CanGenericSignature();
+
+      B.addRelativeAddress(IGM.getTypeRef(underlyingType, contextSig,
                                           MangledTypeRefRole::Metadata));
       
       auto opaqueType = O->getDeclaredInterfaceType()
@@ -1698,7 +1703,7 @@ namespace {
         
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
-                                          O->getGenericSignature(),
+                                          contextSig,
                                           /*setLowBit*/ false);
         B.addRelativeAddress(witnessTableRef);
       }
