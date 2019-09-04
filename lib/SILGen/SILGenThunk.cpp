@@ -139,7 +139,9 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
       SGF.getASTContext(),
       assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
   auto autoDiffFn = SGF.B.createAutoDiffFunction(
-      loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
+      loc, loweredIndices,
+      AutoDiffIndexSubset::get(thunk->getASTContext(), 1, {0}),
+      /*differentiationOrder*/ 1, originalFnRef);
   auto autoDiffAssocFn = SGF.B.createAutoDiffFunctionExtract(
       loc, AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
       /*differentiationOrder*/ 1, autoDiffFn);

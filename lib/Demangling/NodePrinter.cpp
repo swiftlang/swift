@@ -330,17 +330,6 @@ private:
     case Node::Kind::AssociatedTypeMetadataAccessor:
     case Node::Kind::AssociatedTypeWitnessTableAccessor:
     case Node::Kind::AutoClosureType:
-<<<<<<< HEAD
-    // SWIFT_ENABLE_TENSORFLOW
-    case Node::Kind::AutoDiffParameterIndices:
-    case Node::Kind::AutoDiffResultIndices:
-    case Node::Kind::AutoDiffJVP:
-    case Node::Kind::AutoDiffVJP:
-    case Node::Kind::AutoDiffDifferential:
-    case Node::Kind::AutoDiffPullback:
-    // SWIFT_ENABLE_TENSORFLOW END
-=======
->>>>>>> tensorflow
     case Node::Kind::BaseConformanceDescriptor:
     case Node::Kind::BaseWitnessTableAccessor:
     case Node::Kind::ClassMetadataBaseOffset:

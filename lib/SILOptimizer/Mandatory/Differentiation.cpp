@@ -4476,9 +4476,6 @@ private:
     assert(differentialCall->getNumResults() == 1 &&
            "Expected differential to return one result");
 
-    // TODO: Generalize for indirect results, multiple results, etc.
-    auto origResult = ai->getResult(actualIndices.source);
-
     // Extract all direct results from the differential.
     SmallVector<SILValue, 8> differentialDirResults;
     extractAllElements(differentialCall, diffBuilder, differentialDirResults);
@@ -4487,12 +4484,13 @@ private:
     collectAllActualResultsInTypeOrder(
         differentialCall, differentialDirResults,
         differentialCall->getIndirectSILResults(), differentialAllResults);
-    auto differentialResult = differentialAllResults[actualIndices.source];
+    auto differentialResult =
+        differentialAllResults[actualIndices.results->front()];
 
     // Add tangent for original result.
-    assert(actualIndices.source == 0 && "Expected result index to be first.");
-    setTangentValue(bb, origResult,
-                    makeConcreteTangentValue(differentialResult));
+    assert(actualIndices.results->getNumIndices() == 1 &&
+           "Expected result index to be first.");
+    setTangentValue(bb, ai, makeConcreteTangentValue(differentialResult));
   }
 
 public:
@@ -4541,7 +4539,7 @@ public:
     auto indices = attr->getIndices();
 
     // Add differential results.
-    auto origResInfo = origTy->getResults()[indices.source];
+    auto origResInfo = origTy->getResults()[indices.results->front()];
     dfResults.push_back(
         SILResultInfo(origResInfo.getType()
                           ->getAutoDiffAssociatedTangentSpace(lookupConformance)
@@ -4855,10 +4853,12 @@ public:
     }
     // Form expected indices by assuming there's only one result.
     SILAutoDiffIndices indices(
-        activeResultIndices.front(),
         AutoDiffIndexSubset::get(
-            getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
-            activeParamIndices));
+            getASTContext(), ai->getSubstCalleeType()->getNumParameters(),
+            activeParamIndices),
+        AutoDiffIndexSubset::get(
+            getASTContext(), ai->getSubstCalleeType()->getNumResults(),
+            activeResultIndices));
 
     // Emit the JVP.
     auto loc = ai->getLoc();
@@ -4933,7 +4933,7 @@ public:
               }
             }
             // Check and diagnose non-differentiable results.
-            if (!originalFnTy->getResults()[indices.source]
+            if (!originalFnTy->getResults()[indices.results->front()]
                     .getSILStorageType()
                     .isDifferentiable(getModule())) {
               context.emitNondifferentiabilityError(
@@ -4948,6 +4948,7 @@ public:
 
       auto *autoDiffFuncInst =
           context.createAutoDiffFunction(builder, loc, indices.parameters,
+                                         indices.results,
                                          /*differentiationOrder*/ 1, original);
       differentiableFunc = autoDiffFuncInst;
 
@@ -7844,7 +7845,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
     if (auto *thunkRef = dyn_cast<FunctionRefInst>(ai->getCallee())) {
       // Create a new curry thunk.
-      SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+      SILAutoDiffIndices desiredIndices(parameterIndices, resultIndices);
       auto *thunk = thunkRef->getReferencedFunctionOrNull();
       // TODO(TF-685): Use more principled mangling for thunks.
       auto newThunkName = "AD__" + thunk->getName().str() +
@@ -7950,7 +7951,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     // if (actualIndices != desiredIndices) { // TODO: Re-enable.
     auto extendedDesiredIndices = desiredIndices.parameters->extendingCapacity(
         getASTContext(), actualIndices.parameters->getCapacity());
-    if (actualIndices.source != desiredIndices.source ||
+    if (actualIndices.results->equals(desiredIndices.results) ||
         !actualIndices.parameters->equals(extendedDesiredIndices)) {
       // Destroy the already emitted associated function reference because it
       // is no longer used.
@@ -7993,7 +7994,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
       }
     }
     auto expectedAssocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, resultIndex, differentiationOrder,
+        parameterIndices, resultIndices, differentiationOrder,
         assocFnKind, getModule(),
         LookUpConformanceInModule(getModule().getSwiftModule()));
     // If `assocFn` is `@convention(thin)` but is expected to be
@@ -8014,9 +8015,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
 
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newADFI = createAutoDiffFunction(
-      builder, loc, parameterIndices, differentiationOrder, origFnCopy,
-      assocFns);
-  resultIndices[adfi] = resultIndex;
+      builder, loc, parameterIndices, resultIndices, differentiationOrder,
+      origFnCopy, assocFns);
   getAutoDiffFunctionInsts().push_back(adfi);
 
   return newADFI;
