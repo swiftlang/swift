@@ -366,6 +366,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
 
 #undef SIMPLE_REFERENCE
@@ -537,6 +538,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
   case ExprKind::LazyInitializer:
+  case ExprKind::OneWay:
     return false;
 
   case ExprKind::NilLiteral:
