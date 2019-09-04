@@ -16,7 +16,7 @@ protocol Foo {
 
 struct ConformsToFoo: Foo { // expected-error {{type 'ConformsToFoo' does not conform to protocol 'Foo'}}
   let bar1: Int // expected-note {{candidate is not settable, but protocol requires it}}{{3-6=var}}
-  var bar2: Int // expected-note {{candidate operates on an instance, not a type as required}}{{3-3=static}}
+  var bar2: Int // expected-note {{candidate operates on an instance, not a type as required}}{{3-3=static }}
   static var bar3: Int = 1 // expected-note {{candidate operates on a type, not an instance as required}}{{3-10=}}
   static postfix func ^^^(value: ConformsToFoo) -> Int { return 0 } // expected-error {{operator implementation without matching operator declaration}}
   // expected-note@-1 {{candidate is postfix, not prefix as required}}{{10-17=prefix}}
@@ -24,7 +24,7 @@ struct ConformsToFoo: Foo { // expected-error {{type 'ConformsToFoo' does not co
   // expected-note@-1 {{candidate is prefix, not postfix as required}}{{10-16=postfix}}
   func bar4(closure: () throws -> Int) throws {} // expected-note {{candidate is not 'rethrows', but protocol requires it}}{{40-46=rethrows}}
   var bar5: Int { return 0 } // expected-note {{candidate is not settable, but protocol requires it}}{{none}}
-  subscript(_ pos: Int) -> Int { return 0 } // expected-note {{candidate operates on an instance, not a type as required}}{{3-3=static}}
+  subscript(_ pos: Int) -> Int { return 0 } // expected-note {{candidate operates on an instance, not a type as required}}{{3-3=static }}
 }
 
 protocol Foo1 {
