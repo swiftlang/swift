@@ -2600,8 +2600,20 @@ bool ConstraintSystem::repairFailures(
         elt.castTo<LocatorPathElt::ApplyArgToParam>().getParamIdx() == 1)
       break;
 
-    conversionsOrFixes.push_back(AllowArgumentMismatch::create(
-        *this, lhs, rhs, getConstraintLocator(locator)));
+    if (auto *fix = ExplicitlyConstructRawRepresentable::attempt(
+            *this, lhs, rhs, locator)) {
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
+    if (auto *fix = UseValueTypeOfRawRepresentative::attempt(*this, lhs, rhs,
+                                                             locator)) {
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
+    conversionsOrFixes.push_back(
+        AllowArgumentMismatch::create(*this, lhs, rhs, loc));
     break;
   }
 
@@ -7474,7 +7486,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::AddMissingArguments:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
-  case FixKind::UseWrappedValue: {
+  case FixKind::UseWrappedValue:
+  case FixKind::UseValueTypeOfRawRepresentative:
+  case FixKind::ExplicitlyConstructRawRepresentable: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
 

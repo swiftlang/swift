@@ -196,6 +196,10 @@ enum class FixKind : uint8_t {
   /// Allow a single argument type mismatch. This is the most generic
   /// failure related to argument-to-parameter conversions.
   AllowArgumentTypeMismatch,
+
+  /// Explicitly construct type conforming to `RawRepresentable` protocol
+  /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
+  ExplicitlyConstructRawRepresentable,
 };
 
 class ConstraintFix {
@@ -1313,10 +1317,15 @@ public:
 };
 
 class AllowArgumentMismatch : public ContextualMismatch {
+protected:
   AllowArgumentMismatch(ConstraintSystem &cs, Type argType, Type paramType,
                         ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowArgumentTypeMismatch, argType,
-                           paramType, locator) {}
+      : AllowArgumentMismatch(cs, FixKind::AllowArgumentTypeMismatch, argType,
+                              paramType, locator) {}
+
+  AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
+                        Type paramType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, kind, argType, paramType, locator) {}
 
 public:
   std::string getName() const override {
@@ -1328,6 +1337,23 @@ public:
   static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
                                        Type paramType,
                                        ConstraintLocator *locator);
+};
+
+class ExplicitlyConstructRawRepresentable final : public AllowArgumentMismatch {
+  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::ExplicitlyConstructRawRepresentable,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "explicitly construct a raw representable type";
+  }
+
+  static ExplicitlyConstructRawRepresentable *
+  attempt(ConstraintSystem &cs, Type argType, Type paramType,
+          ConstraintLocatorBuilder locator);
 };
 
 } // end namespace constraints

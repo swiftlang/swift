@@ -773,6 +773,32 @@ AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
       AllowInOutConversion(cs, argType, paramType, locator);
 }
 
+ExplicitlyConstructRawRepresentable *
+ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
+                                             Type paramType,
+                                             ConstraintLocatorBuilder locator) {
+  auto rawRepresentableType = paramType->lookThroughAllOptionalTypes();
+  auto valueType = argType->lookThroughAllOptionalTypes();
+
+  auto rawType = isRawRepresentable(cs, rawRepresentableType);
+  if (!rawType)
+    return nullptr;
+
+  KnownProtocolKind protocols[] = {
+      KnownProtocolKind::ExpressibleByStringLiteral,
+      KnownProtocolKind::ExpressibleByIntegerLiteral};
+
+  for (auto protocol : protocols) {
+    if (conformsToKnownProtocol(cs, valueType, protocol) &&
+        valueType->isEqual(rawType))
+      return new (cs.getAllocator()) ExplicitlyConstructRawRepresentable(
+          cs, valueType, rawRepresentableType,
+          cs.getConstraintLocator(locator));
+  }
+
+  return nullptr;
+}
+
 bool AllowArgumentMismatch::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   ArgumentMismatchFailure failure(root, cs, getFromType(), getToType(),
