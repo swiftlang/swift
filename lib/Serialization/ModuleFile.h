@@ -13,13 +13,13 @@
 #ifndef SWIFT_SERIALIZATION_MODULEFILE_H
 #define SWIFT_SERIALIZATION_MODULEFILE_H
 
+#include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"

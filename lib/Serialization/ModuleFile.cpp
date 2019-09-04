@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "DocFormat.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -25,7 +26,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Chrono.h"

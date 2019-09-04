@@ -12,6 +12,13 @@
 // RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
 // RUN: diff -u %t.expected %t.result.tmp
 
+// Compare color against an empty baseline
+// RUN: %swift -emit-module -o %t.mod1/color.swiftmodule %S/Inputs/cake_baseline/color.swift -parse-as-library -enable-library-evolution -I %S/Inputs/APINotesLeft %clang-importer-sdk-nosource -module-name color
+// RUN: %api-digester -diagnose-sdk -o %t.result -empty-baseline -I %S/Inputs/APINotesLeft -I %t.mod1 %clang-importer-sdk-nosource -module color -abi
+// RUN: %clang -E -P -x c %S/Outputs/color_vs_empty.txt -o - | sed '/^\s*$/d' > %t.expected
+// RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
+// RUN: diff -u %t.expected %t.result.tmp
+
 // Run another module API checking without -enable-library-evolution
 // RUN: %swift -emit-module -o %t.mod1/color.swiftmodule %S/Inputs/cake_baseline/color.swift -parse-as-library -I %S/Inputs/APINotesLeft %clang-importer-sdk-nosource -module-name color
 // RUN: %swift -emit-module -o %t.mod2/color.swiftmodule %S/Inputs/cake_current/color.swift -parse-as-library -I %S/Inputs/APINotesRight %clang-importer-sdk-nosource -module-name color

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"

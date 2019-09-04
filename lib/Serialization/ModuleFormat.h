@@ -761,7 +761,7 @@ namespace decls_block {
   enum RecordKind : uint8_t {
 #define RECORD(Id) Id,
 #define RECORD_VAL(Id, Value) Id = Value,
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
   };
 
   using BuiltinAliasTypeLayout = BCRecordLayout<

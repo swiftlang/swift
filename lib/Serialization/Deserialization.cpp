@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
-#include "swift/Serialization/ModuleFile.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFile.h"
+#include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
@@ -27,7 +28,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -83,7 +83,7 @@ namespace {
     static const char *getRecordKindString(decls_block::RecordKind Kind) {
       switch (Kind) {
 #define RECORD(Id) case decls_block::Id: return #Id;
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
       }
 
       llvm_unreachable("Unhandled RecordKind in switch.");
@@ -1979,7 +1979,7 @@ static bool isDeclAttrRecord(unsigned ID) {
   using namespace decls_block;
   switch (ID) {
 #define DECL_ATTR(NAME, CLASS, ...) case CLASS##_DECL_ATTR: return true;
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
   default: return false;
   }
 }
