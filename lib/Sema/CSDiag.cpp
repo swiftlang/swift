@@ -2713,134 +2713,6 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
       .diagnose();
 }
 
-namespace {
-enum class RawRepresentableMismatch {
-  NotApplicable,
-  Convertible,
-  ExactMatch
-};
-}
-
-static RawRepresentableMismatch
-checkRawRepresentableMismatch(Type fromType, Type toType,
-                              KnownProtocolKind kind,
-                              ConstraintSystem &CS) {
-  toType = toType->lookThroughAllOptionalTypes();
-  fromType = fromType->lookThroughAllOptionalTypes();
-
-  // First check if this is an attempt to convert from something to
-  // raw representable.
-  if (conformsToKnownProtocol(CS, fromType, kind)) {
-    if (auto rawType = isRawRepresentable(CS, toType, kind)) {
-      if (rawType->isEqual(fromType))
-        return RawRepresentableMismatch::ExactMatch;
-      return RawRepresentableMismatch::Convertible;
-    }
-  }
-
-  // Otherwise, it might be an attempt to convert from raw representable
-  // to its raw value.
-  if (auto rawType = isRawRepresentable(CS, fromType, kind)) {
-    if (conformsToKnownProtocol(CS, toType, kind)) {
-      if (rawType->isEqual(toType))
-        return RawRepresentableMismatch::ExactMatch;
-      return RawRepresentableMismatch::Convertible;
-    }
-  }
-
-  return RawRepresentableMismatch::NotApplicable;
-}
-
-static bool diagnoseRawRepresentableMismatch(CalleeCandidateInfo &CCI,
-                                             Expr *argExpr,
-                                             ArrayRef<Identifier> argLabels) {
-  // We are only interested in cases which are
-  // unrelated to argument count or label mismatches.
-  switch (CCI.closeness) {
-    case CC_OneArgumentNearMismatch:
-    case CC_OneArgumentMismatch:
-    case CC_OneGenericArgumentNearMismatch:
-    case CC_OneGenericArgumentMismatch:
-    case CC_ArgumentNearMismatch:
-    case CC_ArgumentMismatch:
-      break;
-
-    default:
-      return false;
-  }
-
-  auto argType = CCI.CS.getType(argExpr);
-  if (!argType || argType->hasTypeVariable() || argType->hasUnresolvedType())
-    return false;
-
-  KnownProtocolKind rawRepresentableProtocols[] = {
-      KnownProtocolKind::ExpressibleByStringLiteral,
-      KnownProtocolKind::ExpressibleByIntegerLiteral};
-
-  auto &CS = CCI.CS;
-  auto arguments = decomposeArgType(argType, argLabels);
-
-  auto bestMatchKind = RawRepresentableMismatch::NotApplicable;
-  const OverloadCandidate *bestMatchCandidate = nullptr;
-  KnownProtocolKind bestMatchProtocol;
-  size_t bestMatchIndex;
-
-  for (auto &candidate : CCI.candidates) {
-    auto *decl = candidate.getDecl();
-    if (!decl)
-      continue;
-
-    if (!candidate.hasParameters())
-      continue;
-
-    auto parameters = candidate.getParameters();
-    // FIXME: Default arguments?
-    if (parameters.size() != arguments.size())
-      continue;
-
-    for (unsigned i = 0, n = parameters.size(); i != n; ++i) {
-      auto paramType = parameters[i].getOldType();
-      auto argType = arguments[i].getOldType();
-
-      for (auto kind : rawRepresentableProtocols) {
-        // If trying to convert from raw type to raw representable,
-        // or vice versa from raw representable (e.g. enum) to raw type.
-        auto matchKind = checkRawRepresentableMismatch(argType, paramType, kind,
-                                                       CS);
-        if (matchKind > bestMatchKind) {
-          bestMatchKind = matchKind;
-          bestMatchProtocol = kind;
-          bestMatchCandidate = &candidate;
-          bestMatchIndex = i;
-        }
-      }
-    }
-  }
-
-  if (bestMatchKind == RawRepresentableMismatch::NotApplicable)
-    return false;
-
-  Expr *expr = argExpr;
-  if (auto *tupleArgs = dyn_cast<TupleExpr>(argExpr))
-    expr = tupleArgs->getElement(bestMatchIndex);
-
-  expr = expr->getValueProvidingExpr();
-
-  auto parameters = bestMatchCandidate->getParameters();
-  auto paramType = parameters[bestMatchIndex].getOldType();
-  auto singleArgType = arguments[bestMatchIndex].getOldType();
-
-  auto diag = CS.TC.diagnose(expr->getLoc(),
-                             diag::cannot_convert_argument_value,
-                             singleArgType, paramType);
-
-  ContextualFailure failure(expr, CS, singleArgType, paramType,
-                            CS.getConstraintLocator(expr));
-
-  (void)failure.tryRawRepresentableFixIts(diag, bestMatchProtocol);
-  return true;
-}
-
 // Extract expression for failed argument number
 static Expr *getFailedArgumentExpr(CalleeCandidateInfo CCI, Expr *argExpr) {
   if (auto *TE = dyn_cast<TupleExpr>(argExpr))
@@ -4117,9 +3989,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     if (isContextualConversionFailure(argTuple))
       return false;
 
-    if (diagnoseRawRepresentableMismatch(calleeInfo, argExpr, argLabels))
-      return true;
-
     if (!lhsType->isEqual(rhsType)) {
       auto diag = diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_args,
                            overloadName, lhsType, rhsType);
@@ -4218,9 +4087,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
   if (CS.getType(argExpr)->hasUnresolvedType())
     return false;
-
-  if (diagnoseRawRepresentableMismatch(calleeInfo, argExpr, argLabels))
-    return true;
 
   SmallVector<AnyFunctionType::Param, 8> params;
   AnyFunctionType::decomposeInput(CS.getType(argExpr), params);
