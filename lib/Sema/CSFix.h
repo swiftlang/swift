@@ -200,6 +200,10 @@ enum class FixKind : uint8_t {
   /// Explicitly construct type conforming to `RawRepresentable` protocol
   /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
   ExplicitlyConstructRawRepresentable,
+
+  /// Use raw value type associated with raw representative accessible
+  /// using `.rawValue` member.
+  UseValueTypeOfRawRepresentative,
 };
 
 class ConstraintFix {
@@ -1352,6 +1356,22 @@ public:
   }
 
   static ExplicitlyConstructRawRepresentable *
+  attempt(ConstraintSystem &cs, Type argType, Type paramType,
+          ConstraintLocatorBuilder locator);
+};
+
+class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
+  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type argType,
+                                  Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::UseValueTypeOfRawRepresentative,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "use `.rawValue` of a raw representable type";
+  }
+
+  static UseValueTypeOfRawRepresentative *
   attempt(ConstraintSystem &cs, Type argType, Type paramType,
           ConstraintLocatorBuilder locator);
 };

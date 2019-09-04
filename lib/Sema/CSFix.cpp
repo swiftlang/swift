@@ -773,16 +773,14 @@ AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
       AllowInOutConversion(cs, argType, paramType, locator);
 }
 
-ExplicitlyConstructRawRepresentable *
-ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
-                                             Type paramType,
-                                             ConstraintLocatorBuilder locator) {
-  auto rawRepresentableType = paramType->lookThroughAllOptionalTypes();
-  auto valueType = argType->lookThroughAllOptionalTypes();
-
+/// Check whether given `value` type is indeed a the same type as a `RawValue`
+/// type of a given raw representable type.
+static bool isValueOfRawRepresentable(ConstraintSystem &cs,
+                                      Type rawRepresentableType,
+                                      Type valueType) {
   auto rawType = isRawRepresentable(cs, rawRepresentableType);
   if (!rawType)
-    return nullptr;
+    return false;
 
   KnownProtocolKind protocols[] = {
       KnownProtocolKind::ExpressibleByStringLiteral,
@@ -791,10 +789,36 @@ ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
   for (auto protocol : protocols) {
     if (conformsToKnownProtocol(cs, valueType, protocol) &&
         valueType->isEqual(rawType))
-      return new (cs.getAllocator()) ExplicitlyConstructRawRepresentable(
-          cs, valueType, rawRepresentableType,
-          cs.getConstraintLocator(locator));
+      return true;
   }
+
+  return false;
+}
+
+ExplicitlyConstructRawRepresentable *
+ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
+                                             Type paramType,
+                                             ConstraintLocatorBuilder locator) {
+  auto rawRepresentableType = paramType->lookThroughAllOptionalTypes();
+  auto valueType = argType->lookThroughAllOptionalTypes();
+
+  if (isValueOfRawRepresentable(cs, rawRepresentableType, valueType))
+    return new (cs.getAllocator()) ExplicitlyConstructRawRepresentable(
+        cs, valueType, rawRepresentableType, cs.getConstraintLocator(locator));
+
+  return nullptr;
+}
+
+UseValueTypeOfRawRepresentative *
+UseValueTypeOfRawRepresentative::attempt(ConstraintSystem &cs, Type argType,
+                                         Type paramType,
+                                         ConstraintLocatorBuilder locator) {
+  auto rawRepresentableType = argType->lookThroughAllOptionalTypes();
+  auto valueType = paramType->lookThroughAllOptionalTypes();
+
+  if (isValueOfRawRepresentable(cs, rawRepresentableType, valueType))
+    return new (cs.getAllocator()) UseValueTypeOfRawRepresentative(
+        cs, rawRepresentableType, valueType, cs.getConstraintLocator(locator));
 
   return nullptr;
 }
