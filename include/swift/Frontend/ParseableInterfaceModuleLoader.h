@@ -134,14 +134,16 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
       bool RemarkOnRebuildFromInterface)
-  : SerializedModuleLoaderBase(ctx, tracker, loadMode, PreferInterfaceForModules),
+  : SerializedModuleLoaderBase(ctx, tracker, loadMode),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface)
+  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
+  PreferInterfaceForModules(PreferInterfaceForModules)
   {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
+  ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
