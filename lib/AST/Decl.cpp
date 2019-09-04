@@ -617,40 +617,64 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
-bool Decl::isWeakImported(ModuleDecl *fromModule,
-                          AvailabilityContext fromContext) const {
+AvailabilityContext Decl::getAvailabilityForLinkage() const {
+  auto containingContext =
+      AvailabilityInference::annotatedAvailableRange(this, getASTContext());
+  if (containingContext.hasValue())
+    return *containingContext;
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(this))
+    return accessor->getStorage()->getAvailabilityForLinkage();
+
+  auto *dc = getDeclContext();
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    return ext->getAvailabilityForLinkage();
+  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal->getAvailabilityForLinkage();
+
+  return AvailabilityContext::alwaysAvailable();
+}
+
+bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
   }
 
-  auto *containingModule = getModuleContext();
-  if (containingModule == fromModule)
-    return false;
-
-  auto containingContext =
-      AvailabilityInference::availableRange(this,
-                                            containingModule->getASTContext());
-  if (!fromContext.isContainedIn(containingContext))
-    return true;
-
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    return accessor->getStorage()->isWeakImported(fromModule, fromContext);
-
-  if (auto *dtor = dyn_cast<DestructorDecl>(this))
-    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(
-        fromModule, fromContext);
+    return accessor->getStorage()->isAlwaysWeakImported();
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    return ext->isWeakImported(fromModule, fromContext);
-  if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
-    return ntd->isWeakImported(fromModule, fromContext);
+    return ext->isAlwaysWeakImported();
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal->isAlwaysWeakImported();
 
   return false;
+}
+
+bool Decl::isWeakImported(ModuleDecl *fromModule) const {
+  if (fromModule == nullptr) {
+    return (isAlwaysWeakImported() ||
+            !getAvailabilityForLinkage().isAlwaysAvailable());
+  }
+
+  if (getModuleContext() == fromModule)
+    return false;
+
+  if (isAlwaysWeakImported())
+    return true;
+
+  auto containingContext = getAvailabilityForLinkage();
+  if (containingContext.isAlwaysAvailable())
+    return false;
+
+  auto fromContext = AvailabilityContext::forDeploymentTarget(
+      fromModule->getASTContext());
+  return !fromContext.isContainedIn(containingContext);
 }
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
