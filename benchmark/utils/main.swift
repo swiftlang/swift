@@ -125,6 +125,7 @@ import PopFrontGeneric
 import Prefix
 import PrefixWhile
 import Prims
+import PrimsNonStrongRef
 import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
@@ -305,6 +306,7 @@ registerBenchmark(PopFrontArrayGeneric)
 registerBenchmark(Prefix)
 registerBenchmark(PrefixWhile)
 registerBenchmark(Prims)
+registerBenchmark(PrimsNonStrongRef)
 registerBenchmark(PrimsSplit)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
