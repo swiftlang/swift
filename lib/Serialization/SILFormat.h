@@ -18,7 +18,7 @@
 #ifndef SWIFT_SERIALIZATION_SILFORMAT_H
 #define SWIFT_SERIALIZATION_SILFORMAT_H
 
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFormat.h"
 
 namespace swift {
 namespace serialization {

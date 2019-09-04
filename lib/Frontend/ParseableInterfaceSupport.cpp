@@ -24,7 +24,6 @@
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
