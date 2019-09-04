@@ -52,11 +52,13 @@ class ClangModuleUnit;
 class ClangNode;
 class Decl;
 class DeclContext;
+class EnumDecl;
 class ImportDecl;
 class IRGenOptions;
 class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
+class StructDecl;
 class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
@@ -214,6 +216,9 @@ public:
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
+
+  /// Look up the nested 'Code' enum for an error wrapper struct.
+  EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) const;
 
   /// Look for textually included declarations from the bridging header.
   ///

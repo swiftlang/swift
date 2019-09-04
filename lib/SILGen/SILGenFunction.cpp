@@ -19,6 +19,7 @@
 #include "RValue.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"

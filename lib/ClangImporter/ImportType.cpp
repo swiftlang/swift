@@ -842,23 +842,15 @@ namespace {
 
     /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
     /// this is not a bridged NSError type.
-    static TypeDecl *getBridgedNSErrorCode(TypeDecl *decl) {
-      auto nominal = dyn_cast<NominalTypeDecl>(decl);
-      if (!nominal) return nullptr;
+    TypeDecl *getBridgedNSErrorCode(TypeDecl *decl) {
+      auto errorWrapper = dyn_cast<StructDecl>(decl);
+      if (!errorWrapper) return nullptr;
 
-      const DeclAttributes &allAttrs = decl->getAttrs();
+      const DeclAttributes &allAttrs = errorWrapper->getAttrs();
       for (auto attr : allAttrs.getAttributes<SynthesizedProtocolAttr>()) {
         if (attr->getProtocolKind() ==
             KnownProtocolKind::BridgedStoredNSError) {
-          auto &ctx = nominal->getASTContext();
-          auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-          flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-          auto lookup = nominal->lookupDirect(ctx.Id_Code, flags);
-          for (auto found : lookup) {
-            if (auto codeDecl = dyn_cast<TypeDecl>(found))
-              return codeDecl;
-          }
-          llvm_unreachable("couldn't find 'Code' within bridged error type");
+          return Impl.lookupErrorCodeEnum(errorWrapper);
         }
       }
 

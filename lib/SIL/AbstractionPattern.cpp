@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"

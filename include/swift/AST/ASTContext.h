@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
@@ -32,6 +31,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
@@ -49,10 +49,12 @@ namespace clang {
 }
 
 namespace swift {
+  class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class ClangModuleLoader;
   class ClangNode;
   class ConcreteDeclRef;
   class ConstructorDecl;

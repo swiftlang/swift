@@ -543,7 +543,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
@@ -557,7 +557,10 @@ protected:
     HasForcedEmittedMembers : 1,     
 
     HasMissingDesignatedInitializers : 1,
+    ComputedHasMissingDesignatedInitializers : 1,
+
     HasMissingVTableEntries : 1,
+    ComputedHasMissingVTableEntries : 1,
 
     /// Whether instances of this class are incompatible
     /// with weak and unowned references.
@@ -3272,7 +3275,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
   /// Prepare the lookup table to make it ready for lookups.
-  void prepareLookupTable(bool ignoreNewExtensions);
+  void prepareLookupTable();
 
   /// True if the entries in \c LookupTable are complete--that is, if a
   /// name is present, it contains all members with that name.
@@ -3378,24 +3381,11 @@ public:
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
 
-  /// Make a member of this nominal type, or one of its extensions,
-  /// immediately visible in the lookup table.
-  ///
-  /// A member of a nominal type or extension thereof will become
-  /// visible to name lookup as soon as it is added. However, if the
-  /// addition of a member is delayed---for example, because it's
-  /// being introduced in response to name lookup---this method can be
-  /// called to make it immediately visible.
-  void makeMemberVisible(ValueDecl *member);
-
   /// Special-behaviour flags passed to lookupDirect()
   enum class LookupDirectFlags {
-    /// Whether to avoid loading any new extension.
-    /// Used by the module loader to break recursion.
-    IgnoreNewExtensions = 1 << 0,
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
-    IncludeAttrImplements = 1 << 1,
+    IncludeAttrImplements = 1 << 0,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -3879,6 +3869,7 @@ public:
   bool hasMissingDesignatedInitializers() const;
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
+    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
     Bits.ClassDecl.HasMissingDesignatedInitializers = newValue;
   }
 
@@ -3889,6 +3880,7 @@ public:
   bool hasMissingVTableEntries() const;
 
   void setHasMissingVTableEntries(bool newValue = true) {
+    Bits.ClassDecl.ComputedHasMissingVTableEntries = 1;
     Bits.ClassDecl.HasMissingVTableEntries = newValue;
   }
 
@@ -4194,6 +4186,14 @@ public:
   /// saves loading the set of members in cases where there's no possibility of
   /// a protocol having nested types (ObjC protocols).
   llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
+
+  /// Returns a protocol requirement with the given name, or nullptr if the
+  /// name has multiple overloads, or no overloads at all.
+  ValueDecl *getSingleRequirement(DeclName name) const;
+
+  /// Returns an associated type with the given name, or nullptr if one does
+  /// not exist.
+  AssociatedTypeDecl *getAssociatedType(Identifier name) const;
 
   /// Walk this protocol and all of the protocols inherited by this protocol,
   /// transitively, invoking the callback function for each protocol.
