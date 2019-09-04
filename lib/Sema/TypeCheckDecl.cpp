@@ -3057,7 +3057,7 @@ public:
 
     auto nominal = ED->getExtendedNominal();
     if (nominal == nullptr) {
-	  const bool wasAlreadyInvalid = ED->isInvalid();
+      const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
       if (extType && !extType->hasError() && extType->getAnyNominal()) {
         // If we've got here, then we have some kind of extension of a prima
@@ -3075,7 +3075,7 @@ public:
           .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
                         canExtType->getString());
       } else if (!wasAlreadyInvalid) {
-		// If nothing else applies, fall back to a generic diagnostic.
+        // If nothing else applies, fall back to a generic diagnostic.
         ED->diagnose(diag::non_nominal_extension, extType);
       }
       return;
