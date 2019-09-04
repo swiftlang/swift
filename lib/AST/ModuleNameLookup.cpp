@@ -153,9 +153,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       resolutionKind == ResolutionKind::Overloadable) {
     // If we only found top-level functions, keep looking, since we may
     // find additional overloads.
-    if (std::find_if(decls.begin() + initialCount, decls.end(),
-                     [](ValueDecl *VD) { return !isa<FuncDecl>(VD); })
-        == decls.end())
+    if (std::all_of(decls.begin() + initialCount, decls.end(),
+                    [](ValueDecl *VD) { return isa<FuncDecl>(VD); }))
       canReturnEarly = false;
   }
 
