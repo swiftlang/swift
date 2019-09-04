@@ -1718,8 +1718,7 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
-  bool weakImported = entity.isWeakImported(IGM.getSwiftModule(),
-                                            IGM.getAvailabilityContext());
+  bool weakImported = entity.isWeakImported(IGM.getSwiftModule());
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
                    ForDefinition, weakImported);
@@ -1739,13 +1738,11 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   return LinkInfo::get(UniversalLinkageInfo(IGM),
                        IGM.getSwiftModule(),
-                       IGM.getAvailabilityContext(),
                        entity, isDefinition);
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        ModuleDecl *swiftModule,
-                       AvailabilityContext availabilityContext,
                        const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
@@ -1761,7 +1758,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
       ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
 
   entity.mangle(result.Name);
-  bool weakImported = entity.isWeakImported(swiftModule, availabilityContext);
+  bool weakImported = entity.isWeakImported(swiftModule);
   result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
                             isDefinition, weakImported);
   result.ForDefinition = isDefinition;
