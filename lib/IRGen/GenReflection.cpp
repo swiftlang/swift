@@ -178,8 +178,11 @@ std::pair<llvm::Constant *, unsigned>
 IRGenModule::getLoweredTypeRef(SILType loweredType,
                                CanGenericSignature genericSig,
                                MangledTypeRefRole role) {
-  auto type =
-      substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig).getASTType();
+  auto substTy =
+      substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig);
+  auto type = substTy.getASTType();
+  if (substTy.hasArchetype())
+    type = substTy.getASTType()->mapTypeOutOfContext()->getCanonicalType();
 
   switch (role) {
   case MangledTypeRefRole::DefaultAssociatedTypeWitness:
@@ -954,9 +957,8 @@ public:
         })->getCanonicalType();
       }
 
-      auto InterfaceType = SwiftType->mapTypeOutOfContext();
       CaptureTypes.push_back(
-          SILType::getPrimitiveObjectType(InterfaceType->getCanonicalType()));
+          SILType::getPrimitiveObjectType(SwiftType->getCanonicalType()));
     }
 
     return CaptureTypes;
