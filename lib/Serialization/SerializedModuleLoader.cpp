@@ -104,10 +104,8 @@ Optional<bool> forEachModuleSearchPath(
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoaderBase::SerializedModuleLoaderBase(
-    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode,
-    ArrayRef<std::string> PreferInterfaceForModules)
-    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode),
-      PreferInterfaceForModules(PreferInterfaceForModules) {}
+    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode)
+    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
 
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 SerializedModuleLoader::~SerializedModuleLoader() = default;
