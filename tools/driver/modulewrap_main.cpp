@@ -22,7 +22,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Option/Options.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "swift/Serialization/Validation.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -146,13 +146,11 @@ int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
   }
 
   // Superficially verify that the input is a swift module file.
-  llvm::BitstreamCursor Cursor(ErrOrBuf.get()->getMemBufferRef());
-  for (unsigned char Byte : serialization::SWIFTMODULE_SIGNATURE)
-    if (Cursor.AtEndOfStream() || Cursor.Read(8) != Byte) {
-      Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
-                                   Filename, "signature mismatch");
-      return 1;
-    }
+  if (!serialization::isSerializedAST(ErrOrBuf.get()->getBuffer())) {
+    Instance.getDiags().diagnose(SourceLoc(), diag::error_parse_input_file,
+                                 Filename, "signature mismatch");
+    return 1;
+  }
 
   // Wrap the bitstream in a module object file. To use the ClangImporter to
   // create the module loader, we need to properly set the runtime library path.

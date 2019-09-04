@@ -728,7 +728,7 @@ void Serializer::writeBlockInfoBlock() {
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
   BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
