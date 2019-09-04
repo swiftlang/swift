@@ -29,6 +29,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
