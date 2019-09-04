@@ -49,3 +49,5 @@ add_sourcekit_library(SourceKitSwiftLang
       objcarcopts
       profiledata
 )
+
+add_dependencies(SourceKitSwiftLang clang-tablegen-targets)
