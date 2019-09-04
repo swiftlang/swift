@@ -60,7 +60,7 @@ public:
   /// \p kind. Missing optional elements are represented with a null
   /// ParsedRawSyntaxNode object.
   ParsedRawSyntaxNode recordRawSyntax(syntax::SyntaxKind kind,
-                                     ArrayRef<ParsedRawSyntaxNode> elements);
+                                      MutableArrayRef<ParsedRawSyntaxNode> elements);
 
   /// Record a raw syntax collecton without eny elements. \p loc can be invalid
   /// or an approximate location of where an element of the collection would be

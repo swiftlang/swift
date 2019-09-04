@@ -1169,6 +1169,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
+  DeferringContextRAII Deferring(*SyntaxContext);
   ParserResult<Expr> subExpr =
     parseExprImpl(diag::expected_pattern, isExprBasic);
   ParserStatus status = subExpr;

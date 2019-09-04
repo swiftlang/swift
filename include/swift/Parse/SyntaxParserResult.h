@@ -40,18 +40,18 @@ public:
     assert(Status.isError());
   }
 
-  explicit ParsedSyntaxResult(ParsedRawSyntaxNode Raw)
-      : Raw(Raw), Status() {}
+  explicit ParsedSyntaxResult(ParsedRawSyntaxNode &&Raw)
+      : Raw(std::move(Raw)), Status() {}
 
-  explicit ParsedSyntaxResult(ParsedSyntaxNode Node)
-      : ParsedSyntaxResult(Node.getRaw()) {}
+  explicit ParsedSyntaxResult(ParsedSyntaxNode &&Node)
+      : ParsedSyntaxResult(Node.takeRaw()) {}
 
   template <typename OtherParsedSyntaxNode,
             typename Enable = typename std::enable_if<std::is_base_of<
                 ParsedSyntaxNode, OtherParsedSyntaxNode>::value>::type>
-  ParsedSyntaxResult(ParsedSyntaxResult<OtherParsedSyntaxNode> other) {
-    Raw = other.Raw;
-    Status = other.Status;
+  ParsedSyntaxResult(ParsedSyntaxResult<OtherParsedSyntaxNode> &&other) {
+    Raw = std::move(other.Raw);
+    Status = std::move(other.Status);
   }
 
   bool isSuccess() const {
@@ -72,11 +72,20 @@ public:
     Status.setHasCodeCompletion();
   }
 
-  ParsedSyntaxNode get() const {
+  ParsedSyntaxNode get() {
     assert(!isNull());
-    return ParsedSyntaxNode(Raw);
+    return ParsedSyntaxNode(std::move(Raw));
   }
-  Optional<ParsedSyntaxNode> getOrNull() const {
+
+  template<typename NewSyntaxNode>
+  Optional<NewSyntaxNode> getAs() {
+    assert(!isNull());
+    if (NewSyntaxNode::kindof(Raw.getKind()))
+      return NewSyntaxNode(std::move(Raw));
+    return None;
+  }
+
+  Optional<ParsedSyntaxNode> getOrNull() {
     if (isNull())
       return None;
     return get();
@@ -94,13 +103,13 @@ public:
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
 makeParsedResult(ParsedSyntaxNode node) {
-  return ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  return ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node));
 }
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
 makeParsedError(ParsedSyntaxNode node) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node));
   result.setIsError();
   return result;
 }
@@ -113,7 +122,7 @@ static ParsedSyntaxResult<ParsedSyntaxNode> makeParsedError() {
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
 makeParsedCodeCompletion(ParsedSyntaxNode node) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node));
   result.setHasCodeCompletion();
   return result;
 }
@@ -121,7 +130,7 @@ makeParsedCodeCompletion(ParsedSyntaxNode node) {
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
 makeParsedResult(ParsedSyntaxNode node, ParserStatus Status) {
-  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(std::move(node));
   if (Status.hasCodeCompletion())
     result.setHasCodeCompletion();
   else if (Status.isError())
