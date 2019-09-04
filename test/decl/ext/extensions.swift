@@ -103,7 +103,7 @@ protocol P3 {
   func foo() -> Assoc
 }
 
-struct X3 : P3 {
+struct X3 : P3 { // expected-note{{'X3' declared here}}
 }
 
 extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}

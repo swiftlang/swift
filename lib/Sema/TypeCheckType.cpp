@@ -1223,6 +1223,12 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
                      comp->getIdentifier(), parentType)
         .highlight(parentRange);
+      // Note where the type was defined, this can help diagnose if the user
+      // expected name lookup to find a module when there's a conflicting type.
+      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
+        ctx.Diags.diagnose(typeDecl, diag::decl_declared_here,
+                           typeDecl->getFullName());
+      }
     }
   }
   return ErrorType::get(ctx);
