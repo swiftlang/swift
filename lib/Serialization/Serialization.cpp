@@ -2654,11 +2654,6 @@ public:
     // simpler user model to just always desugar extension types.
     extendedType = extendedType->getCanonicalType();
 
-    // Make sure the base type has registered itself as a provider of generic
-    // parameters.
-    auto firstNominalInExtendedType = extendedType->getAnyNominal();
-    (void)S.addDeclRef(firstNominalInExtendedType);
-
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All, nullptr);
 
@@ -2680,8 +2675,10 @@ public:
       inheritedAndDependencyTypes.push_back(S.addTypeRef(dependencyTy));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ExtensionLayout::Code];
+    auto extendedNominal = extension->getExtendedNominal();
     ExtensionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                 S.addTypeRef(extendedType),
+                                S.addDeclRef(extendedNominal),
                                 contextID.getOpaqueValue(),
                                 extension->isImplicit(),
                                 S.addGenericEnvironmentRef(
@@ -2691,9 +2688,9 @@ public:
                                 inheritedAndDependencyTypes);
 
     bool isClassExtension = false;
-    if (firstNominalInExtendedType) {
-      isClassExtension = isa<ClassDecl>(firstNominalInExtendedType) ||
-                         isa<ProtocolDecl>(firstNominalInExtendedType);
+    if (extendedNominal) {
+      isClassExtension = isa<ClassDecl>(extendedNominal) ||
+                         isa<ProtocolDecl>(extendedNominal);
     }
 
     // Extensions of nested generic types have multiple generic parameter
