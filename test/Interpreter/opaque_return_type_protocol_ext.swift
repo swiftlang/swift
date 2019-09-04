@@ -85,10 +85,25 @@ dynamic func opaqueAssocTypeUnderlyingType() -> some Any {
   return g().f()
 }
 
+extension Optional: Q where Wrapped: Q {
+  func f() -> Wrapped.A? {
+    return map { $0.f() }
+  }
+}
+
+@available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *)
+dynamic func structuralOpaqueAssocTypeUnderlyingType() -> some Any {
+  return Optional(g()).f()
+}
+
 if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
+  // CHECK: {{[\1, 2, 3\]|too old}}
   let x = opaqueAssocTypeUnderlyingType()
-  // CHECK: {{[1, 2, 3]|too old}}
   print(x)
+  // CHECK: {{Optional\(\[1, 2, 3\]\)|too damn old}}
+  let y = structuralOpaqueAssocTypeUnderlyingType()
+  print(y)
 } else {
   print("nope, still too old")
+  print("too damn old")
 }
