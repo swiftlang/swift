@@ -1347,6 +1347,20 @@ class FooClassComputed {
 // PASS_PRINT_AST: }
 }
 
+// PASS_PRINT_AST: struct HasDefaultTupleOfNils {
+// PASS_PRINT_AST:   var x: (Int?, Int?)
+// PASS_PRINT_AST:   var y: Int?
+// PASS_PRINT_AST:   var z: Int
+// PASS_PRINT_AST:   var w: ((Int?, (), Int?), (Int?, Int?))
+// PASS_PRINT_AST:   init(x: (Int?, Int?) = (nil, nil), y: Int? = nil, z: Int, w: ((Int?, (), Int?), (Int?, Int?)) = ((nil, (), nil), (nil, nil)))
+// PASS_PRINT_AST: }
+struct HasDefaultTupleOfNils {
+  var x: (Int?, Int?)
+  var y: Int?
+  var z: Int
+  var w: ((Int?, (), Int?), (Int?, Int?))
+}
+
 // Protocol extensions
 
 protocol ProtocolToExtend {
