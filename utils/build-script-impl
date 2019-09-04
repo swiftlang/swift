@@ -3373,6 +3373,7 @@ for host in "${ALL_HOSTS[@]}"; do
 		    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
 		fi
 
+                # SWIFT_ENABLE_TENSORFLOW: use python3 to launch llvm-lit below.
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
                 if [[ "$using_xcodebuild" == "FALSE" ]] ; then
@@ -3381,7 +3382,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     with_pushd ${lldb_build_dir} \
                         call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
                     with_pushd ${results_dir} \
-                        call "${llvm_build_dir}/bin/llvm-lit" \
+                        call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
                              "${lldb_build_dir}/lit" \
                              ${LLVM_LIT_ARGS} \
                              --xunit-xml-output=${results_dir}/results.xml \
@@ -3390,7 +3391,7 @@ for host in "${ALL_HOSTS[@]}"; do
                         echo "Running LLDB swift compatibility tests against" \
                              "${LLDB_TEST_SWIFT_COMPATIBILITY}"
                         with_pushd ${results_dir} \
-                           call "${llvm_build_dir}/bin/llvm-lit" \
+                           call "/usr/bin/env" "python3" "${llvm_build_dir}/bin/llvm-lit" \
                                 "${lldb_build_dir}/lit" \
                                 ${LLVM_LIT_ARGS} \
                                 --xunit-xml-output=${results_dir}/results.xml \
