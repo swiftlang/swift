@@ -1608,7 +1608,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   
   // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
-  auto &C = D->getASTContext();
+  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
+  auto &C = SF->getASTContext();
 
   auto KitModule = C.getLoadedModule(Id_Kit);
   ProtocolDecl *ApplicationDelegateProto = nullptr;
@@ -1617,7 +1618,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
-                               KitModule);
+                               SF);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -1637,30 +1638,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
-  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
   if (SF->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
-  
-  // Check that we have the needed symbols in the frameworks.
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookupMain = TC.lookupUnqualified(KitModule, Id_ApplicationMain,
-                                         SourceLoc(), lookupOptions);
-
-  for (const auto &result : lookupMain) {
-    TC.validateDecl(result.getValueDecl());
-  }
-  auto Foundation = TC.Context.getLoadedModule(C.Id_Foundation);
-  if (Foundation) {
-    auto lookupString = TC.lookupUnqualified(
-                          Foundation,
-                          C.getIdentifier("NSStringFromClass"),
-                          SourceLoc(),
-                          lookupOptions);
-    for (const auto &result : lookupString) {
-      TC.validateDecl(result.getValueDecl());
-    }
-  }
 }
 
 void AttributeChecker::visitNSApplicationMainAttr(NSApplicationMainAttr *attr) {
