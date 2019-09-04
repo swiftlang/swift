@@ -2168,7 +2168,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   llvm::Constant *mangledString;
   unsigned mangledStringSize;
   std::tie(mangledString, mangledStringSize) =
-    IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+    IGM.getTypeRef(type, CanGenericSignature(), MangledTypeRefRole::Metadata);
   
   assert(mangledStringSize < 0x80000000u
          && "2GB of mangled name ought to be enough for anyone");

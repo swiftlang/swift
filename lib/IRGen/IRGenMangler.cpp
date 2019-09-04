@@ -277,7 +277,22 @@ std::string IRGenMangler::mangleSymbolNameForAssociatedConformanceWitness(
   return finalize();
 }
 
-std::string IRGenMangler::mangleSymbolNameForKeyPathMetadata(
+std::string IRGenMangler::mangleSymbolNameForMangledMetadataAccessorString(
+                                           const char *kind,
+                                           CanGenericSignature genericSig,
+                                           CanType type) {
+  beginManglingWithoutPrefix();
+  Buffer << kind << " ";
+
+  if (genericSig)
+    appendGenericSignature(genericSig);
+
+  if (type)
+    appendType(type);
+  return finalize();
+}
+
+std::string IRGenMangler::mangleSymbolNameForMangledConformanceAccessorString(
                                            const char *kind,
                                            CanGenericSignature genericSig,
                                            CanType type,
