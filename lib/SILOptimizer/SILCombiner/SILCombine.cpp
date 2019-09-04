@@ -102,7 +102,7 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
 }
 
 static void eraseSingleInstFromFunction(SILInstruction &I,
-                                        SILCombineWorklist &Worklist,
+                                        SILInstructionWorklist &Worklist,
                                         bool AddOperandsToWorklist) {
   LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
@@ -127,21 +127,13 @@ static void eraseSingleInstFromFunction(SILInstruction &I,
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
-void SILCombineWorklist::add(SILInstruction *I) {
-  if (!WorklistMap.insert(std::make_pair(I, Worklist.size())).second)
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "SC: ADD: " << *I << '\n');
-  Worklist.push_back(I);
-}
-
 // Define a CanonicalizeInstruction subclass for use in SILCombine.
 class SILCombineCanonicalize final : CanonicalizeInstruction {
-  SILCombineWorklist &Worklist;
+  SILInstructionWorklist &Worklist;
   bool changed = false;
 
 public:
-  SILCombineCanonicalize(SILCombineWorklist &Worklist)
+  SILCombineCanonicalize(SILInstructionWorklist &Worklist)
       : CanonicalizeInstruction(DEBUG_TYPE), Worklist(Worklist) {}
 
   void notifyNewInstruction(SILInstruction *inst) override {
@@ -268,20 +260,6 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   Worklist.zap();
   return MadeChange;
-}
-
-void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
-  assert(Worklist.empty() && "Worklist must be empty to add initial group");
-  Worklist.reserve(List.size()+16);
-  WorklistMap.reserve(List.size());
-  LLVM_DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
-                          << " instrs to worklist\n");
-  while (!List.empty()) {
-    SILInstruction *I = List.back();
-    List = List.slice(0, List.size()-1);    
-    WorklistMap.insert(std::make_pair(I, Worklist.size()));
-    Worklist.push_back(I);
-    }
 }
 
 bool SILCombiner::runOnFunction(SILFunction &F) {
