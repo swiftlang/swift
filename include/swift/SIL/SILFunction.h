@@ -160,6 +160,23 @@ private:
 
   Identifier ObjCReplacementFor;
 
+  /// The function's set of semantics attributes.
+  ///
+  /// TODO: Why is this using a std::string? Why don't we use uniqued
+  /// StringRefs?
+  std::vector<std::string> SemanticsAttrSet;
+
+  /// The function's remaining set of specialize attributes.
+  std::vector<SILSpecializeAttr*> SpecializeAttrSet;
+
+  /// Has value if there's a profile for this function
+  /// Contains Function Entry Count
+  ProfileCounter EntryCount;
+
+  /// This is the number of uses of this SILFunction inside the SIL.
+  /// It does not include references from debug scopes.
+  unsigned RefCount = 0;
+
   /// The function's bare attribute. Bare means that the function is SIL-only
   /// and does not require debug info.
   unsigned Bare : 1;
@@ -200,33 +217,9 @@ private:
   // Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
 
-  /// If != OptimizationMode::NotSet, the optimization mode specified with an
-  /// function attribute.
-  OptimizationMode OptMode;
-
-  /// This is the number of uses of this SILFunction inside the SIL.
-  /// It does not include references from debug scopes.
-  unsigned RefCount = 0;
-
-  /// The function's set of semantics attributes.
-  ///
-  /// TODO: Why is this using a std::string? Why don't we use uniqued
-  /// StringRefs?
-  llvm::SmallVector<std::string, 1> SemanticsAttrSet;
-
-  /// The function's remaining set of specialize attributes.
-  std::vector<SILSpecializeAttr*> SpecializeAttrSet;
-
-  /// The function's effects attribute.
-  EffectsKind EffectsKindAttr;
-
-  /// Has value if there's a profile for this function
-  /// Contains Function Entry Count
-  ProfileCounter EntryCount;
-
   /// True if this function is inlined at least once. This means that the
   /// debug info keeps a pointer to this function.
-  bool Inlined = false;
+  unsigned Inlined : 1;
 
   /// True if this function is a zombie function. This means that the function
   /// is dead and not referenced from anywhere inside the SIL. But it is kept
@@ -235,7 +228,7 @@ private:
   /// *) It is a dead method of a class which has higher visibility than the
   ///    method itself. In this case we need to create a vtable stub for it.
   /// *) It is a function referenced by the specialization information.
-  bool Zombie = false;
+  unsigned Zombie : 1;
 
   /// True if this function is in Ownership SSA form and thus must pass
   /// ownership verification.
@@ -243,12 +236,12 @@ private:
   /// This enables the verifier to easily prove that before the Ownership Model
   /// Eliminator runs on a function, we only see a non-semantic-arc world and
   /// after the pass runs, we only see a semantic-arc world.
-  bool HasOwnership = true;
+  unsigned HasOwnership : 1;
 
   /// Set if the function body was deserialized from canonical SIL. This implies
   /// that the function's home module performed SIL diagnostics prior to
   /// serialization.
-  bool WasDeserializedCanonical = false;
+  unsigned WasDeserializedCanonical : 1;
 
   /// True if this is a reabstraction thunk of escaping function type whose
   /// single argument is a potentially non-escaping closure. This is an escape
@@ -256,7 +249,14 @@ private:
   /// argument with escaping function type. The thunk argument's function type
   /// is not necessarily @noescape. The only relevant aspect of the argument is
   /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
-  bool IsWithoutActuallyEscapingThunk = false;
+  unsigned IsWithoutActuallyEscapingThunk : 1;
+
+  /// If != OptimizationMode::NotSet, the optimization mode specified with an
+  /// function attribute.
+  unsigned OptMode : NumOptimizationModeBits;
+
+  /// The function's effects attribute.
+  unsigned EffectsKindAttr : NumEffectsKindBits;
 
   static void
   validateSubclassScope(SubclassScope scope, IsThunk_t isThunk,
@@ -650,13 +650,17 @@ public:
 
   /// Get this function's optimization mode or OptimizationMode::NotSet if it is
   /// not set for this specific function.
-  OptimizationMode getOptimizationMode() const { return OptMode; }
+  OptimizationMode getOptimizationMode() const {
+    return OptimizationMode(OptMode);
+  }
 
   /// Returns the optimization mode for the function. If no mode is set for the
   /// function, returns the global mode, i.e. the mode of the module's options.
   OptimizationMode getEffectiveOptimizationMode() const;
 
-  void setOptimizationMode(OptimizationMode mode) { OptMode = mode; }
+  void setOptimizationMode(OptimizationMode mode) {
+    OptMode = unsigned(mode);
+  }
 
   /// \returns True if the function is optimizable (i.e. not marked as no-opt),
   ///          or is raw SIL (so that the mandatory passes still run).
@@ -726,16 +730,16 @@ public:
   void setInlineStrategy(Inline_t inStr) { InlineStrategy = inStr; }
 
   /// \return the function side effects information.
-  EffectsKind getEffectsKind() const { return EffectsKindAttr; }
+  EffectsKind getEffectsKind() const { return EffectsKind(EffectsKindAttr); }
 
   /// \return True if the function is annotated with the @_effects attribute.
   bool hasEffectsKind() const {
-    return EffectsKindAttr != EffectsKind::Unspecified;
+    return EffectsKind(EffectsKindAttr) != EffectsKind::Unspecified;
   }
 
   /// Set the function side effect information.
   void setEffectsKind(EffectsKind E) {
-    EffectsKindAttr = E;
+    EffectsKindAttr = unsigned(E);
   }
 
   /// Get this function's global_init attribute.
