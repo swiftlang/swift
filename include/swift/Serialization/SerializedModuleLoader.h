@@ -41,10 +41,8 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
-  ArrayRef<std::string> PreferInterfaceForModules;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
-                             ModuleLoadingMode LoadMode,
-                             ArrayRef<std::string> PreferInterfaceForModules = {});
+                             ModuleLoadingMode LoadMode);
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
