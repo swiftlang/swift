@@ -2106,8 +2106,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
       }
       diag.fixItRemove(loc);
     } else {
-      diag.fixItInsert(witness->getAttributeInsertionLoc(true),
-                       getTokenText(tok::kw_static));
+      diag.fixItInsert(witness->getAttributeInsertionLoc(true), "static ");
     }
     break;
   }
