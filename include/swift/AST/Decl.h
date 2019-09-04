@@ -4338,7 +4338,7 @@ public:
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
 
-  /// Create the generic parameters of this protocol if the haven't been
+  /// Create the generic parameters of this protocol if they haven't been
   /// created yet.
   void createGenericParamsIfMissing();
 
