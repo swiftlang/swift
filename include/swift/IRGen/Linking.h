@@ -1102,8 +1102,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module,
-                      AvailabilityContext fromContext) const;
+  bool isWeakImported(ModuleDecl *module) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.
@@ -1173,7 +1172,6 @@ public:
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       ModuleDecl *swiftModule,
-                      AvailabilityContext availabilityContext,
                       const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 
