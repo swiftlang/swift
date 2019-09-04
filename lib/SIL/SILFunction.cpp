@@ -98,13 +98,16 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsDynamicallyReplaceable_t isDynamic)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
-      DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
-      Serialized(isSerialized), Thunk(isThunk),
+      DebugScope(DebugScope), EntryCount(entryCount), Bare(isBareSILFunction),
+      Transparent(isTrans), Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       HasCReferences(false), IsWeakLinked(false),
-      IsDynamicReplaceable(isDynamic), OptMode(OptimizationMode::NotSet),
-      EffectsKindAttr(E), EntryCount(entryCount) {
+      IsDynamicReplaceable(isDynamic),
+      Inlined(false), Zombie(false), HasOwnership(true),
+      WasDeserializedCanonical(false), IsWithoutActuallyEscapingThunk(false),
+      OptMode(unsigned(OptimizationMode::NotSet)),
+      EffectsKindAttr(unsigned(E)) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
 
@@ -189,8 +192,8 @@ ASTContext &SILFunction::getASTContext() const {
 }
 
 OptimizationMode SILFunction::getEffectiveOptimizationMode() const {
-  if (OptMode != OptimizationMode::NotSet)
-    return OptMode;
+  if (OptimizationMode(OptMode) != OptimizationMode::NotSet)
+    return OptimizationMode(OptMode);
 
   return getModule().getOptions().OptMode;
 }
