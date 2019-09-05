@@ -802,10 +802,6 @@ public:
   GenericSignature *buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
 
-  /// Utility function for building simple generic environments.
-  GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
-                                              DeclContext *dc);
-
   /// Import the given Clang declaration context into Swift.
   ///
   /// Usually one will use \c importDeclContextOf instead.

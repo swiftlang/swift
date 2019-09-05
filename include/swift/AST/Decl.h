@@ -1535,9 +1535,6 @@ public:
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
 
-  /// Set the generic context of this context.
-  void setGenericEnvironment(GenericEnvironment *genericEnv);
-
   /// Set the generic signature of this context.
   void setGenericSignature(GenericSignature *genericSig);
 

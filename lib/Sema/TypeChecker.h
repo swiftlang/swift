@@ -1047,8 +1047,8 @@ public:
   ///
   /// \param inferenceSources Additional types to infer requirements from.
   ///
-  /// \returns the resulting generic environment.
-  static GenericEnvironment *checkGenericEnvironment(
+  /// \returns the resulting generic signature.
+  static GenericSignature *checkGenericSignature(
                         GenericParamList *genericParams,
                         DeclContext *dc,
                         GenericSignature *outerSignature,

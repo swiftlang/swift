@@ -3012,7 +3012,7 @@ public:
 
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
-      opaqueDecl->setGenericEnvironment(genericSig->getGenericEnvironment());
+      opaqueDecl->setGenericSignature(genericSig);
     if (underlyingTypeID)
       opaqueDecl->setUnderlyingTypeSubstitutions(
                                        MF.getSubstitutionMap(underlyingTypeID));

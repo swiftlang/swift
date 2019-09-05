@@ -850,10 +850,6 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
   return nullptr;
 }
 
-void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  setGenericSignature(genericEnv ? genericEnv->getGenericSignature() : nullptr);
-}
-
 void GenericContext::setGenericSignature(GenericSignature *genericSig) {
   assert(GenericSig == nullptr && "Generic signature cannot be changed");
   this->GenericSig = genericSig;
@@ -3826,7 +3822,7 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
 
   // Wire up generic environment of DD.
-  DD->setGenericEnvironment(CD->getGenericEnvironmentOfContext());
+  DD->setGenericSignature(CD->getGenericSignatureOfContext());
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
