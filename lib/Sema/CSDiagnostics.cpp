@@ -2452,8 +2452,10 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // If the protocol requires a class & we don't have one (maybe the context
   // is a struct), then bail out instead of offering a broken fix-it later on.
   auto requiresClass = false;
+  ExistentialLayout layout;
   if (unwrappedToType->isExistentialType()) {
-    requiresClass = unwrappedToType->getExistentialLayout().requiresClass();
+    layout = unwrappedToType->getExistentialLayout();
+    requiresClass = layout.requiresClass();
   }
   if (requiresClass && !FromType->is<ClassType>()) {
     return false;
@@ -2469,23 +2471,20 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   diagnostic.flush();
 
   // Let's build a list of protocols that the contextual type does not
-  // conform to. We will start by first checking if we have a protocol
-  // composition type and add all the individual types that the context
-  // does not conform to.
+  // conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
-  if (auto compositionTy = unwrappedToType->getAs<ProtocolCompositionType>()) {
-    for (auto memberTy : compositionTy->getMembers()) {
-      auto protocol = memberTy->getAnyNominal()->getSelfProtocolDecl();
-      if (!getTypeChecker().conformsToProtocol(
-              FromType, protocol, getDC(),
-              ConformanceCheckFlags::InExpression)) {
-        missingProtoTypeStrings.push_back(memberTy->getString());
-      }
+  for (auto protocol : layout.getProtocols()) {
+    if (!getTypeChecker().conformsToProtocol(
+            FromType, protocol->getDecl(), getDC(),
+            ConformanceCheckFlags::InExpression)) {
+      missingProtoTypeStrings.push_back(protocol->getString());
     }
-    // If we don't conform to all of the protocols in the composition, then
-    // store the composition type only. This is because we need to append
-    // 'Foo & Bar' instead of 'Foo, Bar' in order to match the written type.
-    if (missingProtoTypeStrings.size() == compositionTy->getMembers().size()) {
+  }
+
+  // If we have a protocol composition type and we don't conform to all
+  // the protocols of the composition, then store the composition directly.
+  if (auto compositionTy = unwrappedToType->getAs<ProtocolCompositionType>()) {
+    if (compositionTy->getMembers().size() == missingProtoTypeStrings.size()) {
       missingProtoTypeStrings = {compositionTy->getString()};
     }
   }
