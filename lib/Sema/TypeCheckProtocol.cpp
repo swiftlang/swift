@@ -1927,9 +1927,29 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
   return SourceLoc();
 }
 
+namespace {
+/// Describes the position for optional adjustment made to a witness.
+///
+/// This is used by the following diagnostics:
+/// 1) 'err_protocol_witness_optionality',
+/// 2) 'warn_protocol_witness_optionality'
+/// 3) 'protocol_witness_optionality_conflict'
+enum class OptionalAdjustmentPosition : unsigned {
+  /// The type of a variable.
+  VarType = 0,
+  /// The result type of something.
+  Result = 1,
+  /// The parameter type of something.
+  Param = 2,
+  /// The parameter types of something.
+  MultipleParam = 3,
+  /// Both return and parameter adjustments.
+  ParamAndReturn = 4,
+};
+} // end anonymous namespace
+
 /// Classify the provided optionality issues for use in diagnostics.
-/// FIXME: Enumify this
-static unsigned classifyOptionalityIssues(
+static OptionalAdjustmentPosition classifyOptionalityIssues(
     const SmallVectorImpl<OptionalAdjustment> &adjustments,
     ValueDecl *requirement) {
   unsigned numParameterAdjustments = 0;
@@ -1942,21 +1962,20 @@ static unsigned classifyOptionalityIssues(
   }
 
   if (hasNonParameterAdjustment) {
-    // Both return and parameter adjustments.
     if (numParameterAdjustments > 0)
-      return 4;
+      return OptionalAdjustmentPosition::ParamAndReturn;
 
-    // The type of a variable.
     if (isa<VarDecl>(requirement))
-      return 0;
+      return OptionalAdjustmentPosition::VarType;
 
-    // The result type of something.
-    return 1;
+    return OptionalAdjustmentPosition::Result;
   }
 
   // Only parameter adjustments.
   assert(numParameterAdjustments > 0 && "No adjustments?");
-  return numParameterAdjustments == 1 ? 2 : 3;
+  return numParameterAdjustments == 1
+             ? OptionalAdjustmentPosition::Param
+             : OptionalAdjustmentPosition::MultipleParam;
 }
 
 static void addOptionalityFixIts(
@@ -2076,10 +2095,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::OptionalityConflict: {
     auto &adjustments = match.OptionalAdjustments;
-    auto diag = diags.diagnose(match.Witness, 
+    auto issues =
+        static_cast<unsigned>(classifyOptionalityIssues(adjustments, req));
+    auto diag = diags.diagnose(match.Witness,
                                diag::protocol_witness_optionality_conflict,
-                               classifyOptionalityIssues(adjustments, req),
-                               withAssocTypes);
+                               issues, withAssocTypes);
     addOptionalityFixIts(adjustments,
                          match.Witness->getASTContext(),
                          match.Witness,
@@ -3167,14 +3187,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto &diags = ctx.Diags;
           {
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
+            auto issues = static_cast<unsigned>(
+                classifyOptionalityIssues(adjustments, requirement));
             auto diag = diags.diagnose(
                 diagLoc,
                 hasAnyError(adjustments)
-                  ? diag::err_protocol_witness_optionality
-                  : diag::warn_protocol_witness_optionality,
-                classifyOptionalityIssues(adjustments, requirement),
-                witness->getFullName(),
-                proto->getFullName());
+                    ? diag::err_protocol_witness_optionality
+                    : diag::warn_protocol_witness_optionality,
+                issues, witness->getFullName(), proto->getFullName());
             if (diagLoc == witness->getLoc()) {
               addOptionalityFixIts(adjustments, ctx, witness, diag);
             } else {
