@@ -1948,7 +1948,7 @@ enum class OptionalAdjustmentPosition : unsigned {
   /// Both return and parameter adjustments.
   ParamAndReturn = 4,
 };
-} // namespace
+} // end anonymous namespace.
 
 /// Classify the provided optionality issues for use in diagnostics.
 static OptionalAdjustmentPosition classifyOptionalityIssues(
