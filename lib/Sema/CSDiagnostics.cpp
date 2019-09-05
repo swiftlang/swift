@@ -158,8 +158,8 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
 
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
-static bool shouldHaveDirectCalleeOverload(const ApplyExpr *apply) {
-  auto *fnExpr = apply->getFn()->getValueProvidingExpr();
+static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
+  auto *fnExpr = callExpr->getDirectCallee();
 
   // An apply of an apply/subscript doesn't have a direct callee.
   if (isa<ApplyExpr>(fnExpr) || isa<SubscriptExpr>(fnExpr))
@@ -169,11 +169,9 @@ static bool shouldHaveDirectCalleeOverload(const ApplyExpr *apply) {
   if (isa<ClosureExpr>(fnExpr))
     return false;
 
-  // If the optionality changes, there's no direct callee.
-  if (isa<BindOptionalExpr>(fnExpr) || isa<ForceValueExpr>(fnExpr) ||
-      isa<OptionalTryExpr>(fnExpr)) {
+  // No direct callee for a try!/try?.
+  if (isa<ForceTryExpr>(fnExpr) || isa<OptionalTryExpr>(fnExpr))
     return false;
-  }
 
   // If we have an intermediate cast, there's no direct callee.
   if (isa<ExplicitCastExpr>(fnExpr))
