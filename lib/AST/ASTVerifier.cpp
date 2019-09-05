@@ -667,14 +667,6 @@ public:
             Out << "AST verification error: archetype "
                 << root->getString() << " not allowed in this context\n";
 
-            if (auto env = rootPrimary->getGenericEnvironment()) {
-              if (auto owningDC = env->getOwningDeclContext()) {
-                llvm::errs() << "archetype came from:\n";
-                owningDC->dumpContext();
-                llvm::errs() << "\n";
-              }
-            }
-
             return true;
           }
 

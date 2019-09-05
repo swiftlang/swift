@@ -3357,17 +3357,16 @@ bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
     }
   };
 
-  auto *dc = env->getOwningDeclContext();
   auto substitutionFn = QueryTypeSubstitutionMap{substitutions};
   RequirementsListener genericReqListener(CS, AFD, substitutionFn,
                                           callExpr, fnExpr, argExpr);
 
   auto result = TC.checkGenericArguments(
-      dc, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
+      AFD, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
       env->getGenericSignature()->getGenericParams(),
       env->getGenericSignature()->getRequirements(),
       substitutionFn,
-      LookUpConformanceInModule{dc->getParentModule()},
+      LookUpConformanceInModule{AFD->getParentModule()},
       ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
 
   // Note: If result is RequirementCheckResult::SubstitutionFailure, we did

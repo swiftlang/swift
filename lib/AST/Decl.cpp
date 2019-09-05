@@ -874,8 +874,6 @@ void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
             genericEnv->getGenericSignature()->getCanonicalSignature()) &&
          "set a generic environment with a different generic signature");
   this->GenericSigOrEnv = genericEnv;
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
 }
 
 GenericEnvironment *

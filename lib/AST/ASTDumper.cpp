@@ -3519,10 +3519,6 @@ namespace {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      auto genericEnv = T->getGenericEnvironment();
-      if (auto owningDC = genericEnv->getOwningDeclContext()) {
-        owningDC->printContext(OS, Indent + 2);
-      }
       printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
