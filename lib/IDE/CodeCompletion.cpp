@@ -1279,11 +1279,23 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     if (CheckKind == CompletionTypeCheckKind::Normal &&
         ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>()) {
       auto refDecl = ParsedExpr->getReferencedDecl();
+      auto exprTy = ParsedExpr->getType();
       if (!refDecl) {
-        if (auto apply = dyn_cast<ApplyExpr>(ParsedExpr))
+        // FIXME: do this in the not-already-type-checked branch too?
+        if (auto *apply = dyn_cast<SelfApplyExpr>(ParsedExpr)) {
           refDecl = apply->getFn()->getReferencedDecl();
+        } else if (auto *apply = dyn_cast<ApplyExpr>(ParsedExpr)) {
+          // If this is an IUO, use the underlying non-optional type instead
+          auto fnDecl = apply->getFn()->getReferencedDecl();
+          if (auto FD = fnDecl.getDecl()) {
+            if (FD->isImplicitlyUnwrappedOptional()) {
+              if (auto OT = exprTy->getOptionalObjectType())
+                exprTy = OT;
+            }
+          }
+        }
       }
-      return std::make_pair(ParsedExpr->getType(), refDecl);
+      return std::make_pair(exprTy, refDecl);
     }
 
     ConcreteDeclRef ReferencedDecl = nullptr;
@@ -1452,7 +1464,6 @@ static bool hasTrivialTrailingClosure(const FuncDecl *FD,
 class CompletionLookup final : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
-  LazyResolver *TypeResolver = nullptr;
   const DeclContext *CurrDeclContext;
   ModuleDecl *CurrModule;
   ClangImporter *Importer;
@@ -1609,7 +1620,6 @@ public:
           getClangModuleLoader())),
         CompletionContext(CompletionContext) {
     (void)createTypeChecker(Ctx);
-    TypeResolver = Ctx.getLazyResolver();
 
     // Determine if we are doing code completion inside a static method.
     if (CurrDeclContext) {
@@ -2145,7 +2155,7 @@ public:
       // Optional<T> type.  Same applies to optional members.
       VarType = OptionalType::get(VarType);
     }
-    if (VD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    if (VD->isImplicitlyUnwrappedOptional())
       addTypeAnnotationForImplicitlyUnwrappedOptional(Builder, VarType,
                                                       DynamicOrOptional);
     else
@@ -2222,7 +2232,7 @@ public:
           continue;
         argName = PD->getArgumentName();
         bodyName = PD->getParameterName();
-        isIUO = PD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        isIUO = PD->isImplicitlyUnwrappedOptional();
       } else {
         isIUO = false;
         argName = typeParam.getLabel();
@@ -2368,7 +2378,7 @@ public:
       Builder.addRightBracket();
     else
       Builder.addAnnotatedRightBracket();
-    if (SD && SD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+    if (SD && SD->isImplicitlyUnwrappedOptional())
       addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
                                                       AFT->getResult());
     else
@@ -2415,7 +2425,7 @@ public:
       addThrows(Builder, AFT, AFD);
 
       if (AFD &&
-          AFD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+          AFD->isImplicitlyUnwrappedOptional())
         addTypeAnnotationForImplicitlyUnwrappedOptional(Builder,
                                                         AFT->getResult());
       else
@@ -2586,7 +2596,7 @@ public:
           // unwrapped optional results.
           bool IsIUO =
               !IsImplicitlyCurriedInstanceMethod &&
-              FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+              FD->isImplicitlyUnwrappedOptional();
 
           PrintOptions PO;
           PO.OpaqueReturnTypePrinting =
@@ -2672,7 +2682,7 @@ public:
 
       addThrows(Builder, ConstructorType, CD);
 
-      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
+      if (CD->isImplicitlyUnwrappedOptional()) {
         addTypeAnnotationForImplicitlyUnwrappedOptional(
             Builder, Result.hasValue() ? Result.getValue()
                                        : ConstructorType->getResult());
@@ -2698,12 +2708,13 @@ public:
     SmallVector<ValueDecl *, 16> initializers;
     if (CurrDeclContext->lookupQualified(type, DeclBaseName::createConstructor(),
                                          NL_QualifiedDefault,
-                                         TypeResolver, initializers)) {
+                                         initializers)) {
       for (auto *init : initializers) {
         if (init->shouldHideFromEditor())
           continue;
         if (IsUnresolvedMember &&
-            cast<ConstructorDecl>(init)->getFailability() == OTK_Optional) {
+            cast<ConstructorDecl>(init)->isFailable() &&
+            !cast<ConstructorDecl>(init)->isImplicitlyUnwrappedOptional()) {
           continue;
         }
         addConstructorCall(cast<ConstructorDecl>(init), Reason,
@@ -2982,11 +2993,7 @@ public:
       return;
 
     if (!D->hasInterfaceType())
-      TypeResolver->resolveDeclSignature(D);
-    else if (isa<TypeAliasDecl>(D)) {
-      // A TypeAliasDecl might have type set, but not the underlying type.
-      TypeResolver->resolveDeclSignature(D);
-    }
+      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     switch (Kind) {
     case LookupKind::ValueExpr:
@@ -3145,7 +3152,7 @@ public:
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
     if (!D->hasInterfaceType())
-      TypeResolver->resolveDeclSignature(D);
+      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, dynamicLookupInfo,
@@ -3156,7 +3163,7 @@ public:
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
         if (!Ele->hasInterfaceType())
-          TypeResolver->resolveDeclSignature(Ele);
+          D->getASTContext().getLazyResolver()->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                           /*HasTypeContext=*/true);
       }
@@ -3232,7 +3239,7 @@ public:
     if (isIUO) {
       if (Type Unwrapped = ExprType->getOptionalObjectType()) {
         lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                 TypeResolver, IncludeInstanceMembers);
+                                 IncludeInstanceMembers);
         return true;
       }
       assert(IsUnwrappedOptional && "IUOs should be optional if not bound/forced");
@@ -3252,7 +3259,6 @@ public:
           CodeCompletionResult::MaxNumBytesToErase) {
         if (!tryTupleExprCompletions(Unwrapped)) {
           lookupVisibleMemberDecls(*this, Unwrapped, CurrDeclContext,
-                                   TypeResolver,
                                    IncludeInstanceMembers);
         }
       }
@@ -3312,8 +3318,7 @@ public:
       ExprType = OptionalType::get(ExprType);
 
     // Handle special cases
-    bool isIUO = VD && VD->getAttrs()
-        .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    bool isIUO = VD && VD->isImplicitlyUnwrappedOptional();
     if (tryFunctionCallCompletions(ExprType, VD))
       return;
     if (tryModuleCompletions(ExprType))
@@ -3324,7 +3329,7 @@ public:
     tryUnwrappedCompletions(ExprType, isIUO);
 
     lookupVisibleMemberDecls(*this, ExprType, CurrDeclContext,
-                             TypeResolver, IncludeInstanceMembers);
+                             IncludeInstanceMembers);
   }
 
   template <typename T>
@@ -3780,7 +3785,7 @@ public:
     Kind = LookupKind::ValueInDeclContext;
     NeedLeadingDot = false;
     FilteredDeclConsumer Consumer(*this, Filter);
-    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver,
+    lookupVisibleDecls(Consumer, CurrDeclContext,
                        /*IncludeTopLevel=*/IncludeTopLevel, Loc);
     if (RequestCache)
       RequestedCachedResults.push_back(RequestedResultsTy::toplevelResults());
@@ -3844,7 +3849,6 @@ public:
     llvm::SaveAndRestore<Type> SaveType(ExprType, baseType);
     llvm::SaveAndRestore<bool> SaveUnresolved(IsUnresolvedMember, true);
     lookupVisibleMemberDecls(consumer, baseType, CurrDeclContext,
-                             TypeResolver,
                              /*includeInstanceMembers=*/false);
   }
 
@@ -3886,7 +3890,7 @@ public:
     this->BaseType = BaseType;
     NeedLeadingDot = !HaveDot;
     lookupVisibleMemberDecls(*this, MetatypeType::get(BaseType),
-                             CurrDeclContext, TypeResolver,
+                             CurrDeclContext,
                              IncludeInstanceMembers);
     if (BaseType->isAnyExistentialType()) {
       addKeyword("Protocol", MetatypeType::get(BaseType));
@@ -4010,7 +4014,7 @@ public:
 
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
-    lookupVisibleDecls(*this, CurrDeclContext, TypeResolver,
+    lookupVisibleDecls(*this, CurrDeclContext,
                        /*IncludeTopLevel=*/false, Loc);
 
     RequestedCachedResults.push_back(
@@ -4053,7 +4057,6 @@ class CompletionOverrideLookup : public swift::VisibleDeclConsumer {
   CodeCompletionResultSink &Sink;
   ASTContext &Ctx;
   const DeclContext *CurrDeclContext;
-  LazyResolver *TypeResolver;
   SmallVectorImpl<StringRef> &ParsedKeywords;
   SourceLoc introducerLoc;
 
@@ -4074,7 +4077,6 @@ public:
       : Sink(Sink), Ctx(Ctx), CurrDeclContext(CurrDeclContext),
         ParsedKeywords(ParsedKeywords), introducerLoc(introducerLoc) {
     (void)createTypeChecker(Ctx);
-    TypeResolver = Ctx.getLazyResolver();
 
     hasFuncIntroducer = isKeywordSpecified("func");
     hasVarIntroducer = isKeywordSpecified("var") ||
@@ -4338,7 +4340,7 @@ public:
       return;
 
     if (!D->hasInterfaceType())
-      TypeResolver->resolveDeclSignature(D);
+      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
 
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
@@ -4447,7 +4449,6 @@ public:
       // Look for overridable static members too.
       Type Meta = MetatypeType::get(CurrTy);
       lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
-                               TypeResolver,
                                /*includeInstanceMembers=*/true);
       addDesignatedInitializers(NTD);
       addAssociatedTypes(NTD);

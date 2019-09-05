@@ -19,7 +19,6 @@ add_swift_host_library(swiftIDE STATIC
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter
-  swiftDWARFImporter
   swiftFrontend
   swiftIndex
   swiftParse

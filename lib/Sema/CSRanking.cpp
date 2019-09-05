@@ -368,8 +368,8 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 // Is a particular parameter of a function or subscript declaration
 // declared to be an IUO?
 static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
-  return swift::getParameterAt(decl, paramNum)->getAttrs()
-      .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  return swift::getParameterAt(decl, paramNum)
+    ->isImplicitlyUnwrappedOptional();
 }
 
 /// Determine whether the first declaration is as "specialized" as

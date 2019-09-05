@@ -13,5 +13,3 @@
 // The digester can incorrectly register a generic signature change when
 // declarations are shuffled. rdar://problem/46618883
 // UNSUPPORTED: swift_evolve
-
-// REQUIRES: rdar51332842

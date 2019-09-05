@@ -56,6 +56,7 @@ sil [ossa] @generic_callee2 : $@convention(thin) <T, U> (@in T, @owned <τ_0_0> 
 bb0(%i : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <U>):
   %12 = tuple ()
   destroy_value %b : $<τ_0_0> { var τ_0_0 } <U>
+  destroy_addr %i : $*T
   return %12 : $()
 }
 

@@ -1036,6 +1036,8 @@ public:
   }
 
   void visitAllocStackInst(AllocStackInst *AVI) {
+    if (AVI->hasDynamicLifetime())
+      *this << "[dynamic_lifetime] ";
     *this << AVI->getElementType();
     printDebugVar(AVI->getVarInfo());
   }
@@ -1069,6 +1071,8 @@ public:
   }
 
   void visitAllocBoxInst(AllocBoxInst *ABI) {
+    if (ABI->hasDynamicLifetime())
+      *this << "[dynamic_lifetime] ";
     *this << ABI->getType();
     printDebugVar(ABI->getVarInfo());
   }

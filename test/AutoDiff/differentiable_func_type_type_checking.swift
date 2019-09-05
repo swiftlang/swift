@@ -88,12 +88,11 @@ struct Vector<T> {
 }
 extension Vector: Differentiable where T: Differentiable {}
 
-// expected-note @+2 {{where 'T' = 'Int'}}
-// expected-note @+1 {{where 'U' = 'Int'}}
+// expected-note @+1 {{where 'T' = 'Int'}}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
 func nondiffVectorFunc(x: Vector<Int>) -> Vector<Int> {}
-// expected-error @+1 2 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
+// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
 inferredConformancesGeneric(nondiffVectorFunc)
 
 func diffVectorFunc(x: Vector<Float>) -> Vector<Float> {}

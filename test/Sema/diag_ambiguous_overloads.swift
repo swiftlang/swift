@@ -93,6 +93,9 @@ class sr7440_Genre {
   static func fetch(_ iTunesGenre: sr7440_ITunesGenre) -> sr7440_Genre {
     return sr7440_Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
 // expected-error@-1 {{value of type 'sr7440_ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
+// expected-error@-2 {{cannot convert return expression of type '()' to return type 'sr7440_Genre'}}
+// expected-error@-3 {{protocol type 'Any' cannot conform to 'BinaryInteger' because only concrete types can conform to protocols}}
+// TODO(diagnostics): Last diagnostic should not be recorded but to be able to correctly handle it we need a notion of a "hole" in constraint system.
   }
 }
 

@@ -459,36 +459,6 @@ static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
         !isa<SubscriptDecl>(DC);
 }
 
-static const Decl *getDeclForContext(const DeclContext *DC) {
-  switch (DC->getContextKind()) {
-  case DeclContextKind::Module:
-    // Use a null decl to represent the module.
-    return nullptr;
-  case DeclContextKind::FileUnit:
-    return getDeclForContext(DC->getParent());
-  case DeclContextKind::SerializedLocal:
-    llvm_unreachable("Serialized local contexts should only come from deserialization");
-  case DeclContextKind::Initializer:
-  case DeclContextKind::AbstractClosureExpr:
-    // FIXME: What about default functions?
-    llvm_unreachable("shouldn't serialize decls from anonymous closures");
-  case DeclContextKind::GenericTypeDecl:
-    return cast<GenericTypeDecl>(DC);
-  case DeclContextKind::ExtensionDecl:
-    return cast<ExtensionDecl>(DC);
-  case DeclContextKind::TopLevelCodeDecl:
-    llvm_unreachable("shouldn't serialize the main module");
-  case DeclContextKind::AbstractFunctionDecl:
-    return cast<AbstractFunctionDecl>(DC);
-  case DeclContextKind::SubscriptDecl:
-    return cast<SubscriptDecl>(DC);
-  case DeclContextKind::EnumElementDecl:
-    return cast<EnumElementDecl>(DC);
-  }
-
-  llvm_unreachable("Unhandled DeclContextKind in switch.");
-}
-
 namespace {
   struct Accessors {
     uint8_t OpaqueReadOwnership;
@@ -634,7 +604,7 @@ DeclContextID Serializer::addDeclContextRef(const DeclContext *DC) {
   if (shouldSerializeAsLocalContext(DC))
     addLocalDeclContextRef(DC);
   else
-    addDeclRef(getDeclForContext(DC));
+    addDeclRef(DC->getAsDecl());
 
   auto &id = DeclContextIDs[DC];
   if (id)
@@ -1027,23 +997,19 @@ void Serializer::writeHeader(const SerializationOptions &options) {
   }
 }
 
-using ImportPathBlob = llvm::SmallString<64>;
 static void flattenImportPath(const ModuleDecl::ImportedModule &import,
-                              ImportPathBlob &out) {
-  SmallVector<StringRef, 4> reverseSubmoduleNames(
-      import.second->getReverseFullModuleName(), {});
-
-  interleave(reverseSubmoduleNames.rbegin(), reverseSubmoduleNames.rend(),
-             [&out](StringRef next) { out.append(next); },
-             [&out] { out.push_back('\0'); });
+                              SmallVectorImpl<char> &out) {
+  llvm::raw_svector_ostream outStream(out);
+  import.second->getReverseFullModuleName().printForward(outStream,
+                                                         StringRef("\0", 1));
 
   if (import.first.empty())
     return;
 
-  out.push_back('\0');
+  outStream << '\0';
   assert(import.first.size() == 1 && "can only handle top-level decl imports");
   auto accessPathElem = import.first.front();
-  out.append(accessPathElem.first.str());
+  outStream << accessPathElem.first.str();
 }
 
 uint64_t getRawModTimeOrHash(const SerializationOptions::FileDependency &dep) {
@@ -1156,7 +1122,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
       continue;
     }
 
-    ImportPathBlob importPath;
+    SmallString<64> importPath;
     flattenImportPath(import, importPath);
 
     serialization::ImportControl stableImportControl;
@@ -1542,7 +1508,7 @@ Serializer::writeConformance(ProtocolConformanceRef conformanceRef,
   switch (conformance->getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto normal = cast<NormalProtocolConformance>(conformance);
-    if (!isDeclXRef(getDeclForContext(normal->getDeclContext()))
+    if (!isDeclXRef(normal->getDeclContext()->getAsDecl())
         && !isa<ClangModuleUnit>(normal->getDeclContext()
                                        ->getModuleScopeContext())) {
       // A normal conformance in this module file.
@@ -1622,20 +1588,6 @@ Serializer::writeConformances(ArrayRef<ProtocolConformance*> conformances,
 
   for (auto conformance : conformances)
     writeConformance(conformance, abbrCodes);
-}
-
-static uint8_t getRawStableOptionalTypeKind(swift::OptionalTypeKind kind) {
-  switch (kind) {
-  case swift::OTK_None:
-    return static_cast<uint8_t>(serialization::OptionalTypeKind::None);
-  case swift::OTK_Optional:
-    return static_cast<uint8_t>(serialization::OptionalTypeKind::Optional);
-  case swift::OTK_ImplicitlyUnwrappedOptional:
-    return static_cast<uint8_t>(
-             serialization::OptionalTypeKind::ImplicitlyUnwrappedOptional);
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 
 static bool shouldSerializeMember(Decl *D) {
@@ -1735,6 +1687,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::GenericTypeDecl: {
     auto generic = cast<GenericTypeDecl>(DC);
 
+    writeCrossReference(DC->getParent(), pathLen + 1);
+
     // Opaque return types are unnamed and need a special xref.
     if (auto opaque = dyn_cast<OpaqueTypeDecl>(generic)) {
       if (!opaque->hasName()) {
@@ -1748,8 +1702,6 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     }
       
     assert(generic->hasName());
-    
-    writeCrossReference(DC->getParent(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
 
@@ -2002,8 +1954,8 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
     return serialization::SelfAccessKind::NonMutating;
   case swift::SelfAccessKind::Mutating:
     return serialization::SelfAccessKind::Mutating;
-  case swift::SelfAccessKind::__Consuming:
-    return serialization::SelfAccessKind::__Consuming;
+  case swift::SelfAccessKind::Consuming:
+    return serialization::SelfAccessKind::Consuming;
   }
 
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
@@ -2023,12 +1975,6 @@ static void verifyAttrSerializable(const KIND ## Decl *D) {\
 #else
 static void verifyAttrSerializable(const Decl *D) {}
 #endif
-
-static inline unsigned getOptionalOrZero(const llvm::Optional<unsigned> &X) {
-  if (X.hasValue())
-    return X.getValue();
-  return 0;
-}
 
 bool Serializer::isDeclXRef(const Decl *D) const {
   const DeclContext *topLevel = D->getDeclContext()->getModuleScopeContext();
@@ -2081,7 +2027,7 @@ void Serializer::writeDeclContext(const DeclContext *DC) {
   case DeclContextKind::GenericTypeDecl:
   case DeclContextKind::ExtensionDecl:
   case DeclContextKind::EnumElementDecl:
-    declOrDeclContextID = addDeclRef(getDeclForContext(DC));
+    declOrDeclContextID = addDeclRef(DC->getAsDecl());
     isDecl = true;
     break;
 
@@ -2456,8 +2402,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     if (X##_Val.hasValue()) {\
       const auto &Y = X##_Val.getValue();\
       X##_Major = Y.getMajor();\
-      X##_Minor = getOptionalOrZero(Y.getMinor());\
-      X##_Subminor = getOptionalOrZero(Y.getSubminor());\
+      X##_Minor = Y.getMinor().getValueOr(0);\
+      X##_Subminor = Y.getSubminor().getValueOr(0);\
       X##_HasMinor = Y.getMinor().hasValue();\
       X##_HasSubminor = Y.getSubminor().hasValue();\
     }
@@ -2930,13 +2876,6 @@ public:
     for (auto Attr : D->getAttrs())
       writeDeclAttribute(Attr);
 
-    if (auto VD = dyn_cast<ValueDecl>(D)) {
-      // Hack: synthesize a 'final' attribute if finality was inferred.
-      if (VD->isFinal() && !D->getAttrs().hasAttribute<FinalAttr>())
-        writeDeclAttribute(
-            new (D->getASTContext()) FinalAttr(/*Implicit=*/false));
-    }
-
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
@@ -2953,7 +2892,6 @@ public:
 
     auto contextID = S.addDeclContextRef(extension->getDeclContext());
     Type baseTy = extension->getExtendedType();
-    assert(!baseTy->hasUnboundGenericType());
     assert(!baseTy->hasArchetype());
 
     // FIXME: Use the canonical type here in order to minimize circularity
@@ -3018,8 +2956,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    std::reverse(allGenericParams.begin(), allGenericParams.end());
-    for (auto *genericParams : allGenericParams)
+    for (auto *genericParams : swift::reversed(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);
@@ -3467,6 +3404,7 @@ public:
                           accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           S.addTypeRef(ty),
+                          var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
                           S.addDeclRef(var->getOpaqueResultTypeDecl()),
@@ -3499,6 +3437,7 @@ public:
         contextID,
         getRawStableParamDeclSpecifier(param->getSpecifier()),
         S.addTypeRef(interfaceType),
+        param->isImplicitlyUnwrappedOptional(),
         param->isVariadic(),
         param->isAutoClosure(),
         getRawStableDefaultArgumentKind(argKind),
@@ -3544,6 +3483,7 @@ public:
                            S.addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                            S.addTypeRef(fn->getResultInterfaceType()),
+                           fn->isImplicitlyUnwrappedOptional(),
                            S.addDeclRef(fn->getOperatorDecl()),
                            S.addDeclRef(fn->getOverriddenDecl()),
                            fn->getFullName().getArgumentNames().size() +
@@ -3631,6 +3571,7 @@ public:
                                S.addGenericEnvironmentRef(
                                                   fn->getGenericEnvironment()),
                                S.addTypeRef(fn->getResultInterfaceType()),
+                               fn->isImplicitlyUnwrappedOptional(),
                                S.addDeclRef(fn->getOverriddenDecl()),
                                S.addDeclRef(fn->getStorage()),
                                rawAccessorKind,
@@ -3740,6 +3681,7 @@ public:
                                 S.addGenericEnvironmentRef(
                                             subscript->getGenericEnvironment()),
                                 S.addTypeRef(subscript->getElementInterfaceType()),
+                                subscript->isImplicitlyUnwrappedOptional(),
                                 S.addDeclRef(subscript->getOverriddenDecl()),
                                 rawAccessLevel,
                                 rawSetterAccessLevel,
@@ -3778,8 +3720,8 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[ConstructorLayout::Code];
     ConstructorLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                   contextID,
-                                  getRawStableOptionalTypeKind(
-                                    ctor->getFailability()),
+                                  ctor->isFailable(),
+                                  ctor->isImplicitlyUnwrappedOptional(),
                                   ctor->isImplicit(),
                                   ctor->isObjC(),
                                   ctor->hasStubImplementation(),
@@ -5134,7 +5076,7 @@ void swift::serializeToBuffers(
   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
   const SILModule *M) {
 
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
   {
     SharedTimer timer("Serialization, swiftmodule, to buffer");
     llvm::SmallString<1024> buf;
@@ -5153,7 +5095,7 @@ void swift::serializeToBuffers(
                         std::move(buf), options.OutputPath);
   }
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     SharedTimer timer("Serialization, swiftdoc, to buffer");
     llvm::SmallString<1024> buf;
     llvm::raw_svector_ostream stream(buf);
@@ -5197,12 +5139,12 @@ void swift::serializeToMemory(
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
-  assert(options.OutputPath && options.OutputPath[0] != '\0');
+  assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
 
-  if (strcmp("-", options.OutputPath) == 0) {
+  if (StringRef(options.OutputPath) == "-") {
     // Special-case writing to stdout.
     Serializer::writeToStream(llvm::outs(), DC, M, options);
-    assert(!options.DocOutputPath || options.DocOutputPath[0] == '\0');
+    assert(StringRef::withNullAsEmpty(options.DocOutputPath).empty());
     return;
   }
 
@@ -5216,7 +5158,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (hadError)
     return;
 
-  if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
+  if (!StringRef::withNullAsEmpty(options.DocOutputPath).empty()) {
     (void)withOutputFile(getContext(DC).Diags,
                          options.DocOutputPath,
                          [&](raw_ostream &out) {

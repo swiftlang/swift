@@ -150,8 +150,10 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F,
-                               Optional<SILDebugVariable> Var)
-    : InstructionBase(Loc, elementType.getAddressType()) {
+                               Optional<SILDebugVariable> Var,
+                               bool hasDynamicLifetime)
+    : InstructionBase(Loc, elementType.getAddressType()),
+    dynamicLifetime(hasDynamicLifetime) {
   SILInstruction::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
   assert(SILInstruction::Bits.AllocStackInst.NumOperands ==
@@ -166,14 +168,16 @@ AllocStackInst *
 AllocStackInst::create(SILDebugLocation Loc,
                        SILType elementType, SILFunction &F,
                        SILOpenedArchetypesState &OpenedArchetypes,
-                       Optional<SILDebugVariable> Var) {
+                       Optional<SILDebugVariable> Var,
+                       bool hasDynamicLifetime) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                elementType.getASTType());
   void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
       F.getModule(), Var, TypeDependentOperands);
   return ::new (Buffer)
-      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var);
+      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
+                     hasDynamicLifetime);
 }
 
 VarDecl *AllocStackInst::getDecl() const {
@@ -256,24 +260,28 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, Optional<SILDebugVariable> Var)
+                           SILFunction &F, Optional<SILDebugVariable> Var,
+                           bool hasDynamicLifetime)
     : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
                                       SILType::getPrimitiveObjectType(BoxType)),
-      VarInfo(Var, getTrailingObjects<char>()) {
+      VarInfo(Var, getTrailingObjects<char>()),
+      dynamicLifetime(hasDynamicLifetime) {
 }
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
                                    SILFunction &F,
                                    SILOpenedArchetypesState &OpenedArchetypes,
-                                   Optional<SILDebugVariable> Var) {
+                                   Optional<SILDebugVariable> Var,
+                                   bool hasDynamicLifetime) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
-  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var);
+  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
+                                  hasDynamicLifetime);
 }
 
 VarDecl *AllocBoxInst::getDecl() const {
