@@ -1377,7 +1377,7 @@ function verify_tensorflow_directories() {
 
                 # Check that "LIB" arguments contain the necessary libraries.
                 if [[ "dir_type" == "LIB" ]]; then
-                    for lib_name in tensorflow tensorflow_framework; do
+                    for lib_name in tensorflow; do
                         lib="lib${lib_name}.so"
                         if [[ ! -e "${!dir_name}/${lib}" ]]; then
                             echo "Error: '${lib}' does not exist in TensorFlow ${lower_platform} ${lower_dir_type} directory (was '${!dir_name}')"
@@ -2585,7 +2585,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     # Bazel-built libraries do not have write permission, which is
                     # problematic for overwriting/stripping symbols. Thus, write
                     # permission is added here.
-                    for lib_name in tensorflow tensorflow_framework; do
+                    for lib_name in tensorflow; do
                         lib=".*lib${lib_name}.so[0-9.]*"
                         dylib=".*lib${lib_name}[0-9.]*.dylib"
                         find "${TF_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec rm -f {} \;
@@ -3040,7 +3040,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 # Configure TensorFlow and build using bazel.
                 (cd "${source_dir}"; echo yes "" | ./configure)
                 with_pushd "${source_dir}" \
-                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so //tensorflow:libtensorflow_framework.so
+                    call bazel build -c opt "${TENSORFLOW_BAZEL_OPTIONS[@]}" --define framework_shared_object=false //tensorflow:libtensorflow.so
 
                 # TensorFlow builds itself and doesn't use CMake.
                 continue
@@ -4011,8 +4011,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 TF_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}"
                 TF_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
                 mkdir -p "${TF_DEST_DIR}"
-                for lib_name in tensorflow tensorflow_framework
-                do
+                for lib_name in tensorflow; do
                     lib=".*lib${lib_name}.so[0-9.]*"
                     dylib=".*lib${lib_name}[0-9.]*.dylib"
                     find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec echo "{} => ${TF_DEST_DIR}" \;
