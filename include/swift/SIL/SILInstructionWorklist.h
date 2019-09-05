@@ -134,80 +134,88 @@ public:
     worklist.clear();
   }
 
-  /// Find usages of \p I and replace them with usages of \p Result.
+  /// Find usages of \p instruction and replace them with usages of \p result.
   ///
-  /// Intended to be called during visitation after \p I has been removed from
-  /// the worklist.
+  /// Intended to be called during visitation after \p instruction has been
+  /// removed from the worklist.
   ///
-  /// \p I the instruction whose usages will be replaced
-  /// \p Result the instruction whose usages will replace \p I
-  bool replaceInstructionWithInstruction(
-      SILInstruction *I, 
-      SILInstruction *Result
+  /// \p instruction the instruction whose usages will be replaced
+  /// \p result the instruction whose usages will replace \p instruction
+  ///
+  /// \return whether the instruction was deleted or modified.
+  bool replaceInstructionWithInstruction(SILInstruction *instruction,
+                                         SILInstruction *result
 #ifndef NDNEBUG
-     , std::string OrigI
+                                         ,
+                                         std::string instructionDescription
 #endif
   ) {
-    if (Result != I) {
-      assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
-            "Expected new instruction inserted before existing instruction!");
+    if (result != instruction) {
+      assert(&*std::prev(instruction->getIterator()) == result &&
+             "Expected new instruction inserted before existing instruction!");
 
       withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
-        stream << loggingName << ": Old = " << *I      << '\n'
-               << "  "        << "  New = " << *Result << '\n';
+        stream << loggingName << ": Old = " << *instruction << '\n'
+               << "  "
+               << "  New = " << *result << '\n';
       });
 
       // Everything uses the new instruction now.
-      replaceInstUsesPairwiseWith(I, Result);
+      replaceInstUsesPairwiseWith(instruction, result);
 
       // Push the new instruction and any users onto the worklist.
-      add(Result);
-      addUsersOfAllResultsToWorklist(Result);
+      add(result);
+      addUsersOfAllResultsToWorklist(result);
 
-      eraseInstFromFunction(*I);
+      eraseInstFromFunction(*instruction);
 
       return true;
     } else {
       withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
-        stream << loggingName << ": Mod = " << OrigI << '\n'
-               << "  "        << "  New = " << *I    << '\n';
+        stream << loggingName << ": Mod = " << instructionDescription << '\n'
+               << "  "
+               << "  New = " << *instruction << '\n';
       });
 
       // If the instruction was modified, it's possible that it is now dead.
       // if so, remove it.
-      if (isInstructionTriviallyDead(I)) {
-        eraseInstFromFunction(*I);
+      if (isInstructionTriviallyDead(instruction)) {
+        eraseInstFromFunction(*instruction);
       } else {
-        add(I);
-        addUsersOfAllResultsToWorklist(I);
+        add(instruction);
+        addUsersOfAllResultsToWorklist(instruction);
       }
       return false;
     }
   }
 
-  // Insert the instruction New before instruction Old in Old's parent BB. Add
-  // New to the worklist.
-  SILInstruction *insertNewInstBefore(SILInstruction *New, SILInstruction &Old) {
-    assert(New && New->getParent() == nullptr &&
-           "New instruction already inserted into a basic block!");
-    SILBasicBlock *BB = Old.getParent();
-    BB->insert(&Old, New);  // Insert inst
-    add(New);
-    return New;
+  // Insert the instruction newInstruction before instruction old in old's
+  // parent block. Add newInstruction to the worklist.
+  SILInstruction *insertNewInstBefore(SILInstruction *newInstruction,
+                                      SILInstruction &old) {
+    assert(newInstruction && newInstruction->getParent() == nullptr &&
+           "newInstruction instruction already inserted into a basic block!");
+    SILBasicBlock *block = old.getParent();
+    block->insert(&old, newInstruction); // Insert inst
+    add(newInstruction);
+    return newInstruction;
   }
 
   // This method is to be used when an instruction is found to be dead,
-  // replaceable with another preexisting expression. Here we add all uses of I
-  // to the worklist, and replace all uses of I with the new value.
-  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
-    addUsersToWorklist(&I);   // Add all modified instrs to worklist.
+  // replaceable with another preexisting expression. Here we add all uses of
+  // instruction to the worklist, and replace all uses of instruction with the
+  // new value.
+  void replaceInstUsesWith(SingleValueInstruction &instruction,
+                           ValueBase *value) {
+    addUsersToWorklist(&instruction); // Add all modified instrs to worklist.
 
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
-      stream << loggingName << ": Replacing " << I << '\n'
-             << "  "        << "  with "      << *V << '\n';
+      stream << loggingName << ": Replacing " << instruction << '\n'
+             << "  "
+             << "  with " << *value << '\n';
     });
 
-    I.replaceAllUsesWith(V);
+    instruction.replaceAllUsesWith(value);
   }
 
   // This method is to be used when a value is found to be dead,
@@ -219,7 +227,8 @@ public:
 
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
       stream << loggingName << ": Replacing " << oldValue << '\n'
-             << "  "        << "  with "      << newValue << '\n';
+             << "  "
+             << "  with " << newValue << '\n';
     });
 
     oldValue->replaceAllUsesWith(newValue);
@@ -228,7 +237,8 @@ public:
   void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI) {
     withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
       stream << loggingName << ": Replacing " << *oldI << '\n'
-             << "  "        << "  with "      << *newI << '\n';
+             << "  "
+             << "  with " << *newI << '\n';
     });
 
     auto oldResults = oldI->getResults();
@@ -243,61 +253,61 @@ public:
   }
 
   // Some instructions can never be "trivially dead" due to side effects or
-  // producing a void value. In those cases visit methods should use this
-  // method to delete the given instruction and upon completion of their
-  // peephole return the value returned by this method.
-  void eraseInstFromFunction(SILInstruction &I,
-                                        SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true) {
+  // producing a void value. In those cases, visit methods should use this
+  // method to delete the given instruction.
+  void eraseInstFromFunction(SILInstruction &instruction,
+                             SILBasicBlock::iterator &iterator,
+                             bool addOperandsToWorklist = true) {
     // Delete any debug users first.
-    for (auto result : I.getResults()) {
+    for (auto result : instruction.getResults()) {
       while (!result->use_empty()) {
         auto *user = result->use_begin()->getUser();
         assert(user->isDebugInstruction());
-        if (InstIter == user->getIterator())
-          ++InstIter;
+        if (iterator == user->getIterator())
+          ++iterator;
         erase(user);
         user->eraseFromParent();
       }
     }
-    if (InstIter == I.getIterator())
-      ++InstIter;
+    if (iterator == instruction.getIterator())
+      ++iterator;
 
-    eraseSingleInstFromFunction(I, AddOperandsToWorklist);
+    eraseSingleInstFromFunction(instruction, addOperandsToWorklist);
   }
 
-  void eraseInstFromFunction(SILInstruction &I,
-                             bool AddOperandsToWorklist = true) {
+  void eraseInstFromFunction(SILInstruction &instruction,
+                             bool addOperandsToWorklist = true) {
     SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+    return eraseInstFromFunction(instruction, nullIter, addOperandsToWorklist);
   }
 
-  void eraseSingleInstFromFunction(
-      SILInstruction &I,
-      bool AddOperandsToWorklist) {
-      withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
-        stream << loggingName << ": ERASE " << I << '\n';
-      });
+  void eraseSingleInstFromFunction(SILInstruction &instruction,
+                                   bool addOperandsToWorklist) {
+    withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+      stream << loggingName << ": ERASE " << instruction << '\n';
+    });
 
-    assert(!I.hasUsesOfAnyResult() && "Cannot erase instruction that is used!");
+    assert(!instruction.hasUsesOfAnyResult() &&
+           "Cannot erase instruction that is used!");
 
     // Make sure that we reprocess all operands now that we reduced their
     // use counts.
-    if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
-      for (auto &OpI : I.getAllOperands()) {
-        if (auto *Op = OpI.get()->getDefiningInstruction()) {
-          withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
-            stream << loggingName << ": add op " << *Op << '\n'
-                                  << " from erased inst to worklist\n";
+    if (instruction.getNumOperands() < 8 && addOperandsToWorklist) {
+      for (auto &operand : instruction.getAllOperands()) {
+        if (auto *operandInstruction =
+                operand.get()->getDefiningInstruction()) {
+          withDebugStream([&](llvm::raw_ostream &stream,
+                              StringRef loggingName) {
+            stream << loggingName << ": add op " << *operandInstruction << '\n'
+                   << " from erased inst to worklist\n";
           });
-          add(Op);
+          add(operandInstruction);
         }
       }
     }
-    erase(&I);
-    I.eraseFromParent();
+    erase(&instruction);
+    instruction.eraseFromParent();
   }
-
 };
 
 // TODO: This name is somewhat unpleasant.  Once the type is templated over its
