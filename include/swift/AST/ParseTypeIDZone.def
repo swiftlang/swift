@@ -14,5 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(Parse, ParseMembersRequest)
-SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest)
+SWIFT_REQUEST(Parse, ParseMembersRequest,
+              ArrayRef<Decl *>(IterableDeclContext *), Cached)
+SWIFT_REQUEST(Parse, ParseAbstractFunctionBodyRequest,
+              BraceStmt *(AbstractFunctionDecl *), SeparatelyCached)
