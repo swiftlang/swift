@@ -1173,17 +1173,18 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
 bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
                                   bool isSystem) {
   clang::FileManager &fileMgr = Impl.Instance->getFileManager();
-  auto entry = fileMgr.getDirectory(newSearchPath);
-  if (!entry)
+  auto optionalEntry = fileMgr.getOptionalDirectoryRef(newSearchPath);
+  if (!optionalEntry)
     return true;
+  auto entry = *optionalEntry;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
                             headerSearchInfo.search_dir_end(),
                             [&](const clang::DirectoryLookup &lookup) -> bool {
     if (isFramework)
-      return lookup.getFrameworkDir() == *entry;
-    return lookup.getDir() == *entry;
+      return lookup.getFrameworkDir() == &entry.getDirEntry();
+    return lookup.getDir() == &entry.getDirEntry();
   });
   if (exists) {
     // Don't bother adding a search path that's already there. Clang would have
@@ -1192,7 +1193,7 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
   }
 
   auto kind = isSystem ? clang::SrcMgr::C_System : clang::SrcMgr::C_User;
-  headerSearchInfo.AddSearchPath({*entry, kind, isFramework},
+  headerSearchInfo.AddSearchPath({entry, kind, isFramework},
                                  /*isAngled=*/true);
 
   // In addition to changing the current preprocessor directly, we still need
