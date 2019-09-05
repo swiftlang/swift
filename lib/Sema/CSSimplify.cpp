@@ -2603,6 +2603,24 @@ bool ConstraintSystem::repairFailures(
           *this, fnType, {FunctionType::Param(*arg)},
           getConstraintLocator(anchor, path)));
     }
+
+    if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
+        (!lhs->is<InOutType>() && rhs->is<InOutType>())) {
+      // We want to call matchTypes with the default decomposition options
+      // in case there are type variables that we couldn't bind due to the
+      // inout attribute mismatch.
+      auto result = matchTypes(lhs->getInOutObjectType(),
+                               rhs->getInOutObjectType(), matchKind,
+                               getDefaultDecompositionOptions(TMF_ApplyingFix),
+                               locator);
+
+      if (result.isSuccess()) {
+        conversionsOrFixes.push_back(AllowInOutConversion::create(*this, lhs,
+            rhs, getConstraintLocator(locator)));
+        break;
+      }
+    }
+
     break;
   }
 
