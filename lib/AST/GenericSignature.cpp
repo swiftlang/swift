@@ -701,14 +701,6 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type) {
   return getCanonicalTypeInContext(type, builder);
 }
 
-GenericEnvironment *CanGenericSignature::getGenericEnvironment() const {
-  // generic signature builders are stored on the ASTContext.
-  auto &ctx = getGenericParams()[0]->getASTContext();
-  return ctx.getOrCreateCanonicalGenericEnvironment(
-           ctx.getOrCreateGenericSignatureBuilder(*this),
-           *this);
-}
-
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const{
   auto params = Signature->getGenericParams().getOriginalArray();

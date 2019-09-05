@@ -370,13 +370,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
       GenericSignatureBuilders;
 
-    /// Canonical generic environments for canonical generic signatures.
-    ///
-    /// The keys are the generic signature builders in
-    /// \c GenericSignatureBuilders.
-    llvm::DenseMap<GenericSignatureBuilder *, GenericEnvironment *>
-      CanonicalGenericEnvironments;
-
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
 
@@ -1621,22 +1614,6 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
 #endif
 
   return builder;
-}
-
-GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                              GenericSignatureBuilder *builder,
-                                              GenericSignature *sig) {
-  auto arena = getArena(sig);
-  auto &canonicalGenericEnvironments =
-      getImpl().getArena(arena).CanonicalGenericEnvironments;
-
-  auto known = canonicalGenericEnvironments.find(builder);
-  if (known != canonicalGenericEnvironments.end())
-    return known->second;
-
-  auto env = sig->getGenericEnvironment();
-  canonicalGenericEnvironments[builder] = env;
-  return env;
 }
 
 Optional<llvm::TinyPtrVector<ValueDecl *>>

@@ -876,12 +876,6 @@ public:
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
                                                      CanGenericSignature sig);
 
-  /// Retrieve or create the canonical generic environment of a canonical
-  /// generic signature builder.
-  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                       GenericSignatureBuilder *builder,
-                                       GenericSignature *sig);
-
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
