@@ -1819,14 +1819,25 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         if (!shouldAttemptFixes())
           return getTypeMatchFailure(locator);
 
+        // Determine whether this conformance mismatch is
+        // associate with argument to a call, and if so
+        // produce a tailored fix.
         if (auto last = locator.last()) {
-          // TODO(diagnostics): Diagnosing missing conformances
-          // associated with arguments requires having general
-          // conversion failures implemented first, otherwise
-          // we would be misdiagnosing ambiguous cases associated
-          // with overloaded declarations.
-          if (last->getKind() == ConstraintLocator::ApplyArgToParam)
-            return getTypeMatchFailure(locator);
+          if (last->is<LocatorPathElt::ApplyArgToParam>()) {
+            auto *fix = AllowArgumentMismatch::create(
+                *this, type1, proto, getConstraintLocator(locator));
+
+            // Impact is 2 here because there are two failures
+            // 1 - missing conformance and 2 - incorrect argument type.
+            //
+            // This would make sure that arguments with incorrect
+            // conformances are not prioritized over general argument
+            // mismatches.
+            if (recordFix(fix, /*impact=*/2))
+              return getTypeMatchFailure(locator);
+
+            break;
+          }
         } else { // There are no elements in the path
           auto *anchor = locator.getAnchor();
           if (!(anchor && isa<AssignExpr>(anchor)))
@@ -2421,6 +2432,12 @@ bool ConstraintSystem::repairFailures(
     // If the problem is related to missing unwrap, there is a special
     // fix for that.
     if (lhs->getOptionalObjectType() && !rhs->getOptionalObjectType()) {
+      // If this is an attempt to check whether optional conforms to a
+      // particular protocol, let's do that before attempting to force
+      // unwrap the optional.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+        break;
+
       auto result = matchTypes(lhs->getOptionalObjectType(), rhs, matchKind,
                                TMF_ApplyingFix, locator);
 
@@ -2581,6 +2598,11 @@ bool ConstraintSystem::repairFailures(
     // are unrelated types, let's give `matchTypes` a chance to consider
     // element types.
     if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
+    // If there right-hand side is an existential value, let's allow conformance
+    // check to happen before trying to do anything else for arguments.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
       break;
 
     // If there implicit 'something-to-pointer' conversions involved,
