@@ -4264,6 +4264,30 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
 
 bool InOutConversionFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
+  auto *locator = getLocator();
+  auto path = locator->getPath();
+
+  if (!path.empty() &&
+      path.back().getKind() == ConstraintLocator::FunctionArgument) {
+    if (auto argApplyInfo = getFunctionArgApplyInfo(locator)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
+          argApplyInfo->getArgType(), argApplyInfo->getParamType());
+    } else {
+      assert(locator->findLast<LocatorPathElt::ContextualType>());
+      auto contextualType = getConstraintSystem().getContextualType();
+      auto purpose = getContextualTypePurpose();
+      auto diagnostic = getDiagnosticFor(purpose, /*forProtocol=*/false);
+
+      if (!diagnostic)
+        return false;
+
+      emitDiagnostic(anchor->getLoc(), *diagnostic, getType(anchor),
+                     contextualType);
+    }
+
+    return true;
+  }
+
   emitDiagnostic(anchor->getLoc(), diag::cannot_pass_rvalue_inout_converted,
                  getFromType(), getToType());
   fixItChangeArgumentType();
