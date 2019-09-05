@@ -140,7 +140,7 @@ static void addSanitizerCoveragePass(const PassManagerBuilder &Builder,
                                      legacy::PassManagerBase &PM) {
   const PassManagerBuilderWrapper &BuilderWrapper =
       static_cast<const PassManagerBuilderWrapper &>(Builder);
-  PM.add(createSanitizerCoverageLegacyPassPass(
+  PM.add(createModuleSanitizerCoverageLegacyPassPass(
       BuilderWrapper.IRGOpts.SanitizeCoverage));
 }
 
