@@ -681,6 +681,10 @@ protected:
   /// conversion is possible.
   bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
 
+  /// Try to add a fix-it to conform the decl context (if it's a type) to the
+  /// protocol
+  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+
   /// Check whether this contextual failure represents an invalid
   /// conversion from array literal to dictionary.
   static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
