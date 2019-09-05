@@ -391,10 +391,16 @@ TypeRepr *ASTGen::generate(DictionaryTypeSyntax Type, SourceLoc &Loc) {
 
 TypeRepr *ASTGen::generate(ArrayTypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *ElementType = generate(Type.getElementType(), Loc);
-  auto LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
-  auto RBraceLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  SourceRange Range{LBraceLoc, RBraceLoc};
-  return new (Context) ArrayTypeRepr(ElementType, Range);
+  SourceLoc LBraceLoc, RBraceLoc;
+  if (Type.getLeftSquareBracket().isPresent())
+    LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
+  else
+    LBraceLoc = advanceLocBegin(Loc, Type.getElementType());
+  if (Type.getLeftSquareBracket().isPresent())
+    RBraceLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
+  else
+    RBraceLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  return new (Context) ArrayTypeRepr(ElementType, {LBraceLoc, RBraceLoc});
 }
 
 TypeRepr *ASTGen::generate(MetatypeTypeSyntax Type, SourceLoc &Loc) {

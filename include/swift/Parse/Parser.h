@@ -1172,9 +1172,12 @@ public:
 
   using TypeASTResult = ParserResult<TypeRepr>;
   using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
-  using TypeErrorResult = ParsedSyntaxResult<ParsedUnknownTypeSyntax>;
 
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
+
+  TypeResult parseTypeSyntax();
+  TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
+                             bool IsSILFuncDecl = false);
 
   TypeASTResult parseType();
   TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
@@ -1202,8 +1205,8 @@ public:
   TypeResult parseOptionalType(ParsedTypeSyntax Base);
   TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
 
-  TypeErrorResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
-  TypeErrorResult parseOldStyleProtocolComposition();
+  TypeResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
+  TypeResult parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
   ParsedTokenSyntax consumeOptionalTokenSyntax();

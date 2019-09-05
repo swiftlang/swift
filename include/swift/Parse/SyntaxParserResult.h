@@ -30,137 +30,103 @@ public:
   friend class ParsedSyntaxResult;
 
 private:
-  // todo [gsoc]: use some kind of a proper sum type
-  llvm::Optional<ParsedSyntaxNode> SuccessNode;
-  llvm::Optional<llvm::SmallVector<ParsedSyntax, 0>> ErrorNodes;
-  llvm::Optional<llvm::SmallVector<ParsedSyntax, 0>> CodeCompletionNodes;
-
-  ResultDataKind DK;
+  ParsedRawSyntaxNode Raw;
+  ParserStatus Status;
 
 public:
+  explicit ParsedSyntaxResult() : Raw(), Status() { setIsError(); }
+
+  ParsedSyntaxResult(ParserStatus Status) : Raw(), Status(Status) {
+    assert(Status.isError());
+  }
+
+  explicit ParsedSyntaxResult(ParsedRawSyntaxNode Raw)
+      : Raw(Raw), Status() {}
+
   explicit ParsedSyntaxResult(ParsedSyntaxNode Node)
-      : SuccessNode(Node), DK(ResultDataKind::Success) {}
-
-  ParsedSyntaxResult(ArrayRef<ParsedSyntax> Nodes,
-                     ResultDataKind Kind)
-      : DK(Kind) {
-    switch (DK) {
-    case ResultDataKind::Error:
-      ErrorNodes.emplace(Nodes.begin(), Nodes.end());
-      break;
-    case ResultDataKind::CodeCompletion:
-      CodeCompletionNodes.emplace(Nodes.begin(), Nodes.end());
-      break;
-    default:
-      llvm_unreachable("success cannot contain multiple nodes");
-    }
-  }
-
-  ParsedSyntaxResult(const ParsedSyntaxResult &Other) {
-    DK = Other.DK;
-
-    switch (DK) {
-    case ResultDataKind::Success:
-      SuccessNode = Other.SuccessNode;
-      break;
-    case ResultDataKind::Error:
-      ErrorNodes = Other.ErrorNodes;
-      break;
-    case ResultDataKind::CodeCompletion:
-      CodeCompletionNodes = Other.CodeCompletionNodes;
-      break;
-    }
-  }
+      : ParsedSyntaxResult(Node.getRaw()) {}
 
   template <typename OtherParsedSyntaxNode,
             typename Enable = typename std::enable_if<std::is_base_of<
                 ParsedSyntaxNode, OtherParsedSyntaxNode>::value>::type>
-  ParsedSyntaxResult(ParsedSyntaxResult<OtherParsedSyntaxNode> Other) {
-    DK = Other.DK;
-
-    switch (DK) {
-    case ResultDataKind::Success:
-      SuccessNode = *Other.SuccessNode;
-      break;
-    case ResultDataKind::Error:
-      ErrorNodes = *Other.ErrorNodes;
-      break;
-    case ResultDataKind::CodeCompletion:
-      CodeCompletionNodes = *Other.CodeCompletionNodes;
-      break;
-    }
+  ParsedSyntaxResult(ParsedSyntaxResult<OtherParsedSyntaxNode> other) {
+    Raw = other.Raw;
+    Status = other.Status;
   }
 
   bool isSuccess() const {
-    return DK == ResultDataKind::Success;
+    return Status.isSuccess();
   }
 
   bool isError() const {
-    return DK == ResultDataKind::Error;
+    return Status.isError();
+  }
+  void setIsError() {
+    Status.setIsParseError();
   }
 
-  bool isCodeCompletion() const {
-    return DK == ResultDataKind::CodeCompletion;
+  bool hasCodeCompletion() const {
+    return Status.hasCodeCompletion();
+  }
+  void setHasCodeCompletion() {
+    Status.setHasCodeCompletion();
   }
 
-  ParsedSyntaxNode getResult() const {
-    assert(isSuccess() && "unsuccessful parse doesn't have any result");
-    return *SuccessNode;
+  ParsedSyntaxNode get() const {
+    assert(!isNull());
+    return ParsedSyntaxNode(Raw);
+  }
+  Optional<ParsedSyntaxNode> getOrNull() const {
+    if (isNull())
+      return None;
+    return get();
   }
 
-  ArrayRef<ParsedSyntax> getUnknownNodes() const {
-    assert(!isSuccess() && "successful parse doesn't contain unknown nodes");
-    switch (DK) {
-    case ResultDataKind::Error:
-      return *ErrorNodes;
-    case ResultDataKind::CodeCompletion:
-      return *CodeCompletionNodes;
-    default:
-      llvm_unreachable("cannot get here");
-    }
+  bool isNull() const {
+    return Raw.isNull();
   }
-  
+
   ParserStatus getStatus() const {
-    ParserStatus S;
-    if (isError())
-      S.setIsParseError();
-    if (isCodeCompletion())
-      S.setHasCodeCompletion();
-    return S;
+    return Status;
   }
 };
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedSuccess(ParsedSyntaxNode Node) {
-  return ParsedSyntaxResult<ParsedSyntaxNode>(Node);
+makeParsedResult(ParsedSyntaxNode node) {
+  return ParsedSyntaxResult<ParsedSyntaxNode>(node);
 }
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedError(ArrayRef<ParsedSyntax> Nodes) {
-  return ParsedSyntaxResult<ParsedSyntaxNode>(Nodes, ResultDataKind::Error);
+makeParsedError(ParsedSyntaxNode node) {
+  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  result.setIsError();
+  return result;
 }
 
 template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode> makeParsedErrorEmpty() {
-  return ParsedSyntaxResult<ParsedSyntaxNode>({}, ResultDataKind::Error);
-}
-
-template <typename ParsedSyntaxNode>
-static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedCodeCompletion(ArrayRef<ParsedSyntax> Nodes) {
-  return ParsedSyntaxResult<ParsedSyntaxNode>(Nodes,
-                                              ResultDataKind::CodeCompletion);
+static ParsedSyntaxResult<ParsedSyntaxNode> makeParsedError() {
+  return ParsedSyntaxResult<ParsedSyntaxNode>();
 }
 
 template <typename ParsedSyntaxNode>
 static ParsedSyntaxResult<ParsedSyntaxNode>
-makeParsedResult(ArrayRef<ParsedSyntax> Nodes,
-                 ParserStatus Status) {
-  return Status.hasCodeCompletion()
-             ? makeParsedCodeCompletion<ParsedSyntaxNode>(Nodes)
-             : makeParsedError<ParsedSyntaxNode>(Nodes);
+makeParsedCodeCompletion(ParsedSyntaxNode node) {
+  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  result.setHasCodeCompletion();
+  return result;
+}
+
+template <typename ParsedSyntaxNode>
+static ParsedSyntaxResult<ParsedSyntaxNode>
+makeParsedResult(ParsedSyntaxNode node, ParserStatus Status) {
+  auto result = ParsedSyntaxResult<ParsedSyntaxNode>(node);
+  if (Status.hasCodeCompletion())
+    result.setHasCodeCompletion();
+  else if (Status.isError())
+    result.setIsError();
+  return result;
 }
 
 template <typename Syntax, typename AST> class SyntaxParserResult {
