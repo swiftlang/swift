@@ -149,7 +149,7 @@ Below is more information about TensorFlow-related build arguments.
     * Default: None.
 * `tensorflow-host-include-dir`: A directory containing custom TensorFlow headers.
     * Default value: None.
-* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
+* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so`).
     * Default value: None.
 * `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
     * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
