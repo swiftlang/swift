@@ -22,11 +22,18 @@
 /// ensuring that removing an instruction is not unnecessarily expensive and
 /// that only valid instructions are removed from the list.
 ///
+/// Additionally, SILInstructionWorklist provides conveniences for simple
+/// instruction modifications and ensuring that the appropriate instructions
+/// will be visited accordingly.  For example, if provides a method for 
+/// replacing an operation which has already been removed with a new instruction
+/// determined by a SILInstructionVisitor.
+///
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -126,6 +133,171 @@ public:
     // Do an explicit clear, shrinking the storage if needed.
     worklist.clear();
   }
+
+  /// Find usages of \p I and replace them with usages of \p Result.
+  ///
+  /// Intended to be called during visitation after \p I has been removed from
+  /// the worklist.
+  ///
+  /// \p I the instruction whose usages will be replaced
+  /// \p Result the instruction whose usages will replace \p I
+  bool replaceInstructionWithInstruction(
+      SILInstruction *I, 
+      SILInstruction *Result
+#ifndef NDNEBUG
+     , std::string OrigI
+#endif
+  ) {
+    if (Result != I) {
+      assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
+            "Expected new instruction inserted before existing instruction!");
+
+      withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+        stream << loggingName << ": Old = " << *I      << '\n'
+               << "  "        << "  New = " << *Result << '\n';
+      });
+
+      // Everything uses the new instruction now.
+      replaceInstUsesPairwiseWith(I, Result);
+
+      // Push the new instruction and any users onto the worklist.
+      add(Result);
+      addUsersOfAllResultsToWorklist(Result);
+
+      eraseInstFromFunction(*I);
+
+      return true;
+    } else {
+      withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+        stream << loggingName << ": Mod = " << OrigI << '\n'
+               << "  "        << "  New = " << *I    << '\n';
+      });
+
+      // If the instruction was modified, it's possible that it is now dead.
+      // if so, remove it.
+      if (isInstructionTriviallyDead(I)) {
+        eraseInstFromFunction(*I);
+      } else {
+        add(I);
+        addUsersOfAllResultsToWorklist(I);
+      }
+      return false;
+    }
+  }
+
+  // Insert the instruction New before instruction Old in Old's parent BB. Add
+  // New to the worklist.
+  SILInstruction *insertNewInstBefore(SILInstruction *New, SILInstruction &Old) {
+    assert(New && New->getParent() == nullptr &&
+           "New instruction already inserted into a basic block!");
+    SILBasicBlock *BB = Old.getParent();
+    BB->insert(&Old, New);  // Insert inst
+    add(New);
+    return New;
+  }
+
+  // This method is to be used when an instruction is found to be dead,
+  // replaceable with another preexisting expression. Here we add all uses of I
+  // to the worklist, and replace all uses of I with the new value.
+  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
+    addUsersToWorklist(&I);   // Add all modified instrs to worklist.
+
+    withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+      stream << loggingName << ": Replacing " << I << '\n'
+             << "  "        << "  with "      << *V << '\n';
+    });
+
+    I.replaceAllUsesWith(V);
+  }
+
+  // This method is to be used when a value is found to be dead,
+  // replaceable with another preexisting expression. Here we add all
+  // uses of oldValue to the worklist, replace all uses of oldValue
+  // with newValue.
+  void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+    addUsersToWorklist(oldValue); // Add all modified instrs to worklist.
+
+    withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+      stream << loggingName << ": Replacing " << oldValue << '\n'
+             << "  "        << "  with "      << newValue << '\n';
+    });
+
+    oldValue->replaceAllUsesWith(newValue);
+  }
+
+  void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI) {
+    withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+      stream << loggingName << ": Replacing " << *oldI << '\n'
+             << "  "        << "  with "      << *newI << '\n';
+    });
+
+    auto oldResults = oldI->getResults();
+    auto newResults = newI->getResults();
+    assert(oldResults.size() == newResults.size());
+    for (auto i : indices(oldResults)) {
+      // Add all modified instrs to worklist.
+      addUsersToWorklist(oldResults[i]);
+
+      oldResults[i]->replaceAllUsesWith(newResults[i]);
+    }
+  }
+
+  // Some instructions can never be "trivially dead" due to side effects or
+  // producing a void value. In those cases visit methods should use this
+  // method to delete the given instruction and upon completion of their
+  // peephole return the value returned by this method.
+  void eraseInstFromFunction(SILInstruction &I,
+                                        SILBasicBlock::iterator &InstIter,
+                                        bool AddOperandsToWorklist = true) {
+    // Delete any debug users first.
+    for (auto result : I.getResults()) {
+      while (!result->use_empty()) {
+        auto *user = result->use_begin()->getUser();
+        assert(user->isDebugInstruction());
+        if (InstIter == user->getIterator())
+          ++InstIter;
+        erase(user);
+        user->eraseFromParent();
+      }
+    }
+    if (InstIter == I.getIterator())
+      ++InstIter;
+
+    eraseSingleInstFromFunction(I, AddOperandsToWorklist);
+  }
+
+  void eraseInstFromFunction(SILInstruction &I,
+                             bool AddOperandsToWorklist = true) {
+    SILBasicBlock::iterator nullIter;
+    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+  }
+
+  void eraseSingleInstFromFunction(
+      SILInstruction &I,
+      bool AddOperandsToWorklist) {
+      withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+        stream << loggingName << ": ERASE " << I << '\n';
+      });
+
+    assert(!I.hasUsesOfAnyResult() && "Cannot erase instruction that is used!");
+
+    // Make sure that we reprocess all operands now that we reduced their
+    // use counts.
+    if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
+      for (auto &OpI : I.getAllOperands()) {
+        if (auto *Op = OpI.get()->getDefiningInstruction()) {
+          withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+            stream << loggingName << ": add op " << *Op << '\n'
+                                  << " from erased inst to worklist\n";
+          });
+          add(Op);
+        }
+      }
+    }
+    erase(&I);
+    I.eraseFromParent();
+  }
+
 };
 
 // TODO: This name is somewhat unpleasant.  Once the type is templated over its
