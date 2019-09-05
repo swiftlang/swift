@@ -2457,6 +2457,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     layout = unwrappedToType->getExistentialLayout();
     requiresClass = layout.requiresClass();
   }
+
   if (requiresClass && !FromType->is<ClassType>()) {
     return false;
   }
@@ -2470,8 +2471,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
 
   diagnostic.flush();
 
-  // Let's build a list of protocols that the contextual type does not
-  // conform to.
+  // Let's build a list of protocols that the context does not conform to.
   SmallVector<std::string, 8> missingProtoTypeStrings;
   for (auto protocol : layout.getProtocols()) {
     if (!getTypeChecker().conformsToProtocol(
@@ -2483,19 +2483,22 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
 
   // If we have a protocol composition type and we don't conform to all
   // the protocols of the composition, then store the composition directly.
+  // This is because we need to append 'Foo & Bar' instead of 'Foo, Bar' in
+  // order to match the written type.
   if (auto compositionTy = unwrappedToType->getAs<ProtocolCompositionType>()) {
     if (compositionTy->getMembers().size() == missingProtoTypeStrings.size()) {
       missingProtoTypeStrings = {compositionTy->getString()};
     }
   }
 
+  assert(!missingProtoTypeStrings.empty() &&
+         "type already conforms to all the protocols?");
+
   // If we didn't have a protocol composition type, it means we only have a
   // single protocol, so just use it directly. Otherwise, construct a comma
   // separated list of missing types.
   std::string protoString;
-  if (missingProtoTypeStrings.empty()) {
-    protoString = unwrappedToType->getString();
-  } else if (missingProtoTypeStrings.size() == 1) {
+  if (missingProtoTypeStrings.size() == 1) {
     protoString = missingProtoTypeStrings.front();
   } else {
     protoString = llvm::join(missingProtoTypeStrings, ", ");
