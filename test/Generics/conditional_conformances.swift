@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -typecheck -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 {}
@@ -19,6 +19,9 @@ func takes_P2<X: P2>(_: X) {}
 // expected-note@-5 {{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
 // expected-note@-6 {{candidate requires that 'C1' inherit from 'Int' (requirement specified as 'Int' : 'C1')}}
 func takes_P5<X: P5>(_: X) {}
+
+// Skip the first generic signature declcontext dump
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Free
 
 struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free

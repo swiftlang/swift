@@ -66,6 +66,21 @@ void swift::simple_display(llvm::raw_ostream &out, Type type) {
     out << "null";
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const TypeRepr *TyR) {
+  if (TyR)
+    TyR->print(out);
+  else
+    out << "null";
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
+  out << "(";
+  simple_display(out, source.getType());
+  out << ", ";
+  simple_display(out, source.getTypeRepr());
+  out << ")";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//

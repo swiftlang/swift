@@ -1428,7 +1428,7 @@ public:
   /// to the given DeclContext.
   GenericParamList *clone(DeclContext *dc) const;
 
-  void print(raw_ostream &OS);
+  void print(raw_ostream &OS) const;
   void dump();
 };
   
@@ -7260,6 +7260,9 @@ inline void simple_display(llvm::raw_ostream &out,
                            const NominalTypeDecl *decl) {
   simple_display(out, static_cast<const Decl *>(decl));
 }
+
+/// Display GenericParamList.
+void simple_display(llvm::raw_ostream &out, const GenericParamList *GPL);
 
 /// Extract the source location from the given declaration.
 SourceLoc extractNearestSourceLoc(const Decl *decl);
