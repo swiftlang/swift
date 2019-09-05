@@ -427,33 +427,6 @@ TypeRepr *ASTGen::generate(ImplicitlyUnwrappedOptionalTypeSyntax Type,
 TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
   auto ChildrenCount = Type.getNumChildren();
 
-  // Recover from C-style array type:
-  //   type '[' ']'
-  //   type '[' expr ']'
-  if (ChildrenCount == 3 || ChildrenCount == 4) {
-    auto Element = Type.getChild(0)->getAs<TypeSyntax>();
-    auto LSquare = Type.getChild(1)->getAs<TokenSyntax>();
-    auto Last = Type.getChild(ChildrenCount - 1);
-
-    if (Element && LSquare && LSquare->getTokenKind() == tok::l_square) {
-      auto ElementType = generate(*Element, Loc);
-      auto Begin = advanceLocBegin(Loc, *Element);
-      auto End = advanceLocBegin(Loc, *Last);
-      return new (Context) ArrayTypeRepr(ElementType, {Begin, End});
-    }
-  }
-
-  // Recover from extra `[`:
-  //   type `[`
-  if (ChildrenCount == 2) {
-    auto Element = Type.getChild(0)->getAs<TypeSyntax>();
-    auto LSquare = Type.getChild(1)->getAs<TokenSyntax>();
-
-    if (Element && LSquare && LSquare->getTokenKind() == tok::l_square) {
-      return generate(*Element, Loc);
-    }
-  }
-
   // Recover from old-style protocol composition:
   //   `protocol` `<` protocols `>`
   if (ChildrenCount >= 2) {
