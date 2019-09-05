@@ -2006,6 +2006,9 @@ void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
   if (tryIntegerCastFixIts(diagnostic))
     return;
 
+  if (tryProtocolConformanceFixIt(diagnostic))
+    return;
+
   if (tryTypeCoercionFixIt(diagnostic))
     return;
 }
@@ -2428,6 +2431,101 @@ bool ContextualFailure::tryTypeCoercionFixIt(
   }
 
   return false;
+}
+
+bool ContextualFailure::tryProtocolConformanceFixIt(
+    InFlightDiagnostic &diagnostic) const {
+  auto innermostTyCtx = getDC()->getInnermostTypeContext();
+  if (!innermostTyCtx)
+    return false;
+
+  auto nominal = innermostTyCtx->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  // We need to get rid of optionals and parens as it's not relevant when
+  // printing the diagnostic and the fix-it.
+  auto unwrappedToType =
+      ToType->lookThroughAllOptionalTypes()->getWithoutParens();
+
+  // If the protocol requires a class & we don't have one (maybe the context
+  // is a struct), then bail out instead of offering a broken fix-it later on.
+  auto requiresClass = false;
+  if (unwrappedToType->isExistentialType()) {
+    if (auto protocolTy = unwrappedToType->getAs<ProtocolType>()) {
+      requiresClass = protocolTy->requiresClass();
+    } else if (auto compositionTy =
+                   unwrappedToType->getAs<ProtocolCompositionType>()) {
+      requiresClass = compositionTy->requiresClass();
+    }
+  }
+  if (requiresClass && !FromType->is<ClassType>()) {
+    return false;
+  }
+
+  // We can only offer a fix-it if we're assigning to a protocol type and
+  // the type we're assigning is the same as the innermost type context.
+  bool shouldOfferFixIt = nominal->getSelfTypeInContext()->isEqual(FromType) &&
+                          unwrappedToType->isExistentialType();
+  if (!shouldOfferFixIt)
+    return false;
+
+  diagnostic.flush();
+
+  // Let's build a list of protocols that the contextual type does not
+  // conform to. We will start by first checking if we have a protocol
+  // composition type and add all the individual types that the context
+  // does not conform to.
+  SmallVector<std::string, 8> missingProtoTypeStrings;
+  if (auto compositionTy = unwrappedToType->getAs<ProtocolCompositionType>()) {
+    for (auto memberTy : compositionTy->getMembers()) {
+      auto protocol = memberTy->getAnyNominal()->getSelfProtocolDecl();
+      if (!getTypeChecker().conformsToProtocol(
+              FromType, protocol, getDC(),
+              ConformanceCheckFlags::InExpression)) {
+        missingProtoTypeStrings.push_back(memberTy->getString());
+      }
+    }
+
+    // If we don't conform to all of the protocols in the composition, then
+    // store the composition type only. This is because we need to append
+    // 'Foo & Bar' instead of 'Foo, Bar' in order to match the written type.
+    if (missingProtoTypeStrings.size() == compositionTy->getMembers().size()) {
+      missingProtoTypeStrings = {compositionTy->getString()};
+    }
+  }
+
+  // If we didn't have a protocol composition type, it means we only have a
+  // single protocol, so just use it directly. Otherwise, construct a comma
+  // separated list of missing types.
+  std::string protoString;
+  if (missingProtoTypeStrings.empty()) {
+    protoString = unwrappedToType->getString();
+  } else if (missingProtoTypeStrings.size() == 1) {
+    protoString = missingProtoTypeStrings.front();
+  } else {
+    protoString = llvm::join(missingProtoTypeStrings, ", ");
+  }
+
+  // Emit a diagnostic to inform the user that they need to conform to the
+  // missing protocols.
+  //
+  // TODO: Maybe also insert the requirement stubs?
+  auto conformanceDiag = emitDiagnostic(
+      getAnchor()->getLoc(), diag::assign_protocol_conformance_fix_it,
+      unwrappedToType, nominal->getDescriptiveKind(), FromType);
+  if (nominal->getInherited().size() > 0) {
+    auto lastInherited = nominal->getInherited().back().getLoc();
+    auto lastInheritedEndLoc =
+        Lexer::getLocForEndOfToken(getASTContext().SourceMgr, lastInherited);
+    conformanceDiag.fixItInsert(lastInheritedEndLoc, ", " + protoString);
+  } else {
+    auto nameEndLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                                 nominal->getNameLoc());
+    conformanceDiag.fixItInsert(nameEndLoc, ": " + protoString);
+  }
+
+  return true;
 }
 
 void ContextualFailure::tryComputedPropertyFixIts(Expr *expr) const {

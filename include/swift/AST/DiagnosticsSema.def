@@ -459,6 +459,9 @@ ERROR(cannot_convert_coerce_nil,none,
 ERROR(cannot_convert_assign,none,
       "cannot assign value of type %0 to type %1",
       (Type,Type))
+NOTE(assign_protocol_conformance_fix_it,none,
+     "add missing conformance to %0 to %1 %2",
+     (Type, DescriptiveDeclKind, Type))
 ERROR(cannot_convert_assign_protocol,none,
       "value of type %0 does not conform to %1 in assignment",
       (Type, Type))
