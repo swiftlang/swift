@@ -1970,10 +1970,10 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
   if (isa<ProtocolDecl>(dc))
     entry = Allocate<LazyProtocolData>();
-  else if (isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc))
+  else {
+    assert(isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc));
     entry = Allocate<LazyIterableDeclContextData>();
-  else
-    entry = Allocate<LazyGenericContextData>();
+  }
 
   entry->loader = lazyLoader;
   return entry;
@@ -1990,13 +1990,6 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
   auto nominal = cast<NominalTypeDecl>(idc);
   return (LazyIterableDeclContextData *)getOrCreateLazyContextData(nominal,
                                                                    lazyLoader);
-}
-
-LazyGenericContextData *ASTContext::getOrCreateLazyGenericContextData(
-                                               const GenericContext *dc,
-                                               LazyMemberLoader *lazyLoader) {
-  return (LazyGenericContextData *)getOrCreateLazyContextData(dc,
-                                                              lazyLoader);
 }
 
 bool ASTContext::hasDelayedConformanceErrors() const {

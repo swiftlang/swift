@@ -1242,12 +1242,6 @@ public:
                                  uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
-  
-  /// Returns the generic environment.
-  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) override {
-    llvm_unreachable("unimplemented for ClangImporter");
-  }
 
   void loadRequirementSignature(const ProtocolDecl *decl, uint64_t contextData,
                                 SmallVectorImpl<Requirement> &reqs) override {

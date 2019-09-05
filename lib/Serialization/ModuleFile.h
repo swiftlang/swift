@@ -554,11 +554,6 @@ private:
   void readGenericRequirements(SmallVectorImpl<Requirement> &requirements,
                                llvm::BitstreamCursor &Cursor);
 
-  /// Set up a (potentially lazy) generic environment for the given type,
-  /// function or extension.
-  void configureGenericEnvironment(GenericContext *genericDecl,
-                                   serialization::GenericSignatureID envID);
-
   /// Populates the protocol's default witness table.
   ///
   /// Returns true if there is an error.
@@ -788,9 +783,6 @@ public:
 
   virtual void finishNormalConformance(NormalProtocolConformance *conformance,
                                        uint64_t contextData) override;
-
-  GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                             uint64_t contextData) override;
 
   void
   loadRequirementSignature(const ProtocolDecl *proto, uint64_t contextData,
