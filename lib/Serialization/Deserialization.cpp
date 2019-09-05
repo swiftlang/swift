@@ -808,24 +808,10 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
 }
 
 void ModuleFile::configureGenericEnvironment(
-    GenericContext *genericDecl, serialization::GenericSignatureID envID) {
-  if (envID == 0) return;
-
-  auto sigOrEnv = getGenericSignatureOrEnvironment(envID);
-
-  // If we just have a generic signature, set up lazy generic environment
-  // creation.
-  if (auto genericSig = sigOrEnv.dyn_cast<GenericSignature *>()) {
-    genericDecl->setLazyGenericEnvironment(this, genericSig, envID);
-    return;
-  }
-
-  // If we have a full generic environment, it's because it happened to be
-  // deserialized already. Record it directly.
-  if (auto genericEnv = sigOrEnv.dyn_cast<GenericEnvironment *>()) {
-    genericDecl->setGenericEnvironment(genericEnv);
-    return;
-  }
+    GenericContext *genericDecl, serialization::GenericSignatureID sigID) {
+  if (sigID == 0) return;
+  auto *genericSig = getGenericSignature(sigID);
+  genericDecl->setLazyGenericEnvironment(this, genericSig, sigID);
 }
 
 GenericSignature *ModuleFile::getGenericSignature(
@@ -835,20 +821,17 @@ GenericSignature *ModuleFile::getGenericSignature(
   // Zero is a sentinel for having no generic signature.
   if (ID == 0) return nullptr;
 
-  assert(ID <= GenericSignaturesAndEnvironments.size() &&
+  assert(ID <= GenericSignatures.size() &&
          "invalid GenericSignature ID");
-  auto &sigOrEnvOrOffset = GenericSignaturesAndEnvironments[ID-1];
+  auto &sigOffset = GenericSignatures[ID-1];
 
   // If we've already deserialized this generic signature, return it.
-  if (sigOrEnvOrOffset.isComplete()) {
-    if (auto *env = sigOrEnvOrOffset.get().dyn_cast<GenericEnvironment *>())
-      return env->getGenericSignature();
-    return sigOrEnvOrOffset.get().get<GenericSignature *>();
-  }
+  if (sigOffset.isComplete())
+    return sigOffset.get();
 
   // Read the generic signature.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  DeclTypeCursor.JumpToBit(sigOrEnvOrOffset);
+  DeclTypeCursor.JumpToBit(sigOffset);
 
   // Read the parameter types.
   SmallVector<GenericTypeParamType *, 4> paramTypes;
@@ -909,49 +892,14 @@ GenericSignature *ModuleFile::getGenericSignature(
   // If we've already deserialized this generic signature, start over to return
   // it directly.
   // FIXME: Is this kind of re-entrancy actually possible?
-  if (sigOrEnvOrOffset.isComplete())
+  if (sigOffset.isComplete())
     return getGenericSignature(ID);
 
   // Construct the generic signature from the loaded parameters and
   // requirements.
   auto signature = GenericSignature::get(paramTypes, requirements);
-  sigOrEnvOrOffset = signature;
+  sigOffset = signature;
   return signature;
-}
-
-ModuleFile::GenericSignatureOrEnvironment
-ModuleFile::getGenericSignatureOrEnvironment(
-    serialization::GenericSignatureID ID,
-    bool wantEnvironment) {
-  // The empty result with the type the caller expects.
-  GenericSignatureOrEnvironment result;
-  if (wantEnvironment)
-    result = static_cast<GenericEnvironment *>(nullptr);
-
-  // Zero is a sentinel for having no generic environment.
-  if (ID == 0) return result;
-
-  assert(ID <= GenericSignaturesAndEnvironments.size() &&
-         "invalid GenericEnvironment ID");
-  auto &sigOrEnvOrOffset = GenericSignaturesAndEnvironments[ID-1];
-
-  if (!sigOrEnvOrOffset.isComplete()) {
-    // Force the loading process by fetching the generic signature.
-    (void)getGenericSignature(ID);
-    assert(sigOrEnvOrOffset.isComplete());
-  }
-
-  if (wantEnvironment)
-    if (auto *sig = sigOrEnvOrOffset.get().dyn_cast<GenericSignature *>())
-      sigOrEnvOrOffset.uncheckedOverwrite(sig->getGenericEnvironment());
-
-  return sigOrEnvOrOffset.get();
-}
-
-GenericEnvironment *
-ModuleFile::getGenericEnvironment(serialization::GenericSignatureID ID) {
-  return getGenericSignatureOrEnvironment(ID, /*wantEnvironment=*/true)
-           .get<GenericEnvironment *>();
 }
 
 SubstitutionMap ModuleFile::getSubstitutionMap(
@@ -3040,16 +2988,16 @@ public:
     DeclContextID contextID;
     GenericSignatureID interfaceSigID;
     TypeID interfaceTypeID;
-    GenericSignatureID genericEnvID;
+    GenericSignatureID genericSigID;
     SubstitutionMapID underlyingTypeID;
     
     decls_block::OpaqueTypeLayout::readRecord(scratch, contextID,
                                               namingDeclID, interfaceSigID,
-                                              interfaceTypeID, genericEnvID,
+                                              interfaceTypeID, genericSigID,
                                               underlyingTypeID);
     
     auto declContext = MF.getDeclContext(contextID);
-    auto sig = MF.getGenericSignature(interfaceSigID);
+    auto interfaceSig = MF.getGenericSignature(interfaceSigID);
     auto interfaceType = MF.getType(interfaceTypeID)
                             ->castTo<GenericTypeParamType>();
     
@@ -3060,7 +3008,7 @@ public:
     // Create the decl.
     auto opaqueDecl =
       new (ctx) OpaqueTypeDecl(nullptr, nullptr, declContext,
-                               sig, interfaceType);
+                               interfaceSig, interfaceType);
     declOrOffset = opaqueDecl;
 
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
@@ -3069,14 +3017,15 @@ public:
     if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl))
       opaqueDecl->setGenericParams(genericParams);
 
-    auto genericEnv = MF.getGenericEnvironment(genericEnvID);
-    opaqueDecl->setGenericEnvironment(genericEnv);
+    auto genericSig = MF.getGenericSignature(genericSigID);
+    if (genericSig)
+      opaqueDecl->setGenericEnvironment(genericSig->getGenericEnvironment());
     if (underlyingTypeID)
       opaqueDecl->setUnderlyingTypeSubstitutions(
                                        MF.getSubstitutionMap(underlyingTypeID));
     SubstitutionMap subs;
-    if (genericEnv) {
-      subs = genericEnv->getGenericSignature()->getIdentitySubstitutionMap();
+    if (genericSig) {
+      subs = genericSig->getIdentitySubstitutionMap();
     }
     auto opaqueTy = OpaqueTypeArchetypeType::get(opaqueDecl, subs);
     auto metatype = MetatypeType::get(opaqueTy);
@@ -4727,18 +4676,19 @@ public:
 
   Expected<Type> deserializePrimaryArchetypeType(ArrayRef<uint64_t> scratch,
                                                  StringRef blobData) {
-    GenericSignatureID envID;
+    GenericSignatureID sigID;
     unsigned depth, index;
 
-    decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, envID,
+    decls_block::PrimaryArchetypeTypeLayout::readRecord(scratch, sigID,
                                                         depth, index);
 
-    auto env = MF.getGenericEnvironment(envID);
-    if (!env)
+    auto sig = MF.getGenericSignature(sigID);
+    if (!sig)
       MF.fatal();
 
     Type interfaceType = GenericTypeParamType::get(depth, index, ctx);
-    Type contextType = env->mapTypeIntoContext(interfaceType);
+    Type contextType = sig->getGenericEnvironment()
+        ->mapTypeIntoContext(interfaceType);
 
     if (contextType->hasError())
       MF.fatal();
@@ -4777,18 +4727,7 @@ public:
     
     auto rootTy = MF.getType(rootID)->castTo<ArchetypeType>();
     auto interfaceTy = MF.getType(interfaceTyID)->castTo<DependentMemberType>();
-    auto rootInterfaceTy = interfaceTy->getRootGenericParam();
-    
-    auto sig = rootTy->getGenericEnvironment()->getGenericSignature();
-    
-    auto subs = SubstitutionMap::get(sig,
-      [&](SubstitutableType *t) -> Type {
-        if (t->isEqual(rootInterfaceTy))
-          return rootTy;
-        return t;
-      }, LookUpConformanceInModule(MF.getAssociatedModule()));
-    
-    return Type(interfaceTy).subst(subs);
+    return rootTy->getGenericEnvironment()->mapTypeIntoContext(interfaceTy);
   }
 
   Expected<Type> deserializeGenericTypeParamType(ArrayRef<uint64_t> scratch,
@@ -5561,7 +5500,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
 GenericEnvironment *ModuleFile::loadGenericEnvironment(const DeclContext *decl,
                                                        uint64_t contextData) {
-  return getGenericEnvironment(contextData);
+  return decl->getGenericSignatureOfContext()->getGenericEnvironment();
 }
 
 void ModuleFile::loadRequirementSignature(const ProtocolDecl *decl,

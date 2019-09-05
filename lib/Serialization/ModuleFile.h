@@ -316,17 +316,8 @@ private:
   /// Types referenced by this module.
   MutableArrayRef<Serialized<Type>> Types;
 
-  using GenericSignatureOrEnvironment =
-      llvm::PointerUnion<GenericSignature *, GenericEnvironment *>;
-
-  /// Generic signatures and environments referenced by this module.
-  ///
-  /// Technically only the GenericSignatures are encoded, but storing the
-  /// environment here too allows caching them.
-  // FIXME: That caching should be done at the AST level; it's not specific to
-  // Serialization.
-  MutableArrayRef<Serialized<GenericSignatureOrEnvironment>>
-      GenericSignaturesAndEnvironments;
+  /// Generic signatures referenced by this module.
+  MutableArrayRef<Serialized<GenericSignature *>> GenericSignatures;
 
   /// Substitution maps referenced by this module.
   MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
@@ -876,21 +867,6 @@ public:
 
   /// Returns the generic signature for the given ID.
   GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);
-
-  /// Returns the generic signature or environment for the given ID,
-  /// deserializing it if needed.
-  ///
-  /// \param wantEnvironment If true, always return the full generic
-  /// environment. Otherwise, only return the generic environment if it's
-  /// already been constructed, and the signature in other cases.
-  GenericSignatureOrEnvironment
-  getGenericSignatureOrEnvironment(serialization::GenericSignatureID ID,
-                                   bool wantEnvironment = false);
-
-  /// Returns the generic environment for the given ID, deserializing it if
-  /// needed.
-  GenericEnvironment *
-  getGenericEnvironment(serialization::GenericSignatureID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.
