@@ -289,7 +289,7 @@ public:
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_REQUEST(Zone, RequestType)                         \
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \

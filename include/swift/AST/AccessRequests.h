@@ -75,14 +75,15 @@ public:
   void cacheResult(AccessLevel value) const;
 };
 
+using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
+
 /// Request the Default and Max AccessLevels of the given ExtensionDecl.
 class DefaultAndMaxAccessLevelRequest :
     public SimpleRequest<DefaultAndMaxAccessLevelRequest,
-                         std::pair<AccessLevel, AccessLevel>(ExtensionDecl *),
+                         DefaultAndMax(ExtensionDecl *),
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-  using DefaultAndMax = std::pair<AccessLevel, AccessLevel>;
 private:
   friend SimpleRequest;
 
@@ -104,7 +105,7 @@ public:
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_REQUEST(Zone, RequestType)                         \
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \

@@ -138,10 +138,10 @@ public:
 
 /// Request to determine the set of declarations that were are overridden
 /// by the given declaration.
-class OverriddenDeclsRequest
-  : public SimpleRequest<OverriddenDeclsRequest,
-                         llvm::TinyPtrVector<ValueDecl *>(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+class OverriddenDeclsRequest :
+  public SimpleRequest<OverriddenDeclsRequest,
+                       llvm::TinyPtrVector<ValueDecl *>(ValueDecl *),
+                       CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -183,7 +183,7 @@ public:
 void simple_display(llvm::raw_ostream &out, CtorInitializerKind initKind);
 
 /// Computes the kind of initializer for a given \c ConstructorDecl
-class InitKindRequest:
+class InitKindRequest :
     public SimpleRequest<InitKindRequest,
                          CtorInitializerKind(ConstructorDecl *),
                          CacheKind::Cached> {
@@ -203,7 +203,7 @@ public:
 };
 
 /// Determine whether the given protocol declaration is class-bounded.
-class ProtocolRequiresClassRequest:
+class ProtocolRequiresClassRequest :
     public SimpleRequest<ProtocolRequiresClassRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
@@ -229,7 +229,7 @@ public:
 
 /// Determine whether an existential conforming to a protocol can be matched
 /// with a generic type parameter constrained to that protocol.
-class ExistentialConformsToSelfRequest:
+class ExistentialConformsToSelfRequest :
     public SimpleRequest<ExistentialConformsToSelfRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
@@ -255,7 +255,7 @@ public:
 
 /// Determine whether we are allowed to refer to an existential type conforming
 /// to this protocol.
-class ExistentialTypeSupportedRequest:
+class ExistentialTypeSupportedRequest :
     public SimpleRequest<ExistentialTypeSupportedRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
@@ -1195,7 +1195,7 @@ void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_REQUEST(Zone, RequestType)                         \
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
