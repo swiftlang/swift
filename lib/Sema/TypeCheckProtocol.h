@@ -347,20 +347,6 @@ public:
   SourceLoc getOptionalityLoc(TypeRepr *tyR) const;
 };
 
-/// Describes the position for optional adjustment made to a witness
-enum class OptionalAdjustmentPosition : unsigned {
-  /// The type of a variable.
-  VarType = 0,
-  /// The result type of something.
-  Result = 1,
-  /// The parameter type of something.
-  Param = 2,
-  /// The parameter types of something.
-  MultipleParam = 3,
-  /// Both return and parameter adjustments.
-  ParamAndReturn = 4,
-};
-
 /// Describes a match between a requirement and a witness.
 struct RequirementMatch {
   RequirementMatch(ValueDecl *witness, MatchKind kind,
