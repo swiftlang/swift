@@ -620,7 +620,7 @@ public:
     return Signature;
   }
 
-  bool operator==(const swift::CanGenericSignature& other) {
+  bool operator==(const swift::CanGenericSignature &other) {
     return Signature == other.Signature;
   }
 };

@@ -943,7 +943,7 @@ ModuleFile::getGenericSignatureOrEnvironment(
 
   if (wantEnvironment)
     if (auto *sig = sigOrEnvOrOffset.get().dyn_cast<GenericSignature *>())
-      sigOrEnvOrOffset.uncheckedOverwrite(sig->createGenericEnvironment());
+      sigOrEnvOrOffset.uncheckedOverwrite(sig->getGenericEnvironment());
 
   return sigOrEnvOrOffset.get();
 }

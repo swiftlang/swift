@@ -453,7 +453,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
           std::move(requirements)
         },
         nullptr);
-    genericEnv = genericSig->createGenericEnvironment();
+    genericEnv = genericSig->getGenericEnvironment();
   } else {
     genericEnv = classDecl->getGenericEnvironment();
   }

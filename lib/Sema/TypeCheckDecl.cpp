@@ -4479,7 +4479,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   }
 
   // Form the generic environment.
-  return sig->createGenericEnvironment();
+  return sig->getGenericEnvironment();
 }
 
 static bool isNonGenericTypeAliasType(Type type) {

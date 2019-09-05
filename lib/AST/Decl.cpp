@@ -884,7 +884,7 @@ GenericContext::getLazyGenericEnvironmentSlow() const {
   if (auto PD = dyn_cast<ProtocolDecl>(this)) {
     // The signature of a Protocol is trivial (Self: TheProtocol) so let's
     // compute it directly.
-    auto *genericEnv = getGenericSignature()->createGenericEnvironment();
+    auto *genericEnv = getGenericSignature()->getGenericEnvironment();
     const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
     return genericEnv;
   }

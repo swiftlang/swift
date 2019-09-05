@@ -8044,7 +8044,7 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
 // Calculate the generic environment from an imported generic param list.
 GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
     GenericParamList *genericParams, DeclContext *dc) {
-  return buildGenericSignature(genericParams, dc)->createGenericEnvironment();
+  return buildGenericSignature(genericParams, dc)->getGenericEnvironment();
 }
 
 DeclContext *

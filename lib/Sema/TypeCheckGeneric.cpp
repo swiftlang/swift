@@ -555,7 +555,7 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
       llvm::errs() << "\n";
     }
 
-    genCtx->setGenericEnvironment(sig->createGenericEnvironment());
+    genCtx->setGenericEnvironment(sig->getGenericEnvironment());
   }
 
   auto resolution = TypeResolution::forInterface(genCtx, sig);
@@ -629,7 +629,7 @@ GenericEnvironment *TypeChecker::checkGenericEnvironment(
 
 
   // Form the generic environment.
-  return sig->createGenericEnvironment();
+  return sig->getGenericEnvironment();
 }
 
 void TypeChecker::validateGenericTypeSignature(GenericTypeDecl *typeDecl) {

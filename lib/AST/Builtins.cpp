@@ -479,7 +479,7 @@ namespace {
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
           nullptr);
-      GenericEnv = GenericSig->createGenericEnvironment();
+      GenericEnv = GenericSig->getGenericEnvironment();
     }
 
     template <class G>

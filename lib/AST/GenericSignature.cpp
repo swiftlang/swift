@@ -339,9 +339,13 @@ GenericSignature::getCanonicalSignature() const {
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
-GenericEnvironment *GenericSignature::createGenericEnvironment() {
-  auto *builder = getGenericSignatureBuilder();
-  return GenericEnvironment::getIncomplete(this, builder);
+GenericEnvironment *GenericSignature::getGenericEnvironment() {
+  if (GenericEnv == nullptr) {
+    auto *builder = getGenericSignatureBuilder();
+    GenericEnv = GenericEnvironment::getIncomplete(this, builder);
+  }
+
+  return GenericEnv;
 }
 
 
