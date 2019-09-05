@@ -224,10 +224,8 @@ TypeRepr *ASTGen::generate(AttributedTypeSyntax Type, SourceLoc &Loc) {
 
       if (AttrKind == TAK_convention) {
         auto Argument = Attr.getArgument()->castTo<TokenSyntax>();
-        auto Begin = advanceLocBegin(Loc, Argument);
-        auto End = advanceLocEnd(Loc, Argument);
-        CharSourceRange Range{Context.SourceMgr, Begin, End};
-        TypeAttrs.convention = Range.str();
+        auto Convention = Context.getIdentifier(Argument.getText());
+        TypeAttrs.convention = Convention.str();
       }
 
       if (AttrKind == TAK_opened) {
@@ -543,15 +541,6 @@ StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
 
 SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
   return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
-}
-
-SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const TokenSyntax &Token) {
-  return advanceLocAfter(Loc, Token.withTrailingTrivia({}));
-}
-
-SourceLoc ASTGen::advanceLocAfter(const SourceLoc &Loc, const Syntax &Node) {
-  return Loc.getAdvancedLoc(
-      Node.getAbsoluteEndPositionAfterTrailingTrivia().getOffset());
 }
 
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
