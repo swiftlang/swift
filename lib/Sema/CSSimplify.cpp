@@ -3032,9 +3032,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case TypeKind::TypeVariable:
       llvm_unreachable("type variables should have already been handled by now");
 
-    case TypeKind::DependentMember:
-      // Nothing we can solve.
+    case TypeKind::DependentMember: {
+      // If neither side here has any type variables,
+      // this comparison is effectively illformed and
+      // we wouldn't be able to solve this constraint,
+      // so let's just fail.
+      if (!desugar1->hasTypeVariable() && !desugar2->hasTypeVariable())
+        return getTypeMatchFailure(locator);
+
+      // Nothing we can solve, have to wait until
+      // dependent types are resolved.
       return formUnsolvedResult();
+    }
 
     case TypeKind::Module:
     case TypeKind::PrimaryArchetype:
@@ -3992,7 +4001,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
-        if (!recordFix(fix)) {
+        unsigned choiceImpact = 0;
+        // If this requirement is associated with overload choice let's
+        // tie implact how many times this non-conforming type is mentioned.
+        if (auto *ODRE = dyn_cast_or_null<OverloadedDeclRefExpr>(anchor)) {
+          auto *choice = findSelectedOverloadFor(ODRE);
+          if (typeVar && choice) {
+            choice->ImpliedType.visit([&](Type type) {
+              if (type->isEqual(typeVar))
+                ++choiceImpact;
+            });
+          }
+        }
+
+        if (!recordFix(fix, choiceImpact == 0 ? 1 : choiceImpact)) {
           // Record this conformance requirement as "fixed".
           recordFixedRequirement(type, RequirementKind::Conformance,
                                  protocolTy);
@@ -7330,7 +7352,7 @@ static bool isAugmentingFix(ConstraintFix *fix) {
   }
 }
 
-bool ConstraintSystem::recordFix(ConstraintFix *fix) {
+bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
   auto &ctx = getASTContext();
   if (ctx.LangOpts.DebugConstraintSolver) {
     auto &log = ctx.TypeCheckerDebug->getStream();
@@ -7346,7 +7368,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix) {
   if (!fix->isWarning()) {
     // Otherswise increase the score. If this would make the current
     // solution worse than the best solution we've seen already, stop now.
-    increaseScore(SK_Fix);
+    increaseScore(SK_Fix, impact);
     if (worseThanBestSolution())
       return true;
   }
