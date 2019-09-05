@@ -1103,6 +1103,43 @@ public:
   }
 };
 
+class InferredGenericSignatureRequest :
+    public SimpleRequest<InferredGenericSignatureRequest,
+                         GenericSignature *(ModuleDecl *,
+                                            GenericSignature *,
+                                            SmallVector<GenericParamList *, 2>,
+                                            SmallVector<Requirement, 2>,
+                                            SmallVector<TypeLoc, 2>,
+                                            bool),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator,
+           ModuleDecl *module,
+           GenericSignature *baseSignature,
+           SmallVector<GenericParamList *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements,
+           SmallVector<TypeLoc, 2> inferenceSources,
+           bool allowConcreteGenericParams) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+
+  /// Inferred generic signature requests don't have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const TypeLoc source);
+
 class ExtendedTypeRequest
     : public SimpleRequest<ExtendedTypeRequest,
                            Type(ExtensionDecl *),
@@ -1149,6 +1186,7 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
 }
 
 void simple_display(llvm::raw_ostream &out, Type value);
+void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"

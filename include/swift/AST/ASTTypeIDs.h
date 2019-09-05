@@ -26,6 +26,7 @@ class Decl;
 class GenericSignature;
 class GenericTypeParamType;
 class IterableDeclContext;
+class ModuleDecl;
 class NominalTypeDecl;
 class OperatorDecl;
 struct PropertyWrapperBackingPropertyInfo;
