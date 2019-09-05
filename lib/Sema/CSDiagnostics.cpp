@@ -20,6 +20,7 @@
 #include "TypoCorrection.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
@@ -2452,12 +2453,7 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   // is a struct), then bail out instead of offering a broken fix-it later on.
   auto requiresClass = false;
   if (unwrappedToType->isExistentialType()) {
-    if (auto protocolTy = unwrappedToType->getAs<ProtocolType>()) {
-      requiresClass = protocolTy->requiresClass();
-    } else if (auto compositionTy =
-                   unwrappedToType->getAs<ProtocolCompositionType>()) {
-      requiresClass = compositionTy->requiresClass();
-    }
+    requiresClass = unwrappedToType->getExistentialLayout().requiresClass();
   }
   if (requiresClass && !FromType->is<ClassType>()) {
     return false;
@@ -2486,7 +2482,6 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
         missingProtoTypeStrings.push_back(memberTy->getString());
       }
     }
-
     // If we don't conform to all of the protocols in the composition, then
     // store the composition type only. This is because we need to append
     // 'Foo & Bar' instead of 'Foo, Bar' in order to match the written type.
