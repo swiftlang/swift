@@ -753,6 +753,57 @@ void Parser::skipSingle() {
   }
 }
 
+void Parser::ignoreToken() {
+  ParsedTriviaList Skipped;
+  Skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
+  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+            std::back_inserter(Skipped));
+  Skipped.emplace_back(TriviaKind::GarbageText, Tok.getText().size());
+  std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
+            std::back_inserter(Skipped));
+
+  consumeTokenWithoutFeedingReceiver();
+
+  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+            std::back_inserter(Skipped));
+  LeadingTrivia = {std::move(Skipped)};
+}
+
+void Parser::ignoreSingle() {
+  switch (Tok.getKind()) {
+  case tok::l_paren:
+      ignoreToken();
+    ignoreUntil(tok::r_paren);
+    ignoreIf(tok::r_paren);
+    break;
+  case tok::l_brace:
+    ignoreToken();
+    ignoreUntil(tok::r_brace);
+    ignoreIf(tok::r_brace);
+    break;
+  case tok::l_square:
+    ignoreToken();
+    ignoreUntil(tok::r_square);
+    ignoreIf(tok::r_square);
+    break;
+  case tok::pound_if:
+  case tok::pound_else:
+  case tok::pound_elseif:
+    ignoreToken();
+    ignoreUntil(tok::pound_endif);
+    ignoreIf(tok::pound_endif);
+    break;
+  default:
+    ignoreToken();
+    break;
+  }
+}
+
+void Parser::ignoreUntil(tok Kind) {
+  while (Tok.isNot(Kind, tok::eof, tok::pound_endif, tok::code_complete))
+    ignoreSingle();
+}
+
 void Parser::skipUntilSyntax(llvm::SmallVectorImpl<ParsedSyntax> &Skipped,
                              tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
@@ -774,6 +825,30 @@ void Parser::skipUntilAnyOperator() {
   while (Tok.isNot(tok::eof, tok::pound_endif, tok::code_complete) &&
          Tok.isNotAnyOperator())
     skipSingle();
+}
+
+bool Parser::ignoreUntilGreaterInTypeList() {
+  while (true) {
+    switch (Tok.getKind()) {
+    case tok::eof:
+    case tok::l_brace:
+    case tok::r_brace:
+    case tok::code_complete:
+      return false;
+
+#define KEYWORD(X) case tok::kw_##X:
+#define POUND_KEYWORD(X) case tok::pound_##X:
+#include "swift/Syntax/TokenKinds.def"
+      if (isStartOfStmt() || isStartOfDecl() || Tok.is(tok::pound_endif))
+        return false;
+      break;
+    default:
+      if (startsWithGreater(Tok))
+        return true;
+      break;
+    }
+    ignoreSingle();
+  }
 }
 
 void Parser::skipUntilGreaterInTypeListSyntax(

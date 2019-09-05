@@ -695,6 +695,25 @@ public:
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1);
 
+  void ignoreToken();
+  void ignoreToken(tok Kind) {
+    assert(Tok.is(Kind));
+    ignoreToken();
+  }
+  bool ignoreIf(tok Kind) {
+    if (!Tok.is(Kind))
+      return false;
+    ignoreToken();
+    return true;
+  }
+  void ignoreSingle();
+  void ignoreUntil(tok Kind);
+
+  /// Ignore tokens until a token that starts with '>', and return true it if
+  /// found. Applies heuristics that are suitable when trying to find the end
+  /// of a list of generic parameters, generic arguments.
+  bool ignoreUntilGreaterInTypeList();
+
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
