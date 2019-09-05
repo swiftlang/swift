@@ -224,9 +224,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   if (auto overload = getChoiceFor(anchor)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
-    if (auto *decl = overload->choice.getDeclOrNull())
-      callee = decl;
-
+    callee = overload->choice.getDeclOrNull();
     rawFnType = overload->openedType;
   } else {
     // If we didn't resolve an overload for the callee, we must be dealing with
@@ -234,10 +232,15 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     auto *call = cast<CallExpr>(anchor);
     assert(!shouldHaveDirectCalleeOverload(call) &&
            "Should we have resolved a callee for this?");
-    rawFnType = cs.getType(call->getFn())->getRValueType();
+    rawFnType = cs.getType(call->getFn());
   }
 
-  auto *fnType = resolveType(rawFnType)->getAs<FunctionType>();
+  // Try to resolve the function type by loading lvalues and looking through
+  // optional types, which can occur for expressions like `fn?(5)`.
+  auto *fnType = resolveType(rawFnType)
+                     ->getRValueType()
+                     ->lookThroughAllOptionalTypes()
+                     ->getAs<FunctionType>();
   if (!fnType)
     return None;
 
