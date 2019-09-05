@@ -2494,15 +2494,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
   assert(!missingProtoTypeStrings.empty() &&
          "type already conforms to all the protocols?");
 
-  // If we didn't have a protocol composition type, it means we only have a
-  // single protocol, so just use it directly. Otherwise, construct a comma
-  // separated list of missing types.
-  std::string protoString;
-  if (missingProtoTypeStrings.size() == 1) {
-    protoString = missingProtoTypeStrings.front();
-  } else {
-    protoString = llvm::join(missingProtoTypeStrings, ", ");
-  }
+  // Combine all protocol names together, separated by commas.
+  std::string protoString = llvm::join(missingProtoTypeStrings, ", ");
 
   // Emit a diagnostic to inform the user that they need to conform to the
   // missing protocols.
