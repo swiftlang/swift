@@ -393,6 +393,27 @@ function is_swift_lto_enabled() {
     fi
 }
 
+# SWIFT_ENABLE_TENSORFLOW
+# Copy a file to a destination directory.
+# If the file is a symbolic link, then copy the underlying file to the
+# destination and create a new symlink. Otherwise, copy the file directly.
+function copy_file_preserving_symlinks() {
+  # $1: source directory.
+  # $2: source file basename.
+  # $3: destination directory.
+
+  # If source file is a symlink, then copy the underlying file to the
+  # destination and create a new symlink.
+  if [[ -L "$1/$2" ]]; then
+    local target=`readlink "$1/$2"`
+    copy_file_preserving_symlinks "$1" "$target" "$3"
+    ln -sv "$3/$target" -f -r "$3/$2"
+  # Otherwise, directly copy the source file to the destination.
+  else
+    cp -v "$1/$2" "$3"
+  fi
+}
+
 # Support for performing isolated actions.
 #
 # This is part of refactoring more work to be done or controllable via
@@ -4013,9 +4034,12 @@ for host in "${ALL_HOSTS[@]}"; do
                 mkdir -p "${TF_DEST_DIR}"
                 for lib_name in tensorflow; do
                     lib=".*lib${lib_name}.so[0-9.]*"
-                    dylib=".*lib${lib_name}[0-9.]*.dylib"
-                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec echo "{} => ${TF_DEST_DIR}" \;
-                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
+                    # Wipe existing TensorFlow libraries in the destination
+                    # directory. This ensures that old versions of libraries
+                    # are not copied, taking up unnecessary space.
+                    rm -rf "${TF_DEST_DIR}/${lib}"
+                    # Copy TensorFlow library, preserving symlinks.
+                    copy_file_preserving_symlinks "${TF_LIBDIR}" "lib${lib_name}.so" "${TF_DEST_DIR}"
                 done
                 continue
                 ;;
