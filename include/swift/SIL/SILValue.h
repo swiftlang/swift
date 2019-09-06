@@ -275,6 +275,27 @@ public:
   template <class T>
   inline T *getSingleUserOfType() const;
 
+  /// Helper struct for DowncastUserFilterRange
+  struct UseToUser;
+
+  template <typename Subclass>
+  using DowncastUserFilterRange =
+      DowncastFilterRange<Subclass,
+                          llvm::iterator_range<llvm::mapped_iterator<
+                              use_iterator, UseToUser, SILInstruction *>>>;
+
+  /// Iterate over the use list of this ValueBase visiting all users that are of
+  /// class T.
+  ///
+  /// Example:
+  ///
+  ///   ValueBase *v = ...;
+  ///   for (CopyValueInst *cvi : v->getUsersOfType<CopyValueInst>()) { ... }
+  ///
+  /// NOTE: Uses llvm::dyn_cast internally.
+  template <typename T>
+  inline DowncastUserFilterRange<T> getUsersOfType() const;
+
   /// Return the instruction that defines this value, or null if it is
   /// not defined by an instruction.
   const SILInstruction *getDefiningInstruction() const {
@@ -715,6 +736,25 @@ inline T *ValueBase::getSingleUserOfType() const {
     }
   }
   return Result;
+}
+
+struct ValueBase::UseToUser {
+  SILInstruction *operator()(const Operand *use) const {
+    return const_cast<SILInstruction *>(use->getUser());
+  }
+  SILInstruction *operator()(const Operand &use) const {
+    return const_cast<SILInstruction *>(use.getUser());
+  }
+  SILInstruction *operator()(Operand *use) { return use->getUser(); }
+  SILInstruction *operator()(Operand &use) { return use.getUser(); }
+};
+
+template <typename T>
+inline ValueBase::DowncastUserFilterRange<T> ValueBase::getUsersOfType() const {
+  auto begin = llvm::map_iterator(use_begin(), UseToUser());
+  auto end = llvm::map_iterator(use_end(), UseToUser());
+  auto transformRange = llvm::make_range(begin, end);
+  return makeDowncastFilterRange<T>(transformRange);
 }
 
 /// A constant-size list of the operands of an instruction.
