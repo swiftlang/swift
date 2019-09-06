@@ -74,6 +74,70 @@ public:
   /// Base visitor that does not do anything.
   SILInstruction *visitSILInstruction(SILInstruction *) { return nullptr; }
 
+  /// \returns whether all the values are of trivial type in the provided
+  ///          function.
+  template <typename Values>
+  static bool areAllValuesTrivial(Values values, SILFunction &function) {
+    return llvm::all_of(values, [&](SILValue value) -> bool {
+      return value->getType().isTrivial(function);
+    });
+  }
+
+  SILInstruction *visitApplyInst(ApplyInst *instruction) {
+    // Apply this pass only to partial applies all of whose arguments are
+    // trivial.
+    auto calledValue = instruction->getCallee();
+    if (calledValue == nullptr) {
+      return nullptr;
+    }
+    auto fullApplyCallee = calledValue->getDefiningInstruction();
+    if (fullApplyCallee == nullptr) {
+      return nullptr;
+    }
+    auto partialApply = dyn_cast<PartialApplyInst>(fullApplyCallee);
+    if (partialApply == nullptr) {
+      return nullptr;
+    }
+    auto *function = partialApply->getCalleeFunction();
+    if (function == nullptr) {
+      return nullptr;
+    }
+    ApplySite fullApplySite(instruction);
+    auto fullApplyArguments = fullApplySite.getArguments();
+    if (!areAllValuesTrivial(fullApplyArguments, *function)) {
+      return nullptr;
+    }
+    auto partialApplyArguments = ApplySite(partialApply).getArguments();
+    if (!areAllValuesTrivial(partialApplyArguments, *function)) {
+      return nullptr;
+    }
+
+    auto callee = partialApply->getCallee();
+
+    ApplySite partialApplySite(partialApply);
+
+    SmallVector<SILValue, 8> argsVec;
+    llvm::copy(fullApplyArguments, std::back_inserter(argsVec));
+    llvm::copy(partialApplyArguments, std::back_inserter(argsVec));
+
+    SILBuilderWithScope builder(instruction, &createdInstructions);
+    ApplyInst *replacement = builder.createApply(
+        /*Loc=*/instruction->getDebugLocation().getLocation(), /*Fn=*/callee,
+        /*Subs=*/partialApply->getSubstitutionMap(),
+        /*Args*/ argsVec,
+        /*isNonThrowing=*/instruction->isNonThrowing(),
+        /*SpecializationInfo=*/partialApply->getSpecializationInfo());
+
+    worklist.replaceInstructionWithInstruction(instruction, replacement
+#ifndef NDEBUG
+                                               ,
+                                               /*instructionDescription=*/""
+#endif
+    );
+    tryDeleteDeadClosure(partialApply, instModCallbacks);
+    return nullptr;
+  }
+
   void addReachableCodeToWorklist(SILFunction &function) {
     SmallBlotSetVector<SILBasicBlock *, 32> blockWorklist;
     SmallBlotSetVector<SILBasicBlock *, 32> blocksVisited;
