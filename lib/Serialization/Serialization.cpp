@@ -2180,25 +2180,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
 
     case DAK_Available: {
-#define LIST_VER_TUPLE_PIECES(X)\
-    X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
-#define DEF_VER_TUPLE_PIECES(X, X_Expr)\
-    unsigned X##_Major = 0, X##_Minor = 0, X##_Subminor = 0,\
-             X##_HasMinor = 0, X##_HasSubminor = 0;\
-    const auto &X##_Val = X_Expr;\
-    if (X##_Val.hasValue()) {\
-      const auto &Y = X##_Val.getValue();\
-      X##_Major = Y.getMajor();\
-      X##_Minor = Y.getMinor().getValueOr(0);\
-      X##_Subminor = Y.getSubminor().getValueOr(0);\
-      X##_HasMinor = Y.getMinor().hasValue();\
-      X##_HasSubminor = Y.getSubminor().hasValue();\
-    }
-
       auto *theAttr = cast<AvailableAttr>(DA);
-      DEF_VER_TUPLE_PIECES(Introduced, theAttr->Introduced)
-      DEF_VER_TUPLE_PIECES(Deprecated, theAttr->Deprecated)
-      DEF_VER_TUPLE_PIECES(Obsoleted, theAttr->Obsoleted)
+      ENCODE_VER_TUPLE(Introduced, theAttr->Introduced)
+      ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
+      ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
@@ -2218,8 +2203,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->Rename.size(),
           blob);
       return;
-#undef LIST_VER_TUPLE_PIECES
-#undef DEF_VER_TUPLE_PIECES
     }
 
     case DAK_ObjC: {
