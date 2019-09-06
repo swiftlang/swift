@@ -30,6 +30,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -4545,10 +4546,10 @@ namespace {
                       Impl.SwiftContext, loc,
                       nullptr,
                       { }, dc, nullptr, decl);
-      Impl.SwiftContext
-          .evaluator
-          .cacheOutput(ExtendedTypeRequest{result},
-                       objcClass->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
+                                              objcClass->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
+                                              objcClass);
       
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
@@ -8126,6 +8127,8 @@ ClangImporter::Implementation::importDeclContextOf(
                                    getClangModuleForDecl(decl), nullptr);
   SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{ext},
                                      nominal->getDeclaredType());
+  SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{ext},
+                                     std::move(nominal));
   ext->setValidationToChecked();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 

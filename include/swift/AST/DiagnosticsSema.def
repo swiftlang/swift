@@ -1616,6 +1616,11 @@ ERROR(inferred_opaque_type,none,
 // Extensions
 ERROR(non_nominal_extension,none,
       "non-nominal type %0 cannot be extended", (Type))
+WARNING(composition_in_extended_type,none,
+        "extending a protocol composition is not supported; extending %0 "
+        "instead", (Type))
+NOTE(composition_in_extended_type_alternative,none,
+     "did you mean to extend the most specific type %0 instead?", (Type))
 ERROR(extension_access_with_conformances,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
