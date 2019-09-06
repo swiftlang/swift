@@ -609,6 +609,7 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 
 //===----------------------------------------------------------------------===//
@@ -743,7 +744,9 @@ func invalidDictionaryLiteral() {
 
 
 [4].joined(separator: [1]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
 [4].joined(separator: [[[1]]]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
@@ -797,11 +800,10 @@ func testParenExprInTheWay() {
   
   if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  //expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
-
+  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
   
   if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
 }

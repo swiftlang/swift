@@ -217,7 +217,7 @@ struct SR_3248 {
 
 SR_3248().callback?("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 SR_3248().callback!("test") // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
-SR_3248().callback("test")  // expected-error {{cannot invoke 'callback' with an argument list of type '(String)'}}
+SR_3248().callback("test")  // expected-error {{cannot convert value of type 'String' to expected argument type '[AnyObject]'}}
 
 _? = nil  // expected-error {{'nil' requires a contextual type}}
 _?? = nil // expected-error {{'nil' requires a contextual type}}

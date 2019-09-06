@@ -349,13 +349,12 @@ takeVoidVoidFn { () -> Void in
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {}
-func f19997471(_ x: Int) {}
+func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' at psoition #0}}
+func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' at psoition #0}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
-    f19997471(x) // expected-error {{cannot invoke 'f19997471' with an argument list of type '(T)'}}
-    // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (Int), (String)}}
+    f19997471(x) // expected-error {{no exact matches in call to global function 'f19997471'}}
   }
 }
 
@@ -584,8 +583,7 @@ let u = rdar33296619().element //expected-error {{use of unresolved identifier '
 
 [1].forEach { _ in
   _ = "\(u)"
-  _ = 1 + "hi" // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}}
-  // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists}}
+  _ = 1 + "hi" // expected-error {{no exact matches in call to operator function '+'}}
 }
 
 class SR5666 {
@@ -745,7 +743,7 @@ takesTwoInOut { _ in } // expected-error {{contextual closure type '(Int, inout 
 func f20371273() {
   let x: [Int] = [1, 2, 3, 4]
   let y: UInt = 4
-  _ = x.filter { ($0 + y)  > 42 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UInt, UInt)}}
+  _ = x.filter { ($0 + y)  > 42 } // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
 }
 
 // rdar://problem/42337247

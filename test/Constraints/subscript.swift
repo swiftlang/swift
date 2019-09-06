@@ -143,7 +143,7 @@ class C_r25601561 {
 // rdar://problem/31977679 - Misleading diagnostics when using subscript with incorrect argument
 
 func r31977679_1(_ properties: [String: String]) -> Any? {
-  return properties[0] // expected-error {{cannot subscript a value of type '[String : String]' with an argument of type 'Int'}}
+  return properties[0] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 }
 
 func r31977679_2(_ properties: [String: String]) -> Any? {
