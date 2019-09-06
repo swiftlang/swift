@@ -152,6 +152,9 @@ private:
   /// The source location and scope of the function.
   const SILDebugScope *DebugScope;
 
+  /// The AST decl context of the function.
+  DeclContext *DeclCtxt;
+
   /// The profiler for instrumentation based profiling, or null if profiling is
   /// disabled.
   SILProfiler *Profiler = nullptr;
@@ -614,10 +617,8 @@ public:
     ExactSelfClass = t;
   }
 
-  /// Get the DeclContext of this function. (Debug info only).
-  DeclContext *getDeclContext() const {
-    return getLocation().getAsDeclContext();
-  }
+  /// Get the DeclContext of this function.
+  DeclContext *getDeclContext() const { return DeclCtxt; }
 
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the
@@ -704,8 +705,16 @@ public:
     return getDebugScope()->Loc;
   }
 
-  /// Initialize the debug scope of the function.
-  void setDebugScope(const SILDebugScope *DS) { DebugScope = DS; }
+  /// Initialize the debug scope of the function and also set the DeclCtxt.
+  void setDebugScope(const SILDebugScope *DS) {
+    DebugScope = DS;
+    DeclCtxt = (DS ? DebugScope->Loc.getAsDeclContext() : nullptr);
+  }
+
+  /// Initialize the debug scope for debug info on SIL level (-gsil).
+  void setSILDebugScope(const SILDebugScope *DS) {
+    DebugScope = DS;
+  }
 
   /// Get the source location of the function.
   const SILDebugScope *getDebugScope() const { return DebugScope; }
