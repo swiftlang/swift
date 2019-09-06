@@ -3616,56 +3616,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     }
   }
 
-  auto isFailingConstraintRelevant = [&]() -> bool {
-    auto *constraint = CS.failedConstraint;
-    if (!constraint)
-      return false;
-
-    auto *locator = constraint->getLocator();
-    return locator && locator->getAnchor() == callExpr;
-  };
-
-  // If there is a failing constraint associated with current constraint
-  // system which points to the argument/parameter mismatch, let's use
-  // that information while re-typechecking argument expression, this
-  // makes it a lot easier to determine contextual mismatch.
-  if (isFailingConstraintRelevant() && !hasTrailingClosure) {
-    auto *constraint = CS.failedConstraint;
-    if (constraint->getKind() == ConstraintKind::ApplicableFunction) {
-      auto calleeType = CS.simplifyType(constraint->getSecondType());
-      if (auto *fnType = calleeType->getAs<FunctionType>())
-        argType = AnyFunctionType::composeInput(fnType->getASTContext(),
-                                                fnType->getParams(),
-                                                /*canonicalVararg=*/false);
-    } else if (constraint->getKind() == ConstraintKind::ArgumentConversion ||
-               constraint->getKind() ==
-                   ConstraintKind::OperatorArgumentConversion) {
-      using PathEltKind = ConstraintLocator::PathElementKind;
-      // Dig up type variable which represents the overload choice that fit
-      // this call expression after simplifying `ApplicableFunction` constraint.
-      for (auto *typeVar : CS.getTypeVariables()) {
-        auto *locator = typeVar->getImpl().getLocator();
-        auto path = locator->getPath();
-
-        // Check whether this type variable in anchored at current
-        // expression and path ends with `apply function`, which means
-        // that it's related to `ApplicableFunction` constraint.
-        if (locator->getAnchor() != callExpr || path.empty() ||
-            path.back().getKind() != PathEltKind::ApplyFunction)
-          continue;
-
-        if (auto type = typeVar->getImpl().getFixedType(nullptr)) {
-          fnType = type;
-          if (auto *FT = fnType->getAs<AnyFunctionType>())
-            argType = AnyFunctionType::composeInput(FT->getASTContext(),
-                                                    FT->getParams(),
-                                                    /*canonicalVararg=*/false);
-        }
-        break;
-      }
-    }
-  }
-
   // Let's check whether this is a situation when callee expects
   // no arguments but N are given. Otherwise, just below
   // `typeCheckArgumentChild*` is going to use `()` is a contextual type which
