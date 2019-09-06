@@ -92,7 +92,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
 
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *parseRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name, Sig, Caching)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/ParseTypeIDZone.def"
 #undef SWIFT_REQUEST

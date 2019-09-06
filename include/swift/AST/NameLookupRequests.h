@@ -62,10 +62,6 @@ class InheritedDeclsReferencedRequest :
                          unsigned),
                        CacheKind::Uncached> // FIXME: Cache these
 {
-  /// Retrieve the TypeLoc for this inherited type.
-  TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      unsigned index) const;
-
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -265,12 +261,12 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
-#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching)                         \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
-}
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+  template <>                                                                  \
+  inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
+                                     const RequestType &request) {             \
+    ++stats.getFrontendCounters().RequestType;                                 \
+  }
 #include "swift/AST/NameLookupTypeIDZone.def"
 #undef SWIFT_REQUEST
 
