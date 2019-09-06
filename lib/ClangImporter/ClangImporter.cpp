@@ -1744,8 +1744,16 @@ void ClangImporter::Implementation::handleDeferredImports()
     ImportedHeaderExports.push_back(R.getSubmodule(ID));
   }
   PCHImportedSubmodules.clear();
-  for (const clang::Module *M : ImportedHeaderExports)
-    (void)finishLoadingClangModule(M, /*preferOverlay=*/true);
+
+  // Avoid a for-in loop because in unusual situations we can end up pulling in
+  // another bridging header while we finish loading the modules that are
+  // already here. This is a brittle situation but it's outside what's
+  // officially supported with bridging headers: app targets and unit tests
+  // only. Unfortunately that's not enforced.
+  for (size_t i = 0; i < ImportedHeaderExports.size(); ++i) {
+    (void)finishLoadingClangModule(ImportedHeaderExports[i],
+                                   /*preferOverlay=*/true);
+  }
 }
 
 ModuleDecl *ClangImporter::getImportedHeaderModule() const {
