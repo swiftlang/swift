@@ -4423,6 +4423,10 @@ ERROR(property_delegate_type_not_usable_from_inline,none,
       "must be '@usableFromInline' or public",
       (bool, bool))
 
+WARNING(option_set_zero_constant,none,
+      "'static let' constant inside %0 that conforms to OptionSet produces an empty option set",
+      (Type))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
