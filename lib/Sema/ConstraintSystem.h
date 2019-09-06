@@ -3950,7 +3950,7 @@ void simplifyLocator(Expr *&anchor,
 ///
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
-Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
+Expr *simplifyLocatorToAnchor(ConstraintLocator *locator);
 
 /// Retrieve argument at specified index from given expression.
 /// The expression could be "application", "subscript" or "member" call.

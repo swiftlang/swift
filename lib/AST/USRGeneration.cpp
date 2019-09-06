@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTMangler.h"

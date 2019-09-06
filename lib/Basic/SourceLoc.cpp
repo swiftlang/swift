@@ -35,6 +35,9 @@ void SourceManager::verifyAllBuffers() const {
 }
 
 SourceLoc SourceManager::getCodeCompletionLoc() const {
+  if (CodeCompletionBufferID == 0U)
+    return SourceLoc();
+
   return getLocForBufferStart(CodeCompletionBufferID)
       .getAdvancedLoc(CodeCompletionOffset);
 }

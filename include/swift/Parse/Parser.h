@@ -46,7 +46,6 @@ namespace llvm {
 namespace swift {
   class CodeCompletionCallbacks;
   class DefaultArgumentInitializer;
-  class DelayedParsingCallbacks;
   class DiagnosticEngine;
   class Expr;
   class Lexer;
@@ -165,14 +164,8 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  DelayedParsingCallbacks *DelayedParseCB = nullptr;
-
   bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || DelayedParseCB != nullptr;
-  }
-
-  void setDelayedParsingCallbacks(DelayedParsingCallbacks *DelayedParseCB) {
-    this->DelayedParseCB = DelayedParseCB;
+    return DelayBodyParsing || SourceMgr.getCodeCompletionLoc().isValid();
   }
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
@@ -554,11 +547,10 @@ public:
   ParsedTokenSyntax consumeIdentifierSyntax(bool allowDollarIdentifier = false) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
 
-    Context.getIdentifier(Tok.getText());
-
     if (Tok.getText()[0] == '$' && !allowDollarIdentifier)
       diagnoseDollarIdentifier(Tok);
 
+    Tok.setKind(tok::identifier);
     return consumeTokenSyntax();
   }
 
@@ -1124,7 +1116,7 @@ public:
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+  BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 

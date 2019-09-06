@@ -111,10 +111,8 @@ swift::getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
 
         // Check whether there is an associated type of the same name in
         // this protocol.
-        for (auto member : proto->lookupDirect(assocType->getFullName())) {
-          if (auto protoAssoc = dyn_cast<AssociatedTypeDecl>(member))
-            return protoAssoc;
-        }
+        if (auto *found = proto->getAssociatedType(assocType->getName()))
+          return found;
       }
     }
   }
@@ -1929,9 +1927,29 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
   return SourceLoc();
 }
 
+namespace {
+/// Describes the position for optional adjustment made to a witness.
+///
+/// This is used by the following diagnostics:
+/// 1) 'err_protocol_witness_optionality',
+/// 2) 'warn_protocol_witness_optionality'
+/// 3) 'protocol_witness_optionality_conflict'
+enum class OptionalAdjustmentPosition : unsigned {
+  /// The type of a variable.
+  VarType = 0,
+  /// The result type of something.
+  Result = 1,
+  /// The parameter type of something.
+  Param = 2,
+  /// The parameter types of something.
+  MultipleParam = 3,
+  /// Both return and parameter adjustments.
+  ParamAndReturn = 4,
+};
+} // end anonymous namespace
+
 /// Classify the provided optionality issues for use in diagnostics.
-/// FIXME: Enumify this
-static unsigned classifyOptionalityIssues(
+static OptionalAdjustmentPosition classifyOptionalityIssues(
     const SmallVectorImpl<OptionalAdjustment> &adjustments,
     ValueDecl *requirement) {
   unsigned numParameterAdjustments = 0;
@@ -1944,21 +1962,20 @@ static unsigned classifyOptionalityIssues(
   }
 
   if (hasNonParameterAdjustment) {
-    // Both return and parameter adjustments.
     if (numParameterAdjustments > 0)
-      return 4;
+      return OptionalAdjustmentPosition::ParamAndReturn;
 
-    // The type of a variable.
     if (isa<VarDecl>(requirement))
-      return 0;
+      return OptionalAdjustmentPosition::VarType;
 
-    // The result type of something.
-    return 1;
+    return OptionalAdjustmentPosition::Result;
   }
 
   // Only parameter adjustments.
   assert(numParameterAdjustments > 0 && "No adjustments?");
-  return numParameterAdjustments == 1 ? 2 : 3;
+  return numParameterAdjustments == 1
+             ? OptionalAdjustmentPosition::Param
+             : OptionalAdjustmentPosition::MultipleParam;
 }
 
 static void addOptionalityFixIts(
@@ -2078,10 +2095,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::OptionalityConflict: {
     auto &adjustments = match.OptionalAdjustments;
-    auto diag = diags.diagnose(match.Witness, 
+    auto issues =
+        static_cast<unsigned>(classifyOptionalityIssues(adjustments, req));
+    auto diag = diags.diagnose(match.Witness,
                                diag::protocol_witness_optionality_conflict,
-                               classifyOptionalityIssues(adjustments, req),
-                               withAssocTypes);
+                               issues, withAssocTypes);
     addOptionalityFixIts(adjustments,
                          match.Witness->getASTContext(),
                          match.Witness,
@@ -2089,53 +2107,88 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   }
 
-  case MatchKind::StaticNonStaticConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness, diag::protocol_witness_static_conflict,
-                   !req->isInstanceMember());
+  case MatchKind::StaticNonStaticConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
+                               !req->isInstanceMember());
+    if (req->isInstanceMember()) {
+      SourceLoc loc;
+      if (auto FD = dyn_cast<FuncDecl>(witness)) {
+        loc = FD->getStaticLoc();
+      } else if (auto VD = dyn_cast<VarDecl>(witness)) {
+        loc = VD->getParentPatternBinding()->getStaticLoc();
+      } else if (auto SD = dyn_cast<SubscriptDecl>(witness)) {
+        loc = SD->getStaticLoc();
+      } else {
+        llvm_unreachable("Unexpected witness");
+      }
+      diag.fixItRemove(loc);
+    } else {
+      diag.fixItInsert(witness->getAttributeInsertionLoc(true), "static ");
+    }
     break;
-      
-  case MatchKind::SettableConflict:
-    diags.diagnose(match.Witness, diag::protocol_witness_settable_conflict);
-    break;
+  }
 
-  case MatchKind::PrefixNonPrefixConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_prefix_postfix_conflict, false,
-                   match.Witness->getAttrs().hasAttribute<PostfixAttr>() ? 2
-                                                                         : 0);
+  case MatchKind::SettableConflict: {
+    auto witness = match.Witness;
+    auto diag =
+        diags.diagnose(witness, diag::protocol_witness_settable_conflict);
+    if (auto VD = dyn_cast<VarDecl>(witness)) {
+      if (VD->hasStorage()) {
+        auto PBD = VD->getParentPatternBinding();
+        diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+      }
+    }
     break;
+  }
 
-  case MatchKind::PostfixNonPostfixConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_prefix_postfix_conflict, true,
-                   match.Witness->getAttrs().hasAttribute<PrefixAttr>() ? 1
-                                                                        : 0);
+  case MatchKind::PrefixNonPrefixConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(
+        witness, diag::protocol_witness_prefix_postfix_conflict, false,
+        witness->getAttrs().hasAttribute<PostfixAttr>() ? 2 : 0);
+    // We already emit a fix-it when we're missing the attribute, so only
+    // emit a fix-it if the attribute is there, but is not correct.
+    if (auto attr = witness->getAttrs().getAttribute<PostfixAttr>()) {
+      diag.fixItReplace(attr->getLocation(), "prefix");
+    }
     break;
+  }
+
+  case MatchKind::PostfixNonPostfixConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(
+        witness, diag::protocol_witness_prefix_postfix_conflict, true,
+        witness->getAttrs().hasAttribute<PrefixAttr>() ? 1 : 0);
+    // We already emit a fix-it when we're missing the attribute, so only
+    // emit a fix-it if the attribute is there, but is not correct.
+    if (auto attr = witness->getAttrs().getAttribute<PrefixAttr>()) {
+      diag.fixItReplace(attr->getLocation(), "postfix");
+    }
+    break;
+  }
   case MatchKind::MutatingConflict:
-    // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
                    SelfAccessKind::Mutating);
     break;
   case MatchKind::NonMutatingConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_mutation_modifier_conflict,
-                   SelfAccessKind::NonMutating);
+    // Don't bother about this, because a non-mutating witness can satisfy
+    // a mutating requirement.
     break;
   case MatchKind::ConsumingConflict:
-    // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
                    SelfAccessKind::Consuming);
     break;
-  case MatchKind::RethrowsConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness, diag::protocol_witness_rethrows_conflict);
+  case MatchKind::RethrowsConflict: {
+    auto witness = match.Witness;
+    auto diag =
+        diags.diagnose(witness, diag::protocol_witness_rethrows_conflict);
+    auto FD = cast<FuncDecl>(witness);
+    diag.fixItReplace(FD->getThrowsLoc(), getTokenText(tok::kw_rethrows));
     break;
+  }
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
@@ -3136,14 +3189,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto &diags = ctx.Diags;
           {
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
+            auto issues = static_cast<unsigned>(
+                classifyOptionalityIssues(adjustments, requirement));
             auto diag = diags.diagnose(
                 diagLoc,
                 hasAnyError(adjustments)
-                  ? diag::err_protocol_witness_optionality
-                  : diag::warn_protocol_witness_optionality,
-                classifyOptionalityIssues(adjustments, requirement),
-                witness->getFullName(),
-                proto->getFullName());
+                    ? diag::err_protocol_witness_optionality
+                    : diag::warn_protocol_witness_optionality,
+                issues, witness->getFullName(), proto->getFullName());
             if (diagLoc == witness->getLoc()) {
               addOptionalityFixIts(adjustments, ctx, witness, diag);
             } else {
@@ -4845,10 +4898,11 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           continue;
 
         bool valueIsType = isa<TypeDecl>(value);
-        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto requirement
-                : diag.Protocol->lookupDirect(value->getFullName(), flags)) {
+                : diag.Protocol->lookupDirect(value->getFullName())) {
+          if (requirement->getDeclContext() != diag.Protocol)
+            continue;
+
           auto requirementIsType = isa<TypeDecl>(requirement);
           if (valueIsType != requirementIsType)
             continue;
@@ -5046,9 +5100,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     if (!proto->isObjC()) continue;
 
     Optional<ProtocolConformance *> conformance;
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto req : proto->lookupDirect(name, flags)) {
+    for (auto req : proto->lookupDirect(name)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;
 

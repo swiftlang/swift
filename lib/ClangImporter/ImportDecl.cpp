@@ -21,6 +21,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -29,6 +30,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -781,9 +783,8 @@ static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
   auto anonymousFieldTypeDecl
       = anonymousFieldType->getStructOrBoundGenericStruct();
 
-  auto lookupFlags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
   for (auto decl : anonymousFieldTypeDecl->lookupDirect(
-                       importedFieldDecl->getName(), lookupFlags)) {
+                       importedFieldDecl->getName())) {
     if (isa<VarDecl>(decl)) {
       return cast<VarDecl>(decl);
     }
@@ -2947,6 +2948,9 @@ namespace {
           // Add the 'Code' enum to the error wrapper.
           errorWrapper->addMember(enumDecl);
           Impl.addAlternateDecl(enumDecl, errorWrapper);
+
+          // Stash the 'Code' enum so we can find it later.
+          Impl.ErrorCodeEnums[errorWrapper] = enumDecl;
         }
 
         // The enumerators go into this enumeration.
@@ -4543,10 +4547,10 @@ namespace {
                       Impl.SwiftContext, loc,
                       nullptr,
                       { }, dc, nullptr, decl);
-      Impl.SwiftContext
-          .evaluator
-          .cacheOutput(ExtendedTypeRequest{result},
-                       objcClass->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
+                                              objcClass->getDeclaredType());
+      Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
+                                              objcClass);
       
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
@@ -4735,6 +4739,7 @@ namespace {
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
         result->setAddedImplicitInitializers(); // suppress all initializers
+        result->setHasMissingVTableEntries(false);
         addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
         return result;
       };
@@ -4902,6 +4907,7 @@ namespace {
       if (decl->isArcWeakrefUnavailable())
         result->setIsIncompatibleWithWeakReferences();
 
+      result->setHasMissingVTableEntries(false);
       result->setMemberLoader(&Impl, 0);
 
       return result;
@@ -5313,6 +5319,7 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
+  theClass->setHasMissingVTableEntries(false);
   theClass->setForeignClassKind(ClassDecl::ForeignKind::CFType);
   addObjCAttribute(theClass, None);
 
@@ -6254,20 +6261,16 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   SmallVector<AnyFunctionType::Param, 4> allocParams;
   bodyParams->getParams(allocParams);
 
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  if (isa<ClassDecl>(dc))
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto other : ownerNominal->lookupDirect(importedName.getDeclName(),
-                                               flags)) {
-    auto ctor = dyn_cast<ConstructorDecl>(other);
-    if (!ctor || ctor->isInvalid() ||
+  TinyPtrVector<ConstructorDecl *> ctors;
+  auto found = Impl.ConstructorsForNominal.find(ownerNominal);
+  if (found != Impl.ConstructorsForNominal.end())
+    ctors = found->second;
+
+  for (auto ctor : ctors) {
+    if (ctor->isInvalid() ||
         ctor->getAttrs().isUnavailable(Impl.SwiftContext) ||
         !ctor->getClangDecl())
       continue;
-
-    // Resolve the type of the constructor.
-    if (!ctor->hasInterfaceType())
-      Impl.SwiftContext.getLazyResolver()->resolveDeclSignature(ctor);
 
     // If the types don't match, this is a different constructor with
     // the same selector. This can happen when an overlay overloads an
@@ -6339,10 +6342,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*ThrowsLoc=*/SourceLoc(), bodyParams,
       /*GenericParams=*/nullptr, dc);
 
-  // Make the constructor declaration immediately visible in its
-  // class or protocol type.
-  ownerNominal->makeMemberVisible(result);
-
   addObjCAttribute(result, selector);
 
   // Calculate the function type of the result.
@@ -6405,6 +6404,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // Record the constructor for future re-use.
   Impl.Constructors[std::make_tuple(objcMethod, dc, getVersion())] = result;
+  Impl.ConstructorsForNominal[ownerNominal].push_back(result);
 
   // If this constructor overrides another constructor, mark it as such.
   recordObjCOverride(result);
@@ -6864,30 +6864,11 @@ void SwiftDeclConverter::addObjCProtocolConformances(
 
   Impl.recordImportedProtocols(decl, protocols);
 
-  // Synthesize trivial conformances for each of the protocols.
-  SmallVector<ProtocolConformance *, 4> conformances;
-
-  auto dc = decl->getInnermostDeclContext();
-  auto &ctx = Impl.SwiftContext;
-  for (unsigned i = 0, n = protocols.size(); i != n; ++i) {
-    // FIXME: Build a superclass conformance if the superclass
-    // conforms.
-    auto conformance = ctx.getConformance(dc->getDeclaredInterfaceType(),
-                                          protocols[i], SourceLoc(), dc,
-                                          ProtocolConformanceState::Incomplete);
-    conformance->setLazyLoader(&Impl, /*context*/0);
-    conformance->setState(ProtocolConformanceState::Complete);
-    conformances.push_back(conformance);
-  }
-
-  // Set the conformances.
-  // FIXME: This could be lazier.
-  unsigned id = Impl.allocateDelayedConformance(std::move(conformances));
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    nominal->setConformanceLoader(&Impl, id);
+    nominal->setConformanceLoader(&Impl, 0);
   } else {
     auto ext = cast<ExtensionDecl>(decl);
-    ext->setConformanceLoader(&Impl, id);
+    ext->setConformanceLoader(&Impl, 0);
   }
 }
 
@@ -8147,6 +8128,8 @@ ClangImporter::Implementation::importDeclContextOf(
                                    getClangModuleForDecl(decl), nullptr);
   SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{ext},
                                      nominal->getDeclaredType());
+  SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{ext},
+                                     std::move(nominal));
   ext->setValidationToChecked();
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
@@ -8325,8 +8308,7 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
     DeclName initName = DeclName(ctx, DeclBaseName::createConstructor(),
                                  { ctx.Id_rawValue });
     auto nominal = type->getAnyNominal();
-    auto lookupFlags = NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto found : nominal->lookupDirect(initName, lookupFlags)) {
+    for (auto found : nominal->lookupDirect(initName)) {
       init = dyn_cast<ConstructorDecl>(found);
       if (init && init->getDeclContext() == nominal)
         break;
@@ -8690,7 +8672,7 @@ void ClangImporter::Implementation::collectMembersToAdd(
 
   SwiftDeclConverter converter(*this, CurrentVersion);
 
-  SmallVector<ProtocolDecl *, 4> protos = takeImportedProtocols(D);
+  auto protos = getImportedProtocols(D);
   if (auto clangClass = dyn_cast<clang::ObjCInterfaceDecl>(objcContainer)) {
     auto swiftClass = cast<ClassDecl>(D);
     objcContainer = clangClass = clangClass->getDefinition();
@@ -8713,9 +8695,22 @@ void ClangImporter::Implementation::collectMembersToAdd(
 }
 
 void ClangImporter::Implementation::loadAllConformances(
-       const Decl *D, uint64_t contextData,
+       const Decl *decl, uint64_t contextData,
        SmallVectorImpl<ProtocolConformance *> &Conformances) {
-  Conformances = takeDelayedConformance(contextData);
+  auto dc = decl->getInnermostDeclContext();
+
+  // Synthesize trivial conformances for each of the protocols.
+  for (auto *protocol : getImportedProtocols(decl)) {
+    // FIXME: Build a superclass conformance if the superclass
+    // conforms.
+    auto conformance = SwiftContext.getConformance(
+        dc->getDeclaredInterfaceType(),
+        protocol, SourceLoc(), dc,
+        ProtocolConformanceState::Incomplete);
+    conformance->setLazyLoader(this, /*context*/0);
+    conformance->setState(ProtocolConformanceState::Complete);
+    Conformances.push_back(conformance);
+  }
 }
 
 Optional<MappedTypeNameKind>

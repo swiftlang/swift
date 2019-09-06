@@ -2190,34 +2190,9 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
-  // If we have something like '(s.foo)()', where 's.foo()' returns an IUO,
-  // then we need to only create a single constraint that binds the
-  // type to an optional.
-  auto isIUOCallWrappedInParens = [&]() {
-    auto decl = choice.getDecl();
-    auto type = decl ? decl->getInterfaceType() : nullptr;
-    if (!type || !type->is<AnyFunctionType>())
-      return false;
-
-    auto expr = locator->getAnchor();
-    if (!expr)
-      return false;
-
-    if (isa<CallExpr>(expr)) {
-      return false;
-    }
-
-    auto parentExpr = getParentExpr(expr);
-    if (parentExpr && isa<ParenExpr>(parentExpr))
-      return true;
-
-    return false;
-  };
-
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {
-    if (choice.isImplicitlyUnwrappedValueOrReturnValue() &&
-        !isIUOCallWrappedInParens()) {
+    if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
       buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
@@ -2625,7 +2600,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
 
     // If we can't resolve the locator to an anchor expression with no path,
     // we can't diagnose this well.
-    auto *anchor = simplifyLocatorToAnchor(*this, overload.locator);
+    auto *anchor = simplifyLocatorToAnchor(overload.locator);
     if (!anchor)
       continue;
     auto it = indexMap.find(anchor);
@@ -2666,7 +2641,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   if (bestOverload) {
     auto &overload = diff.overloads[*bestOverload];
     auto name = getOverloadChoiceName(overload.choices);
-    auto anchor = simplifyLocatorToAnchor(*this, overload.locator);
+    auto anchor = simplifyLocatorToAnchor(overload.locator);
 
     // Emit the ambiguity diagnostic.
     auto &tc = getTypeChecker();
@@ -2718,17 +2693,21 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   return false;
 }
 
-Expr *constraints::simplifyLocatorToAnchor(ConstraintSystem &cs,
-                                           ConstraintLocator *locator) {
-  if (!locator || !locator->getAnchor())
+Expr *constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
+  if (!locator)
+    return nullptr;
+
+  auto *anchor = locator->getAnchor();
+  if (!anchor)
     return nullptr;
 
   SourceRange range;
-  locator = simplifyLocator(cs, locator, range);
-  if (!locator->getAnchor() || !locator->getPath().empty())
-    return nullptr;
+  auto path = locator->getPath();
+  simplifyLocator(anchor, path, range);
 
-  return locator->getAnchor();
+  // We only want the new anchor if all the path elements have been simplified
+  // away.
+  return path.empty() ? anchor : nullptr;
 }
 
 Expr *constraints::getArgumentExpr(Expr *expr, unsigned index) {

@@ -10,15 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
-#include "swift/Serialization/ModuleFile.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFile.h"
+#include "ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -27,7 +29,6 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
@@ -83,7 +84,7 @@ namespace {
     static const char *getRecordKindString(decls_block::RecordKind Kind) {
       switch (Kind) {
 #define RECORD(Id) case decls_block::Id: return #Id;
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
       }
 
       llvm_unreachable("Unhandled RecordKind in switch.");
@@ -1950,7 +1951,7 @@ static bool isDeclAttrRecord(unsigned ID) {
   using namespace decls_block;
   switch (ID) {
 #define DECL_ATTR(NAME, CLASS, ...) case CLASS##_DECL_ATTR: return true;
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
   default: return false;
   }
 }
@@ -3688,14 +3689,16 @@ public:
 
   Expected<Decl *> deserializeExtension(ArrayRef<uint64_t> scratch,
                                         StringRef blobData) {
-    TypeID baseID;
+    TypeID extendedTypeID;
+    DeclID extendedNominalID;
     DeclContextID contextID;
     bool isImplicit;
     GenericSignatureID genericEnvID;
     unsigned numConformances, numInherited;
     ArrayRef<uint64_t> inheritedAndDependencyIDs;
 
-    decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
+    decls_block::ExtensionLayout::readRecord(scratch, extendedTypeID,
+                                             extendedNominalID, contextID,
                                              isImplicit, genericEnvID,
                                              numConformances, numInherited,
                                              inheritedAndDependencyIDs);
@@ -3732,10 +3735,12 @@ public:
 
     MF.configureGenericEnvironment(extension, genericEnvID);
 
-    auto baseTy = MF.getType(baseID);
+    auto extendedType = MF.getType(extendedTypeID);
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
-                              std::move(baseTy));
-    auto nominal = extension->getExtendedNominal();
+                              std::move(extendedType));
+    auto nominal = dyn_cast<NominalTypeDecl>(MF.getDecl(extendedNominalID));
+    ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
+                              std::move(nominal));
 
     if (isImplicit)
       extension->setImplicit();

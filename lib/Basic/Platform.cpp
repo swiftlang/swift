@@ -351,6 +351,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     if (Major == 10) {
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
+      } else if (Minor <= 15) {
+        return llvm::VersionTuple(5, 1);
       } else {
         return None;
       }
@@ -361,6 +363,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     Triple.getiOSVersion(Major, Minor, Micro);
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
+    } else if (Major <= 13) {
+      return llvm::VersionTuple(5, 1);
     } else {
       return None;
     }
@@ -368,6 +372,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
       return llvm::VersionTuple(5, 0);
+    } else if (Major <= 6) {
+      return llvm::VersionTuple(5, 1);
     } else {
       return None;
     }

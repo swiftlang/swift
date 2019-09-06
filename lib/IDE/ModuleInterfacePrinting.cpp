@@ -24,7 +24,6 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Token.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "swift/Subsystems.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/ASTContext.h"
