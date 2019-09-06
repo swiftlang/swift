@@ -2167,26 +2167,9 @@ static bool isVisibleFromModule(const ClangModuleUnit *ModuleFilter,
   if (!Wrapper)
     return false;
 
-  auto ClangNode = VD->getClangNode();
-  if (!ClangNode) {
-    // If we synthesized a ValueDecl, it won't have a Clang node. Find the
-    // associated declaration that /does/ have a Clang node, and use that.
-    auto *SynthesizedTypeAttr =
-        VD->getAttrs().getAttribute<ClangImporterSynthesizedTypeAttr>();
-    assert(SynthesizedTypeAttr);
-
-    switch (SynthesizedTypeAttr->getKind()) {
-    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapper:
-    case ClangImporterSynthesizedTypeAttr::Kind::NSErrorWrapperAnon: {
-      ASTContext &Ctx = ContainingUnit->getASTContext();
-      auto *Importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
-      auto WrapperStruct = cast<StructDecl>(VD);
-      auto *CodeEnum = Importer->lookupErrorCodeEnum(WrapperStruct);
-      ClangNode = CodeEnum->getClangNode();
-      break;
-    }
-    }
-  }
+  ASTContext &Ctx = ContainingUnit->getASTContext();
+  auto *Importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
+  auto ClangNode = Importer->getEffectiveClangNode(VD);
 
   // Macros can be "redeclared" by putting an equivalent definition in two
   // different modules. (We don't actually check the equivalence.)
@@ -2493,8 +2476,19 @@ void ClangImporter::lookupValue(DeclName name, VisibleDeclConsumer &consumer) {
   });
 }
 
-EnumDecl *ClangImporter::lookupErrorCodeEnum(const StructDecl *errorWrapper) const {
-  return Impl.lookupErrorCodeEnum(errorWrapper);
+ClangNode ClangImporter::getEffectiveClangNode(const Decl *decl) const {
+  // Directly...
+  if (auto clangNode = decl->getClangNode())
+    return clangNode;
+
+  // Or via the nested "Code" enum.
+  if (auto *errorWrapper = dyn_cast<StructDecl>(decl)) {
+    if (auto *code = Impl.lookupErrorCodeEnum(errorWrapper))
+      if (auto clangNode = code->getClangNode())
+        return clangNode;
+  }
+
+  return ClangNode();
 }
 
 void ClangImporter::lookupTypeDecl(

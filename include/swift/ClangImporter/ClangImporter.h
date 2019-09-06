@@ -215,8 +215,9 @@ public:
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
 
-  /// Look up the nested 'Code' enum for an error wrapper struct.
-  EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) const;
+  /// Just like Decl::getClangNode() except we look through to the 'Code'
+  /// enum of an error wrapper struct.
+  ClangNode getEffectiveClangNode(const Decl *decl) const;
 
   /// Look for textually included declarations from the bridging header.
   ///

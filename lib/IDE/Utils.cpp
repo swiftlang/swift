@@ -954,21 +954,9 @@ bool swift::ide::isFromClang(const Decl *D) {
 }
 
 ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
-  // Directly...
-  if (auto clangNode = decl->getClangNode())
-    return clangNode;
-
-  // Or via the nested "Code" enum.
-  if (auto *errorWrapper = dyn_cast<StructDecl>(decl)) {
-    auto &ctx = errorWrapper->getASTContext();
-    auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-    if (importer)
-      if (auto *code = importer->lookupErrorCodeEnum(errorWrapper))
-        if (auto clangDecl = code->getClangDecl())
-          return clangDecl;
-  }
-
-  return ClangNode();
+  auto &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  return importer->getEffectiveClangNode(decl);
 }
 
 /// Retrieve the Clang node for the given extension, if it has one.
