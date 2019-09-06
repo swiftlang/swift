@@ -468,13 +468,6 @@ private:
                                     CalleeCandidateInfo &calleeInfo,
                                     SourceLoc applyLoc);
 
-  /// Produce diagnostic for failures related to unfulfilled requirements
-  /// of the generic parameters used as arguments.
-  bool diagnoseArgumentGenericRequirements(TypeChecker &TC, Expr *callExpr,
-                                           Expr *fnExpr, Expr *argExpr,
-                                           CalleeCandidateInfo &candidates,
-                                           ArrayRef<Identifier> argLabels);
-
   bool diagnoseMemberFailures(
       Expr *E, Expr *baseEpxr, ConstraintKind lookupKind, DeclName memberName,
       FunctionRefKind funcRefKind, ConstraintLocator *locator,
@@ -3065,185 +3058,6 @@ bool FailureDiagnosis::diagnoseNilLiteralComparison(
   return true;
 }
 
-bool FailureDiagnosis::diagnoseArgumentGenericRequirements(
-    TypeChecker &TC, Expr *callExpr, Expr *fnExpr, Expr *argExpr,
-    CalleeCandidateInfo &candidates, ArrayRef<Identifier> argLabels) {
-  if (candidates.closeness != CC_ExactMatch || candidates.size() != 1)
-    return false;
-
-  AbstractFunctionDecl *AFD = nullptr;
-  if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
-    AFD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
-  } else if (auto *candidate = candidates[0].getDecl()) {
-    AFD = dyn_cast<AbstractFunctionDecl>(candidate);
-  }
-
-  if (!AFD || !AFD->getGenericSignature() || !AFD->hasInterfaceType())
-    return false;
-
-  auto env = AFD->getGenericEnvironment();
-  if (!env)
-    return false;
-
-  auto const &candidate = candidates.candidates[0];
-
-  if (!candidate.hasParameters())
-    return false;
-
-  auto params = candidate.getParameters();
-  auto paramInfo = candidate.getParameterListInfo(params);
-  auto args = decomposeArgType(CS.getType(argExpr), argLabels);
-
-  SmallVector<ParamBinding, 4> bindings;
-  MatchCallArgumentListener listener;
-  if (matchCallArguments(args, params, paramInfo,
-                         candidates.hasTrailingClosure,
-                         /*allowFixes=*/false, listener, bindings))
-    return false;
-
-  TypeSubstitutionMap substitutions;
-  // First, let's collect all of the archetypes and their substitutions,
-  // that's going to help later on if there are cross-archetype
-  // requirements e.g. <A, B where A.Element == B.Element>.
-  for (unsigned i = 0, e = bindings.size(); i != e; ++i) {
-    auto param = params[i];
-    auto paramType = param.getPlainType();
-
-    auto archetype = paramType->getAs<ArchetypeType>();
-    if (!archetype)
-      continue;
-
-    // Bindings specify the arguments that source the parameter. The only case
-    // this returns a non-singular value is when there are varargs in play.
-    for (auto argNo : bindings[i]) {
-      auto argType = args[argNo]
-                         .getOldType()
-                         ->getWithoutSpecifierType();
-
-      if (auto *archetype = argType->getAs<ArchetypeType>()) {
-        auto interfaceTy = archetype->getInterfaceType();
-        if (auto *paramTy = interfaceTy->getAs<GenericTypeParamType>()) {
-          diagnoseAmbiguousGenericParameter(paramTy, fnExpr);
-          return true;
-        }
-      }
-
-      if (isUnresolvedOrTypeVarType(argType) || argType->hasError())
-        return false;
-
-      // Record substitution from generic parameter to the argument type.
-      substitutions[archetype->getInterfaceType()->getCanonicalType()
-                        ->castTo<SubstitutableType>()] = argType;
-    }
-  }
-
-  if (substitutions.empty())
-    return false;
-
-  class RequirementsListener : public GenericRequirementsCheckListener {
-    ConstraintSystem &CS;
-    AbstractFunctionDecl *Candidate;
-    TypeSubstitutionFn Substitutions;
-
-    Expr *CallExpr;
-    Expr *FnExpr;
-    Expr *ArgExpr;
-
-  public:
-    RequirementsListener(ConstraintSystem &cs, AbstractFunctionDecl *AFD,
-                         TypeSubstitutionFn subs,
-                         Expr *callExpr, Expr *fnExpr, Expr *argExpr)
-        : CS(cs), Candidate(AFD), Substitutions(subs), CallExpr(callExpr),
-          FnExpr(fnExpr), ArgExpr(argExpr) {}
-
-    bool shouldCheck(RequirementKind kind, Type first, Type second) override {
-      // This means that we have encountered requirement which references
-      // generic parameter not used in the arguments, we can't diagnose it here.
-      return !(first->hasTypeParameter() || first->isTypeVariableOrMember());
-    }
-
-    bool diagnoseUnsatisfiedRequirement(
-        const Requirement &req, Type first, Type second,
-        ArrayRef<ParentConditionalConformance> parents) override {
-      Diag<Type, Type, Type, Type, StringRef> note;
-      switch (req.getKind()) {
-      case RequirementKind::Conformance:
-      case RequirementKind::Layout:
-        return false;
-
-      case RequirementKind::Superclass:
-        note = diag::candidate_types_inheritance_requirement;
-        break;
-
-      case RequirementKind::SameType:
-        note = diag::candidate_types_equal_requirement;
-        break;
-      }
-
-      TypeChecker &TC = CS.TC;
-      SmallVector<char, 8> scratch;
-      auto overloadName = Candidate->getFullName().getString(scratch);
-
-      if (isa<BinaryExpr>(CallExpr) && isa<TupleExpr>(ArgExpr)) {
-        auto argTuple = cast<TupleExpr>(ArgExpr);
-        auto lhsExpr = argTuple->getElement(0),
-             rhsExpr = argTuple->getElement(1);
-        auto lhsType = CS.getType(lhsExpr)->getRValueType();
-        auto rhsType = CS.getType(rhsExpr)->getRValueType();
-
-        TC.diagnose(FnExpr->getLoc(), diag::cannot_apply_binop_to_args,
-                    overloadName, lhsType, rhsType)
-            .highlight(lhsExpr->getSourceRange())
-            .highlight(rhsExpr->getSourceRange());
-      } else if (isa<PrefixUnaryExpr>(CallExpr) ||
-                 isa<PostfixUnaryExpr>(CallExpr)) {
-        TC.diagnose(ArgExpr->getLoc(), diag::cannot_apply_unop_to_arg,
-                    overloadName, CS.getType(ArgExpr));
-      } else {
-        bool isInitializer = isa<ConstructorDecl>(Candidate);
-
-        SmallVector<AnyFunctionType::Param, 8> Params;
-        AnyFunctionType::decomposeInput(CS.getType(ArgExpr), Params);
-        TC.diagnose(ArgExpr->getLoc(), diag::cannot_call_with_params,
-                    overloadName, AnyFunctionType::getParamListAsString(Params),
-                    isInitializer);
-      }
-
-      auto rawFirstType = req.getFirstType();
-      auto rawSecondType = req.getSecondType();
-      auto *genericSig = Candidate->getGenericSignature();
-
-      TC.diagnose(Candidate, note, first, second,
-                  rawFirstType, rawSecondType,
-                  TypeChecker::gatherGenericParamBindingsText(
-                    {rawFirstType, rawSecondType},
-                    genericSig->getGenericParams(),
-                    Substitutions));
-
-      ParentConditionalConformance::diagnoseConformanceStack(
-          TC.Diags, Candidate->getLoc(), parents);
-
-      return true;
-    }
-  };
-
-  auto substitutionFn = QueryTypeSubstitutionMap{substitutions};
-  RequirementsListener genericReqListener(CS, AFD, substitutionFn,
-                                          callExpr, fnExpr, argExpr);
-
-  auto result = TC.checkGenericArguments(
-      AFD, callExpr->getLoc(), fnExpr->getLoc(), AFD->getInterfaceType(),
-      env->getGenericSignature()->getGenericParams(),
-      env->getGenericSignature()->getRequirements(),
-      substitutionFn,
-      LookUpConformanceInModule{AFD->getParentModule()},
-      ConformanceCheckFlags::SuppressDependencyTracking, &genericReqListener);
-
-  // Note: If result is RequirementCheckResult::SubstitutionFailure, we did
-  // not emit a diagnostic, so we must return false in that case.
-  return result == RequirementCheckResult::Failure;
-}
-
 static bool diagnoseClosureExplicitParameterMismatch(
     ConstraintSystem &CS, SourceLoc loc,
     ArrayRef<AnyFunctionType::Param> params,
@@ -3980,10 +3794,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
       }
     }
 
-    if (diagnoseArgumentGenericRequirements(CS.TC, callExpr, fnExpr, argExpr,
-                                            calleeInfo, argLabels))
-      return true;
-
     if (isContextualConversionFailure(argTuple))
       return false;
 
@@ -4052,15 +3862,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
     return true;
   }
-
-  // If all of the arguments are a perfect match, let's check if there
-  // are problems with requirements placed on generic parameters, because
-  // CalleeCandidateInfo validates only conformance of the parameters
-  // to their protocol types (if any) but it doesn't check additional
-  // requirements placed on e.g. nested types or between parameters.
-  if (diagnoseArgumentGenericRequirements(CS.TC, callExpr, fnExpr, argExpr,
-                                          calleeInfo, argLabels))
-    return true;
 
   // If we have a failure where closeness is an exact match, but there is
   // still a failed argument, it is because one (or more) of the arguments
