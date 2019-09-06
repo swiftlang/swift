@@ -2123,18 +2123,14 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<NominalTypeDecl *>
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
-  DirectlyReferencedTypeDecls referenced;
-  ASTContext &ctx = ext->getASTContext();
+  auto typeRepr = ext->getExtendedTypeRepr();
+  if (!typeRepr)
+    // We must've seen 'extension { ... }' during parsing.
+    return nullptr;
 
-  // Prefer syntactic information when we have it.
-  if (auto typeRepr = ext->getExtendedTypeRepr()) {
-    referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-  } else if (auto type = ext->getExtendedType()) {
-    // Fall back to semantic types.
-    // FIXME: In the long run, we shouldn't need this. Non-syntactic results
-    // should be cached.
-    referenced = directReferencesForType(type);
-  }
+  ASTContext &ctx = ext->getASTContext();
+  DirectlyReferencedTypeDecls referenced =
+    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
@@ -2142,7 +2138,10 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   auto nominalTypes
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
                                 anyObject);
-  return nominalTypes.empty() ? nullptr : nominalTypes.front();
+
+  // If there is more than 1 element, we will emit a warning or an error
+  // elsewhere, so don't handle that case here.
+  return nominalTypes.empty() ? nullptr : nominalTypes[0];
 }
 
 llvm::Expected<NominalTypeDecl *>

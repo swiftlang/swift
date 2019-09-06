@@ -3057,7 +3057,7 @@ public:
 
     auto nominal = ED->getExtendedNominal();
     if (nominal == nullptr) {
-	  const bool wasAlreadyInvalid = ED->isInvalid();
+      const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
       if (extType && !extType->hasError() && extType->getAnyNominal()) {
         // If we've got here, then we have some kind of extension of a prima
@@ -3075,13 +3075,48 @@ public:
           .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
                         canExtType->getString());
       } else if (!wasAlreadyInvalid) {
-		// If nothing else applies, fall back to a generic diagnostic.
+        // If nothing else applies, fall back to a generic diagnostic.
         ED->diagnose(diag::non_nominal_extension, extType);
       }
       return;
     }
 
     TC.validateExtension(ED);
+
+    extType = ED->getExtendedType();
+    if (extType && !extType->hasError()) {
+      // The first condition catches syntactic forms like
+      //     protocol A & B { ... } // may be protocols or typealiases
+      // The second condition also looks through typealiases and catches
+      //    typealias T = P1 & P2 // P2 is a refined protocol of P1
+      //    extension T { ... }
+      // However, it is trickier to catch cases like
+      //    typealias T = P2 & P1 // P2 is a refined protocol of P1
+      //    extension T { ... }
+      // so we don't do that here.
+      auto extTypeRepr = ED->getExtendedTypeRepr();
+      auto *extTypeNominal = extType->getAnyNominal();
+      bool firstNominalIsNotMostSpecific =
+        extTypeNominal && extTypeNominal != nominal;
+      if (isa<CompositionTypeRepr>(extTypeRepr)
+          || firstNominalIsNotMostSpecific) {
+        auto firstNominalType = nominal->getDeclaredType();
+        auto diag = ED->diagnose(diag::composition_in_extended_type,
+                                 firstNominalType);
+        diag.highlight(extTypeRepr->getSourceRange());
+        if (firstNominalIsNotMostSpecific) {
+          diag.flush();
+          Type mostSpecificProtocol = extTypeNominal->getDeclaredType();
+          ED->diagnose(diag::composition_in_extended_type_alternative,
+                       mostSpecificProtocol)
+            .fixItReplace(extTypeRepr->getSourceRange(),
+                          mostSpecificProtocol->getString());
+        } else {
+          diag.fixItReplace(extTypeRepr->getSourceRange(),
+                            firstNominalType->getString());
+        }
+      }
+    }
 
     checkInheritanceClause(ED);
 
