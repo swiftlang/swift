@@ -179,7 +179,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       }
     };
 
-    bool HasDocComment;
+    bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
     void addRequirement(GenericSignature *GenericSig,
@@ -194,14 +194,14 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
-      if (HasDocComment || Another.HasDocComment)
+      if (Unmergable || Another.Unmergable)
         return false;
       if (InheritsCount != 0 || Another.InheritsCount != 0)
         return false;
       return Requirements == Another.Requirements;
     }
     bool isMergeableWithTypeDef() {
-      return !HasDocComment && InheritsCount == 0 && Requirements.empty();
+      return !Unmergable && InheritsCount == 0 && Requirements.empty();
     }
   };
 
@@ -279,7 +279,8 @@ struct SynthesizedExtensionAnalyzer::Implementation {
                ExtensionDecl *EnablingExt, NormalProtocolConformance *Conf) {
     SynthesizedExtensionInfo Result(IsSynthesized, EnablingExt);
     ExtensionMergeInfo MergeInfo;
-    MergeInfo.HasDocComment = !Ext->getRawComment().isEmpty();
+    MergeInfo.Unmergable = !Ext->getRawComment().isEmpty() || // With comments
+                           Ext->getAttrs().hasAttribute<AvailableAttr>(); // With @available
     MergeInfo.InheritsCount = countInherits(Ext);
 
     // There's (up to) two extensions here: the extension with the items that we
