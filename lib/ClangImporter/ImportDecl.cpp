@@ -4550,7 +4550,7 @@ namespace {
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
-                                              objcClass);
+                                              static_cast<swift::NominalTypeDecl *>(objcClass));
       
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
