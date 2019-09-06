@@ -2791,8 +2791,6 @@ bool FailureDiagnosis::diagnoseParameterErrors(CalleeCandidateInfo &CCI,
 
     // It could be that the argument doesn't conform to an archetype.
     Expr *badArgExpr = getFailedArgumentExpr(CCI, argExpr);
-    if (CCI.diagnoseGenericParameterErrors(badArgExpr))
-      return true;
 
     // Re-type-check the argument with the expected type of the candidate set.
     // This should produce a specific and tailored diagnostic saying that the

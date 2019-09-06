@@ -939,49 +939,6 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
   }
 }
 
-/// If the candidate set has been narrowed to a single parameter or single
-/// archetype that has argument type errors, diagnose that error and
-/// return true.
-bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
-  Type argType = CS.getType(badArgExpr);
-  
-  // FIXME: For protocol argument types, could add specific error
-  // similar to could_not_use_member_on_existential.
-  if (argType->hasTypeVariable() || argType->is<ProtocolType>() ||
-      argType->is<ProtocolCompositionType>())
-    return false;
-  
-  bool foundFailure = false;
-  TypeSubstitutionMap archetypesMap;
-  
-  if (!findGenericSubstitutions(failedArgument.declContext,
-                                failedArgument.parameterType,
-                                argType, archetypesMap))
-    return false;
-
-  for (auto pair : archetypesMap) {
-    auto paramArchetype = pair.first->castTo<ArchetypeType>();
-    auto substitution = pair.second;
-    
-    // FIXME: Add specific error for not subclass, if the archetype has a superclass?
-    
-    for (auto proto : paramArchetype->getConformsTo()) {
-      if (!TypeChecker::conformsToProtocol(substitution, proto, CS.DC,
-                                           ConformanceCheckFlags::InExpression)) {
-        if (!substitution->isEqual(argType)) {
-          CS.TC.diagnose(badArgExpr->getLoc(),
-                         diag::cannot_convert_partial_argument_value_protocol,
-                         argType, substitution, proto->getDeclaredType());
-          foundFailure = true;
-          break;
-        }
-      }
-    }
-  }
-  
-  return foundFailure;
-}
-
 /// Emit a diagnostic and return true if this is an error condition we can
 /// handle uniformly.  This should be called after filtering the candidate
 /// list.
