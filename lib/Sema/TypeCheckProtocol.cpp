@@ -2966,8 +2966,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
                          nominal,
                          requirement)) {
     if (derivable == requirement) {
-      // If it's the same requirement, we can derive it here.
-      canDerive = true;
+      // If it's the same requirement, we can derive it here. Although, don't
+      // attempt to do it if we have an explicit witness. If they don't match,
+      // we'll diagnose them later. If they do match, there's nothing to derive.
+      canDerive = nominal->lookupDirect(derivable->getFullName()).empty();
     } else {
       // Otherwise, go satisfy the derivable requirement, which can introduce
       // a member that could in turn satisfy *this* requirement.

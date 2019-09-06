@@ -80,3 +80,21 @@ enum SE3<T : ExpressibleByIntegerLiteral> : T where T: InstanceGettable {
 }
 
 enum SE4<T : ExpressibleByIntegerLiteral & Equatable> : T { case X }
+
+// SR-6897
+struct SR_6897_S: ExpressibleByStringLiteral {
+  init(stringLiteral: String) {}
+}
+
+enum SR_6897_E1: SR_6897_S { // expected-error {{RawRepresentable conformance cannot be synthesized because raw type 'SR_6897_S' is not Equatable}}
+  case some1
+  typealias RawValue = SR_6897_S
+}
+
+enum SR_6897_E2: SR_6897_S { // expected-error {{'SR_6897_E2' declares raw type 'SR_6897_S', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-note@-1 2{{do you want to add protocol stubs?}}
+  case some2
+  typealias RawValue = SR_6897_S
+  init?(rawValue: Int) { self = .some2 } // expected-note {{candidate has non-matching type '(rawValue: Int)'}}
+  var rawValue: Int { 0 } // expected-note {{candidate has non-matching type 'Int'}}
+}
