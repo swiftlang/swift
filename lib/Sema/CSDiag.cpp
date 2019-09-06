@@ -820,7 +820,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure(Constraint *constraint) {
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
   if (auto locator = bindOverload->getLocator()) {
-    anchor = simplifyLocatorToAnchor(CS, locator);
+    anchor = simplifyLocatorToAnchor(locator);
     if (!anchor)
       return false;
   }
@@ -1002,7 +1002,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure(Constraint *constraint){
   bool resolvedAnchorToExpr = false;
   
   if (auto locator = constraint->getLocator()) {
-    anchor = simplifyLocatorToAnchor(CS, locator);
+    anchor = simplifyLocatorToAnchor(locator);
     if (anchor)
       resolvedAnchorToExpr = true;
     else
@@ -4389,52 +4389,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   return false;
 }
 
-
-/// Return true if this type is known to be an ArrayType.
-static bool isKnownToBeArrayType(Type ty) {
-  if (!ty) return false;
-
-  auto bgt = ty->getAs<BoundGenericType>();
-  if (!bgt) return false;
-
-  auto &ctx = bgt->getASTContext();
-  return bgt->getDecl() == ctx.getArrayDecl();
-}
-
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  // If we have a contextual type, it must be an inout type.
-  auto contextualType = CS.getContextualType();
-  if (contextualType) {
-    // If the contextual type is one of the UnsafePointer<T> types, then the
-    // contextual type of the subexpression must be T.
-    Type unwrappedType = contextualType;
-    if (auto unwrapped = contextualType->getOptionalObjectType())
-      unwrappedType = unwrapped;
-
-    if (auto pointerEltType = unwrappedType->getAnyPointerElementType()) {
-
-      // If the element type is Void, then we allow any input type, since
-      // everything is convertible to UnsafeRawPointer
-      if (pointerEltType->isVoid())
-        contextualType = Type();
-      else
-        contextualType = pointerEltType;
-      
-      // Furthermore, if the subexpr type is already known to be an array type,
-      // then we must have an attempt at an array to pointer conversion.
-      if (isKnownToBeArrayType(CS.getType(IOE->getSubExpr()))) {
-        contextualType = ArraySliceType::get(contextualType);
-      }
-    } else if (contextualType->is<InOutType>()) {
-      contextualType = contextualType->getInOutObjectType();
-    }
-  }
-
-  if (!typeCheckChildIndependently(IOE->getSubExpr(), contextualType,
-                                   CS.getContextualTypePurpose(),
-                                   TCC_AllowLValue)) {
-    return true;
-  }
   return false;
 }
 
@@ -5323,10 +5278,10 @@ bool FailureDiagnosis::visitObjectLiteralExpr(ObjectLiteralExpr *E) {
     return false;
   DeclName constrName = TC.getObjectLiteralConstructorName(E);
   assert(constrName);
-  auto constrs = protocol->lookupDirect(constrName);
-  if (constrs.size() != 1 || !isa<ConstructorDecl>(constrs.front()))
+  auto *constr = dyn_cast_or_null<ConstructorDecl>(
+      protocol->getSingleRequirement(constrName));
+  if (!constr)
     return false;
-  auto *constr = cast<ConstructorDecl>(constrs.front());
   auto paramType = TC.getObjectLiteralParameterType(E, constr);
   if (!typeCheckChildIndependently(
         E->getArg(), paramType, CTP_CallArgument))
@@ -5390,7 +5345,7 @@ bool FailureDiagnosis::visitUnresolvedMemberExpr(UnresolvedMemberExpr *E) {
   Constraint *memberConstraint = nullptr;
   auto checkConstraint = [&](Constraint *C) {
     if (C->getKind() == ConstraintKind::UnresolvedValueMember &&
-        simplifyLocatorToAnchor(CS, C->getLocator()) == E)
+        simplifyLocatorToAnchor(C->getLocator()) == E)
       memberConstraint = C;
   };
 
@@ -6121,14 +6076,13 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
     // If we found a type, presuppose it was the intended result and insert a
     // fixit hint.
     if (resultType && !isUnresolvedOrTypeVarType(resultType)) {
-      std::string resultTypeStr = resultType->getString();
-      
       // If there is a location for an 'in' token, then the argument list was
       // specified somehow but no return type was.  Insert a "-> ReturnType "
       // before the in token.
       if (closure->getInLoc().isValid()) {
         diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-          .fixItInsert(closure->getInLoc(), "-> " + resultTypeStr + " ");
+            .fixItInsert(closure->getInLoc(), diag::insert_closure_return_type,
+                         resultType, /*argListSpecified*/ false);
         return true;
       }
       
@@ -6138,9 +6092,10 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       //
       // As such, we insert " () -> ReturnType in " right after the '{' that
       // starts the closure body.
-      auto insertString = " () -> " + resultTypeStr + " " + "in ";
       diagnose(closure->getLoc(), diag::cannot_infer_closure_result_type)
-        .fixItInsertAfter(closure->getBody()->getLBraceLoc(), insertString);
+          .fixItInsertAfter(closure->getBody()->getLBraceLoc(),
+                            diag::insert_closure_return_type, resultType,
+                            /*argListSpecified*/ true);
       return true;
     }
   }

@@ -33,6 +33,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -3815,7 +3816,9 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
   Bits.ClassDecl.InheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
+  Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.HasMissingVTableEntries = 0;
+  Bits.ClassDecl.ComputedHasMissingVTableEntries = 0;
   Bits.ClassDecl.IsIncompatibleWithWeakReferences = 0;
 }
 
@@ -3900,16 +3903,22 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 
 
 bool ClassDecl::hasMissingDesignatedInitializers() const {
-  auto *mutableThis = const_cast<ClassDecl *>(this);
-  auto flags = OptionSet<LookupDirectFlags>();
-  flags |= LookupDirectFlags::IgnoreNewExtensions;
-  (void)mutableThis->lookupDirect(DeclBaseName::createConstructor(),
-                                  flags);
+  if (!Bits.ClassDecl.ComputedHasMissingDesignatedInitializers) {
+    auto *mutableThis = const_cast<ClassDecl *>(this);
+    mutableThis->Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
+    (void)mutableThis->lookupDirect(DeclBaseName::createConstructor());
+  }
+
   return Bits.ClassDecl.HasMissingDesignatedInitializers;
 }
 
 bool ClassDecl::hasMissingVTableEntries() const {
-  (void)getMembers();
+  if (!Bits.ClassDecl.ComputedHasMissingVTableEntries) {
+    auto *mutableThis = const_cast<ClassDecl *>(this);
+    mutableThis->Bits.ClassDecl.ComputedHasMissingVTableEntries = 1;
+    mutableThis->loadAllMembers();
+  }
+
   return Bits.ClassDecl.HasMissingVTableEntries;
 }
 
@@ -4361,6 +4370,34 @@ ProtocolDecl::getAssociatedTypeMembers() const {
   }
 
   return result;
+}
+
+ValueDecl *ProtocolDecl::getSingleRequirement(DeclName name) const {
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  ValueDecl *result = nullptr;
+  for (auto candidate : results) {
+    if (candidate->getDeclContext() != this ||
+        !candidate->isProtocolRequirement())
+      continue;
+    if (result) {
+      // Multiple results.
+      return nullptr;
+    }
+    result = candidate;
+  }
+
+  return result;
+}
+
+AssociatedTypeDecl *ProtocolDecl::getAssociatedType(Identifier name) const {
+  auto results = const_cast<ProtocolDecl *>(this)->lookupDirect(name);
+  for (auto candidate : results) {
+    if (candidate->getDeclContext() == this &&
+        isa<AssociatedTypeDecl>(candidate)) {
+      return cast<AssociatedTypeDecl>(candidate);
+    }
+  }
+  return nullptr;
 }
 
 Type ProtocolDecl::getSuperclass() const {
@@ -6020,13 +6057,8 @@ ParamDecl::getDefaultValueStringRepresentation(
     if (!existing.empty())
       return existing;
 
-    if (!getDefaultValue()) {
-      // TypeChecker::checkDefaultArguments() nulls out the default value
-      // if it fails to type check it. This only seems to happen with an
-      // invalid/incomplete parameter list that contains a parameter with an
-      // unresolved default value.
-      return "<<empty>>";
-    }
+    assert(getDefaultValue()
+           && "Normal default argument with no default expression?!");
     return extractInlinableText(getASTContext().SourceMgr, getDefaultValue(),
                                 scratch);
   }
@@ -6307,37 +6339,22 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
-  switch (getBodyKind()) {
-  case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
-  case BodyKind::None:
-  case BodyKind::Skipped:
+  if ((getBodyKind() == BodyKind::Synthesize ||
+       getBodyKind() == BodyKind::Unparsed) &&
+      !canSynthesize)
     return nullptr;
 
-  case BodyKind::Parsed:
-  case BodyKind::TypeChecked:
-    return Body;
+  ASTContext &ctx = getASTContext();
 
-  case BodyKind::Unparsed:
-    // FIXME: Go parse now!
+  // Don't allow getBody() to trigger parsing of an unparsed body containing the
+  // code completion location.
+  if (getBodyKind() == BodyKind::Unparsed &&
+      ctx.SourceMgr.rangeContainsCodeCompletionLoc(getBodySourceRange())) {
     return nullptr;
-
-  case BodyKind::Synthesize: {
-    if (!canSynthesize)
-      return nullptr;
-
-    const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-    BraceStmt *body;
-    bool isTypeChecked;
-
-    auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-    std::tie(body, isTypeChecked) = (Synthesizer.Fn)(
-        mutableThis, Synthesizer.Context);
-    mutableThis->setBody(
-        body, isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
-    return body;
   }
-  }
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, ParseAbstractFunctionBodyRequest{mutableThis}, nullptr);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -6804,11 +6821,15 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   switch (getBodyKind()) {
   case BodyKind::Deserialized:
     return true;
+
+  case BodyKind::Unparsed:
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
-    return getBody() && !getBody()->isImplicit();
+    if (auto body = getBody())
+      return !body->isImplicit();
+    return false;
+
   case BodyKind::None:
-  case BodyKind::Unparsed:
   case BodyKind::Synthesize:
   case BodyKind::Skipped:
   case BodyKind::MemberwiseInitializer:
@@ -7655,6 +7676,12 @@ void swift::simple_display(llvm::raw_ostream &out, const ValueDecl *decl) {
   else out << "(null)";
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const GenericParamList *GPL) {
+  if (GPL) GPL->print(out);
+  else out << "(null)";
+}
+
+      
 StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
@@ -7675,4 +7702,50 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
     return loc;
 
   return extractNearestSourceLoc(decl->getDeclContext());
+}
+
+Optional<BraceStmt *>
+ParseAbstractFunctionBodyRequest::getCachedResult() const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+  case BodyKind::Parsed:
+    return afd->Body;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    return None;
+  }
+}
+
+void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    // The body is always empty, so don't cache anything.
+    assert(value == nullptr);
+    return;
+
+  case BodyKind::Parsed:
+  case BodyKind::TypeChecked:
+    afd->Body = value;
+    return;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    llvm_unreachable("evaluate() did not set the body kind");
+    return;
+  }
+
 }

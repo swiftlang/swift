@@ -12,6 +12,7 @@
 
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/NameLookup.h"
 #include "llvm/Support/raw_ostream.h"
@@ -153,9 +154,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
       resolutionKind == ResolutionKind::Overloadable) {
     // If we only found top-level functions, keep looking, since we may
     // find additional overloads.
-    if (std::find_if(decls.begin() + initialCount, decls.end(),
-                     [](ValueDecl *VD) { return !isa<FuncDecl>(VD); })
-        == decls.end())
+    if (std::all_of(decls.begin() + initialCount, decls.end(),
+                    [](ValueDecl *VD) { return isa<FuncDecl>(VD); }))
       canReturnEarly = false;
   }
 

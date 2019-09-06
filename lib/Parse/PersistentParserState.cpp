@@ -25,31 +25,6 @@ PersistentParserState::PersistentParserState() { }
 
 PersistentParserState::~PersistentParserState() { }
 
-void PersistentParserState::delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
-                                                     SourceRange BodyRange,
-                                                     SourceLoc PreviousLoc) {
-  std::unique_ptr<FunctionBodyState> State;
-  State.reset(new FunctionBodyState(BodyRange, PreviousLoc,
-                                    ScopeInfo.saveCurrentScope()));
-  assert(DelayedFunctionBodies.find(AFD) == DelayedFunctionBodies.end() &&
-         "Already recorded state for this body");
-  DelayedFunctionBodies[AFD] = std::move(State);
-}
-
-std::unique_ptr<PersistentParserState::FunctionBodyState>
-PersistentParserState::takeFunctionBodyState(AbstractFunctionDecl *AFD) {
-  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed);
-  DelayedFunctionBodiesTy::iterator I = DelayedFunctionBodies.find(AFD);
-  assert(I != DelayedFunctionBodies.end() && "State should be saved");
-  std::unique_ptr<FunctionBodyState> State = std::move(I->second);
-  DelayedFunctionBodies.erase(I);
-  return State;
-}
-
-bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
-  return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
-}
-
 void PersistentParserState::delayDecl(DelayedDeclKind Kind,
                                       unsigned Flags,
                                       DeclContext *ParentContext,

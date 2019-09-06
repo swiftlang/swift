@@ -15,12 +15,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest)
-SWIFT_REQUEST(NameLookup, ExtendedNominalRequest)
-SWIFT_REQUEST(NameLookup, GetDestructorRequest)
-SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest)
-SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest)
-SWIFT_REQUEST(NameLookup, SuperclassDeclRequest)
-SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest)
-SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest)
-
+SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
+              NominalTypeDecl *(CustomAttr *, DeclContext *), Cached)
+SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
+              NominalTypeDecl *(ExtensionDecl *), SeparatelyCached)
+SWIFT_REQUEST(NameLookup, GetDestructorRequest, DestructorDecl *(ClassDecl *),
+              SeparatelyCached)
+SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
+              DirectlyReferencedTypeDecls(
+                  llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
+              Uncached)
+SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
+              SelfBounds(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>),
+              Uncached)
+SWIFT_REQUEST(NameLookup, SuperclassDeclRequest, ClassDecl *(NominalTypeDecl *),
+              SeparatelyCached)
+SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest,
+              DirectlyReferencedTypeDecls(ExtensionDecl *), Uncached)
+SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
+              DirectlyReferencedTypeDecls(TypeAliasDecl *), Uncached)

@@ -34,7 +34,7 @@ namespace swift {
 
 // Define request evaluation functions for each of the IDE type check requests.
 static AbstractRequestFunction *ideTypeCheckRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching)                      \
 reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #undef SWIFT_REQUEST

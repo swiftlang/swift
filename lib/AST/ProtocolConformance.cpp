@@ -162,14 +162,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
 
   // Find the named requirement.
   ProtocolDecl *proto = getRequirement();
-  AssociatedTypeDecl *assocType = nullptr;
-  auto members = proto->lookupDirect(name,
-                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
+  auto *assocType = proto->getAssociatedType(name);
 
   // FIXME: Shouldn't this be a hard error?
   if (!assocType)
@@ -183,16 +176,7 @@ ConcreteDeclRef
 ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   // Find the named requirement.
   auto *proto = getRequirement();
-  auto results =
-    proto->lookupDirect(name,
-                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
-
-  ValueDecl *requirement = nullptr;
-  for (auto *result : results) {
-    if (isa<ProtocolDecl>(result->getDeclContext()))
-      requirement = result;
-  }
-
+  auto *requirement = proto->getSingleRequirement(name);
   if (requirement == nullptr)
     return ConcreteDeclRef();
 

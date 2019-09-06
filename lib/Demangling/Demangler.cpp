@@ -1919,79 +1919,96 @@ NodePointer Demangler::demanglePrivateContextDescriptor() {
 
 NodePointer Demangler::demangleArchetype() {
   switch (nextChar()) {
-    case 'a': {
-      NodePointer Ident = popNode(Node::Kind::Identifier);
-      NodePointer ArcheTy = popTypeAndGetChild();
-      NodePointer AssocTy = createType(
-            createWithChildren(Node::Kind::AssociatedTypeRef, ArcheTy, Ident));
-      addSubstitution(AssocTy);
-      return AssocTy;
-    }
-    case 'O': {
-      auto definingContext = popContext();
-      return createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext);
-    }
-    case 'o': {
-      auto index = demangleIndex();
-      Vector<NodePointer> boundGenericArgs;
-      NodePointer retroactiveConformances;
-      if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
-        return nullptr;
-      auto Name = popNode();
-      auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
-                                     createNode(Node::Kind::Index, index));
-      auto boundGenerics = createNode(Node::Kind::TypeList);
-      for (unsigned i = boundGenericArgs.size(); i-- > 0;)
-        boundGenerics->addChild(boundGenericArgs[i], *this);
-      opaque->addChild(boundGenerics, *this);
-      if (retroactiveConformances)
-        opaque->addChild(retroactiveConformances, *this);
-      
-      auto opaqueTy = createType(opaque);
-      addSubstitution(opaqueTy);
-      return opaqueTy;
-    }
-    case 'r': {
-      return createType(createNode(Node::Kind::OpaqueReturnType));
-    }
-    case 'y': {
-      NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
-      addSubstitution(T);
-      return T;
-    }
-    case 'z': {
-      NodePointer T = demangleAssociatedTypeSimple(
-                                            getDependentGenericParamType(0, 0));
-      addSubstitution(T);
-      return T;
-    }
-    case 'Y': {
-      NodePointer T = demangleAssociatedTypeCompound(
-                                                   demangleGenericParamIndex());
-      addSubstitution(T);
-      return T;
-    }
-    case 'Z': {
-      NodePointer T = demangleAssociatedTypeCompound(
-                                            getDependentGenericParamType(0, 0));
-      addSubstitution(T);
-      return T;
-    }
-    default:
+  case 'a': {
+    NodePointer Ident = popNode(Node::Kind::Identifier);
+    NodePointer ArcheTy = popTypeAndGetChild();
+    NodePointer AssocTy = createType(
+          createWithChildren(Node::Kind::AssociatedTypeRef, ArcheTy, Ident));
+    addSubstitution(AssocTy);
+    return AssocTy;
+  }
+  case 'O': {
+    auto definingContext = popContext();
+    return createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext);
+  }
+  case 'o': {
+    auto index = demangleIndex();
+    Vector<NodePointer> boundGenericArgs;
+    NodePointer retroactiveConformances;
+    if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
       return nullptr;
+    auto Name = popNode();
+    auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
+                                   createNode(Node::Kind::Index, index));
+    auto boundGenerics = createNode(Node::Kind::TypeList);
+    for (unsigned i = boundGenericArgs.size(); i-- > 0;)
+      boundGenerics->addChild(boundGenericArgs[i], *this);
+    opaque->addChild(boundGenerics, *this);
+    if (retroactiveConformances)
+      opaque->addChild(retroactiveConformances, *this);
+    
+    auto opaqueTy = createType(opaque);
+    addSubstitution(opaqueTy);
+    return opaqueTy;
+  }
+  case 'r': {
+    return createType(createNode(Node::Kind::OpaqueReturnType));
+  }
+
+  case 'x': {
+    NodePointer T = demangleAssociatedTypeSimple(nullptr);
+    addSubstitution(T);
+    return T;
+  }
+      
+  case 'X': {
+    NodePointer T = demangleAssociatedTypeCompound(nullptr);
+    addSubstitution(T);
+    return T;
+  }
+
+  case 'y': {
+    NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
+    addSubstitution(T);
+    return T;
+  }
+  case 'Y': {
+    NodePointer T = demangleAssociatedTypeCompound(
+                                                 demangleGenericParamIndex());
+    addSubstitution(T);
+    return T;
+  }
+
+  case 'z': {
+    NodePointer T = demangleAssociatedTypeSimple(
+                                          getDependentGenericParamType(0, 0));
+    addSubstitution(T);
+    return T;
+  }
+  case 'Z': {
+    NodePointer T = demangleAssociatedTypeCompound(
+                                          getDependentGenericParamType(0, 0));
+    addSubstitution(T);
+    return T;
+  }
+  default:
+    return nullptr;
   }
 }
 
-NodePointer Demangler::demangleAssociatedTypeSimple(
-                                                  NodePointer GenericParamIdx) {
-  NodePointer GPI = createType(GenericParamIdx);
+NodePointer Demangler::demangleAssociatedTypeSimple(NodePointer Base) {
   NodePointer ATName = popAssocTypeName();
+  NodePointer BaseTy;
+  if (Base) {
+    BaseTy = createType(Base);
+  } else {
+    BaseTy = popNode(Node::Kind::Type);
+  }
   return createType(createWithChildren(Node::Kind::DependentMemberType,
-                                       GPI, ATName));
+                                       BaseTy, ATName));
 }
 
-NodePointer Demangler::demangleAssociatedTypeCompound(
-                                                  NodePointer GenericParamIdx) {
+NodePointer Demangler::demangleAssociatedTypeCompound(NodePointer Base) {
   Vector<NodePointer> AssocTyNames(*this, 4);
   bool firstElem = false;
   do {
@@ -2001,15 +2018,19 @@ NodePointer Demangler::demangleAssociatedTypeCompound(
       return nullptr;
     AssocTyNames.push_back(AssocTyName, *this);
   } while (!firstElem);
-
-  NodePointer Base = GenericParamIdx;
+    
+  NodePointer BaseTy;
+  if (Base)
+    BaseTy = createType(Base);
+  else
+    BaseTy = popNode(Node::Kind::Type);
 
   while (NodePointer AssocTy = AssocTyNames.pop_back_val()) {
     NodePointer depTy = createNode(Node::Kind::DependentMemberType);
-    depTy = addChild(depTy, createType(Base));
-    Base = addChild(depTy, AssocTy);
+    depTy = addChild(depTy, BaseTy);
+    BaseTy = createType(addChild(depTy, AssocTy));
   }
-  return createType(Base);
+  return BaseTy;
 }
 
 NodePointer Demangler::popAssocTypeName() {

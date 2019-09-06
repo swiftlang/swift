@@ -1289,7 +1289,7 @@ public:
 };
 
 /// If this is an argument-to-parameter conversion which is associated with
-/// `inout` parameter, subtyping is now permitted, types have to
+/// `inout` parameter, subtyping is not permitted, types have to
 /// be identical.
 class AllowInOutConversion final : public ContextualMismatch {
   AllowInOutConversion(ConstraintSystem &cs, Type argType, Type paramType,

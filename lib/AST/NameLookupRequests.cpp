@@ -113,7 +113,7 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
 
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching)                      \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/NameLookupTypeIDZone.def"
 #undef SWIFT_REQUEST

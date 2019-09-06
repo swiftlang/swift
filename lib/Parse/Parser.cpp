@@ -25,7 +25,6 @@
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParsedSyntaxNodes.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -112,7 +111,6 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 using namespace swift;
 using namespace swift::syntax;
 
-void DelayedParsingCallbacks::anchor() { }
 void SILParserTUStateBase::anchor() { }
 
 namespace {
@@ -138,6 +136,9 @@ public:
 
 private:
   void parseFunctionBody(AbstractFunctionDecl *AFD) {
+    // FIXME: This duplicates the evaluation of
+    // ParseAbstractFunctionBodyRequest, but installs a code completion
+    // factory.
     assert(AFD->getBodyKind() == FuncDecl::BodyKind::Unparsed);
 
     SourceFile &SF = *AFD->getDeclContext()->getParentSourceFile();
@@ -152,8 +153,8 @@ private:
           CodeCompletionFactory->createCodeCompletionCallbacks(TheParser));
       TheParser.setCodeCompletionCallbacks(CodeCompletion.get());
     }
-    if (ParserState.hasFunctionBodyState(AFD))
-      TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    auto body = TheParser.parseAbstractFunctionBodyDelayed(AFD);
+    AFD->setBodyParsed(body);
 
     if (CodeCompletion)
       CodeCompletion->doneParsing();
@@ -170,8 +171,7 @@ static void parseDelayedDecl(
   SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
-                   /*DelayBodyParsing=*/false);
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
   TheParser.SyntaxContext->setDiscard();
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {

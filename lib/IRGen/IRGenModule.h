@@ -1070,7 +1070,7 @@ public:
   getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
   
   std::pair<llvm::Constant *, unsigned>
-  getTypeRef(CanType type, MangledTypeRefRole role);
+  getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
 
   std::pair<llvm::Constant *, unsigned>
   getLoweredTypeRef(SILType loweredType, CanGenericSignature genericSig,

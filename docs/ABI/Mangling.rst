@@ -551,6 +551,11 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  
+  #if SWIFT_RUNTIME_VERSION >= 5.2
+    type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
+    type ::= type assoc-type-list 'QX' // associated type relative to base `type`
+  #endif
 
   protocol-list ::= protocol '_' protocol*
   protocol-list ::= empty-list

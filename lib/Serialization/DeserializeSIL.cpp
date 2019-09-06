@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
 
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFile.h"
 #include "SILFormat.h"
 
 #include "SILSerializationFunctionBuilder.h"
@@ -27,8 +29,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/Serialization/BCReadingExtras.h"
-#include "swift/Serialization/ModuleFile.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"

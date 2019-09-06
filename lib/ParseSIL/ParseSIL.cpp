@@ -115,7 +115,6 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB,
                                 bool FullParse,
                                 bool DelayBodyParsing) {
   assert((!FullParse || (SF.canBeParsedInFull() && !SIL)) &&
@@ -147,8 +146,6 @@ static bool parseIntoSourceFileImpl(SourceFile &SF,
 
   llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens,
                                SF.hasInterfaceHash());
-  if (DelayedParseCB)
-    P.setDelayedParsingCallbacks(DelayedParseCB);
 
   bool FoundSideEffects = false;
   do {
@@ -177,22 +174,20 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
                                 bool *Done,
                                 SILParserState *SIL,
                                 PersistentParserState *PersistentState,
-                                DelayedParsingCallbacks *DelayedParseCB,
                                 bool DelayBodyParsing) {
   return parseIntoSourceFileImpl(SF, BufferID, Done, SIL,
-                                 PersistentState, DelayedParseCB,
+                                 PersistentState,
                                  /*FullParse=*/SF.shouldBuildSyntaxTree(),
                                  DelayBodyParsing);
 }
 
 bool swift::parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
                                     PersistentParserState *PersistentState,
-                                    DelayedParsingCallbacks *DelayedParseCB,
                                     bool DelayBodyParsing) {
   bool Done = false;
   return parseIntoSourceFileImpl(SF, BufferID, &Done, /*SIL=*/nullptr,
-                                 PersistentState, DelayedParseCB,
-                                 /*FullParse=*/true, DelayBodyParsing);
+                                 PersistentState, /*FullParse=*/true,
+                                 DelayBodyParsing);
 }
 
 
