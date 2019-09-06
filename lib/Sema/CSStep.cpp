@@ -709,7 +709,7 @@ bool DisjunctionStep::shortCircuitDisjunctionAt(
         continue;
 
       auto choiceTyvar =
-          CS.getType(simplifyLocatorToAnchor(CS, overload.getFirst()))
+          CS.getType(simplifyLocatorToAnchor(overload.getFirst()))
               ->getAs<TypeVariableType>();
       if (!choiceTyvar)
         continue;
