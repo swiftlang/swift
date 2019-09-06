@@ -396,19 +396,19 @@ public:
     /// subclass, returning \c None if unsuccessful.
     template <class T>
     Optional<T> getAs() const {
-      if (auto *result = dyn_cast<T>(this))
+      if (auto *result = llvm::dyn_cast<T>(this))
         return *result;
       return None;
     }
 
     /// Cast the path element to a specific \c LocatorPathElt subclass.
     template <class T>
-    T castTo() const { return *cast<T>(this); }
+    T castTo() const { return *llvm::cast<T>(this); }
 
     /// Checks whether the path element is a specific \c LocatorPathElt
     /// subclass.
     template <class T>
-    bool is() const { return isa<T>(this); }
+    bool is() const { return llvm::isa<T>(this); }
 
     /// Return the summary flags for this particular element.
     unsigned getNewSummaryFlags() const {
