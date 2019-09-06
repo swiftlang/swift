@@ -50,7 +50,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                  SmallVector<GenericParamList *, 2>,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),
-              CacheKind::Cached)
+              Cached)
 SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
               Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned,
                    TypeResolutionStage),
