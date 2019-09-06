@@ -18,7 +18,6 @@
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -954,22 +953,13 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
     if (getSILGlobalVariable()->getDecl()) {
-      return getSILGlobalVariable()->getDecl()
-          ->isWeakImported(module);
+      return getSILGlobalVariable()->getDecl()->isWeakImported(module);
     }
     return false;
   case Kind::DynamicallyReplaceableFunctionKey:
   case Kind::DynamicallyReplaceableFunctionVariable:
   case Kind::SILFunction: {
-    // For imported functions check the Clang declaration.
-    if (auto clangOwner = getSILFunction()->getClangNodeOwner())
-      return clangOwner->isWeakImported(module);
-
-    // For native functions check a flag on the SILFunction
-    // itself.
-    if (getSILFunction()->isWeakLinked())
-      return getSILFunction()->isAvailableExternally();
-    return false;
+    return getSILFunction()->isWeakImported();
   }
 
   case Kind::AssociatedConformanceDescriptor:

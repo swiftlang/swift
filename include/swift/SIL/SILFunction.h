@@ -18,6 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/AST/ASTNode.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -173,6 +174,10 @@ private:
   /// Contains Function Entry Count
   ProfileCounter EntryCount;
 
+  /// The availability used to determine if declarations of this function
+  /// should use weak linking.
+  AvailabilityContext Availability;
+
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
@@ -211,8 +216,9 @@ private:
   /// would indicate.
   unsigned HasCReferences : 1;
 
-  /// Whether cross-module references to this function should use weak linking.
-  unsigned IsWeakLinked : 1;
+  /// Whether cross-module references to this function should always use
+  /// weak linking.
+  unsigned IsWeakImported : 1;
 
   // Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
@@ -575,17 +581,27 @@ public:
   bool hasCReferences() const { return HasCReferences; }
   void setHasCReferences(bool value) { HasCReferences = value; }
 
-  /// Returns whether this function's symbol must always be weakly referenced
-  /// across module boundaries.
-  bool isWeakLinked() const { return IsWeakLinked; }
-  /// Forces IRGen to treat references to this function as weak across module
-  /// boundaries (i.e. if it has external linkage).
-  void setWeakLinked(bool value = true) {
-    assert(!IsWeakLinked && "already set");
-    IsWeakLinked = value;
+  /// Returns the availability context used to determine if the function's
+  /// symbol should be weakly referenced across module boundaries.
+  AvailabilityContext getAvailabilityForLinkage() const {
+    return Availability;
   }
 
-  /// Returs whether this function implementation can be dynamically replaced.
+  void setAvailabilityForLinkage(AvailabilityContext availability) {
+    Availability = availability;
+  }
+
+  /// Returns whether this function's symbol must always be weakly referenced
+  /// across module boundaries.
+  bool isAlwaysWeakImported() const { return IsWeakImported; }
+
+  void setAlwaysWeakImported(bool value) {
+    IsWeakImported = value;
+  }
+
+  bool isWeakImported() const;
+
+  /// Returns whether this function implementation can be dynamically replaced.
   IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
     return IsDynamicallyReplaceable_t(IsDynamicReplaceable);
   }
