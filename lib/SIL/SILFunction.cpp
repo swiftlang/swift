@@ -93,7 +93,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsExactSelfClass_t isExactSelfClass)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
-      DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
+      Bare(isBareSILFunction), Transparent(isTrans),
       Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
@@ -104,6 +104,7 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       EffectsKindAttr(E), EntryCount(entryCount) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);
+  setDebugScope(DebugScope);
 
   if (InsertBefore)
     Module.functions.insert(SILModule::iterator(InsertBefore), this);
