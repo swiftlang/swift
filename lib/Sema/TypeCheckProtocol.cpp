@@ -3948,20 +3948,6 @@ static void diagnoseConformanceFailure(Type T,
       diags.diagnose(enumDecl->getInherited()[0].getSourceRange().Start,
                      diag::enum_raw_type_nonconforming_and_nonsynthable,
                      T, rawType);
-
-      // If the reason is that the raw type does not conform to
-      // Equatable, say so.
-      auto equatableProto = ctx.getProtocol(KnownProtocolKind::Equatable);
-      if (!equatableProto)
-        return;
-
-      if (!TypeChecker::conformsToProtocol(rawType, equatableProto, enumDecl,
-                                           None)) {
-        SourceLoc loc = enumDecl->getInherited()[0].getSourceRange().Start;
-        diags.diagnose(loc, diag::enum_raw_type_not_equatable, rawType);
-        return;
-      }
-
       return;
     }
   }

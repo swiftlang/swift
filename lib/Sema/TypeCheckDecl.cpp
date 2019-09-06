@@ -1462,6 +1462,23 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
   };
 
+  // The raw type must conform to Equatable, unless we explicitly have a
+  // rawValue and init(rawValue:).
+  if (!conformsToProtocol(KnownProtocolKind::Equatable)) {
+    auto &ctx = TC.Context;
+    auto rawValueInit =
+        DeclName(ctx, DeclBaseName::createConstructor(), {ctx.Id_rawValue});
+    auto doesNotHaveRawValue = ED->lookupDirect(ctx.Id_rawValue).empty();
+    auto doesNotHaveRawValueInit = ED->lookupDirect(rawValueInit).empty();
+
+    if (doesNotHaveRawValue || doesNotHaveRawValueInit) {
+      auto rawTypeInherited = ED->getInherited().front();
+      TC.diagnose(rawTypeInherited.getLoc(), diag::enum_raw_type_not_equatable,
+                  rawTy);
+      rawTypeInherited.setInvalidType(TC.Context);
+    }
+  }
+
   if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     valueKind = AutomaticEnumValueKind::Integer;
   } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
