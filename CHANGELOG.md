@@ -63,18 +63,15 @@ Swift Next
   extension Foo where Self: Bar {
     var anotherProperty1: Int {
       get { return someProperty }
-      // 'someProperty' exists as a protocol requirement (implicitly mutating
-      // due to the lack of a class constraint), so the setter below needs to 
-      // be explicitly marked as 'mutating'.
-      set { someProperty = newValue } // Error
-    }
-    
-    var anotherProperty2: Int {
-      get { return someProperty }
-      mutating set { someProperty = newValue } // Okay
+      // This will now error, because the protocol requirement
+      // is implicitly mutating and the setter is implicitly 
+      // nonmutating.
+      set { someProperty = newValue }
     }
   }
   ```
+
+  To resolve this, explicitly mark the setter as `nonmutating` in the protocol.
 
 * [SE-0253][]:
 
