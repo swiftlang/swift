@@ -62,10 +62,6 @@ class InheritedDeclsReferencedRequest :
                          unsigned),
                        CacheKind::Uncached> // FIXME: Cache these
 {
-  /// Retrieve the TypeLoc for this inherited type.
-  TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      unsigned index) const;
-
 public:
   using SimpleRequest::SimpleRequest;
 

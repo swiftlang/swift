@@ -68,7 +68,7 @@ InheritedTypeRequest::evaluate(
   }
   }
 
-  TypeLoc &typeLoc = getTypeLoc(decl, index);
+  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())

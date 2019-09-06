@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -31,19 +32,11 @@ namespace swift {
 //----------------------------------------------------------------------------//
 // Referenced inherited decls computation.
 //----------------------------------------------------------------------------//
-TypeLoc &InheritedDeclsReferencedRequest::getTypeLoc(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
-  // FIXME: Copy-pasted from InheritedTypeRequest. We need to consolidate here.
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
-}
 
 SourceLoc InheritedDeclsReferencedRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   return typeLoc.getLoc();
 }
 

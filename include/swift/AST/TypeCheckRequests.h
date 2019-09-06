@@ -57,10 +57,6 @@ class InheritedTypeRequest :
                               TypeResolutionStage),
                          CacheKind::SeparatelyCached>
 {
-  /// Retrieve the TypeLoc for this inherited type.
-  TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      unsigned index) const;
-
 public:
   using SimpleRequest::SimpleRequest;
 
