@@ -16,12 +16,12 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(IDETypeChecking, HasDynamicMemberLookupAttributeRequest,
-              bool(TypeBase *), Cached)
+              bool(TypeBase *), Cached, NoLocationInfo)
 SWIFT_REQUEST(IDETypeChecking, IsDeclApplicableRequest,
-              bool(DeclApplicabilityOwner), Cached)
+              bool(DeclApplicabilityOwner), Cached, NoLocationInfo)
 SWIFT_REQUEST(IDETypeChecking, RootAndResultTypeOfKeypathDynamicMemberRequest,
-              TypePair(SubscriptDecl *), Cached)
+              TypePair(SubscriptDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(IDETypeChecking, RootTypeOfKeypathDynamicMemberRequest,
-              Type(SubscriptDecl *), Uncached)
+              Type(SubscriptDecl *), Uncached, NoLocationInfo)
 SWIFT_REQUEST(IDETypeChecking, TypeRelationCheckRequest,
-              bool(TypeRelationCheckInput), Cached)
+              bool(TypeRelationCheckInput), Cached, NoLocationInfo)

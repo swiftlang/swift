@@ -432,8 +432,15 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
       return getConstraintLocator(fnLocator,
                                   ConstraintLocator::ConstructorMember);
     }
-    // Otherwise fall through and look for locators anchored on the fn expr.
-    expr = fnExpr->getSemanticsProvidingExpr();
+
+    // Otherwise fall through and look for locators anchored on the function
+    // expr. For CallExprs, this can look through things like parens and
+    // optional chaining.
+    if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
+      expr = callExpr->getDirectCallee();
+    } else {
+      expr = fnExpr;
+    }
   }
 
   if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
