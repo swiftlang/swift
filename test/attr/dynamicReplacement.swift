@@ -50,6 +50,14 @@ extension K {
   func replacement_finalFunction() {}
 }
 
+extension undeclared { // expected-error{{use of undeclared type 'undeclared'}}
+  @_dynamicReplacement(for: property)
+  var replacement_property: Int { return 2 }
+
+  @_dynamicReplacement(for: func)
+  func func2() -> Int { return 2 }
+}
+
 extension P {
   @_dynamicReplacement(for: v)
   var replacement_v : Int {

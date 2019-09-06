@@ -8,14 +8,14 @@ extension G {
   }
 }
 
-extension G {
-  struct S<T> { // expected-note {{generic type 'S' declared here}}
+extension { // expected-error {{expected type name in extension declaration}}
+  struct S<T> {
     func foo(t: T) {}
   }
 
-  class M : S {} // expected-error {{reference to generic type 'G<T>.S' requires arguments in <...>}}
+  class M : S {}
 
-  protocol P { // expected-error {{protocol 'P' cannot be nested inside another declaration}}
+  protocol P {
     associatedtype A
   }
 }

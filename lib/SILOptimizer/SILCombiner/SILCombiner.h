@@ -57,7 +57,7 @@ class SILCombiner :
   ClassHierarchyAnalysis *CHA;
 
   /// Worklist containing all of the instructions primed for simplification.
-  SILInstructionWorklist Worklist;
+  SmallSILInstructionWorklist<256> Worklist;
 
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
@@ -97,7 +97,7 @@ public:
 
   void clear() {
     Iteration = 0;
-    Worklist.zap();
+    Worklist.resetChecked();
     MadeChange = false;
   }
 

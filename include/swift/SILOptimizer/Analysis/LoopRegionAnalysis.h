@@ -762,7 +762,7 @@ private:
 
   unsigned addSucc(LoopRegion *Successor) {
     assert(!isFunction() && "Functions cannot have successors");
-    return Succs.insert(SuccessorID(Successor->getID(), false));
+    return Succs.insert(SuccessorID(Successor->getID(), false)).first;
   }
 
   void replacePred(unsigned OldPredID, unsigned NewPredID) {
