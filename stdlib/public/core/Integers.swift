@@ -3365,19 +3365,9 @@ extension FixedWidthInteger {
   public static func _random<R: RandomNumberGenerator>(
     using generator: inout R
   ) -> Self {
-    if bitWidth <= UInt64.bitWidth {
-      return Self(truncatingIfNeeded: generator.next() as UInt64)
+    stride(from: 0, to: bitWidth, by: 64).reduce(into: .zero) {
+      $0 |= Self(truncatingIfNeeded: generator.next()) &<< $1
     }
-
-    let (quotient, remainder) = bitWidth.quotientAndRemainder(
-      dividingBy: UInt64.bitWidth
-    )
-    var tmp: Self = 0
-    for i in 0 ..< quotient + remainder.signum() {
-      let next: UInt64 = generator.next()
-      tmp += Self(truncatingIfNeeded: next) &<< (UInt64.bitWidth * i)
-    }
-    return tmp
   }
 }
 
