@@ -1,6 +1,0 @@
-Darwin
-Dispatch
-MachO
-ObjectiveC
-libkern
-os
