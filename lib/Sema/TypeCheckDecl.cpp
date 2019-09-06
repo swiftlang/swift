@@ -1322,7 +1322,6 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add all of the generic parameters.
-  proto->createGenericParamsIfMissing();
   for (auto gp : *proto->getGenericParams())
     builder.addGenericParameter(gp);
 

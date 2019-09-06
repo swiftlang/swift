@@ -4554,7 +4554,6 @@ namespace {
       
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
-        result->createGenericParamsIfMissing(objcClass);
         result->setGenericSignature(objcClass->getGenericSignature());
       }
 
@@ -4827,7 +4826,8 @@ namespace {
       if (auto gpImportResult = importObjCGenericParams(decl, dc)) {
         auto genericParams = *gpImportResult;
         if (genericParams) {
-          result->setGenericParams(genericParams);
+          result->getASTContext().evaluator.cacheOutput(
+                GenericParamListRequest{result}, std::move(genericParams));
 
           auto *sig = Impl.buildGenericSignature(genericParams, dc);
           result->setGenericSignature(sig);
@@ -5155,8 +5155,11 @@ namespace {
 
       if (auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl)) {
         typealias->setGenericSignature(GTD->getGenericSignature());
-        if (GTD->isGeneric())
-          typealias->setGenericParams(GTD->getGenericParams()->clone(typealias));
+        if (GTD->isGeneric()) {
+          typealias->getASTContext().evaluator.cacheOutput(
+                GenericParamListRequest{typealias},
+                std::move(GTD->getGenericParams()->clone(typealias)));
+        }
       }
 
       typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
@@ -5387,8 +5390,11 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl);
   if (GTD && !isa<ProtocolDecl>(GTD)) {
     alias->setGenericSignature(GTD->getGenericSignature());
-    if (GTD->isGeneric())
-      alias->setGenericParams(GTD->getGenericParams()->clone(alias));
+    if (GTD->isGeneric()) {
+      alias->getASTContext().evaluator.cacheOutput(
+            GenericParamListRequest{alias},
+            std::move(GTD->getGenericParams()->clone(alias)));
+    }
   }
 
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
@@ -8126,7 +8132,6 @@ ClangImporter::Implementation::importDeclContextOf(
   ext->setMemberLoader(this, reinterpret_cast<uintptr_t>(declSubmodule));
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
-    ext->createGenericParamsIfMissing(protoDecl);
     ext->setGenericSignature(protoDecl->getGenericSignature());
   }
 

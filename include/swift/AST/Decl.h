@@ -1474,7 +1474,7 @@ public:
 class alignas(8) _GenericContext {
 // Not really public. See GenericContext.
 public:
-  GenericParamList *GenericParams = nullptr;
+  llvm::PointerIntPair<GenericParamList *, 1, bool> GenericParamsAndBit;
 
   /// The trailing where clause.
   ///
@@ -1487,16 +1487,16 @@ public:
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
+  friend class GenericParamListRequest;
+
 protected:
-  GenericContext(DeclContextKind Kind, DeclContext *Parent)
-    : _GenericContext(), DeclContext(Kind, Parent) { }
+  GenericContext(DeclContextKind Kind, DeclContext *Parent,
+                 GenericParamList *Params);
 
 public:
   /// Retrieve the set of parameters to a generic context, or null if
   /// this context is not generic.
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  void setGenericParams(GenericParamList *GenericParams);
+  GenericParamList *getGenericParams() const;
 
   /// Determine whether this context has generic parameters
   /// of its own.
@@ -1511,7 +1511,7 @@ public:
   ///   func p()   // isGeneric == false
   /// }
   /// \endcode
-  bool isGeneric() const { return GenericParams != nullptr; }
+  bool isGeneric() const { return getGenericParams() != nullptr; }
 
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
@@ -1748,8 +1748,6 @@ public:
   bool hasValidSignature() const {
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
-
-  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -3306,7 +3304,6 @@ protected:
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
-    setGenericParams(GenericParams);
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
@@ -4321,10 +4318,6 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Create the generic parameters of this protocol if they haven't been
-  /// created yet.
-  void createGenericParamsIfMissing();
 
   /// Retrieve the requirements that describe this protocol.
   ///
@@ -5415,7 +5408,7 @@ public:
                 SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
-    : GenericContext(DeclContextKind::SubscriptDecl, Parent),
+    : GenericContext(DeclContextKind::SubscriptDecl, Parent, GenericParams),
       AbstractStorageDecl(DeclKind::Subscript,
                           StaticSpelling != StaticSpellingKind::None,
                           Parent, Name, SubscriptLoc,
@@ -5424,7 +5417,6 @@ public:
       Indices(nullptr), ElementTy(ElementTy) {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
-    setGenericParams(GenericParams);
   }
   
   /// \returns the way 'static'/'class' was spelled in the source.
@@ -5589,11 +5581,10 @@ protected:
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
         ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
-    setGenericParams(GenericParams);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
@@ -7243,6 +7234,16 @@ inline void simple_display(llvm::raw_ostream &out, const ExtensionDecl *decl) {
 inline void simple_display(llvm::raw_ostream &out,
                            const NominalTypeDecl *decl) {
   simple_display(out, static_cast<const Decl *>(decl));
+}
+
+/// Display GenericContext.
+///
+/// The template keeps this sorted down in the overload set relative to the
+/// more concrete overloads with Decl pointers thereby breaking a potential ambiguity.
+template <typename T>
+inline typename std::enable_if<std::is_same<T, GenericContext>::value>::type
+simple_display(llvm::raw_ostream &out, const T *GC) {
+  simple_display(out, GC->getAsDecl());
 }
 
 /// Display GenericParamList.
