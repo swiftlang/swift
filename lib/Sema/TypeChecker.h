@@ -574,8 +574,6 @@ private:
   /// The set of expressions currently being analyzed for failures.
   llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
-  ModuleDecl *StdlibModule = nullptr;
-
   /// The index of the next response metavariable to bind to a REPL result.
   unsigned NextResponseVariableIndex = 0;
 

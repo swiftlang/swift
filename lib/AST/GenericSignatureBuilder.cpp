@@ -4114,7 +4114,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   }
 
   // Add any requirements in the where clause on the protocol.
-  RequirementRequest::visitRequirements(proto, TypeResolutionStage::Structural,
+  WhereClauseOwner(proto).visitRequirements(TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         // If we're only looking at same-type constraints, skip everything else.
         if (onlySameTypeConstraints &&
@@ -4240,8 +4240,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
     }
 
     // Add requirements from this associated type's where clause.
-    RequirementRequest::visitRequirements(assocTypeDecl,
-                                          TypeResolutionStage::Structural,
+    WhereClauseOwner(assocTypeDecl).visitRequirements(
+        TypeResolutionStage::Structural,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
           // If we're only looking at same-type constraints, skip everything else.
           if (onlySameTypeConstraints &&
@@ -7714,10 +7714,10 @@ InferredGenericSignatureRequest::evaluate(
 
     // Add the requirements clause to the builder.
 
-    WhereClauseOwner owner(lookupDC, genericParams);
     using FloatingRequirementSource =
       GenericSignatureBuilder::FloatingRequirementSource;
-    RequirementRequest::visitRequirements(owner, TypeResolutionStage::Structural,
+    WhereClauseOwner(lookupDC, genericParams).visitRequirements(
+        TypeResolutionStage::Structural,
         [&](const Requirement &req, RequirementRepr *reqRepr) {
           auto source = FloatingRequirementSource::forExplicit(reqRepr);
           
@@ -7725,7 +7725,7 @@ InferredGenericSignatureRequest::evaluate(
           // for example, `extension Foo where Self: Foo`, then emit a
           // diagnostic.
           
-          if (auto decl = owner.dc->getAsDecl()) {
+          if (auto decl = lookupDC->getAsDecl()) {
             if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
               auto extType = extDecl->getDeclaredInterfaceType();
               auto extSelfType = extDecl->getSelfInterfaceType();

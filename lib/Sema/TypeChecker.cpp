@@ -209,17 +209,11 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (StdlibModule)
-    return StdlibModule;
-
-  StdlibModule = Context.getStdlibModule();
-
-  if (!StdlibModule) {
-    return dc->getParentModule();
+  if (auto *stdlib = Context.getStdlibModule()) {
+    return stdlib;
   }
 
-  assert(StdlibModule && "no main module found");
-  return StdlibModule;
+  return dc->getParentModule();
 }
 
 /// Bind the given extension to the given nominal type.
