@@ -47,111 +47,132 @@ namespace swift {
 template <typename ValueT, typename VectorT = std::vector<Optional<ValueT>>,
           typename MapT = llvm::DenseMap<ValueT, unsigned>>
 class BlotSetVector {
-  VectorT Vector;
-  MapT Map;
+  VectorT vector;
+  MapT map;
 
 public:
   /// Construct an empty BlotSetVector.
   BlotSetVector() {}
 
-  bool empty() const { return Vector.empty(); }
+  bool empty() const { return vector.empty(); }
 
-  unsigned size() const { return Vector.size(); }
+  unsigned size() const { return vector.size(); }
 
   using iterator = typename VectorT::iterator;
   using const_iterator = typename VectorT::const_iterator;
-  iterator begin() { return Vector.begin(); }
-  iterator end() { return Vector.end(); }
-  const_iterator begin() const { return Vector.begin(); }
-  const_iterator end() const { return Vector.end(); }
+  iterator begin() { return vector.begin(); }
+  iterator end() { return vector.end(); }
+  const_iterator begin() const { return vector.begin(); }
+  const_iterator end() const { return vector.end(); }
   llvm::iterator_range<const_iterator> getRange() const {
     return {begin(), end()};
   }
 
   using const_reverse_iterator = typename VectorT::const_reverse_iterator;
-  const_reverse_iterator rbegin() const { return Vector.rbegin(); }
-  const_reverse_iterator rend() const { return Vector.rend(); }
+  const_reverse_iterator rbegin() const { return vector.rbegin(); }
+  const_reverse_iterator rend() const { return vector.rend(); }
   llvm::iterator_range<const_reverse_iterator> getReverseRange() const {
     return {rbegin(), rend()};
   }
 
   const Optional<ValueT> &operator[](unsigned n) const {
-    assert(n < Vector.size() && "Out of range!");
-    return Vector[n];
+    assert(n < vector.size() && "Out of range!");
+    return vector[n];
   }
 
-  /// Insert \p V into the SetVector if it is not in the array and return the
-  /// index of \p V in the Set Vector. If \p V is already in the SetVector, just
-  /// return its index in the array.
-  unsigned insert(const ValueT &V) {
-    auto Iter = Map.find(V);
-    if (Iter != Map.end())
-      return Iter->second;
-
-    unsigned Index = Vector.size();
-    Map[V] = Index;
-    Vector.push_back(V);
-    return Index;
+  /// Grow the set vector so that it can contain at least \p capacity items
+  /// before resizing again.
+  ///
+  /// \param capacity The minimum size that the set vector will be able to grow
+  ///                 to before a resize is required to insert additional items.
+  void reserve(unsigned capacity) {
+    vector.reserve(capacity);
+    map.reserve(capacity);
   }
 
-  /// Replace \p V1 with \p V2 placing \p V2 into the position in the array
-  /// where V1 used to be. If \p V2 is already in the set, this just erases \p
-  /// V1.
-  void replace(const ValueT &V1, const ValueT &V2) {
-    auto Iter1 = Map.find(V1);
-    assert(Iter1 != Map.end() && "Cannot replace value that is not in set");
-    unsigned V1Index = Iter1->second;
-    Map.erase(V1);
+  /// Insert \p value into the SetVector if it is not there already.
+  ///
+  /// \param value The item to insert if not already present.
+  ///
+  /// \returns Both the index of the item and whether it was inserted in a pair.
+  ///          If the item was already present, its preexisting index along with
+  ///          false will be returned.  If the item was newly added, its new
+  ///          index along with true will be returned.
+  std::pair<unsigned, bool> insert(const ValueT &value) {
+    auto iterator = map.find(value);
+    if (iterator != map.end())
+      return {iterator->second, false};
 
-    auto Iter2 = Map.find(V2);
-    if (Iter2 != Map.end()) {
-      Vector[V1Index] = None;
+    unsigned index = vector.size();
+    map[value] = index;
+    vector.push_back(value);
+    return {index, true};
+  }
+
+  /// Replace \p value1 with \p value2 placing \p value2 into the position in
+  /// the array where value1 used to be. If \p value2 is already in the set,
+  /// this just erases \p value1.
+  void replace(const ValueT &value1, const ValueT &value2) {
+    auto iterator1 = map.find(value1);
+    assert(iterator1 != map.end() && "Cannot replace value that is not in set");
+    unsigned index1 = iterator1->second;
+    map.erase(value1);
+
+    auto iterator2 = map.find(value2);
+    if (iterator2 != map.end()) {
+      vector[index1] = None;
       return;
     }
 
-    Map[V2] = V1Index;
-    Vector[V1Index] = V2;
+    map[value2] = index1;
+    vector[index1] = value2;
   }
 
-  /// Erase the value \p V if it is in the set. Returns true if V was
+  /// Erase the value \p value if it is in the set. Returns true if value was
   /// successfully erased and false otherwise.
-  bool erase(const ValueT &V) {
-    auto Iter = Map.find(V);
-    if (Iter == Map.end())
+  bool erase(const ValueT &value) {
+    auto iterator = map.find(value);
+    if (iterator == map.end())
       return false;
-    unsigned Index = Iter->second;
-    Map.erase(Iter);
-    Vector[Index] = None;
+    unsigned index = iterator->second;
+    map.erase(iterator);
+    vector[index] = None;
     return true;
   }
 
   /// Return the last element of the blot map vector. Will be None if blotted.
   Optional<ValueT> pop_back_val() {
-    auto result = Vector.pop_back_val();
+    auto result = vector.pop_back_val();
     if (!result)
       return result;
-    Map.erase(*result);
+    map.erase(*result);
     return result;
   }
 
-  /// Attempt to lookup the index of \p V. Returns None upon failure and the
+  /// Attempt to lookup the index of \p value. Returns None upon failure and the
   /// value on success.
-  Optional<unsigned> getIndex(const ValueT &V) {
-    auto Iter = Map.find(V);
-    if (Iter == Map.end())
+  Optional<unsigned> getIndex(const ValueT &value) {
+    auto iterator = map.find(value);
+    if (iterator == map.end())
       return None;
-    return Iter->second;
+    return iterator->second;
+  }
+
+  /// Clear the backing vector and map.
+  void clear() {
+    vector.clear();
+    map.clear();
   }
 };
 
-template <typename ValueT, unsigned N,
-          typename VectorT = llvm::SmallVector<Optional<ValueT>, N>,
-          typename MapT = llvm::SmallDenseMap<ValueT, unsigned, N>>
-class SmallBlotSetVector : public BlotSetVector<ValueT, VectorT, MapT> {
+template <typename ValueT, unsigned N>
+class SmallBlotSetVector
+    : public BlotSetVector<ValueT, llvm::SmallVector<Optional<ValueT>, N>,
+                           llvm::SmallDenseMap<ValueT, unsigned, N>> {
 public:
   SmallBlotSetVector() {}
 };
 
-} // end swift namespace
+} // namespace swift
 
 #endif // SWIFT_BASIC_BLOTSETVECTOR_H

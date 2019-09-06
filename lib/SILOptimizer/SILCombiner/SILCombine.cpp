@@ -101,9 +101,10 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   addInitialGroup(InstrsForSILCombineWorklist);
 }
 
-static void eraseSingleInstFromFunction(SILInstruction &I,
-                                        SILInstructionWorklist &Worklist,
-                                        bool AddOperandsToWorklist) {
+static void eraseSingleInstFromFunction(
+    SILInstruction &I,
+    SmallSILInstructionWorklist<256> &Worklist,
+    bool AddOperandsToWorklist) {
   LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
   assert(!I.hasUsesOfAnyResult() && "Cannot erase instruction that is used!");
@@ -119,7 +120,7 @@ static void eraseSingleInstFromFunction(SILInstruction &I,
       }
     }
   }
-  Worklist.remove(&I);
+  Worklist.erase(&I);
   I.eraseFromParent();
 }
 
@@ -129,11 +130,12 @@ static void eraseSingleInstFromFunction(SILInstruction &I,
 
 // Define a CanonicalizeInstruction subclass for use in SILCombine.
 class SILCombineCanonicalize final : CanonicalizeInstruction {
-  SILInstructionWorklist &Worklist;
+  SmallSILInstructionWorklist<256> &Worklist;
   bool changed = false;
 
 public:
-  SILCombineCanonicalize(SILInstructionWorklist &Worklist)
+  SILCombineCanonicalize(
+      SmallSILInstructionWorklist<256> &Worklist)
       : CanonicalizeInstruction(DEBUG_TYPE), Worklist(Worklist) {}
 
   void notifyNewInstruction(SILInstruction *inst) override {
@@ -175,7 +177,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
-    SILInstruction *I = Worklist.removeOne();
+    SILInstruction *I = Worklist.pop_back_val();
 
     // When we erase an instruction, we use the map in the worklist to check if
     // the instruction is in the worklist. If it is, we replace it with null
@@ -258,7 +260,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     TrackingList.clear();
   }
 
-  Worklist.zap();
+  Worklist.resetChecked();
   return MadeChange;
 }
 
@@ -345,7 +347,7 @@ SILCombiner::eraseInstFromFunction(SILInstruction &I,
       assert(user->isDebugInstruction());
       if (InstIter == user->getIterator())
         ++InstIter;
-      Worklist.remove(user);
+      Worklist.erase(user);
       user->eraseFromParent();
     }
   }

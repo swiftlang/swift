@@ -16,12 +16,12 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(IDE, CollectOverriddenDeclsRequest,
-              ArrayRef<ValueDecl *>(OverridenDeclsOwner), CacheKind::Cached)
+              ArrayRef<ValueDecl *>(OverridenDeclsOwner), Cached)
 SWIFT_REQUEST(IDE, CursorInfoRequest, ide::ResolvedCursorInfo(CursorInfoOwner),
-              CacheKind::Cached)
+              Cached)
 SWIFT_REQUEST(IDE, ProvideDefaultImplForRequest,
-              ArrayRef<ValueDecl *>(ValueDecl *), CacheKind::Cached)
+              ArrayRef<ValueDecl *>(ValueDecl *), Cached)
 SWIFT_REQUEST(IDE, RangeInfoRequest, ide::ResolvedRangeInfo(RangeInfoOwner),
-              CacheKind::Cached)
+              Cached)
 SWIFT_REQUEST(IDE, ResolveProtocolNameRequest,
-              ProtocolDecl *(ProtocolNameOwner), CacheKind::Cached)
+              ProtocolDecl *(ProtocolNameOwner), Cached)

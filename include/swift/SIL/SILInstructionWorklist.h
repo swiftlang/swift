@@ -24,6 +24,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/DenseMap.h"
@@ -31,66 +32,81 @@
 
 namespace swift {
 
+class SILInstructionWorklistBase {
+  const char *loggingName;
+
+protected:
+  SILInstructionWorklistBase(const char *loggingName)
+      : loggingName(loggingName){};
+  void withDebugStream(
+      std::function<void(llvm::raw_ostream &stream, const char *loggingName)>
+          perform);
+};
+
 /// Manages a list of instructions awaiting visitation.
-class SILInstructionWorklist final {
-  llvm::SmallVector<SILInstruction *, 256> worklist;
-  llvm::DenseMap<SILInstruction *, unsigned> worklistMap;
-  StringRef loggingName;
+template <typename VectorT = std::vector<SILInstruction *>,
+          typename MapT = llvm::DenseMap<SILInstruction *, unsigned>>
+class SILInstructionWorklist : SILInstructionWorklistBase {
+  BlotSetVector<SILInstruction *, VectorT, MapT> worklist;
 
   void operator=(const SILInstructionWorklist &rhs) = delete;
   SILInstructionWorklist(const SILInstructionWorklist &worklist) = delete;
 
 public:
   SILInstructionWorklist(const char *loggingName = "InstructionWorklist")
-      : loggingName(loggingName) {}
+      : SILInstructionWorklistBase(loggingName) {}
 
   /// Returns true if the worklist is empty.
   bool isEmpty() const { return worklist.empty(); }
 
   /// Add the specified instruction to the worklist if it isn't already in it.
-  void add(SILInstruction *instruction);
+  void add(SILInstruction *instruction) {
+    if (worklist.insert(instruction).second) {
+      withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+        stream << loggingName << ": ADD: " << *instruction << '\n';
+      });
+    }
+  }
 
-  /// If the given ValueBase is a SILInstruction add it to the worklist.
-  void addValue(ValueBase *value) {
-    if (auto *instruction = value->getDefiningInstruction())
+  /// If the given SILValue is a SILInstruction add it to the worklist.
+  void addValue(SILValue value) {
+    if (auto *instruction = value->getDefiningInstruction()) {
       add(instruction);
+    }
   }
 
   /// Add the given list of instructions in reverse order to the worklist. This
   /// routine assumes that the worklist is empty and the given list has no
   /// duplicates.
-  void addInitialGroup(ArrayRef<SILInstruction *> list);
-
-  // If instruction is in the worklist, remove it.
-  void remove(SILInstruction *instruction) {
-    auto iterator = worklistMap.find(instruction);
-    if (iterator == worklistMap.end())
-      return; // Not in worklist.
-
-    // Don't bother moving everything down, just null out the slot. We will
-    // check before we process any instruction if it is null.
-    worklist[iterator->second] = nullptr;
-    worklistMap.erase(iterator);
+  void addInitialGroup(ArrayRef<SILInstruction *> list) {
+    assert(worklist.empty() && "worklist must be empty to add initial group");
+    worklist.reserve(list.size() + 16);
+    withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+      stream << loggingName << ": ADDING: " << list.size()
+             << " instrs to worklist\n";
+    });
+    while (!list.empty()) {
+      SILInstruction *instruction = list.back();
+      list = list.drop_back();
+      worklist.insert(instruction);
+    }
   }
 
+  // If instruction is in the worklist, remove it.
+  void erase(SILInstruction *instruction) { worklist.erase(instruction); }
+
   /// Remove the top element from the worklist.
-  SILInstruction *removeOne() {
-    SILInstruction *instruction = worklist.pop_back_val();
-    worklistMap.erase(instruction);
-    return instruction;
+  SILInstruction *pop_back_val() {
+    return worklist.pop_back_val().getValueOr(nullptr);
   }
 
   /// When an instruction has been simplified, add all of its users to the
   /// worklist, since additional simplifications of its users may have been
   /// exposed.
-  void addUsersToWorklist(ValueBase *instruction) {
-    for (auto *use : instruction->getUses())
-      add(use->getUser());
-  }
-
   void addUsersToWorklist(SILValue value) {
-    for (auto *use : value->getUses())
+    for (auto *use : value->getUses()) {
       add(use->getUser());
+    }
   }
 
   /// When an instruction has been simplified, add all of its users to the
@@ -98,18 +114,38 @@ public:
   /// exposed.
   void addUsersOfAllResultsToWorklist(SILInstruction *instruction) {
     for (auto result : instruction->getResults()) {
-      addUsersToWorklist(result);
+      addUsersToWorklist(&*result);
     }
   }
 
-  /// Check that the worklist is empty and nuke the backing store for the map if
-  /// it is large.
-  void zap() {
-    assert(worklistMap.empty() && "Worklist empty, but the map is not?");
+  /// Check that the worklist is empty and nuke the backing store if it is
+  /// large.
+  void resetChecked() {
+    assert(worklist.empty() && "Vector empty, but the map is not?");
 
-    // Do an explicit clear, this shrinks the map if needed.
-    worklistMap.clear();
+    // Do an explicit clear, shrinking the storage if needed.
+    worklist.clear();
   }
+};
+
+// TODO: This name is somewhat unpleasant.  Once the type is templated over its
+//       storage and renamed BlottableWorklist, this type will be
+//       SmallBlottableWorklist which is more reasonable.
+template <unsigned N>
+class SmallSILInstructionWorklist final
+    : public SILInstructionWorklist<
+          llvm::SmallVector<Optional<SILInstruction *>, N>,
+          // TODO: A DenseMap rather than a SmallDenseMap is used here to avoid
+          //       running into an upstream problem with the handling of grow()
+          //       when it results in rehashing and tombstone removal:
+          //
+          //       https://reviews.llvm.org/D56455
+          llvm::DenseMap<SILInstruction *, unsigned>> {
+public:
+  using VectorT = llvm::SmallVector<Optional<SILInstruction *>, N>;
+  using MapT = llvm::DenseMap<SILInstruction *, unsigned>;
+  SmallSILInstructionWorklist(const char *loggingName = "InstructionWorklist")
+      : SILInstructionWorklist<VectorT, MapT>(loggingName) {}
 };
 
 } // end namespace swift

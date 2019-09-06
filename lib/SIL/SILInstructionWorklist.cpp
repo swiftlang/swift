@@ -15,24 +15,10 @@
 
 using namespace swift;
 
-void SILInstructionWorklist::add(SILInstruction *instruction) {
-  if (!worklistMap.insert(std::make_pair(instruction, worklist.size())).second)
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << loggingName << ": ADD: " << *instruction << '\n');
-  worklist.push_back(instruction);
-}
-
-void SILInstructionWorklist::addInitialGroup(ArrayRef<SILInstruction *> list) {
-  assert(worklist.empty() && "worklist must be empty to add initial group");
-  worklist.reserve(list.size() + 16);
-  worklistMap.reserve(list.size());
-  LLVM_DEBUG(llvm::dbgs() << loggingName << ": ADDING: " << list.size()
-                          << " instrs to worklist\n");
-  while (!list.empty()) {
-    SILInstruction *instruction = list.back();
-    list = list.slice(0, list.size() - 1);
-    worklistMap.insert(std::make_pair(instruction, worklist.size()));
-    worklist.push_back(instruction);
-  }
+void SILInstructionWorklistBase::withDebugStream(
+    std::function<void(llvm::raw_ostream &stream, const char *loggingName)>
+        perform) {
+#ifndef NDEBUG
+  LLVM_DEBUG(perform(llvm::dbgs(), loggingName));
+#endif
 }
