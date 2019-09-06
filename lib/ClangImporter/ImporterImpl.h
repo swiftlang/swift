@@ -950,9 +950,6 @@ public:
   /// Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 
-  /// Retrieve a sugared referenece to the given (imported) type.
-  Type getSugaredTypeReference(TypeDecl *type);
-
   /// Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesHashableBound(Type type);
