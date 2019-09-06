@@ -48,6 +48,33 @@ Swift Next
     }
   }
   ```
+  
+  As a result, this could lead to code that currently compiles today to throw an error.
+  
+  ```swift
+  protocol Foo {
+    var someProperty: Int { get set }
+  }
+  
+  class Bar: Foo {
+    var someProperty = 0
+  }
+  
+  extension Foo where Self: Bar {
+    var anotherProperty1: Int {
+      get { return someProperty }
+      // 'someProperty' exists as a protocol requirement (implicitly mutating
+      // due to the lack of a class constraint), so the setter below needs to 
+      // be explicitly marked as 'mutating'.
+      set { someProperty = newValue } // Error
+    }
+    
+    var anotherProperty2: Int {
+      get { return someProperty }
+      mutating set { someProperty = newValue } // Okay
+    }
+  }
+  ```
 
 * [SR-4206][]:
 
