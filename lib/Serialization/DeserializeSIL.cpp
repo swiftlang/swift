@@ -471,13 +471,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, funcTyID, replacedFunctionID, genericEnvID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -584,7 +586,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
-    fn->setWeakLinked(isWeakLinked);
+    fn->setAlwaysWeakImported(isWeakImported);
+
+    llvm::VersionTuple available;
+    DECODE_VER_TUPLE(available);
+    fn->setAvailabilityForLinkage(
+      available.empty()
+      ? AvailabilityContext::alwaysAvailable()
+      : AvailabilityContext(VersionRange::allGTE(available)));
+
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     if (replacedFunction)
       fn->setDynamicallyReplacedFunction(replacedFunction);
@@ -2530,13 +2540,16 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic;
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, funcTyID, replacedFunctionID, genericEnvID,
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic,
+      funcTyID, replacedFunctionID, genericEnvID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

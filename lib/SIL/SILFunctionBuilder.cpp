@@ -159,17 +159,8 @@ SILFunctionBuilder::getOrCreateFunction(SILLocation loc, SILDeclRef constant,
     if (constant.isForeign && decl->hasClangNode())
       F->setClangNodeOwner(decl);
 
-    if (decl->isAlwaysWeakImported())
-      F->setWeakLinked();
-    else {
-      auto containingContext = decl->getAvailabilityForLinkage();
-      if (!containingContext.isAlwaysAvailable()) {
-        auto fromContext = AvailabilityContext::forDeploymentTarget(
-          decl->getASTContext());
-        if (!fromContext.isContainedIn(containingContext))
-          F->setWeakLinked();
-      }
-    }
+    F->setAvailabilityForLinkage(decl->getAvailabilityForLinkage());
+    F->setAlwaysWeakImported(decl->isAlwaysWeakImported());
 
     if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
       auto *storage = accessor->getStorage();

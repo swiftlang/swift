@@ -18,12 +18,15 @@
 #include "swift/SIL/SILProfiler.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/PrettyStackTrace.h"
+#include "swift/AST/Availability.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
+#include "clang/AST/Decl.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -98,11 +101,13 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          IsDynamicallyReplaceable_t isDynamic)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
-      DebugScope(DebugScope), EntryCount(entryCount), Bare(isBareSILFunction),
-      Transparent(isTrans), Serialized(isSerialized), Thunk(isThunk),
+      DebugScope(DebugScope), EntryCount(entryCount),
+      Availability(AvailabilityContext::alwaysAvailable()),
+      Bare(isBareSILFunction), Transparent(isTrans),
+      Serialized(isSerialized), Thunk(isThunk),
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
-      HasCReferences(false), IsWeakLinked(false),
+      HasCReferences(false), IsWeakImported(false),
       IsDynamicReplaceable(isDynamic),
       Inlined(false), Zombie(false), HasOwnership(true),
       WasDeserializedCanonical(false), IsWithoutActuallyEscapingThunk(false),
@@ -270,6 +275,27 @@ bool SILFunction::isTypeABIAccessible(SILType type) const {
   // FIXME: Expansion
   return getModule().isTypeABIAccessible(type,
                                          ResilienceExpansion::Minimal);
+}
+
+bool SILFunction::isWeakImported() const {
+  // For imported functions check the Clang declaration.
+  if (ClangNodeOwner)
+    return ClangNodeOwner->getClangDecl()->isWeakImported();
+
+  // For native functions check a flag on the SILFunction
+  // itself.
+  if (!isAvailableExternally())
+    return false;
+
+  if (isAlwaysWeakImported())
+    return true;
+
+  if (Availability.isAlwaysAvailable())
+    return false;
+
+  auto fromContext = AvailabilityContext::forDeploymentTarget(
+      getASTContext());
+  return !fromContext.isContainedIn(Availability);
 }
 
 SILBasicBlock *SILFunction::createBasicBlock() {
