@@ -103,21 +103,30 @@ public:
 
   // Insert the instruction New before instruction Old in Old's parent BB. Add
   // New to the worklist.
-  SILInstruction *insertNewInstBefore(SILInstruction *New, SILInstruction &Old);
+  SILInstruction *insertNewInstBefore(SILInstruction *New,
+                                      SILInstruction &Old) {
+    return Worklist.insertNewInstBefore(New, Old);
+  }
 
   // This method is to be used when an instruction is found to be dead,
   // replaceable with another preexisting expression. Here we add all uses of I
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
-  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V);
+  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
+    return Worklist.replaceInstUsesWith(I, V);
+  }
 
   // This method is to be used when a value is found to be dead,
   // replaceable with another preexisting expression. Here we add all
   // uses of oldValue to the worklist, replace all uses of oldValue
   // with newValue.
-  void replaceValueUsesWith(SILValue oldValue, SILValue newValue);
+  void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+    Worklist.replaceValueUsesWith(oldValue, newValue);
+  }
 
-  void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI);
+  void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI) {
+    Worklist.replaceInstUsesPairwiseWith(oldI, newI);
+  }
 
   // Some instructions can never be "trivially dead" due to side effects or
   // producing a void value. In those cases, since we cannot rely on
@@ -127,7 +136,12 @@ public:
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true);
+                                        bool AddOperandsToWorklist = true) {
+    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
+    MadeChange = true;
+    // Dummy return, so the caller doesn't need to explicitly return nullptr.
+    return nullptr;
+  }
 
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         bool AddOperandsToWorklist = true) {
