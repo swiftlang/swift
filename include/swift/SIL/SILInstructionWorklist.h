@@ -45,6 +45,12 @@ class SILInstructionWorklistBase {
 protected:
   SILInstructionWorklistBase(const char *loggingName)
       : loggingName(loggingName){};
+  // Invokes the provided function with the debug stream and the previously
+  // specified logging name.
+  //
+  // Note: Because it contains LLVM_DEBUG, the definition is in the .cpp file.
+  //       Consequently, we are relying on LTO to ensure that the calls are
+  //       inlined and removed in non-assert builds.
   void withDebugStream(
       std::function<void(llvm::raw_ostream &stream, const char *loggingName)>
           perform);
@@ -150,27 +156,7 @@ public:
                                          std::string instructionDescription
 #endif
   ) {
-    if (result != instruction) {
-      assert(&*std::prev(instruction->getIterator()) == result &&
-             "Expected new instruction inserted before existing instruction!");
-
-      withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
-        stream << loggingName << ": Old = " << *instruction << '\n'
-               << "  "
-               << "  New = " << *result << '\n';
-      });
-
-      // Everything uses the new instruction now.
-      replaceInstUsesPairwiseWith(instruction, result);
-
-      // Push the new instruction and any users onto the worklist.
-      add(result);
-      addUsersOfAllResultsToWorklist(result);
-
-      eraseInstFromFunction(*instruction);
-
-      return true;
-    } else {
+    if (result == instruction) {
       withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
         stream << loggingName << ": Mod = " << instructionDescription << '\n'
                << "  "
@@ -187,6 +173,26 @@ public:
       }
       return false;
     }
+
+    assert(&*std::prev(instruction->getIterator()) == result &&
+           "Expected new instruction inserted before existing instruction!");
+
+    withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
+      stream << loggingName << ": Old = " << *instruction << '\n'
+             << "  "
+             << "  New = " << *result << '\n';
+    });
+
+    // Everything uses the new instruction now.
+    replaceInstUsesPairwiseWith(instruction, result);
+
+    // Push the new instruction and any users onto the worklist.
+    add(result);
+    addUsersOfAllResultsToWorklist(result);
+
+    eraseInstFromFunction(*instruction);
+
+    return true;
   }
 
   // Insert the instruction newInstruction before instruction old in old's
