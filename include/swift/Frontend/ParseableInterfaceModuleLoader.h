@@ -128,15 +128,18 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   explicit ParseableInterfaceModuleLoader(
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
+      ArrayRef<std::string> PreferInterfaceForModules,
       bool RemarkOnRebuildFromInterface)
   : SerializedModuleLoaderBase(ctx, tracker, loadMode),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
-  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface)
+  RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
+  PreferInterfaceForModules(PreferInterfaceForModules)
   {}
 
   std::string CacheDir;
   std::string PrebuiltCacheDir;
   bool RemarkOnRebuildFromInterface;
+  ArrayRef<std::string> PreferInterfaceForModules;
 
   std::error_code findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
@@ -150,10 +153,12 @@ public:
   static std::unique_ptr<ParseableInterfaceModuleLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
+         ArrayRef<std::string> PreferInterfaceForModules = {},
          bool RemarkOnRebuildFromInterface = false) {
     return std::unique_ptr<ParseableInterfaceModuleLoader>(
       new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
+                                         PreferInterfaceForModules,
                                          RemarkOnRebuildFromInterface));
   }
 

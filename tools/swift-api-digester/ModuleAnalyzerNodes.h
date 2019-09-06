@@ -58,6 +58,13 @@ class Output;
 namespace ide {
 namespace api {
 
+/// Serialized json format  version number.
+///
+/// When the json format changes in a way that requires version-specific handling, this number should be incremented.
+/// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
+const uint8_t DIGESTER_JSON_VERSION = 5; // Populate ObjC, Dynamic and Final to attribute list
+const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
+
 class SDKNode;
 typedef SDKNode* NodePtr;
 typedef std::map<NodePtr, NodePtr> ParentMap;
@@ -140,13 +147,16 @@ struct BreakingAttributeInfo {
 
 struct CheckerOptions {
   bool AvoidLocation;
+  bool AvoidToolArgs;
   bool ABI;
   bool Verbose;
   bool AbortOnModuleLoadFailure;
   bool PrintModule;
   bool SwiftOnly;
   bool SkipOSCheck;
+  bool Migrator;
   StringRef LocationFilter;
+  std::vector<StringRef> ToolArgs;
 };
 
 class SDKContext {
@@ -162,7 +172,8 @@ class SDKContext {
 
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
-
+  // The common version of two ABI/API descriptors under comparison.
+  Optional<uint8_t> CommonVersion;
 public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
@@ -194,8 +205,19 @@ public:
   DiagnosticEngine &getDiags() {
     return Diags;
   }
+  void setCommonVersion(uint8_t Ver) {
+    assert(!CommonVersion.hasValue());
+    CommonVersion = Ver;
+  }
+  uint8_t getCommonVersion() const {
+    return *CommonVersion;
+  }
+  bool commonVersionAtLeast(uint8_t Ver) const {
+    return getCommonVersion() >= Ver;
+  }
   StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
   StringRef getLanguageIntroVersion(Decl *D);
+  StringRef getObjcName(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -208,7 +230,6 @@ public:
     CIs.emplace_back(new CompilerInstance());
     return *CIs.back();
   }
-
   template<class YAMLNodeTy, typename ...ArgTypes>
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
@@ -285,6 +306,8 @@ public:
   SDKNode* getOnlyChild() const;
   SDKContext &getSDKContext() const { return Ctx; }
   SDKNodeRoot *getRootNode() const;
+  uint8_t getJsonFormatVersion() const;
+  bool versionAtLeast(uint8_t Ver) const { return getJsonFormatVersion() >= Ver; }
   virtual void jsonize(json::Output &Out);
   virtual void diagnose(SDKNode *Right) {};
   template <typename T> const T *getAs() const {
@@ -326,8 +349,12 @@ class SDKNodeDecl: public SDKNode {
   bool IsABIPlaceholder;
   uint8_t ReferenceOwnership;
   StringRef GenericSig;
+  // In ABI mode, this field is populated as a user-friendly version of GenericSig.
+  // Dignostic preferes the sugared versions if they differ as well.
+  StringRef SugaredGenericSig;
   Optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
+  StringRef ObjCName;
 
 protected:
   SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -359,10 +386,12 @@ public:
   bool isInternal() const { return IsInternal; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
   StringRef getGenericSignature() const { return GenericSig; }
+  StringRef getSugaredGenericSignature() const { return SugaredGenericSig; }
   StringRef getScreenInfo() const;
   bool hasFixedBinaryOrder() const { return FixedBinaryOrder.hasValue(); }
   uint8_t getFixedBinaryOrder() const { return *FixedBinaryOrder; }
   PlatformIntroVersion getIntroducingVersion() const { return introVersions; }
+  StringRef getObjCName() const { return ObjCName; }
   virtual void jsonize(json::Output &Out) override;
   virtual void diagnose(SDKNode *Right) override;
 
@@ -383,12 +412,16 @@ public:
 class SDKNodeRoot: public SDKNode {
   /// This keeps track of all decl descendants with USRs.
   llvm::StringMap<llvm::SmallSetVector<SDKNodeDecl*, 2>> DescendantDeclTable;
-
+  /// The tool invocation arguments to generate this root node. We shouldn't need APIs for it.
+  std::vector<StringRef> ToolArgs;
+  uint8_t JsonFormatVer;
 public:
   SDKNodeRoot(SDKNodeInitInfo Info);
   static SDKNode *getInstance(SDKContext &Ctx);
   static bool classof(const SDKNode *N);
   void registerDescendant(SDKNode *D);
+  virtual void jsonize(json::Output &Out) override;
+  uint8_t getJsonFormatVersion() const { return JsonFormatVer; }
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
@@ -497,6 +530,7 @@ public:
   ArrayRef<SDKNode*> getConformances() const { return Conformances; }
   NodeVector getConformances() { return Conformances; }
   bool isExternal() const { return IsExternal; }
+  bool isExtension() const { return isExternal(); }
   StringRef getSuperClassName() const {
     return SuperclassNames.empty() ? StringRef() : SuperclassNames.front();
   };
@@ -672,7 +706,6 @@ struct TypeInitInfo {
 
 class SwiftDeclCollector: public VisibleDeclConsumer {
   SDKContext &Ctx;
-  std::vector<std::unique_ptr<llvm::MemoryBuffer>> OwnedBuffers;
   SDKNode *RootNode;
   llvm::SetVector<Decl*> KnownDecls;
   // Collected and sorted after we get all of them.
@@ -734,8 +767,11 @@ int dumpSwiftModules(const CompilerInvocation &InitInvok,
 
 SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
                             const CompilerInvocation &InitInvok,
-                            const llvm::StringSet<> &ModuleNames,
-                            CheckerOptions Opts);
+                            const llvm::StringSet<> &ModuleNames);
+
+SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
+
+void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
 
 int dumpSDKContent(const CompilerInvocation &InitInvok,
                    const llvm::StringSet<> &ModuleNames,

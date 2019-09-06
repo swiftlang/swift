@@ -16,7 +16,7 @@
             {
               "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void",
+              "printedName": "Swift.Void",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -29,10 +29,12 @@
           "declKind": "Func",
           "usr": "c:objc(pl)AnotherObjcProt(im)anotherFunctionFromProt",
           "moduleName": "Foo",
-          "genericSig": "<Self where Self : AnotherObjcProt>",
+          "genericSig": "<Self where Self : Foo.AnotherObjcProt>",
           "protocolReq": true,
+          "objc_name": "anotherFunctionFromProt",
           "declAttributes": [
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ],
           "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
@@ -41,8 +43,10 @@
       "declKind": "Protocol",
       "usr": "c:objc(pl)AnotherObjcProt",
       "moduleName": "Foo",
+      "objc_name": "AnotherObjcProt",
       "declAttributes": [
-        "ObjC"
+        "ObjC",
+        "Dynamic"
       ]
     },
     {
@@ -58,7 +62,7 @@
             {
               "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void",
+              "printedName": "Swift.Void",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -72,8 +76,10 @@
           "usr": "c:objc(cs)ClangInterface(im)someFunction",
           "moduleName": "Foo",
           "isOpen": true,
+          "objc_name": "someFunction",
           "declAttributes": [
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ],
           "funcSelfKind": "NonMutating"
         },
@@ -85,7 +91,7 @@
             {
               "kind": "TypeNominal",
               "name": "ClangInterface",
-              "printedName": "ClangInterface",
+              "printedName": "Foo.ClangInterface",
               "usr": "c:objc(cs)ClangInterface"
             }
           ],
@@ -94,9 +100,11 @@
           "moduleName": "Foo",
           "overriding": true,
           "implicit": true,
+          "objc_name": "init",
           "declAttributes": [
             "Override",
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ]
         }
       ],
@@ -104,12 +112,14 @@
       "usr": "c:objc(cs)ClangInterface",
       "moduleName": "Foo",
       "isOpen": true,
+      "objc_name": "ClangInterface",
       "declAttributes": [
-        "ObjC"
+        "ObjC",
+        "Dynamic"
       ],
       "superclassUsr": "c:objc(cs)NSObject",
       "superclassNames": [
-        "NSObject"
+        "ObjectiveC.NSObject"
       ],
       "conformances": [
         {
@@ -139,7 +149,7 @@
             {
               "kind": "TypeNameAlias",
               "name": "Void",
-              "printedName": "Void",
+              "printedName": "Swift.Void",
               "children": [
                 {
                   "kind": "TypeNominal",
@@ -152,10 +162,12 @@
           "declKind": "Func",
           "usr": "c:objc(pl)ObjcProt(im)someFunctionFromProt",
           "moduleName": "Foo",
-          "genericSig": "<Self where Self : ObjcProt>",
+          "genericSig": "<Self where Self : Foo.ObjcProt>",
           "protocolReq": true,
+          "objc_name": "someFunctionFromProt",
           "declAttributes": [
-            "ObjC"
+            "ObjC",
+            "Dynamic"
           ],
           "reqNewWitnessTableEntry": true,
           "funcSelfKind": "NonMutating"
@@ -164,9 +176,12 @@
       "declKind": "Protocol",
       "usr": "c:objc(pl)ObjcProt",
       "moduleName": "Foo",
+      "objc_name": "ObjcProt",
       "declAttributes": [
-        "ObjC"
+        "ObjC",
+        "Dynamic"
       ]
     }
-  ]
+  ],
+  "json_format_version": 5
 }
