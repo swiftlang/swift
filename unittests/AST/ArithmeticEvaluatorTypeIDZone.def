@@ -15,8 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 SWIFT_REQUEST(ArithmeticEvaluator, UncachedEvaluationRule,
-              double(ArithmeticExpr *), Uncached)
+              double(ArithmeticExpr *), Uncached, HasNearestLocation)
 SWIFT_REQUEST(ArithmeticEvaluator, InternallyCachedEvaluationRule,
-              double(ArithmeticExpr *), Cached)
+              double(ArithmeticExpr *), Cached, HasNearestLocation)
 SWIFT_REQUEST(ArithmeticEvaluator, ExternallyCachedEvaluationRule,
-              double(ArithmeticExpr *), SeparatelyCached)
+              double(ArithmeticExpr *), SeparatelyCached, HasNearestLocation)

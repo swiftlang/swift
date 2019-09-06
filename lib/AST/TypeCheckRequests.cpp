@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -85,18 +86,10 @@ void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
 // Inherited type computation.
 //----------------------------------------------------------------------------//
 
-TypeLoc &InheritedTypeRequest::getTypeLoc(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
-}
-
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   return typeLoc.getLoc();
 }
 
@@ -106,7 +99,8 @@ bool InheritedTypeRequest::isCached() const {
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   if (typeLoc.wasValidated())
     return typeLoc.getType();
 
@@ -115,7 +109,8 @@ Optional<Type> InheritedTypeRequest::getCachedResult() const {
 
 void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   typeLoc.setType(value);
 }
 

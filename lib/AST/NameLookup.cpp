@@ -2030,7 +2030,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  TypeLoc &typeLoc = getTypeLoc(decl, index);
+  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
