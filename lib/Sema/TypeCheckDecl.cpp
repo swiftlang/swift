@@ -485,8 +485,7 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC,
-                               TypeChecker &tc) {
+                               DeclContext *owningDC, TypeChecker &tc) {
   if (!genericParams)
     return;
 
@@ -496,12 +495,9 @@ static void checkGenericParams(GenericParamList *genericParams,
   }
 
   // Force visitation of each of the requirements here.
-  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
-                                                         genericParams),
-                                        TypeResolutionStage::Interface,
-                                        [](Requirement, RequirementRepr *) {
-                                          return false;
-                                        });
+  WhereClauseOwner(owningDC, genericParams)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -2011,7 +2007,8 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
                                           TypeDecl *source) {
-  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+  WhereClauseOwner(source).visitRequirements(
+      TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::Conformance:

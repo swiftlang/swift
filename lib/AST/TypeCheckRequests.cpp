@@ -369,20 +369,19 @@ SourceLoc RequirementRequest::getNearestLoc() const {
   return owner.getLoc();
 }
 
-MutableArrayRef<RequirementRepr>
-RequirementRequest::getRequirements(WhereClauseOwner owner) {
-  if (auto genericParams = owner.source.dyn_cast<GenericParamList *>()) {
+MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
+  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
   }
 
-  if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
+  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
     
     return { };
   }
 
-  auto decl = owner.source.dyn_cast<Decl *>();
+  auto decl = source.dyn_cast<Decl *>();
   if (!decl)
     return { };
 
@@ -406,14 +405,15 @@ RequirementRequest::getRequirements(WhereClauseOwner owner) {
   return { };
 }
 
-bool RequirementRequest::visitRequirements(
-      WhereClauseOwner owner, TypeResolutionStage stage,
-      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback) {
-  auto &evaluator = owner.dc->getASTContext().evaluator;
-  auto requirements = getRequirements(owner);
+bool WhereClauseOwner::visitRequirements(
+    TypeResolutionStage stage,
+    llvm::function_ref<bool(Requirement, RequirementRepr *)> callback)
+    const && {
+  auto &evaluator = dc->getASTContext().evaluator;
+  auto requirements = getRequirements();
   for (unsigned index : indices(requirements)) {
     // Resolve to a requirement.
-    auto req = evaluator(RequirementRequest{owner, index, stage});
+    auto req = evaluator(RequirementRequest{*this, index, stage});
     if (req) {
       // Invoke the callback. If it returns true, we're done.
       if (callback(*req, &requirements[index]))
@@ -422,10 +422,10 @@ bool RequirementRequest::visitRequirements(
       continue;
     }
 
-    llvm::handleAllErrors(req.takeError(),
-      [](const CyclicalRequestError<RequirementRequest> &E) {
-        // cycle detected
-      });
+    llvm::handleAllErrors(
+        req.takeError(), [](const CyclicalRequestError<RequirementRequest> &E) {
+          // cycle detected
+        });
   }
 
   return false;
@@ -434,7 +434,7 @@ bool RequirementRequest::visitRequirements(
 RequirementRepr &RequirementRequest::getRequirement() const {
   auto owner = std::get<0>(getStorage());
   auto index = std::get<1>(getStorage());
-  return getRequirements(owner)[index];
+  return owner.getRequirements()[index];
 }
 
 bool RequirementRequest::isCached() const {
