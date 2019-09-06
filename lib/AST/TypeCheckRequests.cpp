@@ -508,49 +508,20 @@ void swift::simple_display(llvm::raw_ostream &out,
 // DefaultTypeRequest caching.
 //----------------------------------------------------------------------------//
 
-SourceFile *DefaultTypeRequest::getSourceFile() const {
-  return getDeclContext()->getParentSourceFile();
-}
-
-Type &DefaultTypeRequest::getCache() const {
-  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
-      getSourceFile(), getKnownProtocolKind());
-}
-
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
-  auto const &cachedType = getCache();
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  const auto &cachedType = DC->getASTContext().getDefaultTypeRequestCache(
+      DC->getParentSourceFile(), knownProtocolKind);
   return cachedType ? Optional<Type>(cachedType) : None;
 }
 
-void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
-
-const char *
-DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-
-  // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return typeName;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return nullptr;
-  }
-}
-
-bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-      
-    // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return performLocalLookup;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return false;
-  }
+void DefaultTypeRequest::cacheResult(Type value) const {
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  auto &cacheEntry = DC->getASTContext().getDefaultTypeRequestCache(
+                         DC->getParentSourceFile(), knownProtocolKind);
+  cacheEntry = value;
 }
 
 bool PropertyWrapperTypeInfoRequest::isCached() const {

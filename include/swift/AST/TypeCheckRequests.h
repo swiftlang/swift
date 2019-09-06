@@ -507,20 +507,6 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
-
-private:
-  KnownProtocolKind getKnownProtocolKind() const {
-    return std::get<0>(getStorage());
-  }
-  const DeclContext *getDeclContext() const {
-    return std::get<1>(getStorage());
-  }
-
-  static const char *getTypeName(KnownProtocolKind);
-  static bool getPerformLocalLookup(KnownProtocolKind);
-  TypeChecker &getTypeChecker() const;
-  SourceFile *getSourceFile() const;
-  Type &getCache() const;
 };
 
 /// Retrieve information about a property wrapper type.
