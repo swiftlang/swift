@@ -285,24 +285,6 @@ protected:
   virtual DiagInReference getDiagnosticInRereference() const = 0;
   virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
-  /// Determine whether it would be possible to diagnose
-  /// current requirement failure.
-  bool canDiagnoseFailure() const {
-    // If this is a conditional requirement failure,
-    // we have a lot more information compared to
-    // type requirement case, because we know that
-    // underlying conformance requirement matched.
-    if (isConditional())
-      return true;
-
-    // For static/initializer calls there is going to be
-    // a separate fix, attached to the argument, which is
-    // much easier to diagnose.
-    // For operator calls we can't currently produce a good
-    // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && isOperator(Apply));
-  }
-
   static bool isOperator(const ApplyExpr *apply) {
     return isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
            isa<BinaryExpr>(apply);

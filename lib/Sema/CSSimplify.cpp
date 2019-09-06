@@ -1775,8 +1775,24 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   if (auto layoutConstraint = layout.getLayoutConstraint()) {
     if (layoutConstraint->isClass()) {
       if (kind == ConstraintKind::ConformsTo) {
-        if (!type1->satisfiesClassConstraint())
+        if (!type1->satisfiesClassConstraint()) {
+          if (shouldAttemptFixes()) {
+            if (auto last = locator.last()) {
+              // If solver is in diagnostic mode and this is a
+              // superclass requirement, let's consider conformance
+              // to `AnyObject` as solved since actual superclass
+              // requirement is going to fail too (because type can't
+              // satisfy it), and it's more interesting from diagnostics
+              // perspective.
+              auto req = last->getAs<LocatorPathElt::AnyRequirement>();
+              if (req &&
+                  req->getRequirementKind() == RequirementKind::Superclass)
+                return getTypeMatchSuccess();
+            }
+          }
+
           return getTypeMatchFailure(locator);
+        }
       } else {
         // Subtype relation to AnyObject also allows class-bound
         // existentials that are not @objc and therefore carry

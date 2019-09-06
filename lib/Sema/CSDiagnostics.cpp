@@ -455,9 +455,6 @@ bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
 }
 
 bool RequirementFailure::diagnoseAsError() {
-  if (!canDiagnoseFailure())
-    return false;
-
   auto *anchor = getRawAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
@@ -532,9 +529,6 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 }
 
 bool MissingConformanceFailure::diagnoseAsError() {
-  if (!canDiagnoseFailure())
-    return false;
-
   auto *anchor = getAnchor();
   auto ownerType = getOwnerType();
   auto nonConformingType = getLHS();
