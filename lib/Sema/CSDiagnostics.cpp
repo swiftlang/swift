@@ -159,8 +159,8 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
 
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
-static bool shouldHaveDirectCalleeOverload(const ApplyExpr *apply) {
-  auto *fnExpr = apply->getFn()->getValueProvidingExpr();
+static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
+  auto *fnExpr = callExpr->getDirectCallee();
 
   // An apply of an apply/subscript doesn't have a direct callee.
   if (isa<ApplyExpr>(fnExpr) || isa<SubscriptExpr>(fnExpr))
@@ -170,11 +170,9 @@ static bool shouldHaveDirectCalleeOverload(const ApplyExpr *apply) {
   if (isa<ClosureExpr>(fnExpr))
     return false;
 
-  // If the optionality changes, there's no direct callee.
-  if (isa<BindOptionalExpr>(fnExpr) || isa<ForceValueExpr>(fnExpr) ||
-      isa<OptionalTryExpr>(fnExpr)) {
+  // No direct callee for a try!/try?.
+  if (isa<ForceTryExpr>(fnExpr) || isa<OptionalTryExpr>(fnExpr))
     return false;
-  }
 
   // If we have an intermediate cast, there's no direct callee.
   if (isa<ExplicitCastExpr>(fnExpr))
@@ -225,9 +223,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   if (auto overload = getChoiceFor(anchor)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
-    if (auto *decl = overload->choice.getDeclOrNull())
-      callee = decl;
-
+    callee = overload->choice.getDeclOrNull();
     rawFnType = overload->openedType;
   } else {
     // If we didn't resolve an overload for the callee, we must be dealing with
@@ -235,10 +231,15 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     auto *call = cast<CallExpr>(anchor);
     assert(!shouldHaveDirectCalleeOverload(call) &&
            "Should we have resolved a callee for this?");
-    rawFnType = cs.getType(call->getFn())->getRValueType();
+    rawFnType = cs.getType(call->getFn());
   }
 
-  auto *fnType = resolveType(rawFnType)->getAs<FunctionType>();
+  // Try to resolve the function type by loading lvalues and looking through
+  // optional types, which can occur for expressions like `fn?(5)`.
+  auto *fnType = resolveType(rawFnType)
+                     ->getRValueType()
+                     ->lookThroughAllOptionalTypes()
+                     ->getAs<FunctionType>();
   if (!fnType)
     return None;
 
