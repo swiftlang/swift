@@ -1195,12 +1195,12 @@ void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching)                         \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
-}
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+  template<>                                                                   \
+  inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
+                              const RequestType &request) {                    \
+    ++stats.getFrontendCounters().RequestType;                                 \
+  }
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #undef SWIFT_REQUEST
 
