@@ -3510,6 +3510,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
     if (!Options.FullyQualifiedTypesIfAmbiguous)
       return false;
 
+    // If present, IsTypeAmbiguous overrides the other heuristics.
+    if (Options.IsTypeAmbiguous)
+      return  Options.IsTypeAmbiguous(T);
+
     Decl *D;
     if (auto *TAT = dyn_cast<TypeAliasType>(T))
       D = TAT->getDecl();

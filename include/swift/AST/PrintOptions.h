@@ -195,6 +195,11 @@ struct PrintOptions {
   /// type might be ambiguous.
   bool FullyQualifiedTypesIfAmbiguous = false;
 
+  /// A predicate to use in lieu of the default heuristics when determining if a
+  /// type is ambiguous. Is only considered if \c FullyQualifiedTypesIfAmbiguous
+  /// is \c true.
+  std::function<bool(Type)> IsTypeAmbiguous;
+
   /// If true, printed module names will use the "exported" name, which may be
   /// different from the regular name.
   ///
