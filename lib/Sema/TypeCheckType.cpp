@@ -2265,7 +2265,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
               diagnose(attrs.getLoc(TAK_convention),
                        diag::invalid_autoclosure_and_convention_attributes,
                        attrs.getConvention());
-              attrs.clearAttribute(TAK_autoclosure);
+              attrs.clearAttribute(TAK_convention);
             }
           }
         }
