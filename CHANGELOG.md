@@ -71,7 +71,7 @@ Swift Next
   }
   ```
 
-  **Workaround**: Define a new mutable property inside the setter that has a reference to `self`:
+  **Workaround**: Define a new mutable variable inside the setter that has a reference to `self`:
   
   ```swift
   var anotherProperty1: Int {
