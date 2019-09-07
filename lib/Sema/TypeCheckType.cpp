@@ -2256,16 +2256,18 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                    attrs.getConvention());
           rep = FunctionType::Representation::Swift;
         } else {
-          auto convention = attrs.getConvention();
+          rep = *parsedRep;
+          
           if (attrs.has(TAK_autoclosure)) {
             // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
-            if (convention == "c" || convention == "block" ) {
+            if (rep == FunctionType::Representation::CFunctionPointer ||
+                rep == FunctionType::Representation::Block) {
               diagnose(attrs.getLoc(TAK_convention),
                        diag::invalid_autoclosure_and_convention_attributes,
                        attrs.getConvention());
+              attrs.clearAttribute(TAK_autoclosure);
             }
           }
-          rep = *parsedRep;
         }
       }
 

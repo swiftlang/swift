@@ -18,3 +18,15 @@ sr11027_swift(1)
 
 func sr11027_thin(_ f: @convention(thin) @autoclosure () -> Int) -> Void {} // OK
 sr11027_thin(1)
+
+func sr11027_2(_ f: @autoclosure @convention(block) () -> Int) -> Void {}
+sr11027_2(1)
+
+func sr11027_c_2(_ f: @autoclosure @convention(c) () -> Int) -> Void {}
+sr11027_c_2(1)
+
+func sr11027_swift_2(_ f: @autoclosure @convention(swift) () -> Int) -> Void {} // OK
+sr11027_swift_2(1)
+
+func sr11027_thin_2(_ f: @autoclosure @convention(thin) () -> Int) -> Void {} // OK
+sr11027_thin_2(1)
