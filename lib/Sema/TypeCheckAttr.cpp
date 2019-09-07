@@ -1852,8 +1852,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
 
   // Go over the set of requirements, adding them to the builder.
-  RequirementRequest::visitRequirements(
-      WhereClauseOwner(FD, attr), TypeResolutionStage::Interface,
+  WhereClauseOwner(FD, attr).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         // Collect all of the generic parameters used by these types.
         switch (req.getKind()) {

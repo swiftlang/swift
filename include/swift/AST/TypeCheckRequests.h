@@ -370,10 +370,10 @@ struct WhereClauseOwner {
   WhereClauseOwner(Decl *decl);
 
   WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
-    : dc(dc), source(genericParams) { }
+      : dc(dc), source(genericParams) {}
 
   WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
-    : dc(dc), source(attr) { }
+      : dc(dc), source(attr) {}
 
   SourceLoc getLoc() const;
 
@@ -392,6 +392,19 @@ struct WhereClauseOwner {
                          const WhereClauseOwner &rhs) {
     return !(lhs == rhs);
   }
+
+public:
+  /// Retrieve the array of requirements.
+  MutableArrayRef<RequirementRepr> getRequirements() const;
+
+  /// Visit each of the requirements,
+  ///
+  /// \returns true after short-circuiting if the callback returned \c true
+  /// for any of the requirements.
+  bool
+  visitRequirements(TypeResolutionStage stage,
+                    llvm::function_ref<bool(Requirement, RequirementRepr *)>
+                        callback) const &&;
 };
 
 void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
@@ -404,17 +417,6 @@ class RequirementRequest :
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  /// Retrieve the array of requirements from the given owner.
-  static MutableArrayRef<RequirementRepr> getRequirements(WhereClauseOwner);
-
-  /// Visit each of the requirements in the given owner,
-  ///
-  /// \returns true after short-circuiting if the callback returned \c true
-  /// for any of the requirements.
-  static bool visitRequirements(
-      WhereClauseOwner, TypeResolutionStage stage,
-      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback);
 
 private:
   friend SimpleRequest;
@@ -501,20 +503,6 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
-
-private:
-  KnownProtocolKind getKnownProtocolKind() const {
-    return std::get<0>(getStorage());
-  }
-  const DeclContext *getDeclContext() const {
-    return std::get<1>(getStorage());
-  }
-
-  static const char *getTypeName(KnownProtocolKind);
-  static bool getPerformLocalLookup(KnownProtocolKind);
-  TypeChecker &getTypeChecker() const;
-  SourceFile *getSourceFile() const;
-  Type &getCache() const;
 };
 
 /// Retrieve information about a property wrapper type.
