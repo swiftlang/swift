@@ -3022,7 +3022,16 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       // If it's the same requirement, we can derive it here. Although, don't
       // attempt to do it if we have an explicit witness. If they don't match,
       // we'll diagnose them later. If they do match, there's nothing to derive.
-      canDerive = nominal->lookupDirect(derivable->getFullName()).empty();
+      //
+      // If the decl is synthesized, then don't attempt the check. Otherwise,
+      // we could end up with issues like someone adding a intValue property to
+      // enum, which will satisfy the intValue requirement of nested CodingKey
+      // enum, which is not correct.
+      if (nominal->isImplicit()) {
+        canDerive = true;
+      } else {
+        canDerive = nominal->lookupDirect(derivable->getFullName()).empty();
+      }
     } else {
       // Otherwise, go satisfy the derivable requirement, which can introduce
       // a member that could in turn satisfy *this* requirement.

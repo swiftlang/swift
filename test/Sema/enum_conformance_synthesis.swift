@@ -55,13 +55,10 @@ func customHashable() {
   CustomHashable.A.hash(into: &hasher)
 }
 
-// We still synthesize conforming overloads of '==' and 'hashValue' if
-// explicit definitions don't satisfy the protocol requirements. Probably
-// not what we actually want.
-enum InvalidCustomHashable {
+enum InvalidCustomHashable { // expected-error {{type 'InvalidCustomHashable' does not conform to protocol 'Hashable'}} // expected-note {{do you want to add protocol stubs?}}
   case A, B
 
-  var hashValue: String { return "" } // expected-note{{previously declared here}}
+  var hashValue: String { return "" } // expected-note 2{{candidate has non-matching type 'String'}}
 }
 func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
@@ -71,8 +68,8 @@ func invalidCustomHashable() {
   var s: String = InvalidCustomHashable.A == .B
   s = InvalidCustomHashable.A.hashValue
   _ = s
-  var _: Int = InvalidCustomHashable.A.hashValue
-  InvalidCustomHashable.A.hash(into: &hasher)
+  var _: Int = InvalidCustomHashable.A.hashValue // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+  InvalidCustomHashable.A.hash(into: &hasher) // expected-error {{use of unresolved identifier 'hasher'}}
 }
 
 // Check use of an enum's synthesized members before the enum is actually declared.
