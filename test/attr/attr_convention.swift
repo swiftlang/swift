@@ -14,3 +14,9 @@ sr11027(1)
 
 func sr11027_c(_ f: @convention(c) @autoclosure () -> Int) -> Void {} // expected-error{{@convention(c) attribute is not allowed on @autoclosure type}}
 sr11027_c(1)
+
+func sr11027_swift(_ f: @convention(swift) @autoclosure () -> Int) -> Void {} // OK
+sr11027_swift(1)
+
+func sr11027_thin(_ f: @convention(thin) @autoclosure () -> Int) -> Void {} // OK
+sr11027_thin(1)
