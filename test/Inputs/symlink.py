@@ -1,7 +1,7 @@
 #!/usr/bin/env python
+import os
 import subprocess
 import sys
-import os
 
 if len(sys.argv) < 3:
     print('Too few args to ' + sys.argv[0])
@@ -22,6 +22,8 @@ if sys.platform == 'win32':
         is_dir = os.path.isdir(sys.argv[1])
 
     # Windows symlink support was introduced in python 3.2
-    subprocess.check_call(['cmd.exe', '/C', 'mklink ' + ('/D' if is_dir else ''), link_path, points_to])
+    subprocess.check_call(['cmd.exe', '/C',
+                           'mklink ' + ('/D' if is_dir else ''),
+                           link_path, points_to])
 else:
     os.symlink(points_to, link_path)
