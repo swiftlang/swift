@@ -2332,8 +2332,13 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
 
   if (isGlobalInit())
     OS << "[global_init] ";
-  if (isWeakLinked())
-    OS << "[_weakLinked] ";
+  if (isAlwaysWeakImported())
+    OS << "[weak_imported] ";
+  auto availability = getAvailabilityForLinkage();
+  if (!availability.isAlwaysAvailable()) {
+    auto version = availability.getOSVersion().getLowerEndpoint();
+    OS << "[available " << version.getAsString() << "] ";
+  }
 
   switch (getInlineStrategy()) {
     case NoInline: OS << "[noinline] "; break;

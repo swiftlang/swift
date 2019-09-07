@@ -940,9 +940,31 @@ public:
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  /// Whether this declaration is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule,
-                      AvailabilityContext fromContext) const;
+  AvailabilityContext getAvailabilityForLinkage() const;
+
+  /// Whether this declaration or one of its outer contexts has the
+  /// @_weakLinked attribute.
+  bool isAlwaysWeakImported() const;
+
+  /// Whether this declaration is weak-imported from the given module,
+  /// either because of the presence of the @_weakLinked attribute, or
+  /// because of availability.
+  ///
+  /// Note that \p fromModule should either be the "main module" or
+  /// nullptr. (This is because when it is non-null, we query the
+  /// current deployment target, and not the deployment target that
+  /// the module was built with.)
+  ///
+  /// If \p fromModule is the main module, this returns false when the
+  /// declaration is part of the main module, or if the declaration is
+  /// at least as available as the current deployment target.
+  ///
+  /// If \p fromModule is null, we instead return true if the
+  /// declaration is meant to be weak linked with _some_ deployment
+  /// target; that is, the presence of the @_weakLinked attribute or
+  /// any kind of availability is enough, irrespective of the current
+  /// deployment target.
+  bool isWeakImported(ModuleDecl *fromModule) const;
 
   /// Returns true if the nature of this declaration allows overrides.
   /// Note that this does not consider whether it is final or whether

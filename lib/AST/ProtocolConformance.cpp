@@ -400,25 +400,24 @@ SourceLoc RootProtocolConformance::getLoc() const {
 }
 
 bool
-RootProtocolConformance::isWeakImported(ModuleDecl *fromModule,
-                                        AvailabilityContext fromContext) const {
+RootProtocolConformance::isWeakImported(ModuleDecl *fromModule) const {
   auto *dc = getDeclContext();
   if (dc->getParentModule() == fromModule)
     return false;
 
   // If the protocol is weak imported, so are any conformances to it.
-  if (getProtocol()->isWeakImported(fromModule, fromContext))
+  if (getProtocol()->isWeakImported(fromModule))
     return true;
 
   // If the conforming type is weak imported, so are any of its conformances.
   if (auto *nominal = getType()->getAnyNominal())
-    if (nominal->isWeakImported(fromModule, fromContext))
+    if (nominal->isWeakImported(fromModule))
       return true;
 
   // If the conformance is declared in an extension with the @_weakLinked
   // attribute, it is weak imported.
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    if (ext->isWeakImported(fromModule, fromContext))
+    if (ext->isWeakImported(fromModule))
       return true;
 
   return false;
