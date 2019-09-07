@@ -1159,7 +1159,7 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
   
   GenericEnvironment *genericEnv = nullptr;
   if (auto sig = pattern->getGenericSignature()) {
-    genericEnv = sig->createGenericEnvironment();
+    genericEnv = sig->getGenericEnvironment();
     enumerateGenericSignatureRequirements(pattern->getGenericSignature(),
       [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   }

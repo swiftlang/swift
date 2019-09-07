@@ -231,7 +231,7 @@ getTypeRefByFunction(IRGenModule &IGM,
       if (sig) {
         enumerateGenericSignatureRequirements(sig,
                 [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-        genericEnv = sig->createGenericEnvironment();
+        genericEnv = sig->getGenericEnvironment();
       }
       
       {
@@ -362,7 +362,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
     genericSig = origGenericSig->getCanonicalSignature();
     enumerateGenericSignatureRequirements(genericSig,
                 [&](GenericRequirement reqt) { requirements.push_back(reqt); });
-    genericEnv = genericSig->createGenericEnvironment();
+    genericEnv = genericSig->getGenericEnvironment();
   }
 
   IRGenMangler mangler;

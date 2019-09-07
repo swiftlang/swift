@@ -465,7 +465,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  GenericSignatureID genericEnvID;
+  GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
@@ -476,7 +476,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakLinked, isDynamic, isExactSelfClass,
-      funcTyID, replacedFunctionID, genericEnvID,
+      funcTyID, replacedFunctionID, genericSigID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -643,7 +643,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    genericEnv = MF->getGenericEnvironment(genericEnvID);
+    if (auto *genericSig = MF->getGenericSignature(genericSigID))
+      genericEnv = genericSig->getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
   // no contents.
@@ -2534,7 +2535,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  GenericSignatureID genericEnvID;
+  GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
@@ -2545,7 +2546,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
       isWeakLinked, isDynamic, isExactSelfClass,
-      funcTyID, replacedFunctionID, genericEnvID,
+      funcTyID, replacedFunctionID, genericSigID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

@@ -175,17 +175,6 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   return nullptr;
 }
 
-bool DeclContext::contextHasLazyGenericEnvironment() const {
-  auto dc = this;
-  do {
-    if (auto decl = dc->getAsDecl())
-      if (auto GC = decl->getAsGenericContext())
-        return GC->hasLazyGenericEnvironment();
-  } while ((dc = dc->getParent()));
-
-  return false;
-}
-
 Type DeclContext::mapTypeIntoContext(Type type) const {
   return GenericEnvironment::mapTypeIntoContext(
       getGenericEnvironmentOfContext(), type);

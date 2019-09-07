@@ -616,10 +616,11 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->setDepth(i);
   }
 
-  return TypeChecker::checkGenericEnvironment(
+  auto *sig = TypeChecker::checkGenericSignature(
              nestedList.back(), DC,
              /*parentSig=*/nullptr,
              /*allowConcreteGenericParams=*/true);
+  return (sig ? sig->getGenericEnvironment() : nullptr);
 }
 
 /// Check whether \c current is a redeclaration.
@@ -3831,7 +3832,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     for (auto member : proto->getMembers()) {
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
         if (!aliasDecl->isGeneric()) {
-          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+          // FIXME: Force creation of the protocol's generic environment now.
+          (void) proto->getGenericEnvironment();
+          aliasDecl->setGenericSignature(proto->getGenericSignature());
 
           // The generic environment didn't exist until now, we may have
           // unresolved types we will need to deal with, and need to record the
@@ -4440,7 +4443,7 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static GenericEnvironment *
+static GenericSignature *
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
@@ -4464,10 +4467,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   };
   
   // Re-use the signature of the type being extended by default.
-  GenericSignature *sig =
-      ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
   if (cannotReuseNominalSignature()) {
-    return TypeChecker::checkGenericEnvironment(
+    return TypeChecker::checkGenericSignature(
         genericParams, ext,
         /*parent signature*/ nullptr,
         /*allowConcreteGenericParams=*/true,
@@ -4475,8 +4476,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
         {TypeLoc{nullptr, extInterfaceType}});
   }
 
-  // Form the generic environment.
-  return sig->createGenericEnvironment();
+  return ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
 }
 
 static bool isNonGenericTypeAliasType(Type type) {
@@ -4568,8 +4568,8 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     validateDecl(nominal);
 
     if (auto *genericParams = ext->getGenericParams()) {
-      auto *env = checkExtensionGenericParams(*this, ext, genericParams);
-      ext->setGenericEnvironment(env);
+      auto *sig = checkExtensionGenericParams(*this, ext, genericParams);
+      ext->setGenericSignature(sig);
     }
   }
 }

@@ -761,8 +761,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  if (auto env = conformanceDC->getGenericEnvironmentOfContext())
-    encodeDecl->setGenericEnvironment(env);
+  encodeDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
 
   encodeDecl->setValidationToChecked();
@@ -1043,8 +1042,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  if (auto env = conformanceDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
 
   initDecl->setValidationToChecked();
