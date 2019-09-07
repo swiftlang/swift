@@ -2682,7 +2682,7 @@ ERROR(autoclosure_function_type,none,
       ())
 
 ERROR(autoclosure_and_convention_function_type,none,
-"@convention(%0) attribute is not allowed on a @autoclosure type",
+      "@convention(%0) attribute is not allowed on @autoclosure type",
       (StringRef))
 
 ERROR(autoclosure_function_input_nonunit,none,
