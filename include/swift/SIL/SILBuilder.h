@@ -1746,13 +1746,7 @@ public:
         getSILDebugLocation(Loc), valueType, operand));
   }
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
-                                   unsigned index) {
-    auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-    auto fieldTy = boxTy->getFieldType(getModule(), index);
-
-    return insert(new (getModule()) ProjectBoxInst(
-        getSILDebugLocation(Loc), boxOperand, index, fieldTy));
-  }
+                                   unsigned index);
   ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
                                                          SILType valueTy,
                                                          SILValue boxOperand) {

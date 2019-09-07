@@ -1532,7 +1532,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
         Ctx.AllocateCopy(NewConformances);
 
     auto ExistentialRepr =
-        Dest->getType().getPreferredExistentialRepresentation(Mod, SourceType);
+        Dest->getType().getPreferredExistentialRepresentation(SourceType);
 
     switch (ExistentialRepr) {
     default:

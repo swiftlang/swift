@@ -253,7 +253,8 @@ SILType SILFunction::getLoweredType(Type t) const {
 }
 
 SILType SILFunction::getLoweredLoadableType(Type t) const {
-  return getModule().Types.getLoweredLoadableType(t, getResilienceExpansion());
+  auto &M = getModule();
+  return M.Types.getLoweredLoadableType(t, getResilienceExpansion(), M);
 }
 
 const TypeLowering &SILFunction::getTypeLowering(SILType type) const {

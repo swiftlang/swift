@@ -82,7 +82,6 @@
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Target/TargetMachine.h"
 
-#include <deque>
 #include <memory>
 #include <unordered_set>
 #include <utility>
@@ -648,13 +647,6 @@ createOptRecordFile(StringRef Filename, DiagnosticEngine &DE) {
   return File;
 }
 
-struct PostSILGenInputs {
-  std::unique_ptr<SILModule> TheSILModule;
-  bool ASTGuaranteedToCorrespondToSIL;
-  ModuleOrSourceFile ModuleOrPrimarySourceFile;
-  PrimarySpecificPaths PSPs;
-};
-
 static bool precompileBridgingHeader(CompilerInvocation &Invocation,
                                      CompilerInstance &Instance) {
   auto clangImporter = static_cast<ClangImporter *>(
@@ -896,15 +888,27 @@ static bool writeTBDIfNeeded(CompilerInvocation &Invocation,
   return writeTBD(Instance.getMainModule(), TBDPath, tbdOpts);
 }
 
-static std::deque<PostSILGenInputs>
-generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
+static bool performCompileStepsPostSILGen(
+    CompilerInstance &Instance, CompilerInvocation &Invocation,
+    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
+    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
+    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
+    UnifiedStatsReporter *Stats);
+
+static bool
+performCompileStepsPostSema(CompilerInvocation &Invocation,
+                            CompilerInstance &Instance,
+                            bool moduleIsPublic, int &ReturnValue,
+                            FrontendObserver *observer,
+                            UnifiedStatsReporter *Stats) {
   auto mod = Instance.getMainModule();
   if (auto SM = Instance.takeSILModule()) {
-    std::deque<PostSILGenInputs> PSGIs;
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForAtMostOnePrimary();
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), false, mod, PSPs});
-    return PSGIs;
+    return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
+                                         /*ASTGuaranteedToCorrespondToSIL=*/false,
+                                         mod, PSPs, moduleIsPublic,
+                                         ReturnValue, observer, Stats);
   }
 
   SILOptions &SILOpts = Invocation.getSILOptions();
@@ -917,41 +921,52 @@ generateSILModules(CompilerInvocation &Invocation, CompilerInstance &Instance) {
   if (!opts.InputsAndOutputs.hasPrimaryInputs()) {
     // If there are no primary inputs the compiler is in WMO mode and builds one
     // SILModule for the entire module.
-    auto SM = performSILGeneration(mod, SILOpts);
-    std::deque<PostSILGenInputs> PSGIs;
+    auto SM = performSILGeneration(mod, Instance.getSILTypes(), SILOpts);
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
-    PSGIs.push_back(PostSILGenInputs{
-        std::move(SM), llvm::none_of(mod->getFiles(), fileIsSIB), mod, PSPs});
-    return PSGIs;
+    bool astGuaranteedToCorrespondToSIL =
+        llvm::none_of(mod->getFiles(), fileIsSIB);
+    return performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
+                                         astGuaranteedToCorrespondToSIL,
+                                         mod, PSPs, moduleIsPublic,
+                                         ReturnValue, observer, Stats);
   }
   // If there are primary source files, build a separate SILModule for
   // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
   // once for each such input.
-  std::deque<PostSILGenInputs> PSGIs;
-  for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
-    auto SM = performSILGeneration(*PrimaryFile, SILOpts);
-    const PrimarySpecificPaths PSPs =
-        Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
-    PSGIs.push_back(PostSILGenInputs{std::move(SM), true, PrimaryFile, PSPs});
+  if (!Instance.getPrimarySourceFiles().empty()) {
+    bool result = false;
+    for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
+      auto SM = performSILGeneration(*PrimaryFile, Instance.getSILTypes(), SILOpts);
+      const PrimarySpecificPaths PSPs =
+          Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
+      result |= performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
+                                              /*ASTGuaranteedToCorrespondToSIL*/true,
+                                              PrimaryFile, PSPs, moduleIsPublic,
+                                              ReturnValue, observer, Stats);
+    }
+
+    return result;
   }
-  if (!PSGIs.empty())
-    return PSGIs;
+
   // If there are primary inputs but no primary _source files_, there might be
   // a primary serialized input.
+  bool result = false;
   for (FileUnit *fileUnit : mod->getFiles()) {
     if (auto SASTF = dyn_cast<SerializedASTFile>(fileUnit))
       if (Invocation.getFrontendOptions().InputsAndOutputs.isInputPrimary(
               SASTF->getFilename())) {
-        assert(PSGIs.empty() && "Can only handle one primary AST input");
-        auto SM = performSILGeneration(*SASTF, SILOpts);
+        auto SM = performSILGeneration(*SASTF, Instance.getSILTypes(), SILOpts);
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
-        PSGIs.push_back(
-            PostSILGenInputs{std::move(SM), !fileIsSIB(SASTF), mod, PSPs});
+        result |= performCompileStepsPostSILGen(Instance, Invocation, std::move(SM),
+                                                !fileIsSIB(SASTF),
+                                                mod, PSPs, moduleIsPublic,
+                                                ReturnValue, observer, Stats);
       }
   }
-  return PSGIs;
+
+  return result;
 }
 
 /// Emits index data for all primary inputs, or the main module.
@@ -1001,13 +1016,6 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
 
   return hadAnyError;
 }
-
-static bool performCompileStepsPostSILGen(
-    CompilerInstance &Instance, CompilerInvocation &Invocation,
-    std::unique_ptr<SILModule> SM, bool astGuaranteedToCorrespondToSIL,
-    ModuleOrSourceFile MSF, const PrimarySpecificPaths &PSPs,
-    bool moduleIsPublic, int &ReturnValue, FrontendObserver *observer,
-    UnifiedStatsReporter *Stats);
 
 /// Performs the compile requested by the user.
 /// \param Instance Will be reset after performIRGeneration when the verifier
@@ -1125,21 +1133,8 @@ static bool performCompile(CompilerInstance &Instance,
   assert(FrontendOptions::doesActionGenerateSIL(Action) &&
          "All actions not requiring SILGen must have been handled!");
 
-  std::deque<PostSILGenInputs> PSGIs = generateSILModules(Invocation, Instance);
-
-  while (!PSGIs.empty()) {
-    auto PSGI = std::move(PSGIs.front());
-    PSGIs.pop_front();
-    if (performCompileStepsPostSILGen(Instance, Invocation,
-                                      std::move(PSGI.TheSILModule),
-                                      PSGI.ASTGuaranteedToCorrespondToSIL,
-                                      PSGI.ModuleOrPrimarySourceFile,
-                                      PSGI.PSPs,
-                                      moduleIsPublic,
-                                      ReturnValue, observer, Stats))
-      return true;
-  }
-  return false;
+  return performCompileStepsPostSema(Invocation, Instance, moduleIsPublic,
+                                     ReturnValue, observer, Stats);
 }
 
 /// Get the main source file's private discriminator and attach it to
