@@ -4550,7 +4550,7 @@ namespace {
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
-                                              objcClass);
+                                              std::move(objcClass));
       
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
