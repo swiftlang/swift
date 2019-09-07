@@ -66,12 +66,22 @@ Swift Next
       // This will now error, because the protocol requirement
       // is implicitly mutating and the setter is implicitly 
       // nonmutating.
-      set { someProperty = newValue }
+      set { someProperty = newValue } // Error
     }
   }
   ```
 
-  To resolve this, explicitly mark the setter as `nonmutating` in the protocol.
+  **Workaround**: Define a new mutable property inside the setter that has a reference to `self`:
+  
+  ```swift
+  var anotherProperty1: Int {
+    get { return someProperty }
+    set {
+      var mutableSelf = self
+      mutableSelf.someProperty = newValue // Okay
+    }
+  }
+```
 
 * [SE-0253][]:
 
