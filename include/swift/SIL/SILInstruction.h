@@ -1643,9 +1643,7 @@ public:
   bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   // Return the type of the memory stored in the alloc_box.
-  SILType getAddressType() const {
-    return getBoxType()->getFieldType(getModule(), 0).getAddressType();
-  }
+  SILType getAddressType() const;
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.

@@ -69,6 +69,10 @@ namespace swift {
   class UnifiedStatsReporter;
   enum class SourceFileKind;
 
+  namespace Lowering {
+    class TypeConverter;
+  }
+
   /// Used to optionally maintain SIL parsing context for the parser.
   ///
   /// When not parsing SIL, this has no overhead.
@@ -254,11 +258,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, SILOptions &options);
+  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
+                       SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options);
+  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
+                       SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 

@@ -592,7 +592,8 @@ public:
 
       SILOptions &SILOpts = subInvocation.getSILOptions();
       auto Mod = SubInstance.getMainModule();
-      auto SILMod = performSILGeneration(Mod, SILOpts);
+      auto &TC = SubInstance.getSILTypes();
+      auto SILMod = performSILGeneration(Mod, TC, SILOpts);
       if (!SILMod) {
         LLVM_DEBUG(llvm::dbgs() << "SILGen did not produce a module\n");
         SubError = true;

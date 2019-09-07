@@ -1562,7 +1562,7 @@ ContainedAddress irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                               CanType projectedType) {
   // TODO: Non-ErrorType boxed existentials.
   assert(baseTy.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
   
   // Get the reference to the existential box.
   llvm::Value *box = base.claimNext();
@@ -1616,7 +1616,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-Error boxed existentials.
   assert(destType.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
@@ -1656,7 +1656,7 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
                                                       CanType valueType) {
   // TODO: Non-Error boxed existentials.
   assert(containerType.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
 
   auto box = container.claimNext();
   auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
@@ -1803,7 +1803,7 @@ void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType type, Explosion &out) {
   // TODO: Non-Error boxed existentials.
   assert(type.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
 
   // Get the reference to the existential box.
   llvm::Value *box = value.claimNext();
