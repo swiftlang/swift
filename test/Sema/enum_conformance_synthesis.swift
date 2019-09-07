@@ -69,7 +69,7 @@ func invalidCustomHashable() {
   s = InvalidCustomHashable.A.hashValue
   _ = s
   var _: Int = InvalidCustomHashable.A.hashValue // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
-  InvalidCustomHashable.A.hash(into: &hasher) // expected-error {{use of unresolved identifier 'hasher'}}
+  InvalidCustomHashable.A.hash(into: &hasher) // expected-error {{value of type 'InvalidCustomHashable' has no member 'hash'}}
 }
 
 // Check use of an enum's synthesized members before the enum is actually declared.
