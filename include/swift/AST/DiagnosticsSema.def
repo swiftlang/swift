@@ -2680,6 +2680,11 @@ ERROR(rethrows_without_throwing_parameter,none,
 ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
       ())
+
+ERROR(autoclosure_and_convention_function_type,none,
+"@convention(%0) attribute is not allowed on a @autoclosure type",
+      (StringRef))
+
 ERROR(autoclosure_function_input_nonunit,none,
       "argument type of @autoclosure parameter must be '()'", ())
 
