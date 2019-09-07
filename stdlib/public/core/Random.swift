@@ -160,3 +160,9 @@ public struct SystemRandomNumberGenerator: RandomNumberGenerator {
     return random
   }
 }
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+@_silgen_name("arc4random_buf")
+@usableFromInline
+internal func swift_stdlib_random(_: inout UInt64, _: Int)
+#endif
