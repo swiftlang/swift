@@ -2261,7 +2261,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
             // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
             if (convention == "c" || convention == "block" ) {
               diagnose(attrs.getLoc(TAK_convention),
-                       diag::autoclosure_and_convention_function_type,
+                       diag::invalid_autoclosure_and_convention_attributes,
                        attrs.getConvention());
             }
           }

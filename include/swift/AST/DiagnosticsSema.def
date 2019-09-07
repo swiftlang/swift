@@ -2681,7 +2681,7 @@ ERROR(autoclosure_function_type,none,
       "@autoclosure attribute only applies to function types",
       ())
 
-ERROR(autoclosure_and_convention_function_type,none,
+ERROR(invalid_autoclosure_and_convention_attributes,none,
       "@convention(%0) attribute is not allowed on @autoclosure type",
       (StringRef))
 
