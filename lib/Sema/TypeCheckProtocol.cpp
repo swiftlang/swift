@@ -3018,6 +3018,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   if (auto derivable = DerivedConformance::getDerivableRequirement(
                          nominal,
                          requirement)) {
+    auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
     if (derivable == requirement) {
       // If it's the same requirement, we can derive it here. Although, don't
       // attempt to do it if we have an explicit witness. If they don't match,
@@ -3025,9 +3026,13 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
       //
       // If the decl is synthesized, then don't attempt the check. Otherwise,
       // we could end up with issues like someone adding a intValue property to
-      // enum, which will satisfy the intValue requirement of nested CodingKey
-      // enum, which is not correct.
-      if (nominal->isImplicit()) {
+      // Decodable enum, which will satisfy the intValue requirement of nested
+      // CodingKey enum, which is not correct.
+      //
+      // FIXME: The lookup check isn't enough for Equatable
+      bool isEquatable = derivableProto->getKnownProtocolKind() ==
+                         KnownProtocolKind::Equatable;
+      if (nominal->isImplicit() || isEquatable) {
         canDerive = true;
       } else {
         canDerive = nominal->lookupDirect(derivable->getFullName()).empty();
@@ -3035,7 +3040,6 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
     } else {
       // Otherwise, go satisfy the derivable requirement, which can introduce
       // a member that could in turn satisfy *this* requirement.
-      auto derivableProto = cast<ProtocolDecl>(derivable->getDeclContext());
       if (auto conformance =
             TypeChecker::conformsToProtocol(Adoptee, derivableProto,
                                             DC, None)) {
