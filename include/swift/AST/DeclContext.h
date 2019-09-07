@@ -360,10 +360,6 @@ public:
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
 
-  /// Whether the context has a generic environment that will be constructed
-  /// on first access (but has not yet been constructed).
-  bool contextHasLazyGenericEnvironment() const;
-
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
 

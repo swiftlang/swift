@@ -485,7 +485,7 @@ namespace {
       // signature plumbed through.
       if (Sig && type->hasTypeParameter()) {
         type = Sig->getCanonicalSignature()
-          .getGenericEnvironment()
+          ->getGenericEnvironment()
           ->mapTypeIntoContext(type)
           ->getCanonicalType();
       }
@@ -2558,7 +2558,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto loweredContextType = loweredInterfaceType;
   auto contextBoxTy = boxTy;
   if (signature) {
-    auto env = signature.getGenericEnvironment();
+    auto env = signature->getGenericEnvironment();
     loweredContextType = env->mapTypeIntoContext(loweredContextType)
                             ->getCanonicalType();
     contextBoxTy = cast<SILBoxType>(

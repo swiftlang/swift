@@ -356,7 +356,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
            /*isTypeChecked=*/true };
 }
 
-static std::tuple<GenericEnvironment *, GenericParamList *, SubstitutionMap>
+static std::tuple<GenericSignature *, GenericParamList *, SubstitutionMap>
 configureGenericDesignatedInitOverride(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
@@ -367,7 +367,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   auto subMap = superclassTy->getContextSubstitutionMap(
       moduleDecl, superclassDecl);
 
-  GenericEnvironment *genericEnv;
+  GenericSignature *genericSig;
 
   // Inheriting initializers that have their own generic parameters
   auto *genericParams = superclassCtor->getGenericParams();
@@ -445,7 +445,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     subMap = SubstitutionMap::get(superclassSig,
                                   substFn, lookupConformanceFn);
 
-    auto *genericSig = evaluateOrDefault(
+    genericSig = evaluateOrDefault(
         ctx.evaluator,
         AbstractGenericSignatureRequest{
           classDecl->getGenericSignature(),
@@ -453,12 +453,11 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
           std::move(requirements)
         },
         nullptr);
-    genericEnv = genericSig->createGenericEnvironment();
   } else {
-    genericEnv = classDecl->getGenericEnvironment();
+    genericSig = classDecl->getGenericSignature();
   }
 
-  return std::make_tuple(genericEnv, genericParams, subMap);
+  return std::make_tuple(genericSig, genericParams, subMap);
 }
 
 static void
@@ -640,11 +639,11 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     return nullptr;
   }
 
-  GenericEnvironment *genericEnv;
+  GenericSignature *genericSig;
   GenericParamList *genericParams;
   SubstitutionMap subMap;
 
-  std::tie(genericEnv, genericParams, subMap) =
+  std::tie(genericSig, genericParams, subMap) =
       configureGenericDesignatedInitOverride(ctx,
                                              classDecl,
                                              superclassTy,
@@ -690,7 +689,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setImplicit();
 
   // Set the interface type of the initializer.
-  ctor->setGenericEnvironment(genericEnv);
+  ctor->setGenericSignature(genericSig);
   ctor->computeType();
 
   ctor->setImplicitlyUnwrappedOptional(

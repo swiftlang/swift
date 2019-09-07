@@ -66,10 +66,6 @@ using namespace swift;
 
 #define DEBUG_TYPE "Serialization"
 
-STATISTIC(NumLazyGenericEnvironments,
-          "# of lazily-deserialized generic environments known");
-STATISTIC(NumLazyGenericEnvironmentsLoaded,
-          "# of lazily-deserialized generic environments loaded");
 STATISTIC(NumLazyRequirementSignatures,
           "# of lazily-deserialized requirement signatures known");
 
@@ -829,11 +825,8 @@ void GenericContext::setGenericParams(GenericParamList *params) {
 }
 
 GenericSignature *GenericContext::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
+  if (GenericSig)
+    return GenericSig;
 
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
@@ -842,83 +835,24 @@ GenericSignature *GenericContext::getGenericSignature() const {
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    auto *genericSig = GenericSignature::get({self}, {req});
-
-    // Save it for next time.
-    const_cast<GenericContext *>(this)->GenericSigOrEnv = genericSig;
-    return genericSig;
+    const_cast<GenericContext *>(this)->GenericSig
+      = GenericSignature::get({self}, {req});
+    return GenericSig;
   }
 
   return nullptr;
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>() || isa<ProtocolDecl>(this))
-    return getLazyGenericEnvironmentSlow();
+  if (auto *genericSig = getGenericSignature())
+    return genericSig->getGenericEnvironment();
 
   return nullptr;
 }
 
-bool GenericContext::hasLazyGenericEnvironment() const {
-  return GenericSigOrEnv.dyn_cast<GenericSignature *>() != nullptr;
-}
-
-void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-GenericContext::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily computed generic environment");
-
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    // The signature of a Protocol is trivial (Self: TheProtocol) so let's
-    // compute it directly.
-    auto *genericEnv = getGenericSignature()->createGenericEnvironment();
-    const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
-    return genericEnv;
-  }
-
-  auto contextData = getASTContext().getOrCreateLazyGenericContextData(
-    this, nullptr);
-  auto *genericEnv = contextData->loader->loadGenericEnvironment(
-    this, contextData->genericEnvData);
-
-  const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironmentsLoaded++;
-  return genericEnv;
-}
-
-void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                               GenericSignature *genericSig,
-                                               uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyGenericContextData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-
-  ++NumLazyGenericEnvironments;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironments++;
-
+void GenericContext::setGenericSignature(GenericSignature *genericSig) {
+  assert(GenericSig == nullptr && "Generic signature cannot be changed");
+  this->GenericSig = genericSig;
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
@@ -3888,7 +3822,7 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
 
   // Wire up generic environment of DD.
-  DD->setGenericEnvironment(CD->getGenericEnvironmentOfContext());
+  DD->setGenericSignature(CD->getGenericSignatureOfContext());
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);

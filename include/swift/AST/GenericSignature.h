@@ -32,6 +32,7 @@ class GenericSignatureBuilder;
 class ProtocolConformanceRef;
 class ProtocolType;
 class SubstitutionMap;
+class GenericEnvironment;
 
 /// An access path used to find a particular protocol conformance within
 /// a generic signature.
@@ -101,6 +102,8 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   unsigned NumGenericParams;
   unsigned NumRequirements;
 
+  GenericEnvironment *GenericEnv = nullptr;
+
   // Make vanilla new/delete illegal.
   void *operator new(size_t Bytes) = delete;
   void operator delete(void *Data) = delete;
@@ -131,9 +134,6 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   
   static ASTContext &getASTContext(TypeArrayView<GenericTypeParamType> params,
                                    ArrayRef<Requirement> requirements);
-
-  /// Retrieve the generic signature builder for the given generic signature.
-  GenericSignatureBuilder *getGenericSignatureBuilder();
 
   void buildConformanceAccessPath(
       SmallVectorImpl<ConformanceAccessPath::Entry> &path,
@@ -218,10 +218,13 @@ public:
   /// Canonicalize the components of a generic signature.
   CanGenericSignature getCanonicalSignature() const;
 
-  /// Create a new generic environment that provides fresh contextual types
+  /// Retrieve the generic signature builder for the given generic signature.
+  GenericSignatureBuilder *getGenericSignatureBuilder();
+
+  /// Returns the generic environment that provides fresh contextual types
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
-  GenericEnvironment *createGenericEnvironment();
+  GenericEnvironment *getGenericEnvironment();
 
   /// Uniquing for the ASTContext.
   void Profile(llvm::FoldingSetNodeID &ID) {

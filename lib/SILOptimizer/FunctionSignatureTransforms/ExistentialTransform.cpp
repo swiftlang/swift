@@ -326,7 +326,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
         OrigGenericSig, std::move(GenericParams), std::move(Requirements)},
       nullptr);
 
-  NewGenericEnv = NewGenericSig->createGenericEnvironment();
+  NewGenericEnv = NewGenericSig->getGenericEnvironment();
 
   /// Create a lambda for GenericParams.
   auto getCanonicalType = [&](Type t) -> CanType {
@@ -583,7 +583,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   auto NewFTy = createExistentialSpecializedFunctionType();
 
   auto NewFGenericSig = NewFTy->getGenericSignature();
-  auto NewFGenericEnv = NewFGenericSig->createGenericEnvironment();
+  auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
 
   /// Step 1: Create the new protocol constrained generic function.
   NewF = FunctionBuilder.createFunction(

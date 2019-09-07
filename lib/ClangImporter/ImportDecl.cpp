@@ -1726,7 +1726,7 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(elementTy), dc,
                      getter->getClangNode());
 
-  thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
   thunk->setValidationToChecked();
 
@@ -1781,7 +1781,7 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      valueIndicesPL,
                      TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
                      setter->getClangNode());
-  thunk->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
   thunk->setValidationToChecked();
 
@@ -3750,7 +3750,7 @@ namespace {
                                     nameLoc, bodyParams, resultTy,
                                     /*throws*/ false, dc, decl);
 
-      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       if (!dc->isModuleScopeContext()) {
         if (selfIsInOut)
@@ -4338,7 +4338,7 @@ namespace {
       // Record the return type.
       result->getBodyResultTypeLoc().setType(resultTy);
 
-      result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4554,9 +4554,7 @@ namespace {
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
         result->createGenericParamsIfMissing(objcClass);
-
-        auto *env = objcClass->getGenericEnvironment();
-        result->setGenericEnvironment(env);
+        result->setGenericSignature(objcClass->getGenericSignature());
       }
 
       // Create the extension declaration and record it.
@@ -4830,8 +4828,8 @@ namespace {
         if (genericParams) {
           result->setGenericParams(genericParams);
 
-          auto *env = Impl.buildGenericEnvironment(genericParams, dc);
-          result->setGenericEnvironment(env);
+          auto *sig = Impl.buildGenericSignature(genericParams, dc);
+          result->setGenericSignature(sig);
         }
       } else {
         return nullptr;
@@ -5155,7 +5153,7 @@ namespace {
                     /*genericparams=*/nullptr, dc);
 
       if (auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl)) {
-        typealias->setGenericEnvironment(GTD->getGenericEnvironment());
+        typealias->setGenericSignature(GTD->getGenericSignature());
         if (GTD->isGeneric())
           typealias->setGenericParams(GTD->getGenericParams()->clone(typealias));
       }
@@ -5387,7 +5385,7 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 
   auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl);
   if (GTD && !isa<ProtocolDecl>(GTD)) {
-    alias->setGenericEnvironment(GTD->getGenericEnvironment());
+    alias->setGenericSignature(GTD->getGenericSignature());
     if (GTD->isGeneric())
       alias->setGenericParams(GTD->getGenericParams()->clone(alias));
   }
@@ -6344,7 +6342,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   addObjCAttribute(result, selector);
 
   // Calculate the function type of the result.
-  result->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+  result->setGenericSignature(dc->getGenericSignatureOfContext());
   result->computeType();
 
   Impl.recordImplicitUnwrapForDecl(result,
@@ -6775,7 +6773,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   if (setterObjCMethod)
     Impl.importAttributes(setterObjCMethod, setterThunk);
 
-  subscript->setGenericEnvironment(dc->getGenericEnvironmentOfContext());
+  subscript->setGenericSignature(dc->getGenericSignatureOfContext());
 
   subscript->setIsSetterMutating(false);
   makeComputed(subscript, getterThunk, setterThunk);
@@ -8040,12 +8038,6 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
       nullptr);
 }
 
-// Calculate the generic environment from an imported generic param list.
-GenericEnvironment *ClangImporter::Implementation::buildGenericEnvironment(
-    GenericParamList *genericParams, DeclContext *dc) {
-  return buildGenericSignature(genericParams, dc)->createGenericEnvironment();
-}
-
 DeclContext *
 ClangImporter::Implementation::importDeclContextOf(
   const clang::Decl *decl,
@@ -8134,7 +8126,7 @@ ClangImporter::Implementation::importDeclContextOf(
 
   if (auto protoDecl = ext->getExtendedProtocolDecl()) {
     ext->createGenericParamsIfMissing(protoDecl);
-    ext->setGenericEnvironment(protoDecl->getGenericEnvironment());
+    ext->setGenericSignature(protoDecl->getGenericSignature());
   }
 
   // Add the extension to the nominal type.

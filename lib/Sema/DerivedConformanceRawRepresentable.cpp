@@ -445,8 +445,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the interface type of the initializer.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType();
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);
