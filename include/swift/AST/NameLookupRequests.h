@@ -25,6 +25,8 @@ namespace swift {
 
 class ClassDecl;
 class DestructorDecl;
+class GenericContext;
+class GenericParamList;
 class TypeAliasDecl;
 class TypeDecl;
 
@@ -248,6 +250,27 @@ public:
   bool isCached() const { return true; }
   Optional<DestructorDecl *> getCachedResult() const;
   void cacheResult(DestructorDecl *value) const;
+};
+
+class GenericParamListRequest :
+    public SimpleRequest<GenericParamListRequest,
+                         GenericParamList *(GenericContext *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<GenericParamList *>
+  evaluate(Evaluator &evaluator, GenericContext *value) const;
+  
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<GenericParamList *> getCachedResult() const;
+  void cacheResult(GenericParamList *value) const;
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

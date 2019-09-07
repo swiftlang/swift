@@ -222,7 +222,6 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 

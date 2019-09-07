@@ -3007,8 +3007,10 @@ public:
     auto namingDecl = cast<ValueDecl>(MF.getDecl(namingDeclID));
     opaqueDecl->setNamingDecl(namingDecl);
 
-    if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl))
-      opaqueDecl->setGenericParams(genericParams);
+    if (auto genericParams = MF.maybeReadGenericParams(opaqueDecl)) {
+      ctx.evaluator.cacheOutput(GenericParamListRequest{opaqueDecl},
+                                std::move(genericParams));
+    }
 
     auto genericSig = MF.getGenericSignature(genericSigID);
     if (genericSig)
@@ -3129,7 +3131,8 @@ public:
 
     auto genericParams = MF.maybeReadGenericParams(DC);
     assert(genericParams && "protocol with no generic parameters?");
-    proto->setGenericParams(genericParams);
+    ctx.evaluator.cacheOutput(GenericParamListRequest{proto},
+                              std::move(genericParams));
 
     handleInherited(proto,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -3668,12 +3671,14 @@ public:
     while (auto *genericParams = MF.maybeReadGenericParams(DC)) {
       genericParams->setOuterParameters(outerParams);
 
-      // We do this repeatedly to set up the correct DeclContexts for the
-      // GenericTypeParamDecls in the list.
-      extension->setGenericParams(genericParams);
+      // Set up the DeclContexts for the GenericTypeParamDecls in the list.
+      for (auto param : *genericParams)
+        param->setDeclContext(extension);
 
       outerParams = genericParams;
     }
+    ctx.evaluator.cacheOutput(GenericParamListRequest{extension},
+                              std::move(outerParams));
 
     extension->setGenericSignature(MF.getGenericSignature(genericSigID));
 
