@@ -3064,7 +3064,6 @@ public:
                                rawAccessLevel, proto->getInherited().size(),
                                inheritedAndDependencyTypes);
 
-    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);

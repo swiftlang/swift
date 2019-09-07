@@ -819,7 +819,6 @@ public:
 
   NullablePtr<ASTScopeImpl> visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
-    e->createGenericParamsIfMissing();
     return scopeCreator.ifUniqueConstructWithPortionExpandAndInsert<
         NominalTypeScope, GenericTypeOrExtensionWholePortion>(p, e);
   }

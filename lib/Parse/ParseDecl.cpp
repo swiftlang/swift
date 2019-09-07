@@ -4174,8 +4174,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TmpCtxt.reset();
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
+                                          genericParams, CurDeclContext);
   setLocalDiscriminator(TAD);
   ParserResult<TypeRepr> UnderlyingTy;
 
@@ -4207,9 +4206,6 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ContextChange CC(*this, TAD);
     Status |= parseFreestandingGenericWhereClause(genericParams);
   }
-
-  // Set after parsing the where clause, which might create genericParams.
-  TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
     // If there is an attempt to do code completion
@@ -5516,7 +5512,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              /*GenericParams=*/nullptr,
+                              GenericParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
 
@@ -5538,8 +5534,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
       return whereStatus;
     }
   }
-
-  FD->setGenericParams(GenericParams);
   
   // Protocol method arguments may not have default values.
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
@@ -5740,7 +5734,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   }
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
-                                        { }, nullptr, CurDeclContext);
+                                        { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
@@ -5766,8 +5760,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
       return whereStatus;
     }
   }
-
-  ED->setGenericParams(GenericParams);
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6024,7 +6016,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
                                             { },
-                                            nullptr,
+                                            GenericParams,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
@@ -6052,7 +6044,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     }
   }
 
-  SD->setGenericParams(GenericParams);
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6115,7 +6106,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
-                                          { }, nullptr, CurDeclContext);
+                                          { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(CD);
   CD->getAttrs() = Attributes;
 
@@ -6167,8 +6158,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
       return whereStatus;
     }
   }
-
-  CD->setGenericParams(GenericParams);
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6393,7 +6382,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext,
-                                                nullptr);
+                                                GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
@@ -6416,8 +6405,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       return whereStatus;
     }
   }
-
-  Subscript->setGenericParams(GenericParams);
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion && CodeCompletion) {
@@ -6537,7 +6524,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           Params.get(), nullptr,
+                                           Params.get(), GenericParams,
                                            CurDeclContext);
   CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
@@ -6553,8 +6540,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return whereStatus;
     }
   }
-
-  CD->setGenericParams(GenericParams);
 
   // No need to setLocalDiscriminator.
 

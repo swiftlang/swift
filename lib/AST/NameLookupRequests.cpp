@@ -90,6 +90,7 @@ void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
 //----------------------------------------------------------------------------//
 // Destructor computation.
 //----------------------------------------------------------------------------//
+
 Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
   auto *classDecl = std::get<0>(getStorage());
   auto results = classDecl->lookupDirect(DeclBaseName::createDestructor());
@@ -103,6 +104,28 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
   auto *classDecl = std::get<0>(getStorage());
   classDecl->addMember(value);
 }
+
+//----------------------------------------------------------------------------//
+// GenericParamListRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (!decl->GenericParamsAndBit.getInt()) {
+    return None;
+  }
+  return decl->GenericParamsAndBit.getPointer();
+}
+
+void GenericParamListRequest::cacheResult(GenericParamList *params) const {
+  auto *context = std::get<0>(getStorage());
+  if (params) {
+    for (auto param : *params)
+      param->setDeclContext(context);
+  }
+  context->GenericParamsAndBit.setPointerAndInt(params, true);
+}
+
 
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
