@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt %s | %FileCheck %s
 // RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// UNSUPPORTED: OS=windows-msvc
 
 @available(*,unavailable,message: "it has been renamed")
 public struct mmConstUnsafePointer<T> {
