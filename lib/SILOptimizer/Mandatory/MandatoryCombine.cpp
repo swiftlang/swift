@@ -107,14 +107,14 @@ public:
     if (!areAllValuesTrivial(fullApplyArguments, *function)) {
       return nullptr;
     }
-    auto partialApplyArguments = ApplySite(partialApply).getArguments();
+
+    ApplySite partialApplySite(partialApply);
+    auto partialApplyArguments = partialApplySite.getArguments();
     if (!areAllValuesTrivial(partialApplyArguments, *function)) {
       return nullptr;
     }
 
-    auto callee = partialApply->getCallee();
-
-    ApplySite partialApplySite(partialApply);
+    SILValue callee = partialApply->getCallee();
 
     SmallVector<SILValue, 8> argsVec;
     llvm::copy(fullApplyArguments, std::back_inserter(argsVec));
