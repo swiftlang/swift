@@ -64,6 +64,9 @@ public:
   iterator end() { return vector.end(); }
   const_iterator begin() const { return vector.begin(); }
   const_iterator end() const { return vector.end(); }
+
+  ArrayRef<Optional<ValueT>> getArray() const { return vector; }
+
   llvm::iterator_range<const_iterator> getRange() const {
     return {begin(), end()};
   }
