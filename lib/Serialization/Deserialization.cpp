@@ -5062,7 +5062,7 @@ public:
         auto paramDiffOpt =
             getActualSILParameterDifferentiability(rawParamDiff);
         if (!paramDiffOpt) {
-          MF.error();
+          MF.fatal();
           llvm_unreachable("an error is a fatal exit at this point");
         }
         paramDiff = *paramDiffOpt;

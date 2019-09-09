@@ -17,6 +17,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -464,6 +465,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
+    GenericSignature *GenericSig = nullptr;
     // SWIFT_ENABLE_TENSORFLOW
     GenericSignatureBuilder Builder;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
@@ -484,12 +486,11 @@ namespace {
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
 
-      auto GenericSig = evaluateOrDefault(
+      GenericSig = evaluateOrDefault(
           ctx.evaluator,
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
           nullptr);
-      GenericEnv = GenericSig->createGenericEnvironment();
     }
 
     template <class G>

@@ -762,14 +762,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
     break;
   }
 
-  if (isParsingQualifiedDeclName) {
-    // Set the parsing context to transparent to propagate the trailing period
-    // after the base type to the parent context.
-    IdentTypeCtxt.setTransparent();
-    if (ComponentsR.empty())
-      Status.setIsParseError();
-  }
-
   if (Status.hasCodeCompletion()) {
     IdentTypeRepr *ITR = nullptr;
 
