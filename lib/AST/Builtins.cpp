@@ -465,32 +465,31 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericSignature *GenericSig = nullptr;
     // SWIFT_ENABLE_TENSORFLOW
-    GenericSignatureBuilder Builder;
+    // Deleted `GenericSig` because we make that later, when `build()` is
+    // called.
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
+
     // SWIFT_ENABLE_TENSORFLOW
+    // Accumulate params and requirements here, so that we can make the
+    // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
     bool Rethrows = false;
+    SmallVector<GenericTypeParamType *, 2> addedParameters;
+    SmallVector<Requirement, 2> addedRequirements;
 
   public:
     BuiltinGenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
-    // SWIFT_ENABLE_TENSORFLOW
-        : Context(ctx), Builder(ctx) {
+        : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+      // SWIFT_ENABLE_TENSORFLOW
       for (auto gp : GenericTypeParams) {
-        genericParamTypes.push_back(
+        addedParameters.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
 
-      GenericSig = evaluateOrDefault(
-          ctx.evaluator,
-          AbstractGenericSignatureRequest{
-            nullptr, std::move(genericParamTypes), { }},
-          nullptr);
     }
 
     template <class G>
@@ -512,9 +511,7 @@ namespace {
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
                       proto->getDeclaredType());
-      auto source =
-          GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-      Builder.addRequirement(req, source, Context.getStdlibModule());
+      addedRequirements.push_back(req);
     }
 
     void setRethrows(bool rethrows = true) {
@@ -522,12 +519,15 @@ namespace {
     }
 
     ValueDecl *build(Identifier name) {
-      auto GenericSig = std::move(Builder).computeGenericSignature(SourceLoc());
-      auto GenericEnv = GenericSig->createGenericEnvironment();
+      auto GenericSig = evaluateOrDefault(
+          Context.evaluator,
+          AbstractGenericSignatureRequest{
+            nullptr, std::move(addedParameters), std::move(addedRequirements)},
+          nullptr);
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericEnv,
+                                       GenericSig->createGenericEnvironment(),
                                        /*Rethrows*/ Rethrows);
     }
 
