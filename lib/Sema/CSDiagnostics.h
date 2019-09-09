@@ -586,7 +586,8 @@ public:
                     ContextualTypePurpose purpose, Type lhs, Type rhs,
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), CTP(purpose),
-        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
+        FromType(resolve(lhs)->getRValueType()),
+        ToType(resolve(rhs)->getRValueType()) {}
 
   Type getFromType() const { return FromType; }
 

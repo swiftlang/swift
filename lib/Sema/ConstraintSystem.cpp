@@ -2422,13 +2422,13 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
       return false;
     }
 
-    // FIXME: If we were able to actually fix things along the way,
-    // we may have to hunt for the best solution. For now, we don't care.
-
     // Before removing any "fixed" solutions, let's check
     // if ambiguity is caused by fixes and diagnose if possible.
     if (diagnoseAmbiguityWithFixes(expr, viable))
       return true;
+
+    // FIXME: If we were able to actually fix things along the way,
+    // we may have to hunt for the best solution. For now, we don't care.
 
     // Remove solutions that require fixes; the fixes in those systems should
     // be diagnosed rather than any ambiguity.
@@ -2468,6 +2468,63 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable, Expr *expr) {
   // constraints.
   diagnoseFailureForExpr(expr);
   return true;
+}
+
+static void diagnoseOperatorAmbiguity(ConstraintSystem &cs,
+                                      Identifier operatorName,
+                                      ArrayRef<Solution> solutions,
+                                      ConstraintLocator *locator) {
+  auto &TC = cs.getTypeChecker();
+  auto *anchor = locator->getAnchor();
+
+  auto *applyExpr = dyn_cast_or_null<ApplyExpr>(cs.getParentExpr(anchor));
+  if (!applyExpr)
+    return;
+
+  const auto &solution = solutions.front();
+  if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
+    auto *lhs = binaryOp->getArg()->getElement(0);
+    auto *rhs = binaryOp->getArg()->getElement(1);
+
+    auto lhsType = solution.simplifyType(cs.getType(lhs))->getRValueType();
+    auto rhsType = solution.simplifyType(cs.getType(rhs))->getRValueType();
+
+    if (lhsType->isEqual(rhsType)) {
+      TC.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
+                  operatorName.str(), lhsType)
+          .highlight(lhs->getSourceRange())
+          .highlight(rhs->getSourceRange());
+    } else {
+      TC.diagnose(anchor->getLoc(), diag::cannot_apply_binop_to_args,
+                  operatorName.str(), lhsType, rhsType)
+          .highlight(lhs->getSourceRange())
+          .highlight(rhs->getSourceRange());
+    }
+  } else {
+    auto argType = solution.simplifyType(cs.getType(applyExpr->getArg()));
+    TC.diagnose(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
+                operatorName.str(), argType->getRValueType());
+  }
+
+  std::set<std::string> parameters;
+  for (const auto &solution : solutions) {
+    auto overload = solution.getOverloadChoice(locator);
+    auto overloadType = overload.openedType;
+    // Let's suggest only concrete overloads here.
+    // Notes are going to take care of the rest,
+    // since printing types like `(Self, Self)` is not
+    // really useful.
+    if (overloadType->hasTypeVariable())
+      continue;
+
+    if (auto *fnType = overloadType->getAs<FunctionType>())
+      parameters.insert(
+          FunctionType::getParamListAsString(fnType->getParams()));
+  }
+
+  TC.diagnose(anchor->getLoc(), diag::suggest_partial_overloads,
+              /*isResult=*/false, operatorName.str(),
+              llvm::join(parameters, ", "));
 }
 
 bool ConstraintSystem::diagnoseAmbiguityWithFixes(
@@ -2544,6 +2601,10 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
         TC.diagnose(commonAnchor->getLoc(),
                     diag::no_overloads_match_exactly_in_call_special,
                     decl->getDescriptiveKind());
+      } else if (name.isOperator()) {
+        auto operatorId = name.getBaseIdentifier();
+        diagnoseOperatorAmbiguity(*this, operatorId, solutions,
+                                  commonCalleeLocator);
       } else if (llvm::all_of(distinctChoices,
                               [&name](const ValueDecl *choice) {
                                 return choice->getFullName() == name;
