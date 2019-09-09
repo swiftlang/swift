@@ -1113,6 +1113,21 @@ public:
   void *operator new(size_t Bytes, void *Mem) throw() { return Mem; }
 };
 
+/// Holds the information needed to print a type for use in a specific context.
+/// Intended for use when printing a type as part of a fix-it or other
+/// diagnostic message where shadowing is a concern.
+struct TypeDescription {
+  /// The type being described.
+  Type Ty;
+  /// The DeclContext associated with a specific use of the type.
+  DeclContext *DC;
+  /// The SourceLoc associated with a specific use of the type.
+  SourceLoc Loc;
+
+  TypeDescription(Type Ty, DeclContext *DC, SourceLoc Loc)
+      : Ty(Ty), DC(DC), Loc(Loc) {}
+};
+
 /// AnyGenericType - This abstract class helps types ensure that fields
 /// exist at the same offset in memory to improve code generation of the
 /// compiler itself.

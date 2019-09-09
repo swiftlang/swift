@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeRepr.h"
@@ -422,13 +423,77 @@ static bool typeSpellingIsAmbiguous(Type type,
   for (auto arg : Args) {
     if (arg.getKind() == DiagnosticArgumentKind::Type) {
       auto argType = arg.getAsType();
-      if (argType && !argType->isEqual(type) &&
+      if (!argType)
+        continue;
+      // ASTPrinter looks through OpenedArchetypeTypes, so do the same here to
+      // avoid false positives indicating ambiguity.
+      if (auto openedArchetypeType = argType->getAs<OpenedArchetypeType>())
+        argType = openedArchetypeType->getOpenedExistentialType();
+      if (!argType->isEqual(type) &&
           argType->getWithoutParens().getString() == type.getString()) {
         return true;
       }
     }
   }
   return false;
+}
+
+static void formatTypeArgument(Type Ty,
+                               llvm::function_ref<bool(Type)> IsTypeAmbiguous,
+                               DiagnosticFormatOptions FormatOpts,
+                               llvm::raw_ostream &Out) {
+  // Strip extraneous parentheses; they add no value.
+  auto type = Ty->getWithoutParens();
+
+  // If a type has an unresolved type, print it with syntax sugar removed for
+  // clarity. For example, print `Array<_>` instead of `[_]`.
+  if (type->hasUnresolvedType()) {
+    type = type->getWithoutSyntaxSugar();
+  }
+
+  // FIXME: We shouldn't need to recursively walk the type twice to determine
+  // isAmbiguous and type->getString.
+  bool isAmbiguous = false;
+  type.transform([&isAmbiguous, IsTypeAmbiguous](Type Ty) {
+    isAmbiguous = isAmbiguous || IsTypeAmbiguous(Ty);
+    return Ty;
+  });
+  auto printOptions = PrintOptions();
+  printOptions.FullyQualifiedTypesIfAmbiguous = true;
+  printOptions.IsTypeAmbiguous = IsTypeAmbiguous;
+
+  if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
+    auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
+
+    llvm::SmallString<256> NamingDeclText;
+    llvm::raw_svector_ostream OutNaming(NamingDeclText);
+    auto namingDecl = opaqueTypeDecl->getNamingDecl();
+    if (namingDecl->getDeclContext()->isTypeContext()) {
+      auto selfTy = namingDecl->getDeclContext()->getSelfInterfaceType();
+      selfTy->print(OutNaming);
+      OutNaming << '.';
+    }
+    namingDecl->getFullName().printPretty(OutNaming);
+
+    auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
+
+    Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
+                        type->getString(printOptions).c_str(),
+                        Decl::getDescriptiveKindName(descriptiveKind).data(),
+                        NamingDeclText.c_str());
+
+  } else {
+    std::string typeName = type->getString(printOptions);
+
+    if (shouldShowAKA(type, typeName)) {
+      auto akaTypeName = type->getCanonicalType()->getString(printOptions);
+      Out << llvm::format(FormatOpts.AKAFormatString.c_str(), typeName.c_str(),
+                          akaTypeName.c_str());
+    } else {
+      Out << FormatOpts.OpeningQuotationMark << typeName
+          << FormatOpts.ClosingQuotationMark;
+    }
+  }
 }
 
 /// Format a single diagnostic argument and write it to the given
@@ -498,56 +563,31 @@ static void formatDiagnosticArgument(StringRef Modifier,
     Out << FormatOpts.ClosingQuotationMark;
     break;
 
-  case DiagnosticArgumentKind::Type: {
+  case DiagnosticArgumentKind::Type:
     assert(Modifier.empty() && "Improper modifier for Type argument");
-    
-    // Strip extraneous parentheses; they add no value.
-    auto type = Arg.getAsType()->getWithoutParens();
-
-    // If a type has an unresolved type, print it with syntax sugar removed for
-    // clarity. For example, print `Array<_>` instead of `[_]`.
-    if (type->hasUnresolvedType()) {
-      type = type->getWithoutSyntaxSugar();
-    }
-
-    bool isAmbiguous = typeSpellingIsAmbiguous(type, Args);
-
-    if (isAmbiguous && isa<OpaqueTypeArchetypeType>(type.getPointer())) {
-      auto opaqueTypeDecl = type->castTo<OpaqueTypeArchetypeType>()->getDecl();
-
-      llvm::SmallString<256> NamingDeclText;
-      llvm::raw_svector_ostream OutNaming(NamingDeclText);
-      auto namingDecl = opaqueTypeDecl->getNamingDecl();
-      if (namingDecl->getDeclContext()->isTypeContext()) {
-        auto selfTy = namingDecl->getDeclContext()->getSelfInterfaceType();
-        selfTy->print(OutNaming);
-        OutNaming << '.';
+    formatTypeArgument(
+        Arg.getAsType(),
+        [Args](Type Ty) { return typeSpellingIsAmbiguous(Ty, Args); },
+        FormatOpts, Out);
+    break;
+  case DiagnosticArgumentKind::TypeDescription: {
+    assert(Modifier.empty() &&
+           "Improper modifier for TypeDescription argument");
+    auto description = Arg.getAsTypeDescription();
+    auto isAmbiguous = [description](Type Ty) {
+      if (auto nominal = Ty->getAnyNominal()) {
+        UnqualifiedLookup lookup(nominal->getFullName(), description.DC,
+                                 description.Loc,
+                                 UnqualifiedLookup::Flags::TypeLookup);
+        // If the type found via unqualified lookup is different from the
+        // described type, there is ambiguity.
+        return !lookup.getSingleTypeResult()
+                    ->getDeclaredInterfaceType()
+                    ->isEqual(Ty);
       }
-      namingDecl->getFullName().printPretty(OutNaming);
-
-      auto descriptiveKind = opaqueTypeDecl->getDescriptiveKind();
-
-      Out << llvm::format(FormatOpts.OpaqueResultFormatString.c_str(),
-                          type->getString().c_str(),
-                          Decl::getDescriptiveKindName(descriptiveKind).data(),
-                          NamingDeclText.c_str());
-
-    } else {
-      auto printOptions = PrintOptions();
-      printOptions.FullyQualifiedTypes = isAmbiguous;
-      std::string typeName = type->getString(printOptions);
-
-      if (shouldShowAKA(type, typeName)) {
-        llvm::SmallString<256> AkaText;
-        llvm::raw_svector_ostream OutAka(AkaText);
-        OutAka << type->getCanonicalType();
-        Out << llvm::format(FormatOpts.AKAFormatString.c_str(),
-                            typeName.c_str(), AkaText.c_str());
-      } else {
-        Out << FormatOpts.OpeningQuotationMark << typeName
-            << FormatOpts.ClosingQuotationMark;
-      }
-    }
+      return false;
+    };
+    formatTypeArgument(description.Ty, isAmbiguous, FormatOpts, Out);
     break;
   }
   case DiagnosticArgumentKind::TypeRepr:

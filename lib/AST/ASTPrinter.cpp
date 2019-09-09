@@ -3512,7 +3512,7 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
 
     // If present, IsTypeAmbiguous overrides the other heuristics.
     if (Options.IsTypeAmbiguous)
-      return  Options.IsTypeAmbiguous(T);
+      return Options.IsTypeAmbiguous(T);
 
     Decl *D;
     if (auto *TAT = dyn_cast<TypeAliasType>(T))
