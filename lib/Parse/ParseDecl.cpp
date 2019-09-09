@@ -1235,11 +1235,18 @@ bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
   auto currentPosition = P.getParserPosition();
   bool canParseBaseType = P.canParseTypeIdentifier();
   P.backtrackToPosition(currentPosition);
-  if (canParseBaseType)
-    baseType = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true)
-                   .getPtrOrNull();
-  else
+  if (canParseBaseType) {
+    auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+    if (!result.isSuccess())
+      return true;
+
+    P.SyntaxContext->addSyntax(result.getResult());
+    auto node = P.SyntaxContext->topNode<TypeSyntax>();
+    auto baseNameLoc = original.Loc.getBaseNameLoc();
+    baseType = P.Generator.generate(node, baseNameLoc);
+  } else {
     baseType = nullptr;
+  }
   
   // If base type was parsed and has at least one component, then there was a
   // dot before the current token.
