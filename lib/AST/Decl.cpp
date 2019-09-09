@@ -5689,8 +5689,7 @@ ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
 /// If this is a simple 'let' constant, emit a note with a fixit indicating
 /// that it can be rewritten to a 'var'.  This is used in situations where the
 /// compiler detects obvious attempts to mutate a constant.
-void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC,
-                                       ValueDecl *Anchor) const {
+void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   // If it isn't a 'let', don't touch it.
   if (!isLet()) return;
 
@@ -5709,23 +5708,11 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC,
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
 
-        // Do not suggest the fix-it if we have an implicitly nonmutating
-        // setter in a protocol extension and we're assigning to a mutating
-        // protocol requirement.
-        if (Anchor && Anchor->isProtocolRequirement() && isa<VarDecl>(Anchor)) {
-          auto requirementVar = cast<VarDecl>(Anchor);
-          auto innermostTyCtx = AD->getInnermostTypeContext();
-          bool isRequirementSetterMutating = requirementVar->isSetterMutating();
-          bool isProtoExtension =
-              innermostTyCtx
-                  ? innermostTyCtx->getExtendedProtocolDecl() != nullptr
-                  : false;
-          bool isImplicitlyNonMutatingSetter =
-              AD->isSetter() && AD->isNonMutating() &&
-              !AD->getAttrs().hasAttribute<NonMutatingAttr>();
-          if (isRequirementSetterMutating && isProtoExtension &&
-              isImplicitlyNonMutatingSetter)
-            return;
+        // Do not suggest the fix-it if `Self` is a class type.
+        if (AD->getDeclContext()
+                ->getSelfTypeInContext()
+                ->isAnyClassReferenceType()) {
+          return;
         }
       }
 

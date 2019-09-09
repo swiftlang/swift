@@ -1468,18 +1468,9 @@ bool AssignmentFailure::diagnoseAsError() {
         }
       }
 
-      // If this is a simple variable marked with a 'let', emit a note to change
-      // it to 'var'.
-      //
-      // We also need a reference to the overload for the anchor, because it's
-      // possible that we're assigning to a mutating protocol property from an
-      // implicitly nonmutating setter in a protocol extension. In that case,
-      // we want to drop the fix-it to add 'mutating' as it's gonna re-trigger
-      // this error.
-      auto overload =
-          getConstraintSystem().findSelectedOverloadFor(getAnchor());
-      auto anchor = overload ? overload->Choice.getDeclOrNull() : nullptr;
-      VD->emitLetToVarNoteIfSimple(DC, anchor);
+      // If this is a simple variable marked with a 'let', emit a note to fixit
+      // hint it to 'var'.
+      VD->emitLetToVarNoteIfSimple(DC);
       return true;
     }
 

@@ -5131,8 +5131,7 @@ public:
   /// If this is a simple 'let' constant, emit a note with a fixit indicating
   /// that it can be rewritten to a 'var'.  This is used in situations where the
   /// compiler detects obvious attempts to mutate a constant.
-  void emitLetToVarNoteIfSimple(DeclContext *UseDC,
-                                ValueDecl *Anchor = nullptr) const;
+  void emitLetToVarNoteIfSimple(DeclContext *UseDC) const;
 
   /// Returns true if the name is the self identifier and is implicit.
   bool isSelfParameter() const;
