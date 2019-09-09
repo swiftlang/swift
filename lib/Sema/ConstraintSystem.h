@@ -3991,6 +3991,10 @@ Expr *getArgumentExpr(Expr *expr, unsigned index);
 /// associated with implicit `~=` (pattern-matching) operator
 bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
 
+/// Determine whether given expression is a reference to a
+/// pattern-matching operator `~=`
+bool isPatternMatchingOperator(Expr *expr);
+
 // Check whether argument of the call at given position refers to
 // parameter marked as `@autoclosure`. This function is used to
 // maintain source compatibility with Swift versions < 5,

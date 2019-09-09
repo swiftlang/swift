@@ -2899,6 +2899,24 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
 
+bool constraints::isPatternMatchingOperator(Expr *expr) {
+  ValueDecl *choice = nullptr;
+  if (auto *ODRE = dyn_cast_or_null<OverloadedDeclRefExpr>(expr)) {
+    choice = ODRE->getDecls().front();
+  } else if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(expr)) {
+    choice = DRE->getDecl();
+  } else {
+    return false;
+  }
+
+  if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice)) {
+    auto name = FD->getBaseName().userFacingName();
+    return name == "~=";
+  }
+
+  return false;
+}
+
 bool constraints::isArgumentOfPatternMatchingOperator(
     ConstraintLocator *locator) {
   Expr *anchor = nullptr;
@@ -2913,20 +2931,5 @@ bool constraints::isArgumentOfPatternMatchingOperator(
     return false;
 
   auto *fnExpr = binaryOp->getFn()->getSemanticsProvidingExpr();
-
-  ValueDecl *choice = nullptr;
-  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-    choice = ODRE->getDecls().front();
-  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
-    choice = DRE->getDecl();
-  } else {
-    return false;
-  }
-
-  if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice)) {
-    auto name = FD->getBaseName().userFacingName();
-    return name == "~=";
-  }
-
-  return false;
+  return isPatternMatchingOperator(fnExpr);
 }

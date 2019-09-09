@@ -548,6 +548,31 @@ bool MissingConformanceFailure::diagnoseAsError() {
     return arg;
   };
 
+  // If this is a requirement of a pattern-matching operator,
+  // let's see whether argument is already has a fix associated
+  // with it and if so skip conformance error, otherwise we'd
+  // produce an unrelated `<type> doesn't conform to Equatable protocol`
+  // diagnostic.
+  if (isPatternMatchingOperator(anchor)) {
+    if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(anchor))) {
+      auto *caseExpr = binaryOp->getArg()->getElement(0);
+
+      auto &cs = getConstraintSystem();
+      llvm::SmallPtrSet<Expr *, 4> anchors;
+      for (const auto *fix : cs.getFixes())
+        anchors.insert(fix->getAnchor());
+
+      bool hasFix = false;
+      caseExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
+        hasFix |= anchors.count(expr);
+        return hasFix ? nullptr : expr;
+      });
+
+      if (hasFix)
+        return false;
+    }
+  }
+
   Optional<unsigned> atParameterPos;
   // Sometimes fix is recorded by type-checking sub-expression
   // during normal diagnostics, in such case call expression
