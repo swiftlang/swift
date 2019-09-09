@@ -414,7 +414,7 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
 }
 
 ConstraintLocator *
-ConstraintSystem::getAnchormostCalleeLocator(ConstraintLocator *locator) {
+ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
   auto *anchor = locator->getAnchor();
   assert(anchor && "Expected an anchor!");
 
@@ -2497,7 +2497,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     const auto *fix = fixes.front();
-    auto *calleeLocator = getAnchormostCalleeLocator(fix->getLocator());
+    auto *calleeLocator = getCalleeLocator(fix->getLocator());
     if (commonCalleeLocator && commonCalleeLocator != calleeLocator)
       return false;
 
@@ -2875,7 +2875,7 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
     return getConstraintLocator(fnExpr);
   }
 
-  return getAnchormostCalleeLocator(locator);
+  return getCalleeLocator(locator);
 }
 
 Optional<ConstraintSystem::ArgumentInfo>

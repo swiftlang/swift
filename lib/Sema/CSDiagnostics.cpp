@@ -121,14 +121,10 @@ Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
   return nullptr;
 }
 
-Optional<SelectedOverload> FailureDiagnostic::getAnchormostChoice() const {
-  return getAnchormostChoiceFor(getLocator());
-}
-
 Optional<SelectedOverload>
-FailureDiagnostic::getAnchormostChoiceFor(ConstraintLocator *locator) const {
+FailureDiagnostic::getChoiceFor(ConstraintLocator *locator) const {
   auto &cs = getConstraintSystem();
-  return getOverloadChoiceIfAvailable(cs.getAnchormostCalleeLocator(locator));
+  return getOverloadChoiceIfAvailable(cs.getCalleeLocator(locator));
 }
 
 Type FailureDiagnostic::resolveInterfaceType(Type type,
@@ -163,8 +159,7 @@ Type FailureDiagnostic::resolveInterfaceType(Type type,
 }
 
 /// Given an apply expr, returns true if it is expected to have a direct callee
-/// overload, resolvable using `getAnchormostChoiceFor`. Otherwise, returns
-/// false.
+/// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
 static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
   auto *fnExpr = callExpr->getDirectCallee();
 
@@ -226,7 +221,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
 
   ValueDecl *callee = nullptr;
   Type rawFnType;
-  if (auto overload = getAnchormostChoiceFor(argLocator)) {
+  if (auto overload = getChoiceFor(argLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
     callee = overload->choice.getDeclOrNull();
@@ -380,7 +375,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   if (isFromContextualType())
     return getAffectedDeclFromType(cs.getContextualType());
 
-  if (auto overload = getAnchormostChoice()) {
+  if (auto overload = getChoiceFor(getLocator())) {
     // If there is a declaration associated with this
     // failure e.g. an overload choice of the call
     // expression, let's see whether failure is
@@ -752,7 +747,7 @@ bool LabelingFailure::diagnoseAsNote() {
     return "(" + str + ")";
   };
 
-  auto selectedOverload = getAnchormostChoice();
+  auto selectedOverload = getChoiceFor(getLocator());
   if (!selectedOverload)
     return false;
 
@@ -3127,7 +3122,7 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
       };
 
       auto *baseLoc = cs.getConstraintLocator(ctorRef->getBase());
-      if (auto selection = getAnchormostChoiceFor(baseLoc)) {
+      if (auto selection = getChoiceFor(baseLoc)) {
         OverloadChoice choice = selection->choice;
         if (choice.isDecl() && isMutable(choice.getDecl()) &&
             !isCallArgument(initCall) &&
@@ -4287,7 +4282,7 @@ bool MutatingMemberRefOnImmutableBase::diagnoseAsError() {
 }
 
 bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
-  auto selectedOverload = getAnchormostChoice();
+  auto selectedOverload = getChoiceFor(getLocator());
   if (!selectedOverload || !selectedOverload->choice.isDecl())
     return false;
 

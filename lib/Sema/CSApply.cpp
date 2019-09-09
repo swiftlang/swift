@@ -4247,7 +4247,7 @@ namespace {
         // Adjust the locator such that it includes any additional elements to
         // point to the component's callee, e.g a SubscriptMember for a
         // subscript component.
-        locator = cs.getAnchormostCalleeLocator(locator);
+        locator = cs.getCalleeLocator(locator);
 
         bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.

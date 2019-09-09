@@ -3023,8 +3023,8 @@ namespace {
         }
 
         case KeyPathExpr::Component::Kind::TupleElement: {
-          // Note: If implemented, the logic in `getAnchormostCalleeLocator`
-          // will need updating to return the correct callee locator for this.
+          // Note: If implemented, the logic in `getCalleeLocator` will need
+          // updating to return the correct callee locator for this.
           llvm_unreachable("not implemented");
           break;
         }

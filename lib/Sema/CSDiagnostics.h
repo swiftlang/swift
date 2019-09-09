@@ -177,12 +177,8 @@ protected:
   Expr *getArgumentExprFor(Expr *anchor) const;
 
   /// \returns The overload choice made by the constraint system for the callee
-  /// of this failure's raw anchor, or \c None if no such choice can be found.
-  Optional<SelectedOverload> getAnchormostChoice() const;
-
-  /// \returns The overload choice made by the constraint system for the callee
   /// of a given locator's anchor, or \c None if no such choice can be found.
-  Optional<SelectedOverload> getAnchormostChoiceFor(ConstraintLocator *) const;
+  Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the

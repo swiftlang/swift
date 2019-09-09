@@ -2023,7 +2023,12 @@ public:
   /// - For a function application anchor, this will be a locator describing the
   /// 'direct callee' of the call. For example, for the expression \c x.foo?()
   /// the returned locator will describe the member \c foo.
-  ConstraintLocator *getAnchormostCalleeLocator(ConstraintLocator *locator);
+  ///
+  /// Note that because this function deals with the anchor, given a locator
+  /// anchored on \c functionA(functionB()) with path elements pointing to the
+  /// argument \c functionB(), the returned callee locator will describe
+  /// \c functionA rather than \c functionB.
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator);
 
 public:
 
