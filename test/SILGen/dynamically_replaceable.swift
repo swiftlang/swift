@@ -384,7 +384,7 @@ dynamic func funcWithDefaultArg(_ arg : String = String("hello")) {
 func foobar() {
 }
 
-// IMPLICIT-LABEL: sil private [ossa] @$s23dynamically_replaceable6$deferL_yyF
+// IMPLICIT-LABEL: sil private [transparent] [ossa] @$s23dynamically_replaceable6$deferL_yyF
 var x = 10
 defer {
   let y = x

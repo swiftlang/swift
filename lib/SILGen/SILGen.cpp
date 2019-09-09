@@ -721,6 +721,14 @@ void SILGenModule::preEmitFunction(SILDeclRef constant,
   if (F->getLoweredFunctionType()->isPolymorphic())
     F->setGenericEnvironment(Types.getConstantGenericEnvironment(constant));
 
+  if (constant.hasFuncDecl()) {
+    if (auto function = constant.getFuncDecl()) {
+      if (function->isDeferBody()) {
+        F->setTransparent(IsTransparent);
+      }
+    }
+  }
+
   // Create a debug scope for the function using astNode as source location.
   F->setDebugScope(new (M) SILDebugScope(Loc, F));
 

@@ -458,10 +458,10 @@ func defer_test1() {
   // CHECK: [[C1:%.*]] = function_ref @$s10statements11defer_test1yyF6
   // CHECK: apply [[C1]]
 }
-// CHECK: sil private [ossa] @$s10statements11defer_test1yyF6
+// CHECK: sil private [transparent] [ossa] @$s10statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee1yyF
 
-// CHECK: sil private [ossa] @$s10statements11defer_test1yyF6
+// CHECK: sil private [transparent] [ossa] @$s10statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee2yyF
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements11defer_test2yySbF
@@ -517,7 +517,7 @@ func defer_in_generic<T>(_ x: T) {
 func defer_in_closure_in_generic<T>(_ x: T) {
   // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
   _ = {
-    // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
+    // CHECK-LABEL: sil private [transparent] [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
     defer { generic_callee_1(T.self) } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
   }
 }
@@ -541,6 +541,21 @@ func testDeferOpenExistential(_ b: Bool, type: StaticFooProtocol.Type) {
   if b { return }
   return
 }
+
+// CHECK-LABEL: sil hidden [ossa] @$s10statements14testDeferNeveryyF 
+// CHECK: [[DEFER_REF:%.*]] = function_ref @$s10statements14testDeferNeveryyF6$deferL_yyF
+// CHECK: {{%.*}} = apply [[DEFER_REF]]()
+// CHECK: } // end sil function '$s10statements14testDeferNeveryyF'
+// CHECK: sil private [transparent] [ossa] @$s10statements14testDeferNeveryyF6$deferL_yyF
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @$s10statements9exitEarlys5NeverOyF
+// CHECK: {{%.*}} = apply [[FUNCTION_REF]]()
+// CHECK: } // end sil function '$s10statements14testDeferNeveryyF6$deferL_yyF'
+func testDeferNever() {
+  defer { exitEarly() } // expected-warning {{'defer' statement at end of scope always executes immediately; replace with 'do' statement to silence this warning}}
+} // end function 'testDeferNever'
+
+func exitEarly() -> Never { fatalError() } 
+
 
 
 
