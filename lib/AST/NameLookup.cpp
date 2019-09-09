@@ -1130,7 +1130,7 @@ void ExtensionDecl::addedMember(Decl *member) {
 static bool
 populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
                                           MemberLookupTable &LookupTable,
-                                          DeclName name,
+                                          DeclBaseName name,
                                           IterableDeclContext *IDC) {
   if (IDC->isLoadingLazyMembers()) {
     return false;
@@ -1138,8 +1138,7 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   IDC->setLoadingLazyMembers(true);
   auto ci = ctx.getOrCreateLazyIterableContextData(IDC,
                                                    /*lazyLoader=*/nullptr);
-  if (auto res = ci->loader->loadNamedMembers(IDC, name.getBaseName(),
-                                              ci->memberData)) {
+  if (auto res = ci->loader->loadNamedMembers(IDC, name, ci->memberData)) {
     IDC->setLoadingLazyMembers(false);
     if (auto s = ctx.Stats) {
       ++s->getFrontendCounters().NamedLazyMemberLoadSuccessCount;
@@ -1158,11 +1157,11 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
 }
 
 static void populateLookupTableEntryFromCurrentMembers(
-    ASTContext &ctx, MemberLookupTable &LookupTable, DeclName name,
+    ASTContext &ctx, MemberLookupTable &LookupTable, DeclBaseName name,
     IterableDeclContext *IDC) {
   for (auto m : IDC->getMembers()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
-      if (v->getFullName().matchesRef(name.getBaseName())) {
+      if (v->getBaseName() == name) {
         LookupTable.addMember(m);
       }
     }
@@ -1173,7 +1172,7 @@ static void
 populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
                                        NominalTypeDecl *nominal,
-                                       DeclName name) {
+                                       DeclBaseName name) {
   for (auto e : nominal->getExtensions()) {
     if (e->wasDeserialized() || e->hasClangNode()) {
       assert(!e->hasUnparsedMembers());
@@ -1213,7 +1212,7 @@ void NominalTypeDecl::prepareLookupTable() {
       setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getCurrentMembersWithoutLoading());
 
-      llvm::SetVector<DeclName> baseNamesPresent;
+      llvm::SetVector<DeclBaseName> baseNamesPresent;
       for (auto entry : *LookupTable.getPointer()) {
         baseNamesPresent.insert(entry.getFirst().getBaseName());
       }
@@ -1345,10 +1344,11 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // false, and we fall back to loading all members during the retry.
     auto &Table = *LookupTable.getPointer();
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this)) {
+                                                  name.getBaseName(), this)) {
       useNamedLazyMemberLoading = false;
     } else {
-      populateLookupTableEntryFromExtensions(ctx, Table, this, name);
+      populateLookupTableEntryFromExtensions(ctx, Table, this,
+                                             name.getBaseName());
     }
   }
 
