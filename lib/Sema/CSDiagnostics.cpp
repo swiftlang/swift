@@ -2422,9 +2422,10 @@ bool ContextualFailure::tryTypeCoercionFixIt(
                     Kind == CheckedCastKind::BridgingCoercion;
     if (bothOptional && canUseAs)
       toType = OptionalType::get(toType);
-    diagnostic.fixItInsert(Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
-                                                      anchor->getEndLoc()),
-                           diag::insert_type_coercion, canUseAs, toType);
+    auto fixItLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                               anchor->getEndLoc());
+    diagnostic.fixItInsert(fixItLoc, diag::insert_type_coercion, canUseAs,
+                           TypeDescription(toType, getDC(), fixItLoc));
     return true;
   }
 
