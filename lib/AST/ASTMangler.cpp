@@ -735,7 +735,9 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
   if (canSymbolicReference(opaqueDecl)) {
     appendSymbolicReference(opaqueDecl);
   } else if (auto namingDecl = opaqueDecl->getNamingDecl()) {
+    CanGenericSignature savedSignature = CurGenericSignature;
     appendEntity(namingDecl);
+    CurGenericSignature = savedSignature;
     appendOperator("QO");
   } else {
     llvm_unreachable("todo: independent opaque type decls");
