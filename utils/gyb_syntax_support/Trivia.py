@@ -4,7 +4,8 @@ from kinds import lowercase_first_word  # noqa: I201
 
 class Trivia(object):
     def __init__(self, name, comment, serialization_code, characters=[],
-                 swift_characters=[], is_new_line=False, is_comment=False):
+                 swift_characters=[], is_new_line=False, is_comment=False,
+                 deprecated=None):
         self.name = name
         self.comment = comment
         self.serialization_code = serialization_code
@@ -12,6 +13,7 @@ class Trivia(object):
         self.lower_name = lowercase_first_word(name)
         self.is_new_line = is_new_line
         self.is_comment = is_comment
+        self.deprecated = deprecated
 
         # Swift sometimes doesn't support escaped characters like \f or \v;
         # we should allow specifying alternatives explicitly.
@@ -43,9 +45,11 @@ TRIVIAS = [
     Trivia('CarriageReturnLineFeed',
            'A newline consists of contiguous \'\\r\' and \'\\n\' characters.',
            characters=['\\r', '\\n'], is_new_line=True, serialization_code=6),
+    # TODO: Romove 'Backtick' when all known clients are migrated.
     Trivia('Backtick',
            'A backtick \'`\' character, used to escape identifiers.',
-           characters=['`'], serialization_code=7),
+           characters=['`'], serialization_code=7,
+           deprecated="backticks are now part of the token text"),
     Trivia('LineComment', 'A developer line comment, starting with \'//\'',
            is_comment=True, serialization_code=8),
     Trivia('BlockComment',

@@ -141,7 +141,7 @@ public:
     case DataKind::DeferredLayout:
       return getDeferredLayoutRange();
     case DataKind::DeferredToken:
-      return getDeferredTokenRangeWithoutBackticks();
+      return getDeferredTokenRange();
     default:
       llvm_unreachable("node not deferred");
     }
@@ -194,7 +194,7 @@ public:
 
     return CharSourceRange{begin, len};
   }
-  CharSourceRange getDeferredTokenRangeWithoutBackticks() const {
+  CharSourceRange getDeferredTokenRange() const {
     assert(DK == DataKind::DeferredToken);
     return CharSourceRange{DeferredToken.TokLoc, DeferredToken.TokLength};
   }
