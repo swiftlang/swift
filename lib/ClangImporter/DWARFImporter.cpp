@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
 
 using namespace swift;
@@ -20,7 +21,6 @@ void DWARFImporterDelegate::anchor() {}
 /// Represents a Clang module that was "imported" from debug info. Since all the
 /// loading of types is done on demand, this class is effectively empty.
 class DWARFModuleUnit final : public LoadedFile {
-  ~DWARFModuleUnit() = default;
   ClangImporter::Implementation &Owner;
 
 public:
@@ -96,6 +96,9 @@ public:
   }
 };
 
+static_assert(IsTriviallyDestructible<DWARFModuleUnit>::value,
+              "DWARFModuleUnits are BumpPtrAllocated; the d'tor is not called");
+
 ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
     SourceLoc importLoc, ArrayRef<std::pair<Identifier, SourceLoc>> path) {
   // There's no importing from debug info if no importer is installed.
@@ -116,7 +119,7 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   decl->addFile(*wrapperUnit);
 
   // Force load overlay modules for all imported modules.
-  decl->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
+  (void) namelookup::getAllImports(decl);
 
   // Register the module with the ASTContext so it is available for lookups.
   ModuleDecl *&loaded = SwiftContext.LoadedModules[name];

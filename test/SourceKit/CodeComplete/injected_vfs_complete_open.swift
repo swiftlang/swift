@@ -42,7 +42,6 @@ func foo(
 // RUN:   == -req=complete.update -pos=9:1 -req-opts=filtertext=StructDefinedInSameTarget %s | %FileCheck --check-prefix=INNER_SAMETARGET %s
 // INNER_SAMETARGET: key.name: "StructDefinedInSameTarget"
 // INNER_SAMETARGET: key.name: "StructDefinedInSameTarget."
-// INNER_SAMETARGET: key.name: "StructDefinedInSameTarget("
 
 // RUN: %sourcekitd-test -req=complete.open -pos=9:1 -req-opts=filtertext=StructDefinedInCModule -vfs-files=/target_file2.swift=@%S/../Inputs/vfs/other_file_in_target.swift,/CModule/module.modulemap=%S/../Inputs/vfs/CModule/module.modulemap,/CModule/CModule.h=%S/../Inputs/vfs/CModule/CModule.h,/SwiftModule/SwiftModule.swiftmodule=%t/SwiftModule.swiftmodule %s -pass-as-sourcetext -- %s /target_file2.swift -I /CModule -I /SwiftModule -target %target-triple | %FileCheck --check-prefix=INNER_CMODULE %s
 // RUN: %sourcekitd-test -req=complete.open -pos=9:1 -dont-print-response -vfs-files=/target_file2.swift=@%S/../Inputs/vfs/other_file_in_target.swift,/CModule/module.modulemap=%S/../Inputs/vfs/CModule/module.modulemap,/CModule/CModule.h=%S/../Inputs/vfs/CModule/CModule.h,/SwiftModule/SwiftModule.swiftmodule=%t/SwiftModule.swiftmodule %s -pass-as-sourcetext -- %s /target_file2.swift -I /CModule -I /SwiftModule -target %target-triple \

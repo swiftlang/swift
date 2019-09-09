@@ -18,6 +18,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
 #include "swift/Demangling/Demangle.h"
@@ -396,7 +397,8 @@ namespace {
     bool parseSILOwnership(ValueOwnershipKind &OwnershipKind) {
       // We parse here @ <identifier>.
       if (!P.consumeIf(tok::at_sign)) {
-        // If we fail, we must have @any ownership.
+        // If we fail, we must have @any ownership. We check elsewhere in the
+        // parser that this matches what the function signature wants.
         OwnershipKind = ValueOwnershipKind::Any;
         return false;
       }
@@ -1264,14 +1266,19 @@ bool SILParser::performTypeLocChecking(TypeLoc &T, bool IsSILType,
 
 /// Find the top-level ValueDecl or Module given a name.
 static llvm::PointerUnion<ValueDecl *, ModuleDecl *>
-lookupTopDecl(Parser &P, DeclBaseName Name) {
+lookupTopDecl(Parser &P, DeclBaseName Name, bool typeLookup) {
   // Use UnqualifiedLookup to look through all of the imports.
   // We have to lie and say we're done with parsing to make this happen.
   assert(P.SF.ASTStage == SourceFile::Parsing &&
          "Unexpected stage during parsing!");
   llvm::SaveAndRestore<SourceFile::ASTStage_t> ASTStage(P.SF.ASTStage,
                                                         SourceFile::Parsed);
-  UnqualifiedLookup DeclLookup(Name, &P.SF);
+
+  UnqualifiedLookup::Options options;
+  if (typeLookup)
+    options |= UnqualifiedLookup::Flags::TypeLookup;
+
+  UnqualifiedLookup DeclLookup(Name, &P.SF, SourceLoc(), options);
   assert(DeclLookup.isSuccess() && DeclLookup.Results.size() == 1);
   ValueDecl *VD = DeclLookup.Results.back().getValueDecl();
   return VD;
@@ -1343,7 +1350,7 @@ bool SILParser::parseSILType(SILType &Result,
   SILValueCategory category = SILValueCategory::Object;
   if (P.Tok.isAnyOperator() && P.Tok.getText().startswith("*")) {
     category = SILValueCategory::Address;
-    P.consumeStartingCharacterOfCurrentToken();
+    P.consumeStartingCharacterOfCurrentToken(tok::oper_binary_unspaced);
   }
 
   // Parse attributes.
@@ -1452,9 +1459,11 @@ bool SILParser::parseSILDottedPathWithoutPound(ValueDecl *&Decl,
     }
   } while (P.consumeIf(tok::period));
 
-  // Look up ValueDecl from a dotted path.
+  // Look up ValueDecl from a dotted path. If there are multiple components,
+  // the first one must be a type declaration.
   ValueDecl *VD;
-  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(P, FullName[0]);
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(
+    P, FullName[0], /*typeLookup=*/FullName.size() > 1);
   // It is possible that the last member lookup can return multiple lookup
   // results. One example is the overloaded member functions.
   if (Res.is<ModuleDecl*>()) {
@@ -3237,6 +3246,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     REFCOUNTING_INSTRUCTION(RetainValue)
     REFCOUNTING_INSTRUCTION(ReleaseValueAddr)
     REFCOUNTING_INSTRUCTION(RetainValueAddr)
+#define UNCHECKED_REF_STORAGE(Name, ...) UNARY_INSTRUCTION(Copy##Name##Value)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     REFCOUNTING_INSTRUCTION(StrongRetain##Name) \
     REFCOUNTING_INSTRUCTION(Name##Retain) \
@@ -5619,6 +5629,18 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
         SILArgument *Arg;
         if (IsEntry) {
           Arg = BB->createFunctionArgument(Ty);
+          // Today, we construct the ownership kind straight from the function
+          // type. Make sure they are in sync, otherwise bail. We want this to
+          // be an exact check rather than a compatibility check since we do not
+          // want incompatibilities in between @any and other types of ownership
+          // to be ignored.
+          if (F->hasOwnership() && Arg->getOwnershipKind() != OwnershipKind) {
+            auto diagID =
+                diag::silfunc_and_silarg_have_incompatible_sil_value_ownership;
+            P.diagnose(NameLoc, diagID, Arg->getOwnershipKind().asString(),
+                       OwnershipKind.asString());
+            return true;
+          }
         } else {
           Arg = BB->createPhiArgument(Ty, OwnershipKind);
         }
@@ -5765,12 +5787,19 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
 
       if (GenericEnv && !SpecAttrs.empty()) {
         for (auto &Attr : SpecAttrs) {
-          SmallVector<Requirement, 4> requirements;
+          SmallVector<Requirement, 2> requirements;
           // Resolve types and convert requirements.
           FunctionState.convertRequirements(FunctionState.F,
                                             Attr.requirements, requirements);
+          GenericSignature *genericSig = evaluateOrDefault(
+              P.Context.evaluator,
+              AbstractGenericSignatureRequest{
+                FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+                /*addedGenericParams=*/{ },
+                std::move(requirements)},
+                nullptr);
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
-              FunctionState.F->getModule(), requirements, Attr.exported,
+              FunctionState.F->getModule(), genericSig, Attr.exported,
               Attr.kind));
         }
       }
@@ -6069,7 +6098,8 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
     return true;
 
   // Find the class decl.
-  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(P, Name);
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
+    lookupTopDecl(P, Name, /*typeLookup=*/true);
   assert(Res.is<ValueDecl*>() && "Class look-up should return a Decl");
   ValueDecl *VD = Res.get<ValueDecl*>();
   if (!VD) {
@@ -6156,7 +6186,8 @@ static ProtocolDecl *parseProtocolDecl(Parser &P, SILParser &SP) {
     return nullptr;
 
   // Find the protocol decl. The protocol can be imported.
-  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res = lookupTopDecl(P, DeclName);
+  llvm::PointerUnion<ValueDecl*, ModuleDecl *> Res =
+    lookupTopDecl(P, DeclName, /*typeLookup=*/true);
   assert(Res.is<ValueDecl*>() && "Protocol look-up should return a Decl");
   ValueDecl *VD = Res.get<ValueDecl*>();
   if (!VD) {

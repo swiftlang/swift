@@ -18,6 +18,7 @@ add_swift_host_library(swiftParse STATIC
   ParseIfConfig.cpp
   ParsePattern.cpp
   Parser.cpp
+  ParseRequests.cpp
   ParseStmt.cpp
   ParseType.cpp
   PersistentParserState.cpp

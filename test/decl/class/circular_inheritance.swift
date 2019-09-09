@@ -59,6 +59,7 @@ class Outer3 // expected-error {{circular reference}}
 protocol Initable {
   init()
   // expected-note@-1 {{protocol requires initializer 'init()' with type '()'; do you want to add a stub?}}
+  // expected-note@-2 {{did you mean 'init'?}}
 }
 
 protocol Shape : Circle {}

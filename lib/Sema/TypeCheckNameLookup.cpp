@@ -74,7 +74,6 @@ namespace {
     LookupResult &Result;
     DeclContext *DC;
     NameLookupOptions Options;
-    bool IsMemberLookup;
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
@@ -86,53 +85,20 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        NameLookupOptions options,
-                        bool isMemberLookup)
-      : Result(result), DC(dc), Options(options),
-        IsMemberLookup(isMemberLookup) {
+                        NameLookupOptions options)
+      : Result(result), DC(dc), Options(options) {
       if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
-    /// Determine whether we should filter out the results by removing
-    /// overridden and shadowed declarations.
-    /// FIXME: We should *always* do this, but there are weird assumptions
-    /// about the results of unqualified name lookup, e.g., that a local
-    /// variable not having a type indicates that it hasn't been seen yet.
-    bool shouldFilterResults() const {
-      // Member lookups always filter results.
-      if (IsMemberLookup) return true;
-
-      bool allAreInOtherModules = true;
-      auto currentModule = DC->getParentModule();
-      for (const auto &found : Result) {
-        // We found a member, so we need to filter.
-        if (found.getBaseDecl() != nullptr)
-          return true;
-
-        // We found something in our own module.
-        if (found.getValueDecl()->getDeclContext()->getParentModule() ==
-              currentModule)
-          allAreInOtherModules = false;
-      }
-
-      // FIXME: Only perform shadowing if we found things from other modules.
-      // This prevents us from introducing additional type-checking work
-      // during name lookup.
-      return allAreInOtherModules;
-    }
-
     ~LookupResultBuilder() {
-      // Check whether we should do this filtering aat all.
-      if (!shouldFilterResults()) return;
-
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
       removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      removeShadowedDecls(FoundDecls, DC->getParentModule());
-      removeShadowedDecls(FoundOuterDecls, DC->getParentModule());
+      removeShadowedDecls(FoundDecls, DC);
+      removeShadowedDecls(FoundOuterDecls, DC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.
@@ -305,7 +271,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                            convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
-  LookupResultBuilder builder(result, dc, options, /*memberLookup*/false);
+  LookupResultBuilder builder(result, dc, options);
   for (auto idx : indices(lookup.Results)) {
     const auto &found = lookup.Results[idx];
     // Determine which type we looked through to find this result.
@@ -381,8 +347,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
 
-  LookupResultBuilder builder(result, dc, options,
-                              /*memberLookup*/true);
+  LookupResultBuilder builder(result, dc, options);
   SmallVector<ValueDecl *, 4> lookupResults;
   dc->lookupQualified(type, name, subOptions, lookupResults);
 

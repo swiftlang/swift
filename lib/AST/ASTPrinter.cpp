@@ -118,9 +118,13 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->hasInlinableBodyText()) return;
+    if (!AFD)
+      return;
     if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
       return;
+    if (!AFD->hasInlinableBodyText())
+      return;
+
     SmallString<128> scratch;
     printer << " " << AFD->getInlinableBodyText(scratch);
   };
@@ -672,8 +676,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap,
-                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
+      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printTypeWithOptions(T, options);
@@ -1447,10 +1450,12 @@ void PrintAST::printSingleDepthOfGenericSignature(
         second = req.getSecondType();
 
       if (!subMap.empty()) {
-        if (Type subFirst = substParam(first))
+        Type subFirst = substParam(first);
+        if (!subFirst->hasError())
           first = subFirst;
         if (second) {
-          if (Type subSecond = substParam(second))
+          Type subSecond = substParam(second);
+          if (!subSecond->hasError())
             second = subSecond;
           if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
               !(second->is<ArchetypeType>() || second->isTypeParameter()))
@@ -2106,9 +2111,15 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      if (!extendedType || !extendedType->getAnyNominal()) {
+      if (!extendedType) {
         // Fallback to TypeRepr.
-        printTypeLoc(decl->getExtendedTypeLoc());
+        printTypeLoc(decl->getExtendedTypeRepr());
+        return;
+      }
+      if (!extendedType->getAnyNominal()) {
+        // Fallback to the type.  This usually means we're trying to print an
+        // UnboundGenericType.
+        printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
       printExtendedTypeName(extendedType, Printer, Options);

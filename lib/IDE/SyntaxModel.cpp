@@ -781,7 +781,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Kind = SyntaxStructureKind::Extension;
     SN.Range = charSourceRangeFromSourceRange(SM, ED->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, ED->getBraces());
-    SourceRange NSR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange NSR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      NSR = repr->getSourceRange();
     SN.NameRange = charSourceRangeFromSourceRange(SM, NSR);
 
     for (const TypeLoc &TL : ED->getInherited()) {

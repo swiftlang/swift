@@ -236,7 +236,7 @@ function(_compile_swift_files
     if(NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlow" AND
        NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "DifferentiationUnittest")
       list(APPEND swift_flags "-enable-library-evolution")
-      list(APPEND swift_flags "-Xfrontend" "-enable-resilience")
+      list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
     endif()
   endif()
 

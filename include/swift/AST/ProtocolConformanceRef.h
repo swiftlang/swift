@@ -102,13 +102,14 @@ public:
   
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
-                               SubstitutionMap subMap) const;
+                               SubstitutionMap subMap,
+                               SubstOptions options=None) const;
 
   /// Apply a substitution to the conforming type.
   ProtocolConformanceRef subst(Type origType,
                                TypeSubstitutionFn subs,
                                LookupConformanceFn conformances,
-                               SubstOptions options = None) const;
+                               SubstOptions options=None) const;
 
   /// Map contextual types to interface types in the conformance.
   ProtocolConformanceRef mapConformanceOutOfContext() const;

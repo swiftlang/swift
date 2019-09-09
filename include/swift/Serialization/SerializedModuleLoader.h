@@ -42,8 +42,10 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
+  ArrayRef<std::string> PreferInterfaceForModules;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
-                             ModuleLoadingMode LoadMode);
+                             ModuleLoadingMode LoadMode,
+                             ArrayRef<std::string> PreferInterfaceForModules = {});
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
@@ -251,13 +253,7 @@ class SerializedASTFile final : public LoadedFile {
 
   ModuleFile &File;
 
-  /// The parseable interface this module was generated from if any.
-  /// Used for debug info.
-  std::string ParseableInterface;
-
   bool IsSIB;
-
-  ~SerializedASTFile() = default;
 
   SerializedASTFile(ModuleDecl &M, ModuleFile &file, bool isSIB = false)
     : LoadedFile(FileUnitKind::SerializedAST, M), File(file), IsSIB(isSIB) {}
@@ -277,6 +273,9 @@ public:
   virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
                            DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
+
+  virtual StringRef
+  getFilenameForPrivateDecl(const ValueDecl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
   
@@ -351,13 +350,6 @@ public:
 
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
-  /// If this is a module imported from a parseable interface, return the path
-  /// to the interface file, otherwise an empty StringRef.
-  virtual StringRef getParseableInterface() const override {
-    return ParseableInterface;
-  }
-  void setParseableInterface(StringRef PI) { ParseableInterface = PI; }
-  
   virtual bool getAllGenericSignatures(
                    SmallVectorImpl<GenericSignature*> &genericSignatures)
                 override;

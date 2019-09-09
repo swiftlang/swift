@@ -510,66 +510,6 @@ public func %=(lhs: inout CGFloat, rhs: CGFloat) {
 }
 
 //===----------------------------------------------------------------------===//
-// Real conformance
-//===----------------------------------------------------------------------===//
-
-%from SwiftMathFunctions import *
-
-extension CGFloat: ElementaryFunctions {
-% for func in ElementaryFunctions + RealFunctions:
-
-  @_alwaysEmitIntoClient
-  public static func ${func.decl('CGFloat')} {
-    return CGFloat(NativeType.${func.swiftName}(${func.params("", ".native")}))
-  }
-% end
-
-  @_alwaysEmitIntoClient
-  public static func pow(_ x: CGFloat, _ y: CGFloat) -> CGFloat {
-    guard x >= 0 else { return .nan }
-    return CGFloat(NativeType.pow(x.native, y.native))
-  }
-
-  @_alwaysEmitIntoClient
-  public static func pow(_ x: CGFloat, _ n: Int) -> CGFloat {
-    // TODO: this implementation isn't quite right for n so large that
-    // the conversion to `CGFloat` rounds. We could also consider using
-    // a multiply-chain implementation for small `n`; this would be faster
-    // for static `n`, but less accurate on platforms with a good `pow`
-    // implementation.
-    return CGFloat(NativeType.pow(x.native, n))
-  }
-
-  @_alwaysEmitIntoClient
-  public static func root(_ x: CGFloat, _ n: Int) -> CGFloat {
-    guard x >= 0 || n % 2 != 0 else { return .nan }
-    // TODO: this implementation isn't quite right for n so large that
-    // the conversion to `CGFloat` rounds.
-    return CGFloat(NativeType.root(x.native, n))
-  }
-
-  @_alwaysEmitIntoClient
-  public static func atan2(y: CGFloat, x: CGFloat) -> CGFloat {
-    return CGFloat(NativeType.atan2(y: y.native, x: x.native))
-  }
-
-  @_alwaysEmitIntoClient
-  public static func logGamma(_ x: CGFloat) -> CGFloat {
-    return CGFloat(NativeType.logGamma(x.native))
-  }
-
-  @_alwaysEmitIntoClient
-  public static func signGamma(_ x: CGFloat) -> FloatingPointSign {
-    if x >= 0 { return .plus }
-    let trunc = x.rounded(.towardZero)
-    if x == trunc { return .plus }
-    let halfTrunc = trunc/2
-    if halfTrunc == halfTrunc.rounded(.towardZero) { return .minus }
-    return .plus
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // tgmath
 //===----------------------------------------------------------------------===//
 
@@ -589,18 +529,10 @@ BinaryFunctions = [
 }%
 
 %for ufunc in UnaryFunctions:
-% if ufunc in ['rint','nearbyint']:
-@available(swift, deprecated: 5.1, message: "Swift does not model dynamic rounding modes, use x.rounded(.toNearestOrEven) instead.")
-@_transparent
-public func ${ufunc}(_ x: CGFloat) -> CGFloat {
-  return x.rounded(.toNearestOrEven)
-}
-% else:
 @_transparent
 public func ${ufunc}(_ x: CGFloat) -> CGFloat {
   return CGFloat(${ufunc}(x.native))
 }
-% end
 
 %end
 

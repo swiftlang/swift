@@ -24,6 +24,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -518,19 +519,17 @@ public:
       }
     }
 
+    if (EndTypeCheckLoc.isValid()) {
+      assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+    }
+
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
-      }
-
-      // If we are performing code-completion inside a function builder body,
-      // suppress diagnostics to workaround typechecking performance problems.
-      if (func->getFunctionBuilderType() &&
-          TC.Context.SourceMgr.rangeContainsCodeCompletionLoc(
-              func->getBody()->getSourceRange())) {
-        options |= TypeCheckExprFlags::SuppressDiagnostics;
       }
     }
 
@@ -773,7 +772,7 @@ public:
 
       iteratorTy = conformance->getTypeWitnessByName(sequenceType,
                                                      TC.Context.Id_Iterator);
-      if (!iteratorTy)
+      if (iteratorTy->hasError())
         return nullptr;
 
       auto witness = conformance->getWitnessByName(
@@ -838,7 +837,7 @@ public:
 
     Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
                                                         TC.Context.Id_Element);
-    if (!elementTy)
+    if (elementTy->hasError())
       return nullptr;
 
     auto *varRef =
@@ -1787,6 +1786,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 
+      if (EndTypeCheckLoc.isValid()) {
+        assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+               "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+        options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+      }
+
       auto resultTy =
           TC.typeCheckExpression(SubExpr, DC, TypeLoc(), CTP_Unused, options);
 
@@ -1944,10 +1949,10 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   TypeChecker &tc = *static_cast<TypeChecker *>(Context.getLazyResolver());
+  DiagnosticSuppression suppression(tc.Diags);
   auto resultTy =
       tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded |
-                               TypeCheckExprFlags::SuppressDiagnostics);
+                             TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   

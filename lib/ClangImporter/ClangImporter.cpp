@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
@@ -398,14 +399,6 @@ ClangImporter::~ClangImporter() {
   delete &Impl;
 }
 
-void ClangImporter::setTypeResolver(LazyResolver &resolver) {
-  Impl.setTypeResolver(&resolver);
-}
-
-void ClangImporter::clearTypeResolver() {
-  Impl.setTypeResolver(nullptr);
-}
-
 #pragma mark Module loading
 
 /// Finds the glibc.modulemap file relative to the provided resource dir.
@@ -737,7 +730,7 @@ addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
       invocationArgStrs.push_back("-mcpu=cyclone");
     }
   } else if (triple.getArch() == llvm::Triple::systemz) {
-    invocationArgStrs.push_back("-march=z196");
+    invocationArgStrs.push_back("-march=z13");
   }
 
   if (!importerOpts.Optimization.empty()) {
@@ -1718,7 +1711,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       // FIXME: This forces the creation of wrapper modules for all imports as
       // well, and may do unnecessary work.
       cacheEntry.setInt(true);
-      result->forAllVisibleModules({}, [&](ModuleDecl::ImportedModule import) {});
+      (void) namelookup::getAllImports(result);
     }
   } else {
     // Build the representation of the Clang module in Swift.
@@ -1738,7 +1731,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     // Force load overlays for all imported modules.
     // FIXME: This forces the creation of wrapper modules for all imports as
     // well, and may do unnecessary work.
-    result->forAllVisibleModules({}, [](ModuleDecl::ImportedModule import) {});
+    (void) namelookup::getAllImports(result);
   }
 
   if (clangModule->isSubModule()) {
@@ -3201,6 +3194,9 @@ void ClangImporter::verifyAllModules() {
 //===----------------------------------------------------------------------===//
 // ClangModule Implementation
 //===----------------------------------------------------------------------===//
+
+static_assert(IsTriviallyDestructible<ClangModuleUnit>::value,
+              "ClangModuleUnits are BumpPtrAllocated; the d'tor is not called");
 
 ClangModuleUnit::ClangModuleUnit(ModuleDecl &M,
                                  ClangImporter::Implementation &owner,

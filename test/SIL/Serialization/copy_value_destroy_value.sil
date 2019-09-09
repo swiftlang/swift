@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name copydestroy_value
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name copydestroy_value
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name copydestroy_value | %FileCheck %s
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name copydestroy_value -emit-sorted-sil | %FileCheck %s
 
 sil_stage canonical
 
@@ -21,12 +21,12 @@ bb0(%0 : @owned $@sil_unowned Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [serialized] [ossa] @test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [serialized] [ossa] @test_copy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG1:%[0-9]+]] : @owned $Builtin.NativeObject):
 // CHECK: [[COPY_VALUE_RESULT:%[0-9]+]] = copy_value [[ARG1]] : $Builtin.NativeObject
 // CHECK: destroy_value [[ARG1]]
 // CHECK: return [[COPY_VALUE_RESULT]]
-sil [serialized] [ossa] @test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+sil [serialized] [ossa] @test_copy_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = copy_value %0 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject

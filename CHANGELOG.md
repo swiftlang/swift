@@ -26,6 +26,29 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SE-0253][]:
+
+  Values of types that declare `func callAsFunction` methods can be called
+  like functions. The call syntax is shorthand for applying
+  `func callAsFunction` methods.
+
+  ```swift
+  struct Adder {
+    var base: Int
+    func callAsFunction(_ x: Int) -> Int {
+      return x + base
+    }
+  }
+  var adder = Adder(base: 3)
+  adder(10) // returns 13, same as `adder.callAsFunction(10)`
+  ```
+
+  * `func callAsFunction` argument labels are required at call sites.
+  * Multiple `func callAsFunction` methods on a single type are supported.
+  * `mutating func callAsFunction` is supported.
+  * `func callAsFunction` works with `throws` and `rethrows`.
+  * `func callAsFunction` works with trailing closures.
+
 * [SR-4206][]:
 
   A method override is no longer allowed to have a generic signature with 
@@ -7711,6 +7734,7 @@ Swift 1.0
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
+[SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>

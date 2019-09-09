@@ -77,6 +77,11 @@ BOOL TestSwiftNativeNSBase_UnwantedCdtors()
     if (! ([name hasPrefix:@"__SwiftNativeNS"] && [name hasSuffix:@"Base"])) {
       continue;
     }
+    if ([name isEqual: @"__SwiftNativeNSDataBase"] ||
+        [name isEqual: @"__SwiftNativeNSIndexSetBase"]) {
+      //These two were removed but are still present when back-deploying
+      continue;
+    }
     if (! [expectedClasses containsObject:name]) {
       fail("did not expect class %s\n", name.UTF8String);
       continue;

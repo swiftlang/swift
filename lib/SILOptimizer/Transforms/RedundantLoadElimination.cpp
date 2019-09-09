@@ -146,9 +146,12 @@ static bool inline isPerformingRLE(RLEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isRLEInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::RetainValueInst:
@@ -157,7 +160,6 @@ static bool isRLEInertInstruction(SILInstruction *Inst) {
   case SILInstructionKind::IsEscapingClosureInst:
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::FixLifetimeInst:
-  case SILInstructionKind::CopyUnownedValueInst:
     return true;
   default:
     return false;
