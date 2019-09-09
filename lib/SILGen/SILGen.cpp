@@ -428,7 +428,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          /*error result*/ {},
                                          getASTContext());
 
-  auto env = sig->createGenericEnvironment();
+  auto env = sig->getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(SILLinkage::PublicExternal,
@@ -1662,7 +1662,8 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
+SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
+                        SILOptions &options, FileUnit *SF) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
   if (SF) {
@@ -1672,7 +1673,7 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
+      new SILModule(mod, tc, options, DC, /*wholeModule*/ SF == nullptr));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
@@ -1721,11 +1722,13 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod, SILOptions &options) {
-  return SILModule::constructSIL(mod, options, nullptr);
+swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(mod, tc, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf);
+swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
 }

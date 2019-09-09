@@ -485,8 +485,7 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC,
-                               TypeChecker &tc) {
+                               DeclContext *owningDC, TypeChecker &tc) {
   if (!genericParams)
     return;
 
@@ -496,12 +495,9 @@ static void checkGenericParams(GenericParamList *genericParams,
   }
 
   // Force visitation of each of the requirements here.
-  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
-                                                         genericParams),
-                                        TypeResolutionStage::Interface,
-                                        [](Requirement, RequirementRepr *) {
-                                          return false;
-                                        });
+  WhereClauseOwner(owningDC, genericParams)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -620,10 +616,11 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->setDepth(i);
   }
 
-  return TypeChecker::checkGenericEnvironment(
+  auto *sig = TypeChecker::checkGenericSignature(
              nestedList.back(), DC,
              /*parentSig=*/nullptr,
              /*allowConcreteGenericParams=*/true);
+  return (sig ? sig->getGenericEnvironment() : nullptr);
 }
 
 /// Check whether \c current is a redeclaration.
@@ -1325,7 +1322,6 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add all of the generic parameters.
-  proto->createGenericParamsIfMissing();
   for (auto gp : *proto->getGenericParams())
     builder.addGenericParameter(gp);
 
@@ -2011,7 +2007,8 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
                                           TypeDecl *source) {
-  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+  WhereClauseOwner(source).visitRequirements(
+      TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::Conformance:
@@ -3834,7 +3831,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     for (auto member : proto->getMembers()) {
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
         if (!aliasDecl->isGeneric()) {
-          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+          // FIXME: Force creation of the protocol's generic environment now.
+          (void) proto->getGenericEnvironment();
+          aliasDecl->setGenericSignature(proto->getGenericSignature());
 
           // The generic environment didn't exist until now, we may have
           // unresolved types we will need to deal with, and need to record the
@@ -4443,7 +4442,7 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
 
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static GenericEnvironment *
+static GenericSignature *
 checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
@@ -4467,10 +4466,8 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
   };
   
   // Re-use the signature of the type being extended by default.
-  GenericSignature *sig =
-      ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
   if (cannotReuseNominalSignature()) {
-    return TypeChecker::checkGenericEnvironment(
+    return TypeChecker::checkGenericSignature(
         genericParams, ext,
         /*parent signature*/ nullptr,
         /*allowConcreteGenericParams=*/true,
@@ -4478,8 +4475,7 @@ checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
         {TypeLoc{nullptr, extInterfaceType}});
   }
 
-  // Form the generic environment.
-  return sig->createGenericEnvironment();
+  return ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
 }
 
 static bool isNonGenericTypeAliasType(Type type) {
@@ -4560,19 +4556,12 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   DeclValidationRAII IBV(ext);
 
   if (auto *nominal = ext->getExtendedNominal()) {
-    // If this extension was not already bound, it means it is either in an
-    // inactive conditional compilation block, or otherwise (incorrectly)
-    // nested inside of some other declaration. Make sure the generic
-    // parameter list of the extension exists to maintain invariants.
-    if (!ext->alreadyBoundToNominal())
-      ext->createGenericParamsIfMissing(nominal);
-
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
 
     if (auto *genericParams = ext->getGenericParams()) {
-      auto *env = checkExtensionGenericParams(*this, ext, genericParams);
-      ext->setGenericEnvironment(env);
+      auto *sig = checkExtensionGenericParams(*this, ext, genericParams);
+      ext->setGenericSignature(sig);
     }
   }
 }

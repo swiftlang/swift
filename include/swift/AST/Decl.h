@@ -940,9 +940,31 @@ public:
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  /// Whether this declaration is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule,
-                      AvailabilityContext fromContext) const;
+  AvailabilityContext getAvailabilityForLinkage() const;
+
+  /// Whether this declaration or one of its outer contexts has the
+  /// @_weakLinked attribute.
+  bool isAlwaysWeakImported() const;
+
+  /// Whether this declaration is weak-imported from the given module,
+  /// either because of the presence of the @_weakLinked attribute, or
+  /// because of availability.
+  ///
+  /// Note that \p fromModule should either be the "main module" or
+  /// nullptr. (This is because when it is non-null, we query the
+  /// current deployment target, and not the deployment target that
+  /// the module was built with.)
+  ///
+  /// If \p fromModule is the main module, this returns false when the
+  /// declaration is part of the main module, or if the declaration is
+  /// at least as available as the current deployment target.
+  ///
+  /// If \p fromModule is null, we instead return true if the
+  /// declaration is meant to be weak linked with _some_ deployment
+  /// target; that is, the presence of the @_weakLinked attribute or
+  /// any kind of availability is enough, irrespective of the current
+  /// deployment target.
+  bool isWeakImported(ModuleDecl *fromModule) const;
 
   /// Returns true if the nature of this declaration allows overrides.
   /// Note that this does not consider whether it is final or whether
@@ -1474,7 +1496,7 @@ public:
 class alignas(8) _GenericContext {
 // Not really public. See GenericContext.
 public:
-  GenericParamList *GenericParams = nullptr;
+  llvm::PointerIntPair<GenericParamList *, 1, bool> GenericParamsAndBit;
 
   /// The trailing where clause.
   ///
@@ -1482,28 +1504,21 @@ public:
   /// moves the trailing where clause into the generic parameter list.
   TrailingWhereClause *TrailingWhere = nullptr;
 
-  /// The generic signature or environment of this declaration.
-  ///
-  /// When this declaration stores only a signature, the generic
-  /// environment will be lazily loaded.
-  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-    GenericSigOrEnv;
+  /// The generic signature of this declaration.
+  GenericSignature *GenericSig = nullptr;
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
-  /// Lazily populate the generic environment.
-  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
+  friend class GenericParamListRequest;
 
 protected:
-  GenericContext(DeclContextKind Kind, DeclContext *Parent)
-    : _GenericContext(), DeclContext(Kind, Parent) { }
+  GenericContext(DeclContextKind Kind, DeclContext *Parent,
+                 GenericParamList *Params);
 
 public:
   /// Retrieve the set of parameters to a generic context, or null if
   /// this context is not generic.
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  void setGenericParams(GenericParamList *GenericParams);
+  GenericParamList *getGenericParams() const;
 
   /// Determine whether this context has generic parameters
   /// of its own.
@@ -1518,7 +1533,7 @@ public:
   ///   func p()   // isGeneric == false
   /// }
   /// \endcode
-  bool isGeneric() const { return GenericParams != nullptr; }
+  bool isGeneric() const { return getGenericParams() != nullptr; }
 
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
@@ -1542,17 +1557,8 @@ public:
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
 
-  /// Set a lazy generic environment.
-  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                 GenericSignature *genericSig,
-                                 uint64_t genericEnvData);
-
-  /// Whether this generic context has a lazily-created generic environment
-  /// that has not yet been constructed.
-  bool hasLazyGenericEnvironment() const;
-
-  /// Set the generic context of this context.
-  void setGenericEnvironment(GenericEnvironment *genericEnv);
+  /// Set the generic signature of this context.
+  void setGenericSignature(GenericSignature *genericSig);
 
   /// Retrieve the position of any where clause for this context's
   /// generic parameters.
@@ -1764,8 +1770,6 @@ public:
   bool hasValidSignature() const {
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
-
-  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -3322,7 +3326,6 @@ protected:
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
-    setGenericParams(GenericParams);
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
@@ -4337,10 +4340,6 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Create the generic parameters of this protocol if they haven't been
-  /// created yet.
-  void createGenericParamsIfMissing();
 
   /// Retrieve the requirements that describe this protocol.
   ///
@@ -5431,7 +5430,7 @@ public:
                 SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
-    : GenericContext(DeclContextKind::SubscriptDecl, Parent),
+    : GenericContext(DeclContextKind::SubscriptDecl, Parent, GenericParams),
       AbstractStorageDecl(DeclKind::Subscript,
                           StaticSpelling != StaticSpellingKind::None,
                           Parent, Name, SubscriptLoc,
@@ -5440,7 +5439,6 @@ public:
       Indices(nullptr), ElementTy(ElementTy) {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
-    setGenericParams(GenericParams);
   }
   
   /// \returns the way 'static'/'class' was spelled in the source.
@@ -5605,11 +5603,10 @@ protected:
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
         ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
-    setGenericParams(GenericParams);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
@@ -7259,6 +7256,16 @@ inline void simple_display(llvm::raw_ostream &out, const ExtensionDecl *decl) {
 inline void simple_display(llvm::raw_ostream &out,
                            const NominalTypeDecl *decl) {
   simple_display(out, static_cast<const Decl *>(decl));
+}
+
+/// Display GenericContext.
+///
+/// The template keeps this sorted down in the overload set relative to the
+/// more concrete overloads with Decl pointers thereby breaking a potential ambiguity.
+template <typename T>
+inline typename std::enable_if<std::is_same<T, GenericContext>::value>::type
+simple_display(llvm::raw_ostream &out, const T *GC) {
+  simple_display(out, GC->getAsDecl());
 }
 
 /// Display GenericParamList.

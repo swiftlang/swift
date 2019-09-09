@@ -66,10 +66,6 @@ using namespace swift;
 
 #define DEBUG_TYPE "Serialization"
 
-STATISTIC(NumLazyGenericEnvironments,
-          "# of lazily-deserialized generic environments known");
-STATISTIC(NumLazyGenericEnvironmentsLoaded,
-          "# of lazily-deserialized generic environments loaded");
 STATISTIC(NumLazyRequirementSignatures,
           "# of lazily-deserialized requirement signatures known");
 
@@ -621,40 +617,64 @@ bool Decl::isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic) const {
   return false;
 }
 
-bool Decl::isWeakImported(ModuleDecl *fromModule,
-                          AvailabilityContext fromContext) const {
+AvailabilityContext Decl::getAvailabilityForLinkage() const {
+  auto containingContext =
+      AvailabilityInference::annotatedAvailableRange(this, getASTContext());
+  if (containingContext.hasValue())
+    return *containingContext;
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(this))
+    return accessor->getStorage()->getAvailabilityForLinkage();
+
+  auto *dc = getDeclContext();
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc))
+    return ext->getAvailabilityForLinkage();
+  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal->getAvailabilityForLinkage();
+
+  return AvailabilityContext::alwaysAvailable();
+}
+
+bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
   if (auto clangDecl = getClangDecl()) {
     return clangDecl->isWeakImported();
   }
 
-  auto *containingModule = getModuleContext();
-  if (containingModule == fromModule)
-    return false;
-
-  auto containingContext =
-      AvailabilityInference::availableRange(this,
-                                            containingModule->getASTContext());
-  if (!fromContext.isContainedIn(containingContext))
-    return true;
-
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
 
   if (auto *accessor = dyn_cast<AccessorDecl>(this))
-    return accessor->getStorage()->isWeakImported(fromModule, fromContext);
-
-  if (auto *dtor = dyn_cast<DestructorDecl>(this))
-    return cast<ClassDecl>(dtor->getDeclContext())->isWeakImported(
-        fromModule, fromContext);
+    return accessor->getStorage()->isAlwaysWeakImported();
 
   auto *dc = getDeclContext();
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    return ext->isWeakImported(fromModule, fromContext);
-  if (auto *ntd = dyn_cast<NominalTypeDecl>(dc))
-    return ntd->isWeakImported(fromModule, fromContext);
+    return ext->isAlwaysWeakImported();
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    return nominal->isAlwaysWeakImported();
 
   return false;
+}
+
+bool Decl::isWeakImported(ModuleDecl *fromModule) const {
+  if (fromModule == nullptr) {
+    return (isAlwaysWeakImported() ||
+            !getAvailabilityForLinkage().isAlwaysAvailable());
+  }
+
+  if (getModuleContext() == fromModule)
+    return false;
+
+  if (isAlwaysWeakImported())
+    return true;
+
+  auto containingContext = getAvailabilityForLinkage();
+  if (containingContext.isAlwaysAvailable())
+    return false;
+
+  auto fromContext = AvailabilityContext::forDeploymentTarget(
+      fromModule->getASTContext());
+  return !fromContext.isContainedIn(containingContext);
 }
 
 GenericParamList::GenericParamList(SourceLoc LAngleLoc,
@@ -803,6 +823,16 @@ TrailingWhereClause *TrailingWhereClause::create(
   return new (mem) TrailingWhereClause(whereLoc, requirements);
 }
 
+GenericContext::GenericContext(DeclContextKind Kind, DeclContext *Parent,
+                               GenericParamList *Params)
+    : _GenericContext(), DeclContext(Kind, Parent) {
+  if (Params) {
+    Parent->getASTContext().evaluator.cacheOutput(
+          GenericParamListRequest{const_cast<GenericContext *>(this)},
+          std::move(Params));
+  }
+}
+
 TypeArrayView<GenericTypeParamType>
 GenericContext::getInnermostGenericParamTypes() const {
   if (auto sig = getGenericSignature())
@@ -819,106 +849,40 @@ ArrayRef<Requirement> GenericContext::getGenericRequirements() const {
     return { };
 }
 
-void GenericContext::setGenericParams(GenericParamList *params) {
-  GenericParams = params;
-
-  if (GenericParams) {
-    for (auto param : *GenericParams)
-      param->setDeclContext(this);
-  }
+GenericParamList *GenericContext::getGenericParams() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GenericParamListRequest{
+                               const_cast<GenericContext *>(this)}, nullptr);
 }
 
 GenericSignature *GenericContext::getGenericSignature() const {
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv->getGenericSignature();
-
-  if (auto genericSig = GenericSigOrEnv.dyn_cast<GenericSignature *>())
-    return genericSig;
+  if (GenericSig)
+    return GenericSig;
 
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
   // it.
   if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl *>(PD)->createGenericParamsIfMissing();
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    auto *genericSig = GenericSignature::get({self}, {req});
-
-    // Save it for next time.
-    const_cast<GenericContext *>(this)->GenericSigOrEnv = genericSig;
-    return genericSig;
+    const_cast<GenericContext *>(this)->GenericSig
+      = GenericSignature::get({self}, {req});
+    return GenericSig;
   }
 
   return nullptr;
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
-  // Fast case: we already have a generic environment.
-  if (auto genericEnv = GenericSigOrEnv.dyn_cast<GenericEnvironment *>())
-    return genericEnv;
-
-  // If we only have a generic signature, build the generic environment.
-  if (GenericSigOrEnv.dyn_cast<GenericSignature *>() || isa<ProtocolDecl>(this))
-    return getLazyGenericEnvironmentSlow();
+  if (auto *genericSig = getGenericSignature())
+    return genericSig->getGenericEnvironment();
 
   return nullptr;
 }
 
-bool GenericContext::hasLazyGenericEnvironment() const {
-  return GenericSigOrEnv.dyn_cast<GenericSignature *>() != nullptr;
-}
-
-void GenericContext::setGenericEnvironment(GenericEnvironment *genericEnv) {
-  assert((GenericSigOrEnv.isNull() ||
-          getGenericSignature()->getCanonicalSignature() ==
-            genericEnv->getGenericSignature()->getCanonicalSignature()) &&
-         "set a generic environment with a different generic signature");
-  this->GenericSigOrEnv = genericEnv;
-  if (genericEnv)
-    genericEnv->setOwningDeclContext(this);
-}
-
-GenericEnvironment *
-GenericContext::getLazyGenericEnvironmentSlow() const {
-  assert(GenericSigOrEnv.is<GenericSignature *>() &&
-         "not a lazily computed generic environment");
-
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    // The signature of a Protocol is trivial (Self: TheProtocol) so let's
-    // compute it directly.
-    auto *genericEnv = getGenericSignature()->createGenericEnvironment();
-    const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
-    return genericEnv;
-  }
-
-  auto contextData = getASTContext().getOrCreateLazyGenericContextData(
-    this, nullptr);
-  auto *genericEnv = contextData->loader->loadGenericEnvironment(
-    this, contextData->genericEnvData);
-
-  const_cast<GenericContext *>(this)->setGenericEnvironment(genericEnv);
-  ++NumLazyGenericEnvironmentsLoaded;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironmentsLoaded++;
-  return genericEnv;
-}
-
-void GenericContext::setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                               GenericSignature *genericSig,
-                                               uint64_t genericEnvData) {
-  assert(GenericSigOrEnv.isNull() && "already have a generic signature");
-  GenericSigOrEnv = genericSig;
-
-  auto contextData =
-    getASTContext().getOrCreateLazyGenericContextData(this, lazyLoader);
-  contextData->genericEnvData = genericEnvData;
-
-  ++NumLazyGenericEnvironments;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
-  if (getASTContext().Stats)
-    getASTContext().Stats->getFrontendCounters().NumLazyGenericEnvironments++;
-
+void GenericContext::setGenericSignature(GenericSignature *genericSig) {
+  assert(GenericSig == nullptr && "Generic signature cannot be changed");
+  this->GenericSig = genericSig;
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
@@ -1058,7 +1022,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
-  : GenericContext(DeclContextKind::ExtensionDecl, parent),
+  : GenericContext(DeclContextKind::ExtensionDecl, parent, nullptr),
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
@@ -1203,59 +1167,69 @@ createExtensionGenericParams(ASTContext &ctx,
   return toParams;
 }
 
-void ExtensionDecl::createGenericParamsIfMissing(NominalTypeDecl *nominal) {
-  if (getGenericParams())
-    return;
+llvm::Expected<GenericParamList *>
+GenericParamListRequest::evaluate(Evaluator &evaluator, GenericContext *value) const {
+  if (auto *ext = dyn_cast<ExtensionDecl>(value)) {
+    // Create the generic parameter list for the extension by cloning the
+    // generic parameter lists of the nominal and any of its parent types.
+    auto &ctx = value->getASTContext();
+    auto *nominal = ext->getExtendedNominal();
+    if (!nominal) {
+      return nullptr;
+    }
+    auto *genericParams = createExtensionGenericParams(ctx, ext, nominal);
 
-  // Hack to force generic parameter lists of protocols to be created if the
-  // nominal is an (invalid) nested type of a protocol.
-  DeclContext *outerDC = nominal;
-  while (!outerDC->isModuleScopeContext()) {
-    if (auto *proto = dyn_cast<ProtocolDecl>(outerDC))
-      proto->createGenericParamsIfMissing();
-
-    outerDC = outerDC->getParent();
-  }
-
-  // Create the generic parameter list for the extension by cloning the
-  // generic parameter lists of the nominal and any of its parent types.
-  auto &ctx = getASTContext();
-  auto *genericParams = createExtensionGenericParams(ctx, this, nominal);
-  setGenericParams(genericParams);
-
-  // Protocol extensions need an inheritance clause due to how name lookup
-  // is implemented.
-  if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
-    auto protoType = proto->getDeclaredType();
-    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
-    genericParams->getParams().front()->setInherited(
-      ctx.AllocateCopy(selfInherited));
-  }
-
-  // Set the depth of every generic parameter.
-  unsigned depth = nominal->getGenericContextDepth();
-  for (auto *outerParams = genericParams;
-       outerParams != nullptr;
-       outerParams = outerParams->getOuterParameters())
-    outerParams->setDepth(depth--);
-
-  // If we have a trailing where clause, deal with it now.
-  // For now, trailing where clauses are only permitted on protocol extensions.
-  if (auto trailingWhereClause = getTrailingWhereClause()) {
-    if (genericParams) {
-      // Merge the trailing where clause into the generic parameter list.
-      // FIXME: Long-term, we'd like clients to deal with the trailing where
-      // clause explicitly, but for now it's far more direct to represent
-      // the trailing where clause as part of the requirements.
-      genericParams->addTrailingWhereClause(
-        getASTContext(),
-        trailingWhereClause->getWhereLoc(),
-        trailingWhereClause->getRequirements());
+    // Protocol extensions need an inheritance clause due to how name lookup
+    // is implemented.
+    if (auto *proto = ext->getExtendedProtocolDecl()) {
+      auto protoType = proto->getDeclaredType();
+      TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+      genericParams->getParams().front()->setInherited(
+        ctx.AllocateCopy(selfInherited));
     }
 
-    // If there's no generic parameter list, the where clause is diagnosed
-    // in typeCheckDecl().
+    // Set the depth of every generic parameter.
+    unsigned depth = nominal->getGenericContextDepth();
+    for (auto *outerParams = genericParams;
+         outerParams != nullptr;
+         outerParams = outerParams->getOuterParameters())
+      outerParams->setDepth(depth--);
+
+    // If we have a trailing where clause, deal with it now.
+    // For now, trailing where clauses are only permitted on protocol extensions.
+    if (auto trailingWhereClause = ext->getTrailingWhereClause()) {
+      if (genericParams) {
+        // Merge the trailing where clause into the generic parameter list.
+        // FIXME: Long-term, we'd like clients to deal with the trailing where
+        // clause explicitly, but for now it's far more direct to represent
+        // the trailing where clause as part of the requirements.
+        genericParams->addTrailingWhereClause(
+          ext->getASTContext(),
+          trailingWhereClause->getWhereLoc(),
+          trailingWhereClause->getRequirements());
+      }
+
+      // If there's no generic parameter list, the where clause is diagnosed
+      // in typeCheckDecl().
+    }
+    return genericParams;
+  } else if (auto *proto = dyn_cast<ProtocolDecl>(value)) {
+    // The generic parameter 'Self'.
+    auto &ctx = value->getASTContext();
+    auto selfId = ctx.Id_Self;
+    auto selfDecl = new (ctx) GenericTypeParamDecl(
+        proto, selfId, SourceLoc(), /*depth=*/0, /*index=*/0);
+    auto protoType = proto->getDeclaredType();
+    TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
+    selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
+    selfDecl->setImplicit();
+
+    // The generic parameter list itself.
+    auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
+                                           SourceLoc());
+    return result;
   }
+  return nullptr;
 }
 
 PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
@@ -3375,19 +3349,8 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
 void NominalTypeDecl::computeType() {
   assert(!hasInterfaceType());
 
-  ASTContext &ctx = getASTContext();
-
-  // A protocol has an implicit generic parameter list consisting of a single
-  // generic parameter, Self, that conforms to the protocol itself. This
-  // parameter is always implicitly bound.
-  //
-  // If this protocol has been deserialized, it already has generic parameters.
-  // Don't add them again.
-  if (auto proto = dyn_cast<ProtocolDecl>(this))
-    proto->createGenericParamsIfMissing();
-
   Type declaredInterfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(declaredInterfaceTy, ctx));
+  setInterfaceType(MetatypeType::get(declaredInterfaceTy, getASTContext()));
 
   if (declaredInterfaceTy->hasError())
     setInvalid();
@@ -3420,8 +3383,7 @@ static Type computeNominalType(NominalTypeDecl *decl, DeclTypeKind kind) {
     }
   }
 
-  if (decl->getGenericParams() &&
-      !isa<ProtocolDecl>(decl)) {
+  if (!isa<ProtocolDecl>(decl) && decl->getGenericParams()) {
     switch (kind) {
     case DeclTypeKind::DeclaredType:
       return UnboundGenericType::get(decl, Ty, ctx);
@@ -3549,10 +3511,8 @@ GenericTypeDecl::GenericTypeDecl(DeclKind K, DeclContext *DC,
                                  Identifier name, SourceLoc nameLoc,
                                  MutableArrayRef<TypeLoc> inherited,
                                  GenericParamList *GenericParams) :
-    GenericContext(DeclContextKind::GenericTypeDecl, DC),
-    TypeDecl(K, DC, name, nameLoc, inherited) {
-  setGenericParams(GenericParams);
-}
+    GenericContext(DeclContextKind::GenericTypeDecl, DC, GenericParams),
+    TypeDecl(K, DC, name, nameLoc, inherited) {}
 
 TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc,
                              Identifier Name, SourceLoc NameLoc,
@@ -3888,7 +3848,7 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
 
   // Wire up generic environment of DD.
-  DD->setGenericEnvironment(CD->getGenericEnvironmentOfContext());
+  DD->setGenericSignature(CD->getGenericSignatureOfContext());
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
@@ -4682,28 +4642,6 @@ StringRef ProtocolDecl::getObjCRuntimeName(
 
   // Produce the mangled name for this protocol.
   return mangleObjCRuntimeName(this, buffer);
-}
-
-void ProtocolDecl::createGenericParamsIfMissing() {
-  if (getGenericParams())
-    return;
-
-  // The generic parameter 'Self'.
-  auto &ctx = getASTContext();
-  auto selfId = ctx.Id_Self;
-  auto selfDecl = new (ctx) GenericTypeParamDecl(
-      this, selfId,
-      SourceLoc(),
-      /*depth=*/getGenericContextDepth() + 1, /*index=*/0);
-  auto protoType = getDeclaredType();
-  TypeLoc selfInherited[1] = { TypeLoc::withoutLoc(protoType) };
-  selfDecl->setInherited(ctx.AllocateCopy(selfInherited));
-  selfDecl->setImplicit();
-
-  // The generic parameter list itself.
-  auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
-                                         SourceLoc());
-  setGenericParams(result);
 }
 
 ArrayRef<Requirement> ProtocolDecl::getRequirementSignature() const {
@@ -7681,7 +7619,6 @@ void swift::simple_display(llvm::raw_ostream &out, const GenericParamList *GPL) 
   else out << "(null)";
 }
 
-      
 StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \

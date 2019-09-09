@@ -91,10 +91,7 @@ GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   assert(stage == TypeResolutionStage::Interface);
   if (!complete.builder) {
     auto genericSig = getGenericSignature();
-    ASTContext &ctx = genericSig->getASTContext();
-    complete.builder = ctx.getOrCreateGenericSignatureBuilder(
-                                          genericSig->getCanonicalSignature());
-
+    complete.builder = genericSig->getGenericSignatureBuilder();
   }
 
   return complete.builder;

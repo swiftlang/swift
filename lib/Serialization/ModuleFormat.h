@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 518; // save extended nominal separately when serializing extensions
+const uint16_t SWIFTMODULE_VERSION_MINOR = 519; // SIL function availability
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -520,6 +520,44 @@ enum class ImportControl : uint8_t {
   ImplementationOnly
 };
 using ImportControlField = BCFixed<2>;
+
+// Encodes a VersionTuple:
+//
+//  Major
+//  Minor
+//  Subminor
+//  HasMinor
+//  HasSubminor
+#define BC_AVAIL_TUPLE\
+    BCVBR<5>,\
+    BCVBR<5>,\
+    BCVBR<4>,\
+    BCFixed<1>,\
+    BCFixed<1>
+
+#define LIST_VER_TUPLE_PIECES(X)\
+  X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
+#define DEF_VER_TUPLE_PIECES(X) unsigned LIST_VER_TUPLE_PIECES(X)
+#define DECODE_VER_TUPLE(X)\
+  if (X##_HasMinor) {\
+    if (X##_HasSubminor)\
+      X = llvm::VersionTuple(X##_Major, X##_Minor, X##_Subminor);\
+    else\
+      X = llvm::VersionTuple(X##_Major, X##_Minor);\
+    }\
+  else X = llvm::VersionTuple(X##_Major);
+#define ENCODE_VER_TUPLE(X, X_Expr)\
+    unsigned X##_Major = 0, X##_Minor = 0, X##_Subminor = 0,\
+             X##_HasMinor = 0, X##_HasSubminor = 0;\
+    const auto &X##_Val = X_Expr;\
+    if (X##_Val.hasValue()) {\
+      const auto &Y = X##_Val.getValue();\
+      X##_Major = Y.getMajor();\
+      X##_Minor = Y.getMinor().getValueOr(0);\
+      X##_Subminor = Y.getSubminor().getValueOr(0);\
+      X##_HasMinor = Y.getMinor().hasValue();\
+      X##_HasSubminor = Y.getSubminor().hasValue();\
+    }
 
 /// The various types of blocks that can occur within a serialized Swift
 /// module.
@@ -1640,20 +1678,6 @@ namespace decls_block {
     BCFixed<2>  // optimize value
   >;
 
-  // Encodes a VersionTuple:
-  //
-  //  Major
-  //  Minor
-  //  Subminor
-  //  HasMinor
-  //  HasSubminor
-#define BC_AVAIL_TUPLE\
-    BCVBR<5>,\
-    BCVBR<5>,\
-    BCVBR<4>,\
-    BCFixed<1>,\
-    BCFixed<1>
-
   using AvailableDeclAttrLayout = BCRecordLayout<
     Available_DECL_ATTR,
     BCFixed<1>, // implicit flag
@@ -1668,8 +1692,6 @@ namespace decls_block {
     BCVBR<5>,   // number of bytes in rename string
     BCBlob      // platform, followed by message
   >;
-
-#undef BC_AVAIL_TUPLE
 
   using ObjCDeclAttrLayout = BCRecordLayout<
     ObjC_DECL_ATTR,

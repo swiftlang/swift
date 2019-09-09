@@ -174,7 +174,7 @@ void ExistentialSpecializerCloner::cloneArguments(
     ArrayRef<ProtocolConformanceRef> Conformances =
         Ctx.AllocateCopy(NewConformances);
     auto ExistentialRepr =
-        ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
+        ArgDesc.Arg->getType().getPreferredExistentialRepresentation();
     auto &EAD = ExistentialArgDescriptor[ArgDesc.Index];
     switch (ExistentialRepr) {
     case ExistentialRepresentation::Opaque: {
@@ -326,7 +326,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
         OrigGenericSig, std::move(GenericParams), std::move(Requirements)},
       nullptr);
 
-  NewGenericEnv = NewGenericSig->createGenericEnvironment();
+  NewGenericEnv = NewGenericSig->getGenericEnvironment();
 
   /// Create a lambda for GenericParams.
   auto getCanonicalType = [&](Type t) -> CanType {
@@ -434,7 +434,7 @@ void ExistentialTransform::populateThunkBody() {
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;
       auto ExistentialRepr =
-          ArgDesc.Arg->getType().getPreferredExistentialRepresentation(M);
+          ArgDesc.Arg->getType().getPreferredExistentialRepresentation();
       switch (ExistentialRepr) {
       case ExistentialRepresentation::Opaque: {
         archetypeValue = Builder.createOpenExistentialAddr(
@@ -583,7 +583,7 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   auto NewFTy = createExistentialSpecializedFunctionType();
 
   auto NewFGenericSig = NewFTy->getGenericSignature();
-  auto NewFGenericEnv = NewFGenericSig->createGenericEnvironment();
+  auto NewFGenericEnv = NewFGenericSig->getGenericEnvironment();
 
   /// Step 1: Create the new protocol constrained generic function.
   NewF = FunctionBuilder.createFunction(

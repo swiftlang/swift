@@ -429,11 +429,6 @@ public:
   /// The GenericSignature will be scheduled for serialization if necessary.
   GenericSignatureID addGenericSignatureRef(const GenericSignature *sig);
 
-  /// Records the use of the given generic environment.
-  ///
-  /// The GenericEnvironment will be scheduled for serialization if necessary.
-  GenericSignatureID addGenericEnvironmentRef(const GenericEnvironment *env);
-
   /// Records the use of the given substitution map.
   ///
   /// The SubstitutionMap will be scheduled for serialization if necessary.

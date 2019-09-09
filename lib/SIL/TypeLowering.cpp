@@ -99,7 +99,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
   // by value.  If it is address-only, then we can't load it, so capture it
   // by its address (like a var) instead.
   if (!var->supportsMutation() &&
-      (!SILModuleConventions(M).useLoweredAddresses() ||
+      (Context.LangOpts.EnableSILOpaqueValues ||
        !getTypeLowering(var->getType(), expansion).isAddressOnly()))
     return CaptureKind::Constant;
 
@@ -128,7 +128,7 @@ CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
 using RecursiveProperties = TypeLowering::RecursiveProperties;
 
 static RecursiveProperties
-classifyType(CanType type, SILModule &M, CanGenericSignature sig,
+classifyType(CanType type, TypeConverter &TC, CanGenericSignature sig,
              ResilienceExpansion expansion);
 
 namespace {
@@ -138,12 +138,12 @@ namespace {
   class TypeClassifierBase : public CanTypeVisitor<Impl, RetTy> {
     Impl &asImpl() { return *static_cast<Impl*>(this); }
   protected:
-    SILModule &M;
+    TypeConverter &TC;
     CanGenericSignature Sig;
     ResilienceExpansion Expansion;
-    TypeClassifierBase(SILModule &M, CanGenericSignature Sig,
+    TypeClassifierBase(TypeConverter &TC, CanGenericSignature Sig,
                        ResilienceExpansion Expansion)
-      : M(M), Sig(Sig), Expansion(Expansion) {}
+      : TC(TC), Sig(Sig), Expansion(Expansion) {}
 
   public:
     // The subclass should implement:
@@ -247,7 +247,7 @@ namespace {
     CanGenericSignature getGenericSignature() {
       if (Sig)
         return Sig;
-      return M.Types.getCurGenericContext();
+      return TC.getCurGenericContext();
     }
 
     RetTy visitAbstractTypeParamType(CanType type) {
@@ -293,8 +293,7 @@ namespace {
           return getConcreteReferenceStorageReferent(bound->getCanonicalType());
         }
 
-        auto &ctx = M.getASTContext();
-        return ctx.TheUnknownObjectType;
+        return TC.Context.TheUnknownObjectType;
       }
 
       return type;
@@ -324,8 +323,7 @@ namespace {
     RetTy visit##Name##StorageType(Can##Name##StorageType type) { \
       auto referentType = type->getReferentType(); \
       auto concreteType = getConcreteReferenceStorageReferent(referentType); \
-      auto &ctx = M.getASTContext(); \
-      if (Name##StorageType::get(concreteType, ctx) \
+      if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion)) { \
         return asImpl().visitLoadable##Name##StorageType(type); \
       } else { \
@@ -363,7 +361,7 @@ namespace {
 
     RetTy visitExistentialType(CanType type) {
       switch (SILType::getPrimitiveObjectType(type)
-                .getPreferredExistentialRepresentation(M)) {
+                .getPreferredExistentialRepresentation()) {
       case ExistentialRepresentation::None:
         llvm_unreachable("not an existential type?!");
       // Opaque existentials are address-only.
@@ -410,7 +408,7 @@ namespace {
     RetTy visitTupleType(CanTupleType type) {
       RecursiveProperties props;
       for (auto eltType : type.getElementTypes()) {
-        props.addSubobject(classifyType(eltType, M, Sig, Expansion));
+        props.addSubobject(classifyType(eltType, TC, Sig, Expansion));
       }
       return asImpl().handleAggregateByProperties(type, props);
     }
@@ -447,9 +445,9 @@ namespace {
   class TypeClassifier :
       public TypeClassifierBase<TypeClassifier, RecursiveProperties> {
   public:
-    TypeClassifier(SILModule &M, CanGenericSignature Sig,
+    TypeClassifier(TypeConverter &TC, CanGenericSignature Sig,
                    ResilienceExpansion Expansion)
-        : TypeClassifierBase(M, Sig, Expansion) {}
+        : TypeClassifierBase(TC, Sig, Expansion) {}
 
     RecursiveProperties handle(CanType type, RecursiveProperties properties) {
       return properties;
@@ -465,27 +463,27 @@ namespace {
 
       // Consult the type lowering.
       type = getSubstitutedTypeForTypeLowering(type);
-      auto &lowering = M.Types.getTypeLowering(type, Expansion);
+      auto &lowering = TC.getTypeLowering(type, Expansion);
       return handleClassificationFromLowering(type, lowering);
     }
 
     RecursiveProperties visitAnyStructType(CanType type, StructDecl *D) {
       // Consult the type lowering.
       type = getSubstitutedTypeForTypeLowering(type);
-      auto &lowering = M.Types.getTypeLowering(type, Expansion);
+      auto &lowering = TC.getTypeLowering(type, Expansion);
       return handleClassificationFromLowering(type, lowering);
     }
 
   private:
     CanType getSubstitutedTypeForTypeLowering(CanType type) {
       // If we're using a generic signature different from
-      // M.Types.getCurGenericContext(), we have to map the
+      // TC.getCurGenericContext(), we have to map the
       // type into context before asking for a type lowering
       // because the rest of type lowering doesn't have a generic
       // signature plumbed through.
       if (Sig && type->hasTypeParameter()) {
         type = Sig->getCanonicalSignature()
-          .getGenericEnvironment()
+          ->getGenericEnvironment()
           ->mapTypeIntoContext(type)
           ->getCanonicalType();
       }
@@ -500,19 +498,19 @@ namespace {
   };
 } // end anonymous namespace
 
-static RecursiveProperties classifyType(CanType type, SILModule &M,
+static RecursiveProperties classifyType(CanType type, TypeConverter &tc,
                                         CanGenericSignature sig,
                                         ResilienceExpansion expansion) {
-  return TypeClassifier(M, sig, expansion).visit(type);
+  return TypeClassifier(tc, sig, expansion).visit(type);
 }
 
 /// True if the type, or the referenced type of an address
 /// type, is address-only.  For example, it could be a resilient struct or
 /// something of unknown size.
-bool SILType::isAddressOnly(CanType type, SILModule &M,
+bool SILType::isAddressOnly(CanType type, TypeConverter &tc,
                             CanGenericSignature sig,
                             ResilienceExpansion expansion) {
-  return classifyType(type, M, sig, expansion).isAddressOnly();
+  return classifyType(type, tc, sig, expansion).isAddressOnly();
 }
 
 namespace {
@@ -708,7 +706,7 @@ namespace {
     mutable ArrayRef<Child> Children = {};
     
   protected:
-    virtual void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
+    virtual void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
       const = 0;
     
   public:
@@ -722,12 +720,12 @@ namespace {
     virtual SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                                       ArrayRef<SILValue> values) const = 0;
 
-    ArrayRef<Child> getChildren(SILModule &M) const {
+    ArrayRef<Child> getChildren(TypeConverter &TC) const {
       if (Children.data() == nullptr) {
         SmallVector<Child, 4> children;
-        lowerChildren(M, children);
+        lowerChildren(TC, children);
         auto isDependent = IsDependent_t(getLoweredType().hasTypeParameter());
-        auto buf = operator new(sizeof(Child) * children.size(), M.Types,
+        auto buf = operator new(sizeof(Child) * children.size(), TC,
                                 isDependent);
         memcpy(buf, children.data(), sizeof(Child) * children.size());
         Children = {reinterpret_cast<Child*>(buf), children.size()};
@@ -739,7 +737,7 @@ namespace {
     void forEachNonTrivialChild(SILBuilder &B, SILLocation loc,
                                 SILValue aggValue,
                                 const T &operation) const {
-      for (auto &child : getChildren(B.getModule())) {
+      for (auto &child : getChildren(B.getModule().Types)) {
         auto &childLowering = child.getLowering();
         // Skip trivial children.
         if (childLowering.isTrivial())
@@ -780,7 +778,7 @@ namespace {
       }
 
       llvm::SmallVector<SILValue, 8> loweredChildValues;
-      for (auto &child : getChildren(B.getModule())) {
+      for (auto &child : getChildren(B.getModule().Types)) {
         auto &childLowering = child.getLowering();
         SILValue childValue = asImpl().emitRValueProject(B, loc, aggValue,
                                                          child.getIndex(),
@@ -848,7 +846,7 @@ namespace {
     }
   
   private:
-    void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
+    void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       // The children are just the elements of the lowered tuple.
       auto silTy = getLoweredType();
@@ -857,7 +855,7 @@ namespace {
       unsigned index = 0;
       for (auto elt : tupleTy.getElementTypes()) {
         auto silElt = SILType::getPrimitiveType(elt, silTy.getCategory());
-        auto &eltTL = M.Types.getTypeLowering(silElt, getResilienceExpansion());
+        auto &eltTL = TC.getTypeLowering(silElt, getResilienceExpansion());
         children.push_back(Child{index, eltTL});
         ++index;
       }
@@ -885,15 +883,15 @@ namespace {
     }
         
   private:
-    void lowerChildren(SILModule &M, SmallVectorImpl<Child> &children)
+    void lowerChildren(TypeConverter &TC, SmallVectorImpl<Child> &children)
     const override {
       auto silTy = getLoweredType();
       auto structDecl = silTy.getStructOrBoundGenericStruct();
       assert(structDecl);
       
       for (auto prop : structDecl->getStoredProperties()) {
-        SILType propTy = silTy.getFieldType(prop, M);
-        auto &propTL = M.Types.getTypeLowering(propTy, getResilienceExpansion());
+        SILType propTy = silTy.getFieldType(prop, TC);
+        auto &propTL = TC.getTypeLowering(propTy, getResilienceExpansion());
         children.push_back(Child{prop, propTL});
       }
     }
@@ -1166,13 +1164,11 @@ namespace {
   class LowerType
     : public TypeClassifierBase<LowerType, TypeLowering *>
   {
-    TypeConverter &TC;
     IsDependent_t Dependent;
   public:
     LowerType(TypeConverter &TC, CanGenericSignature Sig,
               ResilienceExpansion Expansion, IsDependent_t Dependent)
-      : TypeClassifierBase(TC.M, Sig, Expansion),
-        TC(TC), Dependent(Dependent) {}
+      : TypeClassifierBase(TC, Sig, Expansion), Dependent(Dependent) {}
 
     TypeLowering *handleTrivial(CanType type) {
       return handleTrivial(type, RecursiveProperties::forTrivial());
@@ -1192,7 +1188,7 @@ namespace {
 
     TypeLowering *handleAddressOnly(CanType type,
                                     RecursiveProperties properties) {
-      if (SILModuleConventions(M).useLoweredAddresses()) {
+      if (!TC.Context.LangOpts.EnableSILOpaqueValues) {
         auto silType = SILType::getPrimitiveAddressType(type);
         return new (TC, Dependent) AddressOnlyTypeLowering(silType, properties,
                                                            Expansion);
@@ -1241,7 +1237,7 @@ namespace {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
-        bool sameModule = (D->getModuleContext() == M.getSwiftModule());
+        bool sameModule = (D->getModuleContext() == &TC.M);
         if (sameModule)
           properties.addSubobject(RecursiveProperties::forResilient());
 
@@ -1266,20 +1262,19 @@ namespace {
       if (handleResilience(structType, D, properties))
         return handleAddressOnly(structType, properties);
 
-      auto subMap = structType->getContextSubstitutionMap(
-          M.getSwiftModule(), D);
+      auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
         // FIXME: Remove this once getInterfaceType() is a request.
         if (!field->hasInterfaceType())
-          M.getASTContext().getLazyResolver()->resolveDeclSignature(field);
+          TC.Context.getLazyResolver()->resolveDeclSignature(field);
 
         auto substFieldType =
           field->getInterfaceType().subst(subMap)->getCanonicalType();
 
         properties.addSubobject(classifyType(substFieldType->getCanonicalType(),
-                                             M, Sig, Expansion));
+                                             TC, Sig, Expansion));
       }
 
       return handleAggregateByProperties<LoadableStructTypeLowering>(structType,
@@ -1304,8 +1299,7 @@ namespace {
                                                             Expansion);
       }
 
-      auto subMap = enumType->getContextSubstitutionMap(
-          M.getSwiftModule(), D);
+      auto subMap = enumType->getContextSubstitutionMap(&TC.M, D);
 
       // Accumulate the properties of all direct payloads.
       for (auto elt : D->getAllElements()) {
@@ -1321,12 +1315,12 @@ namespace {
 
         // FIXME: Remove this once getInterfaceType() is a request.
         if (!elt->hasInterfaceType())
-          M.getASTContext().getLazyResolver()->resolveDeclSignature(elt);
+          TC.Context.getLazyResolver()->resolveDeclSignature(elt);
 
         auto substEltType =
           elt->getArgumentInterfaceType().subst(subMap)->getCanonicalType();
         
-        properties.addSubobject(classifyType(substEltType, M, Sig, Expansion));
+        properties.addSubobject(classifyType(substEltType, TC, Sig, Expansion));
       }
 
       return handleAggregateByProperties<LoadableEnumTypeLowering>(enumType,
@@ -1348,7 +1342,7 @@ namespace {
   };
 } // end anonymous namespace
 
-TypeConverter::TypeConverter(SILModule &m)
+TypeConverter::TypeConverter(ModuleDecl &m)
   : M(m), Context(m.getASTContext()) {
 }
 
@@ -1586,7 +1580,7 @@ CanType TypeConverter::computeLoweredRValueType(AbstractionPattern origType,
       }
     }
 
-    return getNativeSILFunctionType(M, origType, substFnType);
+    return getNativeSILFunctionType(*this, origType, substFnType);
   }
 
   // Ignore dynamic self types.
@@ -2558,7 +2552,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
   auto loweredContextType = loweredInterfaceType;
   auto contextBoxTy = boxTy;
   if (signature) {
-    auto env = signature.getGenericEnvironment();
+    auto env = signature->getGenericEnvironment();
     loweredContextType = env->mapTypeIntoContext(loweredContextType)
                             ->getCanonicalType();
     contextBoxTy = cast<SILBoxType>(
@@ -2566,7 +2560,7 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
          ->getCanonicalType());
   }
   assert(contextBoxTy->getLayout()->getFields().size() == 1
-         && contextBoxTy->getFieldType(M, 0).getASTType()
+         && getSILBoxFieldType(contextBoxTy, *this, 0).getASTType()
              == loweredContextType
          && "box field type doesn't match capture!");
 #endif
@@ -2610,7 +2604,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 
   // FIXME: Remove this once getInterfaceType() is a request.
   if (!elt->hasInterfaceType())
-    C.getLazyResolver()->resolveDeclSignature(elt);
+    Context.getLazyResolver()->resolveDeclSignature(elt);
 
   auto boxSignature = getEffectiveGenericSignature(enumDecl);
 
@@ -2635,22 +2629,22 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
 
   // Instantiate the layout with enum's substitution list.
   auto subMap = boundEnum->getContextSubstitutionMap(
-      M.getSwiftModule(), enumDecl, enumDecl->getGenericEnvironment());
+      &M, enumDecl, enumDecl->getGenericEnvironment());
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
   return boxTy;
 }
 
-static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
+static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
                                      SILType Ty, ResilienceExpansion expansion) {
   if (auto *structDecl = Ty.getStructOrBoundGenericStruct()) {
-    assert(!structDecl->isResilient(Module.getSwiftModule(), expansion) &&
+    assert(!structDecl->isResilient(&TC.M, expansion) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     for (auto *prop : structDecl->getStoredProperties()) {
-      SILType propTy = Ty.getFieldType(prop, Module);
+      SILType propTy = Ty.getFieldType(prop, TC);
       unsigned fieldsCountBefore = fieldsCount;
-      countNumberOfInnerFields(fieldsCount, Module, propTy, expansion);
+      countNumberOfInnerFields(fieldsCount, TC, propTy, expansion);
       if (fieldsCount == fieldsCountBefore) {
         // size of Struct(BigStructType) == size of BigStructType()
         // prevent counting its size as BigStructType()+1
@@ -2662,7 +2656,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
   if (auto tupleTy = Ty.getAs<TupleType>()) {
     for (auto elt : tupleTy.getElementTypes()) {
       auto silElt = SILType::getPrimitiveObjectType(elt);
-      countNumberOfInnerFields(fieldsCount, Module, silElt, expansion);
+      countNumberOfInnerFields(fieldsCount, TC, silElt, expansion);
     }
     return;
   }
@@ -2670,7 +2664,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
     if (enumDecl->isIndirect()) {
       return;
     }
-    assert(!enumDecl->isResilient(Module.getSwiftModule(), expansion) &&
+    assert(!enumDecl->isResilient(&TC.M, expansion) &&
            " FSO should not be trying to explode resilient (ie address-only) "
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;
@@ -2683,16 +2677,16 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, SILModule &Module,
         continue;
 
       if (!elt->hasInterfaceType())
-        enumDecl->getASTContext().getLazyResolver()->resolveDeclSignature(elt);
+        TC.Context.getLazyResolver()->resolveDeclSignature(elt);
 
       // Although one might assume enums have a fields count of 1
       // Which holds true for current uses of this code
       // (we shouldn't expand enums)
       // Number of fields > 1 as "future proof" for this heuristic:
       // In case it is used by a pass that tries to explode enums.
-      auto payloadTy = Ty.getEnumElementType(elt, Module);
+      auto payloadTy = Ty.getEnumElementType(elt, TC);
       fieldsCount = 0;
-      countNumberOfInnerFields(fieldsCount, Module, payloadTy, expansion);
+      countNumberOfInnerFields(fieldsCount, TC, payloadTy, expansion);
       if (fieldsCount > maxEnumCount) {
         maxEnumCount = fieldsCount;
       }
@@ -2710,7 +2704,7 @@ unsigned TypeConverter::countNumberOfFields(SILType Ty,
     return std::max(Iter->second, 1U);
   }
   unsigned fieldsCount = 0;
-  countNumberOfInnerFields(fieldsCount, M, Ty, expansion);
+  countNumberOfInnerFields(fieldsCount, *this, Ty, expansion);
   TypeFields[key] = fieldsCount;
   return std::max(fieldsCount, 1U);
 }

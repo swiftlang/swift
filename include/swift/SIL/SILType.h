@@ -228,26 +228,29 @@ public:
   /// something of unknown size.
   ///
   /// This is equivalent to, but possibly faster than, calling
-  /// M.Types.getTypeLowering(type).isAddressOnly().
-  static bool isAddressOnly(CanType T, SILModule &M,
-                            CanGenericSignature Sig,
-                            ResilienceExpansion Expansion);
+  /// tc.getTypeLowering(type).isAddressOnly().
+  static bool isAddressOnly(CanType type, Lowering::TypeConverter &tc,
+                            CanGenericSignature sig,
+                            ResilienceExpansion expansion);
+
   /// Return true if this type must be returned indirectly.
   ///
   /// This is equivalent to, but possibly faster than, calling
-  /// M.Types.getTypeLowering(type).isReturnedIndirectly().
-  static bool isFormallyReturnedIndirectly(CanType type, SILModule &M,
-                                           CanGenericSignature Sig) {
-    return isAddressOnly(type, M, Sig, ResilienceExpansion::Minimal);
+  /// tc.getTypeLowering(type).isReturnedIndirectly().
+  static bool isFormallyReturnedIndirectly(CanType type,
+                                           Lowering::TypeConverter &tc,
+                                           CanGenericSignature sig) {
+    return isAddressOnly(type, tc, sig, ResilienceExpansion::Minimal);
   }
 
   /// Return true if this type must be passed indirectly.
   ///
   /// This is equivalent to, but possibly faster than, calling
-  /// M.Types.getTypeLowering(type).isPassedIndirectly().
-  static bool isFormallyPassedIndirectly(CanType type, SILModule &M,
-                                         CanGenericSignature Sig) {
-    return isAddressOnly(type, M, Sig, ResilienceExpansion::Minimal);
+  /// tc.getTypeLowering(type).isPassedIndirectly().
+  static bool isFormallyPassedIndirectly(CanType type,
+                                         Lowering::TypeConverter &tc,
+                                         CanGenericSignature sig) {
+    return isAddressOnly(type, tc, sig, ResilienceExpansion::Minimal);
   }
 
   /// True if the type, or the referenced type of an address type, is loadable.
@@ -324,15 +327,13 @@ public:
   /// representation kind for the type. Returns None if the type is not an
   /// existential type.
   ExistentialRepresentation
-  getPreferredExistentialRepresentation(SILModule &M,
-                                        Type containedType = Type()) const;
+  getPreferredExistentialRepresentation(Type containedType = Type()) const;
   
   /// Returns true if the existential type can use operations for the given
   /// existential representation when working with values of the given type,
   /// or when working with an unknown type if containedType is null.
   bool
-  canUseExistentialRepresentation(SILModule &M,
-                                  ExistentialRepresentation repr,
+  canUseExistentialRepresentation(ExistentialRepresentation repr,
                                   Type containedType = Type()) const;
   
   /// True if the type contains a type parameter.
@@ -394,11 +395,15 @@ public:
   /// the given field.  Applies substitutions as necessary.  The
   /// result will be an address type if the base type is an address
   /// type or a class.
+  SILType getFieldType(VarDecl *field, Lowering::TypeConverter &TC) const;
+
   SILType getFieldType(VarDecl *field, SILModule &M) const;
 
   /// Given that this is an enum type, return the lowered type of the
   /// data for the given element.  Applies substitutions as necessary.
   /// The result will have the same value category as the base type.
+  SILType getEnumElementType(EnumElementDecl *elt, Lowering::TypeConverter &TC) const;
+
   SILType getEnumElementType(EnumElementDecl *elt, SILModule &M) const;
 
   /// Given that this is a tuple type, return the lowered type of the
@@ -437,6 +442,9 @@ public:
   /// generic args with the appropriate item from the substitution.
   ///
   /// Only call this with function types!
+  SILType substGenericArgs(Lowering::TypeConverter &TC,
+                           SubstitutionMap SubMap) const;
+
   SILType substGenericArgs(SILModule &M,
                            SubstitutionMap SubMap) const;
 
@@ -444,12 +452,19 @@ public:
   ///
   /// If the replacement types are generic, you must push a generic context
   /// first.
-  SILType subst(SILModule &silModule, TypeSubstitutionFn subs,
+  SILType subst(Lowering::TypeConverter &tc, TypeSubstitutionFn subs,
                 LookupConformanceFn conformances,
                 CanGenericSignature genericSig = CanGenericSignature(),
                 bool shouldSubstituteOpaqueArchetypes = false) const;
 
-  SILType subst(SILModule &silModule, SubstitutionMap subs) const;
+  SILType subst(SILModule &M, TypeSubstitutionFn subs,
+                LookupConformanceFn conformances,
+                CanGenericSignature genericSig = CanGenericSignature(),
+                bool shouldSubstituteOpaqueArchetypes = false) const;
+
+  SILType subst(Lowering::TypeConverter &tc, SubstitutionMap subs) const;
+
+  SILType subst(SILModule &M, SubstitutionMap subs) const;
 
   /// Return true if this type references a "ref" type that has a single pointer
   /// representation. Class existentials do not always qualify.
@@ -560,7 +575,7 @@ NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
 CanSILFunctionType getNativeSILFunctionType(
-    SILModule &M, Lowering::AbstractionPattern origType,
+    Lowering::TypeConverter &TC, Lowering::AbstractionPattern origType,
     CanAnyFunctionType substType,
     Optional<SILDeclRef> origConstant = None,
     Optional<SILDeclRef> constant = None,
@@ -581,15 +596,22 @@ static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());
 }
 
-inline SILType SILBoxType::getFieldType(SILModule &M, unsigned index) const {
-  return SILType::getPrimitiveAddressType(getFieldLoweredType(M, index));
-}
-
 inline SILType SILField::getAddressType() const {
   return SILType::getPrimitiveAddressType(getLoweredType());
 }
 inline SILType SILField::getObjectType() const {
   return SILType::getPrimitiveObjectType(getLoweredType());
+}
+
+CanType getSILBoxFieldLoweredType(SILBoxType *type,
+                                  Lowering::TypeConverter &TC,
+                                  unsigned index);
+
+inline SILType getSILBoxFieldType(SILBoxType *type,
+                                  Lowering::TypeConverter &TC,
+                                  unsigned index) {
+  return SILType::getPrimitiveAddressType(
+    getSILBoxFieldLoweredType(type, TC, index));
 }
 
 } // end swift namespace

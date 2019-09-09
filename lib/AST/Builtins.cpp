@@ -192,7 +192,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericEnvironment *Env) {
+                          GenericSignature *Sig) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -227,7 +227,7 @@ getBuiltinGenericFunction(Identifier Id,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
 
-  func->setGenericEnvironment(Env);
+  func->setGenericSignature(Sig);
   func->computeType();
   func->setValidationToChecked();
   func->setImplicit();
@@ -458,7 +458,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericEnvironment *GenericEnv = nullptr;
+    GenericSignature *GenericSig = nullptr;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -474,12 +474,11 @@ namespace {
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
 
-      auto GenericSig = evaluateOrDefault(
+      GenericSig = evaluateOrDefault(
           ctx.evaluator,
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
           nullptr);
-      GenericEnv = GenericSig->createGenericEnvironment();
     }
 
     template <class G>
@@ -499,7 +498,7 @@ namespace {
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericEnv);
+                                       GenericSig);
     }
 
     // Don't use these generator classes directly; call the make{...}

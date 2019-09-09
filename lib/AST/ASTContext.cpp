@@ -370,13 +370,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
     llvm::DenseMap<GenericSignature *, std::unique_ptr<GenericSignatureBuilder>>
       GenericSignatureBuilders;
 
-    /// Canonical generic environments for canonical generic signatures.
-    ///
-    /// The keys are the generic signature builders in
-    /// \c GenericSignatureBuilders.
-    llvm::DenseMap<GenericSignatureBuilder *, GenericEnvironment *>
-      CanonicalGenericEnvironments;
-
     /// The set of function types.
     llvm::FoldingSet<FunctionType> FunctionTypes;
 
@@ -1623,22 +1616,6 @@ GenericSignatureBuilder *ASTContext::getOrCreateGenericSignatureBuilder(
   return builder;
 }
 
-GenericEnvironment *ASTContext::getOrCreateCanonicalGenericEnvironment(
-                                              GenericSignatureBuilder *builder,
-                                              GenericSignature *sig) {
-  auto arena = getArena(sig);
-  auto &canonicalGenericEnvironments =
-      getImpl().getArena(arena).CanonicalGenericEnvironments;
-
-  auto known = canonicalGenericEnvironments.find(builder);
-  if (known != canonicalGenericEnvironments.end())
-    return known->second;
-
-  auto env = sig->createGenericEnvironment();
-  canonicalGenericEnvironments[builder] = env;
-  return env;
-}
-
 Optional<llvm::TinyPtrVector<ValueDecl *>>
 OverriddenDeclsRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
@@ -1993,10 +1970,10 @@ LazyContextData *ASTContext::getOrCreateLazyContextData(
   assert(lazyLoader && "Queried lazy data for non-lazy iterable context");
   if (isa<ProtocolDecl>(dc))
     entry = Allocate<LazyProtocolData>();
-  else if (isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc))
+  else {
+    assert(isa<NominalTypeDecl>(dc) || isa<ExtensionDecl>(dc));
     entry = Allocate<LazyIterableDeclContextData>();
-  else
-    entry = Allocate<LazyGenericContextData>();
+  }
 
   entry->loader = lazyLoader;
   return entry;
@@ -2013,13 +1990,6 @@ LazyIterableDeclContextData *ASTContext::getOrCreateLazyIterableContextData(
   auto nominal = cast<NominalTypeDecl>(idc);
   return (LazyIterableDeclContextData *)getOrCreateLazyContextData(nominal,
                                                                    lazyLoader);
-}
-
-LazyGenericContextData *ASTContext::getOrCreateLazyGenericContextData(
-                                               const GenericContext *dc,
-                                               LazyMemberLoader *lazyLoader) {
-  return (LazyGenericContextData *)getOrCreateLazyContextData(dc,
-                                                              lazyLoader);
 }
 
 bool ASTContext::hasDelayedConformanceErrors() const {
@@ -3653,7 +3623,8 @@ OpaqueTypeArchetypeType::get(OpaqueTypeDecl *Decl,
   
   // Create a generic environment and bind the opaque archetype to the
   // opaque interface type from the decl's signature.
-  auto env = signature->createGenericEnvironment();
+  auto *builder = signature->getGenericSignatureBuilder();
+  auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(GenericParamKey(opaqueInterfaceTy), newOpaque);
   newOpaque->Environment = env;
   
@@ -3726,7 +3697,8 @@ GenericEnvironment *OpenedArchetypeType::getGenericEnvironment() const {
   // Create a generic environment to represent the opened type.
   auto signature = ctx.getExistentialSignature(Opened->getCanonicalType(),
                                                nullptr);
-  auto env = signature->createGenericEnvironment();
+  auto *builder = signature->getGenericSignatureBuilder();
+  auto *env = GenericEnvironment::getIncomplete(signature, builder);
   env->addMapping(signature->getGenericParams()[0], thisType);
   Environment = env;
   

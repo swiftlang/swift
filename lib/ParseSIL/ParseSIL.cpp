@@ -985,7 +985,9 @@ static bool parseDeclSILOptional(bool *isTransparent,
                                  bool *isGlobalInit,
                                  Inline_t *inlineStrategy,
                                  OptimizationMode *optimizationMode,
-                                 bool *isLet, bool *isWeakLinked,
+                                 bool *isLet,
+                                 bool *isWeakImported,
+                                 AvailabilityContext *availability,
                                  bool *isWithoutActuallyEscapingThunk,
                                  SmallVectorImpl<std::string> *Semantics,
                                  SmallVectorImpl<ParsedSpecAttr> *SpecAttrs,
@@ -1027,14 +1029,27 @@ static bool parseDeclSILOptional(bool *isTransparent,
       *isWithoutActuallyEscapingThunk = true;
     else if (isGlobalInit && SP.P.Tok.getText() == "global_init")
       *isGlobalInit = true;
-    else if (isWeakLinked && SP.P.Tok.getText() == "_weakLinked")
+    else if (isWeakImported && SP.P.Tok.getText() == "weak_imported") {
       if (M.getASTContext().LangOpts.Target.isOSBinFormatCOFF())
         SP.P.diagnose(SP.P.Tok, diag::attr_unsupported_on_target,
                       SP.P.Tok.getText(),
                       M.getASTContext().LangOpts.Target.str());
       else
-        *isWeakLinked = true;
-    else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
+        *isWeakImported = true;
+    } else if (availability && SP.P.Tok.getText() == "available") {
+      SP.P.consumeToken(tok::identifier);
+
+      SourceRange range;
+      llvm::VersionTuple version;
+      if (SP.P.parseVersionTuple(version, range,
+                                 diag::sil_availability_expected_version))
+        return true;
+
+      *availability = AvailabilityContext(VersionRange::allGTE(version));
+
+      SP.P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    } else if (inlineStrategy && SP.P.Tok.getText() == "noinline")
       *inlineStrategy = NoInline;
     else if (optimizationMode && SP.P.Tok.getText() == "Onone")
       *optimizationMode = OptimizationMode::NoOptimization;
@@ -5402,7 +5417,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   IsThunk_t isThunk = IsNotThunk;
-  bool isGlobalInit = false, isWeakLinked = false;
+  bool isGlobalInit = false, isWeakImported = false;
+  AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
   bool isWithoutActuallyEscapingThunk = false;
   Inline_t inlineStrategy = InlineDefault;
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
@@ -5417,7 +5433,7 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
           &isThunk, &isDynamic, &isExactSelfClass, &DynamicallyReplacedFunction,
           &objCReplacementFor, &isGlobalInit, &inlineStrategy, &optimizationMode, nullptr,
-          &isWeakLinked, &isWithoutActuallyEscapingThunk, &Semantics,
+          &isWeakImported, &availability, &isWithoutActuallyEscapingThunk, &Semantics,
           &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
@@ -5452,7 +5468,8 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
     if (!objCReplacementFor.empty())
       FunctionState.F->setObjCReplacement(objCReplacementFor);
     FunctionState.F->setGlobalInit(isGlobalInit);
-    FunctionState.F->setWeakLinked(isWeakLinked);
+    FunctionState.F->setAlwaysWeakImported(isWeakImported);
+    FunctionState.F->setAvailabilityForLinkage(availability);
     FunctionState.F->setWithoutActuallyEscapingThunk(
       isWithoutActuallyEscapingThunk);
     FunctionState.F->setInlineStrategy(inlineStrategy);
@@ -5642,7 +5659,7 @@ bool SILParserTUState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, State, M) ||
+                           nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       P.parseToken(tok::colon, diag::expected_sil_type))
@@ -5691,7 +5708,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -5760,7 +5777,7 @@ bool SILParserTUState::parseSILVTable(Parser &P) {
   if (parseDeclSILOptional(nullptr, &Serialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr,
+                           nullptr, nullptr, nullptr,
                            VTableState, M))
     return true;
 
@@ -6295,7 +6312,7 @@ bool SILParserTUState::parseSILWitnessTable(Parser &P) {
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr,
+                           nullptr, nullptr, nullptr,
                            WitnessState, M))
     return true;
 

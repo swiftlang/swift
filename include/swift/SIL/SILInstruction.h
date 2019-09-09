@@ -1643,9 +1643,7 @@ public:
   bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   // Return the type of the memory stored in the alloc_box.
-  SILType getAddressType() const {
-    return getBoxType()->getFieldType(getModule(), 0).getAddressType();
-  }
+  SILType getAddressType() const;
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -3289,16 +3287,6 @@ public:
 
 class EndBorrowInst;
 
-struct UseToEndBorrow {
-  Optional<EndBorrowInst *> operator()(Operand *use) const {
-    if (auto endBorrow = dyn_cast<EndBorrowInst>(use->getUser())) {
-      return endBorrow;
-    } else {
-      return None;
-    }
-  }
-};
-
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
 class LoadBorrowInst :
@@ -3312,14 +3300,14 @@ public:
                              LValue->getType().getObjectType()) {}
 
   using EndBorrowRange =
-      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+      decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
 };
 
 inline auto LoadBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
+  return getUsersOfType<EndBorrowInst>();
 }
 
 /// Represents the begin scope of a borrowed value. Must be paired with an
@@ -3335,7 +3323,7 @@ class BeginBorrowInst
 
 public:
   using EndBorrowRange =
-      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+      decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
@@ -3350,7 +3338,7 @@ public:
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
+  return getUsersOfType<EndBorrowInst>();
 }
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
@@ -3489,6 +3477,8 @@ enum class SILAccessEnforcement : uint8_t {
 };
 StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
 
+class EndAccessInst;
+
 /// Begins an access scope. Must be paired with an end_access instruction
 /// along every path.
 class BeginAccessInst
@@ -3560,13 +3550,8 @@ public:
     return getOperand();
   }
 
-private:
-    /// Predicate used to filter EndAccessRange.
-  struct UseToEndAccess;
-
-public:
   using EndAccessRange =
-    OptionalTransformRange<use_range, UseToEndAccess, use_iterator>;
+      decltype(std::declval<ValueBase>().getUsersOfType<EndAccessInst>());
 
   /// Find all the associated end_access instructions for this begin_access.
   EndAccessRange getEndAccesses() const;
@@ -3607,18 +3592,8 @@ public:
   }
 };
 
-struct BeginAccessInst::UseToEndAccess {
-  Optional<EndAccessInst *> operator()(Operand *use) const {
-    if (auto access = dyn_cast<EndAccessInst>(use->getUser())) {
-      return access;
-    } else {
-      return None;
-    }
-  }
-};
-
 inline auto BeginAccessInst::getEndAccesses() const -> EndAccessRange {
-  return EndAccessRange(getUses(), UseToEndAccess());
+  return getUsersOfType<EndAccessInst>();
 }
 
 /// Begins an access without requiring a paired end_access.

@@ -355,9 +355,9 @@ void LoopRegionFunctionInfo::initializeBlockRegions(PostOrderFunctionInfo *PI,
   // Initialize regions for each BB and associate RPO numbers with each BB.
   //
   // We use the RPO number of a BB as its Index in our data structures.
-  for (auto P : PI->getEnumeratedReversePostOrder()) {
-    BlockTy *BB = P.first;
-    unsigned RPOIndex = P.second;
+  for (auto P : llvm::enumerate(PI->getReversePostOrder())) {
+    BlockTy *BB = P.value();
+    unsigned RPOIndex = P.index();
     auto *BBRegion = createRegion(BB, RPOIndex);
     assert(BBRegion && "Create region fail to create a BB?");
     assert(*PI->getRPONumber(BB) == RPOIndex &&

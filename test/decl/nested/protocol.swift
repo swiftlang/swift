@@ -71,6 +71,7 @@ class OuterClass {
 class OtherGenericClass<T> {
   protocol InnerProtocol : OtherGenericClass { }
   // expected-error@-1{{protocol 'InnerProtocol' cannot be nested inside another declaration}}
+  // expected-error@-2{{superclass constraint 'Self' : 'OtherGenericClass<Self>' is recursive}}
 }
 
 protocol SelfDotTest {

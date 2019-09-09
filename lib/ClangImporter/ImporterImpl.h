@@ -802,10 +802,6 @@ public:
   GenericSignature *buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
 
-  /// Utility function for building simple generic environments.
-  GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
-                                              DeclContext *dc);
-
   /// Import the given Clang declaration context into Swift.
   ///
   /// Usually one will use \c importDeclContextOf instead.
@@ -1240,12 +1236,6 @@ public:
   /// Returns the default definition type for \p ATD.
   Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                  uint64_t contextData) override {
-    llvm_unreachable("unimplemented for ClangImporter");
-  }
-  
-  /// Returns the generic environment.
-  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 

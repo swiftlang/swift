@@ -249,12 +249,6 @@ FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
 
-/// Number of lazy generic environments registered.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
-
-/// Number of lazy generic environments deserialized.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
-
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
 

@@ -578,6 +578,8 @@ public:
     return *Op(*Current);
   }
 
+  reference operator*() { return *Op(*Current); }
+
   OptionalTransformIterator &operator++() {
     ++Current;
     skipNonMatching();

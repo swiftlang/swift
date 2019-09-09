@@ -71,8 +71,7 @@ void TBDGenVisitor::addSymbol(SILDeclRef declRef) {
 
 void TBDGenVisitor::addSymbol(LinkEntity entity) {
   auto linkage =
-      LinkInfo::get(UniversalLinkInfo, SwiftModule, AvailCtx,
-                    entity, ForDefinition);
+      LinkInfo::get(UniversalLinkInfo, SwiftModule, entity, ForDefinition);
 
   auto externallyVisible =
       llvm::GlobalValue::isExternalLinkage(linkage.getLinkage()) &&
@@ -602,8 +601,6 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   const auto &target = ctx.LangOpts.Target;
   UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
                                 isWholeModule);
-  auto availCtx = AvailabilityContext::forDeploymentTarget(ctx);
-
   tapi::internal::InterfaceFile file;
   file.setFileType(tapi::internal::FileType::TBD_V3);
   file.setApplicationExtensionSafe(
@@ -618,7 +615,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setArch(arch);
   file.setInstallAPI();
 
-  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, availCtx, opts);
+  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {
