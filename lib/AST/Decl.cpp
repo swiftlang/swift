@@ -5709,9 +5709,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
           return;
 
         // Do not suggest the fix-it if `Self` is a class type.
-        if (AD->getDeclContext()
-                ->getSelfTypeInContext()
-                ->isAnyClassReferenceType()) {
+        if (!AD->getDeclContext()->hasValueSemantics()) {
           return;
         }
       }

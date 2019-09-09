@@ -1956,26 +1956,10 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   }
 }
 
-bool swift::doesContextHaveValueSemantics(DeclContext *dc) {
-  if (Type contextTy = dc->getDeclaredInterfaceType()) {
-    // If the decl context is an extension, then it could be imposing a class
-    // constraint (ex: where Self: SomeClass). Make sure we include that
-    // in our check as well.
-    auto extensionRequiresClass = false;
-    if (auto ED = dyn_cast<ExtensionDecl>(dc)) {
-      extensionRequiresClass =
-          ED->getGenericSignature()->requiresClass(ED->getSelfInterfaceType());
-    }
-    return !contextTy->hasReferenceSemantics() && !extensionRequiresClass;
-  }
-  return false;
-}
-
 llvm::Expected<SelfAccessKind>
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
-    if (!FD->isInstanceMember() ||
-        !doesContextHaveValueSemantics(FD->getDeclContext())) {
+    if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
       return SelfAccessKind::NonMutating;
     }
     return SelfAccessKind::Mutating;
@@ -1997,8 +1981,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-      if (AD->isInstanceMember() &&
-          doesContextHaveValueSemantics(AD->getDeclContext()))
+      if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
 
