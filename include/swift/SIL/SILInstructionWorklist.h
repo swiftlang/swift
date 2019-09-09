@@ -151,17 +151,19 @@ public:
   /// \return whether the instruction was deleted or modified.
   bool replaceInstructionWithInstruction(SILInstruction *instruction,
                                          SILInstruction *result
-#ifndef NDNEBUG
+#ifndef NDEBUG
                                          ,
                                          std::string instructionDescription
 #endif
   ) {
     if (result == instruction) {
+#ifndef NDEBUG
       withDebugStream([&](llvm::raw_ostream &stream, StringRef loggingName) {
         stream << loggingName << ": Mod = " << instructionDescription << '\n'
                << "  "
                << "  New = " << *instruction << '\n';
       });
+#endif
 
       // If the instruction was modified, it's possible that it is now dead.
       // if so, remove it.
