@@ -573,6 +573,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
+  if (diagnoseAsAmbiguousOperatorRef())
+    return true;
+
   Optional<unsigned> atParameterPos;
   // Sometimes fix is recorded by type-checking sub-expression
   // during normal diagnostics, in such case call expression
@@ -612,6 +615,52 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
   return RequirementFailure::diagnoseAsError();
+}
+
+bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
+  auto *anchor = getRawAnchor();
+  auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor);
+  if (!ODRE)
+    return false;
+
+  auto isStdlibType = [](Type type) {
+    if (auto *NTD = type->getAnyNominal()) {
+      auto *DC = NTD->getDeclContext();
+      return DC->isModuleScopeContext() &&
+             DC->getParentModule()->isStdlibModule();
+    }
+
+    return false;
+  };
+
+  auto name = ODRE->getDecls().front()->getBaseName();
+  if (!(name.isOperator() && isStdlibType(getLHS()) && isStdlibType(getRHS())))
+    return false;
+
+  // If this is an operator reference and both types are from stdlib,
+  // let's produce a generic diagnostic about invocation and a note
+  // about missing conformance just in case.
+  auto operatorID = name.getIdentifier();
+
+  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
+  if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
+    auto lhsType = getType(binaryOp->getArg()->getElement(0));
+    auto rhsType = getType(binaryOp->getArg()->getElement(1));
+
+    if (lhsType->isEqual(rhsType)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
+                     operatorID.str(), lhsType);
+    } else {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_args,
+                     operatorID.str(), lhsType, rhsType);
+    }
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
+                   operatorID.str(), getType(applyExpr->getArg()));
+  }
+
+  diagnoseAsNote();
+  return true;
 }
 
 Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(

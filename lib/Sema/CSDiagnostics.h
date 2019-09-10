@@ -327,6 +327,14 @@ public:
   bool diagnoseAsError() override;
 
 protected:
+  /// Check whether this requirement is associated with one of the
+  /// operator overloads, in cases like that sometimes it makes more
+  /// sense to produce a generic diagnostic about operator reference
+  /// instead of conformance, because it could be something like
+  /// `true + true`, and it doesn't make much sense to suggest to
+  /// add a conformance from one library type to another.
+  bool diagnoseAsAmbiguousOperatorRef();
+
   DiagOnDecl getDiagnosticOnDecl() const override {
     return diag::type_does_not_conform_decl_owner;
   }
