@@ -751,8 +751,9 @@ bool SemanticARCOptVisitor::visitLoadInst(LoadInst *li) {
   if (!isDeadLiveRange(li, destroyValues))
     return false;
 
-  // Then check if our address is ever written to. If it is, then we
-  // can not use the load_borrow.
+  // Then check if our address is ever written to. If it is, then we cannot use
+  // the load_borrow because the stored value may be released during the loaded
+  // value's live range.
   if (isWrittenTo(li))
     return false;
 
