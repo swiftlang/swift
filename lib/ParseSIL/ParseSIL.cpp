@@ -1219,8 +1219,7 @@ static ValueDecl *lookupMember(Parser &P, Type Ty, DeclBaseName Name,
       Lookup.append(found.begin(), found.end());
     }
   } else if (auto moduleTy = CheckTy->getAs<ModuleType>()) {
-    moduleTy->getModule()->lookupValue({ }, Name, NLKind::QualifiedLookup,
-                                       Lookup);
+    moduleTy->getModule()->lookupValue(Name, NLKind::QualifiedLookup, Lookup);
   } else {
     P.diagnose(Loc, diag::sil_member_lookup_bad_type, Name, Ty);
     return nullptr;
@@ -4525,7 +4524,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<ValueDecl*, 4> CurModuleResults;
     // Perform a module level lookup on the first component of the
     // fully-qualified name.
-    P.SF.getParentModule()->lookupValue(ModuleDecl::AccessPathTy(), ProtocolName,
+    P.SF.getParentModule()->lookupValue(ProtocolName,
                                         NLKind::UnqualifiedLookup,
                                         CurModuleResults);
     assert(CurModuleResults.size() == 1);
@@ -5617,7 +5616,7 @@ static Optional<VarDecl *> lookupGlobalDecl(Identifier GlobalName,
 
   SmallVector<ValueDecl *, 4> CurModuleResults;
   P.SF.getParentModule()->lookupValue(
-      {}, P.Context.getIdentifier(GlobalDeclName), NLKind::UnqualifiedLookup,
+      P.Context.getIdentifier(GlobalDeclName), NLKind::UnqualifiedLookup,
       CurModuleResults);
   // Bail-out on clang-imported globals.
   if (CurModuleResults.empty())

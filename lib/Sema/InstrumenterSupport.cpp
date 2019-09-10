@@ -91,7 +91,7 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
 
   SmallVector<ValueDecl *, 1> results;
   TypeCheckDC->getParentModule()->lookupValue(
-      {}, moduleIdentifier, NLKind::UnqualifiedLookup, results);
+      moduleIdentifier, NLKind::UnqualifiedLookup, results);
 
   ModuleIdentifier = (results.size() == 1) ? moduleIdentifier : Identifier();
 
@@ -107,7 +107,7 @@ InstrumenterBase::InstrumenterBase(ASTContext &C, DeclContext *DC)
 
   results.clear();
   TypeCheckDC->getParentModule()->lookupValue(
-      {}, fileIdentifier, NLKind::UnqualifiedLookup, results);
+      fileIdentifier, NLKind::UnqualifiedLookup, results);
 
   FileIdentifier = (results.size() == 1) ? fileIdentifier : Identifier();
 }

@@ -53,7 +53,7 @@ public:
 static CanType getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
   auto &ctx = stdlib->getASTContext();
   SmallVector<ValueDecl*, 1> results;
-  stdlib->lookupValue({}, ctx.getIdentifier(name), NLKind::QualifiedLookup,
+  stdlib->lookupValue(ctx.getIdentifier(name), NLKind::QualifiedLookup,
                       results);
 
   // If we have one single type decl, and that decl has been

@@ -23,7 +23,11 @@ else()
 endif()
 add_custom_command(OUTPUT "${dest}"
                    DEPENDS "${source}"
-                   COMMAND "${CMAKE_COMMAND}" "-E" "${CMAKE_SYMLINK_COMMAND}" "${source}" "${dest}")
+                   COMMAND "${CMAKE_COMMAND}" "-E" "${CMAKE_SYMLINK_COMMAND}" "${source}" "${dest}"
+                   COMMENT "Symlinking ABI checker baseline data to ${dest}")
 add_custom_target("symlink_abi_checker_data" ALL
                   DEPENDS "${dest}"
                   COMMENT "Symlinking ABI checker baseline data to ${dest}")
+if(TARGET swift-api-digester)
+  add_dependencies(swift-api-digester symlink_abi_checker_data)
+endif()
