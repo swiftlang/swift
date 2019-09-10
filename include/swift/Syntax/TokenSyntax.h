@@ -80,6 +80,15 @@ public:
     return getRaw()->getTokenText();
   }
 
+  StringRef getIdentifierText() const {
+    StringRef text = getText();
+    if (text.front() == '`') {
+      assert(text.back() == '`');
+      return text.slice(1, text.size() - 1);
+    }
+    return text;
+  }
+
   static bool kindof(SyntaxKind Kind) {
     return isTokenKind(Kind);
   }

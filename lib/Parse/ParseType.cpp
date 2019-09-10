@@ -1193,7 +1193,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
   auto GetNameText = [this](Optional<ParsedTokenSyntax> Name) {
     return !Name ? StringRef()
                  : SourceMgr.extractText(
-                       Name->getRaw().getDeferredTokenRangeWithoutBackticks(),
+                       Name->getRaw().getDeferredTokenRange(),
                        L->getBufferID());
   };
 
@@ -1208,7 +1208,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
         auto Diag = diagnose(NameLoc, diag::tuple_type_multiple_labels);
         auto Name = Element.getDeferredName();
         auto NameText = SourceMgr.extractText(
-            Name->getRaw().getDeferredTokenRangeWithoutBackticks(),
+            Name->getRaw().getDeferredTokenRange(),
             L->getBufferID());
         if (NameText == "_") {
           Diag.fixItRemoveChars(NameLoc, TypeLoc);

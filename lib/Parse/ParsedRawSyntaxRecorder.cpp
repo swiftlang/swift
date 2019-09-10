@@ -30,7 +30,7 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordToken(const Token &tok,
                                      const ParsedTrivia &leadingTrivia,
                                      const ParsedTrivia &trailingTrivia) {
-  return recordToken(tok.getKind(), tok.getRangeWithoutBackticks(),
+  return recordToken(tok.getKind(), tok.getRange(),
                      leadingTrivia.Pieces, trailingTrivia.Pieces);
 }
 
@@ -63,7 +63,7 @@ getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
   if (node.isDeferredLayout())
     return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
   assert(node.isDeferredToken());
-  CharSourceRange tokRange = node.getDeferredTokenRangeWithoutBackticks();
+  CharSourceRange tokRange = node.getDeferredTokenRange();
   tok tokKind = node.getTokenKind();
   if (node.isMissing())
     return rec.recordMissingToken(tokKind, tokRange.getStart());
