@@ -145,12 +145,18 @@ namespace {
 /// the worklist before we delete them.
 struct SemanticARCOptVisitor
     : SILInstructionVisitor<SemanticARCOptVisitor, bool> {
+  /// Our main worklist. We use this after an initial run through.
   SmallBlotSetVector<SILValue, 32> worklist;
+
+  /// A secondary work list that we use to store dead trivial instructions to
+  /// delete after we are done processing the worklist.
+  SmallBlotSetVector<SILInstruction *, 32> deadTrivialInsts;
+
   SILFunction &F;
   Optional<DeadEndBlocks> TheDeadEndBlocks;
-  
+
   explicit SemanticARCOptVisitor(SILFunction &F) : F(F) {}
-      
+
   DeadEndBlocks &getDeadEndBlocks() {
     if (!TheDeadEndBlocks)
       TheDeadEndBlocks.emplace(&F);
@@ -167,7 +173,7 @@ struct SemanticARCOptVisitor
 
   /// Add all operands of i to the worklist and then call eraseInstruction on
   /// i. Assumes that the instruction doesnt have users.
-  void eraseInstructionAndAddOptsToWorklist(SILInstruction *i) {
+  void eraseInstructionAndAddOperandsToWorklist(SILInstruction *i) {
     // Then copy all operands into the worklist for future processing.
     for (SILValue v : i->getOperandValues()) {
       worklist.insert(v);
@@ -184,6 +190,7 @@ struct SemanticARCOptVisitor
     for (SILValue result : i->getResults()) {
       worklist.erase(result);
     }
+    deadTrivialInsts.erase(i);
     i->eraseFromParent();
   }
 
@@ -227,18 +234,7 @@ bool SemanticARCOptVisitor::processWorklist() {
     // the instruction).
     if (auto *defInst = next->getDefiningInstruction()) {
       if (isInstructionTriviallyDead(defInst)) {
-        madeChange = true;
-        recursivelyDeleteTriviallyDeadInstructions(
-            defInst, true/*force*/,
-            [&](SILInstruction *i) {
-              for (SILValue operand : i->getOperandValues()) {
-                worklist.insert(operand);
-              }
-              for (SILValue result : i->getResults()) {
-                worklist.erase(result);
-              }
-              ++NumEliminatedInsts;
-            });
+        deadTrivialInsts.insert(defInst);
         continue;
       }
     }
@@ -249,6 +245,23 @@ bool SemanticARCOptVisitor::processWorklist() {
       madeChange |= visit(svi);
       continue;
     }
+  }
+
+  // Then eliminate the rest of the dead trivial insts.
+  //
+  // NOTE: We do not need to touch the worklist here since it is guaranteed to
+  // be empty due to the loop above. We enforce this programatically with the
+  // assert.
+  assert(worklist.empty() && "Expected drained worklist so we don't have to "
+                             "remove dead insts form it");
+  while (!deadTrivialInsts.empty()) {
+    auto val = deadTrivialInsts.pop_back_val();
+    if (!val)
+      continue;
+    recursivelyDeleteTriviallyDeadInstructions(
+        *val, true /*force*/,
+        [&](SILInstruction *i) { deadTrivialInsts.erase(i); });
+    madeChange = true;
   }
 
   return madeChange;
@@ -504,7 +517,7 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) 
   if (auto *op = cvi->getSingleUse()) {
     if (auto *dvi = dyn_cast<DestroyValueInst>(op->getUser())) {
       eraseInstruction(dvi);
-      eraseInstructionAndAddOptsToWorklist(cvi);
+      eraseInstructionAndAddOperandsToWorklist(cvi);
       NumEliminatedInsts += 2;
       return true;
     }
@@ -531,7 +544,7 @@ bool SemanticARCOptVisitor::eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi) 
     eraseInstruction(destroys.pop_back_val());
     ++NumEliminatedInsts;
   }
-  eraseInstructionAndAddOptsToWorklist(cvi);
+  eraseInstructionAndAddOperandsToWorklist(cvi);
   ++NumEliminatedInsts;
   return true;
 }
