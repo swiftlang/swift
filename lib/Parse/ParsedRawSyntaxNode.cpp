@@ -35,7 +35,7 @@ ParsedRawSyntaxNode::makeDeferred(Token tok,
                                   const ParsedTrivia &leadingTrivia,
                                   const ParsedTrivia &trailingTrivia,
                                   SyntaxParsingContext &ctx) {
-  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
+  CharSourceRange tokRange = tok.getRange();
   size_t piecesCount = leadingTrivia.size() + trailingTrivia.size();
   ParsedTriviaPiece *piecesPtr = nullptr;
   if (piecesCount > 0) {

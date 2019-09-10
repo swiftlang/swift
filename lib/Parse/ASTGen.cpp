@@ -164,7 +164,7 @@ TupleTypeRepr *ASTGen::generateTuple(TokenSyntax LParen,
       ElementAST.NameLoc = generate(*Name, Loc);
       ElementAST.Name = Name->getText() == "_"
                             ? Identifier()
-                            : Context.getIdentifier(Name->getText());
+                            : Context.getIdentifier(Name->getIdentifierText());
     }
     if (auto Colon = Element.getColon())
       ElementAST.ColonLoc = generate(*Colon, Loc);
@@ -173,7 +173,7 @@ TupleTypeRepr *ASTGen::generateTuple(TokenSyntax LParen,
       ElementAST.SecondName =
           SecondName->getText() == "_"
               ? Identifier()
-              : Context.getIdentifier(SecondName->getText());
+              : Context.getIdentifier(SecondName->getIdentifierText());
       if (IsFunction) {
         // Form the named parameter type representation.
         ElementAST.UnderscoreLoc = ElementAST.NameLoc;
@@ -351,7 +351,7 @@ TypeRepr *ASTGen::generateSimpleOrMemberIdentifier(T Type, SourceLoc &Loc) {
 template <typename T>
 ComponentIdentTypeRepr *ASTGen::generateIdentifier(T Type, SourceLoc &Loc) {
   auto IdentifierLoc = advanceLocBegin(Loc, Type.getName());
-  auto Identifier = Context.getIdentifier(Type.getName().getText());
+  auto Identifier = Context.getIdentifier(Type.getName().getIdentifierText());
   if (auto Clause = Type.getGenericArgumentClause()) {
     auto Args = Clause->getArguments();
     if (!Args.empty()) {
