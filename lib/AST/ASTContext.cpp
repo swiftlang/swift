@@ -654,7 +654,7 @@ void ASTContext::lookupInSwiftModule(
 
   // Find all of the declarations with this name in the Swift module.
   auto identifier = getIdentifier(name);
-  M->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
+  M->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
 }
 
 FuncDecl *ASTContext::getPlusFunctionOnRangeReplaceableCollection() const {
@@ -832,7 +832,7 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
     SmallVector<ValueDecl *, 1> results;
     auto *Context = const_cast<ASTContext *>(this);
     if (ModuleDecl *M = Context->getModuleByName(Id_ObjectiveC.str())) {
-      M->lookupValue({ }, getIdentifier("ObjCBool"), NLKind::UnqualifiedLookup,
+      M->lookupValue(getIdentifier("ObjCBool"), NLKind::UnqualifiedLookup,
                      results);
       for (auto result : results) {
         if (auto structDecl = dyn_cast<StructDecl>(result)) {
@@ -899,7 +899,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
   if (!M)
     return nullptr;
-  M->lookupValue({ }, getIdentifier(getProtocolName(kind)),
+  M->lookupValue(getIdentifier(getProtocolName(kind)),
                  NLKind::UnqualifiedLookup, results);
 
   for (auto result : results) {
@@ -3959,7 +3959,7 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
                                                    ModuleDecl *module) {
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
-  module->lookupValue({ }, name, NLKind::UnqualifiedLookup, results);
+  module->lookupValue(name, NLKind::UnqualifiedLookup, results);
   for (auto result : results) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(result))
       return nominal;

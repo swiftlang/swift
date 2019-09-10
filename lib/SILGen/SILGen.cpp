@@ -86,7 +86,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     SmallVector<ValueDecl *, 2> decls;
-    mod->lookupValue(/*AccessPath=*/{}, ctx.getIdentifier(functionName),
+    mod->lookupValue(ctx.getIdentifier(functionName),
                      NLKind::QualifiedLookup, decls);
     if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,

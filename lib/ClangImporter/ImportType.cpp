@@ -2331,11 +2331,9 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
       // If we have an overlay, look in the overlay. Otherwise, skip
       // the lookup to avoid infinite recursion.
       if (auto module = clangUnit->getOverlayModule())
-        module->lookupValue({ }, identifier,
-                          NLKind::UnqualifiedLookup, results);
+        module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     } else {
-      file->lookupValue({ }, identifier,
-                        NLKind::UnqualifiedLookup, results);
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     }
   }
 
@@ -2376,7 +2374,7 @@ getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
 
   // Look for the type.
   SmallVector<ValueDecl *, 2> results;
-  module->lookupValue({ }, SwiftContext.getIdentifier(name),
+  module->lookupValue(SwiftContext.getIdentifier(name),
                       NLKind::UnqualifiedLookup, results);
   if (results.size() == 1) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {

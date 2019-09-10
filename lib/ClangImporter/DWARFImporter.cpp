@@ -32,10 +32,9 @@ public:
   /// Forwards the request to the ClangImporter, which forwards it to the
   /// DWARFimporterDelegate.
   virtual void
-  lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-              NLKind lookupKind,
+  lookupValue(DeclName name, NLKind lookupKind,
               SmallVectorImpl<ValueDecl *> &results) const override {
-    Owner.lookupValueDWARF(accessPath, name, lookupKind,
+    Owner.lookupValueDWARF(name, lookupKind,
                            getParentModule()->getName(), results);
   }
 
@@ -130,11 +129,8 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
 }
 
 void ClangImporter::Implementation::lookupValueDWARF(
-    ModuleDecl::AccessPathTy accessPath, DeclName name, NLKind lookupKind,
-    Identifier inModule, SmallVectorImpl<ValueDecl *> &results) {
-  if (!swift::ModuleDecl::matchesAccessPath(accessPath, name))
-    return;
-
+    DeclName name, NLKind lookupKind, Identifier inModule,
+    SmallVectorImpl<ValueDecl *> &results) {
   if (lookupKind != NLKind::QualifiedLookup)
     return;
 
