@@ -820,6 +820,14 @@ bool IterableDeclContext::hasUnparsedMembers() const {
 }
 
 void IterableDeclContext::loadAllMembers() const {
+  // SWIFT_ENABLE_TENSORFLOW
+  // If it's an AD-synthesized decl, then the members are already "loaded"
+  // because we create the members eagerly when the synthesize it. Trying to
+  // load the members confuses the parser.
+  if (auto *typeDecl = dyn_cast<TypeDecl>(getDecl()))
+    if (typeDecl->getNameStr().startswith("_AD__"))
+      return;
+
   ASTContext &ctx = getASTContext();
 
   // For contexts within a source file, get the list of parsed members.
