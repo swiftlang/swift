@@ -6326,21 +6326,17 @@ void FailureDiagnosis::diagnoseAmbiguity(Expr *E) {
 /// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
 /// constraint system, return the decl that it references.
 ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  auto *resolvedOverloadSets = this->getResolvedOverloadSets();
-  if (!resolvedOverloadSets) return nullptr;
-  
   // Search through the resolvedOverloadSets to see if we have a resolution for
   // this member.  This is an O(n) search, but only happens when producing an
   // error diagnostic.
-  for (auto resolved = resolvedOverloadSets;
-       resolved; resolved = resolved->Previous) {
-    if (resolved->Locator != locator) continue;
-    
-    // We only handle the simplest decl binding.
-    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl)
-      return nullptr;
-    return resolved->Choice.getDecl();
-  }
-  
-  return nullptr;
+  auto *overload = findSelectedOverloadFor(locator);
+  if (!overload)
+    return nullptr;
+
+  // We only want to handle the simplest decl binding.
+  auto choice = overload->Choice;
+  if (choice.getKind() != OverloadChoiceKind::Decl)
+    return nullptr;
+
+  return choice.getDecl();
 }
