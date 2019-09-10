@@ -3009,31 +3009,13 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return !resultTy;
   }
 
-  /// Expression type checking listener for conditions.
-  class ConditionListener : public ExprTypeCheckListener {
-    Expr *OrigExpr = nullptr;
+  auto *boolDecl = Context.getBoolDecl();
+  if (!boolDecl)
+    return true;
 
-  public:
-    // Add the appropriate Boolean constraint.
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // Save the original expression.
-      OrigExpr = expr;
-      
-      // Otherwise, the result must be convertible to Bool.
-      auto boolDecl = cs.getASTContext().getBoolDecl();
-      if (!boolDecl)
-        return true;
-      
-      // Condition must convert to Bool.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       boolDecl->getDeclaredType(),
-                       cs.getConstraintLocator(expr));
-      return false;
-    }
-  };
-
-  ConditionListener listener;
-  auto resultTy = typeCheckExpression(expr, dc, &listener);
+  auto resultTy = typeCheckExpression(
+      expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
+      CTP_Condition);
   return !resultTy;
 }
 

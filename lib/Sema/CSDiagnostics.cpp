@@ -692,6 +692,8 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_coerce;
   case CTP_SubscriptAssignSource:
     return diag::cannot_convert_subscript_assign;
+  case CTP_Condition:
+    return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
   case CTP_Unused:
@@ -1954,6 +1956,8 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return diag::cannot_convert_assign_nil;
   case CTP_SubscriptAssignSource:
     return diag::cannot_convert_subscript_assign_nil;
+  case CTP_Condition:
+    return diag::cannot_convert_condition_value_nil;
   }
   llvm_unreachable("Unhandled ContextualTypePurpose in switch");
 }
@@ -2691,6 +2695,8 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_SubscriptAssignSource:
     return forProtocol ? diag::cannot_convert_subscript_assign_protocol
                        : diag::cannot_convert_subscript_assign;
+  case CTP_Condition:
+    return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
   case CTP_Unused:

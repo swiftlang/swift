@@ -59,7 +59,7 @@ func funcdecl5(_ a: Int, y: Int) {
   }
 
   // This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{'Int' is not convertible to 'Bool'}}
+  if x {}   // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
   if true {
     if (B) {
@@ -99,7 +99,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{'infloopbool' is not convertible to 'Bool'}}
+  if (infloopbool()) {} // expected-error {{cannot convert value of type 'infloopbool' to expected condition type 'Bool'}}
 }
 
 // test "builder" API style
@@ -566,9 +566,10 @@ func fn(x: Int) {
 }
 
 func bad_if() {
-  if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
-  if (x: false) {} // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
-  if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+  if 1 {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
+  if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
+  if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
 }
 
 // Typo correction for loop labels
