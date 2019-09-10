@@ -436,6 +436,15 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
 ProtocolConformanceRef ModuleFile::readConformance(
                                              llvm::BitstreamCursor &Cursor,
                                              GenericEnvironment *genericEnv) {
+  auto conformance = readConformanceChecked(Cursor, genericEnv);
+  if (!conformance)
+    fatal(conformance.takeError());
+  return conformance.get();
+}
+
+Expected<ProtocolConformanceRef>
+ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
+                                   GenericEnvironment *genericEnv) {
   using namespace decls_block;
 
   SmallVector<uint64_t, 16> scratch;
@@ -456,14 +465,24 @@ ProtocolConformanceRef ModuleFile::readConformance(
   case ABSTRACT_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     AbstractProtocolConformanceLayout::readRecord(scratch, protoID);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+
+    auto decl = getDeclChecked(protoID);
+    if (!decl)
+      return decl.takeError();
+
+    auto proto = cast<ProtocolDecl>(decl.get());
     return ProtocolConformanceRef(proto);
   }
 
   case SELF_PROTOCOL_CONFORMANCE: {
     DeclID protoID;
     SelfProtocolConformanceLayout::readRecord(scratch, protoID);
-    auto proto = cast<ProtocolDecl>(getDecl(protoID));
+
+    auto decl = getDeclChecked(protoID);
+    if (!decl)
+      return decl.takeError();
+
+    auto proto = cast<ProtocolDecl>(decl.get());
     auto conformance = getContext().getSelfConformance(proto);
     return ProtocolConformanceRef(conformance);
   }
@@ -673,6 +692,14 @@ GenericParamList *ModuleFile::maybeReadGenericParams(DeclContext *DC) {
 void ModuleFile::readGenericRequirements(
                    SmallVectorImpl<Requirement> &requirements,
                    llvm::BitstreamCursor &Cursor) {
+  auto error = readGenericRequirementsChecked(requirements, Cursor);
+  if (error)
+    fatal(std::move(error));
+}
+
+llvm::Error ModuleFile::readGenericRequirementsChecked(
+                   SmallVectorImpl<Requirement> &requirements,
+                   llvm::BitstreamCursor &Cursor) {
   using namespace decls_block;
 
   BCOffsetRAII lastRecordOffset(Cursor);
@@ -700,27 +727,42 @@ void ModuleFile::readGenericRequirements(
 
       switch (rawKind) {
       case GenericRequirementKind::Conformance: {
-        auto subject = getType(rawTypeIDs[0]);
-        auto constraint = getType(rawTypeIDs[1]);
+        auto subject = getTypeChecked(rawTypeIDs[0]);
+        if (!subject)
+          return subject.takeError();
+
+        auto constraint = getTypeChecked(rawTypeIDs[1]);
+        if (!constraint)
+          return constraint.takeError();
 
         requirements.push_back(Requirement(RequirementKind::Conformance,
-                                           subject, constraint));
+                                           subject.get(), constraint.get()));
         break;
       }
       case GenericRequirementKind::Superclass: {
-        auto subject = getType(rawTypeIDs[0]);
-        auto constraint = getType(rawTypeIDs[1]);
+        auto subject = getTypeChecked(rawTypeIDs[0]);
+        if (!subject)
+          return subject.takeError();
+
+        auto constraint = getTypeChecked(rawTypeIDs[1]);
+        if (!constraint)
+          return constraint.takeError();
 
         requirements.push_back(Requirement(RequirementKind::Superclass,
-                                           subject, constraint));
+                                           subject.get(), constraint.get()));
         break;
       }
       case GenericRequirementKind::SameType: {
-        auto first = getType(rawTypeIDs[0]);
-        auto second = getType(rawTypeIDs[1]);
+        auto first = getTypeChecked(rawTypeIDs[0]);
+        if (!first)
+          return first.takeError();
+
+        auto second = getTypeChecked(rawTypeIDs[1]);
+        if (!second)
+          return second.takeError();
 
         requirements.push_back(Requirement(RequirementKind::SameType,
-                                           first, second));
+                                           first.get(), second.get()));
         break;
       }
       default:
@@ -737,7 +779,10 @@ void ModuleFile::readGenericRequirements(
       LayoutRequirementLayout::readRecord(scratch, rawKind, rawTypeID,
                                           size, alignment);
 
-      auto first = getType(rawTypeID);
+      auto first = getTypeChecked(rawTypeID);
+      if (!first)
+        return first.takeError();
+
       LayoutConstraint layout;
       LayoutConstraintKind kind = LayoutConstraintKind::UnknownLayout;
       switch (rawKind) {
@@ -779,7 +824,7 @@ void ModuleFile::readGenericRequirements(
             LayoutConstraint::getLayoutConstraint(kind, size, alignment, ctx);
 
       requirements.push_back(
-          Requirement(RequirementKind::Layout, first, layout));
+          Requirement(RequirementKind::Layout, first.get(), layout));
       break;
       }
     default:
@@ -791,6 +836,8 @@ void ModuleFile::readGenericRequirements(
     if (!shouldContinue)
       break;
   }
+
+  return llvm::Error::success();
 }
 
 /// Advances past any records that might be part of a requirement signature.
@@ -828,6 +875,14 @@ static llvm::Error skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
 
 GenericSignature *ModuleFile::getGenericSignature(
     serialization::GenericSignatureID ID) {
+  auto signature = getGenericSignatureChecked(ID);
+  if (!signature)
+    fatal(signature.takeError());
+  return signature.get();
+}
+
+Expected<GenericSignature *>
+ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   using namespace decls_block;
 
   // Zero is a sentinel for having no generic signature.
@@ -902,7 +957,9 @@ GenericSignature *ModuleFile::getGenericSignature(
 
   // Read the generic requirements.
   SmallVector<Requirement, 4> requirements;
-  readGenericRequirements(requirements, DeclTypeCursor);
+  auto error = readGenericRequirementsChecked(requirements, DeclTypeCursor);
+  if (error)
+    return std::move(error);
 
   // If we've already deserialized this generic signature, start over to return
   // it directly.
@@ -919,6 +976,14 @@ GenericSignature *ModuleFile::getGenericSignature(
 
 SubstitutionMap ModuleFile::getSubstitutionMap(
                                         serialization::SubstitutionMapID id) {
+  auto map = getSubstitutionMapChecked(id);
+  if (!map)
+    fatal(map.takeError());
+  return map.get();
+}
+
+Expected<SubstitutionMap>
+ModuleFile::getSubstitutionMapChecked(serialization::SubstitutionMapID id) {
   using namespace decls_block;
 
   // Zero is a sentinel for having an empty substitution map.
@@ -956,7 +1021,11 @@ SubstitutionMap ModuleFile::getSubstitutionMap(
                                     replacementTypeIDs);
 
   // Generic signature.
-  auto genericSig = getGenericSignature(genericSigID);
+  auto genericSigOrError = getGenericSignatureChecked(genericSigID);
+  if (!genericSigOrError)
+    return genericSigOrError.takeError();
+
+  auto genericSig = genericSigOrError.get();
   if (!genericSig)
     fatal();
 
@@ -4793,9 +4862,13 @@ public:
 
     decls_block::DependentMemberTypeLayout::readRecord(scratch, baseID,
                                                        assocTypeID);
+    auto assocType = MF.getDeclChecked(assocTypeID);
+    if (!assocType)
+      return assocType.takeError();
+
     return DependentMemberType::get(
         MF.getType(baseID),
-        cast<AssociatedTypeDecl>(MF.getDecl(assocTypeID)));
+        cast<AssociatedTypeDecl>(assocType.get()));
   }
 
   Expected<Type> deserializeBoundGenericType(ArrayRef<uint64_t> scratch,
@@ -5473,23 +5546,26 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
       continue;
     }
 
-    // Generic environment.
-    GenericEnvironment *syntheticEnv = nullptr;
-    
     auto trySetOpaqueWitness = [&]{
       if (!req)
         return;
-      
-      // We shouldn't yet need to worry about generic requirements, since
-      // an imported ObjC method should never be generic.
-      assert(syntheticEnv == nullptr &&
-             "opaque witness shouldn't be generic yet. when this is "
-             "possible, it should use forwarding substitutions");
+
       conformance->setWitness(req, Witness::forOpaque(req));
     };
 
     // Witness substitutions.
-    SubstitutionMap witnessSubstitutions = getSubstitutionMap(*rawIDIter++);
+    auto witnessSubstitutions = getSubstitutionMapChecked(*rawIDIter++);
+    if (!witnessSubstitutions) {
+      // Missing module errors are most likely caused by an
+      // implementation-only import hiding types and decls.
+      // rdar://problem/52837313
+      if (witnessSubstitutions.errorIsA<XRefNonLoadedModuleError>()) {
+        consumeError(witnessSubstitutions.takeError());
+        isOpaque = true;
+      }
+      else
+        fatal(witnessSubstitutions.takeError());
+    }
 
     // Handle opaque witnesses that couldn't be deserialized.
     if (isOpaque) {
@@ -5498,7 +5574,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
     }
 
     // Set the witness.
-    trySetWitness(Witness::forDeserialized(witness, witnessSubstitutions));
+    trySetWitness(Witness::forDeserialized(witness, witnessSubstitutions.get()));
   }
   assert(rawIDIter <= rawIDs.end() && "read too much");
   
