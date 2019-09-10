@@ -946,12 +946,8 @@ bool SerializedASTFile::isSystemModule() const {
   return false;
 }
 
-void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
-                                    DeclName name, NLKind lookupKind,
+void SerializedASTFile::lookupValue(DeclName name, NLKind lookupKind,
                                     SmallVectorImpl<ValueDecl*> &results) const{
-  if (!ModuleDecl::matchesAccessPath(accessPath, name))
-    return;
-  
   File.lookupValue(name, results);
 }
 

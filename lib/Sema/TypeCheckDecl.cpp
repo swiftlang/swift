@@ -662,7 +662,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     }
   } else {
     // Look within a module context.
-    currentFile->getParentModule()->lookupValue({ }, current->getBaseName(),
+    currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
     if (tracker)
