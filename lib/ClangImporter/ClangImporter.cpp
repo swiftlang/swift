@@ -2733,12 +2733,8 @@ void ClangModuleUnit::getDisplayDecls(SmallVectorImpl<Decl*> &results) const {
   getTopLevelDecls(results);
 }
 
-void ClangModuleUnit::lookupValue(ModuleDecl::AccessPathTy accessPath,
-                                  DeclName name, NLKind lookupKind,
+void ClangModuleUnit::lookupValue(DeclName name, NLKind lookupKind,
                                   SmallVectorImpl<ValueDecl*> &results) const {
-  if (!ModuleDecl::matchesAccessPath(accessPath, name))
-    return;
-
   // FIXME: Ignore submodules, which are empty for now.
   if (clangModule && clangModule->isSubModule())
     return;

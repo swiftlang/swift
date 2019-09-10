@@ -80,7 +80,11 @@ private:
 
   void doLocalLookup(ModuleDecl *module, ModuleDecl::AccessPathTy path,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
-    module->lookupValue(path, name, lookupKind, localDecls);
+    // If this import is specific to some named decl ("import Swift.Int")
+    // then filter out any lookups that don't match.
+    if (!ModuleDecl::matchesAccessPath(path, name))
+      return;
+    module->lookupValue(name, lookupKind, localDecls);
   }
 };
 

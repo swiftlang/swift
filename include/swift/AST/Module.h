@@ -361,7 +361,7 @@ public:
   /// within the current module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
+  void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
   /// Look up a local type declaration by its mangled name.
@@ -629,8 +629,7 @@ public:
   /// within this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
   /// Look up a local type declaration by its mangled name.
@@ -1056,8 +1055,7 @@ public:
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
@@ -1281,8 +1279,7 @@ private:
 public:
   explicit BuiltinUnit(ModuleDecl &M);
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   /// Find all Objective-C methods with the given selector.
