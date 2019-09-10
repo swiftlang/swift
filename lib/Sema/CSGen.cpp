@@ -982,8 +982,8 @@ namespace {
     /// Add constraints for a subscript operation.
     Type addSubscriptConstraints(
         Expr *anchor, Type baseTy, Expr *index,
-        ValueDecl *declOrNull,
-        ConstraintLocator *locator = nullptr,
+        ValueDecl *declOrNull, ArrayRef<Identifier> argLabels,
+        bool hasTrailingClosure, ConstraintLocator *locator = nullptr,
         SmallVectorImpl<TypeVariableType *> *addedTypeVars = nullptr) {
       // Locators used in this expression.
       if (locator == nullptr)
@@ -998,6 +998,8 @@ namespace {
       auto resultLocator =
         CS.getConstraintLocator(locator,
                                 ConstraintLocator::FunctionResult);
+
+      associateArgumentLabels(memberLocator, {argLabels, hasTrailingClosure});
 
       Type outputTy;
 
@@ -1229,8 +1231,9 @@ namespace {
     }
 
     Type visitObjectLiteralExpr(ObjectLiteralExpr *expr) {
+      auto *exprLoc = CS.getConstraintLocator(expr);
       associateArgumentLabels(
-          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+          exprLoc, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
 
       // If the expression has already been assigned a type; just use that type.
       if (expr->getType())
@@ -1244,13 +1247,13 @@ namespace {
         return nullptr;
       }
 
-      auto tv = CS.createTypeVariable(CS.getConstraintLocator(expr),
+      auto tv = CS.createTypeVariable(exprLoc,
                                       TVO_PrefersSubtypeBinding |
                                       TVO_CanBindToNoEscape);
       
       CS.addConstraint(ConstraintKind::LiteralConformsTo, tv,
                        protocol->getDeclaredType(),
-                       CS.getConstraintLocator(expr));
+                       exprLoc);
 
       // The arguments are required to be argument-convertible to the
       // idealized parameter type of the initializer, which generally
@@ -1511,7 +1514,8 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
         associateArgumentLabels(
-            expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
+            CS.getConstraintLocator(expr),
+            {expr->getArgumentLabels(), expr->hasTrailingClosure()});
         return baseTy;
       }
 
@@ -1746,12 +1750,10 @@ namespace {
           return Type();
       }
 
-      associateArgumentLabels(
-          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
-
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
                                      expr->getIndex(),
-                                     decl);
+                                     decl, expr->getArgumentLabels(),
+                                     expr->hasTrailingClosure());
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
@@ -1995,10 +1997,10 @@ namespace {
     }
 
     Type visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
-      associateArgumentLabels(
-          expr, {expr->getArgumentLabels(), expr->hasTrailingClosure()});
       return addSubscriptConstraints(expr, CS.getType(expr->getBase()),
-                                     expr->getIndex(), nullptr);
+                                     expr->getIndex(), /*decl*/ nullptr,
+                                     expr->getArgumentLabels(),
+                                     expr->hasTrailingClosure());
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
@@ -2488,7 +2490,8 @@ namespace {
 
       SmallVector<Identifier, 4> scratch;
       associateArgumentLabels(
-          expr, {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
+          CS.getConstraintLocator(expr),
+          {expr->getArgumentLabels(scratch), expr->hasTrailingClosure()},
           /*labelsArePermanent=*/isa<CallExpr>(expr));
 
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
@@ -3017,7 +3020,10 @@ namespace {
         // re-type-check the constraints during failure diagnosis.
         case KeyPathExpr::Component::Kind::Subscript: {
           base = addSubscriptConstraints(E, base, component.getIndexExpr(),
-                                         /*decl*/ nullptr, memberLocator,
+                                         /*decl*/ nullptr,
+                                         component.getSubscriptLabels(),
+                                         /*hasTrailingClosure*/ false,
+                                         memberLocator,
                                          &componentTypeVars);
           break;
         }
@@ -3251,15 +3257,13 @@ namespace {
       llvm_unreachable("unhandled operation");
     }
 
-    void associateArgumentLabels(Expr *expr,
+    void associateArgumentLabels(ConstraintLocator *locator,
                                  ConstraintSystem::ArgumentInfo info,
                                  bool labelsArePermanent = true) {
-      assert(expr);
+      assert(locator && locator->getAnchor());
       // Record the labels.
       if (!labelsArePermanent)
         info.Labels = CS.allocateCopy(info.Labels);
-
-      auto *locator = CS.getConstraintLocator(expr);
       CS.ArgumentInfos[CS.getArgumentInfoLocator(locator)] = info;
     }
   };

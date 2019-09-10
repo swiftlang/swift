@@ -144,13 +144,7 @@ protected:
   /// by the constraint solver.
   ResolvedOverloadSetListItem *
   getResolvedOverload(ConstraintLocator *locator) const {
-    auto resolvedOverload = CS.getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == locator)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+    return CS.findSelectedOverloadFor(locator);
   }
 
   /// Retrive the constraint locator for the given anchor and

@@ -212,6 +212,18 @@ print(mbuilders.methodBuilder(13))
 // CHECK: ("propertyBuilder", 12)
 print(mbuilders.propertyBuilder)
 
+// SR-11439: Operator builders
+infix operator ^^^
+func ^^^ (lhs: Int, @TupleBuilder rhs: (Int) -> (String, Int)) -> (String, Int) {
+  return rhs(lhs)
+}
+
+// CHECK: ("hello", 6)
+print(5 ^^^ {
+  "hello"
+  $0 + 1
+})
+
 struct Tagged<Tag, Entity> {
   let tag: Tag
   let entity: Entity

@@ -1592,6 +1592,17 @@ public:
     return resolvedOverloadSets;
   }
 
+  ResolvedOverloadSetListItem *
+  findSelectedOverloadFor(ConstraintLocator *locator) const {
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator == locator)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
+  }
+
   ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
     auto resolvedOverload = getResolvedOverloadSets();
     while (resolvedOverload) {

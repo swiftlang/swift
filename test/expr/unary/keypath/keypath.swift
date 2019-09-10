@@ -541,23 +541,19 @@ func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
 }
 
-// Crash in diagnostics
-struct AmbiguousSubscript {
+// Crash in diagnostics + SR-11438
+struct UnambiguousSubscript {
   subscript(sub: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(_:)' declared here}}
-
   subscript(y y: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(y:)' declared here}}
 }
 
-func useAmbiguousSubscript(_ sub: Sub) {
-  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
-  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+func useUnambiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<UnambiguousSubscript> = \.[sub]
 }
 
 struct BothUnavailableSubscript {
   @available(*, unavailable)
-  subscript(sub: Sub) -> Int { get { } set { } }
+  subscript(sub: Sub) -> Int { get { } set { } } // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   subscript(y y: Sub) -> Int { get { } set { } }
@@ -565,7 +561,7 @@ struct BothUnavailableSubscript {
 
 func useBothUnavailableSubscript(_ sub: Sub) {
   let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{'subscript(_:)' is unavailable}}
 }
 
 // SR-6106
