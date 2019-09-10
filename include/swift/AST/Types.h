@@ -1119,13 +1119,12 @@ public:
 struct TypeDescription {
   /// The type being described.
   Type Ty;
-  /// The DeclContext associated with a specific use of the type.
-  DeclContext *DC;
-  /// The SourceLoc associated with a specific use of the type.
-  SourceLoc Loc;
+  /// The printed representation of the type in the given context.
+  std::string PrintedRepresentation;
+  /// Whether the type would be ambiguous if unqualified in the given context.
+  bool AmbiguousIfUnqualified;
 
-  TypeDescription(Type Ty, DeclContext *DC, SourceLoc Loc)
-      : Ty(Ty), DC(DC), Loc(Loc) {}
+  TypeDescription(Type Ty, DeclContext *DC, SourceLoc Loc);
 };
 
 /// AnyGenericType - This abstract class helps types ensure that fields

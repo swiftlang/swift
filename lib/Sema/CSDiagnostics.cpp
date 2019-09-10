@@ -2424,8 +2424,9 @@ bool ContextualFailure::tryTypeCoercionFixIt(
       toType = OptionalType::get(toType);
     auto fixItLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
                                                anchor->getEndLoc());
+    auto description = TypeDescription(toType, getDC(), fixItLoc);
     diagnostic.fixItInsert(fixItLoc, diag::insert_type_coercion, canUseAs,
-                           TypeDescription(toType, getDC(), fixItLoc));
+                           &description);
     return true;
   }
 

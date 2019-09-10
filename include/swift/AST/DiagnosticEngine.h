@@ -119,7 +119,7 @@ namespace swift {
       const DeclAttribute *DeclAttributeVal;
       llvm::VersionTuple VersionVal;
       LayoutConstraint LayoutConstraintVal;
-      TypeDescription TypeDescriptionVal;
+      const TypeDescription *TypeDescriptionVal;
     };
     
   public:
@@ -202,7 +202,7 @@ namespace swift {
       : Kind(DiagnosticArgumentKind::LayoutConstraint), LayoutConstraintVal(L) {
     }
 
-    DiagnosticArgument(TypeDescription D)
+    DiagnosticArgument(const TypeDescription *D)
         : Kind(DiagnosticArgumentKind::TypeDescription), TypeDescriptionVal(D) {
     }
     /// Initializes a diagnostic argument using the underlying type of the
@@ -296,7 +296,7 @@ namespace swift {
       return LayoutConstraintVal;
     }
 
-    TypeDescription getAsTypeDescription() const {
+    const TypeDescription *getAsTypeDescription() const {
       assert(Kind == DiagnosticArgumentKind::TypeDescription);
       return TypeDescriptionVal;
     }

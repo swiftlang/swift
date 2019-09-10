@@ -26,6 +26,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -4450,4 +4451,36 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
   }
   opened = OpenedArchetypeType::get(this);
   return opened;
+}
+
+TypeDescription::TypeDescription(Type Ty, DeclContext *DC, SourceLoc Loc)
+    : Ty(Ty) {
+  // Strip extraneous parentheses; they add no value.
+  auto type = Ty->getWithoutParens();
+
+  // If a type has an unresolved type, print it with syntax sugar removed for
+  // clarity. For example, print `Array<_>` instead of `[_]`.
+  if (type->hasUnresolvedType()) {
+    type = type->getWithoutSyntaxSugar();
+  }
+  auto isAmbiguous = [DC, Loc](Type Ty) {
+    if (auto nominal = Ty->getAnyNominal()) {
+      UnqualifiedLookup lookup(nominal->getFullName(), DC, Loc,
+                               UnqualifiedLookup::Flags::TypeLookup);
+      // If the type found via unqualified lookup is different from the
+      // described type, there is ambiguity.
+      return !lookup.getSingleTypeResult()->getDeclaredInterfaceType()->isEqual(
+          Ty);
+    }
+    return false;
+  };
+  auto printOptions = PrintOptions();
+  printOptions.FullyQualifiedTypesIfAmbiguous = true;
+  printOptions.IsTypeAmbiguous = isAmbiguous;
+  PrintedRepresentation = type->getString(printOptions);
+  AmbiguousIfUnqualified = false;
+  type.transform([&isAmbiguous, this](Type Ty) {
+    AmbiguousIfUnqualified = AmbiguousIfUnqualified || isAmbiguous(Ty);
+    return Ty;
+  });
 }

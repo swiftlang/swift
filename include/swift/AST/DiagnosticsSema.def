@@ -354,7 +354,7 @@ ERROR(cannot_throw_error_code,none,
       "instance", (Type, Type))
 
 FIXIT(insert_type_coercion,
-      " %select{as!|as}0 %1",(bool, TypeDescription))
+      " %select{as!|as}0 %1",(bool, TypeDescription*))
 
 ERROR(bad_yield_count,none,
       "expected %0 yield value(s)", (unsigned))
