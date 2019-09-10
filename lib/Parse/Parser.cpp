@@ -319,7 +319,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
           const ParsedTrivia &TrailingTrivia) {
-        CharSourceRange TokRange = Tok.getRangeWithoutBackticks();
+        CharSourceRange TokRange = Tok.getRange();
         SourceLoc LeadingTriviaLoc =
           TokRange.getStart().getAdvancedLoc(-LeadingTrivia.getLength());
         SourceLoc TrailingTriviaLoc =
@@ -328,7 +328,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
           LeadingTrivia.convertToSyntaxTrivia(LeadingTriviaLoc, SM, BufferID);
         Trivia syntaxTrailingTrivia =
           TrailingTrivia.convertToSyntaxTrivia(TrailingTriviaLoc, SM, BufferID);
-        auto Text = OwnedString::makeRefCounted(Tok.getText());
+        auto Text = OwnedString::makeRefCounted(Tok.getRawText());
         auto ThisToken =
             RawSyntax::make(Tok.getKind(), Text, syntaxLeadingTrivia.Pieces,
                             syntaxTrailingTrivia.Pieces,
