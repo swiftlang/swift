@@ -3284,6 +3284,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         }
       }
 
+      // Before failing, let's give repair a chance to run in diagnostic mode.
+      if (shouldAttemptFixes())
+        break;
+
       // If the archetypes aren't rooted in an opaque type, or are rooted in
       // completely different decls, then there's nothing else we can do.
       return getTypeMatchFailure(locator);
@@ -3819,8 +3823,14 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::Function:
   case TypeKind::LValue:
   case TypeKind::InOut:
-  case TypeKind::Module:
+  case TypeKind::Module: {
+    // If solver is in the diagnostic mode and this is an invalid base,
+    // let's give solver a chance to repair it to produce a good diagnostic.
+    if (shouldAttemptFixes())
+      break;
+
     return SolutionKind::Error;
+  }
   }
 
   auto fnLocator = getConstraintLocator(locator,
