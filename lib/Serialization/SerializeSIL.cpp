@@ -408,6 +408,14 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         S.addUniquedStringRef(F.getObjCReplacement().str());
   }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
+
+  Optional<llvm::VersionTuple> available;
+  auto availability = F.getAvailabilityForLinkage();
+  if (!availability.isAlwaysAvailable()) {
+    available = availability.getOSVersion().getLowerEndpoint();
+  }
+  ENCODE_VER_TUPLE(available, available)
+
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
@@ -415,7 +423,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       (unsigned)F.isGlobalInit(), (unsigned)F.getInlineStrategy(),
       (unsigned)F.getOptimizationMode(), (unsigned)F.getEffectsKind(),
       (unsigned)numSpecAttrs, (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(), FnID,
+      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
+      (unsigned)F.isDynamicallyReplaceable(), FnID,
       replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
