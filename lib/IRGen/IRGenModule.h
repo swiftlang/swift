@@ -725,6 +725,7 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
+  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
