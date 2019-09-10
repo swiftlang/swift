@@ -502,6 +502,27 @@ public:
   /// Determine whether this locator points to the contextual type.
   bool isForContextualType() const;
 
+  /// Attempts to cast the first path element of the locator to a specific
+  /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or
+  /// the locator has no path elements.
+  template <class T>
+  Optional<T> getFirstElementAs() const {
+    auto path = getPath();
+    if (path.empty())
+      return None;
+
+    return path[0].getAs<T>();
+  }
+
+  /// Casts the first path element of the locator to a specific
+  /// \c LocatorPathElt subclass, asserting that it has at least one element.
+  template <class T>
+  T castFirstElementTo() const {
+    auto path = getPath();
+    assert(!path.empty() && "Expected at least one path element!");
+    return path[0].castTo<T>();
+  }
+
   /// Check whether the last element in the path of this locator
   /// is of a given kind.
   bool isLastElement(ConstraintLocator::PathElementKind kind) const;
