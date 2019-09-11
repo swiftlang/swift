@@ -29,6 +29,8 @@
 /// library explicit permission to store the closure and the sequence
 /// in the result, and defer computation until it is needed.
 ///
+/// ## Adding New Lazy Operations
+///
 /// To add a new lazy sequence operation, extend this protocol with
 /// a method that returns a lazy wrapper that itself conforms to
 /// `LazySequenceProtocol`.  For example, an eager `scan(_:_:)`
@@ -123,7 +125,7 @@
 ///     }
 ///
 /// Don't actually use `map` for this purpose, however, since it creates 
-/// and discards a resulting array. Instead, use `reduce` for summing 
+/// and discards the resulting array. Instead, use `reduce` for summing 
 /// operations, or `forEach` or a `for`-`in` loop for operations with side 
 /// effects.
 public protocol LazySequenceProtocol: Sequence {
