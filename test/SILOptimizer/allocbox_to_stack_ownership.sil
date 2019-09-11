@@ -49,19 +49,20 @@ bb0(%0 : $Int):
 // CHECK: return
 }
 // CHECK-LABEL: sil [ossa] @init_var
-sil [ossa] @init_var : $@convention(thin) () -> Int {
-bb0:
+sil [ossa] @init_var : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
+  store %0 to [trivial] %1a : $*Int
   %3 = load [trivial] %1a : $*Int
   destroy_value %1 : ${ var Int }
   return %3 : $Int
 
-// CHECK: %0 = alloc_stack
+// CHECK: %1 = alloc_stack
 // CHECK-NOT: alloc_box
 // CHECK-NOT: destroy_value
 // CHECK-NOT: destroy_addr
-// CHECK: dealloc_stack %0 : $*Int
+// CHECK: dealloc_stack %1 : $*Int
 // CHECK: return
 }
 

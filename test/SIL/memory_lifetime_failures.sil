@@ -23,6 +23,11 @@ struct Outer {
   var z: T
 }
 
+struct Mixed {
+  var t: T
+  var i: Int
+}
+
 // CHECK: SIL memory lifetime failure in @test_simple: indirect argument is not alive at function return
 sil [ossa] @test_simple : $@convention(thin) (@inout T) -> @owned T {
 bb0(%0 : $*T):
@@ -128,5 +133,36 @@ bb0(%0 : @owned $T):
   dealloc_stack %2 : $*T
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @test_mixed: memory is not initialized, but should
+sil [ossa] @test_mixed : $@convention(thin) (@in Mixed, Int) -> Int {
+bb0(%0 : $*Mixed, %1 : $Int):
+  %2 = struct_element_addr %0 : $*Mixed, #Mixed.i
+  store %1 to [trivial] %2 : $*Int
+  destroy_addr %0 : $*Mixed
+  %3 = load [trivial] %2 : $*Int
+  return %3 : $Int
+}
+
+// CHECK: SIL memory lifetime failure in @test_missing_store_to_trivial: memory is not initialized, but should
+sil [ossa] @test_missing_store_to_trivial : $@convention(thin) () -> Int {
+bb0:
+  %1 = alloc_stack $Mixed
+  %2 = struct_element_addr %1 : $*Mixed, #Mixed.i
+  %3 = load [trivial] %2 : $*Int
+  dealloc_stack %1 : $*Mixed
+  return %3 : $Int
+}
+
+// CHECK: SIL memory lifetime failure in @test_load_after_dealloc: memory is not initialized, but should
+sil [ossa] @test_load_after_dealloc : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Mixed
+  %2 = struct_element_addr %1 : $*Mixed, #Mixed.i
+  store %0 to [trivial] %2 : $*Int
+  dealloc_stack %1 : $*Mixed
+  %3 = load [trivial] %2 : $*Int
+  return %3 : $Int
 }
 
