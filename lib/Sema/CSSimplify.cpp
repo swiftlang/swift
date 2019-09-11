@@ -2433,6 +2433,15 @@ bool ConstraintSystem::repairFailures(
         repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
       break;
 
+    // If this is an argument to `===` or `!==` there are tailored
+    // diagnostics available for it as part of argument-to-parameter
+    // conversion fix, so let's not try any restrictions or other fixes.
+    if (isArgumentOfReferenceEqualityOperator(loc)) {
+      conversionsOrFixes.push_back(
+          AllowArgumentMismatch::create(*this, lhs, rhs, loc));
+      break;
+    }
+
     // Argument is a r-value but parameter expects an l-value e.g.
     //
     // func foo(_ x: inout Int) {}

@@ -3991,9 +3991,17 @@ Expr *getArgumentExpr(Expr *expr, unsigned index);
 /// associated with implicit `~=` (pattern-matching) operator
 bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
 
+/// Determine whether given locator points to one of the arguments
+/// associated with `===` and `!==` operators.
+bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
+
 /// Determine whether given expression is a reference to a
 /// pattern-matching operator `~=`
 bool isPatternMatchingOperator(Expr *expr);
+
+/// If given expression references operator overlaod(s)
+/// extract and produce name of the operator.
+Optional<Identifier> getOperatorName(Expr *expr);
 
 // Check whether argument of the call at given position refers to
 // parameter marked as `@autoclosure`. This function is used to

@@ -1613,6 +1613,10 @@ public:
   /// Tailored diagnostic for pattern matching with `~=` operator.
   bool diagnosePatternMatchingMismatch() const;
 
+  /// Tailored diagnostics for argument mismatches associated with
+  /// reference equality operators `===` and `!==`.
+  bool diagnoseUseOfReferenceEqualityOperator() const;
+
 protected:
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 

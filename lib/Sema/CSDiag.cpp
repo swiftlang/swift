@@ -462,12 +462,6 @@ private:
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure(Constraint *constraint);
 
-  /// Produce a diagnostic for binary comparisons of the nil literal
-  /// to other values.
-  bool diagnoseNilLiteralComparison(Expr *lhsExpr, Expr *rhsExpr,
-                                    CalleeCandidateInfo &calleeInfo,
-                                    SourceLoc applyLoc);
-
   bool diagnoseMemberFailures(
       Expr *E, Expr *baseEpxr, ConstraintKind lookupKind, DeclName memberName,
       FunctionRefKind funcRefKind, ConstraintLocator *locator,
@@ -3004,60 +2998,6 @@ static bool isNameOfStandardComparisonOperator(StringRef opName) {
          opName == "<="  || opName == ">=";
 }
 
-bool FailureDiagnosis::diagnoseNilLiteralComparison(
-    Expr *lhsExpr, Expr *rhsExpr, CalleeCandidateInfo &calleeInfo,
-    SourceLoc applyLoc) {
-
-  auto overloadName = calleeInfo.declName;
-
-  // Only diagnose for comparison operators.
-  if (!isNameOfStandardComparisonOperator(overloadName))
-    return false;
-
-  Expr *otherExpr = lhsExpr;
-  Expr *nilExpr = rhsExpr;
-
-  // Swap if we picked the wrong side as the nil literal.
-  if (!isa<NilLiteralExpr>(nilExpr->getValueProvidingExpr()))
-    std::swap(otherExpr, nilExpr);
-
-  // Bail if neither side is a nil literal.
-  if (!isa<NilLiteralExpr>(nilExpr->getValueProvidingExpr()))
-    return false;
-
-  // Bail if both sides are a nil literal.
-  if (isa<NilLiteralExpr>(otherExpr->getValueProvidingExpr()))
-    return false;
-
-  auto otherType = CS.getType(otherExpr)->getRValueType();
-
-  // Bail if we were unable to determine the other type.
-  if (isUnresolvedOrTypeVarType(otherType))
-    return false;
-
-  // Regardless of whether the type has reference or value semantics,
-  // comparison with nil is illegal, albeit for different reasons spelled
-  // out by the diagnosis.
-  if (otherType->getOptionalObjectType() &&
-      (overloadName == "!==" || overloadName == "===")) {
-    auto revisedName = overloadName;
-    revisedName.pop_back();
-
-    // If we made it here, then we're trying to perform a comparison with
-    // reference semantics rather than value semantics.  The fixit will
-    // lop off the extra '=' in the operator.
-    diagnose(applyLoc,
-             diag::value_type_comparison_with_nil_illegal_did_you_mean,
-             otherType)
-        .fixItReplace(applyLoc, revisedName);
-  } else {
-    diagnose(applyLoc, diag::value_type_comparison_with_nil_illegal, otherType)
-        .highlight(otherExpr->getSourceRange());
-  }
-
-  return true;
-}
-
 static bool diagnoseClosureExplicitParameterMismatch(
     ConstraintSystem &CS, SourceLoc loc,
     ArrayRef<AnyFunctionType::Param> params,
@@ -3709,11 +3649,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     auto lhsType = CS.getType(lhsExpr)->getRValueType();
     auto rhsType = CS.getType(rhsExpr)->getRValueType();
 
-    // Diagnose any comparisons with the nil literal.
-    if (diagnoseNilLiteralComparison(lhsExpr, rhsExpr, calleeInfo,
-                                     callExpr->getLoc()))
-      return true;
-
     // TODO(diagnostics): There are still cases not yet handled by new
     // diagnostics framework e.g.
     //
@@ -3730,18 +3665,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
 
       ArgumentMismatchFailure failure(expr, CS, lhsType, rhsType, locator);
       return failure.diagnosePatternMatchingMismatch();
-    }
-
-    // Diagnose attempts to compare reference equality of certain types.
-    if (overloadName == "===" || overloadName == "!==") {
-      // Functions.
-      if (lhsType->is<AnyFunctionType>() || rhsType->is<AnyFunctionType>()) {
-        diagnose(callExpr->getLoc(), diag::cannot_reference_compare_types,
-                 overloadName, lhsType, rhsType)
-          .highlight(lhsExpr->getSourceRange())
-          .highlight(rhsExpr->getSourceRange());
-        return true;
-      }
     }
 
     if (isContextualConversionFailure(argTuple))

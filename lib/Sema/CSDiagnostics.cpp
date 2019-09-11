@@ -4526,6 +4526,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
   if (diagnosePatternMatchingMismatch())
     return true;
 
+  if (diagnoseUseOfReferenceEqualityOperator())
+    return true;
+
   auto argType = getFromType();
   auto paramType = getToType();
 
@@ -4562,6 +4565,71 @@ bool ArgumentMismatchFailure::diagnoseAsNote() {
   if (auto *decl = getDecl()) {
     emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
                    getToType(), argToParam->getParamIdx());
+    return true;
+  }
+
+  return false;
+}
+
+bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
+  auto *locator = getLocator();
+
+  if (!isArgumentOfReferenceEqualityOperator(locator))
+    return false;
+
+  auto *binaryOp = cast<BinaryExpr>(getRawAnchor());
+  auto *lhs = binaryOp->getArg()->getElement(0);
+  auto *rhs = binaryOp->getArg()->getElement(1);
+
+  auto name = *getOperatorName(binaryOp->getFn());
+
+  auto lhsType = getType(lhs)->getRValueType();
+  auto rhsType = getType(rhs)->getRValueType();
+
+  // If both arguments where incorrect e.g. both are function types,
+  // let's avoid producing a diagnostic second time, because first
+  // one would cover both arguments.
+  if (getAnchor() == rhs && rhsType->is<FunctionType>()) {
+    auto &cs = getConstraintSystem();
+    if (cs.hasFixFor(cs.getConstraintLocator(
+            binaryOp, {ConstraintLocator::ApplyArgument,
+                       LocatorPathElt::ApplyArgToParam(0, 0)})))
+      return true;
+  }
+
+  // Regardless of whether the type has reference or value semantics,
+  // comparison with nil is illegal, albeit for different reasons spelled
+  // out by the diagnosis.
+  if (isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs)) {
+    std::string revisedName = name.str();
+    revisedName.pop_back();
+
+    auto loc = binaryOp->getLoc();
+    auto nonNilType = isa<NilLiteralExpr>(lhs) ? rhsType : lhsType;
+    auto nonNilExpr = isa<NilLiteralExpr>(lhs) ? rhs : lhs;
+
+    // If we made it here, then we're trying to perform a comparison with
+    // reference semantics rather than value semantics. The fixit will
+    // lop off the extra '=' in the operator.
+    if (nonNilType->getOptionalObjectType()) {
+      emitDiagnostic(loc,
+                     diag::value_type_comparison_with_nil_illegal_did_you_mean,
+                     nonNilType)
+          .fixItReplace(loc, revisedName);
+    } else {
+      emitDiagnostic(loc, diag::value_type_comparison_with_nil_illegal,
+                     nonNilType)
+          .highlight(nonNilExpr->getSourceRange());
+    }
+
+    return true;
+  }
+
+  if (lhsType->is<FunctionType>() || rhsType->is<FunctionType>()) {
+    emitDiagnostic(binaryOp->getLoc(), diag::cannot_reference_compare_types,
+                   name.str(), lhsType, rhsType)
+        .highlight(lhs->getSourceRange())
+        .highlight(rhs->getSourceRange());
     return true;
   }
 

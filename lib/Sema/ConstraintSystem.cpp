@@ -2960,37 +2960,48 @@ bool constraints::isKnownKeyPathDecl(ASTContext &ctx, ValueDecl *decl) {
          decl == ctx.getPartialKeyPathDecl() || decl == ctx.getAnyKeyPathDecl();
 }
 
-bool constraints::isPatternMatchingOperator(Expr *expr) {
+static bool isOperator(Expr *expr, StringRef expectedName) {
+  auto name = getOperatorName(expr);
+  return name ? name->is(expectedName) : false;
+}
+
+Optional<Identifier> constraints::getOperatorName(Expr *expr) {
   ValueDecl *choice = nullptr;
   if (auto *ODRE = dyn_cast_or_null<OverloadedDeclRefExpr>(expr)) {
     choice = ODRE->getDecls().front();
   } else if (auto *DRE = dyn_cast_or_null<DeclRefExpr>(expr)) {
     choice = DRE->getDecl();
   } else {
-    return false;
+    return None;
   }
 
-  if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice)) {
-    auto name = FD->getBaseName().userFacingName();
-    return name == "~=";
-  }
+  if (auto *FD = dyn_cast_or_null<AbstractFunctionDecl>(choice))
+    return FD->getBaseName().getIdentifier();
 
-  return false;
+  return None;
+}
+
+bool constraints::isPatternMatchingOperator(Expr *expr) {
+  return isOperator(expr, "~=");
 }
 
 bool constraints::isArgumentOfPatternMatchingOperator(
     ConstraintLocator *locator) {
-  Expr *anchor = nullptr;
-  if (locator->findLast<LocatorPathElt::ApplyArgToParam>()) {
-    anchor = locator->getAnchor();
-  } else {
-    return false;
-  }
-
-  auto *binaryOp = dyn_cast_or_null<BinaryExpr>(anchor);
+  auto *binaryOp = dyn_cast_or_null<BinaryExpr>(locator->getAnchor());
   if (!(binaryOp && binaryOp->isImplicit()))
     return false;
+  return isPatternMatchingOperator(binaryOp->getFn());
+}
 
-  auto *fnExpr = binaryOp->getFn()->getSemanticsProvidingExpr();
-  return isPatternMatchingOperator(fnExpr);
+bool constraints::isArgumentOfReferenceEqualityOperator(
+    ConstraintLocator *locator) {
+  if (!locator->findLast<LocatorPathElt::ApplyArgToParam>())
+    return false;
+
+  if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(locator->getAnchor())) {
+    auto *fnExpr = binaryOp->getFn();
+    return isOperator(fnExpr, "===") || isOperator(fnExpr, "!==");
+  }
+
+  return false;
 }
