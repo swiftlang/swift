@@ -74,8 +74,9 @@ private:
   void printTypePost(const TypeLoc &TL) override {
     return OtherPrinter.printTypePost(TL);
   }
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
-    return OtherPrinter.printTypeRef(T, TD, Name);
+  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name,
+                    PrintNameContext NameContext) override {
+    return OtherPrinter.printTypeRef(T, TD, Name, NameContext);
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
     return OtherPrinter.printModuleRef(Mod, Name);
