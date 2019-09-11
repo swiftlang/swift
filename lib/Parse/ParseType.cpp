@@ -249,10 +249,15 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSyntax() {
 ParsedSyntaxResult<ParsedTypeSyntax>
 Parser::parseTypeSyntax(Diag<> messageID, bool HandleCodeCompletion,
                         bool IsSILFuncDecl) {
+  SyntaxParsingContext ctxt(SyntaxContext);
+  ctxt.setTransparent();
+
+  auto loc = Tok.getLoc();
   auto tyR = parseType(messageID, HandleCodeCompletion, IsSILFuncDecl);
-  auto ty = SyntaxContext->popIf<ParsedTypeSyntax>();
-  if (ty)
+  if (auto ty = SyntaxContext->popIf<ParsedTypeSyntax>()) {
+    Generator.addType(tyR.getPtrOrNull(), loc);
     return makeParsedResult(*ty, tyR.getStatus());
+  }
   return tyR.getStatus();
 }
 
