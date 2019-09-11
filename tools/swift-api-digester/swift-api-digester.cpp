@@ -2522,7 +2522,15 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.SwiftOnly = options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
   for (int i = 1; i < argc; ++i)
-    Opts.ToolArgs.push_back(StringRef(argv[i]));
+    Opts.ToolArgs.push_back(argv[i]);
+
+  if (!options::SDK.empty()) {
+    auto Ver = getSDKVersion(options::SDK);
+    if (!Ver.empty()) {
+      Opts.ToolArgs.push_back("-sdk-version");
+      Opts.ToolArgs.push_back(Ver);
+    }
+  }
   return Opts;
 }
 

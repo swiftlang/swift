@@ -1358,7 +1358,7 @@ createErrorExistentialTypeInfo(IRGenModule &IGM,
 }
 
 llvm::Type *TypeConverter::getExistentialType(unsigned numWitnessTables) {
-  auto &type = OpaqueExistentialTypes[numWitnessTables];
+  llvm::StructType *&type = OpaqueExistentialTypes[numWitnessTables];
   if (type)
     return type;
   

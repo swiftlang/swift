@@ -2525,7 +2525,9 @@ except that ``destroy_addr`` may be used even if ``%0`` is of an
 address-only type.  This does not deallocate memory; it only destroys the
 pointed-to value, leaving the memory uninitialized.
 
-If ``T`` is a trivial type, then ``destroy_addr`` is a no-op.
+If ``T`` is a trivial type, then ``destroy_addr`` is a no-op. However, even a
+memory location ``%a`` with a trivial type must not be accessed after a
+``destroy_addr %a``.
 
 index_addr
 ``````````

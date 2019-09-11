@@ -21,6 +21,12 @@ struct Outer {
   var x: T
   var y: Inner
   var z: T
+  var i: Int
+}
+
+struct Mixed {
+  var t: T
+  var i: Int
 }
 
 sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
@@ -133,6 +139,28 @@ bb1:
 bb2:
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_mixed_cfg_merge : $@convention(thin) (@owned T, Int) -> () {
+bb0(%0 : @owned $T, %1 : $Int):
+  %2 = alloc_stack $Mixed
+  %3 = struct_element_addr %2 : $*Mixed, #Mixed.t
+  %4 = struct_element_addr %2 : $*Mixed, #Mixed.i
+  store %0 to [init] %3 : $*T
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %1 to [trivial] %4 : $*Int
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  destroy_addr %2 : $*Mixed
+  dealloc_stack %2 : $*Mixed
   %r = tuple ()
   return %r : $()
 }

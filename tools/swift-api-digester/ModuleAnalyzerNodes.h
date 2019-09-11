@@ -156,7 +156,7 @@ struct CheckerOptions {
   bool SkipOSCheck;
   bool Migrator;
   StringRef LocationFilter;
-  std::vector<StringRef> ToolArgs;
+  std::vector<std::string> ToolArgs;
 };
 
 class SDKContext {

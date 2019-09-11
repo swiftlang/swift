@@ -395,7 +395,8 @@ SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   SDKNodeInitInfo Info(Ctx);
   Info.Name = Ctx.buffer("TopLevel");
   Info.PrintedName = Ctx.buffer("TopLevel");
-  Info.ToolArgs = Ctx.getOpts().ToolArgs;
+  llvm::transform(Ctx.getOpts().ToolArgs, std::back_inserter(Info.ToolArgs),
+                  [&](std::string s) { return Ctx.buffer(s); });
   Info.JsonFormatVer = DIGESTER_JSON_VERSION;
   return Info.createSDKNode(SDKNodeKind::Root);
 }

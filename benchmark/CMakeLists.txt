@@ -131,6 +131,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Prefix
     single-source/PrefixWhile
     single-source/Prims
+    single-source/PrimsNonStrongRef
     single-source/ProtocolDispatch
     single-source/ProtocolDispatch2
     single-source/Queue

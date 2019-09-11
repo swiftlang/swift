@@ -2257,6 +2257,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
+          
+          if (attrs.has(TAK_autoclosure)) {
+            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
+            if (rep == FunctionType::Representation::CFunctionPointer ||
+                rep == FunctionType::Representation::Block) {
+              diagnose(attrs.getLoc(TAK_convention),
+                       diag::invalid_autoclosure_and_convention_attributes,
+                       attrs.getConvention());
+              attrs.clearAttribute(TAK_convention);
+            }
+          }
         }
       }
 
