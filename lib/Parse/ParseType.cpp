@@ -561,41 +561,45 @@ Parser::parseGenericArgumentClauseSyntax() {
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   auto LAngleLoc = Tok.getLoc();
   ParsedGenericArgumentClauseSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
+
+  // Parse '<'.
   builder.useLeftAngleBracket(consumeStartingLessSyntax());
 
-  while (true) {
-    ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
-    auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
-    auto Comma = consumeTokenSyntaxIf(tok::comma);
-    if (Ty.isParseError()) {
-      if (Type) {
-        auto Arg = ParsedSyntaxRecorder::makeGenericArgument(*Type, Comma,
-                                                             *SyntaxContext);
-        builder.addArgumentsMember(Arg);
-      }
-      if (ignoreUntilGreaterInTypeList())
-        builder.useRightAngleBracket(consumeStartingGreaterSyntax());
-      return makeParsedResult(builder.build(), Ty.getStatus());
-    }
-    auto Arg =
-        ParsedSyntaxRecorder::makeGenericArgument(*Type, Comma, *SyntaxContext);
-    builder.addArgumentsMember(Arg);
-    if (!Comma)
+  bool hasNext = true;
+  do {
+    // Parse argument type.
+    auto ty = parseTypeSyntax(diag::expected_type);
+    status |= ty.getStatus();
+    if (ty.isNull())
       break;
-  }
+    ParsedGenericArgumentSyntaxBuilder argBuilder(*SyntaxContext);
+    argBuilder.useArgumentType(ty.get());
 
-  if (!startsWithGreater(Tok)) {
+    // Parse trailing comma: ','.
+    if (Tok.is(tok::comma)) {
+      argBuilder.useTrailingComma(consumeTokenSyntax());
+    } else {
+      hasNext = false;
+    }
+    builder.addArgumentsMember(argBuilder.build());
+  } while (hasNext);
+
+  // Parse '>'.
+  if (startsWithGreater(Tok)) {
+    builder.useRightAngleBracket(consumeStartingGreaterSyntax());
+  } else {
+    if (status.isSuccess()) {
+      diagnose(Tok, diag::expected_rangle_generic_arg_list);
+      diagnose(LAngleLoc, diag::opening_angle);
+    }
     checkForInputIncomplete();
-    diagnose(Tok, diag::expected_rangle_generic_arg_list);
-    diagnose(LAngleLoc, diag::opening_angle);
+    status.setIsParseError();
     if (ignoreUntilGreaterInTypeList())
       builder.useRightAngleBracket(consumeStartingGreaterSyntax());
-
-    return makeParsedError(builder.build());
   }
 
-  builder.useRightAngleBracket(consumeStartingGreaterSyntax());
-  return makeParsedResult(builder.build());
+  return makeParsedResult(builder.build(), status);
 }
 
 ParserStatus
