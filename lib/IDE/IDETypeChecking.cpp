@@ -325,7 +325,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
         switch (Kind) {
         case RequirementKind::Conformance:
-        case RequirementKind::Superclass:
           // FIXME: This could be more accurate; check
           // conformance instead of subtyping
           if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
@@ -335,8 +334,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
 
+        case RequirementKind::Superclass:
+          if (!Second->isBindableToSuperclassOf(First)) {
+            return true;
+          } else if (!Second->isExactSuperclassOf(Second)) {
+            MergeInfo.addRequirement(GenericSig, First, Second, Kind);
+          }
+          break;
+
         case RequirementKind::SameType:
-          if (!canPossiblyEqual(First, Second, *DC)) {
+          if (!First->isBindableTo(Second) &&
+              !Second->isBindableTo(First)) {
             return true;
           } else if (!First->isEqual(Second)) {
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
@@ -751,19 +759,6 @@ bool swift::isMemberDeclApplied(const DeclContext *DC, Type BaseTy,
                                 const ValueDecl *VD) {
   return evaluateOrDefault(DC->getASTContext().evaluator,
     IsDeclApplicableRequest(DeclApplicabilityOwner(DC, BaseTy, VD)), false);
-}
-
-bool swift::canPossiblyEqual(Type T1, Type T2, DeclContext &DC) {
-   return evaluateOrDefault(DC.getASTContext().evaluator,
-     TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
-       TypeRelation::PossiblyEqualTo, true)), false);
-}
-
-
-bool swift::isEqual(Type T1, Type T2, DeclContext &DC) {
-  return evaluateOrDefault(DC.getASTContext().evaluator,
-    TypeRelationCheckRequest(TypeRelationCheckInput(&DC, T1, T2,
-      TypeRelation::EqualTo, true)), false);
 }
 
 bool swift::isConvertibleTo(Type T1, Type T2, bool openArchetypes,
