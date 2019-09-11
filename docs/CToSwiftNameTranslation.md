@@ -211,4 +211,32 @@ Additionally, typedefs for `void *` or `const void *` that are themselves annota
 
 If a typedef's underlying type is itself a "CF pointer" typedef, the "alias" typedef will be imported as a regular typealias, with the suffix "Ref" still dropped from its name (if present) unless doing so would conflict with another declaration in the same module as the typedef.
 
+
+## `swift_private`
+
+The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override; in that case the name needs to match the overridden declaration.
+
+```objc
+@interface Example : NSObject
+- (instancetype)initWithValue:(int)value __attribute__((swift_private));
+@property(readonly) int value __attribute__((swift_private));
+@end
+
+// Usually seen as NS_REFINED_FOR_SWIFT
+```
+
+```swift
+class Example: NSObject {
+  init(__value: Int32)
+  var __value: Int32 { get }
+}
+```
+
+The purpose of this annotation is to allow a more idiomatic implementation to be provided in Swift. The effect of `swift_private` is inherited from an enum onto its elements if the enum is not imported as an error code enum, an `@objc` enum, or an option set.
+
+_The original intent of the `swift_private` attribute was additionally to limit access to a Swift module with the same name as the owning Clang module, e.g. the Swift half of a mixed-source framework. However, this restriction has not been implemented as of Swift 5.1._
+
+_For "historical reasons", the `swift_private` attribute is ignored on factory methods with no arguments imported as initializers. This is essentially matching the behavior of older Swift compilers for source compatibility in case someone has marked such a factory method as `swift_private`._
+
+
 ## More to come...
