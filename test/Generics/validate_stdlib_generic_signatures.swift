@@ -1,7 +1,7 @@
 // Verifies that all of the generic signatures in the standard library are
 // minimal and canonical.
 
-// RUN: not %target-typecheck-verify-swift -typecheck -verify-generic-signatures Swift 2> %t.log
+// RUN: not %target-typecheck-verify-swift -verify-generic-signatures Swift 2> %t.log
 
 // RUN: grep -c "error:" %t.log | count 1
 // RUN: %FileCheck %s < %t.log
