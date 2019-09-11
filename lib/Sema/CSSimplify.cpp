@@ -7168,6 +7168,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   // T1 <c T2 && T2 : Hashable ===> T1 <c AnyHashable
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
+    type1 = simplifyType(type1);
     if (isAnyHashableType(
             type1->getRValueType()->lookThroughAllOptionalTypes())) {
       return SolutionKind::Error;
