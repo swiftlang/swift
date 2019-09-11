@@ -2,6 +2,19 @@
 
 This document gives a high-level description of how C and Objective-C declarations are translated to Swift, with particular focus on how names are adjusted. It is not attempting to be a *complete* description of everything the compiler does except with regards to how *names* are transformed; even there, some special cases that only apply to Apple's SDKs have been omitted.
 
+## Word boundaries
+
+Several forms of name translation are defined in terms of word boundaries. The word-splitting algorithm used by the Swift compiler is as follows: there is a boundary after
+
+1. An underscore ("\_").
+2. A series of two or more uppercase ASCII characters and the suffix "s", "es", or "ies" (e.g. "URLs", "VAXes")...unless the last uppercase letter is "I" and the suffix is "s", in which case it's just as likely to be an acronym followed by "Is" (i.e. "URLIs" is treated as "URL Is").
+2. A series of two or more uppercase ASCII characters followed by an uppercase ASCII character and then a lowercase ASCII character ("XMLReader" becomes "XML Reader").
+3. A series of two or more uppercase ASCII characters followed by a non-ASCII-alphabetic character. ("UTF8" becomes "UTF 8")
+4. A series of two or more uppercase ASCII characters at the end of the string.
+5. An uppercase ASCII character and any number of non-ASCII-uppercase, non-underscore characters ("ContrivedExample" becomes "Contrived Example").
+6. Any number of non-ASCII-uppercase, non-underscore characters ("lowercase\_example" becomes "lowercase \_ example").
+
+
 ## Enums
 
 1. Anonymous? Import elements as constants of the underlying type, *except* that Int is used for an inferred underlying type if all the cases fit in an Int32, since integer conversions are explicit in Swift.
@@ -114,15 +127,7 @@ In C, enumerators (enum cases) aren't namespaced under their enum type, so their
 
 1. Collect all *available, non-deprecated* enum cases *without custom names.* If there are no such cases, collect all cases without custom names, whether available or not.
 
-2. Find the common word-boundary prefix __CP__ of these cases. There is a word boundary after
-
-    1. An underscore ("\_").
-    2. A series of two or more uppercase ASCII characters and the suffix "s", "es", or "ies" (e.g. "URLs", "VAXes")...unless the last uppercase letter is "I" and the suffix is "s", in which case it's just as likely to be an acronym followed by "Is" (i.e. "URLIs" is treated as "URL Is").
-    2. A series of two or more uppercase ASCII characters followed by an uppercase ASCII character and then a lowercase ASCII character ("XMLReader" becomes "XML Reader").
-    3. A series of two or more uppercase ASCII characters followed by a non-ASCII-alphabetic character. ("UTF8" becomes "UTF 8")
-    4. A series of two or more uppercase ASCII characters at the end of the string.
-    5. An uppercase ASCII character and any number of non-ASCII-uppercase, non-underscore characters ("ContrivedExample" becomes "Contrived Example").
-    6. Any number of non-ASCII-uppercase, non-underscore characters ("lowercase\_example" becomes "lowercase \_ example").
+2. Find the common word-boundary prefix __CP__ of these cases.
 
 3. If __CP__ starts with "k" followed by an uppercase letter, or if it's *just* "k" and none of the cases have a non-identifier-start character immediately after the 'k', treat that as meaning "constant" and ignore it for the next step.
 
@@ -144,7 +149,7 @@ In C, enumerators (enum cases) aren't namespaced under their enum type, so their
 
 9. ASCII-lowercase the first word of the remaining name if it starts with an uppercase ASCII character.
 
-    _There's a bug here where the special case for "Is" is missing, so "URLIs" will be lowercased to "urlis"._
+    _There's a bug in this step where the special case for "Is" is missing, so "URLIs" will be lowercased to "urlis"._
 
 ## `swift_wrapper` typedefs
 
