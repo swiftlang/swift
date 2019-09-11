@@ -150,6 +150,9 @@ testSuite.test("Basic")
   requireClass(named: "main.ObjCSuperclass")
 }
 
+class Çlass<T> {}
+class SubÇlass: Çlass<Int> {}
+
 testSuite.test("BasicMangled")
   .requireOwnProcess()
   .code {
@@ -188,6 +191,10 @@ testSuite.test("GenericMangled")
                demangledName: "main.ConstrainedObjCSubclass")
   requireClass(named:   "_TtC4main25ConstrainedObjCSuperclass",
                demangledName: "main.ConstrainedObjCSuperclass")
+
+  // Make sure we don't accidentally ban high-bit characters.
+  requireClass(named: "_TtC4main9SubÇlass", demangledName: "main.SubÇlass")
+  requireClass(named: "4main9SubÇlassC", demangledName: "main.SubÇlass")
 }
 
 testSuite.test("ResilientSubclass")
