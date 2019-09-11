@@ -1025,6 +1025,9 @@ DeclContextKind DeclContext::getContextKind() const {
 }
 
 bool DeclContext::hasValueSemantics() const {
+	if (!isTypeContext())
+		return false;
+	
   if (auto contextTy = getSelfTypeInContext()) {
     return !contextTy->hasReferenceSemantics();
   }
