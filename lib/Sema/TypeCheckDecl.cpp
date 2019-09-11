@@ -3720,8 +3720,8 @@ static void validateResultType(TypeChecker &TC,
     resultTyLoc.setType(
         TC.getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
   } else {
-    TC.validateType(resultTyLoc, resolution,
-                    TypeResolverContext::FunctionResult);
+    TypeChecker::validateType(TC.Context, resultTyLoc, resolution,
+                              TypeResolverContext::FunctionResult);
   }
 }
 
@@ -3862,7 +3862,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     for (auto member : proto->getMembers()) {
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
         if (!aliasDecl->isGeneric()) {
-          assert(aliasDecl->getGenericSignature() == proto->getGenericSignature());
           // FIXME: Force creation of the protocol's generic environment now.
           (void) proto->getGenericEnvironment();
           
