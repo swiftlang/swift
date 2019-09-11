@@ -2869,9 +2869,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   auto desugar2 = type2->getDesugaredType();
 
   // If both sides are dependent members without type variables, it's
-  // possible that base type is incorrect e.g. `U.Element` where `U`
-  // is a generic parameter, so checking equality here would lead to
-  // incorrect behavior, let's defer it until later proper check.
+  // possible that base type is incorrect e.g. `Foo.Element` where `Foo`
+  // is a concrete type substituted for generic generic parameter,
+  // so checking equality here would lead to incorrect behavior,
+  // let's defer it until later proper check.
   if (!(desugar1->is<DependentMemberType>() &&
         desugar2->is<DependentMemberType>())) {
     // If the types are obviously equivalent, we're done.
