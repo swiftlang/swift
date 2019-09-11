@@ -1505,12 +1505,13 @@ public:
   TrailingWhereClause *TrailingWhere = nullptr;
 
   /// The generic signature of this declaration.
-  GenericSignature *GenericSig = nullptr;
+  llvm::PointerIntPair<GenericSignature *, 1, bool> GenericSigAndBit;
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
   friend class GenericParamListRequest;
-
+  friend class GenericSignatureRequest;
+  
 protected:
   GenericContext(DeclContextKind Kind, DeclContext *Parent,
                  GenericParamList *Params);
@@ -1534,7 +1535,8 @@ public:
   /// }
   /// \endcode
   bool isGeneric() const { return getGenericParams() != nullptr; }
-
+  bool hasComputedGenericSignature() const;
+  
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
     return TrailingWhere;
