@@ -571,7 +571,11 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   case NORMAL_PROTOCOL_CONFORMANCE_ID: {
     NormalConformanceID conformanceID;
     NormalProtocolConformanceIdLayout::readRecord(scratch, conformanceID);
-    return ProtocolConformanceRef(readNormalConformance(conformanceID));
+
+    auto conformance = readNormalConformanceChecked(conformanceID);
+    if (!conformance)
+      return conformance.takeError();
+    return ProtocolConformanceRef(conformance.get());
   }
 
   case PROTOCOL_CONFORMANCE_XREF: {
@@ -614,7 +618,7 @@ ModuleFile::readConformanceChecked(llvm::BitstreamCursor &Cursor,
   }
 }
 
-NormalProtocolConformance *ModuleFile::readNormalConformance(
+Expected<NormalProtocolConformance *> ModuleFile::readNormalConformanceChecked(
                              NormalConformanceID conformanceID) {
   auto &conformanceEntry = NormalConformances[conformanceID-1];
   if (conformanceEntry.isComplete()) {
@@ -653,7 +657,11 @@ NormalProtocolConformance *ModuleFile::readNormalConformance(
   Type conformingType = dc->getDeclaredInterfaceType();
   PrettyStackTraceType trace(ctx, "reading conformance for", conformingType);
 
-  auto proto = cast<ProtocolDecl>(getDecl(protoID));
+  auto protoOrError = getDeclChecked(protoID);
+  if (!protoOrError)
+    return protoOrError.takeError();
+  auto proto = cast<ProtocolDecl>(protoOrError.get());
+
   PrettyStackTraceDecl traceTo("... to", proto);
   ++NumNormalProtocolConformancesLoaded;
 
@@ -5761,9 +5769,22 @@ ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
   fatalIfNotSuccess(DeclTypeCursor.JumpToBit(bitPosition));
 
   while (numConformances--) {
-    auto conf = readConformance(DeclTypeCursor);
-    if (conf.isConcrete())
-      conformances.push_back(conf.getConcrete());
+    auto conformance = readConformanceChecked(DeclTypeCursor);
+
+    if (!conformance) {
+      // Missing module errors are most likely caused by an
+      // implementation-only import hiding types and decls.
+      // rdar://problem/60291019
+      if (conformance.errorIsA<XRefNonLoadedModuleError>()) {
+        consumeError(conformance.takeError());
+        return;
+      }
+      else
+        fatal(conformance.takeError());
+    }
+
+    if (conformance.get().isConcrete())
+      conformances.push_back(conformance.get().getConcrete());
   }
 }
 
