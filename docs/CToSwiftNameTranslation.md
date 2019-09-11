@@ -196,6 +196,11 @@ extension SecretResourceID {
 On Apple platforms, whenever Foundation is imported, constants with the type "NSNotificationName" additionally have the suffix "Notification" stripped before performing the above rules unless they have a custom name. Global NSString constants whose name ends in "Notification" will also automatically be treated as if they were declared with the type NSNotificationName unless they have a custom name.
 
 
+## Objective-C Protocols
+
+Protocols in Objective-C are normally in a separate namespace from the "ordinary" identifier namespace used by typedefs and classes. Swift does not have separate namespaces, so if the protocol has the same name as another declaration in the same module, the suffix "Protocol" is appended. (Example: NSObjectProtocol in the ObjectiveC module.)
+
+
 ## CF Types
 
 "Core Foundation" is a C-based object-oriented system with strong conventions built around pointers to opaque structs. Creating new Core Foundation types is not generally supported, but Swift will recognize those in Apple's SDKs. If a struct has the `objc_bridge`, `objc_mutable_bridge`, or `objc_bridge_related` Clang attributes, it will be treated as a CF type and a typedef of a pointer to that struct will be imported as a class in Swift. The suffix "Ref" will be dropped from the class's name if present unless doing so would conflict with another declaration in the same module as the typedef.
