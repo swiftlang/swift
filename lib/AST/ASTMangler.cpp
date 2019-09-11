@@ -736,9 +736,9 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
   if (canSymbolicReference(opaqueDecl)) {
     appendSymbolicReference(opaqueDecl);
   } else if (auto namingDecl = opaqueDecl->getNamingDecl()) {
-    CanGenericSignature savedSignature = CurGenericSignature;
+    llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+        CurGenericSignature);
     appendEntity(namingDecl);
-    CurGenericSignature = savedSignature;
     appendOperator("QO");
   } else {
     llvm_unreachable("todo: independent opaque type decls");
@@ -2667,11 +2667,11 @@ void ASTMangler::appendConcreteProtocolConformance(
             opaqueSignature->getConformanceAccessPath(opaqueTypeParam, proto);
 
         // Append the conformance access path with the signature of the opaque type.
-        CanGenericSignature savedSignature = CurGenericSignature;
-        CurGenericSignature = opaqueSignature->getCanonicalSignature();
-        appendDependentProtocolConformance(conformanceAccessPath);
-        CurGenericSignature = savedSignature;
-
+        {
+          llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+              CurGenericSignature, opaqueSignature->getCanonicalSignature());
+          appendDependentProtocolConformance(conformanceAccessPath);
+        }
         appendType(canType);
         appendOperator("HO");
       } else {
