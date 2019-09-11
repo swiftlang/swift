@@ -54,7 +54,7 @@ getObjCClassByMangledName_untrusted(const char * _Nonnull typeName,
   // Scan the string for byte sequences that might be recognized as
   // symbolic references, and reject them.
   for (const char *c = typeName; *c != 0; ++c) {
-    if (*c < 0x20) {
+    if (*c >= 1 && *c < 0x20) {
       *outClass = Nil;
       return NO;
     }
