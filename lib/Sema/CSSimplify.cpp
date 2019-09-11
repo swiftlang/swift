@@ -4783,7 +4783,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // as representing "dynamic lookup" unless it's a direct call
     // to such subscript (in that case label is expected to match).
     if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (::hasDynamicMemberLookupAttribute(instanceTy,
+      if (memberLocator &&
+          ::hasDynamicMemberLookupAttribute(instanceTy,
                                             DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
         auto info = getArgumentInfo(memberLocator);
