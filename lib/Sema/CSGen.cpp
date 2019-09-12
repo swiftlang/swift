@@ -2478,11 +2478,11 @@ namespace {
     }
 
     Type visitDefaultArgumentExpr(DefaultArgumentExpr *expr) {
-      llvm_unreachable("Already type checked");
+      return expr->getType();
     }
 
     Type visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
-      llvm_unreachable("Already type checked");
+      return expr->getType();
     }
 
     Type visitApplyExpr(ApplyExpr *expr) {
