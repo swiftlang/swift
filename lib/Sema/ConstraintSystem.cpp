@@ -2880,6 +2880,9 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
 
 Optional<ConstraintSystem::ArgumentInfo>
 ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
+  if (!locator)
+    return None;
+
   if (auto *infoLocator = getArgumentInfoLocator(locator)) {
     auto known = ArgumentInfos.find(infoLocator);
     if (known != ArgumentInfos.end())
