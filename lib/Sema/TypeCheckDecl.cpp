@@ -2403,9 +2403,9 @@ public:
     auto type = VD->getType();
     if (!type->isEqual(DC->getSelfTypeInContext()))
       return;
-    if (!VD->getParentPatternBinding())
-      return;
     auto PBD = VD->getParentPatternBinding();
+    if (!PBD)
+      return;
     for (auto entry : PBD->getPatternList()) {
       auto ctor = dyn_cast<CallExpr>(entry.getInit());
       if (!ctor) continue;
