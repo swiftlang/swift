@@ -1947,6 +1947,8 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
   case DeclContextKind::GenericTypeDecl: {
     auto generic = cast<GenericTypeDecl>(DC);
 
+    writeCrossReference(DC->getParent(), pathLen + 1);
+
     // Opaque return types are unnamed and need a special xref.
     if (auto opaque = dyn_cast<OpaqueTypeDecl>(generic)) {
       if (!opaque->hasName()) {
@@ -1960,8 +1962,6 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
     }
       
     assert(generic->hasName());
-    
-    writeCrossReference(DC->getParent(), pathLen + 1);
 
     abbrCode = DeclTypeAbbrCodes[XRefTypePathPieceLayout::Code];
 
