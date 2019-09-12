@@ -132,7 +132,7 @@ SDKNodeDeclFunction::SDKNodeDeclFunction(SDKNodeInitInfo Info):
   FuncSelfKind(Info.FuncSelfKind) {}
 
 SDKNodeDeclConstructor::SDKNodeDeclConstructor(SDKNodeInitInfo Info):
-  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor) {}
+  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor), InitKind(Info.InitKind) {}
 
 SDKNodeDeclAccessor::SDKNodeDeclAccessor(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclAccessor),
@@ -1271,6 +1271,30 @@ static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
   return Results;
 }
 
+CtorInitializerKind SDKNodeDeclConstructor::getInitKind() const {
+#define CASE(KIND) if (InitKind == #KIND) return CtorInitializerKind::KIND;
+  CASE(Designated)
+  CASE(Convenience)
+  CASE(ConvenienceFactory)
+  CASE(Factory)
+#undef CASE
+  llvm_unreachable("unhandled init kind");
+}
+
+StringRef SDKContext::getInitKind(Decl *D) {
+  if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+    switch(CD->getInitKind()) {
+#define CASE(KIND) case CtorInitializerKind::KIND: return #KIND;
+    CASE(Designated)
+    CASE(Convenience)
+    CASE(ConvenienceFactory)
+    CASE(Factory)
+#undef CASE
+    }
+  }
+  return StringRef();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()),
       Location(calculateLocation(Ctx, D)),
@@ -1285,6 +1309,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
+      InitKind(Ctx.getInitKind(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
@@ -1914,6 +1939,11 @@ void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
 void SDKNodeDeclFunction::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
   output(out, KeyKind::KK_funcSelfKind, FuncSelfKind);
+}
+
+void SDKNodeDeclConstructor::jsonize(json::Output &out) {
+  SDKNodeDeclAbstractFunc::jsonize(out);
+  output(out, KeyKind::KK_init_kind, InitKind);
 }
 
 void SDKNodeDeclType::jsonize(json::Output &out) {
