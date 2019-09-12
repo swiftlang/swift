@@ -1091,4 +1091,5 @@ Requirement Requirement::getCanonical() const {
   case RequirementKind::Layout:
     return Requirement(getKind(), firstType, getLayoutConstraint());
   }
+  llvm_unreachable("Unhandled RequirementKind in switch");
 }
