@@ -740,7 +740,7 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);
@@ -884,18 +884,21 @@ public:
 void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
   class ExpressionFinder : public ASTWalker {
   private:
+    ASTContext &ctx;
     std::mt19937_64 RNG;
     bool HighPerformance;
     unsigned TmpNameIndex = 0;
 
   public:
-    ExpressionFinder(bool HP) : HighPerformance(HP) {}
+    ExpressionFinder(ASTContext &ctx, bool HP) : ctx(ctx), HighPerformance(HP) {}
+
+    // FIXME: Remove this
+    bool shouldWalkAccessorsTheOldWay() override { return true; }
 
     bool walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
-            ASTContext &ctx = FD->getASTContext();
             Instrumenter I(ctx, FD, RNG, HighPerformance, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
@@ -908,7 +911,6 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            ASTContext &ctx = static_cast<Decl *>(TLCD)->getASTContext();
             Instrumenter I(ctx, TLCD, RNG, HighPerformance, TmpNameIndex);
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
@@ -924,8 +926,6 @@ void swift::performPlaygroundTransform(SourceFile &SF, bool HighPerformance) {
     }
   };
 
-  ExpressionFinder EF(HighPerformance);
-  for (Decl *D : SF.Decls) {
-    D->walk(EF);
-  }
+  ExpressionFinder EF(SF.getASTContext(), HighPerformance);
+  SF.walk(EF);
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -closure-lifetime-fixup %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup %s | %FileCheck %s
 
 sil_stage raw
 
@@ -7,6 +7,7 @@ import Builtin
 import SwiftShims
 
 class FakeNSString {}
+class Klass {}
 
 sil @$sSSSgIgg_AAIegg_TR : $@convention(thin) (@guaranteed Optional<String>, @noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()) -> ()
 sil @noescapeBlock3 : $@convention(c) (Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, Optional<@convention(block) @noescape (Optional<FakeNSString>) -> ()>, Optional<FakeNSString>) -> ()
@@ -114,4 +115,43 @@ bb11:
 bb12:
   %77 = enum $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>, #Optional.none!enumelt
   br bb2(%77 : $Optional<@noescape @callee_guaranteed (@guaranteed Optional<String>) -> ()>)
+}
+
+sil @originalClosure : $@convention(thin) () -> ()
+sil @noEscapeThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+sil @blockThunk : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+
+// Just make sure we apply the optimization. The ownership verifier will verify
+// that we do not catch the leak.
+//
+// CHECK-LABEL: sil [ossa] @ssaupdater_no_single_destroy_some_in_exit_block : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed () -> (), @guaranteed Klass, @guaranteed @callee_guaranteed () -> ()) -> () {
+// CHECK-NOT: convert_escape_to_noescape [not_guaranteed]
+// CHECK-NOT: copy_block_without_escaping
+// CHECK: } // end sil function 'ssaupdater_no_single_destroy_some_in_exit_block'
+sil [ossa] @ssaupdater_no_single_destroy_some_in_exit_block : $@convention(thin) (@guaranteed Klass, @guaranteed @callee_guaranteed () -> (), @guaranteed Klass, @guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $@callee_guaranteed () -> (), %2 : @guaranteed $Klass, %3 : @guaranteed $@callee_guaranteed () -> ()):
+  // This basic block is needed to trigger the bug.
+  br bb1
+
+bb1:
+  %39 = function_ref @originalClosure : $@convention(thin) () -> ()
+  %43 = partial_apply [callee_guaranteed] %39() : $@convention(thin) () -> ()
+  %44 = convert_escape_to_noescape [not_guaranteed] %43 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %45 = function_ref @noEscapeThunk : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %46 = partial_apply [callee_guaranteed] %45(%44) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %47 = mark_dependence %46 : $@callee_guaranteed () -> () on %44 : $@noescape @callee_guaranteed () -> ()
+  %48 = copy_value %47 : $@callee_guaranteed () -> ()
+  %49 = alloc_stack $@block_storage @callee_guaranteed () -> ()
+  %50 = project_block_storage %49 : $*@block_storage @callee_guaranteed () -> ()
+  store %48 to [init] %50 : $*@callee_guaranteed () -> ()
+  %52 = function_ref @blockThunk : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> ()
+  %53 = init_block_storage_header %49 : $*@block_storage @callee_guaranteed () -> (), invoke %52 : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed () -> ()) -> (), type $@convention(block) @noescape () -> ()
+  %54 = copy_block_without_escaping %53 : $@convention(block) @noescape () -> () withoutEscaping %47 : $@callee_guaranteed () -> ()
+  %55 = enum $Optional<@convention(block) @noescape () -> ()>, #Optional.some!enumelt.1, %54 : $@convention(block) @noescape () -> ()
+  destroy_addr %50 : $*@callee_guaranteed () -> ()
+  dealloc_stack %49 : $*@block_storage @callee_guaranteed () -> ()
+  destroy_value %43 : $@callee_guaranteed () -> ()
+  destroy_value %55 : $Optional<@convention(block) @noescape () -> ()>
+  %86 = tuple ()
+  return %86 : $()
 }

@@ -344,7 +344,7 @@ extension String.UTF8View.Index {
 }
 
 // Reflection
-extension String.UTF8View : CustomReflectable {
+extension String.UTF8View: CustomReflectable {
   /// Returns a mirror that reflects the UTF-8 view of a string.
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)
@@ -423,7 +423,7 @@ extension String.UTF8View {
 
     if utf8Len == 1 {
       _internalInvariant(idx.transcodedOffset == 0)
-      return idx.nextEncoded
+      return idx.nextEncoded._scalarAligned
     }
 
     // Check if we're still transcoding sub-scalar
@@ -432,7 +432,8 @@ extension String.UTF8View {
     }
 
     // Skip to the next scalar
-    return idx.encoded(offsetBy: scalarLen)
+    _internalInvariant(idx.transcodedOffset == utf8Len - 1)
+    return idx.encoded(offsetBy: scalarLen)._scalarAligned
   }
 
   @usableFromInline @inline(never)
@@ -505,7 +506,7 @@ extension String.UTF8View {
       // _cocoaStringUTF8Count gave us the scalar aligned count, but we still
       // need to compensate for sub-scalar indexing, e.g. if `i` is in the
       // middle of a two-byte UTF8 scalar.
-      let refinedCount = count - (i.transcodedOffset + j.transcodedOffset)
+      let refinedCount = (count - i.transcodedOffset) + j.transcodedOffset
       _internalInvariant(refinedCount == _distance(from: i, to: j))
       return refinedCount
     }

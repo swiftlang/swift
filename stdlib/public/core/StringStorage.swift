@@ -16,7 +16,7 @@ import SwiftShims
 // want.
 #if _runtime(_ObjC)
 
-internal protocol _AbstractStringStorage : _NSCopying {
+internal protocol _AbstractStringStorage: _NSCopying {
   var asString: String { get }
   var count: Int { get }
   var isASCII: Bool { get }
@@ -146,7 +146,7 @@ extension _AbstractStringStorage {
 
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let otherStart = _cocoaUTF8Pointer(other) {
+      if let otherStart = _cocoaASCIIPointer(other) {
         //We know that otherUTF16Length is also its byte count at this point
         if count != otherUTF16Length {
           return 0

@@ -1421,7 +1421,7 @@ extension Array {
   ///     of the new array.
   ///     - Parameters:
   ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///         specified number of of elements.
+  ///         specified number of elements.
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
@@ -1891,7 +1891,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     return hasher._finalize()
   }
 
-  internal func _unbox<T : Hashable>() -> T? {
+  internal func _unbox<T: Hashable>() -> T? {
     return _value as? T
   }
 

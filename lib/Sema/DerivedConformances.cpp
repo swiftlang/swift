@@ -177,8 +177,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // Retrieve the requirement.
-    auto results = proto->lookupDirect(name);
-    return results.empty() ? nullptr : results.front();
+    return proto->getSingleRequirement(name);
   };
 
   // Properties.
@@ -240,7 +239,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::RawRepresentable);
 
       // CodingKey.init?(stringValue:), CodingKey.init?(intValue:)
-      if (ctor->getFailability() == OTK_Optional &&
+      if (ctor->isFailable() &&
+          !ctor->isImplicitlyUnwrappedOptional() &&
           (argumentNames[0] == ctx.Id_stringValue ||
            argumentNames[0] == ctx.Id_intValue))
         return getRequirement(KnownProtocolKind::CodingKey);
@@ -283,8 +283,8 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
   auto getter =
     declareDerivedPropertyGetter(property, propertyContextType);
 
-  property->setAccessors(StorageImplInfo::getImmutableComputed(),
-                         SourceLoc(), {getter}, SourceLoc());
+  property->setImplInfo(StorageImplInfo::getImmutableComputed());
+  property->setAccessors(SourceLoc(), {getter}, SourceLoc());
 
   return getter;
 }
@@ -309,10 +309,10 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
+  getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
+  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
   getterDecl->copyFormalAccessFrom(property);
@@ -331,7 +331,7 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   auto &C = TC.Context;
   auto parentDC = getConformanceContext();
 
-  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Specifier::Var,
+  VarDecl *propDecl = new (C) VarDecl(/*IsStatic*/isStatic, VarDecl::Introducer::Var,
                                       /*IsCaptureList*/false, SourceLoc(), name,
                                       parentDC);
   propDecl->setImplicit();

@@ -7,7 +7,7 @@
 struct Wrapper<Value> {
   var _stored: Value?
 
-  var value: Value {
+  var wrappedValue: Value {
     get {
       return _stored!
     }
@@ -21,7 +21,7 @@ struct Wrapper<Value> {
     self._stored = nil
   }
 
-  init(initialValue: Value) {
+  init(wrappedValue initialValue: Value) {
     self._stored = initialValue
   }
 

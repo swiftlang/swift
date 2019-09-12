@@ -116,7 +116,7 @@ extension NSEvent.SpecialKey {
     static public let f34 = NSEvent.SpecialKey(rawValue: 0xF725)
     static public let f35 = NSEvent.SpecialKey(rawValue: 0xF726)
     static public let insert = NSEvent.SpecialKey(rawValue: 0xF727)
-    static public let deleteForward = NSEvent.SpecialKey(rawValue: 0xF7028)
+    static public let deleteForward = NSEvent.SpecialKey(rawValue: 0xF728)
     static public let home = NSEvent.SpecialKey(rawValue: 0xF729)
     static public let begin = NSEvent.SpecialKey(rawValue: 0xF72A)
     static public let end = NSEvent.SpecialKey(rawValue: 0xF72B)

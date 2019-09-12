@@ -26,10 +26,10 @@ struct S {
     f({x in x}, 2) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
-  func g<T>(_ a: T, _ b: Int) -> Void {}
+  func g<T>(_ a: T, _ b: Int) -> Void {} // expected-note {{in call to function 'g'}}
   func g(_ a: String) -> Void {}
   func test2() -> Void {
-    g(.notAThing, 7) // expected-error {{reference to member 'notAThing' cannot be resolved without a contextual type}}
+    g(.notAThing, 7) // expected-error {{generic parameter 'T' could not be inferred}}
   }
   
   func h(_ a: Int, _ b: Int) -> Void {}
@@ -93,6 +93,7 @@ class sr7440_Genre {
   static func fetch(_ iTunesGenre: sr7440_ITunesGenre) -> sr7440_Genre {
     return sr7440_Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
 // expected-error@-1 {{value of type 'sr7440_ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
+// expected-error@-2 {{cannot convert return expression of type '()' to return type 'sr7440_Genre'}}
   }
 }
 

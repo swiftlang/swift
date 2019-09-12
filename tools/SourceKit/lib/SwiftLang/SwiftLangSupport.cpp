@@ -14,6 +14,7 @@
 #include "SwiftASTManager.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/SwiftLang/Factory.h"
+#include "SourceKit/Support/FileSystemProvider.h"
 #include "SourceKit/Support/UIdent.h"
 
 #include "swift/AST/ASTVisitor.h"
@@ -193,6 +194,66 @@ UIdent UIdentVisitor::visitExtensionDecl(const ExtensionDecl *D) {
   return UIdent();
 }
 
+namespace {
+/// A simple FileSystemProvider that creates an InMemoryFileSystem for a given
+/// dictionary of file contents and overlays that on top of the real filesystem.
+class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
+  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
+  /// contains specified files at specified locations.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+  getFileSystem(OptionsDictionary &options, std::string &error) override {
+    auto InMemoryFS = llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem>(
+        new llvm::vfs::InMemoryFileSystem());
+
+    static UIdent KeyFiles("key.files");
+    static UIdent KeyName("key.name");
+    static UIdent KeySourceFile("key.sourcefile");
+    static UIdent KeySourceText("key.sourcetext");
+    bool failed = options.forEach(KeyFiles, [&](OptionsDictionary &file) {
+      StringRef name;
+      if (!file.valueForOption(KeyName, name)) {
+        error = "missing 'key.name'";
+        return true;
+      }
+
+      StringRef content;
+      if (file.valueForOption(KeySourceText, content)) {
+        auto buffer = llvm::MemoryBuffer::getMemBufferCopy(content, name);
+        InMemoryFS->addFile(name, 0, std::move(buffer));
+        return false;
+      }
+
+      StringRef mappedPath;
+      if (!file.valueForOption(KeySourceFile, mappedPath)) {
+        error = "missing 'key.sourcefile' or 'key.sourcetext'";
+        return true;
+      }
+
+      auto bufferOrErr = llvm::MemoryBuffer::getFile(mappedPath);
+      if (auto err = bufferOrErr.getError()) {
+        llvm::raw_string_ostream errStream(error);
+        errStream << "error reading target file '" << mappedPath
+                  << "': " << err.message() << "\n";
+        return true;
+      }
+
+      auto renamedBuffer = llvm::MemoryBuffer::getMemBufferCopy(
+          bufferOrErr.get()->getBuffer(), name);
+      InMemoryFS->addFile(name, 0, std::move(renamedBuffer));
+      return false;
+    });
+
+    if (failed)
+      return nullptr;
+
+    auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
+        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+    OverlayFS->pushOverlay(std::move(InMemoryFS));
+    return OverlayFS;
+  }
+};
+}
+
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
       CCCache(new SwiftCompletionCache) {
@@ -206,6 +267,9 @@ SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
                                              RuntimeResourcePath);
   // By default, just use the in-memory cache.
   CCCache->inMemory = llvm::make_unique<ide::CodeCompletionCache>();
+
+  // Provide a default file system provider.
+  setFileSystemProvider("in-memory-vfs", llvm::make_unique<InMemoryFileSystemProvider>());
 }
 
 SwiftLangSupport::~SwiftLangSupport() {
@@ -403,7 +467,9 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
     return KindObjectLiteral;
   }
 
-  llvm_unreachable("Unhandled SyntaxNodeKind in switch.");
+  // Default to a known kind to prevent crashing in non-asserts builds
+  assert(0 && "Unhandled SyntaxNodeKind in switch.");
+  return KindIdentifier;
 }
 
 UIdent SwiftLangSupport::getUIDForSyntaxStructureKind(
@@ -807,9 +873,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     if (usePlaceholder)
       OS << "<#T##";
 
-    if (auto substitutedTy = paramTy.subst(substMap))
-      paramTy = substitutedTy;
-
+    paramTy = paramTy.subst(substMap);
     if (paramTy->hasError() && param->getTypeLoc().hasLocation()) {
       // Fallback to 'TypeRepr' printing.
       param->getTypeLoc().getTypeRepr()->print(OS);
@@ -885,6 +949,46 @@ void SwiftLangSupport::getStatistics(StatisticsReceiver receiver) {
 #include "SwiftStatistics.def"
   };
   receiver(stats);
+}
+
+FileSystemProvider *SwiftLangSupport::getFileSystemProvider(StringRef Name) {
+  auto It = FileSystemProviders.find(Name);
+  if (It == FileSystemProviders.end())
+    return nullptr;
+  return It->second.get();
+}
+
+void SwiftLangSupport::setFileSystemProvider(
+     StringRef Name, std::unique_ptr<FileSystemProvider> FileSystemProvider) {
+  assert(FileSystemProvider);
+  auto Result = FileSystemProviders.try_emplace(Name, std::move(FileSystemProvider));
+  assert(Result.second && "tried to set existing FileSystemProvider");
+}
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
+                                Optional<StringRef> primaryFile,
+                                std::string &error) {
+  // First, try the specified vfsOptions.
+  if (vfsOptions) {
+    auto provider = getFileSystemProvider(vfsOptions->name);
+    if (!provider) {
+      error = "unknown virtual filesystem '" + vfsOptions->name + "'";
+      return nullptr;
+    }
+
+    return provider->getFileSystem(*vfsOptions->options, error);
+  }
+
+  // Otherwise, try to find an open document with a filesystem.
+  if (primaryFile) {
+    if (auto doc = EditorDocuments->getByUnresolvedName(*primaryFile)) {
+      return doc->getFileSystem();
+    }
+  }
+
+  // Fallback to the real filesystem.
+  return llvm::vfs::getRealFileSystem();
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

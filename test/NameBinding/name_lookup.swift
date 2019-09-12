@@ -239,7 +239,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisDerived1'}}
-    self.baseExtStaticVar = 42
+    self.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.baseExtStaticFunc0()
 
@@ -264,7 +264,7 @@ class ThisDerived1 : ThisBase1 {
 
     self.derivedExtProp = 42 // expected-error {{member 'derivedExtProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtFunc0() // expected-error {{instance member 'derivedExtFunc0' cannot be used on type 'ThisDerived1'}}
-    self.derivedExtStaticVar = 42
+    self.derivedExtStaticVar = 42 // expected-error {{instance member 'derivedExtStaticVar' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticProp = 42 // expected-error {{member 'derivedExtStaticProp' cannot be used on type 'ThisDerived1'}}
     self.derivedExtStaticFunc0()
 
@@ -305,7 +305,7 @@ class ThisDerived1 : ThisBase1 {
 
     super.baseExtProp = 42 // expected-error {{member 'baseExtProp' cannot be used on type 'ThisBase1'}}
     super.baseExtFunc0() // expected-error {{instance member 'baseExtFunc0' cannot be used on type 'ThisBase1'}}
-    super.baseExtStaticVar = 42 
+    super.baseExtStaticVar = 42 // expected-error {{instance member 'baseExtStaticVar' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticProp = 42 // expected-error {{member 'baseExtStaticProp' cannot be used on type 'ThisBase1'}}
     super.baseExtStaticFunc0()
 
@@ -410,13 +410,14 @@ extension ThisDerived1 {
 
 // <rdar://problem/11554141>
 func shadowbug() {
-  var Foo = 10
+  let Foo = 10
   func g() {
     struct S {
       var x : Foo
       typealias Foo = Int
     }
   }
+  _ = Foo
 }
 func scopebug() {
   let Foo = 10
@@ -619,15 +620,11 @@ struct PatternBindingWithTwoVars1 { var x = 3, y = x }
 
 struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{type 'PatternBindingWithTwoVars2' has no member 'y'}}
-// expected-note@-2 {{did you mean 'x'?}}
-// expected-note@-3 {{did you mean 'y'?}}
 
 // This one should be accepted, but for now PatternBindingDecl validation
 // circularity detection is not fine grained enough.
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
 // expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
-// expected-note@-2 {{did you mean 'x'?}}
-// expected-note@-3 {{did you mean 'y'?}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {

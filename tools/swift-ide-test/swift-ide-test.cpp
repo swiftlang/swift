@@ -14,13 +14,14 @@
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -40,6 +41,7 @@
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/TypeContextInfo.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDE/IDERequests.h"
 #include "swift/Index/Index.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/Markup.h"
@@ -307,6 +309,13 @@ ImportObjCHeader("import-objc-header",
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+DisableFunctionBuilderOneWayConstraints(
+    "disable-function-builder-one-way-constraints",
+    llvm::cl::desc("Disable one-way constraints in function builders"),
+    llvm::cl::cat(Category),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
@@ -763,6 +772,7 @@ static int doTypeContextInfo(const CompilerInvocation &InitInvok,
   }
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   return 0;
 }
@@ -827,6 +837,7 @@ doConformingMethodList(const CompilerInvocation &InitInvok,
   }
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   return 0;
 }
@@ -900,6 +911,7 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   }
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   return 0;
 }
@@ -929,6 +941,7 @@ static int doREPLCodeCompletion(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   SourceFile &SF = CI.getMainModule()->getMainSourceFile(SourceFileKind::REPL);
@@ -1130,6 +1143,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
   Invocation.getLangOptions().BuildSyntaxTree = true;
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   if (!RunTypeChecker)
     CI.performParseOnly();
   else
@@ -1171,6 +1185,7 @@ static int doDumpImporterLookupTables(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   auto &Context = CI.getASTContext();
@@ -1352,6 +1367,7 @@ static int doStructureAnnotation(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performParseOnly();
 
   unsigned BufID = CI.getInputBufferIDs().back();
@@ -1608,6 +1624,7 @@ static int doSemanticAnnotation(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   unsigned BufID = CI.getInputBufferIDs().back();
@@ -1681,7 +1698,7 @@ static int doPrintAST(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   std::unique_ptr<DebuggerClient> DebuggerClient;
   if (!DebugClientDiscriminator.empty()) {
     DebuggerClient.reset(
@@ -1727,6 +1744,7 @@ static int doPrintExpressionTypes(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return EXIT_FAILURE;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   std::vector<ExpressionTypeInfo> Scratch;
 
@@ -1781,7 +1799,7 @@ static int doPrintLocalTypes(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   auto *Stdlib = getModuleByFullName(Context, Context.StdlibModuleName);
@@ -1947,9 +1965,11 @@ public:
     OS << "</synthesized>";
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     OS << "<ref:" << Decl::getKindName(TD->getKind()) << '>';
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
     OS << "</ref>";
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
@@ -1993,7 +2013,7 @@ static int doPrintModuleGroups(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   // Load standard library so that Clang importer can use it.
@@ -2043,7 +2063,7 @@ static int doPrintModules(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   // Load standard library so that Clang importer can use it.
@@ -2121,7 +2141,7 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   // Load standard library so that Clang importer can use it.
@@ -2174,6 +2194,7 @@ static int doPrintSwiftFileInterface(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   std::unique_ptr<ASTPrinter> Printer;
@@ -2205,6 +2226,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   std::unique_ptr<ASTPrinter> Printer;
@@ -2216,7 +2238,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
     UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile(), nullptr);
+                             CI.getPrimarySourceFile());
     for (auto result : lookup.Results) {
       result.getValueDecl()->print(*Printer, Options);
 
@@ -2316,6 +2338,7 @@ static int doPrintTypes(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   PrintOptions Options = PrintOptions::printEverything();
@@ -2540,6 +2563,7 @@ static int doDumpComments(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   ASTDocCommentDumper Dumper;
@@ -2564,6 +2588,7 @@ static int doPrintComments(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   XMLValidator TheXMLValidator;
@@ -2587,7 +2612,7 @@ static int doPrintModuleComments(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   // Load standard library so that Clang importer can use it.
@@ -2626,6 +2651,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
   if (CI.setup(Invocation))
     return 1;
 
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   // Load standard library so that Clang importer can use it.
@@ -2642,7 +2668,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
     }
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
-    M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
+    for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.second->getName();
       if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
@@ -2661,7 +2687,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
-    });
+    }
   }
 
   return ExitCode;
@@ -2682,6 +2708,7 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
   CompilerInstance CI;
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
   unsigned BufID = CI.getInputBufferIDs().back();
@@ -2691,7 +2718,6 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
       break;
   }
   assert(SF && "no source file?");
-  CursorInfoResolver Resolver(*SF);
   SourceManager &SM = SF->getASTContext().SourceMgr;
   auto Offset = SM.resolveFromLineCol(BufID, Pair.getValue().first,
                                       Pair.getValue().second);
@@ -2700,7 +2726,10 @@ static int doPrintTypeInterface(const CompilerInvocation &InitInvok,
     return 1;
   }
   SourceLoc Loc = Lexer::getLocForStartOfToken(SM, BufID, Offset.getValue());
-  auto SemaT = Resolver.resolve(Loc);
+  auto SemaT =
+    evaluateOrDefault(SF->getASTContext().evaluator,
+                      CursorInfoRequest{CursorInfoOwner(SF, Loc)},
+                      ResolvedCursorInfo());
   if (SemaT.isInvalid()) {
     llvm::errs() << "Cannot find sema token at the given location.\n";
     return 1;
@@ -2728,6 +2757,7 @@ static int doPrintTypeInterfaceForTypeUsr(const CompilerInvocation &InitInvok,
   CompilerInstance CI;
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   DeclContext *DC = CI.getMainModule()->getModuleContext();
   assert(DC && "no decl context?");
@@ -2894,6 +2924,7 @@ static int doReconstructType(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
   for (auto Unit : CI.getMainModule()->getFiles()) {
@@ -2930,6 +2961,7 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
   for (auto Unit : CI.getMainModule()->getFiles()) {
@@ -2945,8 +2977,8 @@ static int doPrintRangeInfo(const CompilerInvocation &InitInvok,
                                            StartLineCol.second);
   SourceLoc EndLoc = SM.getLocForLineCol(bufferID, EndLineCol.first,
                                          EndLineCol.second);
-  RangeResolver Resolver(*SF, StartLoc, EndLoc);
-  ResolvedRangeInfo Result = Resolver.resolve();
+  ResolvedRangeInfo Result = evaluateOrDefault(SF->getASTContext().evaluator,
+    RangeInfoRequest(RangeInfoOwner({SF, StartLoc, EndLoc})), ResolvedRangeInfo());
   Result.print(llvm::outs());
   return 0;
 }
@@ -3032,6 +3064,7 @@ static int doPrintIndexedSymbols(const CompilerInvocation &InitInvok,
 
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   SourceFile *SF = nullptr;
   for (auto Unit : CI.getMainModule()->getFiles()) {
@@ -3060,7 +3093,7 @@ static int doPrintIndexedSymbolsFromModule(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
-
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   auto &Context = CI.getASTContext();
 
   // Load standard library so that Clang importer can use it.
@@ -3096,6 +3129,7 @@ static int doPrintUSRs(const CompilerInvocation &InitInvok,
   CI.addDiagnosticConsumer(&PrintDiags);
   if (CI.setup(Invocation))
     return 1;
+  registerIDERequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
 
   unsigned BufID = CI.getInputBufferIDs().back();
@@ -3295,6 +3329,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
+  InitInvok.getLangOptions().FunctionBuilderOneWayConstraints =
+    !options::DisableFunctionBuilderOneWayConstraints;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=

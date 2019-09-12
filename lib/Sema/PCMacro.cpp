@@ -435,7 +435,7 @@ public:
 
               SourceRange SR = PBD->getSourceRange();
               if (!SR.isValid()) {
-                SR = PBD->getOrigInitRange(0);
+                SR = PBD->getOriginalInitRange(0);
               }
 
               Added<Stmt *> LogBefore = buildLoggerCall(SR, true);
@@ -477,7 +477,7 @@ public:
     }
 
     VarDecl *VD =
-        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Specifier::Let,
+        new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               /*IsCaptureList*/false, SourceLoc(),
                               Context.getIdentifier(NameBuf),
                               TypeCheckDC);

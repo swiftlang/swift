@@ -69,7 +69,7 @@ bb0:
 // CHECK:  destroy_addr
 // CHECK:  dealloc_stack
 // CHECK:  return
-// CHECK-LABEL :} // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
+// CHECK-LABEL: } // end sil function '$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF'
 sil public_external [serialized] @$s7dealloc20wrap_foo_ncp_another1aSiAA1P_pz_tF : $@convention(thin) (@inout P) -> Int32 {
 bb0(%0 : $*P):
   debug_value_addr %0 : $*P, var, name "a", argno 1

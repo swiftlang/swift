@@ -246,7 +246,7 @@ extension String {
   }
 }
 
-extension String.UnicodeScalarView : RangeReplaceableCollection {
+extension String.UnicodeScalarView: RangeReplaceableCollection {
   /// Creates an empty view instance.
   @inlinable @inline(__always)
   public init() {
@@ -281,7 +281,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   /// - Parameter newElements: A sequence of Unicode scalar values.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the resulting view.
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: S)
   where S.Element == Unicode.Scalar {
     // TODO(String performance): Skip extra String allocation
     let scalars = String(decoding: newElements.map { $0.value }, as: UTF32.self)
@@ -306,7 +306,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollection {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Element == Unicode.Scalar {
+  ) where C: Collection, C.Element == Unicode.Scalar {
     // TODO(String performance): Skip extra String and Array allocation
 
     let utf8Replacement = newElements.flatMap { String($0).utf8 }
@@ -383,7 +383,7 @@ extension String.UnicodeScalarIndex {
 }
 
 // Reflection
-extension String.UnicodeScalarView : CustomReflectable {
+extension String.UnicodeScalarView: CustomReflectable {
   /// Returns a mirror that reflects the Unicode scalars view of a string.
   public var customMirror: Mirror {
     return Mirror(self, unlabeledChildren: self)

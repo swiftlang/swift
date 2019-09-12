@@ -134,6 +134,12 @@ def repeat_request : Separate<["-"], "repeat-request">,
   HelpText<"Repeat the request n times">, MetaVarName<"<n>">;
 def repeat_request_EQ : Joined<["-"], "repeat-request=">, Alias<repeat_request>;
 
+def vfs_files : CommaJoined<["-"], "vfs-files=">,
+  HelpText<"Injects a VFS into the request, overlaying files specified by the given <name>=<target> pairs over the real filesystem. Prefix destination with '@' to pass as sourcetext.">;
+
+def vfs_name : Separate<["-"], "vfs-name">,
+  HelpText<"Specify a virtual filesystem name">;
+
 def help : Flag<["-", "--"], "help">,
   HelpText<"Display available options">;
 

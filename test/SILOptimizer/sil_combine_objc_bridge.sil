@@ -224,7 +224,7 @@ enum AddressOnlyError : Error {
 // CHECK-LABEL: sil @unconditional_checked_cast_addr_address_only_type
 // CHECK: alloc_stack $Error
 // CHECK: alloc_stack $AddressOnlyError
-// CHECK  copy_addr
+// CHECK:  copy_addr
 // CHECK: alloc_existential_box
 // CHECK: project_existential_box
 // CHECK: copy_addr

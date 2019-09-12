@@ -179,6 +179,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsConcrete) {
+    (void)args.claimAll();
+    auto isConcrete = !substitutions.getReplacementTypes()[0]->hasArchetype();
+    out.add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, isConcrete));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::IsBitwiseTakable) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
@@ -204,7 +211,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // Emit non-mergeable traps only.
   if (IGF.Builder.isTrapIntrinsic(IID)) {
-    IGF.Builder.CreateNonMergeableTrap(IGF.IGM);
+    IGF.Builder.CreateNonMergeableTrap(IGF.IGM, StringRef());
     return;
   }
 
@@ -256,15 +263,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
-
-    if (Opts.EmitProfileCoverageMapping) {
-      // Update the associated coverage mapping: it's now safe to emit, because
-      // a symtab entry for this function is guaranteed (r://39146527).
-      auto &coverageMaps = SILMod.getCoverageMaps();
-      auto CovMapIt = coverageMaps.find(PGOFuncName);
-      if (CovMapIt != coverageMaps.end())
-        CovMapIt->second->setSymtabEntryGuaranteed();
-    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {
@@ -359,7 +357,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // string literal. If we ever get to the point of executing this builtin
     // at run time, it implies an incorrect use of the builtin and must result
     // in a trap.
-    IGF.emitTrap(/*Unreachable=*/false);
+    IGF.emitTrap("invalid use of globalStringTablePointer",
+                 /*Unreachable=*/false);
     auto returnValue = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
     // Consume the arguments of the builtin.
     (void)args.claimAll();
@@ -798,6 +797,8 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     
     // If we know the platform runtime's "done" value, emit the check inline.
     llvm::BasicBlock *doneBB = nullptr;
+    
+    llvm::BasicBlock *beforeBB = IGF.Builder.GetInsertBlock();
 
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       auto PredValue = IGF.Builder.CreateLoad(PredPtr,
@@ -805,11 +806,15 @@ if (Builtin.ID == BuiltinValueKind::id) { \
       auto ExpectedPredValue = llvm::ConstantInt::getSigned(IGF.IGM.OnceTy,
                                                             *ExpectedPred);
       auto PredIsDone = IGF.Builder.CreateICmpEQ(PredValue, ExpectedPredValue);
+      PredIsDone = IGF.Builder.CreateExpect(PredIsDone,
+                                     llvm::ConstantInt::get(IGF.IGM.Int1Ty, 1));
       
       auto notDoneBB = IGF.createBasicBlock("once_not_done");
       doneBB = IGF.createBasicBlock("once_done");
       
       IGF.Builder.CreateCondBr(PredIsDone, doneBB, notDoneBB);
+      
+      IGF.Builder.SetInsertPoint(&IGF.CurFn->back());
       IGF.Builder.emitBlock(notDoneBB);
     }
     
@@ -821,6 +826,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     // If we emitted the "done" check inline, join the branches.
     if (auto ExpectedPred = IGF.IGM.TargetInfo.OnceDonePredicateValue) {
       IGF.Builder.CreateBr(doneBB);
+      IGF.Builder.SetInsertPoint(beforeBB);
       IGF.Builder.emitBlock(doneBB);
       // We can assume the once predicate is in the "done" state now.
       auto PredValue = IGF.Builder.CreateLoad(PredPtr,

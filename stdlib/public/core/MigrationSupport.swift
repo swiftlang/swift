@@ -42,23 +42,23 @@ public typealias LazyDropWhileIndex<T> = LazyDropWhileCollection<T>.Index where 
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyDropWhileCollection")
 public typealias LazyDropWhileBidirectionalCollection<T> = LazyDropWhileCollection<T> where T: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyFilterCollection")
-public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T : BidirectionalCollection
+public typealias LazyFilterBidirectionalCollection<T> = LazyFilterCollection<T> where T: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapSequence.Iterator")
 public typealias LazyMapIterator<T, E> = LazyMapSequence<T, E>.Iterator where T: Sequence
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapCollection")
-public typealias LazyMapBidirectionalCollection<T, E> = LazyMapCollection<T, E> where T : BidirectionalCollection
+public typealias LazyMapBidirectionalCollection<T, E> = LazyMapCollection<T, E> where T: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyMapCollection")
-public typealias LazyMapRandomAccessCollection<T, E> = LazyMapCollection<T, E> where T : RandomAccessCollection
+public typealias LazyMapRandomAccessCollection<T, E> = LazyMapCollection<T, E> where T: RandomAccessCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyCollection")
-public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T : BidirectionalCollection
+public typealias LazyBidirectionalCollection<T> = LazyCollection<T> where T: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "LazyCollection")
-public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T : RandomAccessCollection
+public typealias LazyRandomAccessCollection<T> = LazyCollection<T> where T: RandomAccessCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection.Index")
-public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T : Collection, T.Element : Collection
+public typealias FlattenCollectionIndex<T> = FlattenCollection<T>.Index where T: Collection, T.Element: Collection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection.Index")
-public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T : BidirectionalCollection, T.Element : BidirectionalCollection
+public typealias FlattenBidirectionalCollectionIndex<T> = FlattenCollection<T>.Index where T: BidirectionalCollection, T.Element: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "FlattenCollection")
-public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T : BidirectionalCollection, T.Element : BidirectionalCollection
+public typealias FlattenBidirectionalCollection<T> = FlattenCollection<T> where T: BidirectionalCollection, T.Element: BidirectionalCollection
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "JoinedSequence.Iterator")
 public typealias JoinedIterator<T: Sequence> = JoinedSequence<T>.Iterator where T.Element: Sequence
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "Zip2Sequence.Iterator")
@@ -74,31 +74,31 @@ public typealias ReversedRandomAccessCollection<T: RandomAccessCollection> = Rev
 @available(swift, deprecated: 4.2, obsoleted: 5.0, renamed: "ReversedCollection.Index")
 public typealias ReversedIndex<T: BidirectionalCollection> = ReversedCollection<T>.Index
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias BidirectionalSlice<T> = Slice<T> where T : BidirectionalCollection
+public typealias BidirectionalSlice<T> = Slice<T> where T: BidirectionalCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias RandomAccessSlice<T> = Slice<T> where T : RandomAccessCollection
+public typealias RandomAccessSlice<T> = Slice<T> where T: RandomAccessCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias RangeReplaceableSlice<T> = Slice<T> where T : RangeReplaceableCollection
+public typealias RangeReplaceableSlice<T> = Slice<T> where T: RangeReplaceableCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T : RangeReplaceableCollection & BidirectionalCollection
+public typealias RangeReplaceableBidirectionalSlice<T> = Slice<T> where T: RangeReplaceableCollection & BidirectionalCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T : RangeReplaceableCollection & RandomAccessCollection
+public typealias RangeReplaceableRandomAccessSlice<T> = Slice<T> where T: RangeReplaceableCollection & RandomAccessCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias MutableSlice<T> = Slice<T> where T : MutableCollection
+public typealias MutableSlice<T> = Slice<T> where T: MutableCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias MutableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & BidirectionalCollection
+public typealias MutableBidirectionalSlice<T> = Slice<T> where T: MutableCollection & BidirectionalCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias MutableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RandomAccessCollection
+public typealias MutableRandomAccessSlice<T> = Slice<T> where T: MutableCollection & RandomAccessCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias MutableRangeReplaceableSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection
+public typealias MutableRangeReplaceableSlice<T> = Slice<T> where T: MutableCollection & RangeReplaceableCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias MutableRangeReplaceableBidirectionalSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & BidirectionalCollection
+public typealias MutableRangeReplaceableBidirectionalSlice<T> = Slice<T> where T: MutableCollection & RangeReplaceableCollection & BidirectionalCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "Slice")
-public typealias MutableRangeReplaceableRandomAccessSlice<T> = Slice<T> where T : MutableCollection & RangeReplaceableCollection & RandomAccessCollection
+public typealias MutableRangeReplaceableRandomAccessSlice<T> = Slice<T> where T: MutableCollection & RangeReplaceableCollection & RandomAccessCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "DefaultIndices")
-public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T : BidirectionalCollection
+public typealias DefaultBidirectionalIndices<T> = DefaultIndices<T> where T: BidirectionalCollection
 @available(swift, deprecated: 4.0, obsoleted: 5.0, renamed: "DefaultIndices")
-public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T : RandomAccessCollection
+public typealias DefaultRandomAccessIndices<T> = DefaultIndices<T> where T: RandomAccessCollection
 
 // Deprecated by SE-0115.
 @available(swift, deprecated: 3.0, obsoleted: 5.0, renamed: "ExpressibleByNilLiteral")
@@ -157,7 +157,7 @@ public typealias ClosedRangeIndex<T> = ClosedRange<T>.Index where T: Strideable,
 @available(*, unavailable, renamed: "Optional")
 public typealias ImplicitlyUnwrappedOptional<Wrapped> = Optional<Wrapped>
 
-extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
+extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
   /// for any remaining uses of Range(countableRange).
@@ -167,7 +167,7 @@ extension Range where Bound: Strideable, Bound.Stride : SignedInteger {
   }  
 }
 
-extension ClosedRange where Bound: Strideable, Bound.Stride : SignedInteger {
+extension ClosedRange where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Now that Range is conditionally a collection when Bound: Strideable,
   /// CountableRange is no longer needed. This is a deprecated initializer
   /// for any remaining uses of Range(countableRange).
@@ -236,7 +236,7 @@ extension String {
   }
 }
 
-extension String.UnicodeScalarView : _CustomPlaygroundQuickLookable {
+extension String.UnicodeScalarView: _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UnicodeScalarView.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
@@ -255,14 +255,14 @@ public typealias UTF32 = Unicode.UTF32
 public typealias UnicodeScalar = Unicode.Scalar
 
 
-extension String.UTF16View : _CustomPlaygroundQuickLookable {
+extension String.UTF16View: _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF16View.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
   }
 }
 
-extension String.UTF8View : _CustomPlaygroundQuickLookable {
+extension String.UTF8View: _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "UTF8View.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return .text(description)
@@ -309,7 +309,7 @@ extension Substring {
   }
 }
 
-extension Substring : _CustomPlaygroundQuickLookable {
+extension Substring: _CustomPlaygroundQuickLookable {
   @available(swift, deprecated: 4.2/*, obsoleted: 5.0*/, message: "Substring.customPlaygroundQuickLook will be removed in Swift 5.0")
   public var customPlaygroundQuickLook: _PlaygroundQuickLook {
     return String(self).customPlaygroundQuickLook
@@ -378,7 +378,7 @@ extension UnsafeMutablePointer {
   ///   type.
   // This is fundamentally unsafe since collections can underreport their count.
   @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
-  public func initialize<C : Collection>(from source: C)
+  public func initialize<C: Collection>(from source: C)
     where C.Element == Pointee {
     let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
     var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
@@ -390,19 +390,19 @@ extension UnsafeMutablePointer {
 
 extension UnsafeMutableRawPointer {
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init(_ from : UnsafeRawPointer) { Builtin.unreachable() }
+  public init(_ from: UnsafeRawPointer) { Builtin.unreachable() }
 
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init?(_ from : UnsafeRawPointer?) { Builtin.unreachable() }
+  public init?(_ from: UnsafeRawPointer?) { Builtin.unreachable() }
 
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init<T>(_ from : UnsafePointer<T>) { Builtin.unreachable() }
+  public init<T>(_ from: UnsafePointer<T>) { Builtin.unreachable() }
 
   @available(*, unavailable, renamed: "init(mutating:)")
-  public init?<T>(_ from : UnsafePointer<T>?) { Builtin.unreachable() }
+  public init?<T>(_ from: UnsafePointer<T>?) { Builtin.unreachable() }
 }
 
-extension UnsafeRawPointer : _CustomPlaygroundQuickLookable {
+extension UnsafeRawPointer: _CustomPlaygroundQuickLookable {
   internal var summary: String {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -417,7 +417,7 @@ extension UnsafeRawPointer : _CustomPlaygroundQuickLookable {
   }
 }
 
-extension UnsafeMutableRawPointer : _CustomPlaygroundQuickLookable {
+extension UnsafeMutableRawPointer: _CustomPlaygroundQuickLookable {
   private var summary: String {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
@@ -496,7 +496,7 @@ extension UnsafeMutableRawPointer {
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableRawBufferPointer.initialize(from:)' instead")
   @discardableResult
-  public func initializeMemory<C : Collection>(
+  public func initializeMemory<C: Collection>(
     as type: C.Element.Type, from source: C
   ) -> UnsafeMutablePointer<C.Element> {
     // TODO: Optimize where `C` is a `ContiguousArrayBuffer`.

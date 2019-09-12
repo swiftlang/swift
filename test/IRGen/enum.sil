@@ -497,7 +497,7 @@ bb0(%0 : $SinglePayloadNoXI2):
 sil @single_payload_no_xi_switch : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
-// CHECK;   %2 = trunc i8
+// CHECK:   %2 = trunc i8
 // CHECK:   br i1 %2, label %[[TAGS:[0-9]+]], label %[[X_DEST:[0-9]+]]
 // CHECK: ; <label>:[[TAGS]]
 // CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
@@ -2516,10 +2516,9 @@ entry(%x : $Int32):
   %c = tuple (%b : $Optional<()>, %x : $Int32)
   // CHECK-64: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
   // CHECK-64: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
-  // CHECK-64: [[COMBINE:%.*]] = or i64 0, [[INT_SHL]]
   %d = enum $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt.1, %c : $(Optional<()>, Int32)
-  // CHECK-64: [[BIT:%.*]] = trunc i64 [[COMBINE]] to i1
-  // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[COMBINE]], 32
+  // CHECK-64: [[BIT:%.*]] = trunc i64 [[INT_SHL]] to i1
+  // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[INT_SHL]], 32
   // CHECK-64: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
   %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.some!enumelt.1
   return %d : $Optional<(Optional<()>, Int32)>

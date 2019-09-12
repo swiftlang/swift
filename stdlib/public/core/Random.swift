@@ -145,7 +145,7 @@ extension RandomNumberGenerator {
 /// - Linux platforms use `getrandom(2)` when available; otherwise, they read
 ///   from `/dev/urandom`.
 @frozen
-public struct SystemRandomNumberGenerator : RandomNumberGenerator {
+public struct SystemRandomNumberGenerator: RandomNumberGenerator {
   /// Creates a new instance of the system's default random number generator.
   @inlinable
   public init() { }

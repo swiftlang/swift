@@ -1,13 +1,12 @@
-// RUN: %scale-test -O --begin 5 --end 21 --step 5 --select NumStoredPropertiesQueries %s
+// RUN: %scale-test -O --begin 5 --end 21 --step 5 --select StoredPropertiesRequest %s
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 //
 // Single file with many stored properties.
 //
 // Check that SIL passes don't exhibit cubic behavior by repeatedly
-// asking for all the stored properties (if the
-// NumStoredPropertiesQueries stat scales quadratically, then the
-// behavior is cubic).
+// asking for all the stored properties (if the StoredPropertiesRequest
+// stat scales quadratically, then the behavior is cubic).
 
 public class LazyProperties {
 %for i in range(N):

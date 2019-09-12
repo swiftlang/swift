@@ -68,9 +68,9 @@ public class Base {
 
 // CHECK-LABEL: public class SubImplicit : {{(Test[.])?Base}} {
 public class SubImplicit: Base {
+  // CHECK-NEXT: @objc deinit{{$}}
   // CHECK-NEXT: @objc override public init(){{$}}
   // CHECK-NEXT: @objc required public init(x: Swift.Int){{$}}
-  // CHECK-NEXT: @objc deinit{{$}}
 } // CHECK-NEXT: {{^}$}}
 
 

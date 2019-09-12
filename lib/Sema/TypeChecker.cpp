@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -35,7 +36,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -56,18 +56,9 @@ TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
 }
 
 TypeChecker::TypeChecker(ASTContext &Ctx)
-  : Context(Ctx), Diags(Ctx.Diags)
-{
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->setTypeResolver(*this);
-}
+  : Context(Ctx), Diags(Ctx.Diags) {}
 
-TypeChecker::~TypeChecker() {
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->clearTypeResolver();
-}
+TypeChecker::~TypeChecker() {}
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
@@ -218,17 +209,11 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (StdlibModule)
-    return StdlibModule;
-
-  StdlibModule = Context.getStdlibModule();
-
-  if (!StdlibModule) {
-    return dc->getParentModule();
+  if (auto *stdlib = Context.getStdlibModule()) {
+    return stdlib;
   }
 
-  assert(StdlibModule && "no main module found");
-  return StdlibModule;
+  return dc->getParentModule();
 }
 
 /// Bind the given extension to the given nominal type.
@@ -237,11 +222,10 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 
-static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
@@ -259,7 +243,7 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
@@ -272,7 +256,7 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
             worklist.push_back(ED);
       }
     }
-  });
+  }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
   // extension there, removing it from the worklist if we succeed.
@@ -318,26 +302,9 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
     for (unsigned n = TC.definedFunctions.size(); currentFunctionIdx != n;
          ++currentFunctionIdx) {
       auto *AFD = TC.definedFunctions[currentFunctionIdx];
+      assert(!AFD->getDeclContext()->isLocalContext());
 
       TC.typeCheckAbstractFunctionBody(AFD);
-    }
-
-    // Validate any referenced declarations for SIL's purposes.
-    // Note: if we ever start putting extension members in vtables, we'll need
-    // to validate those members too.
-    // FIXME: If we're not planning to run SILGen, this is wasted effort.
-    while (TC.NextDeclToFinalize < TC.DeclsToFinalize.size()) {
-      auto decl = TC.DeclsToFinalize[TC.NextDeclToFinalize++];
-      if (decl->isInvalid())
-        continue;
-
-      // If we've already encountered an error, don't finalize declarations
-      // from other source files.
-      if (TC.Context.hadError() &&
-          decl->getDeclContext()->getParentSourceFile() != &SF)
-        continue;
-
-      TC.finalizeDecl(decl);
     }
 
     // Type check synthesized functions and their bodies.
@@ -350,42 +317,19 @@ static void typeCheckFunctionsAndExternalDecls(SourceFile &SF, TypeChecker &TC) 
 
   } while (currentFunctionIdx < TC.definedFunctions.size() ||
            currentSynthesizedDecl < SF.SynthesizedDecls.size() ||
-           TC.NextDeclToFinalize < TC.DeclsToFinalize.size() ||
            !TC.ConformanceContexts.empty());
 
   // FIXME: Horrible hack. Store this somewhere more appropriate.
   SF.LastCheckedSynthesizedDecl = currentSynthesizedDecl;
 
-  // Now that all types have been finalized, run any delayed
-  // circularity checks.
-  // This has been written carefully to fail safe + finitely if
-  // for some reason a type gets re-delayed in a non-assertions
-  // build in an otherwise successful build.
-  // Types can be redelayed in a failing build because we won't
-  // type-check required declarations from different files.
-  for (size_t i = 0, e = TC.DelayedCircularityChecks.size(); i != e; ++i) {
-    TC.checkDeclCircularity(TC.DelayedCircularityChecks[i]);
-    assert((e == TC.DelayedCircularityChecks.size() ||
-            TC.Context.hadError()) &&
-           "circularity checking for type was re-delayed!");
-  }
-  TC.DelayedCircularityChecks.clear();
-
   // Compute captures for functions and closures we visited.
   for (auto *closure : TC.ClosuresWithUncomputedCaptures) {
-    TC.computeCaptures(closure);
+    TypeChecker::computeCaptures(closure);
   }
   TC.ClosuresWithUncomputedCaptures.clear();
 
   for (AbstractFunctionDecl *FD : reversed(TC.definedFunctions)) {
-    TC.computeCaptures(FD);
-  }
-
-  // Check error-handling correctness for all the functions defined in
-  // this file.  This can depend on all of their interior function
-  // bodies having been type-checked.
-  for (AbstractFunctionDecl *FD : TC.definedFunctions) {
-    TC.checkFunctionErrorHandling(FD);
+    TypeChecker::computeCaptures(FD);
   }
 
   TC.definedFunctions.clear();
@@ -453,7 +397,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    bindExtensions(SF, TC);
+    bindExtensions(SF);
 
     // Look for bridging functions. This only matters when
     // -enable-source-import is provided.
@@ -579,6 +523,9 @@ void swift::checkInconsistentImplementationOnlyImports(ModuleDecl *MainModule) {
         continue;
 
       ModuleDecl *module = nextImport->getModule();
+      if (!module)
+        continue;
+
       if (nextImport->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
         // We saw an implementation-only import.
         bool isNew =
@@ -751,8 +698,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   TypeChecker &TC = createTypeChecker(ctx);
 
   auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                    ContextualTypePurpose::CTP_Unused,
-                                    TypeCheckExprFlags::SuppressDiagnostics);
+                                         ContextualTypePurpose::CTP_Unused);
   return !resultTy;
 }
 

@@ -10,7 +10,7 @@
 public protocol Assoc {
   associatedtype A = Int
 
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   func act() -> A
 }
 
@@ -29,14 +29,14 @@ extension Int : P {
 struct Pair : P {}
 
 struct Test : Assoc {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   dynamic func act() -> some P {
     return 1
   }
 }
 
 extension Test {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   @_dynamicReplacement(for: act)
   func act_r() -> some P {
     return Pair()
@@ -46,7 +46,7 @@ extension Test {
 func test() {
   let t = Test()
   // CHECK: Pair
-  if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
     testAssociatedType(t)
   } else {
     print("Pair")

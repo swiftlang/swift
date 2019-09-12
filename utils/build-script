@@ -136,7 +136,8 @@ class BuildScriptInvocation(object):
     def apply_default_arguments(toolchain, args):
         # Infer if ninja is required
         ninja_required = (
-            args.cmake_generator == 'Ninja' or args.build_foundation)
+            args.cmake_generator == 'Ninja' or args.build_foundation or
+            args.build_sourcekitlsp or args.build_indexstoredb)
         if ninja_required and toolchain.ninja is None:
             args.build_ninja = True
 
@@ -792,6 +793,7 @@ class BuildScriptInvocation(object):
                         host_target, product_name))
                 product.build(host_target)
                 product.test(host_target)
+                product.install(host_target)
 
         # Extract symbols...
         for host_target in all_hosts:
@@ -1039,6 +1041,14 @@ def main_normal():
         toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
+
+    cmake = CMake(args=args, toolchain=toolchain)
+    # Check the CMake version is sufficient on Linux and build from source
+    # if not.
+    cmake_path = cmake.check_cmake_version(SWIFT_SOURCE_ROOT, SWIFT_BUILD_ROOT)
+    if cmake_path is not None:
+        toolchain.cmake = cmake_path
+        args.cmake = cmake_path
 
     # Preprocess the arguments to apply defaults.
     BuildScriptInvocation.apply_default_arguments(toolchain, args)

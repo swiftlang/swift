@@ -35,12 +35,12 @@ struct PropertyWrapperTypeInfo {
   /// directed.
   VarDecl *valueVar = nullptr;
 
-  /// The initializer init(initialValue:) that will be called when the
+  /// The initializer init(wrappedValue:) that will be called when the
   /// initializing the property wrapper type from a value of the property type.
   ///
   /// This initializer is optional, but if present will be used for the `=`
   /// initialization syntax.
-  ConstructorDecl *initialValueInit = nullptr;
+  ConstructorDecl *wrappedValueInit = nullptr;
 
   /// The initializer `init()` that will be called to default-initialize a
   /// value with an attached property wrapper.
@@ -73,9 +73,50 @@ struct PropertyWrapperTypeInfo {
   friend bool operator==(const PropertyWrapperTypeInfo &lhs,
                          const PropertyWrapperTypeInfo &rhs) {
     return lhs.valueVar == rhs.valueVar &&
-        lhs.initialValueInit == rhs.initialValueInit;
+        lhs.wrappedValueInit == rhs.wrappedValueInit;
   }
 };
+
+/// Describes the mutability of the operations on a property wrapper or composition.
+struct PropertyWrapperMutability {
+  enum Value: uint8_t {
+    Nonmutating = 0,
+    Mutating = 1,
+    DoesntExist = 2,
+  };
+  
+  Value Getter, Setter;
+  
+  /// Get the mutability of a composed access chained after accessing a wrapper with `this`
+  /// getter and setter mutability.
+  Value composeWith(Value x) {
+    switch (x) {
+    case DoesntExist:
+      return DoesntExist;
+    
+    // If an operation is nonmutating, then its input relies only on the
+    // mutating-ness of the outer wrapper's get operation.
+    case Nonmutating:
+      return Getter;
+        
+    // If it's mutating, then it relies
+    // on a) the outer wrapper having a setter to exist at all, and b) the
+    // mutating-ness of either the getter or setter, since we need both to
+    // perform a writeback cycle.
+    case Mutating:
+      if (Setter == DoesntExist) {
+        return DoesntExist;
+      }
+      return std::max(Getter, Setter);
+    }
+  }
+  
+  bool operator==(PropertyWrapperMutability other) const {
+    return Getter == other.Getter && Setter == other.Setter;
+  }
+};
+
+void simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m);
 
 /// Describes the backing property of a property that has an attached wrapper.
 struct PropertyWrapperBackingPropertyInfo {
@@ -98,7 +139,7 @@ struct PropertyWrapperBackingPropertyInfo {
   Expr *originalInitialValue = nullptr;
 
   /// An expression that initializes the backing property from a value of
-  /// the original property's type (e.g., via `init(initialValue:)`), or
+  /// the original property's type (e.g., via `init(wrappedValue:)`), or
   /// \c NULL if the backing property can only be initialized directly.
   Expr *initializeFromOriginal = nullptr;
 
@@ -142,6 +183,9 @@ void simple_display(
 
 /// Given the initializer for the given property with an attached property
 /// wrapper, dig out the original initialization expression.
+///
+/// Cannot just dig out the getOriginalInit() value because this function checks
+/// types, etc. Erroneous code won't return a result from here.
 Expr *findOriginalPropertyWrapperInitialValue(VarDecl *var, Expr *init);
 
 } // end namespace swift

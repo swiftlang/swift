@@ -45,6 +45,10 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
+
+  // FIXME: Remove this
+  bool shouldWalkAccessorsTheOldWay() override { return true; }
+
   bool shouldWalkIntoGenericParams() override {
     return SEWalker.shouldWalkIntoGenericParams();
   }
@@ -133,7 +137,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange SR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      SR = repr->getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
@@ -181,25 +187,6 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
   bool ShouldVisitChildren;
   if (shouldIgnore(D, ShouldVisitChildren))
     return true;
-
-  // FIXME: rdar://17671977 the initializer for a lazy property has already
-  // been moved into its implicit getter.
-  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-    if (auto *VD = PBD->getSingleVar()) {
-      if (VD->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto *Get = VD->getGetter()) {
-          assert((Get->isImplicit() || Get->isInvalid())
-            && "lazy var getter must be either implicitly computed or invalid");
-
-          // Note that an implicit getter may not have the body synthesized
-          // in case the owning PatternBindingDecl is invalid.
-          if (auto *Body = Get->getBody()) {
-            Body->walk(*this);
-          }
-        }
-      }
-    }
-  }
 
   if (isa<ExtensionDecl>(D)) {
     assert(ExtDecls.back() == D);
@@ -660,7 +647,9 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
 
     if (!ExtDecls.empty() && BaseNameLoc.isValid()) {
-      auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
+      SourceLoc ExtTyLoc = SourceLoc();
+      if (auto *repr = ExtDecls.back()->getExtendedTypeRepr())
+        ExtTyLoc = repr->getLoc();
       if (ExtTyLoc.isValid() && ExtTyLoc == BaseNameLoc) {
         ExtDecl = ExtDecls.back();
       }

@@ -2,7 +2,7 @@
 # always built as a shared library.
 if(SWIFT_BUILD_DYNAMIC_STDLIB)
   add_swift_target_library(swiftRemoteMirror
-                           SHARED TARGET_LIBRARY DONT_EMBED_BITCODE NOSWIFTRT
+                           SHARED DONT_EMBED_BITCODE NOSWIFTRT
                            SwiftRemoteMirror.cpp
                            LINK_LIBRARIES
                              swiftReflection

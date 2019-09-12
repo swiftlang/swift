@@ -316,7 +316,7 @@ getAllocStackSingleInitializingInjectEnumAddr(SwitchEnumAddrInst *SEAI) {
     LLVM_DEBUG(llvm::dbgs() << "Visiting: " << *op->getUser());
     if (auto *svi = Projection::isAddressProjection(op->getUser())) {
       LLVM_DEBUG(llvm::dbgs() << "Address projection. Continuing\n");
-      copy(svi->getUses(), std::back_inserter(worklist));
+      llvm::copy(svi->getUses(), std::back_inserter(worklist));
       continue;
     }
 
@@ -392,7 +392,7 @@ getAllocStackSingleInitializingInjectEnumAddr(SwitchEnumAddrInst *SEAI) {
 
   // Otherwise, make sure we are initialized only once and never
   // escape.
-  copy(singleInitializerAddr->getUses(), std::back_inserter(worklist));
+  llvm::copy(singleInitializerAddr->getUses(), std::back_inserter(worklist));
   bool foundInitializer = false;
   while (worklist.size()) {
     auto *op = worklist.pop_back_val();
@@ -400,7 +400,7 @@ getAllocStackSingleInitializingInjectEnumAddr(SwitchEnumAddrInst *SEAI) {
 
     // Look through projections.
     if (auto *svi = Projection::isAddressProjection(op->getUser())) {
-      copy(svi->getUses(), std::back_inserter(worklist));
+      llvm::copy(svi->getUses(), std::back_inserter(worklist));
       continue;
     }
 

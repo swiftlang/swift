@@ -27,6 +27,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
 
@@ -34,22 +35,8 @@ using namespace swift;
 using namespace ast_scope;
 
 static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
-
-SourceRange ASTScopeImpl::getSourceRange(const bool omitAssertions) const {
-  if (omitAssertions && !cachedSourceRange)
-    return SourceRange();
-  assert(cachedSourceRange && "should have been cached after last expandMe");
-  return *cachedSourceRange;
-}
-
-SourceRange
-ASTScopeImpl::getUncachedSourceRange(const bool omitAssertions) const {
-  const auto childlessRange = getChildlessSourceRange();
-  const auto rangeIncludingIgnoredNodes =
-      widenSourceRangeForIgnoredASTNodes(childlessRange);
-  return widenSourceRangeForChildren(rangeIncludingIgnoredNodes,
-                                     omitAssertions);
-}
+static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &,
+                                                    SourceLoc endLoc);
 
 SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
     const SourceRange range) const {
@@ -63,20 +50,15 @@ SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
 
 SourceRange
 ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
-                                          bool omitAssertions) const {
+                                          const bool omitAssertions) const {
   if (getChildren().empty()) {
     assert(omitAssertions || range.Start.isValid());
     return range;
   }
-  // If we change the caching to compute the source range lazily,
-  // the only children required here would be the first and last.
-  for (auto *c: getChildren())
-    c->cacheSourceRange();
-
   const auto childStart =
-      getChildren().front()->getSourceRange(omitAssertions).Start;
+      getChildren().front()->getSourceRangeOfScope(omitAssertions).Start;
   const auto childEnd =
-      getChildren().back()->getSourceRange(omitAssertions).End;
+      getChildren().back()->getSourceRangeOfScope(omitAssertions).End;
   auto childRange = SourceRange(childStart, childEnd);
   assert(omitAssertions || childRange.isValid());
 
@@ -87,15 +69,21 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   return r;
 }
 
-#pragma mark validation
+bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
+  assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
+         "need to be able to find source range");
+  assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
+         "Search will fail");
+  assert(checkLazySourceRange() &&
+         "Lazy scopes must have compatible ranges before and after expansion");
 
-bool ASTScopeImpl::verifySourceRange() const {
-  return verifyThatChildrenAreContained() &&
-         verifyThatThisNodeComeAfterItsPriorSibling();
+  return true;
 }
 
+#pragma mark validation
+
 bool ASTScopeImpl::hasValidSourceRange() const {
-  const auto sourceRange = getSourceRange();
+  const auto sourceRange = getSourceRangeOfScope();
   return sourceRange.Start.isValid() && sourceRange.End.isValid() &&
          !getSourceManager().isBeforeInBuffer(sourceRange.End,
                                               sourceRange.Start);
@@ -108,18 +96,19 @@ bool ASTScopeImpl::hasValidSourceRangeOfIgnoredASTNodes() const {
 bool ASTScopeImpl::precedesInSource(const ASTScopeImpl *next) const {
   if (!hasValidSourceRange() || !next->hasValidSourceRange())
     return false;
-  return !getSourceManager().isBeforeInBuffer(next->getSourceRange().Start,
-                                              getSourceRange().End);
+  return !getSourceManager().isBeforeInBuffer(
+      next->getSourceRangeOfScope().Start, getSourceRangeOfScope().End);
 }
 
-bool ASTScopeImpl::verifyThatChildrenAreContained() const {
+bool ASTScopeImpl::verifyThatChildrenAreContainedWithin(
+    const SourceRange range) const {
   // assumes children are already in order
   if (getChildren().empty())
     return true;
   const SourceRange rangeOfChildren =
-      SourceRange(getChildren().front()->getSourceRange().Start,
-                  getChildren().back()->getSourceRange().End);
-  if (getSourceManager().rangeContains(getSourceRange(), rangeOfChildren))
+      SourceRange(getChildren().front()->getSourceRangeOfScope().Start,
+                  getChildren().back()->getSourceRangeOfScope().End);
+  if (getSourceManager().rangeContains(range, rangeOfChildren))
     return true;
   auto &out = verificationError() << "children not contained in its parent\n";
   if (getChildren().size() == 1) {
@@ -149,12 +138,13 @@ bool ASTScopeImpl::verifyThatThisNodeComeAfterItsPriorSibling() const {
   print(out);
   out << "\n***Parent node***\n";
   getParent().get()->print(out);
-  llvm::errs() << "\n\nsource:\n"
-               << getSourceManager()
-                      .getRangeForBuffer(
-                          getSourceFile()->getBufferID().getValue())
-                      .str();
-  abort();
+  //  llvm::errs() << "\n\nsource:\n"
+  //               << getSourceManager()
+  //                      .getRangeForBuffer(
+  //                          getSourceFile()->getBufferID().getValue())
+  //                      .str();
+  llvm_unreachable("unexpected out-of-order nodes");
+  return false;
 }
 
 NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
@@ -176,80 +166,94 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
   return siblingsAndMe[myIndex - 1];
 }
 
-#pragma mark getChildlessSourceRange
+#pragma mark getSourceRangeOfThisASTNode
 
-
-SourceRange SpecializeAttributeScope::getChildlessSourceRange() const {
+SourceRange SpecializeAttributeScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return specializeAttr->getRange();
 }
 
-SourceRange AbstractFunctionBodyScope::getChildlessSourceRange() const {
+SourceRange AbstractFunctionBodyScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return decl->getBodySourceRange();
 }
 
-
-SourceRange TopLevelCodeScope::getChildlessSourceRange() const {
+SourceRange TopLevelCodeScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return decl->getSourceRange();
 }
 
-SourceRange SubscriptDeclScope::getChildlessSourceRange() const {
+SourceRange SubscriptDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return decl->getSourceRange();
 }
 
-SourceRange WholeClosureScope::getChildlessSourceRange() const {
+SourceRange
+EnumElementScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  return decl->getSourceRange();
+}
+
+SourceRange WholeClosureScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return closureExpr->getSourceRange();
 }
 
-SourceRange AbstractStmtScope::getChildlessSourceRange() const {
+SourceRange AbstractStmtScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return getStmt()->getSourceRange();
 }
 
-SourceRange DefaultArgumentInitializerScope::getChildlessSourceRange() const {
-  return decl->getDefaultValue()->getSourceRange();
+SourceRange DefaultArgumentInitializerScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  if (auto *dv = decl->getDefaultValue())
+    return dv->getSourceRange();
+  return SourceRange();
 }
 
-SourceRange PatternEntryDeclScope::getChildlessSourceRange() const {
+SourceRange PatternEntryDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  // TODO: Once rdar://53627317 is accomplished, the following may be able to be
+  // simplified.
+  if (!getChildren().empty()) { // why needed???
+    bool hasOne = false;
+    getPattern()->forEachVariable([&](VarDecl *) { hasOne = true; });
+    if (!hasOne)
+      return SourceRange(); // just the init
+    if (!getPatternEntry().getInit())
+      return SourceRange(); // just the var decls
+  }
   return getPatternEntry().getSourceRange();
 }
 
-SourceRange PatternEntryInitializerScope::getChildlessSourceRange() const {
-  return getPatternEntry().getInitAsWritten()->getSourceRange();
+SourceRange PatternEntryInitializerScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  // See rdar://53921703
+  // Note: grep for "When the initializer is removed we don't actually clear the
+  // pointer" because we do!
+  return initAsWrittenWhenCreated->getSourceRange();
 }
 
-SourceRange PatternEntryUseScope::getChildlessSourceRange() const {
-  auto range =
-      SourceRange(getPatternEntry().getSourceRange(/*omitAccessors*/ true).End,
-                  getPatternEntry().getSourceRange().End);
-  if (initializerEnd.isValid()) {
-    // Sigh... If there's a correspinding initializer scope, its range may be
-    // wider than the pattern decl indicates if it ends in an interpolated
-    // string literal or editor placeholder.
-    range.widen(SourceRange(initializerEnd));
-    range.Start = initializerEnd;
-  }
-  return range;
+SourceRange
+VarDeclScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
+  const auto br = decl->getBracesRange();
+  return br.isValid() ? br : decl->getSourceRange();
 }
 
-SourceRange VarDeclScope::getChildlessSourceRange() const {
-  return decl->getBracesRange();
-}
-
-SourceRange GenericParamScope::getChildlessSourceRange() const {
+SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   auto nOrE = holder;
   // A protocol's generic parameter list is not written in source, and
   // is visible from the start of the body.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(nOrE))
     return SourceRange(protoDecl->getBraces().Start, protoDecl->getEndLoc());
-  // Explicitly-written generic parameters are in scope *following* their
-  // definition and through the end of the body.
-  // ensure that this isn't an extension where there is no end loc
-  auto startLoc = paramList->getParams()[index]->getEndLoc();
+  auto startLoc = paramList->getSourceRange().Start;
   if (startLoc.isInvalid())
     startLoc = holder->getStartLoc();
   return SourceRange(startLoc, holder->getEndLoc());
 }
 
-SourceRange ASTSourceFileScope::getChildlessSourceRange() const {
+SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   if (auto bufferID = SF->getBufferID()) {
     auto charRange = getSourceManager().getRangeForBuffer(*bufferID);
     return SourceRange(charRange.getStart(), charRange.getEnd());
@@ -263,13 +267,14 @@ SourceRange ASTSourceFileScope::getChildlessSourceRange() const {
                      SF->Decls.back()->getEndLoc());
 }
 
-SourceRange GenericTypeOrExtensionScope::getChildlessSourceRange() const {
-  return portion->getChildlessSourceRangeOf(this);
+SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return portion->getChildlessSourceRangeOf(this, omitAssertions);
 }
 
 SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
-    const GenericTypeOrExtensionScope *scope) const {
-  auto *d = scope->getDecl().get();
+    const GenericTypeOrExtensionScope *scope, const bool omitAssertions) const {
+  auto *d = scope->getDecl();
   auto r = d->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
     assert(r.End.isValid());
@@ -279,21 +284,24 @@ SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
 }
 
 SourceRange GenericTypeOrExtensionWherePortion::getChildlessSourceRangeOf(
-    const GenericTypeOrExtensionScope *scope) const {
+    const GenericTypeOrExtensionScope *scope, const bool omitAssertions) const {
   return scope->getGenericContext()->getTrailingWhereClause()->getSourceRange();
 }
 
 SourceRange IterableTypeBodyPortion::getChildlessSourceRangeOf(
-    const GenericTypeOrExtensionScope *scope) const {
-  auto *d = scope->getDecl().get();
+    const GenericTypeOrExtensionScope *scope, const bool omitAssertions) const {
+  auto *d = scope->getDecl();
   if (auto *nt = dyn_cast<NominalTypeDecl>(d))
     return nt->getBraces();
   if (auto *e = dyn_cast<ExtensionDecl>(d))
     return e->getBraces();
+  if (omitAssertions)
+    return SourceRange();
   llvm_unreachable("No body!");
 }
 
-SourceRange AbstractFunctionDeclScope::getChildlessSourceRange() const {
+SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   // For a get/put accessor	 all of the parameters are implicit, so start
   // them at the start location of the accessor.
   auto r = decl->getSourceRangeIncludingAttrs();
@@ -301,33 +309,30 @@ SourceRange AbstractFunctionDeclScope::getChildlessSourceRange() const {
     assert(r.End.isValid());
     return r;
   }
-  return decl->getBody()->getSourceRange();
+  return decl->getBodySourceRange();
 }
 
-SourceRange AbstractFunctionParamsScope::getChildlessSourceRange() const {
-  auto *fn = getEnclosingAbstractFunctionOrSubscriptDecl();
-  const SourceLoc endLoc = fn->getEndLoc();
-
-  // FIXME: Why oh why don't deinitializers have a parameter list?
-
-  // clang-format off
-  SourceLoc startLoc =
-  isa<AccessorDecl>(fn)         ? fn->getLoc() :
-  isa<DestructorDecl>(fn)       ? dyn_cast<DestructorDecl>(fn)->getNameLoc() :
-  isa<SubscriptDecl>(fn)        ? dyn_cast<SubscriptDecl>(fn)->getIndices()->getLParenLoc() :
-  isa<AbstractFunctionDecl>(fn) ? dyn_cast<AbstractFunctionDecl>(fn)->getParameters()->getLParenLoc() :
-                                    SourceLoc();
-  // clang-format on
-
-  const SourceLoc safeEndLocEvenWithBadInput =
-      getSourceManager().isBeforeInBuffer(startLoc, endLoc) ? endLoc : startLoc;
-
-  assert(startLoc.isValid());
-  return SourceRange(startLoc, safeEndLocEvenWithBadInput);
+SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  const auto rangeForGoodInput =
+      getSourceRangeOfEnclosedParamsOfASTNode(omitAssertions);
+  auto r = SourceRange(rangeForGoodInput.Start,
+                       fixupEndForBadInput(rangeForGoodInput));
+  assert(getSourceManager().rangeContains(
+             getParent().get()->getSourceRangeOfThisASTNode(true), r) &&
+         "Parameters not within function?!");
+  return r;
 }
 
+SourceLoc ParameterListScope::fixupEndForBadInput(
+    const SourceRange rangeForGoodInput) const {
+  const auto s = rangeForGoodInput.Start;
+  const auto e = rangeForGoodInput.End;
+  return getSourceManager().isBeforeInBuffer(s, e) ? e : s;
+}
 
-SourceRange ForEachPatternScope::getChildlessSourceRange() const {
+SourceRange ForEachPatternScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   // The scope of the pattern extends from the 'where' expression (if present)
   // until the end of the body.
   if (stmt->getWhere())
@@ -338,7 +343,8 @@ SourceRange ForEachPatternScope::getChildlessSourceRange() const {
   return stmt->getBody()->getSourceRange();
 }
 
-SourceRange CatchStmtScope::getChildlessSourceRange() const {
+SourceRange
+CatchStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   // The scope of the pattern extends from the 'where' (if present)
   // to the end of the body.
   if (stmt->getGuardExpr())
@@ -347,7 +353,8 @@ SourceRange CatchStmtScope::getChildlessSourceRange() const {
   // Otherwise, the scope of the pattern encompasses the body.
   return stmt->getBody()->getSourceRange();
 }
-SourceRange CaseStmtScope::getChildlessSourceRange() const {
+SourceRange
+CaseStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   // The scope of the case statement begins at the first guard expression,
   // if there is one, and extends to the end of the body.
   // FIXME: Figure out what to do about multiple pattern bindings. We might
@@ -363,7 +370,8 @@ SourceRange CaseStmtScope::getChildlessSourceRange() const {
       ->getSourceRange(); // The scope of the case statement begins
 }
 
-SourceRange BraceStmtScope::getChildlessSourceRange() const {
+SourceRange
+BraceStmtScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   // The brace statements that represent closures start their scope at the
   // 'in' keyword, when present.
   if (auto closure = parentClosureIfAny()) {
@@ -373,7 +381,8 @@ SourceRange BraceStmtScope::getChildlessSourceRange() const {
   return stmt->getSourceRange();
 }
 
-SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
+SourceRange ConditionalClauseScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   // From the start of this particular condition to the start of the
   // then/body part.
   const auto startLoc = getStmtConditionElement().getStartLoc();
@@ -382,113 +391,203 @@ SourceRange ConditionalClauseScope::getChildlessSourceRange() const {
          : SourceRange(endLoc);
 }
 
-SourceRange ConditionalClausePatternUseScope::getChildlessSourceRange() const {
+SourceRange ConditionalClausePatternUseScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   // For a guard continuation, the scope extends from the end of the 'else'
   // to the end of the continuation.
   return SourceRange(startLoc);
 }
 
-SourceRange CaptureListScope::getChildlessSourceRange() const {
+SourceRange
+CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   auto *const closure = expr->getClosureBody();
   return SourceRange(expr->getStartLoc(), getStartOfFirstParam(closure));
 }
 
-SourceRange ClosureParametersScope::getChildlessSourceRange() const {
-  assert(closureExpr->getInLoc().isValid() &&
-         "We don't create these if no in loc");
+SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  if (!omitAssertions)
+    assert(closureExpr->getInLoc().isValid() &&
+           "We don't create these if no in loc");
   return SourceRange(getStartOfFirstParam(closureExpr),
                      closureExpr->getInLoc());
 }
 
-SourceRange ClosureBodyScope::getChildlessSourceRange() const {
+SourceRange
+ClosureBodyScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
   if (closureExpr->getInLoc().isValid())
     return SourceRange(closureExpr->getInLoc(), closureExpr->getEndLoc());
 
   return closureExpr->getSourceRange();
 }
 
-SourceRange AttachedPropertyWrapperScope::getChildlessSourceRange() const {
-  return getCustomAttributesSourceRange(decl);
+SourceRange AttachedPropertyWrapperScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return sourceRangeWhenCreated;
 }
 
-SourceRange GuardStmtUseScope::getChildlessSourceRange() const {
+SourceRange LookupParentDiversionScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
   return SourceRange(startLoc);
 }
 
 #pragma mark source range caching
 
-void ASTScopeImpl::cacheSourceRange() {
-  if (cachedSourceRange)
-    return;
-  cachedSourceRange = getUncachedSourceRange();
-  verifySourceRange();
+SourceRange
+ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
+  if (!isSourceRangeCached(omitAssertions))
+    computeAndCacheSourceRangeOfScope(omitAssertions);
+  return *cachedSourceRange;
 }
 
-void ASTScopeImpl::clearSourceRangeCache() { cachedSourceRange = None; }
-void ASTScopeImpl::cacheSourceRangesOfSlice() {
-  cacheSourceRange();
-  for (auto *s = this->getParent().getPtrOrNull(); s;
-       s = s->getParent().getPtrOrNull())
-    s->cacheSourceRange();
+bool ASTScopeImpl::isSourceRangeCached(const bool omitAssertions) const {
+  const bool isCached = cachedSourceRange.hasValue();
+  assert(omitAssertions || isCached || ensureNoAncestorsSourceRangeIsCached());
+  return isCached;
 }
+
+bool ASTScopeImpl::ensureNoAncestorsSourceRangeIsCached() const {
+  if (const auto *const p = getParent().getPtrOrNull()) {
+    auto r = !p->isSourceRangeCached(true) &&
+             p->ensureNoAncestorsSourceRangeIsCached();
+    if (!r)
+      llvm_unreachable("found a violation");
+    return true;
+  }
+  return true;
+}
+
+void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
+    const bool omitAssertions) const {
+  // In order to satisfy the invariant that, if my range is uncached,
+  // my parent's range is uncached, (which is needed to optimize invalidation
+  // by obviating the need to uncache all the way to the root every time),
+  // when caching a range, must ensure all children's ranges are cached.
+  for (auto *c : getChildren())
+    c->computeAndCacheSourceRangeOfScope(omitAssertions);
+
+  cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
+}
+
+bool ASTScopeImpl::checkLazySourceRange() const {
+  if (!getASTContext().LangOpts.LazyASTScopes)
+    return true;
+  const auto unexpandedRange = sourceRangeForDeferredExpansion();
+  const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
+  if (unexpandedRange.isInvalid() || expandedRange.isInvalid())
+    return true;
+  if (unexpandedRange == expandedRange)
+    return true;
+
+  auto b = getChildren().back()->computeSourceRangeOfScope();
+  llvm::errs() << "*** Lazy range problem. Parent: ***\n";
+  unexpandedRange.print(llvm::errs(), getSourceManager(), false);
+  llvm::errs() << "\n*** vs last child: ***\n";
+  b.print(llvm::errs(), getSourceManager(), false);
+  llvm::errs() << "\n";
+  print(llvm::errs(), 0, false);
+  llvm::errs() << "\n";
+
+  return false;
+}
+
+SourceRange
+ASTScopeImpl::computeSourceRangeOfScope(const bool omitAssertions) const {
+  // If we don't need to consider children, it's cheaper
+  const auto deferredRange = sourceRangeForDeferredExpansion();
+  return deferredRange.isValid()
+             ? deferredRange
+             : computeSourceRangeOfScopeWithChildASTNodes(omitAssertions);
+}
+
+SourceRange ASTScopeImpl::computeSourceRangeOfScopeWithChildASTNodes(
+    const bool omitAssertions) const {
+  const auto rangeOfJustThisASTNode =
+      getSourceRangeOfThisASTNode(omitAssertions);
+  const auto rangeIncludingIgnoredNodes =
+      widenSourceRangeForIgnoredASTNodes(rangeOfJustThisASTNode);
+  const auto uncachedSourceRange =
+      widenSourceRangeForChildren(rangeIncludingIgnoredNodes, omitAssertions);
+  return uncachedSourceRange;
+}
+
 void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
-  clearSourceRangeCache();
+  // An optimization: if my range isn't cached, my ancestors must not be
+  if (!isSourceRangeCached())
+    return;
+  cachedSourceRange = None;
   if (auto p = getParent())
     p.get()->clearCachedSourceRangesOfMeAndAncestors();
 }
 
-#pragma mark ignored nodes and compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders
+#pragma mark compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders
 
-namespace {
-class EffectiveEndFinder : public ASTWalker {
-  SourceLoc end;
-  const SourceManager &SM;
-
-public:
-  EffectiveEndFinder(const SourceManager &SM) : SM(SM) {}
-
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) {
-    if (!E)
-      return {true, E};
-    if (auto *isl = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
-      if (end.isInvalid() ||
-          SM.isBeforeInBuffer(end, isl->getTrailingQuoteLoc()))
-        end = isl->getTrailingQuoteLoc();
-    } else if (auto *epl = dyn_cast<EditorPlaceholderExpr>(E)) {
-      if (end.isInvalid() ||
-          SM.isBeforeInBuffer(end, epl->getTrailingAngleBracketLoc()))
-        end = epl->getTrailingAngleBracketLoc();
-    }
-    return ASTWalker::walkToExprPre(E);
+// If right brace is missing, the source range of the body will end
+// at the last token, which may be a one of the special cases below.
+static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &SM,
+                                                    const SourceLoc endLoc) {
+  const auto tok = Lexer::getTokenAtLocation(SM, endLoc);
+  switch (tok.getKind()) {
+  default:
+    return endLoc;
+  case tok::string_literal:
+    break;
+  case tok::identifier:
+    // subtract one to get a closed-range endpoint from a half-open
+    if (!Identifier::isEditorPlaceholder(tok.getText()))
+      return endLoc;
+    break;
   }
-  SourceLoc getTrailingQuoteLoc() const { return end; }
-};
-} // namespace
+  return tok.getRange().getEnd().getAdvancedLoc(-1);
+}
 
-// FIXME: Alter how EditorPlaceHolder and InterpolgatedStringLiteralExpr are
-// parsed so getSourceRange is enough.
+SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
+  return SourceRange();
+}
+SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
+  return portion->sourceRangeForDeferredExpansion(this);
+}
+SourceRange
+Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
+  return SourceRange();
+}
+
 SourceRange ASTScopeImpl::getEffectiveSourceRange(const ASTNode n) const {
   if (const auto *d = n.dyn_cast<Decl *>())
     return d->getSourceRange();
   if (const auto *s = n.dyn_cast<Stmt *>())
     return s->getSourceRange();
   auto *e = n.dyn_cast<Expr *>();
-  assert(e);
-  EffectiveEndFinder finder(getSourceManager());
-  e->walk(finder);
-  return SourceRange(e->getLoc(), finder.getTrailingQuoteLoc().isValid()
-                                      ? finder.getTrailingQuoteLoc()
-                                      : e->getEndLoc());
+  return getLocEncompassingPotentialLookups(getSourceManager(), e->getEndLoc());
+}
+
+/// Some nodes (e.g. the error expression) cannot possibly contain anything to
+/// be looked up and if included in a parent scope's source range would expand
+/// it beyond an ancestor's source range. But if the ancestor is expanded
+/// lazily, we check that its source range does not change when expanding it,
+/// and this check would fail.
+static bool sourceRangeWouldInterfereWithLaziness(const ASTNode n) {
+  return n.isExpr(ExprKind::Error);
+}
+
+static bool
+shouldIgnoredASTNodeSourceRangeWidenEnclosingScope(const ASTNode n) {
+  if (n.isDecl(DeclKind::Var)) {
+    // The pattern scopes will include the source ranges for VarDecls.
+    // Using its range here would cause a pattern initializer scope's range
+    // to overlap the pattern use scope's range.
+    return false;
+  }
+  if (sourceRangeWouldInterfereWithLaziness(n))
+    return false;
+  return true;
 }
 
 void ASTScopeImpl::widenSourceRangeForIgnoredASTNode(const ASTNode n) {
-  // The pattern scopes will include the source ranges for VarDecls.
-  // Doing the default here would cause a pattern initializer scope's range
-  // to overlap the pattern use scope's range.
-
-  if (PatternEntryDeclScope::isHandledSpecially(n))
+  if (!shouldIgnoredASTNodeSourceRangeWidenEnclosingScope(n))
     return;
 
+  // FIXME: why only do effectiveness bit for *ignored* nodes?
   SourceRange r = getEffectiveSourceRange(n);
   if (r.isInvalid())
     return;
@@ -508,4 +607,60 @@ static SourceLoc getStartOfFirstParam(ClosureExpr *closure) {
   if (closure->getBody())
     return closure->getBody()->getLBraceLoc();
   return closure->getStartLoc();
+}
+
+#pragma mark getSourceRangeOfEnclosedParamsOfASTNode
+
+SourceRange ASTScopeImpl::getSourceRangeOfEnclosedParamsOfASTNode(
+    const bool omitAssertions) const {
+  return getParent().get()->getSourceRangeOfEnclosedParamsOfASTNode(
+      omitAssertions);
+}
+
+SourceRange EnumElementScope::getSourceRangeOfEnclosedParamsOfASTNode(
+    bool omitAssertions) const {
+  auto *pl = decl->getParameterList();
+  return pl ? pl->getSourceRange() : SourceRange();
+}
+
+SourceRange SubscriptDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
+    const bool omitAssertions) const {
+  auto r = SourceRange(decl->getIndices()->getLParenLoc(), decl->getEndLoc());
+  // Because of "subscript(x: MyStruct#^PARAM_1^#) -> Int { return 0 }"
+  // Cannot just use decl->getEndLoc()
+  r.widen(decl->getIndices()->getRParenLoc());
+  return r;
+}
+
+SourceRange AbstractFunctionDeclScope::getSourceRangeOfEnclosedParamsOfASTNode(
+    const bool omitAssertions) const {
+  const auto s = getParmsSourceLocOfAFD(decl);
+  const auto e = getSourceRangeOfThisASTNode(omitAssertions).End;
+  return s.isInvalid() || e.isInvalid() ? SourceRange() : SourceRange(s, e);
+}
+
+SourceLoc
+AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
+  if (auto *c = dyn_cast<ConstructorDecl>(decl))
+    return c->getParameters()->getLParenLoc();
+
+  if (auto *dd = dyn_cast<DestructorDecl>(decl))
+    return dd->getNameLoc();
+
+  auto *fd = cast<FuncDecl>(decl);
+  // clang-format off
+  return isa<AccessorDecl>(fd) ? fd->getLoc()
+       : fd->isDeferBody()     ? fd->getNameLoc()
+       :                         fd->getParameters()->getLParenLoc();
+  // clang-format on
+}
+
+#pragma mark deferred scope source ranges
+
+SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
+    const IterableTypeScope *s) const {
+  const auto bracesRange = getChildlessSourceRangeOf(s, false);
+  const auto &SM = s->getSourceManager();
+  return SourceRange(bracesRange.Start,
+                     getLocEncompassingPotentialLookups(SM, bracesRange.End));
 }

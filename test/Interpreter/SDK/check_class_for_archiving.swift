@@ -52,7 +52,7 @@ print("DerivedClassWithName: \(NSKeyedUnarchiver._swift_checkClassAndWarnForKeye
 // CHECK: NSKeyedUnarchiver: 0
 print("NSKeyedUnarchiver: \(NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(NSKeyedUnarchiver.self, operation: op))")
 
-if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(iOS 13, macOS 10.15, tvOS 13, watchOS 6, *) {
   // CHECK: PrivateClass: 2
   print("PrivateClass: \(NSKeyedUnarchiver._swift_checkClassAndWarnForKeyedArchiving(PrivateClass.self, operation: op))")
   // CHECK: GenericClass: 1

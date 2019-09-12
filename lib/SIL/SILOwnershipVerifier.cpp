@@ -134,8 +134,8 @@ public:
       return false;
 
     SmallVector<BranchPropagatedUser, 32> allRegularUsers;
-    copy(regularUsers, std::back_inserter(allRegularUsers));
-    copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
+    llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
+    llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
     auto linearLifetimeResult =
         valueHasLinearLifetime(value, lifetimeEndingUsers, allRegularUsers,
                                visitedBlocks, deadEndBlocks, errorBehavior);
@@ -331,8 +331,8 @@ bool SILValueOwnershipChecker::gatherUsers(
         for (unsigned i : indices(nonLifetimeEndingUsers)) {
           if (auto *bbi = dyn_cast<BeginBorrowInst>(
                   nonLifetimeEndingUsers[i].getInst())) {
-            copy(bbi->getEndBorrows(),
-                 std::back_inserter(implicitRegularUsers));
+            llvm::copy(bbi->getEndBorrows(),
+                       std::back_inserter(implicitRegularUsers));
           }
         }
       }
@@ -361,7 +361,7 @@ bool SILValueOwnershipChecker::gatherUsers(
         assert(result.getOwnershipKind() == ValueOwnershipKind::Guaranteed &&
                "Our value is guaranteed and this is a forwarding instruction. "
                "Should have guaranteed ownership as well.");
-        copy(result->getUses(), std::back_inserter(users));
+        llvm::copy(result->getUses(), std::back_inserter(users));
       }
 
       continue;
@@ -672,7 +672,8 @@ void SILInstruction::verifyOperandOwnership() const {
                       "with the operand's operand ownership kind map.\n";
       llvm::errs() << "Value: " << opValue;
       llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
-      llvm::errs() << "Instruction: " << *this;
+      llvm::errs() << "Instruction:\n";
+      printInContext(llvm::errs());
       llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
     }
 

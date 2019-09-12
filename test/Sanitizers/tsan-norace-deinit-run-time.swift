@@ -1,11 +1,8 @@
 // RUN: %target-swiftc_driver %s -g -sanitize=thread %import-libdispatch -target %sanitizers-target-triple -o %t_tsan-binary
 // RUN: %target-codesign %t_tsan-binary
-// RUN: env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --implicit-check-not='ThreadSanitizer'
+// RUN: env %env-TSAN_OPTIONS=abort_on_error=0 %target-run %t_tsan-binary 2>&1 | %FileCheck %s --dump-input=fail --implicit-check-not='ThreadSanitizer'
 // REQUIRES: executable_test
 // REQUIRES: tsan_runtime
-
-// Failing sporadically in CI
-// REQUIRES: rdar51804988
 
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.

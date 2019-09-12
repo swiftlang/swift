@@ -9,6 +9,11 @@
 @propertyWrapper
 public struct Wrapper<T> {
   public var value: T
+
+  public var wrappedValue: T {
+    get { value }
+    set { value = newValue }
+  }
 }
 
 @propertyWrapper

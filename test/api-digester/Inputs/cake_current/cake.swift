@@ -200,3 +200,11 @@ public class Zoo {
     return Dog()
   }
 }
+
+public func returnFunctionTypeOwnershipChange() -> (__owned C1) -> () { return { _ in } }
+
+@objc(NewObjCClass)
+public class SwiftObjcClass {
+  @objc(NewObjCFool:NewObjCA:NewObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}

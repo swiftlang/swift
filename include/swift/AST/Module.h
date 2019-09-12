@@ -60,7 +60,6 @@ namespace swift {
   class InfixOperatorDecl;
   class LazyResolver;
   class LinkLibrary;
-  class LookupCache;
   class ModuleLoader;
   class NominalTypeDecl;
   class EnumElementDecl;
@@ -80,6 +79,7 @@ namespace swift {
   class VisibleDeclConsumer;
   class SyntaxParsingCache;
   class ASTScope;
+  class SourceLookupCache;
 
   namespace syntax {
   class SourceFileSyntax;
@@ -193,7 +193,7 @@ public:
 
     /// This is a convenience function that writes the entire name, in forward
     /// order, to \p out.
-    void printForward(raw_ostream &out) const;
+    void printForward(raw_ostream &out, StringRef delim = ".") const;
   };
 
 private:
@@ -203,6 +203,9 @@ private:
   DebuggerClient *DebugClient = nullptr;
 
   SmallVector<FileUnit *, 2> Files;
+
+  std::unique_ptr<SourceLookupCache> Cache;
+  SourceLookupCache &getSourceLookupCache() const;
 
   /// Tracks the file that will generate the module's entry point, either
   /// because it contains a class marked with \@UIApplicationMain
@@ -358,7 +361,7 @@ public:
   /// within the current module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
+  void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
   /// Look up a local type declaration by its mangled name.
@@ -377,6 +380,12 @@ public:
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
                           NLKind LookupKind) const;
+
+  /// This is a hack for 'main' file parsing and the integrated REPL.
+  ///
+  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
+  /// FIXME: Remove the integrated REPL.
+  void clearLookupCache();
 
   /// @{
 
@@ -510,50 +519,11 @@ public:
   /// shadowed clang module.
   void getDisplayDecls(SmallVectorImpl<Decl*> &results) const;
 
-  /// @{
-
-  /// Perform an action for every module visible from this module.
-  ///
-  /// This only includes modules with at least one declaration visible: if two
-  /// import access paths are incompatible, the indirect module will be skipped.
-  /// Modules that can't be used for lookup (including Clang submodules at the
-  /// time this comment was written) are also skipped under certain
-  /// circumstances.
-  ///
-  /// \param topLevelAccessPath If present, include the top-level module in the
-  ///        results, with the given access path.
-  /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
-  ///        Return \c false to abort iteration.
-  ///
-  /// \return True if the traversal ran to completion, false if it ended early
-  ///         due to the callback.
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<bool(ImportedModule)> fn);
-
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            llvm::function_ref<void(ImportedModule)> fn) {
-    return forAllVisibleModules(topLevelAccessPath,
-                                [=](const ImportedModule &import) -> bool {
-      fn(import);
-      return true;
-    });
-  }
-
-  template <typename Fn>
-  bool forAllVisibleModules(AccessPathTy topLevelAccessPath,
-                            Fn &&fn) {
-    using RetTy = typename std::result_of<Fn(ImportedModule)>::type;
-    llvm::function_ref<RetTy(ImportedModule)> wrapped{std::forward<Fn>(fn)};
-    return forAllVisibleModules(topLevelAccessPath, wrapped);
-  }
-
-  /// @}
-
   using LinkLibraryCallback = llvm::function_ref<void(LinkLibrary)>;
 
   /// Generate the list of libraries needed to link this module, based on its
   /// imports.
-  void collectLinkLibraries(LinkLibraryCallback callback);
+  void collectLinkLibraries(LinkLibraryCallback callback) const;
 
   /// Returns true if the two access paths contain the same chain of
   /// identifiers.
@@ -635,7 +605,10 @@ static inline unsigned alignOfFileUnit();
 /// FileUnit is an abstract base class; its subclasses represent different
 /// sorts of containers that can each provide a set of decls, e.g. a source
 /// file. A module can contain several file-units.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
 class FileUnit : public DeclContext {
+#pragma clang diagnostic pop
   virtual void anchor();
 
   // FIXME: Stick this in a PointerIntPair.
@@ -645,8 +618,6 @@ protected:
   FileUnit(FileUnitKind kind, ModuleDecl &M)
     : DeclContext(DeclContextKind::FileUnit, &M), Kind(kind) {
   }
-
-  virtual ~FileUnit() = default;
 
 public:
   FileUnitKind getKind() const {
@@ -658,8 +629,7 @@ public:
   /// within this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
   /// Look up a local type declaration by its mangled name.
@@ -807,37 +777,6 @@ public:
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {}
 
-  /// @{
-
-  /// Perform an action for every module visible from this file.
-  ///
-  /// \param fn A callback of type bool(ImportedModule) or void(ImportedModule).
-  ///           Return \c false to abort iteration.
-  ///
-  /// \return True if the traversal ran to completion, false if it ended early
-  ///         due to the callback.
-  bool
-  forAllVisibleModules(llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn);
-
-  bool
-  forAllVisibleModules(llvm::function_ref<void(ModuleDecl::ImportedModule)> fn) {
-    return forAllVisibleModules([=](ModuleDecl::ImportedModule import) -> bool {
-      fn(import);
-      return true;
-    });
-  }
-  
-  template <typename Fn>
-  bool forAllVisibleModules(Fn &&fn) {
-    using RetTy = typename std::result_of<Fn(ModuleDecl::ImportedModule)>::type;
-    llvm::function_ref<RetTy(ModuleDecl::ImportedModule)> wrapped{
-      std::forward<Fn>(fn)
-    };
-    return forAllVisibleModules(wrapped);
-  }
-
-  /// @}
-
   /// True if this file contains the main class for the module.
   bool hasMainClass() const {
     return getMainClass();
@@ -863,10 +802,6 @@ public:
     return getParentModule()->getName().str();
   }
 
-  /// If this is a module imported from a parseable interface, return the path
-  /// to the interface file, otherwise an empty StringRef.
-  virtual StringRef getParseableInterface() const { return {}; }
-
   /// Traverse the decls within this file.
   ///
   /// \returns true if traversal was aborted, false if it completed
@@ -886,13 +821,7 @@ private:
   // Make placement new and vanilla new/delete illegal for FileUnits.
   void *operator new(size_t Bytes) throw() = delete;
   void *operator new(size_t Bytes, void *Mem) throw() = delete;
-
-protected:
-  // Unfortunately we can't remove this altogether because the virtual
-  // destructor requires it to be accessible.
-  void operator delete(void *Data) throw() {
-    llvm_unreachable("Don't use operator delete on a SourceFile");
-  }
+  void operator delete(void *Data) throw() = delete;
 
 public:
   // Only allow allocation of FileUnits using the allocator in ASTContext
@@ -913,7 +842,6 @@ static inline unsigned alignOfFileUnit() {
 /// IR generation.
 class SourceFile final : public FileUnit {
 public:
-  class LookupCache;
   class Impl;
   struct SourceFileSyntaxInfo;
 
@@ -962,8 +890,8 @@ public:
   };
 
 private:
-  std::unique_ptr<LookupCache> Cache;
-  LookupCache &getCache() const;
+  std::unique_ptr<SourceLookupCache> Cache;
+  SourceLookupCache &getCache() const;
 
   /// This is the list of modules that are imported by this module.
   ///
@@ -1095,6 +1023,8 @@ public:
              ImplicitModuleImportKind ModImpKind, bool KeepParsedTokens = false,
              bool KeepSyntaxTree = false);
 
+  ~SourceFile();
+
   void addImports(ArrayRef<ImportedModuleDesc> IM);
 
   enum ImportQueryKind {
@@ -1116,13 +1046,16 @@ public:
 
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
+  /// This is a hack for 'main' file parsing and the integrated REPL.
+  ///
+  /// FIXME: Refactor main file parsing to not pump the parser incrementally.
+  /// FIXME: Remove the integrated REPL.
   void clearLookupCache();
 
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
@@ -1320,7 +1253,7 @@ public:
   }
   
   void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
-  
+
 private:
 
   /// If not None, the underlying vector should contain tokens of this source file.
@@ -1346,8 +1279,7 @@ private:
 public:
   explicit BuiltinUnit(ModuleDecl &M);
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   /// Find all Objective-C methods with the given selector.
@@ -1370,35 +1302,23 @@ public:
 };
 
 /// Represents an externally-loaded file of some kind.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnon-virtual-dtor"
 class LoadedFile : public FileUnit {
+#pragma clang diagnostic pop
 protected:
-  ~LoadedFile() = default;
   LoadedFile(FileUnitKind Kind, ModuleDecl &M) noexcept
     : FileUnit(Kind, M) {
     assert(classof(this) && "invalid kind");
   }
-
-  /// A map from private/fileprivate decls to the file they were defined in.
-  llvm::DenseMap<const ValueDecl *, Identifier> FilenameForPrivateDecls;
-
 public:
-
   /// Returns an arbitrary string representing the storage backing this file.
   ///
   /// This is usually a filesystem path.
   virtual StringRef getFilename() const;
 
-  void addFilenameForPrivateDecl(const ValueDecl *decl, Identifier id) {
-    assert(!FilenameForPrivateDecls.count(decl) ||
-           FilenameForPrivateDecls[decl] == id);
-    FilenameForPrivateDecls[decl] = id;
-  }
-
-  StringRef getFilenameForPrivateDecl(const ValueDecl *decl) {
-    auto it = FilenameForPrivateDecls.find(decl);
-    if (it == FilenameForPrivateDecls.end())
-      return StringRef();
-    return it->second.str();
+  virtual StringRef getFilenameForPrivateDecl(const ValueDecl *decl) const {
+    return StringRef();
   }
 
   /// Look up an operator declaration.

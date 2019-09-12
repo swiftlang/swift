@@ -7,7 +7,7 @@ public struct MyPublished<Value> {
 		set { stored = newValue }
 	}		
 
-	public init(initialValue: Value) {
+	public init(wrappedValue initialValue: Value) {
 		stored = initialValue
 	}
 

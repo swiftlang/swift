@@ -296,8 +296,8 @@ extension LazyFilterCollection: Collection {
 
 extension LazyFilterCollection: LazyCollectionProtocol { }
 
-extension LazyFilterCollection : BidirectionalCollection
-  where Base : BidirectionalCollection {
+extension LazyFilterCollection: BidirectionalCollection
+  where Base: BidirectionalCollection {
 
   @inlinable // lazy-performance
   public func index(before i: Index) -> Index {

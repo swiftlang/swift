@@ -35,16 +35,12 @@ using swift::version::Version;
 using llvm::BCBlockRAII;
 
 using FileNameToGroupNameMap = llvm::StringMap<std::string>;
-using pFileNameToGroupNameMap = std::unique_ptr<FileNameToGroupNameMap>;
 
 namespace {
 class YamlGroupInputParser {
   ASTContext &Ctx;
   StringRef RecordPath;
   static constexpr const char * const Separator = "/";
-
-  // FIXME: This isn't thread-safe.
-  static llvm::StringMap<pFileNameToGroupNameMap> AllMaps;
 
   bool parseRoot(FileNameToGroupNameMap &Map, llvm::yaml::Node *Root,
                  StringRef ParentName) {
@@ -87,28 +83,23 @@ class YamlGroupInputParser {
     return false;
   }
 
+  FileNameToGroupNameMap diagnoseGroupInfoFile(bool FileMissing = false) {
+    Ctx.Diags.diagnose(SourceLoc(),
+      FileMissing ? diag::cannot_find_group_info_file:
+      diag::cannot_parse_group_info_file, RecordPath);
+    return {};
+  }
+
 public:
   YamlGroupInputParser(ASTContext &Ctx, StringRef RecordPath):
     Ctx(Ctx), RecordPath(RecordPath) {}
 
-  FileNameToGroupNameMap* getParsedMap() {
-    return AllMaps[RecordPath].get();
-  }
-
-  bool diagnoseGroupInfoFile(bool FileMissing = false) {
-    Ctx.Diags.diagnose(SourceLoc(),
-      FileMissing ? diag::cannot_find_group_info_file:
-      diag::cannot_parse_group_info_file, RecordPath);
-    return true;
-  }
-
-  // Parse the Yaml file that contains the group information.
-  // True on failure; false on success.
-  bool parse() {
-    // If we have already parsed this group info file, return false;
-    auto FindMap = AllMaps.find(RecordPath);
-    if (FindMap != AllMaps.end())
-      return false;
+  /// Parse the Yaml file that contains the group information.
+  ///
+  /// If the record path is empty, returns an empty map.
+  FileNameToGroupNameMap parse() {
+    if (RecordPath.empty())
+      return {};
 
     auto Buffer = llvm::MemoryBuffer::getFile(RecordPath);
     if (!Buffer) {
@@ -133,83 +124,50 @@ public:
     if (!Map) {
       return diagnoseGroupInfoFile();
     }
-    pFileNameToGroupNameMap pMap(new FileNameToGroupNameMap());
-    std::string Empty;
-    if (parseRoot(*pMap, Root, Empty))
+    FileNameToGroupNameMap Result;
+    if (parseRoot(Result, Root, ""))
       return diagnoseGroupInfoFile();
 
-    // Save the parsed map to the owner.
-    AllMaps[RecordPath] = std::move(pMap);
-    return false;
+    // Return the parsed map.
+    return Result;
   }
 };
 
-llvm::StringMap<pFileNameToGroupNameMap> YamlGroupInputParser::AllMaps;
-
 class DeclGroupNameContext {
-  struct GroupNameCollector {
-    static const StringLiteral NullGroupName;
-    const bool Enable;
-    GroupNameCollector(bool Enable) : Enable(Enable) {}
-    virtual ~GroupNameCollector() = default;
-    virtual StringRef getGroupNameInternal(const Decl *VD) = 0;
-    StringRef getGroupName(const Decl *VD) {
-      return Enable ? getGroupNameInternal(VD) : StringRef(NullGroupName);
-    };
-  };
-
-  class GroupNameCollectorFromJson : public GroupNameCollector {
-    StringRef RecordPath;
-    FileNameToGroupNameMap* pMap = nullptr;
-    ASTContext &Ctx;
-
-  public:
-    GroupNameCollectorFromJson(StringRef RecordPath, ASTContext &Ctx) :
-      GroupNameCollector(!RecordPath.empty()), RecordPath(RecordPath),
-      Ctx(Ctx) {}
-    StringRef getGroupNameInternal(const Decl *VD) override {
-      // We need the file path, so there has to be a location.
-      if (VD->getLoc().isInvalid())
-        return NullGroupName;
-      auto PathOp = VD->getDeclContext()->getParentSourceFile()->getBufferID();
-      if (!PathOp.hasValue())
-        return NullGroupName;
-      StringRef FullPath =
-          Ctx.SourceMgr.getIdentifierForBuffer(PathOp.getValue());
-      if (!pMap) {
-        YamlGroupInputParser Parser(Ctx, RecordPath);
-        if (!Parser.parse()) {
-
-          // Get the file-name to group map if parsing correctly.
-          pMap = Parser.getParsedMap();
-        }
-      }
-      if (!pMap)
-        return NullGroupName;
-      StringRef FileName = llvm::sys::path::filename(FullPath);
-      auto Found = pMap->find(FileName);
-      if (Found == pMap->end()) {
-        Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
-        return NullGroupName;
-      }
-      return Found->second;
-    }
-  };
-
+  ASTContext &Ctx;
+  FileNameToGroupNameMap FileToGroupMap;
   llvm::MapVector<StringRef, unsigned> Map;
   std::vector<StringRef> ViewBuffer;
-  std::unique_ptr<GroupNameCollector> pNameCollector;
 
 public:
   DeclGroupNameContext(StringRef RecordPath, ASTContext &Ctx) :
-    pNameCollector(new GroupNameCollectorFromJson(RecordPath, Ctx)) {}
+    Ctx(Ctx), FileToGroupMap(YamlGroupInputParser(Ctx, RecordPath).parse()) {}
+
   uint32_t getGroupSequence(const Decl *VD) {
-    return Map.insert(std::make_pair(pNameCollector->getGroupName(VD),
-                                     Map.size())).first->second;
+    if (FileToGroupMap.empty())
+      return 0;
+
+    // We need the file path, so there has to be a location.
+    if (VD->getLoc().isInvalid())
+      return 0;
+    StringRef FullPath =
+        VD->getDeclContext()->getParentSourceFile()->getFilename();
+    if (FullPath.empty())
+      return 0;
+    StringRef FileName = llvm::sys::path::filename(FullPath);
+    auto Found = FileToGroupMap.find(FileName);
+    if (Found == FileToGroupMap.end()) {
+      Ctx.Diags.diagnose(SourceLoc(), diag::error_no_group_info, FileName);
+      return 0;
+    }
+
+    StringRef GroupName = Found->second;
+    return Map.insert(std::make_pair(GroupName, Map.size()+1)).first->second;
   }
 
   ArrayRef<StringRef> getOrderedGroupNames() {
     ViewBuffer.clear();
+    ViewBuffer.push_back(""); // 0 is always outside of any group.
     for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
@@ -217,12 +175,9 @@ public:
   }
 
   bool isEnable() {
-    return pNameCollector->Enable;
+    return !FileToGroupMap.empty();
   }
 };
-
-const StringLiteral
-DeclGroupNameContext::GroupNameCollector::NullGroupName = "";
 
 struct DeclCommentTableData {
   StringRef Brief;
@@ -242,8 +197,7 @@ public:
 
   hash_value_type ComputeHash(key_type_ref key) {
     assert(!key.empty());
-    // FIXME: DJB seed=0, audit whether the default seed could be used.
-    return llvm::djbHash(key, 0);
+    return llvm::djbHash(key, SWIFTDOC_HASH_SEED_5_1);
   }
 
   std::pair<unsigned, unsigned>

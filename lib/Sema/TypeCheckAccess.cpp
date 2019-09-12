@@ -44,11 +44,10 @@ enum class DowngradeToWarning: bool {
 /// Calls \p callback for each type in each requirement provided by
 /// \p source.
 static void forAllRequirementTypes(
-    WhereClauseOwner source,
+    WhereClauseOwner &&source,
     llvm::function_ref<void(Type, TypeRepr *)> callback) {
-  RequirementRequest::visitRequirements(
-      source, TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr* reqRepr) {
+  std::move(source).visitRequirements(TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
@@ -95,11 +94,11 @@ protected:
   }
 
   void checkRequirementAccess(
-      WhereClauseOwner source,
+      WhereClauseOwner &&source,
       AccessScope accessScope,
       const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-    forAllRequirementTypes(source, [&](Type type, TypeRepr *typeRepr) {
+    forAllRequirementTypes(std::move(source), [&](Type type, TypeRepr *typeRepr) {
       checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
                           /*mayBeInferred*/false, diagnose);
     });
@@ -779,6 +778,7 @@ public:
     auto minAccessScope = AccessScope::getPublic();
     const TypeRepr *complainRepr = nullptr;
     auto downgradeToWarning = DowngradeToWarning::No;
+    DescriptiveDeclKind declKind = DescriptiveDeclKind::Protocol;
 
     // FIXME: Hack to ensure that we've computed the types involved here.
     ASTContext &ctx = proto->getASTContext();
@@ -788,6 +788,15 @@ public:
                                 proto, i, TypeResolutionStage::Interface},
                               Type());
     }
+
+    auto declKindForType = [](Type type) {
+      if (isa<TypeAliasType>(type.getPointer()))
+        return DescriptiveDeclKind::TypeAlias;
+      else if (auto nominal = type->getAnyNominal())
+        return nominal->getDescriptiveKind();
+      else
+        return DescriptiveDeclKind::Type;
+    };
 
     std::for_each(proto->getInherited().begin(),
                   proto->getInherited().end(),
@@ -803,29 +812,31 @@ public:
           complainRepr = thisComplainRepr;
           protocolControlErrorKind = PCEK_Refine;
           downgradeToWarning = downgradeDiag;
+          declKind = declKindForType(requirement.getType());
         }
       });
     });
 
-    checkRequirementAccess(proto,
-                           proto->getFormalAccessScope(),
-                           proto->getDeclContext(),
-                           [&](AccessScope typeAccessScope,
-                               const TypeRepr *thisComplainRepr,
-                               DowngradeToWarning downgradeDiag) {
-      if (typeAccessScope.isChildOf(minAccessScope) ||
-          (!complainRepr &&
-           typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
-        minAccessScope = typeAccessScope;
-        complainRepr = thisComplainRepr;
-        protocolControlErrorKind = PCEK_Requirement;
-        downgradeToWarning = downgradeDiag;
-
-        // Swift versions before 5.0 did not check requirements on the
-        // protocol's where clause, so emit a warning.
-        if (!TC.Context.isSwiftVersionAtLeast(5))
-          downgradeToWarning = DowngradeToWarning::Yes;
-      }
+    forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
+      checkTypeAccess(
+          type, typeRepr, proto,
+          /*mayBeInferred*/ false,
+          [&](AccessScope typeAccessScope, const TypeRepr *thisComplainRepr,
+              DowngradeToWarning downgradeDiag) {
+            if (typeAccessScope.isChildOf(minAccessScope) ||
+                (!complainRepr &&
+                 typeAccessScope.hasEqualDeclContextWith(minAccessScope))) {
+              minAccessScope = typeAccessScope;
+              complainRepr = thisComplainRepr;
+              protocolControlErrorKind = PCEK_Requirement;
+              downgradeToWarning = downgradeDiag;
+              declKind = declKindForType(type);
+              // Swift versions before 5.0 did not check requirements on the
+              // protocol's where clause, so emit a warning.
+              if (!TC.Context.isSwiftVersionAtLeast(5))
+                downgradeToWarning = DowngradeToWarning::Yes;
+            }
+          });
     });
 
     if (!minAccessScope.isPublic()) {
@@ -837,10 +848,9 @@ public:
       auto diagID = diag::protocol_access;
       if (downgradeToWarning == DowngradeToWarning::Yes)
         diagID = diag::protocol_access_warn;
-      auto diag = TC.diagnose(proto, diagID,
-                              isExplicit, protoAccess,
+      auto diag = TC.diagnose(proto, diagID, isExplicit, protoAccess,
                               protocolControlErrorKind, minAccess,
-                              isa<FileUnit>(proto->getDeclContext()));
+                              isa<FileUnit>(proto->getDeclContext()), declKind);
       highlightOffendingType(TC, diag, complainRepr);
     }
   }
@@ -1516,7 +1526,7 @@ class ExportabilityChecker : public DeclVisitor<ExportabilityChecker> {
         diagnoseType(typeDecl, /*typeRepr*/nullptr);
       }
 
-      void visitSubstitutionMap(const SubstitutionMap &subs) {
+      void visitSubstitutionMap(SubstitutionMap subs) {
         for (ProtocolConformanceRef conformance : subs.getConformances()) {
           if (!conformance.isConcrete())
             continue;
@@ -1915,9 +1925,6 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto extendedType = ED->getExtendedNominal();
-    // TODO: Sometimes we have an extension that is marked valid but has no
-    //       extended type. Assert, just in case we see it while testing, but
-    //       don't crash. rdar://50401284
     assert(extendedType && "valid extension with no extended type?");
     if (!extendedType || shouldSkipChecking(extendedType))
       return;
@@ -1939,7 +1946,7 @@ public:
     });
 
     if (hasPublicMembers) {
-      checkType(ED->getExtendedTypeLoc(), ED,
+      checkType(ED->getExtendedType(),  ED->getExtendedTypeRepr(), ED,
                 getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers),
                 getDiagnoseCallback(ED, Reason::ExtensionWithPublicMembers));
     }

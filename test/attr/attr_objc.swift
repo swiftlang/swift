@@ -35,25 +35,25 @@ protocol Protocol_Class2 : class {}
 class FáncyName {}
 @objc (FancyName) extension FáncyName {}
 
-@objc  
-var subject_globalVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+@objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+var subject_globalVar: Int
 
 var subject_getterSetter: Int {
-  @objc 
-  get { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  get {
     return 0
   }
-  @objc
-  set {  // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  set {
   }
 }
 
 var subject_global_observingAccessorsVar1: Int = 0 {
-  @objc 
-  willSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  willSet {
   }
-  @objc 
-  didSet { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  didSet {
   }
 }
 
@@ -85,11 +85,11 @@ class subject_getterSetter1 {
   }
 
   var observingAccessorsVar1: Int = 0 {
-    @objc
-    willSet { // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-10=}}
+    @objc // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-11=}}
+    willSet {
     }
-    @objc
-    didSet { // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-10=}}
+    @objc // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-11=}}
+    didSet {
     }
   }
 }
@@ -102,23 +102,25 @@ class subject_staticVar1 {
   class var staticVar2: Int { return 42 }
 }
 
-@objc
-func subject_freeFunc() { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-6=}}
-  @objc
-  var subject_localVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+@objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-7=}}
+func subject_freeFunc() {
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  var subject_localVar: Int
+  // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
 
-  @objc
-  func subject_nestedFreeFunc() { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  func subject_nestedFreeFunc() {
   }
 }
 
-@objc
-func subject_genericFunc<T>(t: T) { // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-6=}}
-  @objc
-  var subject_localVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+@objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{1-7=}}
+func subject_genericFunc<T>(t: T) {
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  var subject_localVar: Int
+  // expected-warning@-1 {{variable 'subject_localVar' was never used; consider replacing with '_' or removing it}}
 
-  @objc
-  func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  func subject_instanceFunc() {}
 }
 
 func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
@@ -126,26 +128,26 @@ func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be
 
 @objc // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_struct {
-  @objc
-  var subject_instanceVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  var subject_instanceVar: Int
 
-  @objc
-  init() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  init() {}
 
-  @objc
-  func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  func subject_instanceFunc() {}
 }
 
 @objc   // expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
 struct subject_genericStruct<T> {
-  @objc
-  var subject_instanceVar: Int // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  var subject_instanceVar: Int
 
-  @objc
-  init() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  init() {}
 
-  @objc
-  func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  func subject_instanceFunc() {}
 }
 
 @objc
@@ -208,8 +210,8 @@ enum subject_enum: Int {
   @objc(subject_enumElement2)
   case subject_enumElement2
 
-  @objc(subject_enumElement3)
-  case subject_enumElement3, subject_enumElement4 // expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-30=}}
+  @objc(subject_enumElement3) // expected-error {{'@objc' enum case declaration defines multiple enum cases with the same Objective-C name}}{{3-31=}}
+  case subject_enumElement3, subject_enumElement4
 
   @objc   // expected-error {{attribute has no effect; cases within an '@objc' enum are already exposed to Objective-C}} {{3-9=}}
   case subject_enumElement5, subject_enumElement6
@@ -217,16 +219,16 @@ enum subject_enum: Int {
   @nonobjc // expected-error {{'@nonobjc' attribute cannot be applied to this declaration}}
   case subject_enumElement7
 
-  @objc   
-  init() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  init() {}
 
-  @objc
-  func subject_instanceFunc() {} // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-8=}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}} {{3-9=}}
+  func subject_instanceFunc() {}
 }
 
 enum subject_enum2 {
-  @objc(subject_enum2Element1)
-  case subject_enumElement1 // expected-error{{'@objc' enum case is not allowed outside of an '@objc' enum}}{{3-31=}}
+  @objc(subject_enum2Element1) // expected-error{{'@objc' enum case is not allowed outside of an '@objc' enum}}{{3-32=}}
+  case subject_enumElement1
 }
 
 @objc
@@ -254,14 +256,14 @@ protocol subject_protocol5 : Protocol_Class1 {} // expected-error {{@objc protoc
 protocol subject_protocol6 : Protocol_ObjC1 {}
 
 protocol subject_containerProtocol1 {
-  @objc
-  var subject_instanceVar: Int { get } // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  var subject_instanceVar: Int { get }
 
-  @objc
-  func subject_instanceFunc() // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  func subject_instanceFunc()
 
-  @objc
-  static func subject_staticFunc() // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  @objc // expected-error {{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
+  static func subject_staticFunc()
 }
 
 @objc
@@ -845,7 +847,7 @@ class infer_instanceVar1 {
   }
 
   var observingAccessorsVar1: Int {
-  // CHECK: @objc @_hasStorage var observingAccessorsVar1: Int {
+  // CHECK: @_hasStorage @objc var observingAccessorsVar1: Int {
     willSet {}
     // CHECK-NEXT: {{^}} @objc get
     didSet {}
@@ -1662,7 +1664,7 @@ class HasIBOutlet {
   init() {}
 
   @IBOutlet weak var goodOutlet: Class_ObjC1!
-  // CHECK-LABEL: {{^}} @objc @IBOutlet @_implicitly_unwrapped_optional @_hasInitialValue weak var goodOutlet: @sil_weak Class_ObjC1!
+  // CHECK-LABEL: {{^}} @objc @IBOutlet @_hasInitialValue weak var goodOutlet: @sil_weak Class_ObjC1!
 
   @IBOutlet var badOutlet: PlainStruct
   // expected-error@-1 {{@IBOutlet property cannot have non-object type 'PlainStruct'}} {{3-13=}}

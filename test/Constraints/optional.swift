@@ -10,8 +10,8 @@ class A {
   @objc(do_b_2:) func do_b(_ x: Int) {}
   @objc func do_b(_ x: Float) {}
 
-  @objc func do_c(x: Int) {}
-  @objc func do_c(y: Int) {}
+  @objc func do_c(x: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+  @objc func do_c(y: Int) {} // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
 }
 
 func test0(_ a: AnyObject) {
@@ -20,7 +20,7 @@ func test0(_ a: AnyObject) {
   a.do_b?(1)
   a.do_b?(5.0)
 
-  a.do_c?(1) // expected-error {{cannot invoke value of function type with argument list '(Int)'}}
+  a.do_c?(1) // expected-error {{no exact matches in call to instance method 'do_c'}}
   a.do_c?(x: 1)
 }
 
@@ -355,5 +355,21 @@ struct S {
       bar = fn  // Ok
       bar = clj // Ok
     }
+  }
+}
+
+// rdar://problem/53238058 - Crash in getCalleeLocator while trying to produce a diagnostic about missing optional unwrap
+//                           associated with an argument to a call
+
+func rdar_53238058() {
+  struct S {
+    init(_: Double) {}
+    init<T>(_ value: T) where T : BinaryFloatingPoint {}
+  }
+
+  func test(_ str: String) {
+    _ = S(Double(str)) // expected-error {{value of optional type 'Double?' must be unwrapped to a value of type 'Double'}}
+    // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 }

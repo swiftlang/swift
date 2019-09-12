@@ -2341,7 +2341,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
     // We don't pass address-only values in basic block arguments.
     SILType ty = SGF.getLoweredType(vd->getType());
     if (ty.isAddressOnly(SGF.F))
-      return;
+      continue;
     block->createPhiArgument(ty, ValueOwnershipKind::Owned, vd);
   }
 }

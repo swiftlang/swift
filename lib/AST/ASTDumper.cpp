@@ -161,7 +161,7 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
-void GenericParamList::print(llvm::raw_ostream &OS) {
+void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
              [&](const GenericTypeParamDecl *P) {
@@ -369,15 +369,6 @@ static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
   }
 
   llvm_unreachable("Unhandled CtorInitializerKind in switch.");
-}
-static StringRef getOptionalTypeKindString(OptionalTypeKind value) {
-  switch (value) {
-    case OTK_None: return "none";
-    case OTK_Optional: return "Optional";
-    case OTK_ImplicitlyUnwrappedOptional: return "ImplicitlyUnwrappedOptional";
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 static StringRef getAssociativityString(Associativity value) {
   switch (value) {
@@ -769,9 +760,9 @@ namespace {
       auto VarD = dyn_cast<VarDecl>(VD);
       if (VD->isFinal() && !(VarD && VarD->isLet()))
         OS << " final";
-      if (VD->isObjC())
+      if (VD->getAttrs().hasAttribute<ObjCAttr>())
         OS << " @objc";
-      if (VD->isDynamic())
+      if (VD->getAttrs().hasAttribute<DynamicAttr>())
         OS << " dynamic";
       if (auto *attr =
               VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
@@ -906,8 +897,16 @@ namespace {
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
+        if (entry.getOriginalInit()) {
+          OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Original init:\n";
+          printRec(entry.getOriginalInit());
+        }
         if (entry.getInit()) {
           OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Processed init:\n";
           printRec(entry.getInit());
         }
       }
@@ -968,19 +967,16 @@ namespace {
       }
 
       switch (P->getSpecifier()) {
-      case VarDecl::Specifier::Let:
+      case ParamDecl::Specifier::Default:
         /* nothing */
         break;
-      case VarDecl::Specifier::Var:
-        OS << " mutable";
-        break;
-      case VarDecl::Specifier::InOut:
+      case ParamDecl::Specifier::InOut:
         OS << " inout";
         break;
-      case VarDecl::Specifier::Shared:
+      case ParamDecl::Specifier::Shared:
         OS << " shared";
         break;
-      case VarDecl::Specifier::Owned:
+      case ParamDecl::Specifier::Owned:
         OS << " owned";
         break;
       }
@@ -1095,9 +1091,11 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " required";
       PrintWithColorRAII(OS, DeclModifierColor) << " "
         << getCtorInitializerKindString(CD->getInitKind());
-      if (CD->getFailability() != OTK_None)
+      if (CD->isFailable())
         PrintWithColorRAII(OS, DeclModifierColor) << " failable="
-          << getOptionalTypeKindString(CD->getFailability());
+          << (CD->isImplicitlyUnwrappedOptional()
+              ? "ImplicitlyUnwrappedOptional"
+              : "Optional");
       printAbstractFunctionDecl(CD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -1949,9 +1947,13 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor)
       << " literal_capacity="
       << E->getLiteralCapacity() << " interpolation_count="
-      << E->getInterpolationCount() << '\n';
+      << E->getInterpolationCount();
+    PrintWithColorRAII(OS, LiteralValueColor) << " builder_init=";
+    E->getBuilderInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
+    E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
+    OS << "\n";
     printRec(E->getAppendingExpr());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   void visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E) {
@@ -1977,7 +1979,6 @@ public:
     printArgumentLabels(E->getArgumentLabels());
     OS << "\n";
     printRec(E->getArg());
-    printSemanticExpr(E->getSemanticExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
@@ -2430,9 +2431,12 @@ public:
     }
     // Printing a function type doesn't indicate whether it's escaping because it doesn't 
     // matter in 99% of contexts. AbstractClosureExpr nodes are one of the only exceptions.
-    if (auto Ty = GetTypeOfExpr(E))
-      if (!Ty->getAs<AnyFunctionType>()->getExtInfo().isNoEscape())
-        PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+    if (auto Ty = GetTypeOfExpr(E)) {
+      if (auto fType = Ty->getAs<AnyFunctionType>()) {
+        if (!fType->getExtInfo().isNoEscape())
+          PrintWithColorRAII(OS, ClosureModifierColor) << " escaping";
+      }
+    }
 
     return OS;
   }
@@ -2783,6 +2787,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitOneWayExpr(OneWayExpr *E) {
+    printCommon(E, "one_way_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTapExpr(TapExpr *E) {
     printCommon(E, "tap_expr");
     PrintWithColorRAII(OS, DeclColor) << " var=";
@@ -2934,6 +2945,13 @@ public:
       printRec(elem.Type);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("implicitly_unwrapped_optional");
+    OS << "\n";
+    printRec(T->getBase());
   }
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {
@@ -3501,10 +3519,6 @@ namespace {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      auto genericEnv = T->getGenericEnvironment();
-      if (auto owningDC = genericEnv->getOwningDeclContext()) {
-        owningDC->printContext(OS, Indent + 2);
-      }
       printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

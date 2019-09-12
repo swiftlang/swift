@@ -37,18 +37,8 @@ namespace swift {
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-    /// The active os target (OSX, iOS, Linux, etc.)
-    OS,
-    /// The active arch target (x86_64, i386, arm, arm64, etc.)
-    Arch,
-    /// The active endianness target (big or little)
-    Endianness,
-    /// Runtime support (_ObjC or _Native)
-    Runtime,
-    /// Conditional import of module
-    CanImport,
-    /// Target Environment (currently just 'simulator' or absent)
-    TargetEnvironment,
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
+#include "swift/AST/PlatformConditionKinds.def"
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -115,9 +105,6 @@ namespace swift {
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
 
-    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
-    bool EnableDWARFImporter = false;
-    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
@@ -215,6 +202,9 @@ namespace swift {
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
+    /// Enable one-way constraints in function builders.
+    bool FunctionBuilderOneWayConstraints = true;
+
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 
@@ -261,8 +251,15 @@ namespace swift {
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
-    /// Sound we compare to ASTScope-based resolution for debugging?
+    /// Should  we compare to ASTScope-based resolution for debugging?
     bool CompareToASTScopeLookup = false;
+
+    /// Since some tests fail if the warning is output, use a flag to decide
+    /// whether it is. The warning is useful for testing.
+    bool WarnIfASTScopeLookup = false;
+
+    /// Build the ASTScope tree lazily
+    bool LazyASTScopes = true;
 
     /// Whether to use the import as member inference system
     ///
@@ -430,11 +427,13 @@ namespace swift {
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
-    /// \param suggestions Populated with suggested replacements
+    /// \param suggestedKind Populated with suggested replacement platform condition
+    /// \param suggestedValues Populated with suggested replacement values
     /// if a match is not found.
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
-      std::vector<StringRef> &suggestions);
+      PlatformConditionKind &suggestedKind,
+      std::vector<StringRef> &suggestedValues);
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

@@ -74,6 +74,13 @@ public:
   /// Don't look in for compiler-provided modules.
   bool SkipRuntimeLibraryImportPaths = false;
 
+  /// When set, don't validate module system dependencies.
+  ///
+  /// If a system header is modified and this is not set, the compiler will
+  /// rebuild PCMs and compiled swiftmodules that depend on them, just like it
+  /// would for a non-system header.
+  bool DisableModulesValidateSystemDependencies = false;
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
@@ -96,6 +103,7 @@ public:
     for (auto RuntimeLibraryImportPath : RuntimeLibraryImportPaths) {
       Code = hash_combine(Code, RuntimeLibraryImportPath);
     }
+    Code = hash_combine(Code, DisableModulesValidateSystemDependencies);
     return Code;
   }
 };

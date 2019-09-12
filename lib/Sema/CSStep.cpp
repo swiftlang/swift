@@ -32,7 +32,7 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   TypeVars = std::move(CS.TypeVariables);
 
   for (auto *typeVar : component.TypeVars)
-    CS.TypeVariables.push_back(typeVar);
+    CS.addTypeVariable(typeVar);
 
   auto &workList = CS.InactiveConstraints;
   workList.splice(workList.end(), *component.Constraints);
@@ -49,23 +49,19 @@ StepResult SplitterStep::take(bool prevFailed) {
   if (prevFailed || CS.failedConstraint || CS.simplify())
     return done(/*isSuccess=*/false);
 
-  SmallVector<std::unique_ptr<ComponentStep>, 4> components;
+  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
   // Try to run "connected components" algorithm and split
   // type variables and their constraints into independent
   // sub-systems to solve.
-  computeFollowupSteps(components);
+  computeFollowupSteps(followup);
 
-  // If there is only one component, there is no reason to
+  // If there is only one step, there is no reason to
   // try to merge solutions, "split" step should be considered
   // done and replaced by a single component step.
-  if (components.size() < 2)
-    return replaceWith(std::move(components.front()));
+  if (followup.size() < 2)
+    return replaceWith(std::move(followup.front()));
 
-  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
-  for (auto &step : components)
-    followup.push_back(std::move(step));
-
-  /// Wait until all of the component steps are done.
+  /// Wait until all of the steps are done.
   return suspend(followup);
 }
 
@@ -81,13 +77,13 @@ StepResult SplitterStep::resume(bool prevFailed) {
   if (prevFailed)
     return done(/*isSuccess=*/false);
 
-  // Otherwise let's try to merge partial soltuions together
+  // Otherwise let's try to merge partial solutions together
   // and form a complete solution(s) for this split.
   return done(mergePartialSolutions());
 }
 
 void SplitterStep::computeFollowupSteps(
-    SmallVectorImpl<std::unique_ptr<ComponentStep>> &componentSteps) {
+    SmallVectorImpl<std::unique_ptr<SolverStep>> &steps) {
   // Compute next steps based on that connected components
   // algorithm tells us is splittable.
 
@@ -96,25 +92,12 @@ void SplitterStep::computeFollowupSteps(
   CG.optimize();
 
   // Compute the connected components of the constraint graph.
-  // FIXME: We're seeding typeVars with TypeVariables so that the
-  // connected-components algorithm only considers those type variables within
-  // our component. There are clearly better ways to do this.
-  std::vector<TypeVariableType *> typeVars(CS.TypeVariables);
-  std::vector<unsigned> components;
-  unsigned numComponents = CG.computeConnectedComponents(typeVars, components);
+  auto components = CG.computeConnectedComponents(CS.getTypeVariables());
+  unsigned numComponents = components.size();
   if (numComponents < 2) {
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, 0, /*single=*/true, &CS.InactiveConstraints, Solutions));
+    steps.push_back(llvm::make_unique<ComponentStep>(
+        CS, 0, &CS.InactiveConstraints, Solutions));
     return;
-  }
-
-  Components.resize(numComponents);
-  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
-      new SmallVector<Solution, 4>[numComponents]);
-
-  for (unsigned i = 0, n = numComponents; i != n; ++i) {
-    componentSteps.push_back(llvm::make_unique<ComponentStep>(
-        CS, i, /*single=*/false, &Components[i], PartialSolutions[i]));
   }
 
   if (isDebugMode()) {
@@ -123,93 +106,130 @@ void SplitterStep::computeFollowupSteps(
     CG.verify();
 
     log << "---Constraint graph---\n";
-    CG.print(log);
+    CG.print(CS.getTypeVariables(), log);
 
     log << "---Connected components---\n";
-    CG.printConnectedComponents(log);
+    CG.printConnectedComponents(CS.getTypeVariables(), log);
   }
 
-  // Map type variables and constraints into appropriate steps.
-  llvm::DenseMap<TypeVariableType *, unsigned> typeVarComponent;
-  llvm::DenseMap<Constraint *, unsigned> constraintComponent;
-  for (unsigned i = 0, n = typeVars.size(); i != n; ++i) {
-    auto *typeVar = typeVars[i];
-    // Record the component of this type variable.
-    typeVarComponent[typeVar] = components[i];
+  // Take the orphaned constraints, because they'll go into a component now.
+  OrphanedConstraints = CG.takeOrphanedConstraints();
 
-    for (auto *constraint : CG[typeVar].getConstraints())
-      constraintComponent[constraint] = components[i];
-  }
+  IncludeInMergedResults.resize(numComponents, true);
+  Components.resize(numComponents);
+  PartialSolutions = std::unique_ptr<SmallVector<Solution, 4>[]>(
+      new SmallVector<Solution, 4>[numComponents]);
 
-  // Add the orphaned components to the mapping from constraints to components.
-  unsigned firstOrphanedComponent =
-      numComponents - CG.getOrphanedConstraints().size();
-  {
-    unsigned component = firstOrphanedComponent;
-    for (auto *constraint : CG.getOrphanedConstraints()) {
-      // Register this orphan constraint both as associated with
-      // a given component as a regular constrant, as well as an
-      // "orphan" constraint, so it can be proccessed correctly.
-      constraintComponent[constraint] = component;
-      componentSteps[component]->recordOrphan(constraint);
-      ++component;
-    }
-  }
+  // Add components.
+  for (unsigned i : indices(components)) {
+    unsigned solutionIndex = components[i].solutionIndex;
 
-  for (auto *typeVar : CS.TypeVariables) {
-    auto known = typeVarComponent.find(typeVar);
-    // If current type variable is associated with
-    // a certain component step, record it as being so.
-    if (known != typeVarComponent.end()) {
-      componentSteps[known->second]->record(typeVar);
+    // If there are no dependencies, build a normal component step.
+    if (components[i].dependsOn.empty()) {
+      steps.push_back(llvm::make_unique<ComponentStep>(
+          CS, solutionIndex, &Components[i], std::move(components[i]),
+          PartialSolutions[solutionIndex]));
       continue;
     }
 
-    // Otherwise, associate it with all of the component steps,
-    // expect for components with orphaned constraints, they are
-    // not supposed to have any type variables.
-    for (unsigned i = 0; i != firstOrphanedComponent; ++i)
-      componentSteps[i]->record(typeVar);
+    // Note that the partial results from any dependencies of this component
+    // need not be included in the final merged results, because they'll
+    // already be part of the partial results for this component.
+    for (auto dependsOn : components[i].dependsOn) {
+      IncludeInMergedResults[dependsOn] = false;
+    }
+
+    // Otherwise, build a dependent component "splitter" step, which
+    // handles all combinations of incoming partial solutions.
+    steps.push_back(llvm::make_unique<DependentComponentSplitterStep>(
+        CS, &Components[i], solutionIndex, std::move(components[i]),
+        llvm::makeMutableArrayRef(PartialSolutions.get(), numComponents)));
   }
 
-  // Transfer all of the constraints from the work list to
-  // the appropriate component.
-  auto &workList = CS.InactiveConstraints;
-  while (!workList.empty()) {
-    auto *constraint = &workList.front();
-    workList.pop_front();
-    componentSteps[constraintComponent[constraint]]->record(constraint);
+  assert(CS.InactiveConstraints.empty() && "Missed a constraint");
+}
+
+namespace {
+  /// Retrieve the size of a container.
+  template<typename Container>
+  unsigned getSize(const Container &container) {
+    return container.size();
   }
 
-  // Remove all of the orphaned constraints; they'll be re-introduced
-  // by each component independently.
-  OrphanedConstraints = CG.takeOrphanedConstraints();
+  /// Retrieve the size of a container referenced by a pointer.
+  template<typename Container>
+  unsigned getSize(const Container *container) {
+    return container->size();
+  }
 
-  // Create component ordering based on the information associated
-  // with constraints in each step - e.g. number of disjunctions,
-  // since components are going to be executed in LIFO order, we'd
-  // want to have smaller/faster components at the back of the list.
-  std::sort(componentSteps.begin(), componentSteps.end(),
-            [](const std::unique_ptr<ComponentStep> &lhs,
-               const std::unique_ptr<ComponentStep> &rhs) {
-              return lhs->disjunctionCount() > rhs->disjunctionCount();
-            });
+  /// Identity getSize() for cases where we are working with a count.
+  unsigned getSize(unsigned size) {
+    return size;
+  }
+
+  /// Compute the next combination of indices into the given array of
+  /// containers.
+  /// \param containers Containers (each of which must have a `size()`) in
+  /// which the indices will be generated.
+  /// \param indices The current indices into the containers, which will
+  /// be updated to represent the next combination.
+  /// \returns true to indicate that \c indices contains the next combination,
+  /// or \c false to indicate that there are no combinations left.
+  template<typename Container>
+  bool nextCombination(ArrayRef<Container> containers,
+                       MutableArrayRef<unsigned> indices) {
+    assert(containers.size() == indices.size() &&
+           "Indices should have been initialized to the same size with 0s");
+    unsigned numIndices = containers.size();
+    for (unsigned n = numIndices; n > 0; --n) {
+      ++indices[n - 1];
+
+      // If we haven't run out of solutions yet, we're done.
+      if (indices[n - 1] < getSize(containers[n - 1]))
+        break;
+
+      // If we ran out of solutions at the first position, we're done.
+      if (n == 1) {
+        return false;
+      }
+
+      // Zero out the indices from here to the end.
+      for (unsigned i = n - 1; i != numIndices; ++i)
+        indices[i] = 0;
+    }
+
+    return true;
+  }
 }
 
 bool SplitterStep::mergePartialSolutions() const {
   assert(Components.size() >= 2);
 
+  // Compute the # of partial solutions that will be merged for each
+  // component. Components that shouldn't be included will get a count of 1,
+  // an we'll skip them later.
   auto numComponents = Components.size();
+  SmallVector<unsigned, 2> countsVec;
+  countsVec.reserve(numComponents);
+  for (unsigned idx : range(numComponents)) {
+    countsVec.push_back(
+        IncludeInMergedResults[idx] ? PartialSolutions[idx].size() : 1);
+  }
+
   // Produce all combinations of partial solutions.
+  ArrayRef<unsigned> counts = countsVec;
   SmallVector<unsigned, 2> indices(numComponents, 0);
-  bool done = false;
   bool anySolutions = false;
   do {
-    // Create a new solver scope in which we apply all of the partial
+    // Create a new solver scope in which we apply all of the relevant partial
     // solutions.
     ConstraintSystem::SolverScope scope(CS);
-    for (unsigned i = 0; i != numComponents; ++i)
+    for (unsigned i : range(numComponents)) {
+      if (!IncludeInMergedResults[i])
+        continue;
+
       CS.applySolution(PartialSolutions[i][indices[i]]);
+    }
 
     // This solution might be worse than the best solution found so far.
     // If so, skip it.
@@ -223,38 +243,86 @@ bool SplitterStep::mergePartialSolutions() const {
       Solutions.push_back(std::move(solution));
       anySolutions = true;
     }
-
-    // Find the next combination.
-    for (unsigned n = numComponents; n > 0; --n) {
-      ++indices[n - 1];
-
-      // If we haven't run out of solutions yet, we're done.
-      if (indices[n - 1] < PartialSolutions[n - 1].size())
-        break;
-
-      // If we ran out of solutions at the first position, we're done.
-      if (n == 1) {
-        done = true;
-        break;
-      }
-
-      // Zero out the indices from here to the end.
-      for (unsigned i = n - 1; i != numComponents; ++i)
-        indices[i] = 0;
-    }
-  } while (!done);
+  } while (nextCombination(counts, indices));
 
   return anySolutions;
+}
+
+StepResult DependentComponentSplitterStep::take(bool prevFailed) {
+  // "split" is considered a failure if previous step failed,
+  // or there is a failure recorded by constraint system, or
+  // system can't be simplified.
+  if (prevFailed || CS.failedConstraint || CS.simplify())
+    return done(/*isSuccess=*/false);
+
+  // Figure out the sets of partial solutions that this component depends on.
+  SmallVector<const SmallVector<Solution, 4> *, 2> dependsOnSets;
+  for (auto index : Component.dependsOn) {
+    dependsOnSets.push_back(&AllPartialSolutions[index]);
+  }
+
+  // Produce all combinations of partial solutions for the inputs.
+  SmallVector<std::unique_ptr<SolverStep>, 4> followup;
+  SmallVector<unsigned, 2> indices(Component.dependsOn.size(), 0);
+  auto dependsOnSetsRef = llvm::makeArrayRef(dependsOnSets);
+  do {
+    // Form the set of input partial solutions.
+    SmallVector<const Solution *, 2> dependsOnSolutions;
+    for (auto index : swift::indices(indices)) {
+      dependsOnSolutions.push_back(&(*dependsOnSets[index])[indices[index]]);
+    }
+
+    followup.push_back(
+        llvm::make_unique<ComponentStep>(CS, Index, Constraints, Component,
+                                         std::move(dependsOnSolutions),
+                                         Solutions));
+  } while (nextCombination(dependsOnSetsRef, indices));
+
+  /// Wait until all of the component steps are done.
+  return suspend(followup);
+}
+
+StepResult DependentComponentSplitterStep::resume(bool prevFailed) {
+  return done(/*isSuccess=*/!Solutions.empty());
+}
+
+void DependentComponentSplitterStep::print(llvm::raw_ostream &Out) {
+  Out << "DependentComponentSplitterStep for dependencies on [";
+  interleave(Component.dependsOn, [&](unsigned index) { Out << index; },
+             [&] { Out << ", "; });
+  Out << "]\n";
 }
 
 StepResult ComponentStep::take(bool prevFailed) {
   // One of the previous components created by "split"
   // failed, it means that we can't solve this component.
-  if (prevFailed || CS.getExpressionTooComplex(Solutions))
+  if ((prevFailed && DependsOnPartialSolutions.empty()) ||
+      CS.getExpressionTooComplex(Solutions))
     return done(/*isSuccess=*/false);
 
   // Setup active scope, only if previous component didn't fail.
   setupScope();
+
+  // If there are any dependent partial solutions to compose, do so now.
+  if (!DependsOnPartialSolutions.empty()) {
+    for (auto partial : DependsOnPartialSolutions) {
+      CS.applySolution(*partial);
+    }
+
+    // Activate all of the one-way constraints.
+    SmallVector<Constraint *, 4> oneWayConstraints;
+    for (auto &constraint : CS.InactiveConstraints) {
+      if (constraint.isOneWayConstraint())
+        oneWayConstraints.push_back(&constraint);
+    }
+    for (auto constraint : oneWayConstraints) {
+      CS.activateConstraint(constraint);
+    }
+
+    // Simplify again.
+    if (CS.failedConstraint || CS.simplify())
+      return done(/*isSuccess=*/false);
+  }
 
   /// Try to figure out what this step is going to be,
   /// after the scope has been established.
@@ -277,7 +345,7 @@ StepResult ComponentStep::take(bool prevFailed) {
   // allowed in the solution.
   if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     if (!CS.shouldAttemptFixes())
-      return done(/*isSuccess=*/false);
+      return finalize(/*isSuccess=*/false);
 
     // Let's see if all of the free type variables are associated with
     // generic parameters and if so, let's default them to `Any` and continue
@@ -298,7 +366,7 @@ StepResult ComponentStep::take(bool prevFailed) {
 
       auto *anchor = locator->getAnchor();
       if (!(anchor && locator->isForGenericParameter()))
-        return done(/*isSuccess=*/false);
+        return finalize(/*isSuccess=*/false);
 
       // Increment the score for every missing generic argument
       // to make ranking of the solutions with different number
@@ -324,14 +392,14 @@ StepResult ComponentStep::take(bool prevFailed) {
       auto *fix =
           ExplicitlySpecifyGenericArguments::create(CS, missingParams, locator);
       if (CS.recordFix(fix))
-        return done(/*isSuccess=*/false);
+        return finalize(/*isSuccess=*/false);
     }
   }
 
   // If this solution is worse than the best solution we've seen so far,
   // skip it.
   if (CS.worseThanBestSolution())
-    return done(/*isSuccess=*/false);
+    return finalize(/*isSuccess=*/false);
 
   // If we only have relational or member constraints and are allowing
   // free type variables, save the solution.
@@ -341,7 +409,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     case ConstraintClassification::Member:
       continue;
     default:
-      return done(/*isSuccess=*/false);
+      return finalize(/*isSuccess=*/false);
     }
   }
 
@@ -350,30 +418,30 @@ StepResult ComponentStep::take(bool prevFailed) {
     getDebugLogger() << "(found solution " << getCurrentScore() << ")\n";
 
   Solutions.push_back(std::move(solution));
-  return done(/*isSuccess=*/true);
+  return finalize(/*isSuccess=*/true);
 }
 
-StepResult ComponentStep::resume(bool prevFailed) {
+StepResult ComponentStep::finalize(bool isSuccess) {
+  // If this was a single component, there is nothing to be done,
+  // because it represents the whole constraint system at some
+  // point of the solver path.
+  if (IsSingle)
+    return done(isSuccess);
+
   // Rewind all modifications done to constraint system.
   ComponentScope.reset();
 
-  if (!IsSingle && isDebugMode()) {
+  if (isDebugMode()) {
     auto &log = getDebugLogger();
-    log << (prevFailed ? "failed" : "finished") << " component #" << Index
+    log << (isSuccess ? "finished" : "failed") << " component #" << Index
         << ")\n";
   }
 
   // If we came either back to this step and previous
   // (either disjunction or type var) failed, it means
   // that component as a whole has failed.
-  if (prevFailed)
+  if (!isSuccess)
     return done(/*isSuccess=*/false);
-
-  // If this was a single component, there is nothing to be done,
-  // because it represents the whole constraint system at some
-  // point of the solver path.
-  if (IsSingle)
-    return done(/*isSuccess=*/true);
 
   assert(!Solutions.empty() && "No Solutions?");
 
@@ -481,8 +549,8 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   auto &ctx = CS.getASTContext();
 
   bool attemptFixes = CS.shouldAttemptFixes();
-  // Enable "fixed" overload choices in "diagnostic" mode.
-  if (!(attemptFixes && choice.hasFix()) && choice.isDisabled()) {
+  // Enable all disabled choices in "diagnostic" mode.
+  if (!attemptFixes && choice.isDisabled()) {
     if (isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(skipping ";

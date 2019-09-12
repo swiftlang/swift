@@ -340,7 +340,7 @@ public class WritableKeyPath<Root, Value>: KeyPath<Root, Value> {
 /// with reference semantics.
 public class ReferenceWritableKeyPath<
   Root, Value
-> : WritableKeyPath<Root, Value> {
+>: WritableKeyPath<Root, Value> {
   // MARK: Implementation detail
 
   internal final override class var kind: Kind { return .reference }
@@ -357,7 +357,7 @@ public class ReferenceWritableKeyPath<
   internal final func _projectMutableAddress(from origBase: Root)
       -> (pointer: UnsafeMutablePointer<Value>, owner: AnyObject?) {
     var keepAlive: AnyObject?
-    var address: UnsafeMutablePointer<Value> = withBuffer {
+    let address: UnsafeMutablePointer<Value> = withBuffer {
       var buffer = $0
       // Project out the reference prefix.
       var base: Any = origBase
@@ -3052,7 +3052,7 @@ internal func _getKeyPathClassAndInstanceSizeFromPattern(
           alignmentMask: MemoryLayout<Int>._alignmentMask)
 }
 
-internal struct InstantiateKeyPathBuffer : KeyPathPatternVisitor {
+internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
   var destData: UnsafeMutableRawBufferPointer
   var genericEnvironment: UnsafeRawPointer?
   let patternArgs: UnsafeRawPointer?

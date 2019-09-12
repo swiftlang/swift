@@ -469,7 +469,7 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   }
 
   case CheckedCastMode::Unconditional: {
-    IGF.emitTrap(/*EmitUnreachable=*/true);
+    IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
     break;
   }
   }

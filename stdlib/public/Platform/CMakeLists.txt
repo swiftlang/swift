@@ -25,6 +25,7 @@ add_swift_target_library(swiftDarwin ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
     SWIFT_COMPILE_FLAGS -Xfrontend -disable-objc-attr-requires-foundation-module ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ALL_APPLE_PLATFORMS
+    INSTALL_IN_COMPONENT sdk-overlay
 
     DEPENDS ${darwin_depends})
 
@@ -39,6 +40,7 @@ add_swift_target_library(swiftGlibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_O
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
     TARGET_SDKS ANDROID CYGWIN FREEBSD LINUX HAIKU
+    INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS glibc_modulemap)
 
 add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
@@ -51,7 +53,8 @@ add_swift_target_library(swiftMSVCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_
 
     SWIFT_COMPILE_FLAGS ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS} ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
-    TARGET_SDKS WINDOWS)
+    TARGET_SDKS WINDOWS
+    INSTALL_IN_COMPONENT sdk-overlay)
 
 set(glibc_modulemap_target_list)
 foreach(sdk ${SWIFT_SDKS})
@@ -122,3 +125,4 @@ foreach(sdk ${SWIFT_SDKS})
 endforeach()
 add_custom_target(glibc_modulemap DEPENDS ${glibc_modulemap_target_list})
 set_property(TARGET glibc_modulemap PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay glibc_modulemap)

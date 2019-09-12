@@ -94,7 +94,7 @@ func test(_ x: Int) {
 // CHECK: func <Func>bar</Func>(<Param>x</Param>: <iStruct@>Int</iStruct>) -> (<iStruct@>Int</iStruct>, <iStruct@>Float</iStruct>) {
 func bar(x: Int) -> (Int, Float) {
   // CHECK: <Ctor@[[@LINE-84]]:8-TypeAlias@[[@LINE-78]]:11>TypealiasForS</Ctor>()
-  TypealiasForS()
+  _ = TypealiasForS()
 }
 
 class C2 {

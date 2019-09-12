@@ -79,15 +79,29 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   // Configure the toolchain.
-  // By default, use the system clang++ to link.
-  const char *Clang = "clang++";
+  //
+  // By default use the system `clang` to perform the link.  We use `clang` for
+  // the driver here because we do not wish to select a particular C++ runtime.
+  // Furthermore, until C++ interop is enabled, we cannot have a dependency on
+  // C++ code from pure Swift code.  If linked libraries are C++ based, they
+  // should properly link C++.  In the case of static linking, the user can
+  // explicitly specify the C++ runtime to link against.  This is particularly
+  // important for platforms like android where as it is a Linux platform, the
+  // default C++ runtime is `libstdc++` which is unsupported on the target but
+  // as the builds are usually cross-compiled from Linux, libstdc++ is going to
+  // be present.  This results in linking the wrong version of libstdc++
+  // generating invalid binaries.  It is also possible to use different C++
+  // runtimes than the default C++ runtime for the platform (e.g. libc++ on
+  // Windows rather than msvcprt).  When C++ interop is enabled, we will need to
+  // surface this via a driver flag.  For now, opt for the simpler approach of
+  // just using `clang` and avoid a dependency on the C++ runtime.
+  const char *Clang = "clang";
   if (const Arg *A = context.Args.getLastArg(options::OPT_tools_directory)) {
     StringRef toolchainPath(A->getValue());
 
     // If there is a clang in the toolchain folder, use that instead.
-    if (auto toolchainClang =
-            llvm::sys::findProgramByName("clang++", {toolchainPath}))
-      Clang = context.Args.MakeArgString(toolchainClang.get());
+    if (auto tool = llvm::sys::findProgramByName("clang", {toolchainPath}))
+      Clang = context.Args.MakeArgString(tool.get());
   }
 
   std::string Target = getTriple().str();

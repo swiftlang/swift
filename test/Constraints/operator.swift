@@ -205,9 +205,8 @@ func rdar37290898(_ arr: inout [P_37290898], _ element: S_37290898?) {
 // SR-8221
 infix operator ??=
 func ??= <T>(lhs: inout T?, rhs: T?) {}
-var c: Int = 0
-c ??= 5 // expected-error{{binary operator '??=' cannot be applied to two 'Int' operands}}
-// expected-note@-1{{expected an argument list of type '(inout T?, T?)'}}
+var c: Int = 0 // expected-note {{change variable type to 'Int?' if it doesn't need to be declared as 'Int'}}
+c ??= 5 // expected-error{{inout argument could be set to a value with a type other than 'Int'; use a value declared as type 'Int?' instead}}
 
 func rdar46459603() {
   enum E {
@@ -237,3 +236,21 @@ func sr10843() {
   (^^^)(s, s)
   _ = (==)(0, 0)
 }
+
+// SR-10970
+precedencegroup PowerPrecedence {
+  lowerThan: BitwiseShiftPrecedence
+  higherThan: AdditionPrecedence
+  associativity: right
+}
+infix operator ^^ : PowerPrecedence
+
+extension Int {
+  static func ^^ (lhs: Int, rhs: Int) -> Int {
+    var result = 1
+    for _ in 1...rhs { result *= lhs }
+    return result
+  }
+}
+
+_ = 1 ^^ 2 ^^ 3 * 4 // expected-error {{adjacent operators are in unordered precedence groups 'PowerPrecedence' and 'MultiplicationPrecedence'}}

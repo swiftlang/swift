@@ -7,7 +7,7 @@ final class ClassWrapper<T> {
     }
   }
 
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     print("  .. init \(initialValue)")
     self.wrappedValue = initialValue
   }
@@ -28,7 +28,7 @@ struct IntStructWithClassWrapper {
 
   init(conditional b: Bool) {
      if b {
-       self._wrapped = ClassWrapper(initialValue: 32)
+       self._wrapped = ClassWrapper(wrappedValue: 32)
      } else {
        wrapped = 42 // expected-error{{'self' used before all stored properties are initialized}}
       // expected-note@-1{{'self.wrapped' not initialized}}

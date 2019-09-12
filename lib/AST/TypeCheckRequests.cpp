@@ -9,12 +9,13 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -23,7 +24,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the type checker type zone (zone 10).
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -66,29 +67,30 @@ void swift::simple_display(llvm::raw_ostream &out, Type type) {
     out << "null";
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const TypeRepr *TyR) {
+  if (TyR)
+    TyR->print(out);
+  else
+    out << "null";
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
+  out << "(";
+  simple_display(out, source.getType());
+  out << ", ";
+  simple_display(out, source.getTypeRepr());
+  out << ")";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
 
-TypeLoc &InheritedTypeRequest::getTypeLoc(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
-}
-
-void InheritedTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+SourceLoc InheritedTypeRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
-  diags.diagnose(typeLoc.getLoc(), diag::circular_reference);
-}
-
-void InheritedTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
-  diags.diagnose(typeLoc.getLoc(), diag::circular_reference_through);
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
+  return typeLoc.getLoc();
 }
 
 bool InheritedTypeRequest::isCached() const {
@@ -97,7 +99,8 @@ bool InheritedTypeRequest::isCached() const {
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   if (typeLoc.wasValidated())
     return typeLoc.getType();
 
@@ -106,7 +109,8 @@ Optional<Type> InheritedTypeRequest::getCachedResult() const {
 
 void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   typeLoc.setType(value);
 }
 
@@ -118,12 +122,6 @@ void SuperclassTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto nominalDecl = std::get<0>(getStorage());
   diags.diagnose(nominalDecl, diag::circular_class_inheritance,
                  nominalDecl->getName());
-}
-
-void SuperclassTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto nominalDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(nominalDecl, diag::circular_reference_through);
 }
 
 bool SuperclassTypeRequest::isCached() const {
@@ -163,12 +161,6 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   diags.diagnose(enumDecl, diag::circular_enum_inheritance, enumDecl->getName());
 }
 
-void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto enumDecl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(enumDecl, diag::circular_reference_through);
-}
-
 bool EnumRawTypeRequest::isCached() const {
   return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
 }
@@ -187,33 +179,8 @@ void EnumRawTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
-// Overridden decls computation.
-//----------------------------------------------------------------------------//
-void OverriddenDeclsRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void OverriddenDeclsRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
-}
-
-//----------------------------------------------------------------------------//
 // isObjC computation.
 //----------------------------------------------------------------------------//
-
-void IsObjCRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void IsObjCRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(decl, diag::circular_reference_through);
-}
 
 Optional<bool> IsObjCRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
@@ -229,20 +196,84 @@ void IsObjCRequest::cacheResult(bool value) const {
 }
 
 //----------------------------------------------------------------------------//
-// isFinal computation.
+// requiresClass computation.
 //----------------------------------------------------------------------------//
 
-void IsFinalRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
+void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
 }
 
-void IsFinalRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(decl, diag::circular_reference_through);
+void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol,
+                 requirement->getName());
 }
+
+Optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedRequiresClass();
+}
+
+void ProtocolRequiresClassRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedRequiresClass(value);
+}
+
+//----------------------------------------------------------------------------//
+// existentialConformsToSelf computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialConformsToSelf();
+}
+
+void ExistentialConformsToSelfRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialConformsToSelf(value);
+}
+
+//----------------------------------------------------------------------------//
+// existentialTypeSupported computation.
+//----------------------------------------------------------------------------//
+
+void ExistentialTypeSupportedRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::circular_protocol_def, decl->getName());
+}
+
+void ExistentialTypeSupportedRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  auto requirement = std::get<0>(getStorage());
+  diags.diagnose(requirement, diag::kind_declname_declared_here,
+                 DescriptiveDeclKind::Protocol, requirement->getName());
+}
+
+Optional<bool> ExistentialTypeSupportedRequest::getCachedResult() const {
+  auto decl = std::get<0>(getStorage());
+  return decl->getCachedExistentialTypeSupported();
+}
+
+void ExistentialTypeSupportedRequest::cacheResult(bool value) const {
+  auto decl = std::get<0>(getStorage());
+  decl->setCachedExistentialTypeSupported(value);
+}
+
+//----------------------------------------------------------------------------//
+// isFinal computation.
+//----------------------------------------------------------------------------//
 
 Optional<bool> IsFinalRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
@@ -266,18 +297,6 @@ void IsFinalRequest::cacheResult(bool value) const {
 // isDynamic computation.
 //----------------------------------------------------------------------------//
 
-void IsDynamicRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void IsDynamicRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(decl, diag::circular_reference_through);
-}
-
 Optional<bool> IsDynamicRequest::getCachedResult() const {
   auto decl = std::get<0>(getStorage());
   if (decl->LazySemanticInfo.isDynamicComputed)
@@ -299,16 +318,6 @@ void IsDynamicRequest::cacheResult(bool value) const {
 // RequirementSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
-void RequirementSignatureRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void RequirementSignatureRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
-}
-
 Optional<ArrayRef<Requirement>> RequirementSignatureRequest::getCachedResult() const {
   auto proto = std::get<0>(getStorage());
   if (proto->isRequirementSignatureComputed())
@@ -320,20 +329,6 @@ Optional<ArrayRef<Requirement>> RequirementSignatureRequest::getCachedResult() c
 void RequirementSignatureRequest::cacheResult(ArrayRef<Requirement> value) const {
   auto proto = std::get<0>(getStorage());
   proto->setRequirementSignature(value);
-}
-
-//----------------------------------------------------------------------------//
-// DefaultDefinitionTypeRequest computation.
-//----------------------------------------------------------------------------//
-
-void DefaultDefinitionTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void DefaultDefinitionTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
 }
 
 //----------------------------------------------------------------------------//
@@ -364,32 +359,24 @@ void swift::simple_display(llvm::raw_ostream &out,
   }
 }
 
-void RequirementRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  // FIXME: Improve this diagnostic.
+SourceLoc RequirementRequest::getNearestLoc() const {
   auto owner = std::get<0>(getStorage());
-  diags.diagnose(owner.getLoc(), diag::circular_reference);
+  return owner.getLoc();
 }
 
-void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto owner = std::get<0>(getStorage());
-  // FIXME: Customize this further.
-  diags.diagnose(owner.getLoc(), diag::circular_reference_through);
-}
-
-MutableArrayRef<RequirementRepr>
-RequirementRequest::getRequirements(WhereClauseOwner owner) {
-  if (auto genericParams = owner.source.dyn_cast<GenericParamList *>()) {
+MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
+  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
   }
 
-  if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
+  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
     
     return { };
   }
 
-  auto decl = owner.source.dyn_cast<Decl *>();
+  auto decl = source.dyn_cast<Decl *>();
   if (!decl)
     return { };
 
@@ -413,14 +400,15 @@ RequirementRequest::getRequirements(WhereClauseOwner owner) {
   return { };
 }
 
-bool RequirementRequest::visitRequirements(
-      WhereClauseOwner owner, TypeResolutionStage stage,
-      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback) {
-  auto &evaluator = owner.dc->getASTContext().evaluator;
-  auto requirements = getRequirements(owner);
+bool WhereClauseOwner::visitRequirements(
+    TypeResolutionStage stage,
+    llvm::function_ref<bool(Requirement, RequirementRepr *)> callback)
+    const && {
+  auto &evaluator = dc->getASTContext().evaluator;
+  auto requirements = getRequirements();
   for (unsigned index : indices(requirements)) {
     // Resolve to a requirement.
-    auto req = evaluator(RequirementRequest{owner, index, stage});
+    auto req = evaluator(RequirementRequest{*this, index, stage});
     if (req) {
       // Invoke the callback. If it returns true, we're done.
       if (callback(*req, &requirements[index]))
@@ -429,10 +417,10 @@ bool RequirementRequest::visitRequirements(
       continue;
     }
 
-    llvm::handleAllErrors(req.takeError(),
-      [](const CyclicalRequestError<RequirementRequest> &E) {
-        // cycle detected
-      });
+    llvm::handleAllErrors(
+        req.takeError(), [](const CyclicalRequestError<RequirementRequest> &E) {
+          // cycle detected
+        });
   }
 
   return false;
@@ -441,7 +429,7 @@ bool RequirementRequest::visitRequirements(
 RequirementRepr &RequirementRequest::getRequirement() const {
   auto owner = std::get<0>(getStorage());
   auto index = std::get<1>(getStorage());
-  return getRequirements(owner)[index];
+  return owner.getRequirements()[index];
 }
 
 bool RequirementRequest::isCached() const {
@@ -503,38 +491,6 @@ void RequirementRequest::cacheResult(Requirement value) const {
 }
 
 //----------------------------------------------------------------------------//
-// USR computation.
-//----------------------------------------------------------------------------//
-
-void USRGenerationRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  const auto &storage = getStorage();
-  auto &d = std::get<0>(storage);
-  diags.diagnose(d, diag::circular_reference);
-}
-
-void USRGenerationRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  const auto &storage = getStorage();
-  auto &d = std::get<0>(storage);
-  diags.diagnose(d, diag::circular_reference);
-}
-
-//----------------------------------------------------------------------------//
-// Mangled local type name computation.
-//----------------------------------------------------------------------------//
-
-void MangleLocalTypeDeclRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  const auto &storage = getStorage();
-  auto &d = std::get<0>(storage);
-  diags.diagnose(d, diag::circular_reference);
-}
-
-void MangleLocalTypeDeclRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  const auto &storage = getStorage();
-  auto &d = std::get<0>(storage);
-  diags.diagnose(d, diag::circular_reference);
-}
-
-//----------------------------------------------------------------------------//
 // DefaultTypeRequest.
 //----------------------------------------------------------------------------//
 
@@ -543,61 +499,24 @@ void swift::simple_display(llvm::raw_ostream &out,
   out << getProtocolName(kind);
 }
 
-void DefaultTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  diags.diagnose(SourceLoc(), diag::circular_reference);
-}
-
-void DefaultTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  diags.diagnose(SourceLoc(), diag::circular_reference_through);
-}
-
 //----------------------------------------------------------------------------//
 // DefaultTypeRequest caching.
 //----------------------------------------------------------------------------//
 
-SourceFile *DefaultTypeRequest::getSourceFile() const {
-  return getDeclContext()->getParentSourceFile();
-}
-
-Type &DefaultTypeRequest::getCache() const {
-  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
-      getSourceFile(), getKnownProtocolKind());
-}
-
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
-  auto const &cachedType = getCache();
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  const auto &cachedType = DC->getASTContext().getDefaultTypeRequestCache(
+      DC->getParentSourceFile(), knownProtocolKind);
   return cachedType ? Optional<Type>(cachedType) : None;
 }
 
-void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
-
-const char *
-DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-
-  // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return typeName;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return nullptr;
-  }
-}
-
-bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-      
-    // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return performLocalLookup;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return false;
-  }
+void DefaultTypeRequest::cacheResult(Type value) const {
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  auto &cacheEntry = DC->getASTContext().getDefaultTypeRequestCache(
+                         DC->getParentSourceFile(), knownProtocolKind);
+  cacheEntry = value;
 }
 
 bool PropertyWrapperTypeInfoRequest::isCached() const {
@@ -605,29 +524,9 @@ bool PropertyWrapperTypeInfoRequest::isCached() const {
   return nominal->getAttrs().hasAttribute<PropertyWrapperAttr>();;
 }
 
-void PropertyWrapperTypeInfoRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void PropertyWrapperTypeInfoRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
-}
-
 bool AttachedPropertyWrappersRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
-}
-
-void AttachedPropertyWrappersRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void AttachedPropertyWrappersRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
 bool AttachedPropertyWrapperTypeRequest::isCached() const {
@@ -635,29 +534,9 @@ bool AttachedPropertyWrapperTypeRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
-void AttachedPropertyWrapperTypeRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void AttachedPropertyWrapperTypeRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
-}
-
 bool PropertyWrapperBackingPropertyTypeRequest::isCached() const {
   auto var = std::get<0>(getStorage());
   return !var->getAttrs().isEmpty();
-}
-
-void PropertyWrapperBackingPropertyTypeRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void PropertyWrapperBackingPropertyTypeRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
 }
 
 bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
@@ -665,14 +544,9 @@ bool PropertyWrapperBackingPropertyInfoRequest::isCached() const {
   return !var->getAttrs().isEmpty();
 }
 
-void PropertyWrapperBackingPropertyInfoRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void PropertyWrapperBackingPropertyInfoRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
+bool PropertyWrapperMutabilityRequest::isCached() const {
+  auto var = std::get<0>(getStorage());
+  return !var->getAttrs().isEmpty();
 }
 
 void swift::simple_display(
@@ -683,8 +557,8 @@ void swift::simple_display(
   else
     out << "null";
   out << ", ";
-  if (propertyWrapper.initialValueInit)
-    out << propertyWrapper.initialValueInit->printRef();
+  if (propertyWrapper.wrappedValueInit)
+    out << propertyWrapper.wrappedValueInit->printRef();
   else
     out << "null";
   out << " }";
@@ -699,16 +573,32 @@ void swift::simple_display(
   out << " }";
 }
 
-//----------------------------------------------------------------------------//
-// StructuralTypeRequest.
-//----------------------------------------------------------------------------//
-
-void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  diags.diagnose(SourceLoc(), diag::circular_reference);
+void swift::simple_display(
+  llvm::raw_ostream &out, const CtorInitializerKind initKind) {
+  out << "{ ";
+  switch (initKind) {
+  case CtorInitializerKind::Designated:
+    out << "designated"; break;
+  case CtorInitializerKind::Convenience:
+    out << "convenience"; break;
+  case CtorInitializerKind::ConvenienceFactory:
+    out << "convenience_factory"; break;
+  case CtorInitializerKind::Factory:
+    out << "factory"; break;
+  }
+  out << " }";
 }
 
-void StructuralTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  diags.diagnose(SourceLoc(), diag::circular_reference_through);
+void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
+  static const char *names[] =
+    {"is nonmutating", "is mutating", "doesn't exist"};
+  
+  os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ResilienceExpansion &value) {
+  out << value;
 }
 
 //----------------------------------------------------------------------------//
@@ -721,37 +611,9 @@ bool AttachedFunctionBuilderRequest::isCached() const {
   return var->getAttrs().hasAttribute<CustomAttr>();
 }
 
-void AttachedFunctionBuilderRequest::diagnoseCycle(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void AttachedFunctionBuilderRequest::noteCycleStep(
-    DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
-}
-
-void FunctionBuilderTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference);
-}
-
-void FunctionBuilderTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  std::get<0>(getStorage())->diagnose(diag::circular_reference_through);
-}
-
 //----------------------------------------------------------------------------//
 // SelfAccessKindRequest computation.
 //----------------------------------------------------------------------------//
-
-void SelfAccessKindRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void SelfAccessKindRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
-}
 
 Optional<SelfAccessKind> SelfAccessKindRequest::getCachedResult() const {
   auto *funcDecl = std::get<0>(getStorage());
@@ -766,16 +628,6 @@ void SelfAccessKindRequest::cacheResult(SelfAccessKind value) const {
 //----------------------------------------------------------------------------//
 // IsGetterMutatingRequest computation.
 //----------------------------------------------------------------------------//
-
-void IsGetterMutatingRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void IsGetterMutatingRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
-}
 
 Optional<bool> IsGetterMutatingRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
@@ -793,16 +645,6 @@ void IsGetterMutatingRequest::cacheResult(bool value) const {
 // IsSetterMutatingRequest computation.
 //----------------------------------------------------------------------------//
 
-void IsSetterMutatingRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void IsSetterMutatingRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
-}
-
 Optional<bool> IsSetterMutatingRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
   if (storage->LazySemanticInfo.IsSetterMutatingComputed)
@@ -819,16 +661,6 @@ void IsSetterMutatingRequest::cacheResult(bool value) const {
 // OpaqueReadOwnershipRequest computation.
 //----------------------------------------------------------------------------//
 
-void OpaqueReadOwnershipRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
-}
-
-void OpaqueReadOwnershipRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
-}
-
 Optional<OpaqueReadOwnership>
 OpaqueReadOwnershipRequest::getCachedResult() const {
   auto *storage = std::get<0>(getStorage());
@@ -843,15 +675,133 @@ void OpaqueReadOwnershipRequest::cacheResult(OpaqueReadOwnership value) const {
 }
 
 //----------------------------------------------------------------------------//
-// LazyStoragePropertyRequest computation.
+// StorageImplInfoRequest computation.
 //----------------------------------------------------------------------------//
 
-void LazyStoragePropertyRequest::diagnoseCycle(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference);
+Optional<StorageImplInfo>
+StorageImplInfoRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.ImplInfoComputed)
+    return storage->ImplInfo;
+  return None;
 }
 
-void LazyStoragePropertyRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  auto decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::circular_reference_through);
+void StorageImplInfoRequest::cacheResult(StorageImplInfo value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->setImplInfo(value);
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueAccessorsRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueAccessorsRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueAccessors;
+  return None;
+}
+
+void RequiresOpaqueAccessorsRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueAccessorsComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueAccessors = value;
+}
+
+//----------------------------------------------------------------------------//
+// RequiresOpaqueModifyCoroutineRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  if (storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed)
+    return storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine;
+  return None;
+}
+
+void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
+  auto *storage = std::get<0>(getStorage());
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
+  storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
+}
+
+//----------------------------------------------------------------------------//
+// IsAccessorTransparentRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsAccessorTransparentRequest::getCachedResult() const {
+  auto *accessor = std::get<0>(getStorage());
+  return accessor->getCachedIsTransparent();
+}
+
+void IsAccessorTransparentRequest::cacheResult(bool value) const {
+  auto *accessor = std::get<0>(getStorage());
+  accessor->setIsTransparent(value);
+
+  // For interface printing, API diff, etc.
+  if (value) {
+    auto &attrs = accessor->getAttrs();
+    if (!attrs.hasAttribute<TransparentAttr>()) {
+      auto &ctx = accessor->getASTContext();
+      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+    }
+  }
+}
+
+//----------------------------------------------------------------------------//
+// SynthesizeAccessorRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<AccessorDecl *>
+SynthesizeAccessorRequest::getCachedResult() const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+  auto *accessor = storage->getAccessor(kind);
+  if (accessor)
+    return accessor;
+  return None;
+}
+
+void SynthesizeAccessorRequest::cacheResult(AccessorDecl *accessor) const {
+  auto *storage = std::get<0>(getStorage());
+  auto kind = std::get<1>(getStorage());
+
+  storage->setSynthesizedAccessor(kind, accessor);
+}
+
+//----------------------------------------------------------------------------//
+// EmittedMembersRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<DeclRange>
+EmittedMembersRequest::getCachedResult() const {
+  auto *classDecl = std::get<0>(getStorage());
+  if (classDecl->hasForcedEmittedMembers())
+    return classDecl->getMembers();
+  return None;
+}
+
+void EmittedMembersRequest::cacheResult(DeclRange result) const {
+  auto *classDecl = std::get<0>(getStorage());
+  classDecl->setHasForcedEmittedMembers();
+}
+
+//----------------------------------------------------------------------------//
+// IsImplicitlyUnwrappedOptionalRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsImplicitlyUnwrappedOptionalRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isIUOComputed)
+    return decl->LazySemanticInfo.isIUO;
+  return None;
+}
+
+void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setImplicitlyUnwrappedOptional(value);
 }

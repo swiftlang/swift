@@ -9,3 +9,9 @@ do {
   tmp.a = 3
   tmp.b = nil
 }
+
+// Namespace lookup
+func namespaceLookup() -> UnsafeMutablePointer<ns.T> {
+  var tmp: UnsafeMutablePointer<ns.T> = ns.doMakeT()!
+  return tmp
+}

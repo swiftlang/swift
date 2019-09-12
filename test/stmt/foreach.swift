@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note 2 {{do you want to add protocol stubs?}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }

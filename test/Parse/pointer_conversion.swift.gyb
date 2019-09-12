@@ -48,17 +48,20 @@ func mutablePointerArguments(_ p: UnsafeMutablePointer<Int>,
   var i: Int = 0
   var f: Float = 0
   takesMutablePointer(&i)
-  takesMutablePointer(&f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+  takesMutablePointer(&f) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<Float>' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Float' and 'Int') are expected to be equal}}
   takesMutablePointer(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'UnsafeMutablePointer<Int>${diag_suffix}'}}
   takesMutablePointer(f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'UnsafeMutablePointer<Int>${diag_suffix}'}}
   var ii: [Int] = [0, 1, 2]
   var ff: [Float] = [0, 1, 2]
   takesMutablePointer(&ii)
-  takesMutablePointer(&ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'Int'}}
+  takesMutablePointer(&ff) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<Float>' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Float' and 'Int') are expected to be equal}}
   takesMutablePointer(ii) // expected-error{{cannot convert value of type '[Int]' to expected argument type 'UnsafeMutablePointer<Int>${diag_suffix}'}}
   takesMutablePointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafeMutablePointer<Int>${diag_suffix}'}}
 
-  takesMutableArrayPointer(&i) // expected-error{{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+  takesMutableArrayPointer(&i) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<[Int]>'}}
+  //expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and '[Int]') are expected to be equal}}
   takesMutableArrayPointer(&ii)
 
   // We don't allow these conversions outside of function arguments.
@@ -148,13 +151,16 @@ func constPointerArguments(_ p: UnsafeMutablePointer<Int>,
   var i: Int = 0
   var f: Float = 0
   takesConstPointer(&i)
-  takesConstPointer(&f) // expected-error{{cannot convert value of type 'Float' to expected argument type 'Int'}}
+  takesConstPointer(&f) // expected-error{{cannot convert value of type 'UnsafePointer<Float>' to expected argument type 'UnsafePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Float' and 'Int') are expected to be equal}}
   var ii: [Int] = [0, 1, 2]
   var ff: [Float] = [0, 1, 2]
   takesConstPointer(&ii)
-  takesConstPointer(&ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'Int'}}
+  takesConstPointer(&ff) // expected-error{{cannot convert value of type 'UnsafePointer<Float>' to expected argument type 'UnsafePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Float' and 'Int') are expected to be equal}}
   takesConstPointer(ii)
-  takesConstPointer(ff) // expected-error{{cannot convert value of type '[Float]' to expected argument type 'UnsafePointer<Int>${diag_suffix}'}}
+  takesConstPointer(ff) // expected-error{{cannot convert value of type 'UnsafePointer<Float>' to expected argument type 'UnsafePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Float' and 'Int') are expected to be equal}}
   takesConstPointer([0, 1, 2])
   // <rdar://problem/22308330> QoI: CSDiags doesn't handle array -> pointer impl conversions well
   takesConstPointer([0.0, 1.0, 2.0])
@@ -255,9 +261,11 @@ func stringArguments(_ s: String) {
   takesMutableVoidPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutableRawPointer${diag_suffix}'}}
   takesMutableRawPointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutableRawPointer${diag_suffix}'}}
   takesMutableInt8Pointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Int8>${diag_suffix}'}}
-  takesMutableInt8Pointer(&s) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int8'}}
+  takesMutableInt8Pointer(&s) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<Int8>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('String' and 'Int8') are expected to be equal}}
   takesMutablePointer(s) // expected-error{{cannot convert value of type 'String' to expected argument type 'UnsafeMutablePointer<Int>${diag_suffix}'}}
-  takesMutablePointer(&s) // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
+  takesMutablePointer(&s) // expected-error{{cannot convert value of type 'UnsafeMutablePointer<String>' to expected argument type 'UnsafeMutablePointer<Int>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('String' and 'Int') are expected to be equal}}
 }
 
 
@@ -316,7 +324,8 @@ func addressConversion(p: UnsafeMutablePointer<Int>, x: Int) {
 func f19478919() {
   var viewport: Int = 1 // intentionally incorrect type, not Int32
   func GLKProject(_ a : UnsafeMutablePointer<Int32>) {}
-  GLKProject(&viewport)  // expected-error {{cannot convert value of type 'Int' to expected argument type 'Int32'}}
+  GLKProject(&viewport)  // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Int32') are expected to be equal}}
 
   func GLKProjectUP(_ a : UnsafePointer<Int32>) {}
   func UP_Void(_ a : UnsafeRawPointer) {}
@@ -338,7 +347,8 @@ func f23202128() {
   UMP(&pipe)  // expected-error {{cannot pass immutable value as inout argument: 'pipe' is a 'let' constant}}
 
   var pipe2: [Int] = [0, 0]
-  UMP(&pipe2) // expected-error {{cannot convert value of type '[Int]' to expected argument type 'Int32'}}
+  UMP(&pipe2) // expected-error {{cannot convert value of type 'UnsafeMutablePointer<Int>' to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Pointee' ('Int' and 'Int32') are expected to be equal}}
 
 
   UP(pipe)    // ok

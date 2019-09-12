@@ -184,8 +184,8 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{ambiguous subscript with base type 'NSMutableDictionary' and index type '_'}}
-  let q = dict[nil]  // expected-error {{ambiguous subscript}}
+  dict[nil] = a // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
+  let q = dict[nil]  // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
   _ = q
 }
 
@@ -352,7 +352,8 @@ func testDynamicSelf(_ queen: Bee, wobbler: NSWobbling) {
   // class itself.
   // FIXME: This should be accepted.
   let baseClass: ObjCParseExtras.Base.Type = ObjCParseExtras.Base.returnMyself()
-  // expected-error@-1 {{missing argument for parameter #1 in call}}
+  // expected-error@-1 {{instance member 'returnMyself' cannot be used on type 'Base'; did you mean to use a value of this type instead?}}
+  // expected-error@-2 {{cannot convert value of type 'Base?' to specified type 'Base.Type'}}
 }
 
 func testRepeatedProtocolAdoption(_ w: NSWindow) {
@@ -370,13 +371,13 @@ class ProtocolAdopter2 : FooProto {
     set { /* do nothing! */ }
   }
 }
-class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}} expected-note {{do you want to add protocol stubs?}}
   @objc var bar: Int = 0 // expected-note {{candidate has non-matching type 'Int'}}
 }
-class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}} expected-note {{do you want to add protocol stubs?}}
   let bar: CInt = 0 // expected-note {{candidate is not settable, but protocol requires it}}
 }
-class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}} expected-note {{do you want to add protocol stubs?}}
   var bar: CInt { // expected-note {{candidate is not settable, but protocol requires it}}
     return 42
   }
@@ -478,8 +479,7 @@ func testProtocolClassShadowing(_ obj: ClassInHelper, p: ProtoInHelper) {
 
 func testDealloc(_ obj: NSObject) {
   // dealloc is subsumed by deinit.
-  // FIXME: Special-case diagnostic in the type checker?
-  obj.dealloc() // expected-error{{value of type 'NSObject' has no member 'dealloc'}}
+  obj.dealloc() // expected-error{{'dealloc()' is unavailable in Swift: use 'deinit' to define a de-initializer}}
 }
 
 func testConstantGlobals() {

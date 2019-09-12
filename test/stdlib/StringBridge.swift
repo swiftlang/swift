@@ -77,7 +77,7 @@ StringBridgeTests.test("Tagged NSString") {
 
 func returnOne<T>(_ t: T) -> Int { return 1 }
 StringBridgeTests.test("Character from NSString") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else { return }
+  guard #available(macOS 10.15, iOS 13, watchOS 6, tvOS 13, *) else { return }
 
   // NOTE: Using hard-coded literals to directly construct NSStrings
   let ns1 = "A" as NSString

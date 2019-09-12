@@ -209,8 +209,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
     }
 
     // Record the replacement.
-    Type replacement = Type(gp).subst(subs, lookupConformance,
-                                      SubstFlags::UseErrorType);
+    Type replacement = Type(gp).subst(subs, lookupConformance);
     replacementTypes.push_back(replacement);
   });
 
@@ -220,8 +219,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
     if (req.getKind() != RequirementKind::Conformance) continue;
 
     CanType depTy = req.getFirstType()->getCanonicalType();
-    auto replacement = depTy.subst(subs, lookupConformance,
-                                   SubstFlags::UseErrorType);
+    auto replacement = depTy.subst(subs, lookupConformance);
     auto protoType = req.getSecondType()->castTo<ProtocolType>();
     auto proto = protoType->getDecl();
     auto conformance = lookupConformance(depTy, replacement, proto)
@@ -392,8 +390,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
       // an archetype.
       auto *M = proto->getParentModule();
       auto substType = type.subst(*this);
-      if (substType &&
-          (!substType->is<ArchetypeType>() ||
+      if ((!substType->is<ArchetypeType>() ||
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
@@ -429,9 +426,11 @@ SubstitutionMap SubstitutionMap::mapReplacementTypesOutOfContext() const {
   return subst(MapTypeOutOfContext(), MakeAbstractConformanceForGenericType());
 }
 
-SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap) const {
+SubstitutionMap SubstitutionMap::subst(SubstitutionMap subMap,
+                                       SubstOptions options) const {
   return subst(QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap));
+               LookUpConformanceInSubstitutionMap(subMap),
+               options);
 }
 
 SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
@@ -440,14 +439,13 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   if (empty()) return SubstitutionMap();
 
   SmallVector<Type, 4> newSubs;
-  for (Type type : getReplacementTypes()) {
+  for (Type type : getReplacementTypesBuffer()) {
     if (!type) {
       // Non-canonical parameter.
       newSubs.push_back(Type());
       continue;
     }
-    newSubs.push_back(type.subst(subs, conformances,
-                                 options | SubstFlags::UseErrorType));
+    newSubs.push_back(type.subst(subs, conformances, options));
   }
 
   SmallVector<ProtocolConformanceRef, 4> newConformances;
@@ -465,11 +463,10 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
         !options.contains(SubstFlags::SubstituteOpaqueArchetypes)) {
       newConformances.push_back(
         ProtocolConformanceRef(
-          conformance.getConcrete()->subst(subs, conformances)));
+          conformance.getConcrete()->subst(subs, conformances, options)));
     } else {
       auto origType = req.getFirstType();
-      auto substType = origType.subst(*this,
-                                      options | SubstFlags::UseErrorType);
+      auto substType = origType.subst(*this, options);
 
       newConformances.push_back(
         conformance.subst(substType, subs, conformances, options));
@@ -646,7 +643,7 @@ void SubstitutionMap::verify() const {
     if (req.getKind() != RequirementKind::Conformance)
       continue;
 
-    auto substType = req.getFirstType().subst(*this, SubstFlags::UseErrorType);
+    auto substType = req.getFirstType().subst(*this);
     if (substType->isTypeParameter() ||
         substType->is<ArchetypeType>() ||
         substType->isTypeVariableOrMember() ||
@@ -688,21 +685,19 @@ bool SubstitutionMap::isIdentity() const {
     return true;
 
   GenericSignature *sig = getGenericSignature();
-  unsigned countOfGenericParams = 0;
   bool hasNonIdentityReplacement = false;
+  auto replacements = getReplacementTypesBuffer();
 
   sig->forEachParam([&](GenericTypeParamType *paramTy, bool isCanonical) {
-    ++countOfGenericParams;
-    if (!isCanonical)
-      return;
+    if (isCanonical) {
+      if (!paramTy->isEqual(replacements[0]))
+        hasNonIdentityReplacement = true;
+    }
 
-    auto replacementTy = Type(paramTy).subst(*this);
-    if (!paramTy->isEqual(replacementTy))
-      hasNonIdentityReplacement = true;
+    replacements = replacements.slice(1);
   });
 
-  assert(countOfGenericParams == getReplacementTypes().size());
-  (void)countOfGenericParams;
+  assert(replacements.empty());
 
   return !hasNonIdentityReplacement;
 }

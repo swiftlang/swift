@@ -324,12 +324,15 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
   case SILInstructionKind::StrongReleaseInst:
   case SILInstructionKind::StrongRetainInst:
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
-  case SILInstructionKind::UnmanagedReleaseValueInst:
-  case SILInstructionKind::UnmanagedRetainValueInst:
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::Name##ReleaseInst: \
-  case SILInstructionKind::StrongRetain##Name##Inst:
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Name##RetainValueInst:                              \
+  case SILInstructionKind::Name##ReleaseValueInst:                             \
+  case SILInstructionKind::Copy##Name##ValueInst:
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  case SILInstructionKind::Name##RetainInst:                                   \
+  case SILInstructionKind::Name##ReleaseInst:                                  \
+  case SILInstructionKind::StrongRetain##Name##Inst:                           \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #include "swift/AST/ReferenceStorage.def"
     return true;
   }
@@ -526,95 +529,4 @@ void swift::findClosuresForFunctionValue(
     }
     // Ignore other unrecognized values that feed this applied argument.
   }
-}
-
-namespace {
-
-enum class OwnershipQualifiedKind {
-  NotApplicable,
-  Qualified,
-  Unqualified,
-};
-
-struct OwnershipQualifiedKindVisitor : SILInstructionVisitor<OwnershipQualifiedKindVisitor, OwnershipQualifiedKind> {
-
-  OwnershipQualifiedKind visitSILInstruction(SILInstruction *I) {
-    return OwnershipQualifiedKind::NotApplicable;
-  }
-
-#define QUALIFIED_INST(CLASS) \
-  OwnershipQualifiedKind visit ## CLASS(CLASS *I) { \
-    return OwnershipQualifiedKind::Qualified;             \
-  }
-  QUALIFIED_INST(EndBorrowInst)
-  QUALIFIED_INST(LoadBorrowInst)
-  QUALIFIED_INST(CopyValueInst)
-  QUALIFIED_INST(DestroyValueInst)
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  QUALIFIED_INST(Copy##Name##ValueInst)
-#include "swift/AST/ReferenceStorage.def"
-#undef QUALIFIED_INST
-
-  OwnershipQualifiedKind visitLoadInst(LoadInst *LI) {
-    if (LI->getOwnershipQualifier() == LoadOwnershipQualifier::Unqualified)
-      return OwnershipQualifiedKind::Unqualified;
-    return OwnershipQualifiedKind::Qualified;
-  }
-
-  OwnershipQualifiedKind visitStoreInst(StoreInst *SI) {
-    if (SI->getOwnershipQualifier() == StoreOwnershipQualifier::Unqualified)
-      return OwnershipQualifiedKind::Unqualified;
-    return OwnershipQualifiedKind::Qualified;
-  }
-};
-
-} // end anonymous namespace
-
-bool FunctionOwnershipEvaluator::evaluate(SILInstruction *I) {
-  assert(I->getFunction() == F.get() && "Can not evaluate function ownership "
-         "implications of an instruction that "
-         "does not belong to the instruction "
-         "that we are evaluating");
-
-  switch (OwnershipQualifiedKindVisitor().visit(I)) {
-  case OwnershipQualifiedKind::Unqualified: {
-    // If we already know that the function has unqualified ownership, just
-    // return early.
-    if (!F.get()->hasOwnership())
-      return true;
-
-    // Ok, so we know at this point that we have qualified ownership. If we have
-    // seen any instructions with qualified ownership, we have an error since
-    // the function mixes qualified and unqualified instructions.
-    if (HasOwnershipQualifiedInstruction)
-      return false;
-
-    // Otherwise, set the function to have unqualified ownership. This will
-    // ensure that no more Qualified instructions can be added to the given
-    // function.
-    F.get()->setOwnershipEliminated();
-    return true;
-  }
-  case OwnershipQualifiedKind::Qualified: {
-    // First check if our function has unqualified ownership. If we already do
-    // have unqualified ownership, then we know that we have already seen an
-    // unqualified ownership instruction. This means the function has both
-    // qualified and unqualified instructions. =><=.
-    if (!F.get()->hasOwnership())
-      return false;
-
-    // Ok, at this point we know that we are still qualified. Since functions
-    // start as qualified, we need to set the HasOwnershipQualifiedInstructions
-    // so we do not need to look back through the function if we see an
-    // unqualified instruction later on.
-    HasOwnershipQualifiedInstruction = true;
-    return true;
-  }
-  case OwnershipQualifiedKind::NotApplicable: {
-    // Not Applicable instr
-    return true;
-  }
-  }
-
-  llvm_unreachable("Unhandled OwnershipQualifiedKind in switch.");
 }

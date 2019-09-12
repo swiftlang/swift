@@ -20,7 +20,6 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
@@ -207,13 +206,10 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Parse, typecheck and temporarily insert the incomplete code into the AST.
   const unsigned OriginalDeclCount = SF.Decls.size();
 
-  PersistentParserState PersistentState(Ctx);
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
-      new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
+  PersistentParserState PersistentState;
   bool Done;
   do {
-    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
-                        DelayedCB.get());
+    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
   performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
                       OriginalDeclCount);

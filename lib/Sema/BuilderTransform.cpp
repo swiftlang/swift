@@ -50,9 +50,10 @@ public:
 
 private:
   /// Produce a builder call to the given named function with the given arguments.
-  CallExpr *buildCallIfWanted(SourceLoc loc,
-                              Identifier fnName, ArrayRef<Expr *> args,
-                              ArrayRef<Identifier> argLabels = {}) {
+  Expr *buildCallIfWanted(SourceLoc loc,
+                          Identifier fnName, ArrayRef<Expr *> args,
+                          ArrayRef<Identifier> argLabels,
+                          bool allowOneWay) {
     if (!wantExpr)
       return nullptr;
 
@@ -60,8 +61,10 @@ private:
     // to get diagnostics if something about this builder call fails,
     // e.g. if there isn't a matching overload for `buildBlock`.
     // But we can only do this if there isn't a type variable in the type.
-    TypeLoc typeLoc(nullptr,
-                    builderType->hasTypeVariable() ? Type() : builderType);
+    TypeLoc typeLoc;
+    if (!builderType->hasTypeVariable()) {
+      typeLoc = TypeLoc(new (ctx) FixedTypeRepr(builderType, loc), builderType);
+    }
 
     auto typeExpr = new (ctx) TypeExpr(typeLoc);
     if (cs) {
@@ -69,10 +72,27 @@ private:
       cs->setType(&typeExpr->getTypeLoc(), builderType);
     }
 
+    SmallVector<SourceLoc, 4> argLabelLocs;
+    for (auto i : indices(argLabels)) {
+      argLabelLocs.push_back(args[i]->getStartLoc());
+    }
+
     typeExpr->setImplicit();
     auto memberRef = new (ctx) UnresolvedDotExpr(
         typeExpr, loc, fnName, DeclNameLoc(loc), /*implicit=*/true);
-    return CallExpr::createImplicit(ctx, memberRef, args, argLabels);
+    SourceLoc openLoc = args.empty() ? loc : args.front()->getStartLoc();
+    SourceLoc closeLoc = args.empty() ? loc : args.back()->getEndLoc();
+    Expr *result = CallExpr::create(ctx, memberRef, openLoc, args,
+                                    argLabels, argLabelLocs, closeLoc,
+                                    /*trailing closure*/ nullptr,
+                                    /*implicit*/true);
+
+    if (ctx.LangOpts.FunctionBuilderOneWayConstraints && allowOneWay) {
+      // Form a one-way constraint to prevent backward propagation.
+      result = new (ctx) OneWayExpr(result);
+    }
+
+    return result;
   }
 
   /// Check whether the builder supports the given operation.
@@ -149,12 +169,17 @@ public:
       }
 
       auto expr = node.get<Expr *>();
+      if (wantExpr && ctx.LangOpts.FunctionBuilderOneWayConstraints)
+        expr = new (ctx) OneWayExpr(expr);
+
       expressions.push_back(expr);
     }
 
     // Call Builder.buildBlock(... args ...)
     return buildCallIfWanted(braceStmt->getStartLoc(),
-                             ctx.Id_buildBlock, expressions);
+                             ctx.Id_buildBlock, expressions,
+                             /*argLabels=*/{ },
+                             /*allowOneWay=*/true);
   }
 
   Expr *visitReturnStmt(ReturnStmt *stmt) {
@@ -179,7 +204,8 @@ public:
     if (!arg)
       return nullptr;
 
-    return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg);
+    return buildCallIfWanted(doStmt->getStartLoc(), ctx.Id_buildDo, arg,
+                             /*argLabels=*/{ }, /*allowOneWay=*/true);
   }
 
   CONTROL_FLOW_STMT(Yield)
@@ -264,7 +290,12 @@ public:
     // so we just need to call `buildIf` now, since we're at the top level.
     if (isOptional) {
       chainExpr = buildCallIfWanted(ifStmt->getStartLoc(),
-                                    ctx.Id_buildIf, chainExpr);
+                                    ctx.Id_buildIf, chainExpr,
+                                    /*argLabels=*/{ },
+                                    /*allowOneWay=*/true);
+    } else if (ctx.LangOpts.FunctionBuilderOneWayConstraints) {
+      // Form a one-way constraint to prevent backward propagation.
+      chainExpr = new (ctx) OneWayExpr(chainExpr);
     }
 
     return chainExpr;
@@ -384,7 +415,8 @@ public:
       bool isSecond = (path & 1);
       operand = buildCallIfWanted(operand->getStartLoc(),
                                   ctx.Id_buildEither, operand,
-                                  {isSecond ? ctx.Id_second : ctx.Id_first});
+                                  {isSecond ? ctx.Id_second : ctx.Id_first},
+                                  /*allowOneWay=*/false);
     }
 
     // Inject into Optional if required.  We'll be adding the call to
@@ -400,10 +432,12 @@ public:
     auto optionalDecl = ctx.getOptionalDecl();
     auto optionalType = optionalDecl->getDeclaredType();
 
-    auto optionalTypeExpr = TypeExpr::createImplicit(optionalType, ctx);
+    auto loc = arg->getStartLoc();
+    auto optionalTypeExpr =
+      TypeExpr::createImplicitHack(loc, optionalType, ctx);
     auto someRef = new (ctx) UnresolvedDotExpr(
-        optionalTypeExpr, SourceLoc(), ctx.getIdentifier("some"),
-        DeclNameLoc(), /*implicit=*/true);
+        optionalTypeExpr, loc, ctx.getIdentifier("some"),
+        DeclNameLoc(loc), /*implicit=*/true);
     return CallExpr::createImplicit(ctx, someRef, arg, { });
   }
 
@@ -411,7 +445,8 @@ public:
     auto optionalDecl = ctx.getOptionalDecl();
     auto optionalType = optionalDecl->getDeclaredType();
 
-    auto optionalTypeExpr = TypeExpr::createImplicit(optionalType, ctx);
+    auto optionalTypeExpr =
+      TypeExpr::createImplicitHack(endLoc, optionalType, ctx);
     return new (ctx) UnresolvedDotExpr(
         optionalTypeExpr, endLoc, ctx.getIdentifier("none"),
         DeclNameLoc(endLoc), /*implicit=*/true);
@@ -437,86 +472,27 @@ public:
 
 } // end anonymous namespace
 
-/// Determine whether the given statement contains a 'return' statement anywhere.
-static bool hasReturnStmt(Stmt *stmt) {
-  class ReturnStmtFinder : public ASTWalker {
-  public:
-    bool hasReturnStmt = false;
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      return { false, expr };
-    }
-
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      // Did we find a 'return' statement?
-      if (isa<ReturnStmt>(stmt)) {
-        hasReturnStmt = true;
-      }
-
-      return { !hasReturnStmt, stmt };
-    }
-
-    Stmt *walkToStmtPost(Stmt *stmt) override {
-      return hasReturnStmt ? nullptr : stmt;
-    }
-
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-      return { false, pattern };
-    }
-
-    bool walkToDeclPre(Decl *D) override { return false; }
-
-    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
-
-    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-  };
-
-  ReturnStmtFinder finder{};
-  stmt->walk(finder);
-  return finder.hasReturnStmt;
-}
-
-bool TypeChecker::typeCheckFunctionBuilderFuncBody(FuncDecl *FD,
-                                                   Type builderType) {
+BraceStmt *
+TypeChecker::applyFunctionBuilderBodyTransform(FuncDecl *FD,
+                                               BraceStmt *body,
+                                               Type builderType) {
   // Try to build a single result expression.
   BuilderClosureVisitor visitor(Context, nullptr,
                                 /*wantExpr=*/true, builderType);
-  Expr *returnExpr = visitor.visit(FD->getBody());
+  Expr *returnExpr = visitor.visit(body);
   if (!returnExpr)
-    return true;
+    return nullptr;
 
   // Make sure we have a usable result type for the body.
   Type returnType = AnyFunctionRef(FD).getBodyResultType();
   if (!returnType || returnType->hasError())
-    return true;
+    return nullptr;
 
-  TypeCheckExprOptions options = {};
-  if (auto opaque = returnType->getAs<OpaqueTypeArchetypeType>()) {
-    if (opaque->getDecl()->isOpaqueReturnTypeOfFunction(FD))
-      options |= TypeCheckExprFlags::ConvertTypeIsOpaqueReturnType;
-  }
-
-  // If we are performing code-completion inside the functions body, supress
-  // diagnostics to workaround typechecking performance problems.
-  if (Context.SourceMgr.rangeContainsCodeCompletionLoc(
-          FD->getBody()->getSourceRange()))
-    options |= TypeCheckExprFlags::SuppressDiagnostics;
-
-  // Type-check the single result expression.
-  Type returnExprType = typeCheckExpression(returnExpr, FD,
-                                            TypeLoc::withoutLoc(returnType),
-                                            CTP_ReturnStmt, options);
-  if (!returnExprType)
-    return true;
-  assert(returnExprType->isEqual(returnType));
-
-  auto returnStmt = new (Context) ReturnStmt(SourceLoc(), returnExpr);
-  auto origBody = FD->getBody();
-  auto fakeBody = BraceStmt::create(Context, origBody->getLBraceLoc(),
-                                    { returnStmt },
-                                    origBody->getRBraceLoc());
-  FD->setBody(fakeBody);
-  return false;
+  auto loc = returnExpr->getStartLoc();
+  auto returnStmt =
+    new (Context) ReturnStmt(loc, returnExpr, /*implicit*/ true);
+  return BraceStmt::create(Context, body->getLBraceLoc(), { returnStmt },
+                           body->getRBraceLoc());
 }
 
 ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
@@ -526,25 +502,35 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   assert(builder && "Bad function builder type");
   assert(builder->getAttrs().hasAttribute<FunctionBuilderAttr>());
 
-  // Check the form of this closure to see if we can apply the function-builder
-  // translation at all.
+  // FIXME: Right now, single-expression closures suppress the function
+  // builder translation.
+  if (closure->hasSingleExpressionBody())
+    return getTypeMatchSuccess();
+
+  // Pre-check the closure body: pre-check any expressions in it and look
+  // for return statements.
+  switch (TC.preCheckFunctionBuilderClosureBody(closure)) {
+  case FunctionBuilderClosurePreCheck::Okay:
+    // If the pre-check was okay, apply the function-builder transform.
+    break;
+
+  case FunctionBuilderClosurePreCheck::Error:
+    // If the pre-check had an error, flag that.
+    return getTypeMatchFailure(locator);
+
+  case FunctionBuilderClosurePreCheck::HasReturnStmt:
+    // If the closure has a return statement, suppress the transform but
+    // continue solving the constraint system.
+    return getTypeMatchSuccess();
+  }
+
+  // Check the form of this closure to see if we can apply the
+  // function-builder translation at all.
   {
-    // FIXME: Right now, single-expression closures suppress the function
-    // builder translation.
-    if (closure->hasSingleExpressionBody())
-      return getTypeMatchSuccess();
-
-    // The presence of an explicit return suppresses the function builder
-    // translation.
-    if (hasReturnStmt(closure->getBody())) {
-      return getTypeMatchSuccess();
-    }
-
-    // Check whether we can apply this function builder.
+    // Check whether we can apply this specific function builder.
     BuilderClosureVisitor visitor(getASTContext(), this,
                                   /*wantExpr=*/false, builderType);
     (void)visitor.visit(closure->getBody());
-
 
     // If we saw a control-flow statement or declaration that the builder
     // cannot handle, we don't have a well-formed function builder application.
@@ -580,18 +566,16 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
     assert(!builderType->hasTypeParameter());
   }
 
-  // If we are performing code-completion inside the closure body, supress
-  // diagnostics to workaround typechecking performance problems.
-  if (getASTContext().SourceMgr.rangeContainsCodeCompletionLoc(
-          closure->getSourceRange()))
-    Options |= ConstraintSystemFlags::SuppressDiagnostics;
-
   BuilderClosureVisitor visitor(getASTContext(), this,
                                 /*wantExpr=*/true, builderType);
   Expr *singleExpr = visitor.visit(closure->getBody());
 
-  if (TC.precheckedClosures.insert(closure).second &&
-      TC.preCheckExpression(singleExpr, closure))
+  // We've already pre-checked all the original expressions, but do the
+  // pre-check to the generated expression just to set up any preconditions
+  // that CSGen might have.
+  //
+  // TODO: just build the AST the way we want it in the first place.
+  if (TC.preCheckExpression(singleExpr, closure))
     return getTypeMatchFailure(locator);
 
   singleExpr = generateConstraints(singleExpr, closure);
@@ -618,4 +602,81 @@ ConstraintSystem::TypeMatchResult ConstraintSystem::applyFunctionBuilder(
   addConstraint(ConstraintKind::Equal, fnType->getResult(), transformedType,
                 locator);
   return getTypeMatchSuccess();
+}
+
+namespace {
+
+/// Pre-check all the expressions in the closure body.
+class PreCheckFunctionBuilderClosure : public ASTWalker {
+  TypeChecker &TC;
+  ClosureExpr *Closure;
+  bool HasReturnStmt = false;
+  bool HasError = false;
+public:
+  PreCheckFunctionBuilderClosure(TypeChecker &tc, ClosureExpr *closure)
+    : TC(tc), Closure(closure) {}
+
+  FunctionBuilderClosurePreCheck run() {
+    Stmt *oldBody = Closure->getBody();
+
+    Stmt *newBody = oldBody->walk(*this);
+
+    // If the walk was aborted, it was because we had a problem of some kind.
+    assert((newBody == nullptr) == (HasError || HasReturnStmt) &&
+           "unexpected short-circuit while walking closure body");
+    if (!newBody) {
+      if (HasError)
+        return FunctionBuilderClosurePreCheck::Error;
+
+      return FunctionBuilderClosurePreCheck::HasReturnStmt;
+    }
+
+    assert(oldBody == newBody && "pre-check walk wasn't in-place?");
+
+    return FunctionBuilderClosurePreCheck::Okay;
+  }
+
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    // Pre-check the expression.  If this fails, abort the walk immediately.
+    // Otherwise, replace the expression with the result of pre-checking.
+    // In either case, don't recurse into the expression.
+    if (TC.preCheckExpression(E, /*DC*/ Closure)) {
+      HasError = true;
+      return std::make_pair(false, nullptr);
+    }
+
+    return std::make_pair(false, E);
+  }
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    // If we see a return statement, abort the walk immediately.
+    if (isa<ReturnStmt>(S)) {
+      HasReturnStmt = true;
+      return std::make_pair(false, nullptr);
+    }
+
+    // Otherwise, recurse into the statement normally.
+    return std::make_pair(true, S);
+  }
+};
+
+}
+
+FunctionBuilderClosurePreCheck
+TypeChecker::preCheckFunctionBuilderClosureBody(ClosureExpr *closure) {
+  // Single-expression closures should already have been pre-checked.
+  if (closure->hasSingleExpressionBody())
+    return FunctionBuilderClosurePreCheck::Okay;
+
+  // Check whether we've already done this analysis.
+  auto it = precheckedFunctionBuilderClosures.find(closure);
+  if (it != precheckedFunctionBuilderClosures.end())
+    return it->second;
+
+  auto result = PreCheckFunctionBuilderClosure(*this, closure).run();
+
+  // Cache the result.
+  precheckedFunctionBuilderClosures.insert(std::make_pair(closure, result));
+
+  return result;
 }

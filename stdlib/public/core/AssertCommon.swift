@@ -172,35 +172,7 @@ internal func _fatalErrorMessage(
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
-#if INTERNAL_CHECKS_ENABLED
-  prefix.withUTF8Buffer() {
-    (prefix) in
-    message.withUTF8Buffer() {
-      (message) in
-      file.withUTF8Buffer() {
-        (file) in
-        _swift_stdlib_reportFatalErrorInFile(
-          prefix.baseAddress!, CInt(prefix.count),
-          message.baseAddress!, CInt(message.count),
-          file.baseAddress!, CInt(file.count), UInt32(line),
-          flags)
-      }
-    }
-  }
-#else
-  prefix.withUTF8Buffer() {
-    (prefix) in
-    message.withUTF8Buffer() {
-      (message) in
-      _swift_stdlib_reportFatalError(
-        prefix.baseAddress!, CInt(prefix.count),
-        message.baseAddress!, CInt(message.count),
-        flags)
-    }
-  }
-#endif
-
-  Builtin.int_trap()
+  _assertionFailure(prefix, message, file: file, line: line, flags: flags)
 }
 
 /// Prints a fatal error message when an unimplemented initializer gets

@@ -36,11 +36,11 @@ public struct _ValidUTF8Buffer {
   }
 }
 
-extension _ValidUTF8Buffer : Sequence {
+extension _ValidUTF8Buffer: Sequence {
   public typealias SubSequence = Slice<_ValidUTF8Buffer>
 
   @frozen
-  public struct Iterator : IteratorProtocol, Sequence {
+  public struct Iterator: IteratorProtocol, Sequence {
     @inlinable
     public init(_ x: _ValidUTF8Buffer) { _biasedBits = x._biasedBits }
 
@@ -60,9 +60,9 @@ extension _ValidUTF8Buffer : Sequence {
   }
 }
 
-extension _ValidUTF8Buffer : Collection {
+extension _ValidUTF8Buffer: Collection {
   @frozen
-  public struct Index : Comparable {
+  public struct Index: Comparable {
     @usableFromInline
     internal var _biasedBits: UInt32
 
@@ -80,22 +80,22 @@ extension _ValidUTF8Buffer : Collection {
   }
 
   @inlinable
-  public var startIndex : Index {
+  public var startIndex: Index {
     return Index(_biasedBits: _biasedBits)
   }
 
   @inlinable
-  public var endIndex : Index {
+  public var endIndex: Index {
     return Index(_biasedBits: 0)
   }
 
   @inlinable
-  public var count : Int {
+  public var count: Int {
     return UInt32.bitWidth &>> 3 &- _biasedBits.leadingZeroBitCount &>> 3
   }
 
   @inlinable
-  public var isEmpty : Bool {
+  public var isEmpty: Bool {
     return _biasedBits == 0
   }
 
@@ -111,7 +111,7 @@ extension _ValidUTF8Buffer : Collection {
   }
 }
 
-extension _ValidUTF8Buffer : BidirectionalCollection {
+extension _ValidUTF8Buffer: BidirectionalCollection {
   @inlinable
   public func index(before i: Index) -> Index {
     let offset = _ValidUTF8Buffer(_biasedBits: i._biasedBits).count
@@ -120,7 +120,7 @@ extension _ValidUTF8Buffer : BidirectionalCollection {
   }
 }
 
-extension _ValidUTF8Buffer : RandomAccessCollection {
+extension _ValidUTF8Buffer: RandomAccessCollection {
   public typealias Indices = DefaultIndices<_ValidUTF8Buffer>
 
   @inlinable
@@ -144,7 +144,7 @@ extension _ValidUTF8Buffer : RandomAccessCollection {
   }
 }
 
-extension _ValidUTF8Buffer : RangeReplaceableCollection {
+extension _ValidUTF8Buffer: RangeReplaceableCollection {
   @inlinable
   public init() {
     _biasedBits = 0
@@ -211,7 +211,7 @@ extension _ValidUTF8Buffer {
 
 extension _ValidUTF8Buffer {
   @inlinable
-  public static var encodedReplacementCharacter : _ValidUTF8Buffer {
+  public static var encodedReplacementCharacter: _ValidUTF8Buffer {
     return _ValidUTF8Buffer(_biasedBits: 0xBD_BF_EF &+ 0x01_01_01)
   }
 

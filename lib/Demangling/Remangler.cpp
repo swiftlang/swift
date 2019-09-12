@@ -424,7 +424,11 @@ std::pair<int, Node *> Remangler::mangleConstrainedType(Node *node) {
     Chain.push_back(node->getChild(1), Factory);
     node = getChildOfType(node->getFirstChild());
   }
-  assert(node->getKind() == Node::Kind::DependentGenericParamType);
+  
+  if (node->getKind() != Node::Kind::DependentGenericParamType) {
+    mangle(node);
+    node = nullptr;
+  }
 
   const char *ListSeparator = (Chain.size() > 1 ? "_" : "");
   for (unsigned i = 1, n = Chain.size(); i <= n; ++i) {
@@ -811,6 +815,7 @@ void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
   if (ProtoOrClass->getFirstChild()->getKind() == Node::Kind::Protocol) {
     manglePureProtocol(ProtoOrClass);
     auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+    assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
     switch (NumMembersAndParamIdx.first) {
       case -1: Buffer << "RQ"; return; // substitution
       case 0: Buffer << "R"; break;
@@ -822,6 +827,7 @@ void Remangler::mangleDependentGenericConformanceRequirement(Node *node) {
   }
   mangle(ProtoOrClass);
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RB"; return; // substitution
     case 0: Buffer << "Rb"; break;
@@ -849,6 +855,7 @@ void Remangler::mangleDependentGenericParamType(Node *node) {
 void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
   mangleChildNode(node, 1);
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RS"; return; // substitution
     case 0: Buffer << "Rs"; break;
@@ -860,6 +867,7 @@ void Remangler::mangleDependentGenericSameTypeRequirement(Node *node) {
 
 void Remangler::mangleDependentGenericLayoutRequirement(Node *node) {
   auto NumMembersAndParamIdx = mangleConstrainedType(node->getChild(0));
+  assert(NumMembersAndParamIdx.first < 0 || NumMembersAndParamIdx.second);
   switch (NumMembersAndParamIdx.first) {
     case -1: Buffer << "RL"; break; // substitution
     case 0: Buffer << "Rl"; break;
@@ -922,11 +930,19 @@ void Remangler::mangleDependentMemberType(Node *node) {
       unreachable("wrong dependent member type");
     case 1:
       Buffer << 'Q';
-      mangleDependentGenericParamIndex(NumMembersAndParamIdx.second, "y", 'z');
+      if (auto dependentBase = NumMembersAndParamIdx.second) {
+        mangleDependentGenericParamIndex(dependentBase, "y", 'z');
+      } else {
+        Buffer << 'x';
+      }
       break;
     default:
       Buffer << 'Q';
-      mangleDependentGenericParamIndex(NumMembersAndParamIdx.second, "Y", 'Z');
+      if (auto dependentBase = NumMembersAndParamIdx.second) {
+        mangleDependentGenericParamIndex(dependentBase, "Y", 'Z');
+      } else {
+        Buffer << 'X';
+      }
       break;
   }
 }
@@ -2063,6 +2079,11 @@ void Remangler::mangleTypeMetadataSingletonInitializationCache(Node *node) {
 void Remangler::mangleTypeMetadataCompletionFunction(Node *node) {
   mangleSingleChildNode(node);
   Buffer << "Mr";
+}
+
+void Remangler::mangleTypeMetadataDemanglingCache(Node *node) {
+  mangleChildNodes(node);
+  Buffer << "MD";
 }
 
 void Remangler::mangleTypeMetadataLazyCache(Node *node) {

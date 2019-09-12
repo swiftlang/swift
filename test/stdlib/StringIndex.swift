@@ -200,7 +200,7 @@ StringIndexTests.test("Scalar Align UTF-8 indices") {
 #if _runtime(_ObjC)
 import Foundation
 StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
-  guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+  guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
     return
   }
 
@@ -242,6 +242,9 @@ StringIndexTests.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
 }
 
 StringIndexTests.test("Misaligned") {
+  // Misaligned indices were fixed in 5.1
+  guard _hasSwift_5_1() else { return }
+
   func doIt(_ str: String) {
     let characterIndices = Array(str.indices)
     let scalarIndices = Array(str.unicodeScalars.indices) + [str.endIndex]
@@ -308,7 +311,7 @@ StringIndexTests.test("Exhaustive Index Interchange") {
     file: String = #file,
     line: UInt = #line
   ) {
-    guard #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) else {
+    guard #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) else {
       return
     }
 

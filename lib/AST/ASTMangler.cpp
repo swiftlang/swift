@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Ownership.h"
 #include "swift/AST/ParameterList.h"
@@ -735,6 +736,8 @@ void ASTMangler::appendOpaqueDeclName(const OpaqueTypeDecl *opaqueDecl) {
   if (canSymbolicReference(opaqueDecl)) {
     appendSymbolicReference(opaqueDecl);
   } else if (auto namingDecl = opaqueDecl->getNamingDecl()) {
+    llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+        CurGenericSignature);
     appendEntity(namingDecl);
     appendOperator("QO");
   } else {
@@ -1002,6 +1005,22 @@ void ASTMangler::appendType(Type type, const ValueDecl *forDecl) {
       
     case TypeKind::NestedArchetype: {
       auto nestedType = cast<NestedArchetypeType>(tybase);
+      
+      // Mangle associated types of opaque archetypes like dependent member
+      // types, so that they can be accurately demangled at runtime.
+      if (auto opaque =
+            dyn_cast<OpaqueTypeArchetypeType>(nestedType->getRoot())) {
+        if (tryMangleTypeSubstitution(nestedType))
+          return;
+        
+        appendType(opaque);
+        bool isAssocTypeAtDepth = false;
+        appendAssocType(nestedType->getInterfaceType(), isAssocTypeAtDepth);
+        appendOperator(isAssocTypeAtDepth ? "QX" : "Qx");
+        addTypeSubstitution(nestedType);
+        return;
+      }
+      
       appendType(nestedType->getParent());
       appendIdentifier(nestedType->getName().str());
       appendOperator("Qa");
@@ -1231,8 +1250,11 @@ void ASTMangler::appendBoundGenericArgs(Type type, bool &isFirstArgList) {
   } else {
     auto boundType = cast<BoundGenericType>(typePtr);
     genericArgs = boundType->getGenericArgs();
-    if (Type parent = boundType->getParent())
-      appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
+    if (Type parent = boundType->getParent()) {
+      GenericTypeDecl *decl = boundType->getAnyGeneric();
+      if (!getSpecialManglingContext(decl, UseObjCProtocolNames))
+        appendBoundGenericArgs(parent->getDesugaredType(), isFirstArgList);
+    }
   }
   if (isFirstArgList) {
     appendOperator("y");
@@ -1486,6 +1508,7 @@ ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
         hasNameForLinkage = !clangDecl->getDeclName().isEmpty();
       if (hasNameForLinkage) {
         auto *clangDC = clangDecl->getDeclContext();
+        if (isa<clang::NamespaceDecl>(clangDC)) return None;
         assert(clangDC->getRedeclContext()->isTranslationUnit() &&
                "non-top-level Clang types not supported yet");
         (void)clangDC;
@@ -1828,6 +1851,10 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl) {
     } else if (isa<clang::TypedefNameDecl>(namedDecl) ||
                isa<clang::ObjCCompatibleAliasDecl>(namedDecl)) {
       appendOperator("a");
+    } else if (isa<clang::NamespaceDecl>(namedDecl)) {
+      // Note: Namespaces are not really structs, but since namespaces are
+      // imported as enums, be consistent.
+      appendOperator("V");
     } else {
       llvm_unreachable("unknown imported Clang type");
     }
@@ -2315,6 +2342,12 @@ CanType ASTMangler::getDeclTypeForMangling(
   parentGenericSig = nullptr;
 
   auto &C = decl->getASTContext();
+  if (!decl->hasInterfaceType() && !decl->getDeclContext()->isLocalContext()) {
+    if (auto *resolver = C.getLazyResolver()) {
+      resolver->resolveDeclSignature(const_cast<ValueDecl *>(decl));
+    }
+  }
+
   if (!decl->hasInterfaceType() || decl->getInterfaceType()->is<ErrorType>()) {
     if (isa<AbstractFunctionDecl>(decl))
       return CanFunctionType::get({AnyFunctionType::Param(C.TheErrorType)},
@@ -2323,29 +2356,34 @@ CanType ASTMangler::getDeclTypeForMangling(
   }
 
 
-  CanType type = decl->getInterfaceType()
-                      ->getReferenceStorageReferent()
-                      ->getCanonicalType();
-  if (auto gft = dyn_cast<GenericFunctionType>(type)) {
+  Type type = decl->getInterfaceType()
+                  ->getReferenceStorageReferent();
+  if (type->hasArchetype()) {
+    assert(isa<ParamDecl>(decl) && "Only ParamDecl's still have archetypes");
+    type = type->mapTypeOutOfContext();
+  }
+  CanType canTy = type->getCanonicalType();
+
+  if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
     CurGenericSignature = gft.getGenericSignature();
 
-    type = CanFunctionType::get(gft.getParams(), gft.getResult(),
-                                gft->getExtInfo());
+    canTy = CanFunctionType::get(gft.getParams(), gft.getResult(),
+                                 gft->getExtInfo());
   }
 
-  if (!type->hasError()) {
+  if (!canTy->hasError()) {
     // Shed the 'self' type and generic requirements from method manglings.
     if (isMethodDecl(decl)) {
       // Drop the Self argument clause from the type.
-      type = cast<AnyFunctionType>(type).getResult();
+      canTy = cast<AnyFunctionType>(canTy).getResult();
     }
 
     if (isMethodDecl(decl) || isa<SubscriptDecl>(decl))
       parentGenericSig = decl->getDeclContext()->getGenericSignatureOfContext();
   }
 
-  return type;
+  return canTy;
 }
 
 void ASTMangler::appendDeclType(const ValueDecl *decl, bool isFunctionMangling) {
@@ -2634,11 +2672,11 @@ void ASTMangler::appendConcreteProtocolConformance(
             opaqueSignature->getConformanceAccessPath(opaqueTypeParam, proto);
 
         // Append the conformance access path with the signature of the opaque type.
-        CanGenericSignature savedSignature = CurGenericSignature;
-        CurGenericSignature = opaqueSignature->getCanonicalSignature();
-        appendDependentProtocolConformance(conformanceAccessPath);
-        CurGenericSignature = savedSignature;
-
+        {
+          llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+              CurGenericSignature, opaqueSignature->getCanonicalSignature());
+          appendDependentProtocolConformance(conformanceAccessPath);
+        }
         appendType(canType);
         appendOperator("HO");
       } else {

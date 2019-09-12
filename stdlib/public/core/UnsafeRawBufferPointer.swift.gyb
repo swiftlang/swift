@@ -375,6 +375,9 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// must be properly aligned for accessing `T`, and `source.count` must be a
   /// multiple of `MemoryLayout<T>.stride`.
   ///
+  /// The memory referenced by `source` may overlap with the memory referenced 
+  /// by this buffer.
+  ///
   /// After calling `copyMemory(from:)`, the first `source.count` bytes of
   /// memory referenced by this buffer are initialized to raw bytes. If the
   /// memory is bound to type `T`, then it contains values of type `T`.
@@ -402,7 +405,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Parameter source: A collection of `UInt8` elements. `source.count` must
   ///   be less than or equal to this buffer's `count`.
   @inlinable
-  public func copyBytes<C : Collection>(from source: C
+  public func copyBytes<C: Collection>(from source: C
   ) where C.Element == UInt8 {
     _debugPrecondition(source.count <= self.count,
       "${Self}.copyBytes source has too many elements")
@@ -677,7 +680,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 }
 
-extension Unsafe${Mutable}RawBufferPointer : CustomDebugStringConvertible {
+extension Unsafe${Mutable}RawBufferPointer: CustomDebugStringConvertible {
   /// A textual representation of the buffer, suitable for debugging.
   public var debugDescription: String {
     return "${Self}"

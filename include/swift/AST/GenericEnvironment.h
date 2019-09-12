@@ -59,7 +59,6 @@ class alignas(1 << DeclAlignInBits) GenericEnvironment final
         : private llvm::TrailingObjects<GenericEnvironment, Type> {
   GenericSignature *Signature = nullptr;
   GenericSignatureBuilder *Builder = nullptr;
-  DeclContext *OwningDC = nullptr;
 
   friend TrailingObjects;
 
@@ -97,18 +96,6 @@ public:
   static
   GenericEnvironment *getIncomplete(GenericSignature *signature,
                                     GenericSignatureBuilder *builder);
-
-  /// Set the owning declaration context for this generic environment.
-  void setOwningDeclContext(DeclContext *owningDC);
-
-  /// Retrieve the declaration context that owns this generic environment, if
-  /// there is one.
-  ///
-  /// Note that several generic environments may refer to the same declaration
-  /// context, because non-generic declarations nested within generic ones
-  /// inherit the enclosing generic environment. In such cases, the owning
-  /// context is the outermost context.
-  DeclContext *getOwningDeclContext() const { return OwningDC; }
 
   /// Add a mapping of a generic parameter to a specific type (which may be
   /// an archetype)

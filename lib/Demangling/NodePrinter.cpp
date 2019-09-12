@@ -472,6 +472,7 @@ private:
     case Node::Kind::TypeMetadataInstantiationCache:
     case Node::Kind::TypeMetadataInstantiationFunction:
     case Node::Kind::TypeMetadataSingletonInitializationCache:
+    case Node::Kind::TypeMetadataDemanglingCache:
     case Node::Kind::TypeMetadataLazyCache:
     case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
@@ -1679,6 +1680,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     Printer << "type metadata completion function for ";
     print(Node->getChild(0));
     return nullptr;
+  case Node::Kind::TypeMetadataDemanglingCache:
+    Printer << "demangling cache variable for type metadata for ";
+    print(Node->getChild(0));
+    return nullptr;
   case Node::Kind::TypeMetadataLazyCache:
     Printer << "lazy cache variable for type metadata for ";
     print(Node->getChild(0));
@@ -2137,7 +2142,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentAssociatedTypeRef: {
-    Printer << Node->getFirstChild()->getText();
+    if (Node->getNumChildren() > 1) {
+      print(Node->getChild(1));
+      Printer << '.';
+    }
+    print(Node->getChild(0));
     return nullptr;
   }
   case Node::Kind::ReflectionMetadataBuiltinDescriptor:

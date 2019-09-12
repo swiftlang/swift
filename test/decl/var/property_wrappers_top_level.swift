@@ -3,7 +3,7 @@
 @propertyWrapper
 struct Wrapper<T> {
   var wrappedValue: T
-  init(initialValue: T) {
+  init(wrappedValue initialValue: T) {
     wrappedValue = initialValue
   }
 }

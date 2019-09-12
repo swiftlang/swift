@@ -231,8 +231,13 @@ public:
   void verifyAllBuffers() const;
 
   /// Translate line and column pair to the offset.
+  /// If the column number is the maximum unsinged int, return the offset of the end of the line.
   llvm::Optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
                                               unsigned Col) const;
+
+  /// Translate the end position of the given line to the offset.
+  llvm::Optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
+                                                     unsigned Line) const;
 
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);

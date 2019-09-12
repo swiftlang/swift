@@ -107,7 +107,7 @@ public protocol Encoder {
   var codingPath: [CodingKey] { get }
 
   /// Any contextual information set by the user for encoding.
-  var userInfo: [CodingUserInfoKey : Any] { get }
+  var userInfo: [CodingUserInfoKey: Any] { get }
 
   /// Returns an encoding container appropriate for holding multiple values
   /// keyed by the given key type.
@@ -149,7 +149,7 @@ public protocol Decoder {
   var codingPath: [CodingKey] { get }
 
   /// Any contextual information set by the user for decoding.
-  var userInfo: [CodingUserInfoKey : Any] { get }
+  var userInfo: [CodingUserInfoKey: Any] { get }
 
   /// Returns the data stored in this decoder as represented in a container
   /// keyed by the given key type.
@@ -187,7 +187,7 @@ public protocol Decoder {
 /// Encoders should provide types conforming to
 /// `KeyedEncodingContainerProtocol` for their format.
 public protocol KeyedEncodingContainerProtocol {
-  associatedtype Key : CodingKey
+  associatedtype Key: CodingKey
 
   /// The path of coding keys taken to get to this point in encoding.
   var codingPath: [CodingKey] { get }
@@ -215,7 +215,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws
+  mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws
 
   /// Encodes a reference to the given object only if it is encoded
   /// unconditionally elsewhere in the payload (previously, or in the future).
@@ -227,7 +227,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - parameter key: The key to associate the object with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encodeConditional<T : AnyObject & Encodable>(
+  mutating func encodeConditional<T: AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
 
 % for type in codable_types:
@@ -246,7 +246,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encodeIfPresent<T : Encodable>(
+  mutating func encodeIfPresent<T: Encodable>(
     _ value: T?, forKey key: Key) throws
 
   /// Stores a keyed encoding container for the given key and returns it.
@@ -287,7 +287,7 @@ public protocol KeyedEncodingContainerProtocol {
 
 /// A concrete container that provides a view into an encoder's storage, making
 /// the encoded properties of an encodable type accessible by keys.
-public struct KeyedEncodingContainer<K : CodingKey> :
+public struct KeyedEncodingContainer<K: CodingKey> :
   KeyedEncodingContainerProtocol
 {
   public typealias Key = K
@@ -299,7 +299,7 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// Creates a new instance with the given container.
   ///
   /// - parameter container: The container to hold.
-  public init<Container : KeyedEncodingContainerProtocol>(
+  public init<Container: KeyedEncodingContainerProtocol>(
     _ container: Container) where Container.Key == Key
   {
     _box = _KeyedEncodingContainerBox(container)
@@ -337,7 +337,7 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  public mutating func encode<T : Encodable>(
+  public mutating func encode<T: Encodable>(
     _ value: T, forKey key: Key) throws
   {
     try _box.encode(value, forKey: key)
@@ -353,7 +353,7 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the object with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  public mutating func encodeConditional<T : AnyObject & Encodable>(
+  public mutating func encodeConditional<T: AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
     try _box.encodeConditional(object, forKey: key)
@@ -379,7 +379,7 @@ public struct KeyedEncodingContainer<K : CodingKey> :
   /// - parameter key: The key to associate the value with.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  public mutating func encodeIfPresent<T : Encodable>(
+  public mutating func encodeIfPresent<T: Encodable>(
     _ value: T?, forKey key: Key) throws
   {
     try _box.encodeIfPresent(value, forKey: key)
@@ -433,7 +433,7 @@ public struct KeyedEncodingContainer<K : CodingKey> :
 /// Decoders should provide types conforming to `UnkeyedDecodingContainer` for
 /// their format.
 public protocol KeyedDecodingContainerProtocol {
-  associatedtype Key : CodingKey
+  associatedtype Key: CodingKey
 
   /// The path of coding keys taken to get to this point in decoding.
   var codingPath: [CodingKey] { get }
@@ -492,7 +492,7 @@ public protocol KeyedDecodingContainerProtocol {
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  func decode<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T
+  func decode<T: Decodable>(_ type: T.Type, forKey key: Key) throws -> T
 
 % for type in codable_types:
   /// Decodes a value of the given type for the given key, if present.
@@ -524,7 +524,7 @@ public protocol KeyedDecodingContainerProtocol {
   ///   the value is a null value.
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
-  func decodeIfPresent<T : Decodable>(
+  func decodeIfPresent<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
 
   /// Returns the data stored for the given key as represented in a container
@@ -579,7 +579,7 @@ public protocol KeyedDecodingContainerProtocol {
 
 /// A concrete container that provides a view into a decoder's storage, making
 /// the encoded properties of a decodable type accessible by keys.
-public struct KeyedDecodingContainer<K : CodingKey> :
+public struct KeyedDecodingContainer<K: CodingKey> :
   KeyedDecodingContainerProtocol
 {
   public typealias Key = K
@@ -591,7 +591,7 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   /// Creates a new instance with the given container.
   ///
   /// - parameter container: The container to hold.
-  public init<Container : KeyedDecodingContainerProtocol>(
+  public init<Container: KeyedDecodingContainerProtocol>(
     _ container: Container) where Container.Key == Key
   {
     _box = _KeyedDecodingContainerBox(container)
@@ -664,7 +664,7 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   for the given key.
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
-  public func decode<T : Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
+  public func decode<T: Decodable>(_ type: T.Type, forKey key: Key) throws -> T {
     return try _box.decode(T.self, forKey: key)
   }
 
@@ -702,7 +702,7 @@ public struct KeyedDecodingContainer<K : CodingKey> :
   ///   the value is a null value.
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
-  public func decodeIfPresent<T : Decodable>(
+  public func decodeIfPresent<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
     return try _box.decodeIfPresent(T.self, forKey: key)
@@ -799,7 +799,7 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter value: The value to encode.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encode<T : Encodable>(_ value: T) throws
+  mutating func encode<T: Encodable>(_ value: T) throws
 
   /// Encodes a reference to the given object only if it is encoded
   /// unconditionally elsewhere in the payload (previously, or in the future).
@@ -813,14 +813,14 @@ public protocol UnkeyedEncodingContainer {
   /// - parameter object: The object to encode.
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
-  mutating func encodeConditional<T : AnyObject & Encodable>(_ object: T) throws
+  mutating func encodeConditional<T: AnyObject & Encodable>(_ object: T) throws
 
 % for type in codable_types:
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T : Sequence>(
+  mutating func encode<T: Sequence>(
     contentsOf sequence: T) throws where T.Element == ${type}
 % end
 
@@ -828,8 +828,8 @@ public protocol UnkeyedEncodingContainer {
   ///
   /// - parameter sequence: The sequences whose contents to encode.
   /// - throws: An error if any of the contained values throws an error.
-  mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Element : Encodable
+  mutating func encode<T: Sequence>(
+    contentsOf sequence: T) throws where T.Element: Encodable
 
   /// Encodes a nested container keyed by the given type and returns it.
   ///
@@ -903,7 +903,7 @@ public protocol UnkeyedDecodingContainer {
   ///   is not convertible to the requested type.
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null, or of there are no more values to decode.
-  mutating func decode<T : Decodable>(_ type: T.Type) throws -> T
+  mutating func decode<T: Decodable>(_ type: T.Type) throws -> T
 
 % for type in codable_types:
   /// Decodes a value of the given type, if present.
@@ -931,7 +931,7 @@ public protocol UnkeyedDecodingContainer {
   ///   is a null value, or if there are no more elements to decode.
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
-  mutating func decodeIfPresent<T : Decodable>(_ type: T.Type) throws -> T?
+  mutating func decodeIfPresent<T: Decodable>(_ type: T.Type) throws -> T?
 
   /// Decodes a nested container keyed by the given type.
   ///
@@ -994,7 +994,7 @@ public protocol SingleValueEncodingContainer {
   ///   the current context for this format.
   /// - precondition: May not be called after a previous `self.encode(_:)`
   ///   call.
-  mutating func encode<T : Encodable>(_ value: T) throws
+  mutating func encode<T: Encodable>(_ value: T) throws
 }
 
 /// A container that can support the storage and direct decoding of a single
@@ -1028,7 +1028,7 @@ public protocol SingleValueDecodingContainer {
   ///   cannot be converted to the requested type.
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null.
-  func decode<T : Decodable>(_ type: T.Type) throws -> T
+  func decode<T: Decodable>(_ type: T.Type) throws -> T
 }
 
 //===----------------------------------------------------------------------===//
@@ -1036,7 +1036,7 @@ public protocol SingleValueDecodingContainer {
 //===----------------------------------------------------------------------===//
 
 /// A user-defined key for providing context during encoding and decoding.
-public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
+public struct CodingUserInfoKey: RawRepresentable, Equatable, Hashable {
   public typealias RawValue = String
 
   /// The key's string value.
@@ -1079,7 +1079,7 @@ public struct CodingUserInfoKey : RawRepresentable, Equatable, Hashable {
 //===----------------------------------------------------------------------===//
 
 /// An error that occurs during the encoding of a value.
-public enum EncodingError : Error {
+public enum EncodingError: Error {
   /// The context in which the error occurred.
   public struct Context {
     /// The path of coding keys taken to get to the point of the failing encode
@@ -1145,7 +1145,7 @@ public enum EncodingError : Error {
       case .invalidValue(_, let c): context = c
       }
 
-      var userInfo: [String : Any] = [
+      var userInfo: [String: Any] = [
         "NSCodingPath": context.codingPath,
         "NSDebugDescription": context.debugDescription
       ]
@@ -1162,7 +1162,7 @@ public enum EncodingError : Error {
 }
 
 /// An error that occurs during the decoding of a value.
-public enum DecodingError : Error {
+public enum DecodingError: Error {
   /// The context in which the error occurred.
   public struct Context {
     /// The path of coding keys taken to get to the point of the failing decode
@@ -1251,7 +1251,7 @@ public enum DecodingError : Error {
       case .dataCorrupted(   let c): context = c
       }
 
-      var userInfo: [String : Any] = [
+      var userInfo: [String: Any] = [
         "NSCodingPath": context.codingPath,
         "NSDebugDescription": context.debugDescription
       ]
@@ -1269,7 +1269,7 @@ public enum DecodingError : Error {
 
 // The following extensions allow for easier error construction.
 
-internal struct _GenericIndexKey : CodingKey {
+internal struct _GenericIndexKey: CodingKey {
     internal var stringValue: String
     internal var intValue: Int?
 
@@ -1296,7 +1296,7 @@ extension DecodingError {
   /// - param debugDescription: A description of the error to aid in debugging.
   ///
   /// - Returns: A new `.dataCorrupted` error with the given information.
-  public static func dataCorruptedError<C : KeyedDecodingContainerProtocol>(
+  public static func dataCorruptedError<C: KeyedDecodingContainerProtocol>(
     forKey key: C.Key, in container: C, debugDescription: String
   ) -> DecodingError {
     let context = DecodingError.Context(
@@ -1351,7 +1351,7 @@ extension DecodingError {
 // Keyed Encoding Container Implementations
 //===----------------------------------------------------------------------===//
 
-internal class _KeyedEncodingContainerBase<Key : CodingKey> {
+internal class _KeyedEncodingContainerBase<Key: CodingKey> {
   internal init(){}
 
   deinit {}
@@ -1371,11 +1371,11 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
   }
 % end
 
-  internal func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
+  internal func encode<T: Encodable>(_ value: T, forKey key: Key) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
 
-  internal func encodeConditional<T : AnyObject & Encodable>(
+  internal func encodeConditional<T: AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
@@ -1387,7 +1387,7 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
   }
 % end
 
-  internal func encodeIfPresent<T : Encodable>(
+  internal func encodeIfPresent<T: Encodable>(
     _ value: T?, forKey key: Key) throws
   {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
@@ -1414,8 +1414,8 @@ internal class _KeyedEncodingContainerBase<Key : CodingKey> {
 }
 
 internal final class _KeyedEncodingContainerBox<
-  Concrete : KeyedEncodingContainerProtocol
-> : _KeyedEncodingContainerBase<Concrete.Key> {
+  Concrete: KeyedEncodingContainerProtocol
+>: _KeyedEncodingContainerBase<Concrete.Key> {
   typealias Key = Concrete.Key
 
   internal var concrete: Concrete
@@ -1438,13 +1438,13 @@ internal final class _KeyedEncodingContainerBox<
   }
 % end
 
-  override internal func encode<T : Encodable>(
+  override internal func encode<T: Encodable>(
     _ value: T, forKey key: Key) throws
   {
     try concrete.encode(value, forKey: key)
   }
 
-  override internal func encodeConditional<T : AnyObject & Encodable>(
+  override internal func encodeConditional<T: AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
     try concrete.encodeConditional(object, forKey: key)
@@ -1458,7 +1458,7 @@ internal final class _KeyedEncodingContainerBox<
   }
 % end
 
-  override internal func encodeIfPresent<T : Encodable>(
+  override internal func encodeIfPresent<T: Encodable>(
     _ value: T?, forKey key: Key) throws
   {
     try concrete.encodeIfPresent(value, forKey: key)
@@ -1485,7 +1485,7 @@ internal final class _KeyedEncodingContainerBox<
   }
 }
 
-internal class _KeyedDecodingContainerBase<Key : CodingKey> {
+internal class _KeyedDecodingContainerBase<Key: CodingKey> {
   internal init(){}
 
   deinit {}
@@ -1514,7 +1514,7 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 % end
 
-  internal func decode<T : Decodable>(
+  internal func decode<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T
   {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
@@ -1528,7 +1528,7 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
   }
 % end
 
-  internal func decodeIfPresent<T : Decodable>(
+  internal func decodeIfPresent<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
@@ -1556,8 +1556,8 @@ internal class _KeyedDecodingContainerBase<Key : CodingKey> {
 }
 
 internal final class _KeyedDecodingContainerBox<
-  Concrete : KeyedDecodingContainerProtocol
-> : _KeyedDecodingContainerBase<Concrete.Key> {
+  Concrete: KeyedDecodingContainerProtocol
+>: _KeyedDecodingContainerBase<Concrete.Key> {
   typealias Key = Concrete.Key
 
   internal var concrete: Concrete
@@ -1590,7 +1590,7 @@ internal final class _KeyedDecodingContainerBox<
   }
 % end
 
-  override internal func decode<T : Decodable>(
+  override internal func decode<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T
   {
     return try concrete.decode(T.self, forKey: key)
@@ -1604,7 +1604,7 @@ internal final class _KeyedDecodingContainerBox<
   }
 % end
 
-  override internal func decodeIfPresent<T : Decodable>(
+  override internal func decodeIfPresent<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
     return try concrete.decodeIfPresent(T.self, forKey: key)
@@ -1636,7 +1636,7 @@ internal final class _KeyedDecodingContainerBox<
 //===----------------------------------------------------------------------===//
 
 % for type in codable_types:
-extension ${type} : Codable {
+extension ${type}: Codable {
   /// Creates a new instance by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -1659,7 +1659,7 @@ extension ${type} : Codable {
   }
 }
 
-extension RawRepresentable where RawValue == ${type}, Self : Encodable {
+extension RawRepresentable where RawValue == ${type}, Self: Encodable {
   /// Encodes this value into the given encoder, when the type's `RawValue`
   /// is `${type}`.
   ///
@@ -1673,7 +1673,7 @@ extension RawRepresentable where RawValue == ${type}, Self : Encodable {
   }
 }
 
-extension RawRepresentable where RawValue == ${type}, Self : Decodable {
+extension RawRepresentable where RawValue == ${type}, Self: Decodable {
   /// Creates a new instance by decoding from the given decoder, when the
   /// type's `RawValue` is `${type}`.
   ///
@@ -1699,7 +1699,7 @@ extension RawRepresentable where RawValue == ${type}, Self : Decodable {
 // Optional/Collection Type Conformances
 //===----------------------------------------------------------------------===//
 
-extension Optional : Encodable where Wrapped : Encodable {
+extension Optional: Encodable where Wrapped: Encodable {
   /// Encodes this optional value into the given encoder.
   ///
   /// This function throws an error if any values are invalid for the given
@@ -1715,7 +1715,7 @@ extension Optional : Encodable where Wrapped : Encodable {
   }
 }
 
-extension Optional : Decodable where Wrapped : Decodable {
+extension Optional: Decodable where Wrapped: Decodable {
   /// Creates a new instance by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -1733,7 +1733,7 @@ extension Optional : Decodable where Wrapped : Decodable {
   }
 }
 
-extension Array : Encodable where Element : Encodable {
+extension Array: Encodable where Element: Encodable {
   /// Encodes the elements of this array into the given encoder in an unkeyed
   /// container.
   ///
@@ -1749,7 +1749,7 @@ extension Array : Encodable where Element : Encodable {
   }
 }
 
-extension Array : Decodable where Element : Decodable {
+extension Array: Decodable where Element: Decodable {
   /// Creates a new array by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -1767,7 +1767,7 @@ extension Array : Decodable where Element : Decodable {
   }
 }
 
-extension ContiguousArray : Encodable where Element : Encodable {
+extension ContiguousArray: Encodable where Element: Encodable {
   /// Encodes the elements of this contiguous array into the given encoder
   /// in an unkeyed container.
   ///
@@ -1783,7 +1783,7 @@ extension ContiguousArray : Encodable where Element : Encodable {
   }
 }
 
-extension ContiguousArray : Decodable where Element : Decodable {
+extension ContiguousArray: Decodable where Element: Decodable {
   /// Creates a new contiguous array by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -1801,7 +1801,7 @@ extension ContiguousArray : Decodable where Element : Decodable {
   }
 }
 
-extension Set : Encodable where Element : Encodable {
+extension Set: Encodable where Element: Encodable {
   /// Encodes the elements of this set into the given encoder in an unkeyed
   /// container.
   ///
@@ -1817,7 +1817,7 @@ extension Set : Encodable where Element : Encodable {
   }
 }
 
-extension Set : Decodable where Element : Decodable {
+extension Set: Decodable where Element: Decodable {
   /// Creates a new set by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -1836,7 +1836,7 @@ extension Set : Decodable where Element : Decodable {
 }
 
 /// A wrapper for dictionary keys which are Strings or Ints.
-internal struct _DictionaryCodingKey : CodingKey {
+internal struct _DictionaryCodingKey: CodingKey {
   internal let stringValue: String
   internal let intValue: Int?
 
@@ -1851,7 +1851,7 @@ internal struct _DictionaryCodingKey : CodingKey {
   }
 }
 
-extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
+extension Dictionary: Encodable where Key: Encodable, Value: Encodable {
   /// Encodes the contents of this dictionary into the given encoder.
   ///
   /// If the dictionary uses `String` or `Int` keys, the contents are encoded
@@ -1890,7 +1890,7 @@ extension Dictionary : Encodable where Key : Encodable, Value : Encodable {
   }
 }
 
-extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
+extension Dictionary: Decodable where Key: Decodable, Value: Decodable {
   /// Creates a new dictionary by decoding from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -1967,7 +1967,7 @@ extension Dictionary : Decodable where Key : Decodable, Value : Decodable {
 // Default implementation of encodeConditional(_:forKey:) in terms of
 // encode(_:forKey:)
 extension KeyedEncodingContainerProtocol {
-  public mutating func encodeConditional<T : AnyObject & Encodable>(
+  public mutating func encodeConditional<T: AnyObject & Encodable>(
     _ object: T, forKey key: Key) throws
   {
     try encode(object, forKey: key)
@@ -1986,7 +1986,7 @@ extension KeyedEncodingContainerProtocol {
   }
 % end
 
-  public mutating func encodeIfPresent<T : Encodable>(
+  public mutating func encodeIfPresent<T: Encodable>(
     _ value: T?, forKey key: Key) throws
   {
     guard let value = value else { return }
@@ -2007,7 +2007,7 @@ extension KeyedDecodingContainerProtocol {
   }
 % end
 
-  public func decodeIfPresent<T : Decodable>(
+  public func decodeIfPresent<T: Decodable>(
     _ type: T.Type, forKey key: Key) throws -> T?
   {
     guard try self.contains(key) && !self.decodeNil(forKey: key)
@@ -2019,14 +2019,14 @@ extension KeyedDecodingContainerProtocol {
 // Default implementation of encodeConditional(_:) in terms of encode(_:),
 // and encode(contentsOf:) in terms of encode(_:) loop.
 extension UnkeyedEncodingContainer {
-  public mutating func encodeConditional<T : AnyObject & Encodable>(
+  public mutating func encodeConditional<T: AnyObject & Encodable>(
     _ object: T) throws
   {
     try self.encode(object)
   }
 
 % for type in codable_types:
-  public mutating func encode<T : Sequence>(
+  public mutating func encode<T: Sequence>(
     contentsOf sequence: T) throws where T.Element == ${type}
   {
     for element in sequence {
@@ -2035,8 +2035,8 @@ extension UnkeyedEncodingContainer {
   }
 % end
 
-  public mutating func encode<T : Sequence>(
-    contentsOf sequence: T) throws where T.Element : Encodable
+  public mutating func encode<T: Sequence>(
+    contentsOf sequence: T) throws where T.Element: Encodable
   {
     for element in sequence {
       try self.encode(element)
@@ -2056,7 +2056,7 @@ extension UnkeyedDecodingContainer {
   }
 % end
 
-  public mutating func decodeIfPresent<T : Decodable>(
+  public mutating func decodeIfPresent<T: Decodable>(
     _ type: T.Type) throws -> T?
   {
     guard try !self.isAtEnd && !self.decodeNil() else { return nil }

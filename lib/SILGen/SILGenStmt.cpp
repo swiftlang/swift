@@ -961,9 +961,18 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   };
 
   auto buildElementRValue = [&](SILLocation loc, SGFContext ctx) {
-    return SGF.emitApplyMethod(
+    RValue result;
+    result = SGF.emitApplyMethod(
         loc, S->getIteratorNext(), buildArgumentSource(),
-        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})), ctx);
+        PreparedArguments(ArrayRef<AnyFunctionType::Param>({})),
+        S->getElementExpr() ? SGFContext() : ctx);
+    if (S->getElementExpr()) {
+      SILGenFunction::OpaqueValueRAII pushOpaqueValue(
+          SGF, S->getElementExpr(),
+          std::move(result).getAsSingleValue(SGF, loc));
+      result = SGF.emitRValue(S->getConvertElementExpr(), ctx);
+    }
+    return result;
   };
   // Then emit the loop destination block.
   //
@@ -976,17 +985,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     {
       ArgumentScope innerForScope(SGF, SILLocation(S));
       SILLocation loc = SILLocation(S);
-      RValue result;
-      if (S->getElementExpr()) {
-        result = buildElementRValue(loc, SGFContext());
-        SILGenFunction::OpaqueValueRAII pushOpaqueValue(
-            SGF, S->getElementExpr(),
-            std::move(result).getAsSingleValue(SGF, loc));
-        result = SGF.emitRValue(S->getConvertElementExpr(),
-                                SGFContext(nextInit.get()));
-      } else {
-        result = buildElementRValue(loc, SGFContext(nextInit.get()));
-      }
+      RValue result = buildElementRValue(loc, SGFContext(nextInit.get()));
       if (!result.isInContext()) {
         ArgumentSource(SILLocation(S->getSequence()),
                        std::move(result).ensurePlusOne(SGF, loc))

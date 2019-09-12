@@ -1183,10 +1183,24 @@ bb0(%0 : $Int32, %1 : $Int32, %2 : $Int32, %3 : $Foo):
 // CHECK-LABEL: sil @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
 sil @cond_fail_test : $(Builtin.Int1) -> () {
 entry(%0 : $Builtin.Int1):
-  // CHECK: cond_fail %0 : $Builtin.Int1
+  // CHECK: cond_fail %0 : $Builtin.Int1, ""
   cond_fail %0 : $Builtin.Int1
+  // CHECK: cond_fail %0 : $Builtin.Int1, "message"
+  cond_fail %0 : $Builtin.Int1, "message"
   %1 = tuple ()
   return %1 : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_lifetime_flag : $@convention(thin) () -> ()
+sil @test_dynamic_lifetime_flag : $() -> () {
+bb0:
+  // CHECK: alloc_box [dynamic_lifetime] $<τ_0_0> { var τ_0_0 } <AnyObject>
+  %0 = alloc_box [dynamic_lifetime] $<τ_0_0> { var τ_0_0 } <AnyObject>
+  // CHECK: alloc_stack [dynamic_lifetime] $AnyObject
+  %1 = alloc_stack [dynamic_lifetime] $AnyObject
+  dealloc_stack %1 : $*AnyObject
+  %2 = tuple ()
+  return %2 : $()
 }
 
 sil_global @staticProp: $Int

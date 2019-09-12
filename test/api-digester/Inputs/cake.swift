@@ -3,6 +3,7 @@
 public protocol P1 {}
 public protocol P2 {}
 public protocol P3: P2, P1 {}
+
 @frozen
 public struct S1: P1 {
   public static func foo1() {}
@@ -101,19 +102,19 @@ class InternalType {}
 
 extension InternalType {}
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 public extension PSuper {
   func futureFoo() {}
 }
 
 public class FutureContainer {
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public func futureFoo() {}
-  @available(macOS 9999, *)
+  @available(macOS 10.15, *)
   public func NotfutureFoo() {}
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 extension FutureContainer: P1 {}
 
 extension FutureContainer: P2 {}
@@ -123,3 +124,18 @@ public class PlatformIntroClass {}
 
 @available(swift, introduced: 5)
 public class SwiftIntroClass {}
+
+@objc(NewObjCClass)
+public class SwiftObjcClass {
+  @objc(ObjCFool:ObjCA:ObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}
+
+@available(iOS 10.2, tvOS 10.3, watchOS 3.4, *)
+@available(macOS, unavailable)
+public class UnavailableOnMac {}
+
+@available(macOS, unavailable)
+extension SwiftObjcClass {
+  public func functionUnavailableOnMac() {}
+}

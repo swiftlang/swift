@@ -368,8 +368,8 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 // Is a particular parameter of a function or subscript declaration
 // declared to be an IUO?
 static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
-  return swift::getParameterAt(decl, paramNum)->getAttrs()
-      .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  return swift::getParameterAt(decl, paramNum)
+    ->isImplicitlyUnwrappedOptional();
 }
 
 /// Determine whether the first declaration is as "specialized" as
@@ -1104,7 +1104,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       continue;
     }
-    
+
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type

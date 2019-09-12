@@ -85,7 +85,7 @@ def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
         reset_to_remote, should_clean, cross_repos_pr = pool_args
     repo_path = os.path.join(source_root, repo_name)
-    if not os.path.isdir(repo_path):
+    if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
 
     try:
@@ -408,6 +408,23 @@ def skip_list_for_platform(config):
     return skip_list
 
 
+def symlink_llvm_monorepo(args):
+    print("Create symlink for LLVM Project")
+    llvm_projects = ['clang',
+                     'llvm',
+                     'lldb',
+                     'compiler-rt',
+                     'libcxx',
+                     'clang-tools-extra']
+    for project in llvm_projects:
+        src_path = os.path.join(args.source_root,
+                                'llvm-project',
+                                project)
+        dst_path = os.path.join(args.source_root, project)
+        if not os.path.islink(dst_path):
+            os.symlink(src_path, dst_path)
+
+
 def main():
     freeze_support()
     parser = argparse.ArgumentParser(
@@ -489,6 +506,10 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
         help="The root directory to checkout repositories",
         default=SWIFT_SOURCE_ROOT,
         dest='source_root')
+    parser.add_argument(
+        '--symlink-llvm-monorepo',
+        help='Create symlink from LLVM-Project to source root directory',
+        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -560,6 +581,8 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     else:
+        if args.symlink_llvm_monorepo:
+            symlink_llvm_monorepo(args)
         print("update-checkout succeeded")
         print_repo_hashes(args, config)
     sys.exit(fail_count)

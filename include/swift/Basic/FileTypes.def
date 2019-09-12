@@ -62,7 +62,12 @@ TYPE("swift-dependencies",  SwiftDeps,                 "swiftdeps",       "")
 TYPE("remap",               Remapping,                 "remap",           "")
 TYPE("imported-modules",    ImportedModules,           "importedmodules", "")
 TYPE("tbd",                 TBD,                       "tbd",             "")
+
+// Module traces are used by Apple's internal build infrastructure. Apple
+// engineers can see more details on the "Swift module traces" page in the
+// Swift section of the internal wiki.
 TYPE("module-trace",        ModuleTrace,               "trace.json",      "")
+
 TYPE("index-data",          IndexData,                 "",                "")
 TYPE("opt-record",          OptRecord,                 "opt.yaml",        "")
 

@@ -355,7 +355,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       // witness completely.
       if (!allUnresolved.count(result.first)) {
         auto existingWitness =
-        conformance->getTypeWitness(result.first);
+          conformance->getTypeWitness(result.first);
         existingWitness = dc->mapTypeIntoContext(existingWitness);
 
         // If the deduced type contains an irreducible
@@ -531,13 +531,11 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       if (depMemTy->getAssocType() &&
           depMemTy->getAssocType()->getProtocol() != proto) {
-        for (auto member : proto->lookupDirect(depMemTy->getName())) {
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-            auto origProto = depMemTy->getAssocType()->getProtocol();
-            if (proto->inheritsFrom(origProto))
-              return Type(DependentMemberType::get(depMemTy->getBase(),
-                                                   assocType));
-          }
+        if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
+          auto origProto = depMemTy->getAssocType()->getProtocol();
+          if (proto->inheritsFrom(origProto))
+            return Type(DependentMemberType::get(depMemTy->getBase(),
+                                                 assocType));
         }
       }
     }
@@ -547,8 +545,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
 
   ModuleDecl *module = conformance->getDeclContext()->getParentModule();
   auto resultType = type.subst(QueryTypeSubstitutionMap{substitutions},
-                               LookUpConformanceInModule(module),
-                               SubstFlags::UseErrorType);
+                               LookUpConformanceInModule(module));
   if (!resultType->hasError()) return resultType;
 
   // Map error types with original types *back* to the original, dependent type.
@@ -867,7 +864,7 @@ Type AssociatedTypeInference::computeDefaultTypeWitness(
                           QueryTypeSubstitutionMap{substitutions},
                           LookUpConformanceInModule(dc->getParentModule()));
 
-  if (!defaultType)
+  if (defaultType->hasError())
     return Type();
 
   if (auto failed = checkTypeWitness(tc, dc, proto, assocType, defaultType)) {
@@ -962,9 +959,9 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
       SWIFT_DEFER { recursionCheck.erase(assocType); };
 
       // Try to substitute into the base type.
-      if (Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy)){
+      Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy);
+      if (!result->hasError())
         return result;
-      }
 
       // If that failed, check whether it's because of the conformance we're
       // evaluating.
@@ -1011,14 +1008,12 @@ static void sanitizeProtocolRequirements(
         if (!depMemTy->getAssocType() ||
             depMemTy->getAssocType()->getProtocol() != proto) {
 
-          for (auto member : proto->lookupDirect(depMemTy->getName())) {
-            if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-              Type sanitizedBase = sanitizeType(depMemTy->getBase());
-              if (!sanitizedBase)
-                return Type();
-              return Type(DependentMemberType::get(sanitizedBase,
-                                                   assocType));
-            }
+          if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
+            Type sanitizedBase = sanitizeType(depMemTy->getBase());
+            if (!sanitizedBase)
+              return Type();
+            return Type(DependentMemberType::get(sanitizedBase,
+                                                  assocType));
           }
 
           if (depMemTy->getBase()->is<GenericTypeParamType>())
@@ -1070,24 +1065,17 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
                  thisProto->inheritsFrom(conformance->getProtocol())) {
         // Find an associated type with the same name in the given
         // protocol.
-        AssociatedTypeDecl *foundAssocType = nullptr;
-        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-        for (auto result : thisProto->lookupDirect(
-                                             assocType->getName(), flags)) {
-          foundAssocType = dyn_cast<AssociatedTypeDecl>(result);
-          if (foundAssocType) break;
-        }
+        auto *foundAssocType = thisProto->getAssociatedType(
+            assocType->getName());
+        if (!foundAssocType) return nullptr;
+        assocType = foundAssocType;
+      } else {
+        return nullptr;
+      }
 
-      if (!foundAssocType) return nullptr;
-      assocType = foundAssocType;
-    } else {
-      return nullptr;
-    }
-
-    Type type = self->typeWitnesses.begin(assocType)->first;
-    return type->mapTypeOutOfContext().getPointer();
-  };
+      Type type = self->typeWitnesses.begin(assocType)->first;
+      return type->mapTypeOutOfContext().getPointer();
+    };
   return options;
 }
 

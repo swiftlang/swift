@@ -48,7 +48,7 @@ enum Result<T> {
   }
 }
 
-func overParenthesized() {
+func parenthesized() {
   // SR-7492: Space projection needs to treat extra paren-patterns explicitly.
   let x: Result<(Result<Int>, String)> = .Ok((.Ok(1), "World"))
   switch x {
@@ -1175,3 +1175,196 @@ func sr10301_as(_ foo: SR10301<String,(Int,Error)>) {
     return
   }
 }
+
+func sr11160() {
+  switch Optional<(Int, Int)>((5, 6)) {
+  case .some((let a, let b)): print(a, b)
+  case nil:                   print(0)
+  }
+
+  switch Optional<(Int, Int)>((5, 6)) {
+  case let b?: print(b)
+  case nil:    print(0)
+  }
+}
+
+enum Z {
+  case z1(a: Int)
+  case z2(a: Int, b: Int)
+  case z3((c: Int, d: Int))
+}
+
+func sr11160_extra() {
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z1(let a)'}}
+  case .z2(_, _): ()
+  case .z3(_): ()
+  }
+
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z2(let a, let b)'}}
+  case .z1(_): ()
+  case .z3(_): ()
+  }
+
+  switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
+                      // expected-note@-1 {{add missing case: '.z3((let c, let d))'}}
+  case .z1(_):    ()
+  case .z2(_, _): ()
+  }
+}
+
+// SR-11212 tests: Some of the tests here rely on compiler bugs related to
+// implicit (un)tupling in patterns.
+//
+// Related codegen test: Compatibility/implicit_tupling_untupling_codegen.swift
+enum SR11212Tests {
+
+  enum Untupled {
+    case upair(Int, Int)
+  }
+
+  func sr11212_content_untupled_pattern_tupled1(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair((let x, let y)): return (x, y)
+    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_tupled2(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let (x, y)): return (x, y)
+    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_tupled3(u: Untupled) -> (Int, Int) {
+    switch u {
+    case let .upair((x, y)): return (x, y)
+    // expected-warning@-1 {{a tuple pattern cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_untupled1(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let x, let y): return (x, y)
+    }
+  }
+
+  func sr11212_content_untupled_pattern_untupled2(u: Untupled) -> (Int, Int) {
+      switch u {
+      case let .upair(x, y): return (x, y)
+      }
+  }
+
+  func sr11212_content_untupled_pattern_ambiguous1(u: Untupled) -> (Int, Int) {
+    switch u {
+    case .upair(let u_): return u_
+    // expected-warning@-1 {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_untupled_pattern_ambiguous2(u: Untupled) -> (Int, Int) {
+    switch u {
+    case let .upair(u_): return u_
+    // expected-warning@-1 {{cannot match several associated values at once, implicitly tupling the associated values and trying to match that instead}}
+    }
+  }
+
+  enum Tupled {
+    case tpair((Int, Int))
+  }
+
+  func sr11212_content_tupled_pattern_tupled1(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_tupled2(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_tupled3(t: Tupled) -> (Int, Int) {
+    switch t {
+    case let .tpair((x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_tupled_pattern_untupled1(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let x, let y): return (x, y)
+    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_tupled_pattern_untupled2(t: Tupled) -> (Int, Int) {
+    switch t {
+    case let .tpair(x, y): return (x, y)
+    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_tupled_pattern_ambiguous1(t: Tupled) -> (Int, Int) {
+    switch t {
+    case .tpair(let t_): return t_
+    }
+  }
+
+  func sr11212_content_tupled_pattern_ambiguous2(t: Tupled) -> (Int, Int) {
+    switch t {
+    case let .tpair(t_): return t_
+    }
+  }
+
+  enum Box<T> {
+    case box(T)
+  }
+
+  func sr11212_content_generic_pattern_tupled1(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box((let x, let y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_tupled2(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let (x, y)): return (x, y)
+    }
+  }
+
+  func sr11212_content_generic_pattern_tupled3(b: Box<(Int, Int)>) -> (Int, Int) {
+   switch b {
+   case let .box((x, y)): return (x, y)
+   }
+  }
+
+  func sr11212_content_generic_pattern_untupled1(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let x, let y): return (x, y)
+    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_generic_pattern_untupled2(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case let .box(x, y): return (x, y)
+    // expected-warning@-1 {{the enum case has a single tuple as an associated value, but there are several patterns here, implicitly tupling the patterns and trying to match that instead}}
+    }
+  }
+
+  func sr11212_content_generic_pattern_ambiguous1(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case .box(let b_): return b_
+    }
+  }
+
+  func sr11212_content_generic_pattern_ambiguous2(b: Box<(Int, Int)>) -> (Int, Int) {
+    switch b {
+    case let .box(b_): return b_
+    }
+  }
+
+} // end SR11212Tests

@@ -48,36 +48,37 @@ void ConstraintFix::dump() const {print(llvm::errs()); }
 
 std::string ForceDowncast::getName() const {
   llvm::SmallString<16> name;
-  name += "force downcast (as! ";
-  name += DowncastTo->getString();
+  name += "force downcast (";
+  name += getFromType()->getString();
+  name += " as! ";
+  name += getToType()->getString();
   name += ")";
   return name.c_str();
 }
 
 bool ForceDowncast::diagnose(Expr *expr, bool asNote) const {
-  MissingExplicitConversionFailure failure(expr, getConstraintSystem(),
-                                           getLocator(), DowncastTo);
+  auto &cs = getConstraintSystem();
+  MissingExplicitConversionFailure failure(expr, cs, getFromType(), getToType(),
+                                           getLocator());
   return failure.diagnose(asNote);
 }
 
-ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type toType,
-                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) ForceDowncast(cs, toType, locator);
+ForceDowncast *ForceDowncast::create(ConstraintSystem &cs, Type fromType,
+                                     Type toType, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) ForceDowncast(cs, fromType, toType, locator);
 }
 
 bool ForceOptional::diagnose(Expr *root, bool asNote) const {
   MissingOptionalUnwrapFailure failure(root, getConstraintSystem(), BaseType,
-                                       UnwrappedType, FullLocator);
+                                       UnwrappedType, getLocator());
   return failure.diagnose(asNote);
 }
 
 ForceOptional *ForceOptional::create(ConstraintSystem &cs, Type baseType,
                                      Type unwrappedType,
                                      ConstraintLocator *locator) {
-  auto *simplifiedLocator =
-      cs.getConstraintLocator(simplifyLocatorToAnchor(cs, locator));
   return new (cs.getAllocator())
-      ForceOptional(cs, baseType, unwrappedType, simplifiedLocator, locator);
+      ForceOptional(cs, baseType, unwrappedType, locator);
 }
 
 bool UnwrapOptionalBase::diagnose(Expr *root, bool asNote) const {
@@ -102,13 +103,15 @@ UnwrapOptionalBase *UnwrapOptionalBase::createWithOptionalResult(
 }
 
 bool AddAddressOf::diagnose(Expr *root, bool asNote) const {
-  MissingAddressOfFailure failure(root, getConstraintSystem(), getLocator());
+  auto &cs = getConstraintSystem();
+  MissingAddressOfFailure failure(root, cs, getFromType(), getToType(),
+                                  getLocator());
   return failure.diagnose(asNote);
 }
 
-AddAddressOf *AddAddressOf::create(ConstraintSystem &cs,
-                                   ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AddAddressOf(cs, locator);
+AddAddressOf *AddAddressOf::create(ConstraintSystem &cs, Type argTy,
+                                   Type paramTy, ConstraintLocator *locator) {
+  return new (cs.getAllocator()) AddAddressOf(cs, argTy, paramTy, locator);
 }
 
 bool TreatRValueAsLValue::diagnose(Expr *root, bool asNote) const {
@@ -229,15 +232,29 @@ ContextualMismatch *ContextualMismatch::create(ConstraintSystem &cs, Type lhs,
   return new (cs.getAllocator()) ContextualMismatch(cs, lhs, rhs, locator);
 }
 
+bool AllowTupleTypeMismatch::diagnose(Expr *root, bool asNote) const {
+  auto failure = TupleContextualFailure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowTupleTypeMismatch *
+AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
+                               ConstraintLocator *locator) {
+  assert(lhs->is<TupleType>() && rhs->is<TupleType>() &&
+         "lhs and rhs must be tuple types");
+  return new (cs.getAllocator()) AllowTupleTypeMismatch(cs, lhs, rhs, locator);
+}
+
 bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
-  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
-                                                 getActual(), getRequired(),
-                                                 getMismatches(), getLocator());
+  auto &cs = getConstraintSystem();
+  GenericArgumentsMismatchFailure failure(root, cs, getFromType(), getToType(),
+                                          getMismatches(), getLocator());
   return failure.diagnose(asNote);
 }
 
 GenericArgumentsMismatch *GenericArgumentsMismatch::create(
-    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    ConstraintSystem &cs, Type actual, Type required,
     llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
   void *mem =
@@ -255,6 +272,20 @@ bool AutoClosureForwarding::diagnose(Expr *root, bool asNote) const {
 AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
                                                      ConstraintLocator *locator) {
   return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
+}
+
+bool AllowAutoClosurePointerConversion::diagnose(Expr *root, bool asNote) const {
+  auto failure = AutoClosurePointerConversionFailure(root, getConstraintSystem(),
+      getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowAutoClosurePointerConversion *
+AllowAutoClosurePointerConversion::create(ConstraintSystem &cs, Type pointeeType,
+                                          Type pointerType,
+                                          ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowAutoClosurePointerConversion(cs, pointeeType, pointerType, locator);
 }
 
 bool RemoveUnwrap::diagnose(Expr *root, bool asNote) const {
@@ -577,13 +608,14 @@ KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool RemoveAddressOf::diagnose(Expr *root, bool asNote) const {
-  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getLocator());
+  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getFromType(),
+                                getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
-RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs,
+RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                          ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RemoveAddressOf(cs, locator);
+  return new (cs.getAllocator()) RemoveAddressOf(cs, lhs, rhs, locator);
 }
 
 bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
@@ -656,4 +688,87 @@ AllowMutatingMemberOnRValueBase::create(ConstraintSystem &cs, Type baseType,
                                         ConstraintLocator *locator) {
   return new (cs.getAllocator())
       AllowMutatingMemberOnRValueBase(cs, baseType, member, name, locator);
+}
+
+bool AllowTupleSplatForSingleParameter::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InvalidTupleSplatWithSingleParameterFailure failure(root, cs, ParamType,
+                                                      getLocator());
+  return failure.diagnose(asNote);
+}
+
+bool AllowTupleSplatForSingleParameter::attempt(
+    ConstraintSystem &cs, SmallVectorImpl<Param> &args, ArrayRef<Param> params,
+    SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+    ConstraintLocatorBuilder locator) {
+  if (params.size() != 1 || args.size() <= 1)
+    return true;
+
+  const auto &param = params.front();
+
+  auto *paramTy = param.getOldType()->getAs<TupleType>();
+  if (!paramTy || paramTy->getNumElements() != args.size())
+    return true;
+
+  SmallVector<TupleTypeElt, 4> argElts;
+  for (const auto &arg : args) {
+    argElts.push_back(
+        {arg.getPlainType(), arg.getLabel(), arg.getParameterFlags()});
+  }
+
+  bindings[0].clear();
+  bindings[0].push_back(0);
+
+  auto newArgType = TupleType::get(argElts, cs.getASTContext());
+
+  args.clear();
+  args.push_back(AnyFunctionType::Param(newArgType, param.getLabel()));
+
+  auto *fix = new (cs.getAllocator()) AllowTupleSplatForSingleParameter(
+      cs, paramTy, cs.getConstraintLocator(locator));
+
+  return cs.recordFix(fix);
+}
+
+bool DropThrowsAttribute::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ThrowingFunctionConversionFailure failure(root, cs, getFromType(),
+                                            getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
+                                                 FunctionType *fromType,
+                                                 FunctionType *toType,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DropThrowsAttribute(cs, fromType, toType, locator);
+}
+
+bool IgnoreContextualType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ContextualFailure failure(root, cs, getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
+                                                   Type resultTy,
+                                                   Type specifiedTy,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreContextualType(cs, resultTy, specifiedTy, locator);
+}
+
+bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InOutConversionFailure failure(root, cs, getFromType(), getToType(),
+                                 getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
+                                                   Type argType, Type paramType,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInOutConversion(cs, argType, paramType, locator);
 }

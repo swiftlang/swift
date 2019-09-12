@@ -35,6 +35,7 @@ namespace swift {
   class ForeignErrorConvention;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
+  class ModuleDecl;
   class SILBuilder;
   class SILLocation;
   class SILModule;
@@ -712,10 +713,10 @@ class TypeConverter {
                               const TypeLowering *lowering);
 
 public:
-  SILModule &M;
+  ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(SILModule &m);
+  TypeConverter(ModuleDecl &m);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -803,7 +804,8 @@ public:
   }
 
   SILType getLoweredLoadableType(Type t,
-                                 ResilienceExpansion forExpansion) {
+                                 ResilienceExpansion forExpansion,
+                                 SILModule &M) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
         (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&

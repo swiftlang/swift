@@ -95,7 +95,7 @@ extension FlattenSequence: Sequence {
   }
 }
 
-extension Sequence where Element : Sequence {
+extension Sequence where Element: Sequence {
   /// Returns the elements of this sequence of sequences, concatenated.
   ///
   /// In this example, an array of three ranges is flattened so that the
@@ -125,7 +125,7 @@ extension Sequence where Element : Sequence {
   }
 }
 
-extension LazySequenceProtocol where Element : Sequence {
+extension LazySequenceProtocol where Element: Sequence {
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
   @inlinable // lazy-performance
@@ -161,7 +161,7 @@ extension FlattenSequence where Base: Collection, Base.Element: Collection {
   }
 }
 
-extension FlattenSequence.Index : Equatable where Base: Collection, Base.Element: Collection {
+extension FlattenSequence.Index: Equatable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
   public static func == (
     lhs: FlattenCollection<Base>.Index,
@@ -171,7 +171,7 @@ extension FlattenSequence.Index : Equatable where Base: Collection, Base.Element
   }
 }
 
-extension FlattenSequence.Index : Comparable where Base: Collection, Base.Element: Collection {
+extension FlattenSequence.Index: Comparable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
   public static func < (
     lhs: FlattenCollection<Base>.Index,
@@ -195,8 +195,8 @@ extension FlattenSequence.Index : Comparable where Base: Collection, Base.Elemen
   }
 }
 
-extension FlattenSequence.Index : Hashable
-  where Base: Collection, Base.Element: Collection, Base.Index : Hashable, Base.Element.Index : Hashable {
+extension FlattenSequence.Index: Hashable
+  where Base: Collection, Base.Element: Collection, Base.Index: Hashable, Base.Element.Index: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -399,8 +399,8 @@ extension FlattenCollection: Collection {
   }
 }
 
-extension FlattenCollection : BidirectionalCollection
-  where Base : BidirectionalCollection, Base.Element : BidirectionalCollection {
+extension FlattenCollection: BidirectionalCollection
+  where Base: BidirectionalCollection, Base.Element: BidirectionalCollection {
 
   // FIXME(performance): swift-3-indexing-model: add custom advance/distance
   // methods that skip over inner collections when random-access

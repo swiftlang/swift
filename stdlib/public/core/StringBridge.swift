@@ -17,17 +17,84 @@ import SwiftShims
 internal typealias _CocoaString = AnyObject
 
 #if _runtime(_ObjC)
+
 // Swift's String bridges NSString via this protocol and these
 // variables, allowing the core stdlib to remain decoupled from
 // Foundation.
+
+@objc private protocol _StringSelectorHolder : _NSCopying {
+    
+  @objc var length: Int { get }
+  
+  @objc var hash: UInt { get }
+  
+  @objc(characterAtIndex:)
+  func character(at offset: Int) -> UInt16
+  
+  @objc(getCharacters:range:)
+  func getCharacters(
+   _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
+  )
+ 
+  @objc(_fastCStringContents:)
+  func _fastCStringContents(
+    _ requiresNulTermination: Int8
+  ) -> UnsafePointer<CChar>?
+  
+  @objc(_fastCharacterContents)
+  func _fastCharacterContents() -> UnsafePointer<UInt16>?
+  
+  @objc(getBytes:maxLength:usedLength:encoding:options:range:remainingRange:)
+  func getBytes(_ buffer: UnsafeMutableRawPointer?,
+   maxLength maxBufferCount: Int,
+  usedLength usedBufferCount: UnsafeMutablePointer<Int>?,
+    encoding: UInt,
+     options: UInt,
+       range: _SwiftNSRange,
+       remaining leftover: UnsafeMutablePointer<_SwiftNSRange>?) -> Int8
+  
+  @objc(compare:options:range:locale:)
+  func compare(_ string: _CocoaString,
+               options: UInt,
+               range: _SwiftNSRange,
+               locale: AnyObject?) -> Int
+
+  @objc(newTaggedNSStringWithASCIIBytes_:length_:)
+  func createTaggedString(bytes: UnsafePointer<UInt8>, 
+                          count: Int) -> AnyObject?
+}
+
+/*
+ Passing a _CocoaString through _objc() lets you call ObjC methods that the
+ compiler doesn't know about, via the protocol above. In order to get good
+ performance, you need a double indirection like this:
+ 
+  func a -> _objc -> func a'
+ 
+ because any refcounting @_effects on 'a' will be lost when _objc breaks ARC's
+ knowledge that the _CocoaString and _StringSelectorHolder are the same object.
+ */
+@inline(__always)
+private func _objc(_ str: _CocoaString) -> _StringSelectorHolder {
+  return unsafeBitCast(str, to: _StringSelectorHolder.self)
+}
+
+@_effects(releasenone)
+private func _copyNSString(_ str: _StringSelectorHolder) -> _CocoaString {
+  return str.copy(with: nil)
+}
 
 @usableFromInline // @testable
 @_effects(releasenone)
 internal func _stdlib_binary_CFStringCreateCopy(
   _ source: _CocoaString
 ) -> _CocoaString {
-  let result = _swift_stdlib_CFStringCreateCopy(nil, source) as AnyObject
-  return result
+  return _copyNSString(_objc(source))
+}
+
+@_effects(readonly)
+private func _NSStringLen(_ str: _StringSelectorHolder) -> Int {
+  return str.length
 }
 
 @usableFromInline // @testable
@@ -35,7 +102,12 @@ internal func _stdlib_binary_CFStringCreateCopy(
 internal func _stdlib_binary_CFStringGetLength(
   _ source: _CocoaString
 ) -> Int {
-  return _swift_stdlib_CFStringGetLength(source)
+  return _NSStringLen(_objc(source))
+}
+
+@_effects(readonly)
+private func _NSStringCharactersPtr(_ str: _StringSelectorHolder) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
+  return UnsafeMutablePointer(mutating: str._fastCharacterContents())
 }
 
 @usableFromInline // @testable
@@ -43,8 +115,19 @@ internal func _stdlib_binary_CFStringGetLength(
 internal func _stdlib_binary_CFStringGetCharactersPtr(
   _ source: _CocoaString
 ) -> UnsafeMutablePointer<UTF16.CodeUnit>? {
-  return UnsafeMutablePointer(
-    mutating: _swift_stdlib_CFStringGetCharactersPtr(source))
+  return _NSStringCharactersPtr(_objc(source))
+}
+
+@_effects(releasenone)
+private func _NSStringGetCharacters(
+  from source: _StringSelectorHolder,
+  range: Range<Int>,
+  into destination: UnsafeMutablePointer<UTF16.CodeUnit>
+) {
+  source.getCharacters(destination, range: _SwiftNSRange(
+    location: range.startIndex,
+    length: range.count)
+  )
 }
 
 /// Copies a slice of a _CocoaString into contiguous storage of sufficient
@@ -55,18 +138,45 @@ internal func _cocoaStringCopyCharacters(
   range: Range<Int>,
   into destination: UnsafeMutablePointer<UTF16.CodeUnit>
 ) {
-  _swift_stdlib_CFStringGetCharacters(
-    source,
-    _swift_shims_CFRange(location: range.lowerBound, length: range.count),
-    destination)
+  _NSStringGetCharacters(from: _objc(source), range: range, into: destination)
+}
+
+@_effects(readonly)
+private func _NSStringGetCharacter(
+  _ target: _StringSelectorHolder, _ position: Int
+) -> UTF16.CodeUnit {
+  return target.character(at: position)
 }
 
 @_effects(readonly)
 internal func _cocoaStringSubscript(
   _ target: _CocoaString, _ position: Int
 ) -> UTF16.CodeUnit {
-  let cfSelf: _swift_shims_CFStringRef = target
-  return _swift_stdlib_CFStringGetCharacterAtIndex(cfSelf, position)
+  return _NSStringGetCharacter(_objc(target), position)
+}
+
+@_effects(releasenone)
+private func _NSStringCopyUTF8(
+  _ o: _StringSelectorHolder,
+  into bufPtr: UnsafeMutableBufferPointer<UInt8>
+) -> Int? {
+  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
+  let len = o.length
+  var remainingRange = _SwiftNSRange(location: 0, length: 0)
+  var usedLen = 0
+  let success = 0 != o.getBytes(
+    ptr,
+    maxLength: bufPtr.count,
+    usedLength: &usedLen,
+    encoding: _cocoaUTF8Encoding,
+    options: 0,
+    range: _SwiftNSRange(location: 0, length: len),
+    remaining: &remainingRange
+  )
+  if success && remainingRange.length == 0 {
+    return usedLen
+  }
+  return nil
 }
 
 @_effects(releasenone)
@@ -74,20 +184,29 @@ internal func _cocoaStringCopyUTF8(
   _ target: _CocoaString,
   into bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
-  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let len = _stdlib_binary_CFStringGetLength(target)
-  var count = 0
-  let converted = _swift_stdlib_CFStringGetBytes(
-    target,
-    _swift_shims_CFRange(location: 0, length: len),
-    kCFStringEncodingUTF8,
-    0,
-    0,
-    ptr,
-    bufPtr.count,
-    &count
+  return _NSStringCopyUTF8(_objc(target), into: bufPtr)
+}
+
+@_effects(readonly)
+private func _NSStringUTF8Count(
+  _ o: _StringSelectorHolder,
+  range: Range<Int>
+) -> Int? {
+  var remainingRange = _SwiftNSRange(location: 0, length: 0)
+  var usedLen = 0
+  let success = 0 != o.getBytes(
+    UnsafeMutablePointer<UInt8>(Builtin.inttoptr_Word(0._builtinWordValue)),
+    maxLength: 0,
+    usedLength: &usedLen,
+    encoding: _cocoaUTF8Encoding,
+    options: 0,
+    range: _SwiftNSRange(location: range.startIndex, length: range.count),
+    remaining: &remainingRange
   )
-  return len == converted ? count : nil
+  if success && remainingRange.length == 0 {
+    return usedLen
+  }
+  return nil
 }
 
 @_effects(readonly)
@@ -95,28 +214,24 @@ internal func _cocoaStringUTF8Count(
   _ target: _CocoaString,
   range: Range<Int>
 ) -> Int? {
-  var count = 0
-  let len = _stdlib_binary_CFStringGetLength(target)
-  let converted = _swift_stdlib_CFStringGetBytes(
-    target,
-    _swift_shims_CFRange(location: range.startIndex, length: range.count),
-    kCFStringEncodingUTF8,
-    0,
-    0,
-    UnsafeMutablePointer<UInt8>(Builtin.inttoptr_Word(0._builtinWordValue)),
-    0,
-    &count
-  )
-  return converted == len ? count : nil
+  if range.isEmpty { return 0 }
+  return _NSStringUTF8Count(_objc(target), range: range)
+}
+
+@_effects(readonly)
+private func _NSStringCompare(
+  _ o: _StringSelectorHolder, _ other: _CocoaString
+) -> Int {
+  let range = _SwiftNSRange(location: 0, length: o.length)
+  let options = UInt(2) /* NSLiteralSearch*/
+  return o.compare(other, options: options, range: range, locale: nil)
 }
 
 @_effects(readonly)
 internal func _cocoaStringCompare(
   _ string: _CocoaString, _ other: _CocoaString
 ) -> Int {
-  let cfSelf: _swift_shims_CFStringRef = string
-  let cfOther: _swift_shims_CFStringRef = other
-  return _swift_stdlib_CFStringCompare(cfSelf, cfOther)
+  return _NSStringCompare(_objc(string), other)
 }
 
 @_effects(readonly)
@@ -158,11 +273,11 @@ internal func _cocoaGetCStringTrampoline(
 // Conversion from NSString to Swift's native representation.
 //
 
-private var kCFStringEncodingASCII : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingASCII: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x0600 }
 }
 
-private var kCFStringEncodingUTF8 : _swift_shims_CFStringEncoding {
+private var kCFStringEncodingUTF8: _swift_shims_CFStringEncoding {
   @inline(__always) get { return 0x8000100 }
 }
 
@@ -196,33 +311,30 @@ internal enum _KnownCocoaString {
 }
 
 #if !(arch(i386) || arch(arm))
+
 // Resiliently write a tagged _CocoaString's contents into a buffer.
+// TODO: move this to the Foundation overlay and reimplement it with
+// _NSTaggedPointerStringGetBytes
 @_effects(releasenone) // @opaque
 internal func _bridgeTagged(
   _ cocoa: _CocoaString,
   intoUTF8 bufPtr: UnsafeMutableBufferPointer<UInt8>
 ) -> Int? {
   _internalInvariant(_isObjCTaggedPointer(cocoa))
-  let ptr = bufPtr.baseAddress._unsafelyUnwrappedUnchecked
-  let length = _stdlib_binary_CFStringGetLength(cocoa)
-  _internalInvariant(length <= _SmallString.capacity)
-  var count = 0
-  let numCharWritten = _swift_stdlib_CFStringGetBytes(
-    cocoa, _swift_shims_CFRange(location: 0, length: length),
-    kCFStringEncodingUTF8, 0, 0, ptr, bufPtr.count, &count)
-  return length == numCharWritten ? count : nil
+  return _cocoaStringCopyUTF8(cocoa, into: bufPtr)
 }
 #endif
 
-@_effects(releasenone) // @opaque
-internal func _cocoaUTF8Pointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
-  // TODO(String bridging): Is there a better interface here? This requires nul
-  // termination and may assume ASCII.
-  guard let ptr = _swift_stdlib_CFStringGetCStringPtr(
-    str, kCFStringEncodingUTF8
-  ) else { return nil }
+@_effects(readonly)
+private func _NSStringASCIIPointer(_ str: _StringSelectorHolder) -> UnsafePointer<UInt8>? {
+ // TODO(String bridging): Is there a better interface here? Ideally we'd be
+  // able to ask for UTF8 rather than just ASCII
+  return str._fastCStringContents(0)?._asUInt8
+}
 
-  return ptr._asUInt8
+@_effects(readonly) // @opaque
+internal func _cocoaASCIIPointer(_ str: _CocoaString) -> UnsafePointer<UInt8>? {
+  return _NSStringASCIIPointer(_objc(str))
 }
 
 private enum CocoaStringPointer {
@@ -236,11 +348,11 @@ private enum CocoaStringPointer {
 private func _getCocoaStringPointer(
   _ cfImmutableValue: _CocoaString
 ) -> CocoaStringPointer {
-  if let utf8Ptr = _cocoaUTF8Pointer(cfImmutableValue) {
+  if let asciiPtr = _cocoaASCIIPointer(cfImmutableValue) {
     // NOTE: CFStringGetCStringPointer means ASCII
-    return .ascii(utf8Ptr)
+    return .ascii(asciiPtr)
   }
-  if let utf16Ptr = _swift_stdlib_CFStringGetCharactersPtr(cfImmutableValue) {
+  if let utf16Ptr = _stdlib_binary_CFStringGetCharactersPtr(cfImmutableValue) {
     return .utf16(utf16Ptr)
   }
   return .none
@@ -303,18 +415,27 @@ extension String {
 }
 
 @_effects(releasenone)
+private func _createNSString(
+  _ receiver: _StringSelectorHolder,
+  _ ptr: UnsafePointer<UInt8>,
+  _ count: Int,
+  _ encoding: UInt32
+) -> AnyObject? {
+  return receiver.createTaggedString(bytes: ptr, count: count)
+}
+
+@_effects(releasenone)
 private func _createCFString(
   _ ptr: UnsafePointer<UInt8>,
   _ count: Int,
   _ encoding: UInt32
-) -> AnyObject {
-  return _swift_stdlib_CFStringCreateWithBytes(
-    nil, //ignored in the shim for perf reasons
+) -> AnyObject? {
+  return _createNSString(
+    unsafeBitCast(__StringStorage.self as AnyClass, to: _StringSelectorHolder.self),
     ptr,
     count,
-    kCFStringEncodingUTF8,
-    0
-  ) as AnyObject
+    encoding
+  )
 }
 
 extension String {
@@ -323,13 +444,14 @@ extension String {
   func _bridgeToObjectiveCImpl() -> AnyObject {
     // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
     if _guts.isSmallASCII {
-      return _guts.asSmall.withUTF8 { bufPtr in
+      let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
         return _createCFString(
           bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
           bufPtr.count,
           kCFStringEncodingUTF8
         )
       }
+      if let tagged = maybeTagged { return tagged }
     }
     if _guts.isSmall {
         // We can't form a tagged pointer String, so grow to a non-small String,

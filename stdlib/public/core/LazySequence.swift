@@ -60,7 +60,7 @@
 /// we can build a sequence that lazily computes the elements in the
 /// result of `scan`:
 ///
-///     struct LazyScanIterator<Base : IteratorProtocol, ResultElement>
+///     struct LazyScanIterator<Base: IteratorProtocol, ResultElement>
 ///       : IteratorProtocol {
 ///       mutating func next() -> ResultElement? {
 ///         return nextElement.map { result in
@@ -128,7 +128,7 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol LazySequenceProtocol : Sequence {
+public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -178,7 +178,7 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 ///
 /// - See also: `LazySequenceProtocol`
 @frozen // lazy-performance
-public struct LazySequence<Base : Sequence> {
+public struct LazySequence<Base: Sequence> {
   @usableFromInline
   internal var _base: Base
 

@@ -42,7 +42,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
-      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                          AC.getIdentifier("$metatype"), SourceLoc(),
                          AC.getIdentifier("$metatype"), DC);
   VD->setInterfaceType(metatype);
@@ -69,7 +69,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
@@ -99,7 +99,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 }
 
 /// If the field has a property wrapper for which we will need to call the
-/// wrapper type's init(initialValue:), set up that evaluation and call the
+/// wrapper type's init(wrapperValue:), set up that evaluation and call the
 /// \c body with the expression to form the property wrapper instance from
 /// the initial value type.
 ///
@@ -142,7 +142,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   SILValue resultSlot;
   if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -303,7 +303,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
   auto &resultLowering = getTypeLowering(resultType);
 
-  if (ctor->getFailability() != OTK_None) {
+  if (ctor->isFailable()) {
     SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
 
     // On failure, we'll clean up everything (except self, which should have
@@ -366,7 +366,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                     LoadOwnershipQualifier::Copy);
 
       // Inject the self value into an optional if the constructor is failable.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         selfValue = B.createEnum(cleanupLoc, selfValue,
                                  getASTContext().getOptionalSomeDecl(),
                                  getLoweredLoadableType(resultType));
@@ -379,19 +379,15 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // Get the address to which to store the result.
       SILValue completeReturnAddress = F.getIndirectResults()[0];
       SILValue returnAddress;
-      switch (ctor->getFailability()) {
-      // For non-failable initializers, store to the return address directly.
-      case OTK_None:
+      if  (!ctor->isFailable()) {
+        // For non-failable initializers, store to the return address directly.
         returnAddress = completeReturnAddress;
-        break;
-      // If this is a failable initializer, project out the payload.
-      case OTK_Optional:
-      case OTK_ImplicitlyUnwrappedOptional:
+      } else {
+        // If this is a failable initializer, project out the payload.
         returnAddress = B.createInitEnumDataAddr(cleanupLoc,
                                                  completeReturnAddress,
-                                       getASTContext().getOptionalSomeDecl(),
+                                         getASTContext().getOptionalSomeDecl(),
                                                  selfLV->getType());
-        break;
       }
       
       // We have to do a non-take copy because someone else may be using the
@@ -400,7 +396,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                        IsNotTake, IsInitialization);
       
       // Inject the enum tag if the result is optional because of failability.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         // Inject the 'Some' tag.
         B.createInjectEnumAddr(cleanupLoc, completeReturnAddress,
                                getASTContext().getOptionalSomeDecl());
@@ -447,7 +443,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -556,6 +552,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
+    F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
@@ -686,7 +683,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILArgument *failureExitArg = nullptr;
   auto &resultLowering = getTypeLowering(resultType);
 
-  if (ctor->getFailability() != OTK_None) {
+  if (ctor->isFailable()) {
     SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
 
     RegularLocation loc(ctor);
@@ -785,7 +782,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
 
     // Inject the self value into an optional if the constructor is failable.
-    if (ctor->getFailability() != OTK_None) {
+    if (ctor->isFailable()) {
       RegularLocation loc(ctor);
       loc.markAutoGenerated();
       selfArg = B.createEnum(loc, selfArg,

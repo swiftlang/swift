@@ -273,9 +273,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  auto resolver = DC.getASTContext().getLazyResolver();
   if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
-                          NL_QualifiedDefault | NL_ProtocolMembers, resolver,
+                          NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
 
@@ -285,10 +284,14 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
-    resolver->resolveDeclSignature(VD);
-    if (!VD->hasInterfaceType())
-      continue;
+    if (!VD->hasInterfaceType()) {
+      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
+      if (!VD->hasInterfaceType())
+        continue;
+    }
     Type declaredMemberType = VD->getInterfaceType();
+    if (!declaredMemberType->is<AnyFunctionType>())
+      continue;
     if (VD->getDeclContext()->isTypeContext()) {
       if (isa<FuncDecl>(VD)) {
         if (!isOnMetaType && VD->isStatic())
@@ -310,7 +313,7 @@ static void collectPossibleCalleesByQualifiedLookup(
     auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
         DC.getParentModule(), VD,
         VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
-    auto fnType = declaredMemberType.subst(subs, SubstFlags::UseErrorType);
+    auto fnType = declaredMemberType.subst(subs);
     if (!fnType)
       continue;
 
@@ -368,19 +371,24 @@ static bool collectPossibleCalleesForApply(
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+  } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+    collectPossibleCalleesByQualifiedLookup(
+        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+    }
   }
 
   if (candidates.empty()) {
@@ -583,6 +591,15 @@ class ExprContextAnalyzer {
     case ExprKind::Array: {
       if (auto type = ParsedExpr->getType()) {
         recordPossibleType(type);
+        break;
+      }
+
+      // Check context types of the array literal expression.
+      ExprContextInfo arrayCtxtInfo(DC, Parent);
+      for (auto arrayT : arrayCtxtInfo.getPossibleTypes()) {
+        if (auto boundGenericT = arrayT->getAs<BoundGenericType>())
+          if (boundGenericT->getDecl() == Context.getArrayDecl())
+            recordPossibleType(boundGenericT->getGenericArgs()[0]);
       }
       break;
     }
@@ -901,13 +918,7 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
 
   // Only non-failable constructors are implicitly referenceable.
   if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-    switch (CD->getFailability()) {
-      case OTK_None:
-      case OTK_ImplicitlyUnwrappedOptional:
-        return true;
-      case OTK_Optional:
-        return false;
-    }
+    return (!CD->isFailable() || CD->isImplicitlyUnwrappedOptional());
   }
 
   // Otherwise, check the result type matches the contextual type.

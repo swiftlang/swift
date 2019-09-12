@@ -158,6 +158,7 @@ class SR4812 {
     let bar = { [weak self] in
     // expected-error@-1 {{closure captures 'bar' before it is declared}}
     // expected-note@-2 {{captured value declared here}}
+    // expected-warning@-3 {{variable 'self' was written to, but never read}}
       bar2()
     }
     func bar2() {

@@ -35,11 +35,9 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter::Implementation &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> overlayModule;
-  mutable ArrayRef<ModuleDecl::ImportedModule> importedModulesForLookup;
+  mutable Optional<ArrayRef<ModuleDecl::ImportedModule>> importedModulesForLookup;
   /// The metadata of the underlying Clang module.
   clang::ExternalASTSource::ASTSourceDescriptor ASTSourceDescriptor;
-
-  ~ClangModuleUnit() = default;
 
 public:
   /// True if the given Module contains an imported Clang module unit.
@@ -66,8 +64,7 @@ public:
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
-                           DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *

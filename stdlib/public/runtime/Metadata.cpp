@@ -31,6 +31,7 @@
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <algorithm>
 #include <cctype>
+#include <cinttypes>
 #include <condition_variable>
 #include <new>
 #include <unordered_set>
@@ -3897,10 +3898,15 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
                                             size_t size,
                                             const char *description) {
   auto presentValue = [&](const void *value) {
-    if (size < sizeof(long long)) {
-      long long intValue = 0;
-      memcpy(&intValue, value, size);
-      fprintf(stderr, "%lld (%#llx)\n                  ", intValue, intValue);
+    if (size <= sizeof(uint64_t)) {
+      uint64_t intValue = 0;
+      auto ptr = reinterpret_cast<uint8_t *>(&intValue);
+#if defined(__BIG_ENDIAN__)
+      ptr += sizeof(uint64_t) - size;
+#endif
+      memcpy(ptr, value, size);
+      fprintf(stderr, "%" PRIu64 " (%#" PRIx64 ")\n", intValue, intValue);
+      fprintf(stderr, "                  ");
     }
     auto bytes = reinterpret_cast<const uint8_t *>(value);
     for (unsigned i = 0; i < size; ++i) {
@@ -3946,9 +3952,15 @@ void Metadata::dump() const {
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
 
-  auto *contextDescriptor = getTypeContextDescriptor();
-  printf("Name: %s.\n", contextDescriptor->Name.get());
-  printf("Type Context Description: %p.\n", contextDescriptor);
+  if (auto *contextDescriptor = getTypeContextDescriptor()) {
+    printf("Name: %s.\n", contextDescriptor->Name.get());
+    printf("Type Context Description: %p.\n", contextDescriptor);
+  }
+
+  if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
+    printf("Labels: %s.\n", tuple->Labels);
+  }
+
   printf("Generic Args: %p.\n", getGenericArgs());
 
 #if SWIFT_OBJC_INTEROP
@@ -5028,7 +5040,7 @@ namespace {
 
 // A statically-allocated pool.  It's zero-initialized, so this
 // doesn't cost us anything in binary size.
-LLVM_ALIGNAS(alignof(void*)) static char InitialAllocationPool[64*1024];
+alignas(void *) static char InitialAllocationPool[64 * 1024];
 static std::atomic<PoolRange>
 AllocationPool{PoolRange{InitialAllocationPool,
                          sizeof(InitialAllocationPool)}};

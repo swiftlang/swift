@@ -198,3 +198,14 @@ extension TestStruct {
     introducedInExtensionMacOS()
   }
 }
+
+@available(macOS, unavailable)
+struct UnavailableStruct { }
+
+@available(macOS, unavailable)
+extension UnavailableStruct { } // no-error
+
+#if os(macOS)
+@available(macOS, unavailable)
+extension UnavailableStruct { } // no-error
+#endif

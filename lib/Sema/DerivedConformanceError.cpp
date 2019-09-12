@@ -27,8 +27,9 @@
 using namespace swift;
 using namespace swift::objc_translation;
 
-static void deriveBodyBridgedNSError_enum_nsErrorDomain(
-                    AbstractFunctionDecl *domainDecl, void *) {
+static std::pair<BraceStmt *, bool>
+deriveBodyBridgedNSError_enum_nsErrorDomain(AbstractFunctionDecl *domainDecl,
+                                            void *) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -50,11 +51,11 @@ static void deriveBodyBridgedNSError_enum_nsErrorDomain(
     new (C) ReturnStmt(SourceLoc(), initReflectingCall, /*implicit*/ true);
 
   auto body = BraceStmt::create(C, SourceLoc(), ASTNode(ret), SourceLoc());
-
-  domainDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
-static void deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
+static std::pair<BraceStmt *, bool>
+deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
                     AbstractFunctionDecl *domainDecl, void *) {
   // enum SomeEnum {
   //   @derived
@@ -75,12 +76,13 @@ static void deriveBodyBridgedNSError_printAsObjCEnum_nsErrorDomain(
   auto body = BraceStmt::create(C, SourceLoc(),
                                 ASTNode(ret),
                                 SourceLoc());
-  domainDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 static ValueDecl *
-deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived,
-                        void (*synthesizer)(AbstractFunctionDecl *, void*)) {
+deriveBridgedNSError_enum_nsErrorDomain(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*synthesizer)(AbstractFunctionDecl *, void*)) {
   // enum SomeEnum {
   //   @derived
   //   static var _nsErrorDomain: String {
@@ -104,7 +106,7 @@ deriveBridgedNSError_enum_nsErrorDomain(DerivedConformance &derived,
       propDecl, stringTy);
   getterDecl->setBodySynthesizer(synthesizer);
 
-  derived.addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  derived.addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }

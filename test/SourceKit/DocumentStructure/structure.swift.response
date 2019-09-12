@@ -591,28 +591,6 @@
       key.namelength: 4
     },
     {
-      key.kind: source.lang.swift.expr.call,
-      key.name: "417",
-      key.offset: 1099,
-      key.length: 11,
-      key.nameoffset: 1099,
-      key.namelength: 3,
-      key.bodyoffset: 1103,
-      key.bodylength: 6,
-      key.substructure: [
-        {
-          key.kind: source.lang.swift.expr.argument,
-          key.name: "d",
-          key.offset: 1103,
-          key.length: 6,
-          key.nameoffset: 1103,
-          key.namelength: 1,
-          key.bodyoffset: 1106,
-          key.bodylength: 3
-        }
-      ]
-    },
-    {
       key.kind: source.lang.swift.stmt.foreach,
       key.offset: 1114,
       key.length: 17,
@@ -1269,18 +1247,20 @@
               key.offset: 2011,
               key.length: 13,
               key.nameoffset: 2011,
-              key.namelength: 13
+              key.namelength: 13,
+              key.substructure: [
+                {
+                  key.kind: source.lang.swift.decl.var.parameter,
+                  key.name: "arg",
+                  key.offset: 2015,
+                  key.length: 8,
+                  key.typename: "Int",
+                  key.nameoffset: 2015,
+                  key.namelength: 3
+                }
+              ]
             }
           ]
-        },
-        {
-          key.kind: source.lang.swift.decl.var.parameter,
-          key.name: "arg",
-          key.offset: 2015,
-          key.length: 8,
-          key.typename: "Int",
-          key.nameoffset: 2015,
-          key.namelength: 3
         }
       ]
     },

@@ -8,9 +8,9 @@ func test_StringSubscriptByInt(
   r1: Range<Int>,
   r2: ClosedRange<Int>
 ) {
-  _ = x[i] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}} {{none}}
-  _ = x[r1] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an integer range, see the documentation comment for discussion}} {{none}}
-  _ = x[r2] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an integer range, see the documentation comment for discussion}} {{none}}
+  _ = x[i] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an Int, use a String.Index instead.}} {{none}}
+  _ = x[r1] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an integer range, use a String.Index range instead.}} {{none}}
+  _ = x[r2] // expected-error {{'subscript(_:)' is unavailable: cannot subscript String with an integer range, use a String.Index range instead.}} {{none}}
 }
 
 func test_UTF8View(s: String.UTF8View, i: String.UTF8View.Index, d: Int) {

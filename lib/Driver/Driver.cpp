@@ -97,7 +97,7 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
   .Case("swift", DriverKind::Interactive)
   .Case("swiftc", DriverKind::Batch)
   .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-  .Case("swift-format", DriverKind::SwiftFormat)
+  .Case("swift-indent", DriverKind::SwiftIndent)
   .Default(None);
   
   if (Kind.hasValue())
@@ -130,42 +130,6 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
   if (args.hasArgNoClaim(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path)) {
     diags.diagnose({}, diag::error_bridging_header_module_interface);
-  }
-}
-
-static void validateDeploymentTarget(DiagnosticEngine &diags,
-                                     const ArgList &args) {
-  const Arg *A = args.getLastArg(options::OPT_target);
-  if (!A)
-    return;
-
-  // Check minimum supported OS versions.
-  llvm::Triple triple(llvm::Triple::normalize(A->getValue()));
-  if (triple.isMacOSX()) {
-    if (triple.isMacOSXVersionLT(10, 9))
-      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                     "OS X 10.9");
-  } else if (triple.isiOS()) {
-    if (triple.isTvOS()) {
-      if (triple.isOSVersionLT(9, 0)) {
-        diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                       "tvOS 9.0");
-        return;
-      }
-    }
-    if (triple.isOSVersionLT(7))
-      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                     "iOS 7");
-    if (triple.isArch32Bit() && !triple.isOSVersionLT(11)) {
-      diags.diagnose(SourceLoc(), diag::error_ios_maximum_deployment_32,
-                     triple.getOSMajorVersion());
-    }
-  } else if (triple.isWatchOS()) {
-    if (triple.isOSVersionLT(2, 0)) {
-      diags.diagnose(SourceLoc(), diag::error_os_minimum_deployment,
-                     "watchOS 2.0");
-      return;
-    }
   }
 }
 
@@ -242,12 +206,16 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
 }
 
 static void validateAutolinkingArgs(DiagnosticEngine &diags,
-                                    const ArgList &args) {
+                                    const ArgList &args,
+                                    const llvm::Triple &T) {
   auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
   if (!forceLoadArg)
     return;
   auto *incrementalArg = args.getLastArg(options::OPT_incremental);
   if (!incrementalArg)
+    return;
+
+  if (T.supportsCOMDAT())
     return;
 
   // Note: -incremental can itself be overridden by other arguments later
@@ -259,15 +227,15 @@ static void validateAutolinkingArgs(DiagnosticEngine &diags,
 }
 
 /// Perform miscellaneous early validation of arguments.
-static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
+static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
+                         const llvm::Triple &T) {
   validateBridgingHeaderArgs(diags, args);
-  validateDeploymentTarget(diags, args);
   validateWarningControlArgs(diags, args);
   validateProfilingArgs(diags, args);
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
-  validateAutolinkingArgs(diags, args);
+  validateAutolinkingArgs(diags, args, T);
 }
 
 std::unique_ptr<ToolChain>
@@ -820,7 +788,10 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<DerivedArgList> TranslatedArgList(
       translateInputAndPathArgs(*ArgList, workingDirectory));
 
-  validateArgs(Diags, *TranslatedArgList);
+  validateArgs(Diags, *TranslatedArgList, TC.getTriple());
+    
+  // Perform toolchain specific args validation.
+  TC.validateArguments(Diags, *TranslatedArgList);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -3087,7 +3058,7 @@ void Driver::printHelp(bool ShowHidden) const {
     break;
   case DriverKind::Batch:
   case DriverKind::AutolinkExtract:
-  case DriverKind::SwiftFormat:
+  case DriverKind::SwiftIndent:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

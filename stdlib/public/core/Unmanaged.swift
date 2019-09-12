@@ -15,7 +15,7 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 @frozen
-public struct Unmanaged<Instance : AnyObject> {
+public struct Unmanaged<Instance: AnyObject> {
   @usableFromInline
   internal unowned(unsafe) var _value: Instance
 
@@ -89,7 +89,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// and you know that you're not responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // unsafe-performance
+  @_transparent // unsafe-performance
   public func takeUnretainedValue() -> Instance {
     return _value
   }
@@ -101,7 +101,7 @@ public struct Unmanaged<Instance : AnyObject> {
   /// and you know that you're responsible for releasing the result.
   ///
   /// - Returns: The object referenced by this `Unmanaged` instance.
-  @inlinable // unsafe-performance
+  @_transparent // unsafe-performance
   public func takeRetainedValue() -> Instance {
     let result = _value
     release()
@@ -194,7 +194,7 @@ public struct Unmanaged<Instance : AnyObject> {
   ///        }
   ///    }
   ///
-  ///    func doSomething(_ u : Unmanaged<Owned>) {
+  ///    func doSomething(_ u: Unmanaged<Owned>) {
   ///      u._withUnsafeGuaranteedRef {
   ///        $0.doSomething()
   ///      }

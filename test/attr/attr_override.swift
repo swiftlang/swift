@@ -505,3 +505,124 @@ class Index<F, T> {
 class CollectionIndex<C : Collection> : Index<C, C.I> {
   override func map(_ f: C) -> C.I {}
 }
+
+// SR-4206: Overrides with different generic signature
+
+// Base class is generic, derived class is concrete //
+
+protocol SR_4206_Protocol_1 {}
+protocol SR_4206_Protocol_2 {}
+
+class SR_4206_BaseGeneric_1<T> {
+  func foo<T: SR_4206_Protocol_1>(arg: T) {}
+}
+
+class SR_4206_DerivedConcrete_1: SR_4206_BaseGeneric_1<SR_4206_Protocol_2> {
+  override func foo<T>(arg: T) {} // Ok?
+}
+
+// Base class is concrete, derived class is generic //
+
+class SR_4206_BaseConcrete_1 {
+  func foo() {}
+}
+
+class SR_4206_DerivedGeneric_1<T>: SR_4206_BaseConcrete_1 {
+  override func foo<T>(arg: T) {} // expected-error {{method does not override any method from its superclass}}
+}
+
+// Base class generic w/ method generic, derived class generic w/ method not generic
+
+class SR_4206_BaseGeneric_2<T> {
+  func foo<T>(arg: T) {}
+}
+
+class SR_4206_DerivedConcrete_2<T>: SR_4206_BaseGeneric_2<T> {
+  override func foo() {} // expected-error {{method does not override any method from its superclass}}
+}
+
+// Base class generic w/ method generic, derived class generic w/ method generic but different requirement
+
+class SR_4206_BaseGeneric_3<T> {
+  func foo<T>(arg: T) {} // expected-note {{overridden declaration is here}}
+}
+
+class SR_4206_DerivedGeneric_3<T>: SR_4206_BaseGeneric_3<T> {
+  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T, T>; expected generic signature to be <T, T>}}
+}
+
+// Base class not generic w/ method generic, derived class not generic w/ method generic but different requirement
+
+class SR_4206_BaseConcrete_4 {
+  func foo<T>(arg: T) {} // expected-note {{overridden declaration is here}}
+}
+
+class SR_4206_DerivedConcrete_4: SR_4206_BaseConcrete_4 {
+  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T>; expected generic signature to be <T>}}
+}
+
+// Base class not generic w/ method generic, derived class not generic w/ method generic but removed requirement
+
+class SR_4206_BaseConcrete_5 {
+  func foo<T: SR_4206_Protocol_2>(arg: T) {}
+}
+
+class SR_4206_DerivedConcrete_5: SR_4206_BaseConcrete_5 {
+  override func foo<T>(arg: T) {} // Ok?
+}
+
+// Base class not generic w/ method generic, derived class generic w/ method generic but different requirement
+
+class SR_4206_BaseConcrete_6 {
+  func foo<T: SR_4206_Protocol_2>(arg: T) {} // expected-note {{overridden declaration is here}}
+}
+
+class SR_4206_DerivedGeneric_6<T>: SR_4206_BaseConcrete_6 {
+  override func foo<T: SR_4206_Protocol_1>(arg: T) {} // expected-error {{overridden method 'foo' has generic signature <T, T where T : SR_4206_Protocol_1> which is incompatible with base method's generic signature <T where T : SR_4206_Protocol_2>; expected generic signature to be <T, T where T : SR_4206_Protocol_2>}}
+}
+
+// Misc //
+
+protocol SR_4206_Key {}
+
+protocol SR_4206_Container {
+  associatedtype Key: SR_4206_Key
+}
+
+class SR_4206_Base<Key: SR_4206_Key> {
+  func foo(forKey key: Key) throws {}
+}
+
+class SR_4206_Derived<C: SR_4206_Container> : SR_4206_Base<C.Key> {
+  typealias Key = C.Key
+  override func foo(forKey key: Key) throws {} // Okay, no generic signature mismatch
+}
+
+// SR-10198
+
+class SR_10198_Base {
+  func a<T>(_ val: T) -> String { return "not equatable" }
+  func a<T: Equatable>(_ val: T) -> String { return "equatable" }
+}
+
+class SR_10198_Derived: SR_10198_Base {
+  override func a<T>(_ val: T) -> String { return super.a(val) } // okay
+  override func a<T: Equatable>(_ val: T) -> String { return super.a(val) } // okay
+}
+
+protocol SR_10198_Base_P {
+  associatedtype Bar
+}
+
+struct SR_10198_Base_S: SR_10198_Base_P {
+  typealias Bar = Int
+}
+
+class SR_10198_Base_1 {
+  init<F: SR_10198_Base_P>(_ arg: F) where F.Bar == Int {}
+}
+
+class SR_10198_Derived_1: SR_10198_Base_1 {
+  init(_ arg1: Int) { super.init(SR_10198_Base_S()) } // okay, doesn't crash
+}
+

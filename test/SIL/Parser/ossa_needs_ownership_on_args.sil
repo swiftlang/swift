@@ -1,0 +1,19 @@
+// RUN: not %sil-opt -verify %s
+
+// Make sure that we error if ossa functions do not parse unless the argument
+// has the proper ownership specifier on it.
+
+import Builtin
+
+sil [ossa] @test1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject): // {{expected-error: SILFunction and SILArgument have mismatching ValueOwnershipKinds. Function type specifies: '@owned'. SIL argument specifies: '@any'.}}
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test2 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : @owned $Builtin.Int32): // {{expected-error: SILFunction and SILArgument have mismatching ValueOwnershipKinds. Function type specifies: '@any'. SIL argument specifies: '@owned'.}}
+  %9999 = tuple()
+  return %9999 : $()
+}

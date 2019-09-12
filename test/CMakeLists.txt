@@ -60,7 +60,7 @@ function(get_test_dependencies SDK result_var_name)
     list(APPEND deps_binaries FileCheck arcmt-test c-arcmt-test c-index-test
          clang llc llvm-cov llvm-dwarfdump llvm-link llvm-as llvm-dis
          llvm-bcanalyzer llvm-nm llvm-readobj llvm-profdata count not
-         llvm-strings dsymutil)
+         llvm-strings llvm-readelf dsymutil)
   endif()
 
   if(("${SDK}" STREQUAL "IOS") OR
@@ -248,7 +248,9 @@ _Block_release(void) { }\n")
     if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
       # These are supported testing SDKs, but their implementation of
       # `command_upload_stdlib` is hidden.
-    elseif("${SDK}" STREQUAL "ANDROID")
+    elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
+      # This adb setup is only needed when cross-compiling for Android, so the
+      # second check above makes sure we don't bother when the host is Android.
       if("${SWIFT_ANDROID_DEPLOY_DEVICE_PATH}" STREQUAL "")
         message(FATAL_ERROR
             "When running Android host tests, you must specify the directory on the device "

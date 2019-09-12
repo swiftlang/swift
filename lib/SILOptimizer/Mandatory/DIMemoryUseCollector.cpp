@@ -471,7 +471,7 @@ static void getScalarizedElements(SILValue V,
                                   SmallVectorImpl<SILValue> &ElementVals,
                                   SILLocation Loc, SILBuilder &B) {
   auto *DTI = B.createDestructureTuple(Loc, V);
-  copy(DTI->getResults(), std::back_inserter(ElementVals));
+  llvm::copy(DTI->getResults(), std::back_inserter(ElementVals));
 }
 
 /// Scalarize a load down to its subelements.  If NewLoads is specified, this
@@ -1789,7 +1789,7 @@ collectClassInitSelfLoadUses(MarkUninitializedInst *MUI,
         isa<UpcastInst>(User) ||
         isa<UncheckedRefCastInst>(User)) {
       auto I = cast<SingleValueInstruction>(User);
-      copy(I->getUses(), std::back_inserter(Worklist));
+      llvm::copy(I->getUses(), std::back_inserter(Worklist));
       continue;
     }
 

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -Xllvm -enable-existential-specializer -Xllvm -sil-disable-pass=GenericSpecializer -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=SILCombine -emit-sil -sil-verify-all %s | %FileCheck %s
+// REQUIRES: optimized_stdlib
 
 internal protocol SomeProtocol : class {
   func foo()  -> Int

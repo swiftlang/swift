@@ -20,11 +20,11 @@
 #include "MiscDiagnostics.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckObjC.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -111,10 +111,8 @@ swift::getReferencedAssocTypeOfProtocol(Type type, ProtocolDecl *proto) {
 
         // Check whether there is an associated type of the same name in
         // this protocol.
-        for (auto member : proto->lookupDirect(assocType->getFullName())) {
-          if (auto protoAssoc = dyn_cast<AssociatedTypeDecl>(member))
-            return protoAssoc;
-        }
+        if (auto *found = proto->getAssociatedType(assocType->getName()))
+          return found;
       }
     }
   }
@@ -238,14 +236,18 @@ static bool checkObjCWitnessSelector(TypeChecker &tc, ValueDecl *req,
   // FIXME: Check property names!
 
   // Check the getter.
-  if (auto reqGetter = reqStorage->getGetter()) {
-    if (checkObjCWitnessSelector(tc, reqGetter, witnessStorage->getGetter()))
+  if (auto reqGetter = reqStorage->getParsedAccessor(AccessorKind::Get)) {
+    auto *witnessGetter =
+      witnessStorage->getSynthesizedAccessor(AccessorKind::Get);
+    if (checkObjCWitnessSelector(tc, reqGetter, witnessGetter))
       return true;
   }
 
   // Check the setter.
-  if (auto reqSetter = reqStorage->getSetter()) {
-    if (checkObjCWitnessSelector(tc, reqSetter, witnessStorage->getSetter()))
+  if (auto reqSetter = reqStorage->getParsedAccessor(AccessorKind::Set)) {
+    auto *witnessSetter =
+      witnessStorage->getSynthesizedAccessor(AccessorKind::Set);
+    if (checkObjCWitnessSelector(tc, reqSetter, witnessSetter))
       return true;
   }
 
@@ -262,48 +264,40 @@ static ParameterList *getParameterList(ValueDecl *value) {
 
 // Find a standin declaration to place the diagnostic at for the
 // given accessor kind.
-static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
+static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
                                         AccessorKind requirementKind) {
-  auto getExplicitAccessor = [&](AccessorKind kind) -> AccessorDecl* {
-    if (auto accessor = witnessStorage->getAccessor(kind)) {
-      if (!accessor->isImplicit())
-        return accessor;
-    }
-    return nullptr;
-  };
-
   // If the storage actually explicitly provides that accessor, great.
-  if (auto accessor = getExplicitAccessor(requirementKind))
+  if (auto accessor = witness->getParsedAccessor(requirementKind))
     return accessor;
 
   // If it didn't, check to see if it provides something else that corresponds
   // to the requirement.
   switch (requirementKind) {
   case AccessorKind::Get:
-    if (auto read = getExplicitAccessor(AccessorKind::Read))
+    if (auto read = witness->getParsedAccessor(AccessorKind::Read))
       return read;
-    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::Address))
       return addressor;
     break;
 
   case AccessorKind::Read:
-    if (auto getter = getExplicitAccessor(AccessorKind::Get))
+    if (auto getter = witness->getParsedAccessor(AccessorKind::Get))
       return getter;
-    if (auto addressor = getExplicitAccessor(AccessorKind::Address))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::Address))
       return addressor;
     break;
 
   case AccessorKind::Modify:
-    if (auto setter = getExplicitAccessor(AccessorKind::Set))
+    if (auto setter = witness->getParsedAccessor(AccessorKind::Set))
       return setter;
-    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::MutableAddress))
       return addressor;
     break;
 
   case AccessorKind::Set:
-    if (auto modify = getExplicitAccessor(AccessorKind::Modify))
+    if (auto modify = witness->getParsedAccessor(AccessorKind::Modify))
       return modify;
-    if (auto addressor = getExplicitAccessor(AccessorKind::MutableAddress))
+    if (auto addressor = witness->getParsedAccessor(AccessorKind::MutableAddress))
       return addressor;
     break;
 
@@ -315,7 +309,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witnessStorage,
   }
 
   // Otherwise, just diagnose starting at the storage declaration itself.
-  return witnessStorage;
+  return witness;
 }
 
 RequirementMatch
@@ -398,8 +392,8 @@ swift::matchWitness(
       return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
 
     // If the requirement is settable and the witness is not, reject it.
-    if (req->isSettable(req->getDeclContext()) &&
-        !witness->isSettable(witness->getDeclContext()))
+    if (reqASD->isSettable(req->getDeclContext()) &&
+        !witnessASD->isSettable(witness->getDeclContext()))
       return RequirementMatch(witness, MatchKind::SettableConflict);
 
     // Validate that the 'mutating' bit lines up for getters and setters.
@@ -407,7 +401,7 @@ swift::matchWitness(
       return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Get),
                               MatchKind::MutatingConflict);
 
-    if (req->isSettable(req->getDeclContext())) {
+    if (reqASD->isSettable(req->getDeclContext())) {
       if (!reqASD->isSetterMutating() && witnessASD->isSetterMutating())
         return RequirementMatch(getStandinForAccessor(witnessASD, AccessorKind::Set),
                                 MatchKind::MutatingConflict);
@@ -449,10 +443,8 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto reqTypeIsIUO =
-          req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      auto witnessTypeIsIUO =
-          witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
+      auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
       auto types =
           getTypesToCompare(req, reqResultType, reqTypeIsIUO, witnessResultType,
                             witnessTypeIsIUO, VarianceKind::Covariant);
@@ -501,12 +493,9 @@ swift::matchWitness(
       auto reqParamDecl = reqParamList->get(i);
       auto witnessParamDecl = witnessParamList->get(i);
 
-      auto reqParamTypeIsIUO =
-          reqParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto reqParamTypeIsIUO = reqParamDecl->isImplicitlyUnwrappedOptional();
       auto witnessParamTypeIsIUO =
-          witnessParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+          witnessParamDecl->isImplicitlyUnwrappedOptional();
 
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
@@ -536,10 +525,8 @@ swift::matchWitness(
     }
 
   } else {
-    auto reqTypeIsIUO =
-        req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-    auto witnessTypeIsIUO =
-        witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
+    auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
     auto types = getTypesToCompare(req, reqType, reqTypeIsIUO, witnessType,
                                    witnessTypeIsIUO, VarianceKind::None);
 
@@ -743,9 +730,8 @@ swift::matchWitness(TypeChecker &tc,
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
     // Open up the type of the requirement.
-    reqLocator = cs->getConstraintLocator(
-                     static_cast<Expr *>(nullptr),
-                     LocatorPathElt(ConstraintLocator::Requirement, req));
+    reqLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+                                          LocatorPathElt::Requirement(req));
     OpenedTypeMap reqReplacements;
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
@@ -763,7 +749,7 @@ swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq || replacedInReq->hasError())
+      if (replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
@@ -778,9 +764,8 @@ swift::matchWitness(TypeChecker &tc,
     witnessType = witness->getInterfaceType();
     // FIXME: witness as a base locator?
     locator = cs->getConstraintLocator(nullptr);
-    witnessLocator = cs->getConstraintLocator(
-                       static_cast<Expr *>(nullptr),
-                       LocatorPathElt(ConstraintLocator::Witness, witness));
+    witnessLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+                                              LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
@@ -1197,15 +1182,17 @@ bool WitnessChecker::checkWitnessAccess(ValueDecl *requirement,
       return true;
   }
 
-  if (requirement->isSettable(DC)) {
-    *isSetter = true;
+  if (auto *requirementASD = dyn_cast<AbstractStorageDecl>(requirement)) {
+    if (requirementASD->isSettable(DC)) {
+      *isSetter = true;
 
-    auto ASD = cast<AbstractStorageDecl>(witness);
+      auto witnessASD = cast<AbstractStorageDecl>(witness);
 
-    // See above about the forConformance flag.
-    if (!ASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
-                                     /*forConformance=*/true))
-      return true;
+      // See above about the forConformance flag.
+      if (!witnessASD->isSetterAccessibleFrom(actualScopeToCheck.getDeclContext(),
+                                              /*forConformance=*/true))
+        return true;
+    }
   }
 
   return false;
@@ -1254,23 +1241,17 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
   // A non-failable initializer requirement cannot be satisfied
   // by a failable initializer.
   if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
-    if (ctor->getFailability() == OTK_None) {
+    if (!ctor->isFailable()) {
       auto witnessCtor = cast<ConstructorDecl>(match.Witness);
 
-      switch (witnessCtor->getFailability()) {
-      case OTK_None:
-        // Okay
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        // Only allowed for non-@objc protocols.
-        if (!Proto->isObjC())
-          break;
-
-        LLVM_FALLTHROUGH;
-
-      case OTK_Optional:
-        return CheckKind::ConstructorFailability;
+      if (witnessCtor->isFailable()) {
+        if (witnessCtor->isImplicitlyUnwrappedOptional()) {
+          // Only allowed for non-@objc protocols.
+          if (Proto->isObjC())
+            return CheckKind::ConstructorFailability;
+        } else {
+          return CheckKind::ConstructorFailability;
+        }
       }
     }
   }
@@ -1830,8 +1811,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
                         return Type(dependentType);
                       },
-                      LookUpConformanceInModule(module),
-                      SubstFlags::UseErrorType);
+                      LookUpConformanceInModule(module));
   };
 
   if (auto fnTy = type->getAs<AnyFunctionType>()) {
@@ -1947,9 +1927,29 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
   return SourceLoc();
 }
 
+namespace {
+/// Describes the position for optional adjustment made to a witness.
+///
+/// This is used by the following diagnostics:
+/// 1) 'err_protocol_witness_optionality',
+/// 2) 'warn_protocol_witness_optionality'
+/// 3) 'protocol_witness_optionality_conflict'
+enum class OptionalAdjustmentPosition : unsigned {
+  /// The type of a variable.
+  VarType = 0,
+  /// The result type of something.
+  Result = 1,
+  /// The parameter type of something.
+  Param = 2,
+  /// The parameter types of something.
+  MultipleParam = 3,
+  /// Both return and parameter adjustments.
+  ParamAndReturn = 4,
+};
+} // end anonymous namespace
+
 /// Classify the provided optionality issues for use in diagnostics.
-/// FIXME: Enumify this
-static unsigned classifyOptionalityIssues(
+static OptionalAdjustmentPosition classifyOptionalityIssues(
     const SmallVectorImpl<OptionalAdjustment> &adjustments,
     ValueDecl *requirement) {
   unsigned numParameterAdjustments = 0;
@@ -1962,21 +1962,20 @@ static unsigned classifyOptionalityIssues(
   }
 
   if (hasNonParameterAdjustment) {
-    // Both return and parameter adjustments.
     if (numParameterAdjustments > 0)
-      return 4;
+      return OptionalAdjustmentPosition::ParamAndReturn;
 
-    // The type of a variable.
     if (isa<VarDecl>(requirement))
-      return 0;
+      return OptionalAdjustmentPosition::VarType;
 
-    // The result type of something.
-    return 1;
+    return OptionalAdjustmentPosition::Result;
   }
 
   // Only parameter adjustments.
   assert(numParameterAdjustments > 0 && "No adjustments?");
-  return numParameterAdjustments == 1 ? 2 : 3;
+  return numParameterAdjustments == 1
+             ? OptionalAdjustmentPosition::Param
+             : OptionalAdjustmentPosition::MultipleParam;
 }
 
 static void addOptionalityFixIts(
@@ -2096,10 +2095,11 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
 
   case MatchKind::OptionalityConflict: {
     auto &adjustments = match.OptionalAdjustments;
-    auto diag = diags.diagnose(match.Witness, 
+    auto issues =
+        static_cast<unsigned>(classifyOptionalityIssues(adjustments, req));
+    auto diag = diags.diagnose(match.Witness,
                                diag::protocol_witness_optionality_conflict,
-                               classifyOptionalityIssues(adjustments, req),
-                               withAssocTypes);
+                               issues, withAssocTypes);
     addOptionalityFixIts(adjustments,
                          match.Witness->getASTContext(),
                          match.Witness,
@@ -2107,53 +2107,88 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     break;
   }
 
-  case MatchKind::StaticNonStaticConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness, diag::protocol_witness_static_conflict,
-                   !req->isInstanceMember());
+  case MatchKind::StaticNonStaticConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(witness, diag::protocol_witness_static_conflict,
+                               !req->isInstanceMember());
+    if (req->isInstanceMember()) {
+      SourceLoc loc;
+      if (auto FD = dyn_cast<FuncDecl>(witness)) {
+        loc = FD->getStaticLoc();
+      } else if (auto VD = dyn_cast<VarDecl>(witness)) {
+        loc = VD->getParentPatternBinding()->getStaticLoc();
+      } else if (auto SD = dyn_cast<SubscriptDecl>(witness)) {
+        loc = SD->getStaticLoc();
+      } else {
+        llvm_unreachable("Unexpected witness");
+      }
+      diag.fixItRemove(loc);
+    } else {
+      diag.fixItInsert(witness->getAttributeInsertionLoc(true), "static ");
+    }
     break;
-      
-  case MatchKind::SettableConflict:
-    diags.diagnose(match.Witness, diag::protocol_witness_settable_conflict);
-    break;
+  }
 
-  case MatchKind::PrefixNonPrefixConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_prefix_postfix_conflict, false,
-                   match.Witness->getAttrs().hasAttribute<PostfixAttr>() ? 2
-                                                                         : 0);
+  case MatchKind::SettableConflict: {
+    auto witness = match.Witness;
+    auto diag =
+        diags.diagnose(witness, diag::protocol_witness_settable_conflict);
+    if (auto VD = dyn_cast<VarDecl>(witness)) {
+      if (VD->hasStorage()) {
+        auto PBD = VD->getParentPatternBinding();
+        diag.fixItReplace(PBD->getStartLoc(), getTokenText(tok::kw_var));
+      }
+    }
     break;
+  }
 
-  case MatchKind::PostfixNonPostfixConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_prefix_postfix_conflict, true,
-                   match.Witness->getAttrs().hasAttribute<PrefixAttr>() ? 1
-                                                                        : 0);
+  case MatchKind::PrefixNonPrefixConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(
+        witness, diag::protocol_witness_prefix_postfix_conflict, false,
+        witness->getAttrs().hasAttribute<PostfixAttr>() ? 2 : 0);
+    // We already emit a fix-it when we're missing the attribute, so only
+    // emit a fix-it if the attribute is there, but is not correct.
+    if (auto attr = witness->getAttrs().getAttribute<PostfixAttr>()) {
+      diag.fixItReplace(attr->getLocation(), "prefix");
+    }
     break;
+  }
+
+  case MatchKind::PostfixNonPostfixConflict: {
+    auto witness = match.Witness;
+    auto diag = diags.diagnose(
+        witness, diag::protocol_witness_prefix_postfix_conflict, true,
+        witness->getAttrs().hasAttribute<PrefixAttr>() ? 1 : 0);
+    // We already emit a fix-it when we're missing the attribute, so only
+    // emit a fix-it if the attribute is there, but is not correct.
+    if (auto attr = witness->getAttrs().getAttribute<PrefixAttr>()) {
+      diag.fixItReplace(attr->getLocation(), "postfix");
+    }
+    break;
+  }
   case MatchKind::MutatingConflict:
-    // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
                    SelfAccessKind::Mutating);
     break;
   case MatchKind::NonMutatingConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness,
-                   diag::protocol_witness_mutation_modifier_conflict,
-                   SelfAccessKind::NonMutating);
+    // Don't bother about this, because a non-mutating witness can satisfy
+    // a mutating requirement.
     break;
   case MatchKind::ConsumingConflict:
-    // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   SelfAccessKind::__Consuming);
+                   SelfAccessKind::Consuming);
     break;
-  case MatchKind::RethrowsConflict:
-    // FIXME: Could emit a Fix-It here.
-    diags.diagnose(match.Witness, diag::protocol_witness_rethrows_conflict);
+  case MatchKind::RethrowsConflict: {
+    auto witness = match.Witness;
+    auto diag =
+        diags.diagnose(witness, diag::protocol_witness_rethrows_conflict);
+    auto FD = cast<FuncDecl>(witness);
+    diag.fixItReplace(FD->getThrowsLoc(), getTokenText(tok::kw_rethrows));
     break;
+  }
   case MatchKind::NonObjC:
     diags.diagnose(match.Witness, diag::protocol_witness_not_objc);
     break;
@@ -2210,12 +2245,6 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
   // Record this witness in the conformance.
   auto witness = match.getWitness(TC.Context);
   Conformance->setWitness(requirement, witness);
-
-  // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(witness.getDecl()))
-    TC.synthesizeWitnessAccessorsForStorage(
-                                        cast<AbstractStorageDecl>(requirement),
-                                        storage);
 }
 
 void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
@@ -2449,7 +2478,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
                                                     DC);
-    aliasDecl->setGenericEnvironment(DC->getGenericEnvironmentOfContext());
+    aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
 
     aliasDecl->setImplicit();
@@ -2689,25 +2718,55 @@ diagnoseMissingWitnesses(MissingWitnessDiagnosisKind Kind) {
       }
       return;
     }
+    auto &SM = DC->getASTContext().SourceMgr;
+    auto FixitBufferId = SM.findBufferContainingLoc(FixitLocation);
     for (auto VD : MissingWitnesses) {
       // Whether this VD has a stub printed.
       bool AddFixit = !NoStubRequirements.count(VD);
+      bool SameFile = VD->getLoc().isValid() ?
+        SM.findBufferContainingLoc(VD->getLoc()) == FixitBufferId : false;
 
       // Issue diagnostics for witness types.
       if (auto MissingTypeWitness = dyn_cast<AssociatedTypeDecl>(VD)) {
-        Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
-                       MissingTypeWitness->getName()).
-        fixItInsertAfter(FixitLocation, FixIt);
+        if (SameFile) {
+          // If the protocol member decl is in the same file of the stub,
+          // we can directly associate the fixit with the note issued to the
+          // requirement.
+          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+            MissingTypeWitness->getName()).fixItInsertAfter(FixitLocation, FixIt);
+        } else {
+          // Otherwise, we have to issue another note to carry the fixit,
+          // because editor may assume the fixit is in the same file with the note.
+          Diags.diagnose(MissingTypeWitness, diag::no_witnesses_type,
+                         MissingTypeWitness->getName());
+          Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
+            fixItInsertAfter(FixitLocation, FixIt);
+        }
         continue;
       }
       // Issue diagnostics for witness values.
       Type RequirementType =
         getRequirementTypeForDisplay(DC->getParentModule(), Conf, VD);
-      auto Diag = Diags.diagnose(VD, diag::no_witnesses,
-                                 getRequirementKind(VD), VD->getFullName(),
-                                 RequirementType, AddFixit);
-      if (AddFixit)
-        Diag.fixItInsertAfter(FixitLocation, FixIt);
+      if (AddFixit) {
+        if (SameFile) {
+          // If the protocol member decl is in the same file of the stub,
+          // we can directly associate the fixit with the note issued to the
+          // requirement.
+          Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
+            VD->getFullName(), RequirementType, true).
+              fixItInsertAfter(FixitLocation, FixIt);
+        } else {
+          // Otherwise, we have to issue another note to carry the fixit,
+          // because editor may assume the fixit is in the same file with the note.
+          Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
+            VD->getFullName(), RequirementType, false);
+          Diags.diagnose(ComplainLoc, diag::missing_witnesses_general).
+            fixItInsertAfter(FixitLocation, FixIt);
+        }
+      } else {
+        Diags.diagnose(VD, diag::no_witnesses, getRequirementKind(VD),
+                       VD->getFullName(), RequirementType, true);
+      }
     }
   };
 
@@ -3128,14 +3187,14 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           auto &diags = ctx.Diags;
           {
             SourceLoc diagLoc = getLocForDiagnosingWitness(conformance,witness);
+            auto issues = static_cast<unsigned>(
+                classifyOptionalityIssues(adjustments, requirement));
             auto diag = diags.diagnose(
                 diagLoc,
                 hasAnyError(adjustments)
-                  ? diag::err_protocol_witness_optionality
-                  : diag::warn_protocol_witness_optionality,
-                classifyOptionalityIssues(adjustments, requirement),
-                witness->getFullName(),
-                proto->getFullName());
+                    ? diag::err_protocol_witness_optionality
+                    : diag::warn_protocol_witness_optionality,
+                issues, witness->getFullName(), proto->getFullName());
             if (diagLoc == witness->getLoc()) {
               addOptionalityFixIts(adjustments, ctx, witness, diag);
             } else {
@@ -3162,8 +3221,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc,
                          diag::witness_initializer_failability,
                          ctor->getFullName(),
-                         witnessCtor->getFailability()
-                           == OTK_ImplicitlyUnwrappedOptional)
+                         witnessCtor->isImplicitlyUnwrappedOptional())
             .highlight(witnessCtor->getFailabilityLoc());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
         });
@@ -3670,10 +3728,6 @@ void ConformanceChecker::resolveValueWitnesses() {
       // Find the witness.
       auto witness = Conformance->getWitness(requirement).getDecl();
       if (!witness) return;
-
-      // Make sure that we finalize the witness, so we can emit this
-      // witness table.
-      TC.DeclsToFinalize.insert(witness);
 
       // Objective-C checking for @objc requirements.
       if (requirement->isObjC() &&
@@ -4320,17 +4374,8 @@ canSuppressPotentialWitnessWarningWithMovement(ValueDecl *requirement,
   // If the witness is a designated or required initializer, we can't move it
   // to an extension.
   if (auto ctor = dyn_cast<ConstructorDecl>(witness)) {
-    switch (ctor->getInitKind()) {
-    case CtorInitializerKind::Designated:
+    if (ctor->isDesignatedInit() || ctor->isRequired())
       return None;
-
-    case CtorInitializerKind::Convenience:
-    case CtorInitializerKind::ConvenienceFactory:
-    case CtorInitializerKind::Factory:
-      break;
-    }
-
-    if (ctor->isRequired()) return None;
   }
 
   // We can move this entity to an extension.
@@ -4865,10 +4910,11 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           continue;
 
         bool valueIsType = isa<TypeDecl>(value);
-        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
         for (auto requirement
-                : diag.Protocol->lookupDirect(value->getFullName(), flags)) {
+                : diag.Protocol->lookupDirect(value->getFullName())) {
+          if (requirement->getDeclContext() != diag.Protocol)
+            continue;
+
           auto requirementIsType = isa<TypeDecl>(requirement);
           if (valueIsType != requirementIsType)
             continue;
@@ -5014,9 +5060,9 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
           sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, funcReq);
         } else {
           auto storageReq = cast<AbstractStorageDecl>(req);
-          if (auto getter = storageReq->getGetter())
+          if (auto getter = storageReq->getParsedAccessor(AccessorKind::Get))
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, getter);
-          if (auto setter = storageReq->getSetter())
+          if (auto setter = storageReq->getParsedAccessor(AccessorKind::Set))
             sf->ObjCUnsatisfiedOptReqs.emplace_back(dc, setter);
         }
       }
@@ -5066,9 +5112,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
     if (!proto->isObjC()) continue;
 
     Optional<ProtocolConformance *> conformance;
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto req : proto->lookupDirect(name, flags)) {
+    for (auto req : proto->lookupDirect(name)) {
       // Skip anything in a protocol extension.
       if (req->getDeclContext() != proto) continue;
 
@@ -5125,7 +5169,7 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
             auto *storageReq = dyn_cast<AbstractStorageDecl>(req);
             if (!storageReq)
               continue;
-            req = storageReq->getAccessor(*accessorKind);
+            req = storageReq->getOpaqueAccessor(*accessorKind);
             if (!req)
               continue;
           }
@@ -5143,10 +5187,10 @@ swift::findWitnessedObjCRequirements(const ValueDecl *witness,
         auto *storageFound = dyn_cast_or_null<AbstractStorageDecl>(found);
         if (!storageReq || !storageFound)
           continue;
-        req = storageReq->getAccessor(*accessorKind);
+        req = storageReq->getOpaqueAccessor(*accessorKind);
         if (!req)
           continue;
-        found = storageFound->getAccessor(*accessorKind);
+        found = storageFound->getOpaqueAccessor(*accessorKind);
       }
 
       // Determine whether the witness for this conformance is in fact
@@ -5317,12 +5361,6 @@ void DefaultWitnessChecker::recordWitness(
                                   const RequirementMatch &match) {
   Proto->setDefaultWitness(requirement,
                            match.getWitness(TC.Context));
-
-  // Synthesize accessors for the protocol witness table to use.
-  if (auto storage = dyn_cast<AbstractStorageDecl>(match.Witness))
-    TC.synthesizeWitnessAccessorsForStorage(
-                                        cast<AbstractStorageDecl>(requirement),
-                                        storage);
 }
 
 void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
@@ -5442,16 +5480,4 @@ void TypeChecker::inferDefaultWitnesses(ProtocolDecl *proto) {
     proto->setDefaultAssociatedConformanceWitness(
         req.getFirstType()->getCanonicalType(), requirementProto, *conformance);
   }
-}
-
-Type TypeChecker::getWitnessType(Type type, ProtocolDecl *protocol,
-                                 ProtocolConformanceRef conformance,
-                                 Identifier name,
-                                 Diag<> brokenProtocolDiag) {
-  Type ty = conformance.getTypeWitnessByName(type, name);
-  if (!ty &&
-      !(conformance.isConcrete() && conformance.getConcrete()->isInvalid()))
-    diagnose(protocol->getLoc(), brokenProtocolDiag);
-
-  return (!ty || ty->hasError()) ? Type() : ty;
 }

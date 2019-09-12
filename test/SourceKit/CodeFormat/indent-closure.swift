@@ -74,6 +74,16 @@ func foo11() {
     }
 }
 
+func foo12() {
+    VStack {
+    }
+        .onAppear1()
+        .onAppear2() {}
+        .onAppear3() {
+        }
+        .onAppear4() {}
+}
+
 // RUN: %sourcekitd-test -req=format -line=3 -length=1 %s >%t.response
 // RUN: %sourcekitd-test -req=format -line=4 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=5 -length=1 %s >>%t.response
@@ -104,6 +114,12 @@ func foo11() {
 // RUN: %sourcekitd-test -req=format -line=66 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=67 -length=1 %s >>%t.response
 // RUN: %sourcekitd-test -req=format -line=73 -length=1 %s >>%t.response
+
+// RUN: %sourcekitd-test -req=format -line=80 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=81 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=82 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=83 -length=1 %s >>%t.response
+// RUN: %sourcekitd-test -req=format -line=84 -length=1 %s >>%t.response
 
 // RUN: %FileCheck --strict-whitespace %s <%t.response
 
@@ -145,3 +161,9 @@ func foo11() {
 // CHECK: key.sourcetext: "    Something() ["
 // CHECK: key.sourcetext: "    ].whatever"
 // CHECK: key.sourcetext: "    .onAppear {"
+
+// CHECK: key.sourcetext: "    .onAppear1()"
+// CHECK: key.sourcetext: "    .onAppear2() {}"
+// CHECK: key.sourcetext: "    .onAppear3() {"
+// CHECK: key.sourcetext: "    }"
+// CHECK: key.sourcetext: "    .onAppear4() {}"

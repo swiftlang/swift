@@ -140,7 +140,7 @@ func testIUOResult(x: IUOResult) {
 // Subscript index must be ExpressibleByStringLiteral.
 @dynamicMemberLookup
 struct Invalid1 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a keypath}}
+  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: Int) -> Int {
     return 42
   }
@@ -149,7 +149,7 @@ struct Invalid1 {
 // Subscript may not be variadic.
 @dynamicMemberLookup
 struct Invalid2 {
-  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a keypath}}
+  // expected-error @+1 {{@dynamicMemberLookup attribute requires 'Invalid2' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
   subscript(dynamicMember member: String...) -> Int {
     return 42
   }
@@ -188,7 +188,7 @@ func NotAllowedOnFunc() {}
 // @dynamicMemberLookup cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a keypath}}
+// expected-error @+1 {{@dynamicMemberLookup attribute requires 'InvalidBase' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
 @dynamicMemberLookup
 class InvalidBase {}
 
@@ -619,7 +619,7 @@ struct WithTrailingClosure {
 
 func keypath_with_trailing_closure_subscript(_ ty: inout SubscriptLens<WithTrailingClosure>) {
   _ = ty[0] { 42 } // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
-  _ = ty[0] { 42 } = 0
+  _ = ty[0] { 42 } = 0 // expected-error {{cannot assign through subscript: subscript is get-only}}
   // expected-error@-1 {{subscript index of type '() -> Int' in a key path must be Hashable}}
   _ = ty[] { 42 }  // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
   _ = ty[] { 42 } = 0 // expected-error {{subscript index of type '() -> Int' in a key path must be Hashable}}
@@ -686,5 +686,61 @@ func invalid_refs_through_dynamic_lookup() {
     _ = lens.bar()         // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
     _ = lens.bar().faz + 1 // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
     _ = lens.baz("hello")  // expected-error {{dynamic key path member lookup cannot refer to static method 'baz'}}
+  }
+}
+
+// SR-10597
+
+final class SR10597 {
+}
+
+@dynamicMemberLookup
+struct SR10597_W<T> {
+  var obj: T
+  init(_ obj: T) { self.obj = obj }
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    return obj[keyPath: member]
+  }
+  var wooo: SR10597 { SR10597() } // expected-note {{declared here}}
+}
+
+_ = SR10597_W<SR10597>(SR10597()).wooooo // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'wooooo' using key path from root type 'SR10597'; did you mean 'wooo'?}}
+_ = SR10597_W<SR10597>(SR10597()).bla // expected-error {{value of type 'SR10597_W<SR10597>' has no dynamic member 'bla' using key path from root type 'SR10597'}}
+
+final class SR10597_1 {
+    var woo: Int? // expected-note 2 {{'woo' declared here}}
+}
+
+@dynamicMemberLookup
+struct SR10597_1_W<T> {
+  var obj: T
+  init(_ obj: T) { self.obj = obj }
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    return obj[keyPath: member]
+  }
+}
+
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).wooo // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'wooo' using key path from root type 'SR10597_1'; did you mean 'woo'?}}
+_ = SR10597_1_W<SR10597_1>(SR10597_1()).bla // expected-error {{value of type 'SR10597_1_W<SR10597_1>' has no dynamic member 'bla' using key path from root type 'SR10597_1'}}
+
+// SR-10557
+
+@dynamicMemberLookup
+struct SR_10557_S {
+  subscript(dynamicMember: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}}{{13-13=dynamicMember }}
+    fatalError()
+  }
+}
+
+@dynamicMemberLookup
+struct SR_10557_S1 {
+  subscript(foo bar: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+    fatalError()
+  }
+
+  subscript(foo: String) -> String { // expected-error {{@dynamicMemberLookup attribute requires 'SR_10557_S1' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}}
+  // expected-note@-1 {{add an explicit argument label to this subscript to satisfy the @dynamicMemberLookup requirement}} {{13-13=dynamicMember }}
+    fatalError()
   }
 }

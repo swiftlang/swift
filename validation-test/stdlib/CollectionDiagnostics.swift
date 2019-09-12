@@ -7,6 +7,7 @@ import StdlibCollectionUnittest
 // Check that Collection.SubSequence is constrained to Collection.
 //
 
+// expected-note@+2 {{do you want to add protocol stubs?}}
 // expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'Collection'}}
 struct CollectionWithBadSubSequence : Collection {
   var startIndex: MinimalIndex {
@@ -70,6 +71,7 @@ struct AnotherGoodIndexable1 : Indexable {
   subscript(pos: Int) -> Int { return 0 }
 }
 
+// expected-note@+4 {{do you want to add protocol stubs?}}
 // expected-warning@+3 {{'Indexable' is deprecated: renamed to 'Collection'}}
 // expected-error@+2 {{type 'BadIndexable2' does not conform to protocol 'Collection'}}
 // expected-note@+1 {{use 'Collection' instead}}

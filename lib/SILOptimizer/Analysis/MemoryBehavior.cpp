@@ -154,6 +154,9 @@ public:
   }
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetainInst)
   REFCOUNTINC_MEMBEHAVIOR_INST(RetainValueInst)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  REFCOUNTINC_MEMBEHAVIOR_INST(Name##RetainValueInst)                          \
+  REFCOUNTINC_MEMBEHAVIOR_INST(Copy##Name##ValueInst)
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   REFCOUNTINC_MEMBEHAVIOR_INST(Name##RetainInst) \
   REFCOUNTINC_MEMBEHAVIOR_INST(StrongRetain##Name##Inst) \

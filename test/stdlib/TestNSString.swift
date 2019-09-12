@@ -57,6 +57,11 @@ class TestNSString : TestNSStringSuper {
     string.enumerateSubstrings(in: middleIndex..<string.endIndex, options: .byLines) { (_, _, _, _) in }  //shouldn't crash
   }
   
+  func test_unpairedSurrogates() {
+    let evil = getNSStringWithUnpairedSurrogate();
+    print("\(evil)")
+  }
+  
 }
 
 #if !FOUNDATION_XCTEST
@@ -64,6 +69,9 @@ var NSStringTests = TestSuite("TestNSString")
 NSStringTests.test("test_equalOverflow") { TestNSString().test_equalOverflow() }
 NSStringTests.test("test_smallString_BOM") {
   TestNSString().test_smallString_BOM()
+}
+NSStringTests.test("test_unpairedSurrogates") {
+  TestNSString().test_unpairedSurrogates()
 }
 runAllTests()
 #endif

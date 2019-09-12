@@ -42,8 +42,14 @@ namespace {
 using BrPropUserAndBlockPair = std::pair<BranchPropagatedUser, SILBasicBlock *>;
 
 struct State {
-  /// The value that we are checking.
-  SILValue value;
+  /// If we are checking for a specific value, this is that value. This is only
+  /// used for diagnostic purposes. The algorithm if this is set works on the
+  /// parent block of the value.
+  Optional<SILValue> value;
+
+  /// The block where the live range begins. If the field value is not None,
+  /// then this is value->getParentBlock();
+  SILBasicBlock *beginBlock;
 
   /// The result error object that use to signal either that no errors were
   /// found or if errors are found the specific type of error that was found.
@@ -75,8 +81,15 @@ struct State {
   State(SILValue value, SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
         ErrorBehaviorKind errorBehavior,
         SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
-      : value(value), error(errorBehavior), visitedBlocks(visitedBlocks),
-        leakingBlocks(leakingBlocks) {}
+      : value(value), beginBlock(value->getParentBlock()), error(errorBehavior),
+        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks) {}
+
+  State(SILBasicBlock *beginBlock,
+        SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+        ErrorBehaviorKind errorBehavior,
+        SmallVectorImpl<SILBasicBlock *> *leakingBlocks)
+      : value(), beginBlock(beginBlock), error(errorBehavior),
+        visitedBlocks(visitedBlocks), leakingBlocks(leakingBlocks) {}
 
   void initializeAllNonConsumingUses(
       ArrayRef<BranchPropagatedUser> nonConsumingUsers);
@@ -183,7 +196,7 @@ void State::initializeAllConsumingUses(
     // If this user is in the same block as the value, do not visit
     // predecessors. We must be extra tolerant here since we allow for
     // unreachable code.
-    if (userBlock == value->getParentBlock())
+    if (userBlock == beginBlock)
       continue;
 
     // Then for each predecessor of this block...
@@ -203,10 +216,15 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
     return;
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
-                 << "Found over consume?!\n"
-                 << "Value: " << *value << "User: " << *consumingUser
-                 << "Block: bb" << userBlock->getDebugID() << "\n\n";
+    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+                 << "Found over consume?!\n";
+    if (auto v = value) {
+      llvm::errs() << "Value: " << *value;
+    } else {
+      llvm::errs() << "Value: N/A\n";
+    }
+    llvm::errs() << "User: " << *consumingUser << "Block: bb"
+                 << userBlock->getDebugID() << "\n\n";
   });
 }
 
@@ -228,10 +246,16 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // the cond branch user is in a previous block. So just bail early.
   if (consumingUser.isCondBranchUser()) {
     error.handleUseAfterFree([&]() {
-      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+                   << "'\n"
                    << "Found use after free?!\n"
-                   << "Value: " << *value
-                   << "Consuming User: " << *consumingUser
+                   << "Value: ";
+      if (auto v = value) {
+        llvm::errs() << *v;
+      } else {
+        llvm::errs() << "N/A. \n";
+      }
+      llvm::errs() << "Consuming User: " << *consumingUser
                    << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
@@ -255,10 +279,16 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                      return nonConsumingUser == &i;
                    }) != userBlock->end()) {
     error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+                   << "'\n"
                    << "Found use after free?!\n"
-                   << "Value: " << *value
-                   << "Consuming User: " << *consumingUser
+                   << "Value: ";
+      if (auto v = value) {
+        llvm::errs() << *v;
+      } else {
+        llvm::errs() << "N/A. \n";
+      }
+      llvm::errs() << "Consuming User: " << *consumingUser
                    << "Non Consuming User: " << *iter->second << "Block: bb"
                    << userBlock->getDebugID() << "\n\n";
     });
@@ -287,10 +317,17 @@ void State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
   }
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
                  << "Found over consume?!\n"
-                 << "Value: " << *value << "User: " << *consumingUser
-                 << "Block: bb" << userBlock->getDebugID() << "\n\n";
+                 << "Value: ";
+    if (auto v = value) {
+      llvm::errs() << *v;
+    } else {
+      llvm::errs() << "N/A. \n";
+    }
+
+    llvm::errs() << "User: " << *consumingUser << "Block: bb"
+                 << userBlock->getDebugID() << "\n\n";
   });
 }
 
@@ -310,10 +347,16 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   }
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
                  << "Found over consume?!\n"
-                 << "Value: " << *value << "Block: bb"
-                 << userBlock->getDebugID() << "\n\n";
+                 << "Value: ";
+    if (auto v = value) {
+      llvm::errs() << *v;
+    } else {
+      llvm::errs() << "N/A. \n";
+    }
+
+    llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
 }
 
@@ -370,7 +413,7 @@ void State::performDataflow(DeadEndBlocks &deBlocks) {
     // further to do since we do not want to visit the predecessors of our
     // dominating block. On the other hand, we do want to add its successors to
     // the successorBlocksThatMustBeVisited set.
-    if (block == value->getParentBlock())
+    if (block == beginBlock)
       continue;
 
     // Then for each predecessor of this block:
@@ -399,17 +442,22 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     // If we are asked to store any leaking blocks, put them in the leaking
     // blocks array.
     if (leakingBlocks) {
-      copy(successorBlocksThatMustBeVisited,
-           std::back_inserter(*leakingBlocks));
+      llvm::copy(successorBlocksThatMustBeVisited,
+                 std::back_inserter(*leakingBlocks));
     }
 
     // If we are supposed to error on leaks, do so now.
     error.handleLeak([&] {
-      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+                   << "'\n"
                    << "Error! Found a leak due to a consuming post-dominance "
-                      "failure!\n"
-                   << "    Value: " << *value
-                   << "    Post Dominating Failure Blocks:\n";
+                      "failure!\n";
+      if (auto v = value) {
+        llvm::errs() << "Value: " << *value;
+      } else {
+        llvm::errs() << "Value: N/A\n";
+      }
+      llvm::errs() << "    Post Dominating Failure Blocks:\n";
       for (auto *succBlock : successorBlocksThatMustBeVisited) {
         llvm::errs() << "        bb" << succBlock->getDebugID();
       }
@@ -434,10 +482,18 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     }
 
     error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << value->getFunction()->getName() << "'\n"
+      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+                   << "'\n"
                    << "Found use after free due to unvisited non lifetime "
                       "ending uses?!\n"
-                   << "Value: " << *value << "    Remaining Users:\n";
+                   << "Value: ";
+      if (auto v = value) {
+        llvm::errs() << *v;
+      } else {
+        llvm::errs() << "N/A. \n";
+      }
+
+      llvm::errs() << "    Remaining Users:\n";
       for (auto &pair : blocksWithNonConsumingUses) {
         llvm::errs() << "User:" << *pair.second << "Block: bb"
                      << pair.first->getDebugID() << "\n";

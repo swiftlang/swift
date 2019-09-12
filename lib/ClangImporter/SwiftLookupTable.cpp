@@ -195,6 +195,14 @@ translateDeclToContext(clang::NamedDecl *decl) {
     return None;
   }
 
+  // Namespace declaration.
+  if (auto namespaceDecl = dyn_cast<clang::NamespaceDecl>(decl)) {
+    if (namespaceDecl->getIdentifier())
+      return std::make_pair(SwiftLookupTable::ContextKind::Tag,
+                            namespaceDecl->getName());
+    return None;
+  }
+
   // Objective-C class context.
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(decl))
     return std::make_pair(SwiftLookupTable::ContextKind::ObjCClass,
@@ -229,6 +237,11 @@ auto SwiftLookupTable::translateDeclContext(const clang::DeclContext *dc)
   // Tag declaration context.
   if (auto tag = dyn_cast<clang::TagDecl>(dc))
     return translateDeclToContext(const_cast<clang::TagDecl *>(tag));
+
+  // Namespace declaration context.
+  if (auto namespaceDecl = dyn_cast<clang::NamespaceDecl>(dc))
+    return translateDeclToContext(
+        const_cast<clang::NamespaceDecl *>(namespaceDecl));
 
   // Objective-C class context.
   if (auto objcClass = dyn_cast<clang::ObjCInterfaceDecl>(dc))
@@ -1077,8 +1090,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(key_type_ref key) {
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second, 0);
+      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -1327,8 +1339,7 @@ namespace {
     }
 
     hash_value_type ComputeHash(internal_key_type key) {
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second, 0);
+      return static_cast<unsigned>(key.first) + llvm::djbHash(key.second);
     }
 
     static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
@@ -1672,7 +1683,7 @@ void importer::addEntryToLookupTable(SwiftLookupTable &table,
   // Walk the members of any context that can have nested members.
   if (isa<clang::TagDecl>(named) || isa<clang::ObjCInterfaceDecl>(named) ||
       isa<clang::ObjCProtocolDecl>(named) ||
-      isa<clang::ObjCCategoryDecl>(named)) {
+      isa<clang::ObjCCategoryDecl>(named) || isa<clang::NamespaceDecl>(named)) {
     clang::DeclContext *dc = cast<clang::DeclContext>(named);
     for (auto member : dc->decls()) {
       if (auto namedMember = dyn_cast<clang::NamedDecl>(member))

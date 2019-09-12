@@ -319,6 +319,10 @@ module SwiftGlibc [system] {
       header "${GLIBC_INCLUDE_PATH}/dirent.h"
       export *
     }
+    module dl {
+      header "${GLIBC_INCLUDE_PATH}/link.h"
+      export *
+    }
     module dlfcn {
       header "${GLIBC_INCLUDE_PATH}/dlfcn.h"
       export *

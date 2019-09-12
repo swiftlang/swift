@@ -201,17 +201,8 @@ GenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
 
   SmallVector<Requirement, 8> canonicalRequirements;
   canonicalRequirements.reserve(requirements.size());
-  for (auto &reqt : requirements) {
-    if (reqt.getKind() != RequirementKind::Layout) {
-      auto secondTy = reqt.getSecondType();
-      canonicalRequirements.push_back(
-          Requirement(reqt.getKind(), reqt.getFirstType()->getCanonicalType(),
-                      secondTy ? secondTy->getCanonicalType() : CanType()));
-    } else
-      canonicalRequirements.push_back(
-          Requirement(reqt.getKind(), reqt.getFirstType()->getCanonicalType(),
-                      reqt.getLayoutConstraint()));
-  }
+  for (auto &reqt : requirements)
+    canonicalRequirements.push_back(reqt.getCanonical());
 
   (void)skipValidation;
   auto canSig = get(canonicalParams, canonicalRequirements,
@@ -348,9 +339,13 @@ GenericSignature::getCanonicalSignature() const {
            CanonicalSignatureOrASTContext.get<GenericSignature*>());
 }
 
-GenericEnvironment *GenericSignature::createGenericEnvironment() {
-  auto *builder = getGenericSignatureBuilder();
-  return GenericEnvironment::getIncomplete(this, builder);
+GenericEnvironment *GenericSignature::getGenericEnvironment() {
+  if (GenericEnv == nullptr) {
+    auto *builder = getGenericSignatureBuilder();
+    GenericEnv = GenericEnvironment::getIncomplete(this, builder);
+  }
+
+  return GenericEnv;
 }
 
 
@@ -706,14 +701,6 @@ CanType GenericSignature::getCanonicalTypeInContext(Type type) {
   return getCanonicalTypeInContext(type, builder);
 }
 
-GenericEnvironment *CanGenericSignature::getGenericEnvironment() const {
-  // generic signature builders are stored on the ASTContext.
-  auto &ctx = getGenericParams()[0]->getASTContext();
-  return ctx.getOrCreateCanonicalGenericEnvironment(
-           ctx.getOrCreateGenericSignatureBuilder(*this),
-           *this);
-}
-
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const{
   auto params = Signature->getGenericParams().getOriginalArray();
@@ -1058,3 +1045,50 @@ bool GenericSignature::hasTypeVariable(ArrayRef<Requirement> requirements) {
   return false;
 }
 
+void swift::simple_display(raw_ostream &out, const GenericSignature *sig) {
+  if (sig)
+    sig->print(out);
+  else
+    out << "NULL";
+}
+
+bool Requirement::isCanonical() const {
+  if (getFirstType() && !getFirstType()->isCanonical())
+    return false;
+
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+  case RequirementKind::SameType:
+  case RequirementKind::Superclass:
+    if (getSecondType() && !getSecondType()->isCanonical())
+      return false;
+    break;
+
+  case RequirementKind::Layout:
+    break;
+  }
+
+  return true;
+}
+
+
+/// Get the canonical form of this requirement.
+Requirement Requirement::getCanonical() const {
+  Type firstType = getFirstType();
+  if (firstType)
+    firstType = firstType->getCanonicalType();
+
+  switch (getKind()) {
+  case RequirementKind::Conformance:
+  case RequirementKind::SameType:
+  case RequirementKind::Superclass: {
+    Type secondType = getSecondType();
+    if (secondType)
+      secondType = secondType->getCanonicalType();
+    return Requirement(getKind(), firstType, secondType);
+  }
+
+  case RequirementKind::Layout:
+    return Requirement(getKind(), firstType, getLayoutConstraint());
+  }
+}

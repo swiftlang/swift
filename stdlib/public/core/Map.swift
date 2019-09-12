@@ -15,7 +15,7 @@
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 @frozen
-public struct LazyMapSequence<Base : Sequence, Element> {
+public struct LazyMapSequence<Base: Sequence, Element> {
 
   public typealias Elements = LazyMapSequence
 
@@ -168,8 +168,8 @@ extension LazyMapCollection: Collection {
   }
 }
 
-extension LazyMapCollection : BidirectionalCollection
-  where Base : BidirectionalCollection {
+extension LazyMapCollection: BidirectionalCollection
+  where Base: BidirectionalCollection {
 
   /// A value less than or equal to the number of elements in the collection.
   ///
@@ -187,8 +187,8 @@ extension LazyMapCollection : BidirectionalCollection
 
 extension LazyMapCollection: LazyCollectionProtocol { }
 
-extension LazyMapCollection : RandomAccessCollection
-  where Base : RandomAccessCollection { }
+extension LazyMapCollection: RandomAccessCollection
+  where Base: RandomAccessCollection { }
 
 //===--- Support for s.lazy -----------------------------------------------===//
 

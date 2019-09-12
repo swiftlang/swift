@@ -40,6 +40,7 @@ namespace constraints {
 class OverloadChoice;
 class ConstraintSystem;
 class ConstraintLocator;
+class ConstraintLocatorBuilder;
 class Solution;
 
 /// Describes the kind of fix to apply to the given constraint before
@@ -136,6 +137,10 @@ enum class FixKind : uint8_t {
   /// referenced constructor must be required.
   AllowInvalidInitRef,
 
+  /// Allow a tuple to be destructured with mismatched arity, or mismatched
+  /// types.
+  AllowTupleTypeMismatch,
+
   /// Allow an invalid member access on a value of protocol type as if
   /// that protocol type were a generic constraint requiring conformance
   /// to that protocol.
@@ -183,6 +188,10 @@ enum class FixKind : uint8_t {
   /// Allow invalid reference to a member declared as `mutating`
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
+
+  /// Allow a single tuple parameter to be matched with N arguments
+  /// by forming all of the given arguments into a single tuple.
+  AllowTupleSplatForSingleParameter,
 };
 
 class ConstraintFix {
@@ -227,34 +236,15 @@ protected:
   ConstraintSystem &getConstraintSystem() const { return CS; }
 };
 
-/// Append 'as! T' to force a downcast to the specified type.
-class ForceDowncast final : public ConstraintFix {
-  Type DowncastTo;
-
-  ForceDowncast(ConstraintSystem &cs, Type toType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::ForceDowncast, locator), DowncastTo(toType) {
-  }
-
-public:
-  std::string getName() const override;
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static ForceDowncast *create(ConstraintSystem &cs, Type toType,
-                               ConstraintLocator *locator);
-};
-
 /// Introduce a '!' to force an optional unwrap.
 class ForceOptional final : public ConstraintFix {
   Type BaseType;
   Type UnwrappedType;
-  ConstraintLocator *FullLocator;
 
   ForceOptional(ConstraintSystem &cs, Type baseType, Type unwrappedType,
-                ConstraintLocator *simplifiedLocator,
-                ConstraintLocator *fullLocator)
-      : ConstraintFix(cs, FixKind::ForceOptional, simplifiedLocator),
-        BaseType(baseType), UnwrappedType(unwrappedType),
-        FullLocator(fullLocator) {
+                ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::ForceOptional, locator), BaseType(baseType),
+        UnwrappedType(unwrappedType) {
     assert(baseType && "Base type must not be null");
     assert(unwrappedType && "Unwrapped type must not be null");
   }
@@ -292,19 +282,6 @@ public:
   static UnwrapOptionalBase *
   createWithOptionalResult(ConstraintSystem &cs, DeclName member,
                            ConstraintLocator *locator);
-};
-
-/// Introduce a '&' to take the address of an lvalue.
-class AddAddressOf final : public ConstraintFix {
-  AddAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddressOf, locator) {}
-
-public:
-  std::string getName() const override { return "add address-of"; }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static AddAddressOf *create(ConstraintSystem &cs, ConstraintLocator *locator);
 };
 
 // Treat rvalue as if it was an lvalue
@@ -494,6 +471,9 @@ protected:
                      ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
+  ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
+                     ConstraintLocator *locator)
+      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -507,6 +487,73 @@ public:
                                     ConstraintLocator *locator);
 };
 
+/// This is a contextual mismatch between throwing and non-throwing
+/// function types, repair it by dropping `throws` attribute.
+class DropThrowsAttribute final : public ContextualMismatch {
+  DropThrowsAttribute(ConstraintSystem &cs, FunctionType *fromType,
+                      FunctionType *toType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, fromType, toType, locator) {
+    assert(fromType->throws() != toType->throws());
+  }
+
+public:
+  std::string getName() const override { return "drop 'throws' attribute"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static DropThrowsAttribute *create(ConstraintSystem &cs,
+                                     FunctionType *fromType,
+                                     FunctionType *toType,
+                                     ConstraintLocator *locator);
+};
+
+/// Append 'as! T' to force a downcast to the specified type.
+class ForceDowncast final : public ContextualMismatch {
+  ForceDowncast(ConstraintSystem &cs, Type fromType, Type toType,
+                ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::ForceDowncast, fromType, toType,
+                           locator) {}
+
+public:
+  std::string getName() const override;
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ForceDowncast *create(ConstraintSystem &cs, Type fromType, Type toType,
+                               ConstraintLocator *locator);
+};
+
+/// Introduce a '&' to take the address of an lvalue.
+class AddAddressOf final : public ContextualMismatch {
+  AddAddressOf(ConstraintSystem &cs, Type argTy, Type paramTy,
+               ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AddressOf, argTy, paramTy, locator) {}
+
+public:
+  std::string getName() const override { return "add address-of"; }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AddAddressOf *create(ConstraintSystem &cs, Type argTy, Type paramTy,
+                              ConstraintLocator *locator);
+};
+
+class RemoveAddressOf final : public ContextualMismatch {
+  RemoveAddressOf(ConstraintSystem &cs, Type lhs, Type rhs,
+                  ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::RemoveAddressOf, lhs, rhs, locator) {}
+
+public:
+  std::string getName() const override {
+    return "remove extraneous use of `&`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static RemoveAddressOf *create(ConstraintSystem &cs, Type lhs, Type rhs,
+                                 ConstraintLocator *locator);
+};
+
 /// Detect situations where two type's generic arguments must
 /// match but are not convertible e.g.
 ///
@@ -515,22 +562,21 @@ public:
 /// let _:F<Int> = F<Bool>()
 /// ```
 class GenericArgumentsMismatch final
-    : public ConstraintFix,
+    : public ContextualMismatch,
       private llvm::TrailingObjects<GenericArgumentsMismatch, unsigned> {
   friend TrailingObjects;
-
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
 
   unsigned NumMismatches;
 
 protected:
-  GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
-                           BoundGenericType *required,
+  GenericArgumentsMismatch(ConstraintSystem &cs, Type actual, Type required,
                            llvm::ArrayRef<unsigned> mismatches,
                            ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
-        Actual(actual), Required(required), NumMismatches(mismatches.size()) {
+      : ContextualMismatch(cs, FixKind::GenericArgumentsMismatch, actual,
+                           required, locator),
+        NumMismatches(mismatches.size()) {
+    assert(actual->is<BoundGenericType>());
+    assert(required->is<BoundGenericType>());
     std::uninitialized_copy(mismatches.begin(), mismatches.end(),
                             getMismatchesBuf().begin());
   }
@@ -540,18 +586,14 @@ public:
     return "fix generic argument mismatch";
   }
 
-  BoundGenericType *getActual() const { return Actual; }
-  BoundGenericType *getRequired() const { return Required; }
-
   ArrayRef<unsigned> getMismatches() const {
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static GenericArgumentsMismatch *create(ConstraintSystem &cs,
-                                          BoundGenericType *actual,
-                                          BoundGenericType *required,
+  static GenericArgumentsMismatch *create(ConstraintSystem &cs, Type actual,
+                                          Type required,
                                           llvm::ArrayRef<unsigned> mismatches,
                                           ConstraintLocator *locator);
 
@@ -607,6 +649,26 @@ public:
 
   static AutoClosureForwarding *create(ConstraintSystem &cs,
                                        ConstraintLocator *locator);
+};
+
+/// Allow invalid pointer conversions for autoclosure result types as if the
+/// pointer type is a function parameter rather than an autoclosure result.
+class AllowAutoClosurePointerConversion final : public ContextualMismatch {
+  AllowAutoClosurePointerConversion(ConstraintSystem &cs, Type pointeeType,
+                                    Type pointerType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, pointeeType, pointerType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow pointer conversion for autoclosure result type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowAutoClosurePointerConversion *create(ConstraintSystem &cs,
+                                                   Type pointeeType,
+                                                   Type pointerType,
+                                                   ConstraintLocator *locator);
 };
 
 class RemoveUnwrap final : public ConstraintFix {
@@ -862,6 +924,23 @@ private:
                                      ConstraintLocator *locator);
 };
 
+class AllowTupleTypeMismatch final : public ContextualMismatch {
+  AllowTupleTypeMismatch(ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::AllowTupleTypeMismatch, lhs, rhs,
+                           locator) {}
+
+public:
+  static AllowTupleTypeMismatch *create(ConstraintSystem &cs, Type lhs,
+                                        Type rhs, ConstraintLocator *locator);
+
+  std::string getName() const override {
+    return "fix tuple mismatches in type and arity";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+};
+
 class AllowMutatingMemberOnRValueBase final : public AllowInvalidMemberRef {
   AllowMutatingMemberOnRValueBase(ConstraintSystem &cs, Type baseType,
                                   ValueDecl *member, DeclName name,
@@ -1070,21 +1149,6 @@ private:
                                           ConstraintLocator *locator);
 };
 
-class RemoveAddressOf final : public ConstraintFix {
-  RemoveAddressOf(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::RemoveAddressOf, locator) {}
-
-public:
-  std::string getName() const override {
-    return "remove extraneous use of `&`";
-  }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static RemoveAddressOf *create(ConstraintSystem &cs,
-                                 ConstraintLocator *locator);
-};
-
 class RemoveReturn final : public ConstraintFix {
   RemoveReturn(ConstraintSystem &cs, ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::RemoveReturn, locator) {}
@@ -1179,6 +1243,69 @@ public:
   static SkipUnhandledConstructInFunctionBuilder *
   create(ConstraintSystem &cs, UnhandledNode unhandledNode,
          NominalTypeDecl *builder, ConstraintLocator *locator);
+};
+
+class AllowTupleSplatForSingleParameter final : public ConstraintFix {
+  using Param = AnyFunctionType::Param;
+
+  Type ParamType;
+
+  AllowTupleSplatForSingleParameter(ConstraintSystem &cs, Type paramTy,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowTupleSplatForSingleParameter, locator),
+        ParamType(paramTy) {}
+
+public:
+  std::string getName() const override {
+    return "allow single parameter tuple splat";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  /// Apply this fix to given arguments/parameters and return `true`
+  /// this fix is not applicable and solver can't continue, `false`
+  /// otherwise.
+  static bool attempt(ConstraintSystem &cs, SmallVectorImpl<Param> &args,
+                      ArrayRef<Param> params,
+                      SmallVectorImpl<SmallVector<unsigned, 1>> &bindings,
+                      ConstraintLocatorBuilder locator);
+};
+
+class IgnoreContextualType : public ContextualMismatch {
+  IgnoreContextualType(ConstraintSystem &cs, Type resultTy, Type specifiedTy,
+                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, resultTy, specifiedTy, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore specified contextual type";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
+                                      Type specifiedTy,
+                                      ConstraintLocator *locator);
+};
+
+/// If this is an argument-to-parameter conversion which is associated with
+/// `inout` parameter, subtyping is not permitted, types have to
+/// be identical.
+class AllowInOutConversion final : public ContextualMismatch {
+  AllowInOutConversion(ConstraintSystem &cs, Type argType, Type paramType,
+                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow conversions between argument/parameter marked as `inout`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInOutConversion *create(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator);
 };
 
 } // end namespace constraints

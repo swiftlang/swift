@@ -2117,6 +2117,7 @@ for host in "${ALL_HOSTS[@]}"; do
         tmp_product=${product}
         if [[ ${tmp_product} == "libdispatch_static" ]]; then
             tmp_product=libdispatch
+            LIBDISPATCH_STATIC_CMAKE_OPTIONS=${LIBDISPATCH_CMAKE_OPTIONS[@]}
         fi
         if ! [[ $(should_execute_action "${host}-${tmp_product}-build") ]]; then
             continue
@@ -2543,6 +2544,7 @@ for host in "${ALL_HOSTS[@]}"; do
                       -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
                       -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
                       -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                      -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
                       -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
                       -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
                       -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
@@ -3552,6 +3554,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_SWIFT}" ]] ; then
                     continue
                 fi
+                INSTALL_TARGETS=install-swift-components
                 # Swift syntax parser is currently a sub-product of Swift;
                 # We need to specify the install target separately here.
                 if [ "${BUILD_LIBPARSER_ONLY}" ]; then
@@ -3573,24 +3576,25 @@ for host in "${ALL_HOSTS[@]}"; do
                     echo "--install-destdir is required to install products."
                     exit 1
                 fi
-
-                case ${host} in
-                    linux-*)
+                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
+                    case ${host} in
+                        linux-*)
                         ;;
-                    freebsd-*)
+                        freebsd-*)
                         ;;
-                    cygwin-*)
+                        cygwin-*)
                         ;;
-                    haiku-*)
+                        haiku-*)
                         ;;
-                    macosx-*)
-                        set_lldb_xcodebuild_options
-                        set_lldb_build_mode
-                        with_pushd ${LLDB_SOURCE_DIR} \
-                            call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
-                        continue
+                        macosx-*)
+                            set_lldb_xcodebuild_options
+                            set_lldb_build_mode
+                            with_pushd ${LLDB_SOURCE_DIR} \
+                                       call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
+                            continue
                         ;;
-                esac
+                    esac
+                fi
                 ;;
             swiftpm)
                 if [[ -z "${INSTALL_SWIFTPM}" ]] ; then
@@ -3877,8 +3881,7 @@ for host in "${ALL_HOSTS[@]}"; do
             # Exclude shell scripts and static archives.
             (cd "${INSTALL_SYMROOT}" &&
              find ./"${CURRENT_PREFIX}" -perm -0111 -type f -print | \
-               grep -v crashlog.py | \
-               grep -v symbolication.py | \
+               grep -v '.py$' | \
                grep -v '.a$' | \
                xargs -n 1 -P ${BUILD_JOBS} $(xcrun_find_tool dsymutil))
 

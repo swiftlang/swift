@@ -2,7 +2,7 @@ add_swift_host_tool(swift
   driver.cpp
   autolink_extract_main.cpp
   modulewrap_main.cpp
-  swift_format_main.cpp
+  swift_indent_main.cpp
   SWIFT_COMPONENT compiler
 )
 target_link_libraries(swift
@@ -20,7 +20,7 @@ swift_create_post_build_symlink(swift
 
 swift_create_post_build_symlink(swift
   SOURCE "swift${CMAKE_EXECUTABLE_SUFFIX}"
-  DESTINATION "swift-format${CMAKE_EXECUTABLE_SUFFIX}"
+  DESTINATION "swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
   WORKING_DIRECTORY "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
 
 swift_create_post_build_symlink(swift
@@ -30,19 +30,22 @@ swift_create_post_build_symlink(swift
 
 add_swift_tool_symlink(swiftc swift compiler)
 add_swift_tool_symlink(swift-autolink-extract swift autolink-driver)
-add_swift_tool_symlink(swift-format swift editor-integration)
+add_swift_tool_symlink(swift-indent swift editor-integration)
 
 # If building as part of clang, make sure the headers are installed.
 if(NOT SWIFT_BUILT_STANDALONE)
   add_dependencies(swift clang-headers)
 endif()
 
+add_dependencies(compiler swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swiftc${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT compiler)
+add_dependencies(autolink-driver swift)
 swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-autolink-extract${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT autolink-driver)
-swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-format${CMAKE_EXECUTABLE_SUFFIX}"
+add_dependencies(editor-integration swift)
+swift_install_in_component(FILES "${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-indent${CMAKE_EXECUTABLE_SUFFIX}"
                            DESTINATION "bin"
                            COMPONENT editor-integration)

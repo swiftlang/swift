@@ -19,11 +19,13 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/Type.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Compiler.h"
 #include <functional>
 #include <utility>
@@ -46,17 +48,14 @@ class ConstraintGraphNode {
   /// Describes information about an adjacency between two type variables.
   struct Adjacency {
     /// Index into the vector of adjacent type variables, \c Adjacencies.
-    unsigned Index : 31;
-
-    /// Whether a fixed type binding relates the two type variables.
-    unsigned FixedBinding : 1;
+    unsigned Index;
 
     /// The number of constraints that link this type variable to the
     /// enclosing node.
     unsigned NumConstraints;
 
     bool empty() const {
-      return !FixedBinding && !NumConstraints;
+      return NumConstraints == 0;
     }
   };
 
@@ -78,6 +77,12 @@ public:
   /// Retrieve the set of type variables to which this node is adjacent.
   ArrayRef<TypeVariableType *> getAdjacencies() const {
     return Adjacencies;
+  }
+
+  /// Retrieve the set of type variables that are adjacent due to fixed
+  /// bindings.
+  ArrayRef<TypeVariableType *> getFixedBindings() const {
+    return FixedBindings;
   }
 
   /// Retrieve all of the type variables in the same equivalence class
@@ -141,6 +146,10 @@ private:
   /// type variable to the index of the adjacency information in
   /// \c Adjacencies.
   llvm::SmallDenseMap<TypeVariableType *, Adjacency, 2> AdjacencyInfo;
+
+  /// The set of type variables that occur within the fixed binding of
+  /// this type variable.
+  SmallVector<TypeVariableType *, 2> FixedBindings;
 
   /// All of the type variables in the same equivalence class as this
   /// representative type variable.
@@ -222,9 +231,8 @@ public:
   /// Gather the set of constraints that involve the given type variable,
   /// i.e., those constraints that will be affected when the type variable
   /// gets merged or bound to a fixed type.
-  void
+  llvm::TinyPtrVector<Constraint *>
   gatherConstraints(TypeVariableType *typeVar,
-                    llvm::SetVector<Constraint *> &constraints,
                     GatheringKind kind,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
@@ -237,20 +245,61 @@ public:
     return TypeVariables;
   }
 
+  /// Describes a single component, as produced by the connected components
+  /// algorithm.
+  struct Component {
+    /// The type variables in this component.
+    TinyPtrVector<TypeVariableType *> typeVars;
+
+    /// The original index of this component in the list of components,
+    /// used to provide the index of where the partial solutions will occur.
+    /// FIXME: This is needed due to some ordering dependencies in the
+    /// merging of partial solutions, which appears to also be related
+    /// DisjunctionStep::pruneOverloads() short-circuiting. It should be
+    /// removed.
+    unsigned solutionIndex;
+
+  private:
+    /// The number of disjunctions in this component.
+    unsigned numDisjunctions = 0;
+
+    /// The constraints in this component.
+    TinyPtrVector<Constraint *> constraints;
+
+  public:
+    /// The set of components that this component depends on, such that
+    /// the partial solutions of the those components need to be available
+    /// before this component can be solved.
+    ///
+    /// FIXME: Use a TinyPtrVector here.
+    std::vector<unsigned> dependsOn;
+
+    Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
+
+    /// Whether this component represents an orphaned constraint.
+    bool isOrphaned() const {
+      return typeVars.empty();
+    }
+
+    /// Add a constraint.
+    void addConstraint(Constraint *constraint);
+
+    const TinyPtrVector<Constraint *> &getConstraints() const {
+      return constraints;
+    }
+
+    unsigned getNumDisjunctions() const { return numDisjunctions; }
+  };
+
   /// Compute the connected components of the graph.
   ///
   /// \param typeVars The type variables that should be included in the
   /// set of connected components that are returned.
   ///
-  /// \param components Receives the component numbers for each type variable
-  /// in \c typeVars.
-  ///
-  /// \returns the number of connected components in the graph, which includes
-  /// one component for each of the constraints produced by
-  /// \c getOrphanedConstraints().
-  unsigned computeConnectedComponents(
-             std::vector<TypeVariableType *> &typeVars,
-             std::vector<unsigned> &components);
+  /// \returns the connected components of the graph, where each component
+  /// contains the type variables and constraints specific to that component.
+  SmallVector<Component, 1> computeConnectedComponents(
+             ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the set of "orphaned" constraints, which are known to the
   /// constraint graph but have no type variables to anchor them.
@@ -281,13 +330,15 @@ public:
   }
 
   /// Print the graph.
-  void print(llvm::raw_ostream &out);
+  void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
+  void dump(llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dump() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Print the connected components of the graph.
-  void printConnectedComponents(llvm::raw_ostream &out);
+  void printConnectedComponents(ArrayRef<TypeVariableType *> typeVars,
+                                llvm::raw_ostream &out);
 
   LLVM_ATTRIBUTE_DEPRECATED(void dumpConnectedComponents() LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
@@ -316,7 +367,6 @@ private:
   /// caution.
   void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
 
-
   /// Perform edge contraction on the constraint graph, merging equivalence
   /// classes until a fixed point is reached.
   bool contractEdges();
@@ -329,7 +379,7 @@ private:
   ConstraintSystem &CS;
 
   /// The type variables in this graph, in stable order.
-  SmallVector<TypeVariableType *, 4> TypeVariables;
+  std::vector<TypeVariableType *> TypeVariables;
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;

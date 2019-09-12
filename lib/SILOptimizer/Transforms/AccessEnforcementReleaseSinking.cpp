@@ -109,6 +109,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::Sizeof:
     case BuiltinValueKind::Strideof:
     case BuiltinValueKind::IsPOD:
+    case BuiltinValueKind::IsConcrete:
     case BuiltinValueKind::IsBitwiseTakable:
     case BuiltinValueKind::IsSameMetatype:
     case BuiltinValueKind::Alignof:
@@ -129,6 +130,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetObjCTypeEncoding:
     case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::WillThrow:
+    case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::GlobalStringTablePointer:
       return false;

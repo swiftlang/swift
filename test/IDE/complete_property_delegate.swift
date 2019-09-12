@@ -8,9 +8,7 @@
 
 @propertyWrapper
 struct Lazzzy<T> {
-  var value: T
-
-  init(initialValue: T) { value = initialValue }
+  var wrappedValue: T
   func delegateOperation() -> Int {}
 }
 
@@ -42,7 +40,7 @@ class MyClass {
     let _ = _foo.#^CONTEXT_STORAGE_VARNAME^#
 // CONTEXT_STORAGE_VARNAME: Begin completions, 3 items
 // CONTEXT_STORAGE_VARNAME-DAG: Keyword[self]/CurrNominal:          self[#Lazzzy<MyMember>#]; name=self
-// CONTEXT_STORAGE_VARNAME-DAG: Decl[InstanceVar]/CurrNominal:      value[#MyMember#]; name=value
+// CONTEXT_STORAGE_VARNAME-DAG: Decl[InstanceVar]/CurrNominal:      wrappedValue[#MyMember#]; name=wrappedValue
 // CONTEXT_STORAGE_VARNAME-DAG: Decl[InstanceMethod]/CurrNominal:   delegateOperation()[#Int#]; name=delegateOperation()
 // CONTEXT_STORAGE_VARNAME-NOT: _
 // CONTEXT_STORAGE_VARNAME: End completions

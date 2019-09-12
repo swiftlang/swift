@@ -13,3 +13,5 @@
 -licuuc
 -licudata
 -ldl
+-lstdc++
+-lm

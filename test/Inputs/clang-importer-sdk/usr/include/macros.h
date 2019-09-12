@@ -1,5 +1,7 @@
 #include <macros_impl.h>
 #include <macros_private_impl.h>
+#include <header_guard.h>
+#include <not_a_header_guard.h>
 
 // Get Clang's NULL.
 #include <stddef.h>

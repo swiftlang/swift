@@ -397,6 +397,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_ARGS_LOCAL_RETURN | %FileCheck %s -check-prefix=WITH_GLOBAL_TYPES
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_DOT_1 | %FileCheck %s -check-prefix=PROTOCOL_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNBOUND_DOT | %FileCheck %s -check-prefix=UNBOUND_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=UNBOUND_DOT_2 | %FileCheck %s -check-prefix=UNBOUND_DOT_2
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERICARG_OPTIONAL | %FileCheck %s -check-prefix=GENERICARG_OPTIONAL
 
 //===--- Helper types that are used in this test
 
@@ -1093,3 +1097,40 @@ func testProtocol() {
 // PROTOCOL_DOT_1-DAG: Keyword/None:                       Type[#FooProtocol.Type#]; name=Type
 // PROTOCOL_DOT_1: End completions
 }
+
+//===---
+//===--- Test we can complete unbound generic types
+//===---
+
+public final class Task<Success> {
+  public enum Inner {
+    public typealias Failure = Int
+    case success(Success)
+    case failure(Failure)
+  }
+}
+extension Task.Inner {
+  public init(left error: Failure) {
+    fatalError()
+  }
+}
+extension Task.Inner.#^UNBOUND_DOT^# {}
+func testUnbound(x: Task.Inner.#^UNBOUND_DOT^#) {}
+// UNBOUND_DOT: Begin completions
+// UNBOUND_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Failure[#Int#]; name=Failure
+// UNBOUND_DOT-DAG: Keyword/None:                       Type[#Task.Inner.Type#]; name=Type
+// UNBOUND_DOT: End completions
+
+
+protocol MyProtocol {}
+struct OuterStruct<U>  {
+  class Inner<V>: MyProtocol {}
+}
+
+func testUnbound2(x: OuterStruct<Int>.Inner.#^UNBOUND_DOT_2^#) {}
+// UNBOUND_DOT_2: Begin completions
+// UNBOUND_DOT_2-DAG: Keyword/None:                       Type[#OuterStruct<Int>.Inner.Type#]; name=Type
+// UNBOUND_DOT_2: End completions
+
+func testGenericArgForOptional() -> Set<#^GENERICARG_OPTIONAL^#>? {}
+// GENERICARG_OPTIONAL: Begin completions

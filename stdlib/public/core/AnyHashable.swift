@@ -21,9 +21,9 @@ public protocol _HasCustomAnyHashableRepresentation {
   /// needs to be boxed into `AnyHashable` using the static
   /// type that introduces the `Hashable` conformance.
   ///
-  ///     class Base : Hashable {}
-  ///     class Derived1 : Base {}
-  ///     class Derived2 : Base, _HasCustomAnyHashableRepresentation {
+  ///     class Base: Hashable {}
+  ///     class Derived1: Base {}
+  ///     class Derived2: Base, _HasCustomAnyHashableRepresentation {
   ///       func _toCustomAnyHashable() -> AnyHashable? {
   ///         // `Derived2` is canonicalized to `Derived1`.
   ///         let customRepresentation = Derived1()
@@ -62,14 +62,14 @@ extension _AnyHashableBox {
   }
 }
 
-internal struct _ConcreteHashableBox<Base : Hashable> : _AnyHashableBox {
+internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
   internal var _baseHashable: Base
 
   internal init(_ base: Base) {
     self._baseHashable = base
   }
 
-  internal func _unbox<T : Hashable>() -> T? {
+  internal func _unbox<T: Hashable>() -> T? {
     return (self as _AnyHashableBox as? _ConcreteHashableBox<T>)?._baseHashable
   }
 
@@ -134,7 +134,7 @@ public struct AnyHashable {
   /// Creates a type-erased hashable value that wraps the given instance.
   ///
   /// - Parameter base: A hashable value to wrap.
-  public init<H : Hashable>(_ base: H) {
+  public init<H: Hashable>(_ base: H) {
     if let custom =
       (base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
       self = custom
@@ -147,7 +147,7 @@ public struct AnyHashable {
       storingResultInto: &self)
   }
 
-  internal init<H : Hashable>(_usingDefaultRepresentationOf base: H) {
+  internal init<H: Hashable>(_usingDefaultRepresentationOf base: H) {
     self._box = _ConcreteHashableBox(base)
   }
 
@@ -187,7 +187,7 @@ public struct AnyHashable {
   }
 }
 
-extension AnyHashable : Equatable {
+extension AnyHashable: Equatable {
   /// Returns a Boolean value indicating whether two type-erased hashable
   /// instances wrap the same type and value.
   ///
@@ -203,7 +203,7 @@ extension AnyHashable : Equatable {
   }
 }
 
-extension AnyHashable : Hashable {
+extension AnyHashable: Hashable {
   /// The hash value.
   public var hashValue: Int {
     return _box._canonicalBox._hashValue
@@ -223,19 +223,19 @@ extension AnyHashable : Hashable {
   }
 }
 
-extension AnyHashable : CustomStringConvertible {
+extension AnyHashable: CustomStringConvertible {
   public var description: String {
     return String(describing: base)
   }
 }
 
-extension AnyHashable : CustomDebugStringConvertible {
+extension AnyHashable: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "AnyHashable(" + String(reflecting: base) + ")"
   }
 }
 
-extension AnyHashable : CustomReflectable {
+extension AnyHashable: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self,
@@ -250,7 +250,7 @@ extension AnyHashable : CustomReflectable {
 /// conformance, if it exists.
 /// Called by AnyHashableSupport.cpp.
 @_silgen_name("_swift_makeAnyHashableUsingDefaultRepresentation")
-internal func _makeAnyHashableUsingDefaultRepresentation<H : Hashable>(
+internal func _makeAnyHashableUsingDefaultRepresentation<H: Hashable>(
   of value: H,
   storingResultInto result: UnsafeMutablePointer<AnyHashable>
 ) {
@@ -259,20 +259,20 @@ internal func _makeAnyHashableUsingDefaultRepresentation<H : Hashable>(
 
 /// Provided by AnyHashable.cpp.
 @_silgen_name("_swift_makeAnyHashableUpcastingToHashableBaseType")
-internal func _makeAnyHashableUpcastingToHashableBaseType<H : Hashable>(
+internal func _makeAnyHashableUpcastingToHashableBaseType<H: Hashable>(
   _ value: H,
   storingResultInto result: UnsafeMutablePointer<AnyHashable>
 )
 
 @inlinable
 public // COMPILER_INTRINSIC
-func _convertToAnyHashable<H : Hashable>(_ value: H) -> AnyHashable {
+func _convertToAnyHashable<H: Hashable>(_ value: H) -> AnyHashable {
   return AnyHashable(value)
 }
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_convertToAnyHashableIndirect")
-internal func _convertToAnyHashableIndirect<H : Hashable>(
+internal func _convertToAnyHashableIndirect<H: Hashable>(
   _ value: H,
   _ target: UnsafeMutablePointer<AnyHashable>
 ) {

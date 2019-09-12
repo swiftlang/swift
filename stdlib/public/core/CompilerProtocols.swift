@@ -149,8 +149,8 @@ public protocol RawRepresentable {
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
 @inlinable // trivial-implementation
-public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
-  where T.RawValue : Equatable {
+public func == <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue: Equatable {
   return lhs.rawValue == rhs.rawValue
 }
 
@@ -160,21 +160,21 @@ public func == <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
 @inlinable // trivial-implementation
-public func != <T : RawRepresentable>(lhs: T, rhs: T) -> Bool
-  where T.RawValue : Equatable {
+public func != <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
+  where T.RawValue: Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
 // This overload is needed for ambiguity resolution against the
-// implementation of != for T : Equatable
+// implementation of != for T: Equatable
 /// Returns a Boolean value indicating whether the two arguments are not equal.
 ///
 /// - Parameters:
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
 @inlinable // trivial-implementation
-public func != <T : Equatable>(lhs: T, rhs: T) -> Bool
-  where T : RawRepresentable, T.RawValue : Equatable {
+public func != <T: Equatable>(lhs: T, rhs: T) -> Bool
+  where T: RawRepresentable, T.RawValue: Equatable {
   return lhs.rawValue != rhs.rawValue
 }
 
@@ -298,7 +298,7 @@ public protocol ExpressibleByIntegerLiteral {
   ///
   /// The standard library integer and floating-point types are all valid types
   /// for `IntegerLiteralType`.
-  associatedtype IntegerLiteralType : _ExpressibleByBuiltinIntegerLiteral
+  associatedtype IntegerLiteralType: _ExpressibleByBuiltinIntegerLiteral
 
   /// Creates an instance initialized to the specified integer value.
   ///
@@ -341,7 +341,7 @@ public protocol ExpressibleByFloatLiteral {
   ///
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
-  associatedtype FloatLiteralType : _ExpressibleByBuiltinFloatLiteral
+  associatedtype FloatLiteralType: _ExpressibleByBuiltinFloatLiteral
   
   /// Creates an instance initialized to the specified floating-point value.
   ///
@@ -373,7 +373,7 @@ public protocol _ExpressibleByBuiltinBooleanLiteral {
 /// of your type with the given Boolean value.
 public protocol ExpressibleByBooleanLiteral {
   /// A type that represents a Boolean literal, such as `Bool`.
-  associatedtype BooleanLiteralType : _ExpressibleByBuiltinBooleanLiteral
+  associatedtype BooleanLiteralType: _ExpressibleByBuiltinBooleanLiteral
 
   /// Creates an instance initialized to the given Boolean value.
   ///
@@ -416,7 +416,7 @@ public protocol ExpressibleByUnicodeScalarLiteral {
   ///
   /// Valid types for `UnicodeScalarLiteralType` are `Unicode.Scalar`,
   /// `Character`, `String`, and `StaticString`.
-  associatedtype UnicodeScalarLiteralType : _ExpressibleByBuiltinUnicodeScalarLiteral
+  associatedtype UnicodeScalarLiteralType: _ExpressibleByBuiltinUnicodeScalarLiteral
 
   /// Creates an instance initialized to the given value.
   ///
@@ -509,7 +509,7 @@ public protocol ExpressibleByStringLiteral
   /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
-  associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
+  associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
   
   /// Creates an instance initialized to the given string value.
   ///
@@ -766,7 +766,7 @@ public protocol ExpressibleByStringInterpolation
   ///
   /// The `StringLiteralType` of an interpolation type must match the
   /// `StringLiteralType` of the conforming type.
-  associatedtype StringInterpolation : StringInterpolationProtocol
+  associatedtype StringInterpolation: StringInterpolationProtocol
     = DefaultStringInterpolation
     where StringInterpolation.StringLiteralType == StringLiteralType
 
@@ -883,7 +883,7 @@ extension ExpressibleByStringInterpolation
 /// `try` or one of its variants.
 public protocol StringInterpolationProtocol {
   /// The type that should be used for literal segments.
-  associatedtype StringLiteralType : _ExpressibleByBuiltinStringLiteral
+  associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
 
   /// Creates an empty instance ready to be filled with string literal content.
   /// 

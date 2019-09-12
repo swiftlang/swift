@@ -45,6 +45,18 @@ TermInst *addNewEdgeValueToBranch(TermInst *Branch, SILBasicBlock *Dest,
 TermInst *changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest, size_t Idx,
                           SILValue Val);
 
+/// Deletes the edge value between a branch and a destination basic block at the
+/// specified index. Asserts internally that the argument along the edge does
+/// not have uses.
+TermInst *deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
+                          size_t argIndex);
+
+/// Erase the \p argIndex phi argument from \p block. Asserts that the argument
+/// is a /real/ phi argument. Removes all incoming values for the argument from
+/// predecessor terminators. Asserts internally that it only ever is given
+/// "true" phi argument.
+void erasePhiArgument(SILBasicBlock *block, unsigned argIndex);
+
 /// Replace a branch target.
 ///
 /// \param T The terminating instruction to modify.

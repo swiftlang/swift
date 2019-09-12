@@ -31,18 +31,18 @@ extension X : P where T : P {
   }
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 func bar() -> some P {
   return 27
 }
 
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
 func foo() -> some P {
   return X(bar())
 }
 
 // CHECK: 27
-if #available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *) {
+if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
 print(foo().get())
 } else {
   print(27)

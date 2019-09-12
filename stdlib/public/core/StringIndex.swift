@@ -164,7 +164,7 @@ extension String.Index {
   internal func _invariantCheck() {
     _internalInvariant(_encodedOffset >= 0)
     if self._isScalarAligned {
-      _internalInvariant(transcodedOffset == 0)
+      _internalInvariant_5_1(transcodedOffset == 0)
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED

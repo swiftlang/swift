@@ -44,6 +44,15 @@ swift_reflection_interop_createReflectionContext(
     GetStringLengthFunction GetStringLength,
     GetSymbolAddressFunction GetSymbolAddress);
 
+static inline SwiftReflectionInteropContextRef
+swift_reflection_interop_createReflectionContextWithDataLayout(
+    void *ReaderContext,
+    QueryDataLayoutFunction DataLayout,
+    FreeBytesFunction FreeBytes,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress);
+
 /// Add a library handle to the interop context. Returns 1 if the
 /// library was added successfully, 0 if a symbol couldn't be looked up
 /// or the reported metadata version is too old.
@@ -193,6 +202,15 @@ struct SwiftReflectionFunctions {
     ReadBytesFunction ReadBytes,
     GetStringLengthFunction GetStringLength,
     GetSymbolAddressFunction GetSymbolAddress);
+
+  // Optional creation function that takes a data layout query function.
+  SwiftReflectionContextRef (*createReflectionContextWithDataLayout)(
+    void *ReaderContext,
+    QueryDataLayoutFunction DataLayout,
+    FreeBytesFunction FreeBytes,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress);
   
   SwiftReflectionContextRef (*createReflectionContextLegacy)(
     void *ReaderContext,
@@ -298,7 +316,7 @@ struct SwiftReflectionInteropContextLegacyImageRangeList {
 
 struct SwiftReflectionInteropContext {
   void *ReaderContext;
-  uint8_t PointerSize;
+  QueryDataLayoutFunction DataLayout;
   FreeBytesFunction FreeBytes;
   ReadBytesFunction ReadBytes;
   uint64_t (*GetStringLength)(void *reader_context,
@@ -409,11 +427,12 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
 #ifndef __cplusplus
 #define decltype(x) void *
 #endif
-#define LOAD_NAMED(field, symbol) do { \
+#define LOAD_NAMED(field, symbol, required) do { \
     Functions->field = (decltype(Functions->field))dlsym(Handle, symbol); \
-    if (Functions->field == NULL) return 0; \
+    if (required && Functions->field == NULL) return 0; \
   } while (0)
-#define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name)
+#define LOAD(name) LOAD_NAMED(name, "swift_reflection_" #name, 1)
+#define LOAD_OPT(name) LOAD_NAMED(name, "swift_reflection_" #name, 0)
   
   Functions->classIsSwiftMaskPtr =
     (unsigned long long *)dlsym(Handle, "swift_reflection_classIsSwiftMask");
@@ -425,8 +444,8 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
   int IsLegacy = dlsym(Handle, "swift_reflection_addImage") == NULL;
   
   if (IsLegacy) {
-    LOAD_NAMED(createReflectionContextLegacy, "swift_reflection_createReflectionContext");
-    LOAD_NAMED(addReflectionInfoLegacy, "swift_reflection_addReflectionInfo");
+    LOAD_NAMED(createReflectionContextLegacy, "swift_reflection_createReflectionContext", 1);
+    LOAD_NAMED(addReflectionInfoLegacy, "swift_reflection_addReflectionInfo", 1);
   } else {
     LOAD(createReflectionContext);
     LOAD(addReflectionInfo);
@@ -434,6 +453,9 @@ swift_reflection_interop_loadFunctions(struct SwiftReflectionInteropContext *Con
     LOAD(ownsObject);
     LOAD(ownsAddress);
     LOAD(metadataForObject);
+    
+    // Optional creation function.
+    LOAD_OPT(createReflectionContextWithDataLayout);
   }
   
   LOAD(destroyReflectionContext);
@@ -508,6 +530,32 @@ swift_reflection_interop_GetSymbolAddressAdapter(
   return Context->GetSymbolAddress(Context->ReaderContext, name, name_length);
 }
 
+static inline int
+swift_reflection_interop_minimalDataLayoutQueryFunction4(
+  void *ReaderContext,
+  DataLayoutQueryType type,
+  void *inBuffer, void *outBuffer) {
+  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+    uint8_t *result = (uint8_t *)outBuffer;
+    *result = 4;
+    return 1;
+  }
+  return 0;
+}
+
+static inline int
+swift_reflection_interop_minimalDataLayoutQueryFunction8(
+  void *ReaderContext,
+  DataLayoutQueryType type,
+  void *inBuffer, void *outBuffer) {
+  if (type == DLQ_GetPointerSize || type == DLQ_GetSizeSize) {
+    uint8_t *result = (uint8_t *)outBuffer;
+    *result = 8;
+    return 1;
+  }
+  return 0;
+}
+
 static inline SwiftReflectionInteropContextRef
 swift_reflection_interop_createReflectionContext(
     void *ReaderContext,
@@ -516,12 +564,37 @@ swift_reflection_interop_createReflectionContext(
     ReadBytesFunction ReadBytes,
     GetStringLengthFunction GetStringLength,
     GetSymbolAddressFunction GetSymbolAddress) {
-  
+  QueryDataLayoutFunction DataLayout;
+  if (PointerSize == 4)
+    DataLayout = swift_reflection_interop_minimalDataLayoutQueryFunction4;
+  else if (PointerSize == 8)
+    DataLayout = swift_reflection_interop_minimalDataLayoutQueryFunction8;
+  else
+    abort(); // Can't handle sizes other than 4 and 8.
+
+  return swift_reflection_interop_createReflectionContextWithDataLayout(
+    ReaderContext,
+    NULL,
+    FreeBytes,
+    ReadBytes,
+    GetStringLength,
+    GetSymbolAddress);
+}
+
+static inline SwiftReflectionInteropContextRef
+swift_reflection_interop_createReflectionContextWithDataLayout(
+    void *ReaderContext,
+    QueryDataLayoutFunction DataLayout,
+    FreeBytesFunction FreeBytes,
+    ReadBytesFunction ReadBytes,
+    GetStringLengthFunction GetStringLength,
+    GetSymbolAddressFunction GetSymbolAddress) { 
+ 
   SwiftReflectionInteropContextRef ContextRef =
     (SwiftReflectionInteropContextRef)calloc(sizeof(*ContextRef), 1);
   
   ContextRef->ReaderContext = ReaderContext;
-  ContextRef->PointerSize = PointerSize;
+  ContextRef->DataLayout = DataLayout;
   ContextRef->FreeBytes = FreeBytes;
   ContextRef->ReadBytes = ReadBytes;
   ContextRef->GetStringLength = GetStringLength;
@@ -548,10 +621,29 @@ swift_reflection_interop_addLibrary(
         swift_reflection_interop_readBytesAdapter,
         swift_reflection_interop_GetStringLengthAdapter,
         swift_reflection_interop_GetSymbolAddressAdapter);
+    } else if (Library->Functions.createReflectionContextWithDataLayout) {
+      Library->Context =
+        Library->Functions.createReflectionContextWithDataLayout(
+        ContextRef->ReaderContext,
+        ContextRef->DataLayout,
+        ContextRef->FreeBytes,
+        ContextRef->ReadBytes,
+        ContextRef->GetStringLength,
+        ContextRef->GetSymbolAddress);          
     } else {
+      uint8_t PointerSize;
+      int result = ContextRef->DataLayout(
+        ContextRef->ReaderContext, DLQ_GetPointerSize, NULL, &PointerSize);
+      if (!result)
+        abort(); // We need the pointer size, can't proceed without it.
+
       Library->Context = Library->Functions.createReflectionContext(
         ContextRef->ReaderContext,
-      ContextRef->PointerSize, ContextRef->FreeBytes, ContextRef->ReadBytes, ContextRef->GetStringLength, ContextRef->GetSymbolAddress);
+        PointerSize,
+        ContextRef->FreeBytes,
+        ContextRef->ReadBytes,
+        ContextRef->GetStringLength,
+        ContextRef->GetSymbolAddress);
     }
   }
   return Success;

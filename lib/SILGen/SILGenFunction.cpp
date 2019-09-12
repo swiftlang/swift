@@ -19,6 +19,7 @@
 #include "RValue.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
@@ -803,9 +804,8 @@ SILValue SILGenFunction::emitUnwrapIntegerResult(SILLocation loc,
   while (!value->getType().is<BuiltinIntegerType>()) {
     auto structDecl = value->getType().getStructOrBoundGenericStruct();
     assert(structDecl && "value for error result wasn't of struct type!");
-    assert(std::next(structDecl->getStoredProperties().begin())
-           == structDecl->getStoredProperties().end());
-    auto property = *structDecl->getStoredProperties().begin();
+    assert(structDecl->getStoredProperties().size() == 1);
+    auto property = structDecl->getStoredProperties()[0];
     value = B.createStructExtract(loc, value, property);
   }
 

@@ -86,7 +86,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     }
 
     SmallVector<ValueDecl *, 2> decls;
-    mod->lookupValue(/*AccessPath=*/{}, ctx.getIdentifier(functionName),
+    mod->lookupValue(ctx.getIdentifier(functionName),
                      NLKind::QualifiedLookup, decls);
     if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
@@ -219,16 +219,9 @@ FuncDecl *SILGenModule::getBridgeToObjectiveCRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getSingleRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -251,17 +244,10 @@ FuncDecl *SILGenModule::getUnconditionallyBridgeFromObjectiveCRequirement(
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  FuncDecl *found = nullptr;
   DeclName name(ctx, ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto func = dyn_cast<FuncDecl>(member)) {
-      found = func;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<FuncDecl>(
+    proto->getSingleRequirement(name));
 
   if (!found)
     diagnose(loc, diag::bridging_objcbridgeable_broken, name);
@@ -284,19 +270,9 @@ SILGenModule::getBridgedObjectiveCTypeRequirement(SILLocation loc) {
 
   // Look for _bridgeToObjectiveC().
   auto &ctx = getASTContext();
-  AssociatedTypeDecl *found = nullptr;
-  DeclName name(ctx.Id_ObjectiveCType);
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(name, flags)) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-      found = assocType;
-      break;
-    }
-  }
-
+  auto *found = proto->getAssociatedType(ctx.Id_ObjectiveCType);
   if (!found)
-    diagnose(loc, diag::bridging_objcbridgeable_broken, name);
+    diagnose(loc, diag::bridging_objcbridgeable_broken, ctx.Id_ObjectiveCType);
 
   BridgedObjectiveCType = found;
   return found;
@@ -337,15 +313,8 @@ VarDecl *SILGenModule::getNSErrorRequirement(SILLocation loc) {
 
   // Look for _nsError.
   auto &ctx = getASTContext();
-  VarDecl *found = nullptr;
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : proto->lookupDirect(ctx.Id_nsError, flags)) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      found = var;
-      break;
-    }
-  }
+  auto *found = dyn_cast_or_null<VarDecl>(
+      proto->getSingleRequirement(ctx.Id_nsError));
 
   NSErrorRequirement = found;
   return found;
@@ -459,7 +428,7 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
                                          /*error result*/ {},
                                          getASTContext());
 
-  auto env = sig->createGenericEnvironment();
+  auto env = sig->getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
   fn = builder.createFunction(SILLinkage::PublicExternal,
@@ -613,13 +582,13 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   if (isa<ClangModuleUnit>(dc))
     return true;
 
-  if (auto *sf = dyn_cast<SourceFile>(dc))
-    if (M.isWholeModule() || M.getAssociatedContext() == dc)
-      return false;
-
   if (auto *func = dyn_cast<FuncDecl>(d))
     if (func->hasForcedStaticDispatch())
       return true;
+
+  if (auto *sf = dyn_cast<SourceFile>(dc))
+    if (M.isWholeModule() || M.getAssociatedContext() == dc)
+      return false;
 
   return false;
 }
@@ -1240,15 +1209,16 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
 }
 
 void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
+  auto *getter = prop->getOpaqueAccessor(AccessorKind::Get);
+
   // If we don't actually need an entry point for the getter, do nothing.
-  if (!prop->getGetter() || !requiresObjCMethodEntryPoint(prop->getGetter()))
+  if (!getter || !requiresObjCMethodEntryPoint(getter))
     return;
 
-  auto getter = SILDeclRef(prop->getGetter(), SILDeclRef::Kind::Func)
-    .asForeign();
+  auto getterRef = SILDeclRef(getter, SILDeclRef::Kind::Func).asForeign();
 
   // Don't emit the thunks if they already exist.
-  if (hasFunction(getter))
+  if (hasFunction(getterRef))
     return;
 
   RegularLocation ThunkBodyLoc(prop);
@@ -1256,30 +1226,29 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
   // ObjC entry points are always externally usable, so emitting can't be
   // delayed.
   {
-    SILFunction *f = getFunction(getter, ForDefinition);
-    preEmitFunction(getter, prop, f, ThunkBodyLoc);
+    SILFunction *f = getFunction(getterRef, ForDefinition);
+    preEmitFunction(getterRef, prop, f, ThunkBodyLoc);
     PrettyStackTraceSILFunction X("silgen objc property getter thunk", f);
     f->setBare(IsBare);
     f->setThunk(IsThunk);
-    SILGenFunction(*this, *f, prop->getGetter())
-      .emitNativeToForeignThunk(getter);
-    postEmitFunction(getter, f);
+    SILGenFunction(*this, *f, getter).emitNativeToForeignThunk(getterRef);
+    postEmitFunction(getterRef, f);
   }
 
   if (!prop->isSettable(prop->getDeclContext()))
     return;
 
   // FIXME: Add proper location.
-  auto setter = SILDeclRef(prop->getSetter(), SILDeclRef::Kind::Func)
-    .asForeign();
+  auto *setter = prop->getOpaqueAccessor(AccessorKind::Set);
+  auto setterRef = SILDeclRef(setter, SILDeclRef::Kind::Func).asForeign();
 
-  SILFunction *f = getFunction(setter, ForDefinition);
-  preEmitFunction(setter, prop, f, ThunkBodyLoc);
+  SILFunction *f = getFunction(setterRef, ForDefinition);
+  preEmitFunction(setterRef, prop, f, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property setter thunk", f);
   f->setBare(IsBare);
   f->setThunk(IsThunk);
-  SILGenFunction(*this, *f, prop->getSetter()).emitNativeToForeignThunk(setter);
-  postEmitFunction(setter, f);
+  SILGenFunction(*this, *f, setter).emitNativeToForeignThunk(setterRef);
+  postEmitFunction(setterRef, f);
 }
 
 void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
@@ -1328,15 +1297,15 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
-  for (auto *accessor : vd->getAllAccessors())
+  vd->visitEmittedAccessors([&](AccessorDecl *accessor) {
     emitFunction(accessor);
+  });
 
   tryEmitPropertyDescriptor(vd);
 }
 
 void SILGenModule::visitSubscriptDecl(SubscriptDecl *sd) {
-  for (auto *accessor : sd->getAllAccessors())
-    emitFunction(accessor);
+  llvm_unreachable("top-level subscript?");
 }
 
 bool
@@ -1396,11 +1365,12 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
       // property in a fixed-layout type.
       return !decl->isFormallyResilient();
     }
+
     // If the type is computed and doesn't have a setter that's hidden from
     // the public, then external components can form the canonical key path
     // without our help.
-    auto setter = decl->getSetter();
-    if (setter == nullptr)
+    auto *setter = decl->getOpaqueAccessor(AccessorKind::Set);
+    if (!setter)
       return true;
 
     if (setter->getFormalAccessScope(nullptr, true).isPublic())
@@ -1415,8 +1385,8 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
   // or a fixed-layout type may not have been.
   // Without availability information, only get-only computed properties
   // can resiliently use trivial descriptors.
-  return !SGM.canStorageUseStoredKeyPathComponent(decl, expansion)
-    && decl->getSetter() == nullptr;
+  return (!SGM.canStorageUseStoredKeyPathComponent(decl, expansion) &&
+          !decl->supportsMutation());
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
@@ -1692,7 +1662,8 @@ void SILGenModule::emitSourceFile(SourceFile *sf) {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<SILModule>
-SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
+SILModule::constructSIL(ModuleDecl *mod, TypeConverter &tc,
+                        SILOptions &options, FileUnit *SF) {
   SharedTimer timer("SILGen");
   const DeclContext *DC;
   if (SF) {
@@ -1702,7 +1673,7 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
   }
 
   std::unique_ptr<SILModule> M(
-      new SILModule(mod, options, DC, /*wholeModule*/ SF == nullptr));
+      new SILModule(mod, tc, options, DC, /*wholeModule*/ SF == nullptr));
   SILGenModule SGM(*M, mod);
 
   if (SF) {
@@ -1751,11 +1722,13 @@ SILModule::constructSIL(ModuleDecl *mod, SILOptions &options, FileUnit *SF) {
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(ModuleDecl *mod, SILOptions &options) {
-  return SILModule::constructSIL(mod, options, nullptr);
+swift::performSILGeneration(ModuleDecl *mod, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(mod, tc, options, nullptr);
 }
 
 std::unique_ptr<SILModule>
-swift::performSILGeneration(FileUnit &sf, SILOptions &options) {
-  return SILModule::constructSIL(sf.getParentModule(), options, &sf);
+swift::performSILGeneration(FileUnit &sf, Lowering::TypeConverter &tc,
+                            SILOptions &options) {
+  return SILModule::constructSIL(sf.getParentModule(), tc, options, &sf);
 }

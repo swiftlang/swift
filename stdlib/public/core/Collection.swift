@@ -66,7 +66,7 @@
 ///     // Prints "15.0"
 ///     // Prints "20.0"
 @frozen
-public struct IndexingIterator<Elements : Collection> {
+public struct IndexingIterator<Elements: Collection> {
   @usableFromInline
   internal let _elements: Elements
   @usableFromInline
@@ -346,7 +346,7 @@ public protocol Collection: Sequence {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
-  associatedtype Index : Comparable
+  associatedtype Index: Comparable
 
   /// The position of the first element in a nonempty collection.
   ///
@@ -457,7 +457,7 @@ public protocol Collection: Sequence {
 
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
-  associatedtype Indices : Collection = DefaultIndices<Self>
+  associatedtype Indices: Collection = DefaultIndices<Self>
     where Indices.Element == Index, 
           Indices.Index == Index,
           Indices.SubSequence == Indices
@@ -1571,7 +1571,7 @@ extension Collection {
   }
 }
 
-extension Collection where Element : Equatable {
+extension Collection where Element: Equatable {
   /// Returns the longest possible subsequences of the collection, in order,
   /// around elements equal to the given element.
   ///

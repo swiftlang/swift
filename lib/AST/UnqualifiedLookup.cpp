@@ -20,8 +20,10 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
@@ -167,7 +169,6 @@ namespace {
     DeclContext *const DC;
     ModuleDecl &M;
     const ASTContext &Ctx;
-    LazyResolver *const TypeResolver;
     const SourceLoc Loc;
     const SourceManager &SM;
     
@@ -202,14 +203,12 @@ namespace {
     // clang-format off
     UnqualifiedLookupFactory(DeclName Name,
                              DeclContext *const DC,
-                             LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
                              UnqualifiedLookup &lookupToBeCreated);
     
     UnqualifiedLookupFactory(DeclName Name,
                              DeclContext *const DC,
-                             LazyResolver *TypeResolver,
                              SourceLoc Loc,
                              Options options,
                              SmallVectorImpl<LookupResultEntry> &Results,
@@ -433,11 +432,10 @@ public:
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclName Name,
                             DeclContext *const DC,
-                            LazyResolver *TypeResolver,
                             SourceLoc Loc,
                             Options options,
                             UnqualifiedLookup &lookupToBeCreated)
-: UnqualifiedLookupFactory(Name, DC, TypeResolver, Loc, options,
+: UnqualifiedLookupFactory(Name, DC, Loc, options,
     lookupToBeCreated.Results,
     lookupToBeCreated.IndexOfFirstOuterResult)
 
@@ -446,7 +444,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 UnqualifiedLookupFactory::UnqualifiedLookupFactory(
                             DeclName Name,
                             DeclContext *const DC,
-                            LazyResolver *TypeResolver,
                             SourceLoc Loc,
                             Options options,
                             SmallVectorImpl<LookupResultEntry> &Results,
@@ -456,7 +453,6 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   DC(DC),
   M(*DC->getParentModule()),
   Ctx(M.getASTContext()),
-  TypeResolver(TypeResolver ? TypeResolver : Ctx.getLazyResolver()),
   Loc(Loc),
   SM(Ctx.SourceMgr),
   DebugClient(M.getDebugClient()),
@@ -478,6 +474,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
+  SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
@@ -486,7 +483,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
   if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
     static bool haveWarned = false;
-    if (!haveWarned) {
+    if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
@@ -502,7 +499,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   if (compareToASTScopes && useASTScopesForExperimentalLookupIfEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
-    UnqualifiedLookupFactory scopeLookup(Name, DC, TypeResolver, Loc, options,
+    UnqualifiedLookupFactory scopeLookup(Name, DC, Loc, options,
                                          results, indexOfFirstOuterResult);
     scopeLookup.experimentallyLookInASTScopes();
     assert(verifyEqualTo(std::move(scopeLookup), "UnqualifedLookup",
@@ -598,18 +595,17 @@ void UnqualifiedLookupFactory::lookupInModuleScopeContext(
 
 void UnqualifiedLookupFactory::lookupNamesIntroducedByPatternBindingInitializer(
     PatternBindingInitializer *PBI, Optional<bool> isCascadingUse) {
-  assert(PBI->getBinding());
   // Lazy variable initializer contexts have a 'self' parameter for
   // instance member lookup.
   if (auto *selfParam = PBI->getImplicitSelfDecl())
     lookupNamesIntroducedByLazyVariableInitializer(PBI, selfParam,
                                                    isCascadingUse);
-  else if (PBI->getBinding()->getDeclContext()->isTypeContext())
+  else if (PBI->getParent()->isTypeContext())
     lookupNamesIntroducedByInitializerOfStoredPropertyOfAType(PBI,
                                                               isCascadingUse);
   else
     lookupNamesIntroducedByInitializerOfGlobalOrLocal(PBI, isCascadingUse);
-  }
+}
 
   void UnqualifiedLookupFactory::lookupNamesIntroducedByLazyVariableInitializer(
       PatternBindingInitializer *PBI, ParamDecl *selfParam,
@@ -667,7 +663,7 @@ void UnqualifiedLookupFactory::lookupNamesIntroducedByFunctionDecl(
   const bool isCascadingUse =
       AFD->isCascadingContextForLookup(false) &&
       (isCascadingUseArg.getValueOr(
-          Loc.isInvalid() || !AFD->getBody() ||
+          Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
           !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc)));
 
   if (AFD->getDeclContext()->isTypeContext())
@@ -818,7 +814,9 @@ void UnqualifiedLookupFactory::lookForLocalVariablesIn(
   // FIXME: when we can parse and typecheck the function body partially
   // for code completion, AFD->getBody() check can be removed.
 
-  if (Loc.isInvalid() || !AFD->getBody()) {
+  if (Loc.isInvalid() || AFD->getBodySourceRange().isInvalid() ||
+      !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc) ||
+      !AFD->getBody()) {
     return;
   }
 
@@ -967,25 +965,16 @@ void UnqualifiedLookupFactory::recordDependencyOnTopLevelName(
 }
 
 void UnqualifiedLookupFactory::addImportedResults(DeclContext *const dc) {
-  // Add private imports to the extra search list.
-  SmallVector<ModuleDecl::ImportedModule, 8> extraImports;
-  if (auto FU = dyn_cast<FileUnit>(dc)) {
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    FU->getImportedModules(extraImports, importFilter);
-  }
-
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
                                                : ResolutionKind::Overloadable;
-  lookupInModule(&M, {}, Name, CurModuleResults, NLKind::UnqualifiedLookup,
-                 resolutionKind, TypeResolver, dc, extraImports);
+  lookupInModule(dc, Name, CurModuleResults, NLKind::UnqualifiedLookup,
+                 resolutionKind, dc);
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
-    removeShadowedDecls(CurModuleResults, &M);
+    removeShadowedDecls(CurModuleResults, dc);
   }
 
   for (auto VD : CurModuleResults) {
@@ -1026,17 +1015,14 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
   if (!desiredModule && Name == Ctx.TheBuiltinModule->getName())
     desiredModule = Ctx.TheBuiltinModule;
   if (desiredModule) {
-    forAllVisibleModules(
-        dc, [&](const ModuleDecl::ImportedModule &import) -> bool {
-          if (import.second == desiredModule) {
-            Results.push_back(LookupResultEntry(import.second));
+    // Make sure the desired module is actually visible from the current
+    // context.
+    if (Ctx.getImportCache().isImportedBy(desiredModule, dc)) {
+      Results.push_back(LookupResultEntry(desiredModule));
 #ifndef NDEBUG
-            addedResult(Results.back());
+      addedResult(Results.back());
 #endif
-            return false;
-          }
-          return true;
-        });
+    }
   }
 }
 
@@ -1205,12 +1191,16 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
 // clang-format off
 UnqualifiedLookup::UnqualifiedLookup(DeclName Name,
                                      DeclContext *const DC,
-                                     LazyResolver *TypeResolver,
                                      SourceLoc Loc,
                                      Options options)
     // clang-format on
     : IndexOfFirstOuterResult(0) {
-  UnqualifiedLookupFactory factory(Name, DC, TypeResolver, Loc, options, *this);
+
+  auto *stats = DC->getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumUnqualifiedLookup++;
+
+  UnqualifiedLookupFactory factory(Name, DC, Loc, options, *this);
   factory.performUnqualifiedLookup();
 }
 
@@ -1332,7 +1322,7 @@ bool UnqualifiedLookupFactory::verifyEqualTo(
       e.getValueDecl()->print(as);
       oe.getValueDecl()->print(bs);
       if (a == b)
-        llvm::errs() << "ValueDecls differ but print same";
+        llvm::errs() << "ValueDecls differ but print same\n";
       else {
         writeErr(std::string( "ValueDecls differ at ") + std::to_string(i));
         assert(false && "ASTScopeImpl found different Decl");

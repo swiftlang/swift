@@ -17,6 +17,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Statistic.h"
@@ -220,32 +221,37 @@ void NameBinder::addImport(
       assert(!M->getFiles().empty() &&
              isa<ClangModuleUnit>(M->getFiles().front()));
       topLevelModule = M;
+    } else if (topLevelModule == SF.getParentModule()) {
+      // This can happen when compiling a mixed-source framework (or overlay)
+      // that imports a submodule of its C part.
+      topLevelModule = nullptr;
     }
   }
 
   auto *testableAttr = ID->getAttrs().getAttribute<TestableAttr>();
-  if (testableAttr && !topLevelModule->isTestingEnabled() &&
+  if (testableAttr && topLevelModule &&
+      !topLevelModule->isTestingEnabled() &&
       !topLevelModule->isNonSwiftModule() &&
       Context.LangOpts.EnableTestableAttrRequiresTestableModule) {
     diagnose(ID->getModulePath().front().second, diag::module_not_testable,
-             topLevelModule->getName());
+             ID->getModulePath().front().first);
     testableAttr->setInvalid();
   }
 
   auto *privateImportAttr = ID->getAttrs().getAttribute<PrivateImportAttr>();
   StringRef privateImportFileName;
   if (privateImportAttr) {
-    if (!topLevelModule->arePrivateImportsEnabled()) {
+    if (!topLevelModule || !topLevelModule->arePrivateImportsEnabled()) {
       diagnose(ID->getModulePath().front().second,
                diag::module_not_compiled_for_private_import,
-               topLevelModule->getName());
+               ID->getModulePath().front().first);
       privateImportAttr->setInvalid();
     } else {
       privateImportFileName = privateImportAttr->getSourceFile();
     }
   }
 
-  if (SF.getParentModule()->isResilient() &&
+  if (SF.getParentModule()->isResilient() && topLevelModule &&
       !topLevelModule->isResilient() &&
       !topLevelModule->isNonSwiftModule() &&
       !ID->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
@@ -277,7 +283,7 @@ void NameBinder::addImport(
   imports.push_back(SourceFile::ImportedModuleDesc(
       {ID->getDeclPath(), M}, options, privateImportFileName));
 
-  if (topLevelModule != M)
+  if (topLevelModule && topLevelModule != M)
     imports.push_back(SourceFile::ImportedModuleDesc(
         {ID->getDeclPath(), topLevelModule}, options, privateImportFileName));
 
@@ -289,9 +295,9 @@ void NameBinder::addImport(
     // FIXME: Doesn't handle scoped testable imports correctly.
     assert(declPath.size() == 1 && "can't handle sub-decl imports");
     SmallVector<ValueDecl *, 8> decls;
-    lookupInModule(topLevelModule, declPath, declPath.front().first, decls,
+    lookupInModule(topLevelModule, declPath.front().first, decls,
                    NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   /*resolver*/nullptr, &SF);
+                   &SF);
 
     if (decls.empty()) {
       diagnose(ID, diag::decl_does_not_exist_in_module,

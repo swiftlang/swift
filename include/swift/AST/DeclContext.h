@@ -51,7 +51,6 @@ namespace swift {
   class GenericParamList;
   class LazyResolver;
   class LazyMemberLoader;
-  class LazyMemberParser;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -361,10 +360,6 @@ public:
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
 
-  /// Whether the context has a generic environment that will be constructed
-  /// on first access (but has not yet been constructed).
-  bool contextHasLazyGenericEnvironment() const;
-
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
 
@@ -459,6 +454,10 @@ public:
   /// are used.
   ResilienceExpansion getResilienceExpansion() const;
 
+  /// Returns true if this context may possibly contain members visible to
+  /// AnyObject dynamic lookup.
+  bool mayContainMembersAccessedByDynamicLookup() const;
+
   /// Returns true if lookups within this context could affect downstream files.
   ///
   /// \param functionsAreNonCascading If true, functions are considered non-
@@ -483,15 +482,11 @@ public:
   /// \param options Options that control name lookup, based on the
   /// \c NL_* constants in \c NameLookupOptions.
   ///
-  /// \param typeResolver Used to resolve types, usually for overload purposes.
-  /// May be null.
-  ///
   /// \param[out] decls Will be populated with the declarations found by name
   /// lookup.
   ///
   /// \returns true if anything was found.
   bool lookupQualified(Type type, DeclName member, NLOptions options,
-                       LazyResolver *typeResolver,
                        SmallVectorImpl<ValueDecl *> &decls) const;
 
   /// Look for the set of declarations with the given name within the
@@ -692,6 +687,24 @@ class IterableDeclContext {
   /// member loading, as a key when doing lookup in this IDC.
   serialization::DeclID SerialID;
 
+  /// Because \c parseDelayedDecl and lazy member adding can add members *after*
+  /// an \c ASTScope tree is created, there must be some way for the tree to
+  /// detect when a member has been added. A bit would suffice,
+  /// but would be more fragile, The scope code could count the members each
+  /// time, but I think it's a better trade to just keep a count here.
+  unsigned MemberCount : 29;
+
+  /// Whether we have already added the parsed members into the context.
+  unsigned AddedParsedMembers : 1;
+
+  /// Whether delayed parsing detected a possible operator definition
+  /// while skipping the body of this context.
+  unsigned HasOperatorDeclarations : 1;
+
+  /// Whether delayed parsing detect a possible nested class definition
+  /// while skipping the body of this context.
+  unsigned HasNestedClassDeclarations : 1;
+
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
@@ -702,11 +715,36 @@ class IterableDeclContext {
 
 public:
   IterableDeclContext(IterableDeclContextKind kind)
-    : LastDeclAndKind(nullptr, kind) { }
+    : LastDeclAndKind(nullptr, kind) {
+    MemberCount = 0;
+    AddedParsedMembers = 0;
+    HasOperatorDeclarations = 0;
+    HasNestedClassDeclarations = 0;
+  }
 
   /// Determine the kind of iterable context we have.
   IterableDeclContextKind getIterableContextKind() const {
     return LastDeclAndKind.getInt();
+  }
+
+  bool hasUnparsedMembers() const;
+
+  bool maybeHasOperatorDeclarations() const {
+    return HasOperatorDeclarations;
+  }
+
+  void setMaybeHasOperatorDeclarations() {
+    assert(hasUnparsedMembers());
+    HasOperatorDeclarations = 1;
+  }
+
+  bool maybeHasNestedClassDeclarations() const {
+    return HasNestedClassDeclarations;
+  }
+
+  void setMaybeHasNestedClassDeclarations() {
+    assert(hasUnparsedMembers());
+    HasNestedClassDeclarations = 1;
   }
 
   /// Retrieve the set of members in this context.
@@ -720,6 +758,9 @@ public:
   /// Add a member to this context. If the hint decl is specified, the new decl
   /// is inserted immediately after the hint.
   void addMember(Decl *member, Decl *hint = nullptr);
+
+  /// See \c MemberCount
+  unsigned getMemberCount() const { return MemberCount; }
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
@@ -786,6 +827,14 @@ void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
   else
     out << "(null)";
 }
+
+void simple_display(llvm::raw_ostream &out, const IterableDeclContext *idc);
+
+/// Extract the source location from the given declaration context.
+SourceLoc extractNearestSourceLoc(const DeclContext *dc);
+
+/// Extract the source location from the given declaration context.
+SourceLoc extractNearestSourceLoc(const IterableDeclContext *idc);
 
 } // end namespace swift
 

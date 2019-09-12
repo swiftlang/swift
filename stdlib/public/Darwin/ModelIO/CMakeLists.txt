@@ -14,4 +14,5 @@ add_swift_target_library(swiftModelIO ${SWIFT_SDK_OVERLAY_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_IOS Darwin CoreGraphics Dispatch simd Foundation CoreFoundation ObjectiveC # auto-updated
   SWIFT_MODULE_DEPENDS_TVOS Darwin CoreGraphics Dispatch simd Foundation CoreFoundation ObjectiveC # auto-updated
   FRAMEWORK_DEPENDS_WEAK ModelIO
+  INSTALL_IN_COMPONENT sdk-overlay
 )

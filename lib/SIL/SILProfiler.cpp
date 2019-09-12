@@ -76,7 +76,7 @@ static bool isUnmapped(ASTNode N) {
   auto *D = N.get<Decl *>();
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     // Don't map functions without bodies.
-    if (!AFD->getBody()) {
+    if (!AFD->hasBody()) {
       LLVM_DEBUG(llvm::dbgs() << "Skipping ASTNode: function without body\n");
       return true;
     }
@@ -1078,6 +1078,9 @@ void SILProfiler::assignRegionCounters() {
   PGOFuncName = llvm::getPGOFuncName(
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
+
+  assert((!CurrentFuncName.empty() && !PGOFuncName.empty()) &&
+         "Expected covered region to be named");
 
   LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
                           << "\n");

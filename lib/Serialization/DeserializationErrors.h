@@ -13,9 +13,9 @@
 #ifndef SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 #define SWIFT_SERIALIZATION_DESERIALIZATIONERRORS_H
 
+#include "ModuleFormat.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Module.h"
-#include "swift/Serialization/ModuleFormat.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
 
@@ -236,14 +236,14 @@ class DeclDeserializationError : public llvm::ErrorInfoBase {
 public:
   enum Flag : unsigned {
     DesignatedInitializer = 1 << 0,
-    NeedsVTableEntry = 1 << 1,
-    NeedsFieldOffsetVectorEntry = 1 << 2,
+    NeedsFieldOffsetVectorEntry = 1 << 1,
   };
   using Flags = OptionSet<Flag>;
 
 protected:
   DeclName name;
   Flags flags;
+  uint8_t numVTableEntries = 0;
 
 public:
   DeclName getName() const {
@@ -253,8 +253,8 @@ public:
   bool isDesignatedInitializer() const {
     return flags.contains(Flag::DesignatedInitializer);
   }
-  bool needsVTableEntry() const {
-    return flags.contains(Flag::NeedsVTableEntry);
+  unsigned getNumberOfVTableEntries() const {
+    return numVTableEntries;
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
@@ -319,9 +319,11 @@ private:
   void anchor() override;
 
 public:
-  explicit OverrideError(DeclName name, Flags flags = {}) {
+  explicit OverrideError(DeclName name,
+                         Flags flags={}, unsigned numVTableEntries=0) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {
@@ -341,10 +343,11 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError> {
   std::unique_ptr<ErrorInfoBase> underlyingReason;
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags = {})
+                     Flags flags={}, unsigned numVTableEntries=0)
       : underlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
+    this->numVTableEntries = numVTableEntries;
   }
 
   void log(raw_ostream &OS) const override {

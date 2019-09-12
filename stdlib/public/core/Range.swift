@@ -126,7 +126,7 @@ extension RangeExpression {
 /// you need to iterate over consecutive floating-point values, see the
 /// `stride(from:to:by:)` function.
 @frozen
-public struct Range<Bound : Comparable> {
+public struct Range<Bound: Comparable> {
   /// The range's lower bound.
   ///
   /// In an empty range, `lowerBound` is equal to `upperBound`.
@@ -181,13 +181,13 @@ public struct Range<Bound : Comparable> {
 }
 
 extension Range: Sequence
-where Bound: Strideable, Bound.Stride : SignedInteger {
+where Bound: Strideable, Bound.Stride: SignedInteger {
   public typealias Element = Bound
   public typealias Iterator = IndexingIterator<Range<Bound>>
 }
 
 extension Range: Collection, BidirectionalCollection, RandomAccessCollection
-where Bound : Strideable, Bound.Stride : SignedInteger
+where Bound: Strideable, Bound.Stride: SignedInteger
 {
   /// A type that represents a position in the range.
   public typealias Index = Bound
@@ -278,7 +278,7 @@ where Bound : Strideable, Bound.Stride : SignedInteger
   }
 }
 
-extension Range where Bound: Strideable, Bound.Stride : SignedInteger {  
+extension Range where Bound: Strideable, Bound.Stride: SignedInteger {
   /// Creates an instance equivalent to the given `ClosedRange`.
   ///
   /// - Parameter other: A closed range to convert to a `Range` instance.
@@ -344,7 +344,7 @@ extension Range {
   }
 }
 
-extension Range : CustomStringConvertible {
+extension Range: CustomStringConvertible {
   /// A textual representation of the range.
   @inlinable // trivial-implementation
   public var description: String {
@@ -352,7 +352,7 @@ extension Range : CustomStringConvertible {
   }
 }
 
-extension Range : CustomDebugStringConvertible {
+extension Range: CustomDebugStringConvertible {
   /// A textual representation of the range, suitable for debugging.
   public var debugDescription: String {
     return "Range(\(String(reflecting: lowerBound))"
@@ -360,7 +360,7 @@ extension Range : CustomDebugStringConvertible {
   }
 }
 
-extension Range : CustomReflectable {
+extension Range: CustomReflectable {
   public var customMirror: Mirror {
     return Mirror(
       self, children: ["lowerBound": lowerBound, "upperBound": upperBound])
@@ -642,7 +642,7 @@ extension PartialRangeFrom: RangeExpression {
 }
 
 extension PartialRangeFrom: Sequence
-  where Bound : Strideable, Bound.Stride : SignedInteger
+  where Bound: Strideable, Bound.Stride: SignedInteger
 {
   public typealias Element = Bound
 
@@ -969,9 +969,9 @@ extension Range {
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountableRange<Bound: Strideable> = Range<Bound>
-  where Bound.Stride : SignedInteger
+  where Bound.Stride: SignedInteger
 
 // Note: this is not for compatibility only, it is considered a useful
 // shorthand. TODO: Add documentation
 public typealias CountablePartialRangeFrom<Bound: Strideable> = PartialRangeFrom<Bound>
-  where Bound.Stride : SignedInteger
+  where Bound.Stride: SignedInteger

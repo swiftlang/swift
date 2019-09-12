@@ -300,15 +300,15 @@ private:
   // For a given Decl and Type, if the type is not an optional return
   // the type and OTK_None as the optionality. If the type is
   // optional, return the underlying object type, and an optionality
-  // that is based on the type but overridden by the
-  // ImplicitlyUnwrappedOptionalAttr on the decl.
+  // that is based on the type but overridden by the return value of
+  // isImplicitlyUnwrappedOptional().
   static std::pair<Type, OptionalTypeKind>
-  getObjectTypeAndOptionality(const Decl *D, Type ty) {
+  getObjectTypeAndOptionality(const ValueDecl *D, Type ty) {
     OptionalTypeKind kind;
     if (auto objTy =
             ty->getReferenceStorageReferent()->getOptionalObjectType()) {
       kind = OTK_Optional;
-      if (D->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+      if (D->isImplicitlyUnwrappedOptional())
         kind = OTK_ImplicitlyUnwrappedOptional;
 
       return {objTy, kind};
@@ -575,7 +575,14 @@ private:
       if (errorConvention && errorConvention->stripsResultOptionality()) {
         printNullability(OTK_Optional, NullabilityPrintKind::ContextSensitive);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
-        printNullability(ctor->getFailability(),
+        OptionalTypeKind kind = OTK_None;
+        if (ctor->isFailable()) {
+          if (ctor->isImplicitlyUnwrappedOptional())
+            kind = OTK_ImplicitlyUnwrappedOptional;
+          else
+            kind = OTK_Optional;
+        }
+        printNullability(kind,
                          NullabilityPrintKind::ContextSensitive);
       } else {
         auto func = cast<FuncDecl>(AFD);
@@ -943,11 +950,14 @@ private:
       if (!renamedParsedDeclName.ContextName.empty()) {
         return nullptr;
       }
-      UnqualifiedLookup lookup(renamedDeclName.getBaseIdentifier(),
-                               declContext->getModuleScopeContext(), nullptr,
-                               SourceLoc(),
-                               UnqualifiedLookup::Flags::TypeLookup);
-      return lookup.getSingleTypeResult();
+      SmallVector<ValueDecl *, 1> decls;
+      declContext->lookupQualified(declContext->getParentModule(),
+                                   renamedDeclName.getBaseIdentifier(),
+                                   NL_OnlyTypes,
+                                   decls);
+      if (decls.size() == 1)
+        return decls[0];
+      return nullptr;
     }
 
     TypeDecl *typeDecl = declContext->getSelfNominalTypeDecl();
@@ -955,7 +965,7 @@ private:
     const ValueDecl *renamedDecl = nullptr;
     SmallVector<ValueDecl *, 4> lookupResults;
     declContext->lookupQualified(typeDecl->getDeclaredInterfaceType(),
-                                 renamedDeclName, NL_QualifiedDefault, nullptr,
+                                 renamedDeclName, NL_QualifiedDefault,
                                  lookupResults);
 
     if (lookupResults.size() == 1) {
@@ -1256,22 +1266,25 @@ private:
 
     printAvailability(VD);
 
+    auto *getter = VD->getOpaqueAccessor(AccessorKind::Get);
+    auto *setter = VD->getOpaqueAccessor(AccessorKind::Set);
+
     os << ";";
     if (VD->isStatic()) {
       os << ")\n";
       // Older Clangs don't support class properties, so print the accessors as
       // well. This is harmless.
-      printAbstractFunctionAsMethod(VD->getGetter(), true);
+      printAbstractFunctionAsMethod(getter, true);
       if (isSettable) {
-        assert(VD->getSetter() && "settable ObjC property missing setter decl");
-        printAbstractFunctionAsMethod(VD->getSetter(), true);
+        assert(setter && "settable ObjC property missing setter decl");
+        printAbstractFunctionAsMethod(setter, true);
       }
     } else {
       os << "\n";
       if (looksLikeInitMethod(VD->getObjCGetterSelector()))
-        printAbstractFunctionAsMethod(VD->getGetter(), false);
+        printAbstractFunctionAsMethod(getter, false);
       if (isSettable && looksLikeInitMethod(VD->getObjCSetterSelector()))
-        printAbstractFunctionAsMethod(VD->getSetter(), false);
+        printAbstractFunctionAsMethod(setter, false);
     }
   }
 
@@ -1286,8 +1299,10 @@ private:
       isNSUIntegerSubscript = isNSUInteger(indexParam->getType());
     }
 
-    printAbstractFunctionAsMethod(SD->getGetter(), false, isNSUIntegerSubscript);
-    if (auto setter = SD->getSetter())
+    auto *getter = SD->getOpaqueAccessor(AccessorKind::Get);
+    printAbstractFunctionAsMethod(getter, false,
+                                  isNSUIntegerSubscript);
+    if (auto *setter = SD->getOpaqueAccessor(AccessorKind::Set))
       printAbstractFunctionAsMethod(setter, false, isNSUIntegerSubscript);
   }
 
@@ -1386,7 +1401,6 @@ private:
     Type objcType = ProtocolConformanceRef(conformance).getTypeWitnessByName(
                                            nominal->getDeclaredType(),
                                            ctx.Id_ObjectiveCType);
-    if (!objcType) return nullptr;
 
     // Dig out the Objective-C class.
     return objcType->getClassOrBoundGenericClass();
@@ -1428,10 +1442,12 @@ private:
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
       if (ModuleDecl *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
         if (!NSCopyingType) {
-          UnqualifiedLookup lookup(ctx.getIdentifier("NSCopying"), M, nullptr);
-          auto type = lookup.getSingleTypeResult();
-          if (type && isa<ProtocolDecl>(type)) {
-            NSCopyingType = type->getDeclaredInterfaceType();
+          SmallVector<ValueDecl *, 1> decls;
+          M->lookupQualified(M, ctx.getIdentifier("NSCopying"),
+                             NL_OnlyTypes, decls);
+          if (decls.size() == 1 && isa<ProtocolDecl>(decls[0])) {
+            NSCopyingType = cast<ProtocolDecl>(decls[0])
+              ->getDeclaredInterfaceType();
           } else {
             NSCopyingType = Type();
           }

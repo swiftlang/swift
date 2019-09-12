@@ -35,6 +35,9 @@ void SourceManager::verifyAllBuffers() const {
 }
 
 SourceLoc SourceManager::getCodeCompletionLoc() const {
+  if (CodeCompletionBufferID == 0U)
+    return SourceLoc();
+
   return getLocForBufferStart(CodeCompletionBufferID)
       .getAdvancedLoc(CodeCompletionOffset);
 }
@@ -310,12 +313,19 @@ void CharSourceRange::dump(const SourceManager &SM) const {
   print(llvm::errs(), SM);
 }
 
+llvm::Optional<unsigned>
+SourceManager::resolveOffsetForEndOfLine(unsigned BufferId,
+                                         unsigned Line) const {
+  return resolveFromLineCol(BufferId, Line, ~0u);
+}
+
 llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
                                                            unsigned Line,
                                                            unsigned Col) const {
   if (Line == 0 || Col == 0) {
     return None;
   }
+  const bool LineEnd = Col == ~0u;
   auto InputBuf = getLLVMSourceMgr().getMemoryBuffer(BufferId);
   const char *Ptr = InputBuf->getBufferStart();
   const char *End = InputBuf->getBufferEnd();
@@ -331,14 +341,18 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
     return None;
   }
   Ptr = LineStart;
-
   // The <= here is to allow for non-inclusive range end positions at EOF
-  for (; Ptr <= End; ++Ptr) {
+  for (; ; ++Ptr) {
     --Col;
     if (Col == 0)
       return Ptr - InputBuf->getBufferStart();
-    if (*Ptr == '\n')
-      break;
+    if (*Ptr == '\n' || Ptr == End) {
+      if (LineEnd) {
+        return Ptr - InputBuf->getBufferStart();
+      } else {
+        break;
+      }
+    }
   }
   return None;
 }

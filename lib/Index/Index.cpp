@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Index/Index.h"
-#include "swift/Index/Utils.h"
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
@@ -31,6 +30,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include <tuple>
 
 using namespace swift;
 using namespace swift::index;
@@ -83,7 +83,10 @@ static SourceLoc getLocForExtension(ExtensionDecl *D) {
   // Use the 'End' token of the range, in case it is a compound name, e.g.
   //   extension A.B {}
   // we want the location of 'B' token.
-  return D->getExtendedTypeLoc().getSourceRange().End;
+  if (auto *repr = D->getExtendedTypeRepr()) {
+    return repr->getSourceRange().End;
+  }
+  return SourceLoc();
 }
 
 namespace {
@@ -473,7 +476,7 @@ private:
       return true;
 
     IndexSymbol Info;
-    std::tie(Info.line, Info.column) = getLineCol(Loc);
+    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
@@ -585,10 +588,13 @@ private:
 
   bool indexComment(const Decl *D);
 
-  std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
+  std::tuple<unsigned, unsigned, Optional<unsigned>>
+  getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
-      return std::make_pair(0, 0);
-    return SrcMgr.getLineAndColumn(Loc, BufferID);
+      return std::make_tuple(0, 0, None);
+    auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
+    unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
+    return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
@@ -847,7 +853,7 @@ bool IndexSwiftASTWalker::startEntityDecl(ValueDecl *D) {
       return false;
   }
 
-  for (auto Overriden: getOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
+  for (auto Overriden: collectAllOverriddenDecls(D, /*IncludeProtocolReqs=*/false)) {
     addRelation(Info, (SymbolRoleSet) SymbolRole::RelationOverrideOf, Overriden);
   }
 
@@ -1063,13 +1069,10 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
   if (startEntityDecl(D)) {
     // Pass accessors.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
-      auto isNullOrImplicit = [](const Decl *D) -> bool {
-        return !D || D->isImplicit();
-      };
-
       bool usedPseudoAccessors = false;
-      if (isa<VarDecl>(D) && isNullOrImplicit(StoreD->getGetter()) &&
-          isNullOrImplicit(StoreD->getSetter())) {
+      if (isa<VarDecl>(D) &&
+          !StoreD->getParsedAccessor(AccessorKind::Get) &&
+          !StoreD->getParsedAccessor(AccessorKind::Set)) {
         usedPseudoAccessors = true;
         auto VarD = cast<VarDecl>(D);
         // No actual getter or setter, pass 'pseudo' accessors.
@@ -1083,7 +1086,7 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           return false;
         if (!reportPseudoSetterDecl(VarD))
           return false;
-      } 
+      }
 
       for (auto accessor : StoreD->getAllAccessors()) {
         // Don't include the implicit getter and setter if we added pseudo
@@ -1107,15 +1110,13 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     // Even if we don't record a local property we still need to walk its
     // accessor bodies.
     if (auto StoreD = dyn_cast<AbstractStorageDecl>(D)) {
-      for (auto accessor : StoreD->getAllAccessors()) {
-        if (accessor->isImplicit())
-          continue;
+      StoreD->visitParsedAccessors([&](AccessorDecl *accessor) {
+        if (Cancelled)
+          return;
         ManuallyVisitedAccessorStack.push_back(accessor);
         SourceEntityWalker::walk(cast<Decl>(accessor));
         ManuallyVisitedAccessorStack.pop_back();
-        if (Cancelled)
-          return false;
-      }
+      });
     }
   }
 
@@ -1230,7 +1231,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column) = getLineCol(Loc);
+  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
   if (!IsRef) {
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
@@ -1251,7 +1252,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
   if (getNameAndUSR(ExtendedD, ExtD, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column) = getLineCol(Loc);
+  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
   if (auto Group = ExtD->getGroupName())
     Info.group = Group.getValue();
   return false;
@@ -1407,7 +1408,7 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
   case swift::AccessKind::Write:
     Info.roles |= (unsigned)SymbolRole::Write;
   }
-  
+
   return false;
 }
 
@@ -1458,7 +1459,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
       OS << "t:" << tagName;
       Info.USR = stringStorage.copyString(OS.str());
     }
-    std::tie(Info.line, Info.column) = getLineCol(loc);
+    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(loc);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
       Cancelled = true;
       break;
@@ -1563,73 +1564,6 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     collectRecursiveModuleImports(*Import.second, Visited);
   }
 }
-
-static Type getContextFreeInterfaceType(ValueDecl *VD) {
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-    return AFD->getMethodInterfaceType();
-  }
-  return VD->getInterfaceType();
-}
-
-ArrayRef<ValueDecl*> swift::
-canDeclProvideDefaultImplementationFor(ValueDecl* VD,
-                                       llvm::SmallVectorImpl<ValueDecl*> &Scratch) {
-
-  // Skip decls that don't have valid names.
-  if (!VD->getFullName())
-    return {};
-
-  // Check if VD is from a protocol extension.
-  auto P = VD->getDeclContext()->getExtendedProtocolDecl();
-  if (!P)
-    return {};
-
-  // Look up all decls in the protocol's inheritance chain for the ones with
-  // the same name with VD.
-  ResolvedMemberResult LookupResult =
-  resolveValueMember(*P->getInnermostDeclContext(),
-                     P->getDeclaredInterfaceType(), VD->getFullName());
-
-  auto VDType = getContextFreeInterfaceType(VD);
-  for (auto Mem : LookupResult.getMemberDecls(InterestedMemberKind::All)) {
-    if (isa<ProtocolDecl>(Mem->getDeclContext())) {
-      if (Mem->isProtocolRequirement() &&
-          getContextFreeInterfaceType(Mem)->isEqual(VDType)) {
-        // We find a protocol requirement VD can provide default
-        // implementation for.
-        Scratch.push_back(Mem);
-      }
-    }
-  }
-  return Scratch;
-}
-
-std::vector<ValueDecl*> swift::
-getOverriddenDecls(ValueDecl *VD, bool IncludeProtocolRequirements,
-                   bool Transitive) {
-  std::vector<ValueDecl*> results;
-
-  if (auto Overridden = VD->getOverriddenDecl()) {
-    results.push_back(Overridden);
-    while (Transitive && (Overridden = Overridden->getOverriddenDecl()))
-      results.push_back(Overridden);
-  }
-
-  // Collect the protocol requirements this decl is a default impl for
-  llvm::SmallVector<ValueDecl*, 2> Buffer;
-  for (auto Req : canDeclProvideDefaultImplementationFor(VD, Buffer)) {
-    results.push_back(Req);
-  }
-
-  if (IncludeProtocolRequirements) {
-    for (auto Satisfied : VD->getSatisfiedProtocolRequirements()) {
-      results.push_back(Satisfied);
-    }
-  }
-
-  return results;
-}
-
 
 //===----------------------------------------------------------------------===//
 // Indexing entry points

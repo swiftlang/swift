@@ -18,8 +18,8 @@
 #include "ForeignRepresentationInfo.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/Decl.h"
@@ -134,7 +134,10 @@ bool TypeBase::isUninhabited() {
   // Empty enum declarations are uninhabited
   if (auto nominalDecl = getAnyNominal())
     if (auto enumDecl = dyn_cast<EnumDecl>(nominalDecl))
-      if (enumDecl->getAllElements().empty())
+      // Objective-C enums may be allowed to hold any value representable by
+      // the underlying type, but only if they come from clang.
+      if (enumDecl->getAllElements().empty() &&
+          !(enumDecl->isObjC() && enumDecl->hasClangNode()))
         return true;
   return false;
 }
@@ -158,7 +161,8 @@ bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
-bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
+bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
+                                  bool functionsCount) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define TYPE(id, parent)
@@ -177,7 +181,7 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   // For Self types, recur on the underlying type.
   case TypeKind::DynamicSelf:
     return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
-                               functionsCount);
+                               sig, functionsCount);
 
   // Archetypes and existentials are only class references if class-bounded.
   case TypeKind::PrimaryArchetype:
@@ -228,13 +232,14 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 
   case TypeKind::GenericTypeParam:
   case TypeKind::DependentMember:
-    llvm_unreachable("Dependent types can't answer reference-semantics query");
+    assert(sig && "dependent types can't answer reference semantics query");
+    return sig->requiresClass(type);
   }
 
   llvm_unreachable("Unhandled type kind!");
 }
 
-/// hasOwnership - Are variables of this type permitted to have
+/// Are variables of this type permitted to have
 /// ownership attributes?
 ///
 /// This includes:
@@ -243,8 +248,8 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
 ///   - existentials with class or class protocol bounds
 /// But not:
 ///   - function types
-bool TypeBase::allowsOwnership() {
-  return getCanonicalType().isAnyClassReferenceType();
+bool TypeBase::allowsOwnership(GenericSignature *sig) {
+  return getCanonicalType().allowsOwnership(sig);
 }
 
 ExistentialLayout::ExistentialLayout(ProtocolType *type) {
@@ -1259,6 +1264,15 @@ TypeBase *TypeBase::reconstituteSugar(bool Recursive) {
     return Func(this).getPointer();
 }
 
+TypeBase *TypeBase::getWithoutSyntaxSugar() {
+  auto Func = [](Type Ty) -> Type {
+    if (auto *syntaxSugarType = dyn_cast<SyntaxSugarType>(Ty.getPointer()))
+      return syntaxSugarType->getSinglyDesugaredType()->getWithoutSyntaxSugar();
+    return Ty;
+  };
+  return Type(this).transform(Func).getPointer();
+}
+
 #define TYPE(Id, Parent)
 #define SUGARED_TYPE(Id, Parent) \
   static_assert(std::is_base_of<SugarType, Id##Type>::value, "Sugar mismatch");
@@ -1337,7 +1351,7 @@ SmallVector<Type, 2> TypeAliasType::getInnermostGenericArgs() const {
   result.reserve(numMyGenericParams);
   unsigned startIndex = numAllGenericParams - numMyGenericParams;
   for (auto gp : genericSig->getGenericParams().slice(startIndex)) {
-    result.push_back(Type(gp).subst(subMap, SubstFlags::UseErrorType));
+    result.push_back(Type(gp).subst(subMap));
   }
   return result;
 }
@@ -2354,7 +2368,8 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
   if (matchMode.contains(TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes))
     if (auto opaque1 = t1->getAs<OpaqueTypeArchetypeType>())
       if (auto opaque2 = t2->getAs<OpaqueTypeArchetypeType>())
-        return opaque1->getBoundSignature() == opaque2->getBoundSignature() &&
+        return opaque1->getBoundSignature()->getCanonicalSignature() ==
+                   opaque2->getBoundSignature()->getCanonicalSignature() &&
                opaque1->getInterfaceType()->getCanonicalType()->matches(
                    opaque2->getInterfaceType()->getCanonicalType(), matchMode);
 
@@ -2539,6 +2554,10 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
+  
+  // Don't allow replacement if the naming decl is dynamically replaceable.
+  if (namingDecl && namingDecl->isDynamic())
+    return false;
 
   // Allow replacement of opaque result types of inlineable function regardless
   // of resilience and in which context.
@@ -2547,7 +2566,7 @@ bool ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
       return true;
     }
   } else if (auto *asd = dyn_cast<AbstractStorageDecl>(namingDecl)) {
-    auto *getter = asd->getGetter();
+    auto *getter = asd->getOpaqueAccessor(AccessorKind::Get);
     if (getter &&
         getter->getResilienceExpansion() == ResilienceExpansion::Minimal) {
       return true;
@@ -2934,9 +2953,8 @@ Type ProtocolCompositionType::get(const ASTContext &C,
 
 FunctionType *
 GenericFunctionType::substGenericArgs(SubstitutionMap subs) {
-  auto substFn = Type(this).subst(subs)->castTo<AnyFunctionType>();
-  return FunctionType::get(substFn->getParams(),
-                           substFn->getResult(), getExtInfo());
+  return substGenericArgs(
+    [=](Type t) { return t.subst(subs); });
 }
 
 FunctionType *GenericFunctionType::substGenericArgs(
@@ -2977,8 +2995,6 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
 
   // Produce a failed result.
   auto failed = [&]() -> Type {
-    if (!options.contains(SubstFlags::UseErrorType)) return Type();
-
     Type baseType = ErrorType::get(substBase ? substBase : origBase);
     if (assocType)
       return DependentMemberType::get(baseType, assocType);
@@ -3036,7 +3052,7 @@ static Type getMemberForBaseType(LookupConformanceFn lookupConformances,
     // Retrieve the type witness.
     auto witness =
       conformance->getConcrete()->getTypeWitness(assocType, options);
-    if (!witness)
+    if (!witness || witness->hasError())
       return failed();
 
     // This is a hacky feature allowing code completion to migrate to
@@ -3111,6 +3127,19 @@ Type DependentMemberType::substBaseType(Type substBase,
                               getAssocType(), getName(), None);
 }
 
+Type DependentMemberType::substRootParam(Type newRoot,
+                                         LookupConformanceFn lookupConformance){
+  auto base = getBase();
+  if (auto param = base->getAs<GenericTypeParamType>()) {
+    return substBaseType(newRoot, lookupConformance);
+  }
+  if (auto depMem = base->getAs<DependentMemberType>()) {
+    return substBaseType(depMem->substRootParam(newRoot, lookupConformance),
+                         lookupConformance);
+  }
+  return Type();
+}
+
 static Type substGenericFunctionType(GenericFunctionType *genericFnType,
                                      TypeSubstitutionFn substitutions,
                                      LookupConformanceFn lookupConformances,
@@ -3126,7 +3155,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   auto *fnType = result->castTo<FunctionType>();
   // Substitute generic parameters.
   bool anySemanticChanges = false;
-  SmallVector<GenericTypeParamType *, 4> genericParams;
+  SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto param : genericFnType->getGenericParams()) {
     Type paramTy =
       Type(param).subst(substitutions, lookupConformances, options);
@@ -3148,7 +3177,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     return result;
 
   // Transform requirements.
-  SmallVector<Requirement, 4> requirements;
+  SmallVector<Requirement, 2> requirements;
   for (const auto &req : genericFnType->getRequirements()) {
     // Substitute into the requirement.
     auto substReqt = req.subst(substitutions, lookupConformances, options);
@@ -3178,20 +3207,11 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
   if (anySemanticChanges) {
     // If there were semantic changes, we need to build a new generic
     // signature.
-    GenericSignatureBuilder builder(genericFnType->getASTContext());
-
-    // Add the generic parameters to the builder.
-    for (auto gp : genericParams)
-      builder.addGenericParameter(gp);
-
-    // Add the requirements to the builder.
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-    for (const auto &req : requirements)
-      builder.addRequirement(req, source, /*inferForModule=*/nullptr);
-
-    // Form the generic signature.
-    genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    ASTContext &ctx = genericFnType->getASTContext();
+    genericSig = evaluateOrDefault(
+        ctx.evaluator,
+        AbstractGenericSignatureRequest{nullptr, genericParams, requirements},
+        nullptr);
   } else {
     // Use the mapped generic signature.
     genericSig = GenericSignature::get(genericParams, requirements);
@@ -3264,21 +3284,16 @@ static Type substType(Type derivedType,
       return None;
 
     // If we have a substitution for this type, use it.
-    if (auto known = substitutions(substOrig))
+    if (auto known = substitutions(substOrig)) {
       return known;
+    }
 
     // If we failed to substitute a generic type parameter, give up.
-    if (isa<GenericTypeParamType>(substOrig)) {
-      if (options.contains(SubstFlags::UseErrorType))
-        return ErrorType::get(type);
-      return Type();
-    }
+    if (isa<GenericTypeParamType>(substOrig))
+      return ErrorType::get(type);
 
-    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig)) {
-      if (options.contains(SubstFlags::UseErrorType))
-        return ErrorType::get(type);
-      return Type();
-    }
+    if (auto primaryArchetype = dyn_cast<PrimaryArchetypeType>(substOrig))
+      return ErrorType::get(type);
 
     // Opened existentials cannot be substituted in this manner,
     // but if they appear in the original type this is not an
@@ -3325,8 +3340,7 @@ Type Type::substDependentTypesWithErrorTypes() const {
   return substType(*this,
                    [](SubstitutableType *t) -> Type { return Type(); },
                    MakeAbstractConformanceForGenericType(),
-                   (SubstFlags::AllowLoweredTypes |
-                    SubstFlags::UseErrorType));
+                   SubstFlags::AllowLoweredTypes);
 }
 
 const DependentMemberType *TypeBase::findUnresolvedDependentMemberType() {
@@ -3471,7 +3485,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
       continue;
     }
 
-    llvm_unreachable("Bad base type");
+    // Assert and break to avoid hanging if we get an unexpected baseTy.
+    assert(0 && "Bad base type");
+    break;
   }
 
   while (n > 0) {
@@ -3551,6 +3567,14 @@ SubstitutionMap TypeBase::getMemberSubstitutionMap(
 
 Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
                                Type memberType) {
+  if (is<ErrorType>())
+    return ErrorType::get(getASTContext());
+
+  if (auto *lvalue = getAs<LValueType>()) {
+    auto objectTy = lvalue->getObjectType();
+    return objectTy->getTypeOfMember(module, member, memberType);
+  }
+
   // If no member type was provided, use the member's type.
   if (!memberType)
     memberType = member->getInterfaceType();
@@ -3559,7 +3583,7 @@ Type TypeBase::getTypeOfMember(ModuleDecl *module, const ValueDecl *member,
 
   // Perform the substitution.
   auto substitutions = getMemberSubstitutionMap(module, member);
-  return memberType.subst(substitutions, SubstFlags::UseErrorType);
+  return memberType.subst(substitutions);
 }
 
 Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
@@ -3574,7 +3598,7 @@ Type TypeBase::adjustSuperclassMemberDeclType(const ValueDecl *baseDecl,
                                    genericMemberType->getExtInfo());
   }
 
-  auto type = memberType.subst(subs, SubstFlags::UseErrorType);
+  auto type = memberType.subst(subs);
   if (baseDecl->getDeclContext()->getSelfProtocolDecl())
     return type;
 
@@ -3882,7 +3906,7 @@ case TypeKind::Id:
     }
     
     // Substitute the new root into the root of the interface type.
-    return nestedType->getInterfaceType()->substBaseType(substRoot,
+    return nestedType->getInterfaceType()->substRootParam(substRoot,
         LookUpConformanceInModule(root->getDecl()->getModuleContext()));
   }
 
@@ -3942,25 +3966,19 @@ case TypeKind::Id:
     }
 
     auto subMap = alias->getSubstitutionMap();
-    if (auto genericSig = subMap.getGenericSignature()) {
-      for (Type gp : genericSig->getGenericParams()) {
-        Type oldReplacementType = gp.subst(subMap);
-        if (!oldReplacementType)
-          return newUnderlyingType;
+    for (Type oldReplacementType : subMap.getReplacementTypes()) {
+      if (oldReplacementType->hasTypeParameter() ||
+          oldReplacementType->hasArchetype())
+        return newUnderlyingType;
 
-        if (oldReplacementType->hasTypeParameter() ||
-            oldReplacementType->hasArchetype())
-          return newUnderlyingType;
+      Type newReplacementType = oldReplacementType.transformRec(fn);
+      if (!newReplacementType)
+        return newUnderlyingType;
 
-        Type newReplacementType = oldReplacementType.transformRec(fn);
-        if (!newReplacementType)
-          return newUnderlyingType;
-
-        // If anything changed with the replacement type, we lose the sugar.
-        // FIXME: This is really unfortunate.
-        if (!newReplacementType->isEqual(oldReplacementType))
-          return newUnderlyingType;
-      }
+      // If anything changed with the replacement type, we lose the sugar.
+      // FIXME: This is really unfortunate.
+      if (!newReplacementType->isEqual(oldReplacementType))
+        return newUnderlyingType;
     }
 
     if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())

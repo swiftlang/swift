@@ -24,6 +24,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -180,6 +181,12 @@ bool constraints::computeTupleShuffle(ArrayRef<TupleTypeElt> fromTuple,
 Expr *ConstraintLocatorBuilder::trySimplifyToExpr() const {
   SmallVector<LocatorPathElt, 4> pathBuffer;
   Expr *anchor = getLocatorParts(pathBuffer);
+  // Locators are not guaranteed to have an anchor
+  // if constraint system is used to verify generic
+  // requirements.
+  if (!anchor)
+    return nullptr;
+
   ArrayRef<LocatorPathElt> path = pathBuffer;
 
   SourceRange range;
@@ -1383,7 +1390,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
-  assert(DC == closure->getParent() && "Decl context isn't correct");
+  assert((closure->getParent() == DC ||
+          closure->getParent()->isChildContextOf(DC)) &&
+      "Decl context isn't correct");
   DC = closure;
   return true;
 }
@@ -2133,7 +2142,7 @@ private:
 
   void maybeProduceFallbackDiagnostic(Expr *expr) const {
     if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        Options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+        DiagnosticSuppression::isEnabled(TC.Diags))
       return;
 
     // Before producing fatal error here, let's check if there are any "error"
@@ -2175,7 +2184,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
 
-  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+  if (DiagnosticSuppression::isEnabled(Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
@@ -2226,7 +2235,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
-        cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+        cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
@@ -2630,8 +2639,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator =
-          cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+      Locator = cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // Collect constraints from the pattern.
       Type patternType = cs.generateConstraints(pattern, Locator);
@@ -2716,7 +2724,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       auto &ctx = singleVar->getASTContext();
       auto outermostWrapperAttr = wrapperAttrs.front();
       if (initializer) {
-        // Form init(initialValue:) call(s).
+        // Form init(wrappedValue:) call(s).
         Expr *wrappedInitializer =
             buildPropertyWrapperInitialValueCall(
                 singleVar, Type(), initializer, /*ignoreAttributeArgs=*/false);
@@ -2921,9 +2929,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      auto elementAssocType =
-        cast<AssociatedTypeDecl>(
-          sequenceProto->lookupDirect(tc.Context.Id_Element).front());
+      auto elementAssocType = sequenceProto->getAssociatedType(
+        tc.Context.Id_Element);
 
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
@@ -3106,7 +3113,7 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
 
   // Create a 'let' binding to stand in for the RHS value.
   auto *matchVar = new (Context) VarDecl(/*IsStatic*/false,
-                                         VarDecl::Specifier::Let,
+                                         VarDecl::Introducer::Let,
                                          /*IsCaptureList*/false,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
@@ -3658,7 +3665,7 @@ void ConstraintSystem::print(raw_ostream &out) {
   }
 
   out << "Type Variables:\n";
-  for (auto tv : TypeVariables) {
+  for (auto tv : getTypeVariables()) {
     out.indent(2);
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())
@@ -4291,9 +4298,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //     print("Caught bar error")
     //   }
     // }
-    if (fromExistential) {
+    //
+    // Note: we relax the restriction if the type we're casting to is a
+    // non-final class because it's possible that we might have a subclass
+    // that conforms to the protocol.
+    if (fromExistential && !toExistential) {
       if (auto NTD = toType->getAnyNominal()) {
-        if (!isa<ProtocolDecl>(NTD)) {
+        if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&

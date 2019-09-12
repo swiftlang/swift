@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
+// RUN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
 
+// REQUIRES: optimized_stdlib
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
@@ -64,17 +66,6 @@ func test_loops() {
   // expected-error @+2 {{#assert condition not constant}}
   // expected-note @+1 {{control-flow loop found during evaluation}}
   #assert(infiniteLoop() == 1)
-}
-
-func recursive(a: Int) -> Int {
-   // expected-note@+1 {{limit exceeded here}}
-  return a == 0 ? 0 : recursive(a: a-1)
-}
-
-func test_recursive() {
-  // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
-  #assert(recursive(a: 20000) > 42)
 }
 
 func conditional(_ x: Int) -> Int {

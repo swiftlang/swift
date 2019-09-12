@@ -17,7 +17,7 @@ func requiresConformance(_: B_RequiresConformance<B_ConformsToProto>) {}
 func requiresConformance(_: B_RequiresConformance<C_RelyOnConformanceImpl.Assoc>) {}
 
 class Sub: Base {} // okay
-class Impl: Proto {} // expected-error {{type 'Impl' does not conform to protocol 'Proto'}}
+class Impl: Proto {} // expected-error {{type 'Impl' does not conform to protocol 'Proto'}} expected-note {{do you want to add protocol stubs?}}
 
 #else // TEST
 

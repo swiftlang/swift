@@ -26,27 +26,47 @@ CHANGELOG
 Swift Next
 ----------
 
-* [SR-8974][]:
+* [SE-0253][]:
 
-  Duplicate tuple element labels are no longer allowed, because it leads
-  to incorrect behavior. For example:
+  Values of types that declare `func callAsFunction` methods can be called
+  like functions. The call syntax is shorthand for applying
+  `func callAsFunction` methods.
+
+  ```swift
+  struct Adder {
+    var base: Int
+    func callAsFunction(_ x: Int) -> Int {
+      return x + base
+    }
+  }
+  var adder = Adder(base: 3)
+  adder(10) // returns 13, same as `adder.callAsFunction(10)`
+  ```
+
+  * `func callAsFunction` argument labels are required at call sites.
+  * Multiple `func callAsFunction` methods on a single type are supported.
+  * `mutating func callAsFunction` is supported.
+  * `func callAsFunction` works with `throws` and `rethrows`.
+  * `func callAsFunction` works with trailing closures.
+
+* [SR-4206][]:
+
+  A method override is no longer allowed to have a generic signature with 
+  requirements not imposed by the base method. For example:
 
   ```
-  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
-
-  enum Foo { case bar(x: Int, x: Int) }
-  let f: Foo = .bar(x: 0, x: 1)
+  protocol P {}
+  
+  class Base {
+    func foo<T>(arg: T) {}
+  }
+  
+  class Derived: Base {
+    override func foo<T: P>(arg: T) {}
+  }
   ```
 
-  will now be diagnosed as an error. 
-
-  Note: You can still use duplicate labels when declaring functions and
-  subscripts, as long as the internal labels are different. For example:
-
-  ```
-  func foo(bar x: Int, bar y: Int) {}
-  subscript(a x: Int, a y: Int) -> Int {}
-  ```
+  will now be diagnosed as an error.
 
 * [SR-6118][]:
 
@@ -67,6 +87,28 @@ Swift Next
 
 Swift 5.1
 ---------
+
+* [SR-8974][]:
+
+  Duplicate tuple element labels are no longer allowed, because it leads
+  to incorrect behavior. For example:
+
+  ```
+  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
+
+  enum Foo { case bar(x: Int, x: Int) }
+  let f: Foo = .bar(x: 0, x: 1)
+  ```
+
+  will now be diagnosed as an error. 
+
+  Note: You can still use duplicate argument labels when declaring functions and
+  subscripts, as long as the internal parameter names are different. For example:
+
+  ```
+  func foo(bar x: Int, bar y: Int) {}
+  subscript(a x: Int, a y: Int) -> Int {}
+  ```
 
 * [SE-0244][]:
 
@@ -7692,6 +7734,7 @@ Swift 1.0
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
+[SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
@@ -7708,6 +7751,7 @@ Swift 1.0
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>

@@ -144,13 +144,7 @@ protected:
   /// by the constraint solver.
   ResolvedOverloadSetListItem *
   getResolvedOverload(ConstraintLocator *locator) const {
-    auto resolvedOverload = CS.getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == locator)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+    return CS.findSelectedOverloadFor(locator);
   }
 
   /// Retrive the constraint locator for the given anchor and
@@ -176,7 +170,9 @@ protected:
   /// reference or subscript, nullptr otherwise.
   Expr *getArgumentExprFor(Expr *anchor) const;
 
-  Optional<SelectedOverload> getChoiceFor(Expr *) const;
+  /// \returns The overload choice made by the constraint system for the callee
+  /// of a given locator's anchor, or \c None if no such choice can be found.
+  Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -184,6 +180,13 @@ protected:
   /// for an argument conversion, returns \c None.
   Optional<FunctionArgApplyInfo>
   getFunctionArgApplyInfo(ConstraintLocator *locator) const;
+
+  /// \returns A new type with all of the type variables associated with
+  /// generic parameters substituted back into being generic parameter type.
+  Type restoreGenericParameters(
+      Type type,
+      llvm::function_ref<void(GenericTypeParamType *, Type)> substitution =
+          [](GenericTypeParamType *, Type) {});
 
 private:
   /// Compute anchor expression associated with current diagnostic.
@@ -215,23 +218,27 @@ protected:
   /// to diagnose failures related to arguments.
   const ApplyExpr *Apply = nullptr;
 
+  /// Types associated with requirement constraint this
+  /// failure originates from.
+  Type LHS, RHS;
+
 public:
   RequirementFailure(ConstraintSystem &cs, Expr *expr, RequirementKind kind,
-                     ConstraintLocator *locator)
+                     Type lhs, Type rhs, ConstraintLocator *locator)
       : FailureDiagnostic(expr, cs, locator),
         Conformance(getConformanceForConditionalReq(locator)),
-        Signature(getSignature(locator)), AffectedDecl(getDeclRef()) {
+        Signature(getSignature(locator)), AffectedDecl(getDeclRef()),
+        LHS(resolveType(lhs)), RHS(resolveType(rhs)) {
     assert(locator);
     assert(isConditional() || Signature);
     assert(AffectedDecl);
+    assert(getRequirementDC() &&
+           "Couldn't find where the requirement came from?");
+    assert(getGenericContext() &&
+           "Affected decl not within a generic context?");
 
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto &last = path.back();
-    assert(last.isTypeParameterRequirement() ||
-           last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -242,13 +249,9 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    assert(!path.empty());
-
-    auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    return reqElt.getIndex();
   }
 
   /// The generic base type where failing requirement comes from.
@@ -260,8 +263,8 @@ public:
   /// Generic requirement associated with the failure.
   const Requirement &getRequirement() const;
 
-  virtual Type getLHS() const = 0;
-  virtual Type getRHS() const = 0;
+  Type getLHS() const { return LHS; }
+  Type getRHS() const { return RHS; }
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -292,31 +295,12 @@ protected:
     if (isConditional())
       return true;
 
-    auto *anchor = getAnchor();
-    // In the situations like this:
-    //
-    // ```swift
-    // enum E<T: P> { case foo(T) }
-    // let _: E = .foo(...)
-    // ```
-    //
-    // `E` is going to be opened twice. First, when
-    // it's used as a contextual type, and when `E.foo`
-    // is found and its function type is opened.
-    // We still want to record both fixes but should
-    // avoid diagnosing the same problem multiple times.
-    if (isa<UnresolvedMemberExpr>(anchor)) {
-      auto path = getLocator()->getPath();
-      if (path.front().getKind() != ConstraintLocator::UnresolvedMember)
-        return false;
-    }
-
     // For static/initializer calls there is going to be
     // a separate fix, attached to the argument, which is
     // much easier to diagnose.
     // For operator calls we can't currently produce a good
     // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && (isOperator(Apply) || isa<TypeExpr>(anchor)));
+    return !(Apply && isOperator(Apply));
   }
 
   static bool isOperator(const ApplyExpr *apply) {
@@ -351,26 +335,14 @@ private:
 ///   foo(S())
 /// ```
 class MissingConformanceFailure final : public RequirementFailure {
-  Type NonConformingType;
-  Type ProtocolType;
-
 public:
   MissingConformanceFailure(Expr *expr, ConstraintSystem &cs,
                             ConstraintLocator *locator,
                             std::pair<Type, Type> conformance)
-      : RequirementFailure(cs, expr, RequirementKind::Conformance, locator),
-        NonConformingType(conformance.first), ProtocolType(conformance.second) {
-  }
+      : RequirementFailure(cs, expr, RequirementKind::Conformance,
+                           conformance.first, conformance.second, locator) {}
 
   bool diagnoseAsError() override;
-
-private:
-  /// The type which was expected, by one of the generic requirements,
-  /// to conform to associated protocol.
-  Type getLHS() const override { return NonConformingType; }
-
-  /// The protocol generic requirement expected associated type to conform to.
-  Type getRHS() const override { return ProtocolType; }
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -384,45 +356,6 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
-};
-
-/// Diagnostics for mismatched generic arguments e.g
-/// ```swift
-/// struct F<G> {}
-/// let _:F<Int> = F<Bool>()
-/// ```
-class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
-  ArrayRef<unsigned> Mismatches;
-
-public:
-  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
-                                  BoundGenericType *actual,
-                                  BoundGenericType *required,
-                                  ArrayRef<unsigned> mismatches,
-                                  ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), Actual(actual),
-        Required(required), Mismatches(mismatches) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  void emitNotesForMismatches() {
-    for (unsigned position : Mismatches) {
-      emitNoteForMismatch(position);
-    }
-  }
-
-  void emitNoteForMismatch(int mismatchPosition);
-
-  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
-
-  /// The actual type being used.
-  BoundGenericType *getActual() const { return Actual; }
-
-  /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const { return Required; }
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -441,16 +374,11 @@ private:
 ///
 /// `S.T` is not the same type as `Int`, which is required by `foo`.
 class SameTypeRequirementFailure final : public RequirementFailure {
-  Type LHS, RHS;
-
 public:
   SameTypeRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                              Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::SameType, locator),
-        LHS(lhs), RHS(rhs) {}
-
-  Type getLHS() const override { return LHS; }
-  Type getRHS() const override { return RHS; }
+      : RequirementFailure(cs, expr, RequirementKind::SameType, lhs, rhs,
+                           locator) {}
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -480,16 +408,11 @@ protected:
 ///
 /// `A` is not the superclass of `B`, which is required by `foo<T>`.
 class SuperclassRequirementFailure final : public RequirementFailure {
-  Type LHS, RHS;
-
 public:
   SuperclassRequirementFailure(Expr *expr, ConstraintSystem &cs, Type lhs,
                                Type rhs, ConstraintLocator *locator)
-      : RequirementFailure(cs, expr, RequirementKind::Superclass, locator),
-        LHS(lhs), RHS(rhs) {}
-
-  Type getLHS() const override { return LHS; }
-  Type getRHS() const override { return RHS; }
+      : RequirementFailure(cs, expr, RequirementKind::Superclass, lhs, rhs,
+                           locator) {}
 
 protected:
   DiagOnDecl getDiagnosticOnDecl() const override {
@@ -522,6 +445,7 @@ public:
       : FailureDiagnostic(root, cs, locator), CorrectLabels(labels) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
 };
 
 /// Diagnose errors related to converting function type which
@@ -551,56 +475,6 @@ public:
       : FailureDiagnostic(expr, cs, locator) {}
 
   bool diagnoseAsError() override;
-};
-
-/// Diagnose failures related to passing value of some type
-/// to `inout` parameter, without explicitly specifying `&`.
-class MissingAddressOfFailure final : public FailureDiagnostic {
-public:
-  MissingAddressOfFailure(Expr *expr, ConstraintSystem &cs,
-                          ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
-
-  bool diagnoseAsError() override;
-};
-
-/// Diagnose failures related attempt to implicitly convert types which
-/// do not support such implicit converstion.
-/// "as" or "as!" has to be specified explicitly in cases like that.
-class MissingExplicitConversionFailure final : public FailureDiagnostic {
-  Type ConvertingTo;
-
-public:
-  MissingExplicitConversionFailure(Expr *expr, ConstraintSystem &cs,
-                                   ConstraintLocator *locator, Type toType)
-      : FailureDiagnostic(expr, cs, locator), ConvertingTo(toType) {}
-
-  bool diagnoseAsError() override;
-
-private:
-  bool exprNeedsParensBeforeAddingAs(Expr *expr) {
-    auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
-    auto asPG = TC.lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
-    if (!asPG)
-      return true;
-    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
-  }
-
-  bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
-    auto *DC = getDC();
-    auto &TC = getTypeChecker();
-
-    auto asPG = TC.lookupPrecedenceGroup(
-        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
-    if (!asPG)
-      return true;
-
-    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
-                                                   asPG);
-  }
 };
 
 /// Diagnose failures related to attempting member access on optional base
@@ -696,9 +570,6 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  void fixItChangeInoutArgType(const Expr *arg, Type actualType,
-                               Type neededType) const;
-
   /// Given an expression that has a non-lvalue type, dig into it until
   /// we find the part of the expression that prevents the entire subexpression
   /// from being mutable.  For example, in a sequence like "x.v.v = 42" we want
@@ -720,29 +591,100 @@ private:
 /// Intended to diagnose any possible contextual failure
 /// e.g. argument/parameter, closure result, conversions etc.
 class ContextualFailure : public FailureDiagnostic {
+  ContextualTypePurpose CTP;
   Type FromType, ToType;
 
 public:
   ContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
                     ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), FromType(resolve(lhs)),
-        ToType(resolve(rhs)) {}
+      : ContextualFailure(root, cs, cs.getContextualTypePurpose(), lhs, rhs,
+                          locator) {}
 
-  Type getFromType() const { return resolveType(FromType); }
+  ContextualFailure(Expr *root, ConstraintSystem &cs,
+                    ContextualTypePurpose purpose, Type lhs, Type rhs,
+                    ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), CTP(purpose),
+        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
 
-  Type getToType() const { return resolveType(ToType); }
+  Type getFromType() const { return FromType; }
+
+  Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
+
+  /// If we're trying to convert something to `nil`.
+  bool diagnoseConversionToNil() const;
 
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
   bool diagnoseMissingFunctionCall() const;
 
+  /// Produce a specialized diagnostic if this is an invalid conversion to Bool.
+  bool diagnoseConversionToBool() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to initialize
+  /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
+  bool diagnoseConversionToDictionary() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to throw
+  /// something with doesn't conform to `Error`.
+  bool diagnoseThrowsTypeMismatch() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to `yield`
+  /// something of incorrect type.
+  bool diagnoseYieldByReferenceMismatch() const;
+
+  /// Attempt to attach any relevant fix-its to already produced diagnostic.
+  void tryFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer where a type conforming to RawRepresentable is
+  ///   expected, by wrapping the expression in a call to the contextual
+  ///   type's initializer
+  ///
+  /// - Passing a type conforming to RawRepresentable where an integer is
+  ///   expected, by wrapping the expression in a call to the rawValue
+  ///   accessor
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool
+  tryRawRepresentableFixIts(InFlightDiagnostic &diagnostic,
+                            KnownProtocolKind rawRepresentablePrococol) const;
+
+  /// Attempts to add fix-its for these two mistakes:
+  ///
+  /// - Passing an integer with the right type but which is getting wrapped with
+  ///   a different integer type unnecessarily. The fixit removes the cast.
+  ///
+  /// - Passing an integer but expecting different integer type. The fixit adds
+  ///   a wrapping cast.
+  ///
+  /// - Return true on the fixit is added, false otherwise.
+  ///
+  /// This helps migration with SDK changes.
+  bool tryIntegerCastFixIts(InFlightDiagnostic &diagnostic) const;
+
+protected:
   /// Try to add a fix-it when converting between a collection and its slice
   /// type, such as String <-> Substring or (eventually) Array <-> ArraySlice
-  static bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diag,
-                                           ConstraintSystem &CS, Type fromType,
-                                           Type toType, Expr *expr);
+  bool trySequenceSubsequenceFixIts(InFlightDiagnostic &diagnostic) const;
+
+  /// Try to add a fix-it that suggests to explicitly use `as` or `as!`
+  /// to coerce one type to another if type-checker can prove that such
+  /// conversion is possible.
+  bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Try to add a fix-it to conform the decl context (if it's a type) to the
+  /// protocol
+  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+
+  /// Check whether this contextual failure represents an invalid
+  /// conversion from array literal to dictionary.
+  static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
+                                            Type contextualType);
 
 private:
   Type resolve(Type rawType) {
@@ -757,6 +699,177 @@ private:
   /// Try to add a fix-it to convert a stored property into a computed
   /// property
   void tryComputedPropertyFixIts(Expr *expr) const;
+
+  bool isIntegerType(Type type) const {
+    return conformsToKnownProtocol(
+        getConstraintSystem(), type,
+        KnownProtocolKind::ExpressibleByIntegerLiteral);
+  }
+
+  /// Return true if the conversion from fromType to toType is
+  /// an invalid string index operation.
+  bool isIntegerToStringIndexConversion() const;
+
+protected:
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
+
+  static Optional<Diag<Type, Type>>
+  getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatchFailure final : public ContextualFailure {
+  ArrayRef<unsigned> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  Type actualType, Type requiredType,
+                                  ArrayRef<unsigned> mismatches,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, actualType, requiredType, locator),
+        Mismatches(mismatches) {
+    assert(actualType->is<BoundGenericType>());
+    assert(requiredType->is<BoundGenericType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
+    }
+  }
+
+  void emitNoteForMismatch(int mismatchPosition);
+
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const {
+    return getFromType()->castTo<BoundGenericType>();
+  }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const {
+    return getToType()->castTo<BoundGenericType>();
+  }
+};
+
+/// Diagnose failures related to conversion between throwing function type
+/// and non-throwing one e.g.
+///
+/// ```swift
+/// func foo<T>(_ t: T) throws -> Void {}
+/// let _: (Int) -> Void = foo // `foo` can't be implictly converted to
+///                            // non-throwing type `(Int) -> Void`
+/// ```
+class ThrowingFunctionConversionFailure final : public ContextualFailure {
+public:
+  ThrowingFunctionConversionFailure(Expr *root, ConstraintSystem &cs,
+                                    Type fromType, Type toType,
+                                    ConstraintLocator *locator)
+      : ContextualFailure(root, cs, fromType, toType, locator) {
+    auto fnType1 = fromType->castTo<FunctionType>();
+    auto fnType2 = toType->castTo<FunctionType>();
+    assert(fnType1->throws() != fnType2->throws());
+  }
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose failures related attempt to implicitly convert types which
+/// do not support such implicit converstion.
+/// "as" or "as!" has to be specified explicitly in cases like that.
+class MissingExplicitConversionFailure final : public ContextualFailure {
+public:
+  MissingExplicitConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                   Type fromType, Type toType,
+                                   ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
+
+private:
+  bool exprNeedsParensBeforeAddingAs(Expr *expr) {
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+
+    auto asPG = TC.lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    if (!asPG)
+      return true;
+    return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
+  }
+
+  bool exprNeedsParensAfterAddingAs(Expr *expr, Expr *rootExpr) {
+    auto *DC = getDC();
+    auto &TC = getTypeChecker();
+
+    auto asPG = TC.lookupPrecedenceGroup(
+        DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
+    if (!asPG)
+      return true;
+
+    return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr,
+                                                   asPG);
+  }
+};
+
+/// Diagnose failures related to passing value of some type
+/// to `inout` or pointer parameter, without explicitly specifying `&`.
+class MissingAddressOfFailure final : public ContextualFailure {
+public:
+  MissingAddressOfFailure(Expr *expr, ConstraintSystem &cs, Type argTy,
+                          Type paramTy, ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, argTy, paramTy, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose extraneous use of address of (`&`) which could only be
+/// associated with arguments to inout parameters e.g.
+///
+/// ```swift
+/// struct S {}
+///
+/// var a: S = ...
+/// var b: S = ...
+///
+/// a = &b
+/// ```
+class InvalidUseOfAddressOf final : public ContextualFailure {
+public:
+  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                        ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Compute location of the failure for diagnostic.
+  SourceLoc getLoc() const;
+};
+
+/// Diagnose mismatches relating to tuple destructuring.
+class TupleContextualFailure final : public ContextualFailure {
+public:
+  TupleContextualFailure(Expr *root, ConstraintSystem &cs, Type lhs, Type rhs,
+                         ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
+
+  bool diagnoseAsError() override;
+
+  bool isNumElementsMismatch() const {
+    auto lhsTy = getFromType()->castTo<TupleType>();
+    auto rhsTy = getToType()->castTo<TupleType>();
+    assert(lhsTy && rhsTy);
+    return lhsTy->getNumElements() != rhsTy->getNumElements();
+  }
 };
 
 /// Diagnose situations when @autoclosure argument is passed to @autoclosure
@@ -765,6 +878,24 @@ class AutoClosureForwardingFailure final : public FailureDiagnostic {
 public:
   AutoClosureForwardingFailure(ConstraintSystem &cs, ConstraintLocator *locator)
       : FailureDiagnostic(nullptr, cs, locator) {}
+
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose invalid pointer conversions for an autoclosure result type.
+///
+/// \code
+/// func foo(_ x: @autoclosure () -> UnsafePointer<Int>) {}
+///
+/// var i = 0
+/// foo(&i) // Invalid conversion to UnsafePointer
+/// \endcode
+class AutoClosurePointerConversionFailure final : public ContextualFailure {
+public:
+  AutoClosurePointerConversionFailure(Expr *root, ConstraintSystem &cs,
+                                      Type pointeeType, Type pointerType,
+                                      ConstraintLocator *locator)
+      : ContextualFailure(root, cs, pointeeType, pointerType, locator) {}
 
   bool diagnoseAsError() override;
 };
@@ -1311,30 +1442,6 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose extraneous use of address of (`&`) which could only be
-/// associated with arguments to inout parameters e.g.
-///
-/// ```swift
-/// struct S {}
-///
-/// var a: S = ...
-/// var b: S = ...
-///
-/// a = &b
-/// ```
-class InvalidUseOfAddressOf final : public FailureDiagnostic {
-public:
-  InvalidUseOfAddressOf(Expr *root, ConstraintSystem &cs,
-                        ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator) {}
-
-  bool diagnoseAsError() override;
-
-protected:
-  /// Compute location of the failure for diagnostic.
-  SourceLoc getLoc() const;
-};
-
 /// Diagnose an attempt return something from a function which
 /// doesn't have a return type specified e.g.
 ///
@@ -1382,10 +1489,24 @@ public:
   }
 
   bool diagnoseAsError() override;
+};
 
-private:
-  static Optional<Diag<Type, Type>>
-  getDiagnosticFor(ContextualTypePurpose purpose);
+/// Diagnose a conversion mismatch between object types of `inout`
+/// argument/parameter e.g. `'inout S' argument conv 'inout P'`.
+///
+/// Even if `S` conforms to `P` there is no subtyping rule for
+/// argument type of `inout` parameter, they have to be equal.
+class InOutConversionFailure final : public ContextualFailure {
+public:
+  InOutConversionFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                         Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Suggest to change a type of the argument if possible.
+  void fixItChangeArgumentType() const;
 };
 
 /// Diagnose generic argument omission e.g.
@@ -1413,7 +1534,9 @@ public:
 
   DeclContext *getDeclContext() const {
     auto *GP = Parameters.front();
-    return GP->getDecl()->getDeclContext();
+    auto *decl = GP->getDecl();
+
+    return decl ? decl->getDeclContext() : nullptr;
   }
 
   bool diagnoseAsError() override;
@@ -1455,6 +1578,25 @@ public:
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
+};
+
+/// Diagnose situation when a single "tuple" parameter is given N arguments e.g.
+///
+/// ```swift
+/// func foo<T>(_ x: (T, Bool)) {}
+/// foo(1, false) // foo exptects a single argument of tuple type `(1, false)`
+/// ```
+class InvalidTupleSplatWithSingleParameterFailure final
+    : public FailureDiagnostic {
+  Type ParamType;
+
+public:
+  InvalidTupleSplatWithSingleParameterFailure(Expr *root, ConstraintSystem &cs,
+                                              Type paramTy,
+                                              ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+
+  bool diagnoseAsError() override;
 };
 
 /// Provides information about the application of a function argument to a

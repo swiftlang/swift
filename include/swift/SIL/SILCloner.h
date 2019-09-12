@@ -509,8 +509,8 @@ public:
     // resolve the type mismatch between SILArgument* and SILValue.
     SmallVector<SILValue, 8> entryArgs;
     entryArgs.reserve(newF->getArguments().size());
-    transform(newF->getArguments(), std::back_inserter(entryArgs),
-              [](SILArgument *arg) -> SILValue { return arg; });
+    llvm::transform(newF->getArguments(), std::back_inserter(entryArgs),
+                    [](SILArgument *arg) -> SILValue { return arg; });
 
     SuperTy::cloneFunctionBody(origF, newEntryBB, entryArgs);
   }
@@ -1308,6 +1308,14 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
         Inst, getBuilder().create##Name##ToRef(getOpLocation(Inst->getLoc()),  \
                                                getOpValue(Inst->getOperand()), \
                                                getOpType(Inst->getType())));   \
+  }                                                                            \
+  template <typename ImplClass>                                                \
+  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
+      Copy##Name##ValueInst *Inst) {                                           \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
+    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
+                                      getOpLocation(Inst->getLoc()),           \
+                                      getOpValue(Inst->getOperand())));        \
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                   \
   LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
@@ -1336,14 +1344,6 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
                                       getOpLocation(Inst->getLoc()),           \
                                       getOpValue(Inst->getOperand()),          \
                                       Inst->getAtomicity()));                  \
-  }                                                                            \
-  template <typename ImplClass>                                                \
-  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
-      Copy##Name##ValueInst *Inst) {                                           \
-    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
-    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
-                                      getOpLocation(Inst->getLoc()),           \
-                                      getOpValue(Inst->getOperand())));        \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
@@ -2089,7 +2089,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   remapOpenedType(cast<OpenedArchetypeType>(openedType));
 
   if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
-          Inst->getModule(), ExistentialRepresentation::Class)) {
+          ExistentialRepresentation::Class)) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     recordClonedInstruction(Inst, getBuilder().createOpenExistentialMetatype(
                                       getOpLocation(Inst->getLoc()),
@@ -2447,7 +2447,8 @@ SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCondFail(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
+                                        getOpValue(Inst->getOperand()),
+                                        Inst->getMessage()));
 }
 
 template<typename ImplClass>

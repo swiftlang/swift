@@ -38,13 +38,19 @@ namespace {
 static
 Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
   return llvm::StringSwitch<Optional<PlatformConditionKind>>(Name)
-    .Case("os", PlatformConditionKind::OS)
-    .Case("arch", PlatformConditionKind::Arch)
-    .Case("_endian", PlatformConditionKind::Endianness)
-    .Case("_runtime", PlatformConditionKind::Runtime)
-    .Case("canImport", PlatformConditionKind::CanImport)
-    .Case("targetEnvironment", PlatformConditionKind::TargetEnvironment)
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+    .Case(IDENTIFIER, PlatformConditionKind::LABEL)
+#include "swift/AST/PlatformConditionKinds.def"
     .Default(None);
+}
+
+/// Get platform condition name from PlatformConditionKind.
+static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
+  switch (Kind) {
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
+  case PlatformConditionKind::LABEL: return IDENTIFIER;
+#include "swift/AST/PlatformConditionKinds.def"
+  }
 }
 
 /// Extract source text of the expression.
@@ -265,9 +271,10 @@ public:
       return nullptr;
     }
 
-    std::vector<StringRef> suggestions;
+    PlatformConditionKind suggestedKind = *Kind;
+    std::vector<StringRef> suggestedValues;
     if (!LangOptions::checkPlatformConditionSupported(*Kind, *ArgStr,
-                                                      suggestions)) {
+                                                      suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
         D.diagnose(Arg->getLoc(),
@@ -294,7 +301,12 @@ public:
       auto Loc = Arg->getLoc();
       D.diagnose(Loc, diag::unknown_platform_condition_argument,
                  DiagName, *KindName);
-      for (auto suggestion : suggestions)
+      if (suggestedKind != *Kind) {
+        auto suggestedKindName = getPlatformConditionName(suggestedKind);
+        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
+          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+      }
+      for (auto suggestion : suggestedValues)
         D.diagnose(Loc, diag::note_typo_candidate, suggestion)
           .fixItReplace(Arg->getSourceRange(), suggestion);
     }
@@ -651,16 +663,11 @@ ParserResult<IfConfigDecl> Parser::parseIfConfig(
     SmallVector<ASTNode, 16> Elements;
     if (isActive || !isVersionCondition) {
       parseElements(Elements, isActive);
-    } else if (SyntaxContext->isEnabled()) {
-      // We shouldn't skip code if we are building syntax tree.
+    } else {
       // The parser will keep running and we just discard the AST part.
       DiagnosticSuppression suppression(Context.Diags);
       SmallVector<ASTNode, 16> dropedElements;
       parseElements(dropedElements, false);
-    } else {
-      DiagnosticTransaction DT(Diags);
-      skipUntilConditionalBlockClose();
-      DT.abort();
     }
 
     Clauses.emplace_back(ClauseLoc, Condition,

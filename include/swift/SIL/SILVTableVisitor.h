@@ -99,6 +99,12 @@ template <class T> class SILVTableVisitor {
     maybeAddEntry(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
   }
 
+  void maybeAddAccessors(AbstractStorageDecl *asd) {
+    asd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
+      maybeAddMethod(accessor);
+    });
+  }
+
   void maybeAddEntry(SILDeclRef declRef) {
     // Introduce a new entry if required.
     if (declRef.requiresNewVTableEntry())
@@ -134,10 +140,14 @@ template <class T> class SILVTableVisitor {
   }
 
   void maybeAddMember(Decl *member) {
-    if (auto *fd = dyn_cast<FuncDecl>(member))
+    if (auto *ad = dyn_cast<AccessorDecl>(member))
+      /* handled as part of its storage */;
+    else if (auto *fd = dyn_cast<FuncDecl>(member))
       maybeAddMethod(fd);
     else if (auto *cd = dyn_cast<ConstructorDecl>(member))
       maybeAddConstructor(cd);
+    else if (auto *asd = dyn_cast<AbstractStorageDecl>(member))
+      maybeAddAccessors(asd);
     else if (auto *placeholder = dyn_cast<MissingMemberDecl>(member))
       asDerived().addPlaceholder(placeholder);
   }
@@ -156,7 +166,7 @@ protected:
     // forced at the end.
     SortedFuncList synthesizedMembers;
 
-    for (auto member : theClass->getMembers()) {
+    for (auto member : theClass->getEmittedMembers()) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(member)) {
         if (afd->isSynthesized()) {
           synthesizedMembers.add(afd);

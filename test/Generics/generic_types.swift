@@ -189,7 +189,7 @@ var yarray : YArray = [1, 2, 3]
 var xarray : XArray = [1, 2, 3]
 
 // Type parameters can be referenced only via unqualified name lookup
-struct XParam<T> {
+struct XParam<T> { // expected-note{{'XParam' declared here}}
   func foo(_ x: T) {
     _ = x as T
   }

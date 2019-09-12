@@ -100,31 +100,29 @@ open class User {
   // CHECK-RECOVERY: var unwrappedProp: Int32?
   public var unwrappedProp: UnwrappedInt?
   // CHECK: var wrappedProp: WrappedInt?
-  // CHECK-RECOVERY: /* placeholder for _ */
-  // CHECK-RECOVERY: /* placeholder for _ */
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK_RECOVERY: /* placeholder for wrappedProp (vtable entries: 3) (field offsets: 1) */
   public var wrappedProp: WrappedInt?
 
   // CHECK: func returnsUnwrappedMethod() -> UnwrappedInt
   // CHECK-RECOVERY: func returnsUnwrappedMethod() -> Int32
   public func returnsUnwrappedMethod() -> UnwrappedInt { fatalError() }
   // CHECK: func returnsWrappedMethod() -> WrappedInt
-  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() */
+  // CHECK-RECOVERY: /* placeholder for returnsWrappedMethod() (vtable entries: 1) */
   public func returnsWrappedMethod() -> WrappedInt { fatalError() }
 
   // CHECK: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == UnwrappedInt
   // CHECK-RECOVERY: func constrainedUnwrapped<T>(_: T) where T : HasAssoc, T.Assoc == Int32
   public func constrainedUnwrapped<T: HasAssoc>(_: T) where T.Assoc == UnwrappedInt { fatalError() }
   // CHECK: func constrainedWrapped<T>(_: T) where T : HasAssoc, T.Assoc == WrappedInt
-  // CHECK-RECOVERY: /* placeholder for constrainedWrapped(_:) */
+  // CHECK-RECOVERY: /* placeholder for constrainedWrapped(_:) (vtable entries: 1) */
   public func constrainedWrapped<T: HasAssoc>(_: T) where T.Assoc == WrappedInt { fatalError() }
 
   // CHECK: subscript(_: WrappedInt) -> () { get }
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript(_: WrappedInt) -> () { return () }
 
   // CHECK: subscript<T>(_: T) -> () where T : HasAssoc, T.Assoc == WrappedInt { get }
-  // CHECK-RECOVERY: /* placeholder for _ */
+  // CHECK-RECOVERY: /* placeholder for subscript(_:) (vtable entries: 1) */
   public subscript<T: HasAssoc>(_: T) -> () where T.Assoc == WrappedInt { return () }
 
   // CHECK: init()
@@ -132,7 +130,7 @@ open class User {
   public init() {}
 
   // CHECK: init(wrapped: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) (vtable entries: 1) */
   public init(wrapped: WrappedInt) {}
 
   // CHECK: convenience init(conveniently: Int)
@@ -144,11 +142,11 @@ open class User {
   public convenience init<T: HasAssoc>(generic: T) where T.Assoc == WrappedInt { self.init() }
 
   // CHECK: required init(wrappedRequired: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) (vtable entries: 1) */
   public required init(wrappedRequired: WrappedInt) {}
 
   // CHECK: {{^}} init(wrappedRequiredInSub: WrappedInt)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) (vtable entries: 1) */
   public init(wrappedRequiredInSub: WrappedInt) {}
 
   // CHECK: dynamic init(wrappedDynamic: WrappedInt)
@@ -247,15 +245,15 @@ open class UserDynamicConvenience {
 // CHECK-RECOVERY-LABEL: class UserSub
 open class UserSub : User {
   // CHECK: init(wrapped: WrappedInt?)
-  // CHECK-RECOVERY: /* placeholder for init(wrapped:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrapped:) (vtable entries: 1) */
   public override init(wrapped: WrappedInt?) { super.init() }
 
   // CHECK: required init(wrappedRequired: WrappedInt?)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequired:) (vtable entries: 1) */
   public required init(wrappedRequired: WrappedInt?) { super.init() }
 
   // CHECK: required init(wrappedRequiredInSub: WrappedInt?)
-  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) */
+  // CHECK-RECOVERY: /* placeholder for init(wrappedRequiredInSub:) (vtable entries: 1) */
   public required override init(wrappedRequiredInSub: WrappedInt?) { super.init() }
 
   // CHECK: required init(wrappedRequiredDynamic: WrappedInt)

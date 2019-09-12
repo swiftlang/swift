@@ -32,6 +32,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -1432,7 +1433,7 @@ llvm::Constant *IRGenModule::getAssociatedTypeWitness(Type type,
   auto role = inProtocolContext
     ? MangledTypeRefRole::DefaultAssociatedTypeWitness
     : MangledTypeRefRole::Metadata;
-  auto typeRef = getTypeRef(type, /*generic signature*/nullptr, role);
+  auto typeRef = getTypeRef(type, /*generic signature*/nullptr, role).first;
 
   // Set the low bit to indicate that this is a mangled name.
   auto witness = llvm::ConstantExpr::getPtrToInt(typeRef, IntPtrTy);
@@ -1566,17 +1567,6 @@ void WitnessTableBuilder::defineAssociatedTypeWitnessTableAccessFunction(
   IGF.bindLocalTypeDataFromTypeMetadata(ConcreteType, IsExact, self,
                                         MetadataState::Abstract);
 
-  // If the associated type is opaque, use the runtime to fetch the conformance.
-  if (associatedRootOpaqueType) {
-    assert(associatedType == CanType(associatedRootOpaqueType)
-           && "associated type is nested type of opaque type?! not implemented");
-    auto wtable = emitOpaqueTypeWitnessTableRef(IGF,
-                          CanOpaqueTypeArchetypeType(associatedRootOpaqueType),
-                          associatedProtocol);
-    IGF.Builder.CreateRet(wtable);
-    return;
-  }
-  
   // Find abstract conformances.
   // TODO: provide an API to find the best metadata path to the conformance
   // and decide whether it's expensive enough to be worth caching.
@@ -2750,6 +2740,12 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(proto)
          && "protocol does not have witness tables?!");
 
+  // Look through any opaque types we're allowed to.
+  if (srcType->hasOpaqueArchetype()) {
+    std::tie(srcType, conformance) =
+      IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType, conformance);
+  }
+  
   // If we don't have concrete conformance information, the type must be
   // an archetype and the conformance must be via one of the protocol
   // requirements of the archetype. Look at what's locally bound.
@@ -2963,6 +2959,10 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  NominalTypeDecl *typeDecl)
     : TheDecl(typeDecl) {
+
+  // FIXME: Remove this once getGenericSignature() is a request.
+  if (!typeDecl->hasInterfaceType())
+    IGM.Context.getLazyResolver()->resolveDeclSignature(typeDecl);
 
   // We only need to do something here if the declaration context is
   // somehow generic.

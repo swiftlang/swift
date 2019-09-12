@@ -14,13 +14,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/GenericSignatureBuilder.h"
-#include "swift/Basic/LLVMContext.h"
-#include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/LLVMContext.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Attributes.h"
@@ -159,7 +160,7 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
   SmallVector<ParamDecl*, 4> params;
   for (Type argType : argTypes) {
     auto PD = new (Context)
-        ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), Identifier(), DC);
     PD->setInterfaceType(argType);
     PD->setValidationToChecked();
@@ -191,7 +192,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericEnvironment *Env) {
+                          GenericSignature *Sig) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -202,7 +203,7 @@ getBuiltinGenericFunction(Identifier Id,
   for (unsigned i = 0, e = ArgParamTypes.size(); i < e; i++) {
     auto paramIfaceType = ArgParamTypes[i].getPlainType();
     auto specifier =
-      VarDecl::getParameterSpecifierForValueOwnership(
+      ParamDecl::getParameterSpecifierForValueOwnership(
         ArgParamTypes[i].getParameterFlags().getValueOwnership());
     auto PD = new (Context) ParamDecl(specifier,
                                       SourceLoc(), SourceLoc(),
@@ -226,7 +227,7 @@ getBuiltinGenericFunction(Identifier Id,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
 
-  func->setGenericEnvironment(Env);
+  func->setGenericSignature(Sig);
   func->computeType();
   func->setValidationToChecked();
   func->setImplicit();
@@ -428,7 +429,6 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  SmallVector<ProtocolDecl *, 1> protos;
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
@@ -458,7 +458,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericEnvironment *GenericEnv = nullptr;
+    GenericSignature *GenericSig = nullptr;
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -468,14 +468,17 @@ namespace {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
-      GenericSignatureBuilder Builder(ctx);
+      SmallVector<GenericTypeParamType *, 2> genericParamTypes;
       for (auto gp : GenericTypeParams) {
-        Builder.addGenericParameter(gp);
+        genericParamTypes.push_back(
+            gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
 
-      auto GenericSig =
-        std::move(Builder).computeGenericSignature(SourceLoc());
-      GenericEnv = GenericSig->createGenericEnvironment();
+      GenericSig = evaluateOrDefault(
+          ctx.evaluator,
+          AbstractGenericSignatureRequest{
+            nullptr, std::move(genericParamTypes), { }},
+          nullptr);
     }
 
     template <class G>
@@ -495,7 +498,7 @@ namespace {
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericEnv);
+                                       GenericSig);
     }
 
     // Don't use these generator classes directly; call the make{...}
@@ -727,6 +730,13 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
 }
 
 static ValueDecl *getIsPODOperation(ASTContext &Context, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
+  return builder.build(Id);
+}
+
+static ValueDecl *getIsConcrete(ASTContext &Context, Identifier Id) {
   BuiltinGenericSignatureBuilder builder(Context);
   builder.addParameter(makeMetatype(makeGenericParam()));
   builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
@@ -1034,11 +1044,19 @@ static ValueDecl *getCanBeObjCClassOperation(ASTContext &Context,
   return builder.build(Id);
 }
 
-static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
+static ValueDecl *getLegacyCondFailOperation(ASTContext &C, Identifier Id) {
   // Int1 -> ()
   auto CondTy = BuiltinIntegerType::get(1, C);
   auto VoidTy = TupleType::getEmpty(C);
   return getBuiltinFunction(Id, {CondTy}, VoidTy);
+}
+
+static ValueDecl *getCondFailOperation(ASTContext &C, Identifier Id) {
+  // Int1 -> ()
+  auto CondTy = BuiltinIntegerType::get(1, C);
+  auto MsgTy = C.TheRawPointerType;
+  auto VoidTy = TupleType::getEmpty(C);
+  return getBuiltinFunction(Id, {CondTy, MsgTy}, VoidTy);
 }
 
 static ValueDecl *getAssertConfOperation(ASTContext &C, Identifier Id) {
@@ -1845,6 +1863,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   case BuiltinValueKind::IsPOD:
     return getIsPODOperation(Context, Id);
 
+  case BuiltinValueKind::IsConcrete:
+    return getIsConcrete(Context, Id);
+
   case BuiltinValueKind::IsBitwiseTakable:
     return getIsBitwiseTakable(Context, Id);
 
@@ -1888,11 +1909,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (!Types.empty()) return nullptr;
     return getAddressOfOperation(Context, Id);
 
+  case BuiltinValueKind::LegacyCondFail:
+    return getLegacyCondFailOperation(Context, Id);
+
   case BuiltinValueKind::AddressOfBorrow:
     if (!Types.empty()) return nullptr;
     return getAddressOfBorrowOperation(Context, Id);
 
-  case BuiltinValueKind::CondFail:
+  case BuiltinValueKind::CondFailMessage:
     return getCondFailOperation(Context, Id);
 
   case BuiltinValueKind::AssertConf:
@@ -2007,4 +2031,104 @@ StringRef swift::getBuiltinName(BuiltinValueKind ID) {
 #include "swift/AST/Builtins.def"
   }
   llvm_unreachable("bad BuiltinValueKind");
+}
+
+BuiltinTypeKind BuiltinType::getBuiltinTypeKind() const {
+  // If we do not have a vector or an integer our job is easy.
+  return BuiltinTypeKind(std::underlying_type<TypeKind>::type(getKind()));
+}
+
+StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
+                                   bool prependBuiltinNamespace) const {
+#ifdef MAYBE_GET_NAMESPACED_BUILTIN
+#error                                                                         \
+    "We define MAYBE_GET_NAMESPACED_BUILTIN here. Do not define before this?!"
+#endif
+#define MAYBE_GET_NAMESPACED_BUILTIN(NAME)                                     \
+  ((prependBuiltinNamespace) ? NAME : NAME.getWithoutPrefix())
+
+  llvm::raw_svector_ostream printer(result);
+  switch (getBuiltinTypeKind()) {
+  case BuiltinTypeKind::BuiltinRawPointer:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_RAWPOINTER);
+    break;
+  case BuiltinTypeKind::BuiltinNativeObject:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinUnknownObject:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinBridgeObject:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);
+    break;
+  case BuiltinTypeKind::BuiltinUnsafeValueBuffer:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(
+        BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER);
+    break;
+  case BuiltinTypeKind::BuiltinIntegerLiteral:
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_INTLITERAL);
+    break;
+  case BuiltinTypeKind::BuiltinVector: {
+    const auto *t = cast<const BuiltinVectorType>(this);
+    llvm::SmallString<32> UnderlyingStrVec;
+    StringRef UnderlyingStr;
+    {
+      // FIXME: Ugly hack: remove the .Builtin from the element type.
+      {
+        llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
+        t->getElementType().print(UnderlyingOS);
+      }
+      if (UnderlyingStrVec.startswith(BUILTIN_TYPE_NAME_PREFIX))
+        UnderlyingStr = UnderlyingStrVec.substr(8);
+      else
+        UnderlyingStr = UnderlyingStrVec;
+    }
+
+    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_VEC)
+            << t->getNumElements() << "x" << UnderlyingStr;
+    break;
+  }
+  case BuiltinTypeKind::BuiltinInteger: {
+    auto width = cast<const BuiltinIntegerType>(this)->getWidth();
+    if (width.isFixedWidth()) {
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_INT)
+              << width.getFixedWidth();
+      break;
+    }
+
+    if (width.isPointerWidth()) {
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_WORD);
+      break;
+    }
+
+    llvm_unreachable("impossible bit width");
+  }
+  case BuiltinTypeKind::BuiltinFloat: {
+    switch (cast<const BuiltinFloatType>(this)->getFPKind()) {
+    case BuiltinFloatType::IEEE16:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "16";
+      break;
+    case BuiltinFloatType::IEEE32:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "32";
+      break;
+    case BuiltinFloatType::IEEE64:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "64";
+      break;
+    case BuiltinFloatType::IEEE80:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "80";
+      break;
+    case BuiltinFloatType::IEEE128:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT) << "128";
+      break;
+    case BuiltinFloatType::PPC128:
+      printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_FLOAT_PPC)
+              << "128";
+      break;
+    }
+    break;
+  }
+  }
+#undef MAYBE_GET_NAMESPACED_BUILTIN
+
+  return printer.str();
 }

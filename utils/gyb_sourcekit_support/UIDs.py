@@ -171,6 +171,9 @@ UID_KEYS = [
     KEY('ExpressionType', 'key.expression_type'),
     KEY('CanonicalizeType', 'key.canonicalize_type'),
     KEY('InternalDiagnostic', "key.internal_diagnostic"),
+    KEY('VFSName', 'key.vfs.name'),
+    KEY('VFSOptions', 'key.vfs.options'),
+    KEY('Files', 'key.files'),
 ]
 
 

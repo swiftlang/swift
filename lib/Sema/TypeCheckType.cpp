@@ -91,10 +91,7 @@ GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   assert(stage == TypeResolutionStage::Interface);
   if (!complete.builder) {
     auto genericSig = getGenericSignature();
-    ASTContext &ctx = genericSig->getASTContext();
-    complete.builder = ctx.getOrCreateGenericSignatureBuilder(
-                                          genericSig->getCanonicalSignature());
-
+    complete.builder = genericSig->getGenericSignatureBuilder();
   }
 
   return complete.builder;
@@ -536,11 +533,20 @@ Type TypeChecker::resolveTypeInContext(
             parentDC = parentDC->getParent()) {
         if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
           auto extendedType = ext->getExtendedType();
+          if (auto *unboundGeneric = dyn_cast<UnboundGenericType>(extendedType.getPointer())) {
+            if (auto *ugAliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
+              if (ugAliasDecl == aliasDecl)
+                return resolution.mapTypeIntoContext(
+                  aliasDecl->getDeclaredInterfaceType());
+
+              extendedType = unboundGeneric->getParent();
+              continue;
+            }
+          }
           if (auto *aliasType = dyn_cast<TypeAliasType>(extendedType.getPointer())) {
-            if (aliasType->getDecl() == aliasDecl) {
+            if (aliasType->getDecl() == aliasDecl)
               return resolution.mapTypeIntoContext(
                   aliasDecl->getDeclaredInterfaceType());
-            }
 
             extendedType = aliasType->getParent();
             continue;
@@ -828,10 +834,10 @@ Type TypeChecker::applyUnboundGenericArguments(
     skipRequirementsCheck |= parentType->hasTypeVariable();
   } else if (auto genericEnv =
                  decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-    auto subMap = genericEnv->getForwardingSubstitutionMap();
-    for (auto gp : subMap.getGenericSignature()->getGenericParams()) {
+    auto genericSig = genericEnv->getGenericSignature();
+    for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        Type(gp).subst(subMap);
+        genericEnv->mapTypeIntoContext(gp);
     }
   }
 
@@ -883,8 +889,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformance(dc),
-                                SubstFlags::UseErrorType);
+                                LookUpConformance(dc));
 
   // Form a sugared typealias reference.
   Type parentType = unboundType->getParent();
@@ -928,19 +933,18 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
                                            SourceLoc loc,
                                            TypeDecl *typeDecl) {
   auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
-  if (!protocol)
-    return;
 
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
-  if (auto conformanceRef = TypeChecker::conformsToProtocol(
-          parentTy, protocol, dc,
-          (ConformanceCheckFlags::InExpression |
-           ConformanceCheckFlags::SuppressDependencyTracking |
-           ConformanceCheckFlags::SkipConditionalRequirements))) {
-    if (conformanceRef->isConcrete())
-      conformance = conformanceRef->getConcrete();
-  }
+  if (protocol)
+    if (auto conformanceRef = TypeChecker::conformsToProtocol(
+            parentTy, protocol, dc,
+            (ConformanceCheckFlags::InExpression |
+             ConformanceCheckFlags::SuppressDependencyTracking |
+             ConformanceCheckFlags::SkipConditionalRequirements))) {
+      if (conformanceRef->isConcrete())
+        conformance = conformanceRef->getConcrete();
+    }
 
   // If any errors have occurred, don't bother diagnosing this cross-file
   // issue.
@@ -949,7 +953,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
     return;
 
   auto diagCode =
-      (conformance && !conformance->getConditionalRequirementsIfAvailable())
+    (!protocol || (conformance && !conformance->getConditionalRequirementsIfAvailable()))
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
@@ -1216,6 +1220,12 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
                      comp->getIdentifier(), parentType)
         .highlight(parentRange);
+      // Note where the type was defined, this can help diagnose if the user
+      // expected name lookup to find a module when there's a conflicting type.
+      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
+        ctx.Diags.diagnose(typeDecl, diag::decl_declared_here,
+                           typeDecl->getFullName());
+      }
     }
   }
   return ErrorType::get(ctx);
@@ -2040,8 +2050,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          TypeResolutionOptions options) {
   // Convenience to grab the source range of a type attribute.
   auto getTypeAttrRangeWithAt = [](ASTContext &ctx, SourceLoc attrLoc) {
-    return SourceRange(attrLoc.getAdvancedLoc(-1),
-                       Lexer::getLocForEndOfToken(ctx.SourceMgr, attrLoc));
+    return SourceRange(attrLoc, attrLoc.getAdvancedLoc(1));
 
   };
 
@@ -2248,6 +2257,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
+          
+          if (attrs.has(TAK_autoclosure)) {
+            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
+            if (rep == FunctionType::Representation::CFunctionPointer ||
+                rep == FunctionType::Representation::Block) {
+              diagnose(attrs.getLoc(TAK_convention),
+                       diag::invalid_autoclosure_and_convention_attributes,
+                       attrs.getConvention());
+              attrs.clearAttribute(TAK_convention);
+            }
+          }
         }
       }
 
@@ -3431,7 +3451,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
       return ErrorType::get(memberType);
 
     subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
-    resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+    resultType = memberType.subst(subs);
   } else {
     resultType = memberType;
   }

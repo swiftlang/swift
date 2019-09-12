@@ -1729,9 +1729,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
 /// Returns true if it is expected that the macro is ignored.
 static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
-  // Ignore include guards.
-  if (macro->isUsedForHeaderGuard())
-    return true;
+  // Ignore include guards. Try not to ignore definitions of useful constants,
+  // which may end up looking like include guards.
+  if (macro->isUsedForHeaderGuard() && macro->getNumTokens() == 1) {
+    auto tok = macro->tokens()[0];
+    if (tok.isLiteral()
+        && StringRef(tok.getLiteralData(), tok.getLength()) == "1")
+      return true;
+  }
 
   // If there are no tokens, there is nothing to convert.
   if (macro->tokens_empty())

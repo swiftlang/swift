@@ -131,8 +131,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitExtensionDecl(ExtensionDecl *ED) {
-    if (doIt(ED->getExtendedTypeLoc()))
-      return true;
+    if (auto *typeRepr = ED->getExtendedTypeRepr())
+      if (doIt(typeRepr))
+        return true;
     for (auto &Inherit : ED->getInherited()) {
       if (doIt(Inherit))
         return true;
@@ -146,12 +147,24 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     for (Decl *M : ED->getMembers()) {
       if (doIt(M))
         return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        // Pretend that accessors share a parent with the storage.
+        //
+        // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+        // children of the storage instead.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(M)) {
+          for (auto AD : ASD->getAllAccessors()) {
+            if (doIt(AD))
+              return true;
+          }
+        }
+      }
     }
     return false;
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    // If there is a single variable, walk it's attributes.
     bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       isPropertyWrapperBackingProperty =
@@ -277,9 +290,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       }
     }
     
-    for (Decl *Member : NTD->getMembers())
+    for (Decl *Member : NTD->getMembers()) {
       if (doIt(Member))
         return true;
+
+      if (Walker.shouldWalkAccessorsTheOldWay()) {
+        // Pretend that accessors share a parent with the storage.
+        //
+        // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+        // children of the storage instead.
+        if (auto *ASD = dyn_cast<AbstractStorageDecl>(Member)) {
+          for (auto AD : ASD->getAllAccessors()) {
+            if (doIt(AD))
+              return true;
+          }
+        }
+      }
+    }
     return false;
   }
 
@@ -289,6 +316,12 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitVarDecl(VarDecl *VD) {
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : VD->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
     return false;
   }
 
@@ -309,6 +342,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
           return true;
       }
     }
+
+    if (!Walker.shouldWalkAccessorsTheOldWay()) {
+      for (auto *AD : SD->getAllAccessors())
+        if (doIt(AD))
+          return true;
+    }
+
     return false;
   }
 
@@ -472,8 +512,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     if (auto oldAppendingExpr = E->getAppendingExpr()) {
       if (auto appendingExpr = doIt(oldAppendingExpr))
         E->setAppendingExpr(dyn_cast<TapExpr>(appendingExpr));
@@ -484,8 +522,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
-    HANDLE_SEMANTIC_EXPR(E);
-
     if (Expr *arg = E->getArg()) {
       if (Expr *arg2 = doIt(arg)) {
         E->setArg(arg2);
@@ -1079,6 +1115,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
 
+  Expr *visitOneWayExpr(OneWayExpr *E) {
+    if (auto oldSubExpr = E->getSubExpr()) {
+      if (auto subExpr = doIt(oldSubExpr)) {
+        E->setSubExpr(subExpr);
+      } else {
+        return nullptr;
+      }
+    }
+
+    return E;
+  }
+
   Expr *visitTapExpr(TapExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {
       if (auto subExpr = doIt(oldSubExpr)) {
@@ -1357,8 +1405,22 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
-    if (doIt(Elem.get<Decl*>()))
+    auto *D = Elem.get<Decl*>();
+    if (doIt(D))
       return nullptr;
+
+    if (Walker.shouldWalkAccessorsTheOldWay()) {
+      // Pretend that accessors share a parent with the storage.
+      //
+      // FIXME: Update existing ASTWalkers to deal with accessors appearing as
+      // children of the storage instead.
+      if (auto *ASD = dyn_cast<AbstractStorageDecl>(D)) {
+        for (auto AD : ASD->getAllAccessors()) {
+          if (doIt(AD))
+            return nullptr;
+        }
+      }
+    }
   }
 
   return BS;

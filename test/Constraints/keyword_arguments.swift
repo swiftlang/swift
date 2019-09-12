@@ -399,7 +399,7 @@ func acceptTuple1<T>(_ x: (T, Bool)) { }
 
 acceptTuple1(produceTuple1())
 acceptTuple1((1, false))
-acceptTuple1(1, false) // expected-error {{global function 'acceptTuple1' expects a single parameter of type '(T, Bool)'}} {{14-14=(}} {{22-22=)}}
+acceptTuple1(1, false) // expected-error {{global function 'acceptTuple1' expects a single parameter of type '(T, Bool)' [with T = Int]}} {{14-14=(}} {{22-22=)}}
 
 func acceptTuple2<T>(_ input : T) -> T { return input }
 var tuple1 = (1, "hello")

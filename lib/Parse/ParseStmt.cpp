@@ -26,6 +26,7 @@
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -122,6 +123,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
 
   if (Tok.is(tok::pound) && Tok.isAtStartOfLine() &&
       peekToken().is(tok::code_complete)) {
+    SyntaxParsingContext CCCtxt(SyntaxContext, SyntaxContextKind::Decl);
     consumeToken();
     if (CodeCompletion)
       CodeCompletion->completeAfterPoundDirective();
@@ -249,6 +251,8 @@ bool Parser::isTerminatorForBraceItemListKind(BraceItemListKind Kind,
 
 void Parser::consumeTopLevelDecl(ParserPosition BeginParserPosition,
                                  TopLevelCodeDecl *TLCD) {
+  SyntaxParsingContext Discarding(SyntaxContext);
+  Discarding.setDiscard();
   SourceLoc EndLoc = PreviousLoc;
   backtrackToPosition(BeginParserPosition);
   SourceLoc BeginLoc = Tok.getLoc();
@@ -468,7 +472,8 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       SourceLoc StartLoc = Tok.getLoc();
       auto CD = cast<ConstructorDecl>(CurDeclContext);
       // Hint at missing 'self.' or 'super.' then skip this statement.
-      bool isSelf = !CD->isDesignatedInit() || !isa<ClassDecl>(CD->getParent());
+      bool isSelf = CD->getAttrs().hasAttribute<ConvenienceAttr>() ||
+                    !isa<ClassDecl>(CD->getParent());
       diagnose(StartLoc, diag::invalid_nested_init, isSelf)
         .fixItInsert(StartLoc, isSelf ? "self." : "super.");
       NeedParseErrorRecovery = true;
@@ -988,10 +993,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
     if (Body.isNull())
       return nullptr;
     Status |= Body;
-    tempDecl->setBody(Body.get());
+    tempDecl->setBodyParsed(Body.get());
   }
   
-  SourceLoc loc = tempDecl->getBody()->getStartLoc();
+  SourceLoc loc = tempDecl->getBodySourceRange().Start;
 
   // Form the call, which will be emitted on any path that needs to run the
   // code.
@@ -1108,7 +1113,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto loc = P.Tok.getLoc();
     auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*IsStatic*/false,
-                                       VarDecl::Specifier::Let,
+                                       VarDecl::Introducer::Let,
                                        /*IsCaptureList*/false, loc, errorName,
                                        P.CurDeclContext);
     var->setImplicit();
@@ -2335,7 +2340,7 @@ parseStmtCase(Parser &P, SourceLoc &CaseLoc,
     for (unsigned i : indices(tmp)) {
       auto *vOld = tmp[i];
       auto *vNew = new (P.Context) VarDecl(
-          /*IsStatic*/ false, vOld->getSpecifier(), false /*IsCaptureList*/,
+          /*IsStatic*/ false, vOld->getIntroducer(), false /*IsCaptureList*/,
           vOld->getNameLoc(), vOld->getName(), vOld->getDeclContext());
       vNew->setHasNonPatternBindingInit();
       vNew->setImplicit();

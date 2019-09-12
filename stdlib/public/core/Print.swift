@@ -158,7 +158,7 @@ public func debugPrint(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
-public func print<Target : TextOutputStream>(
+public func print<Target: TextOutputStream>(
   _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
@@ -205,7 +205,7 @@ public func print<Target : TextOutputStream>(
 ///     default is a newline (`"\n"`).
 ///   - output: An output stream to receive the text representation of each
 ///     item.
-public func debugPrint<Target : TextOutputStream>(
+public func debugPrint<Target: TextOutputStream>(
   _ items: Any...,
   separator: String = " ",
   terminator: String = "\n",
@@ -214,7 +214,7 @@ public func debugPrint<Target : TextOutputStream>(
   _debugPrint(items, separator: separator, terminator: terminator, to: &output)
 }
 
-internal func _print<Target : TextOutputStream>(
+internal func _print<Target: TextOutputStream>(
   _ items: [Any],
   separator: String = " ",
   terminator: String = "\n",
@@ -231,7 +231,7 @@ internal func _print<Target : TextOutputStream>(
   output.write(terminator)
 }
 
-internal func _debugPrint<Target : TextOutputStream>(
+internal func _debugPrint<Target: TextOutputStream>(
   _ items: [Any],
   separator: String = " ",
   terminator: String = "\n",

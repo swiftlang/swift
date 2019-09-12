@@ -98,6 +98,7 @@ public class A_Sub2: A_Sub {
 // CHECK-RECOVERY-NEXT: func nullabilityChangeMethod() -> Any?
 // CHECK-RECOVERY-NEXT: func typeChangeMethod() -> Any
 // CHECK-RECOVERY-NEXT: func disappearingMethodWithOverload()
+// CHECK-RECOVERY-NEXT: /* placeholder for disappearingProperty */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -141,6 +142,7 @@ public class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class C1_IndexedSubscriptDisappears : IndexedSubscriptDisappearsBase {
+// CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -155,6 +157,7 @@ public class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class C2_KeyedSubscriptDisappears : KeyedSubscriptDisappearsBase {
+// CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -169,6 +172,7 @@ public class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisap
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class C3_GenericIndexedSubscriptDisappears : GenericIndexedSubscriptDisappearsBase<Base> {
+// CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -183,6 +187,7 @@ public class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappear
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class C4_GenericKeyedSubscriptDisappears : GenericKeyedSubscriptDisappearsBase<Base> {
+// CHECK-RECOVERY-NEXT: /* placeholder for subscript(_:) */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 
@@ -329,6 +334,7 @@ public class E1_MethodWithDisappearingType : MethodWithDisappearingType {
 // CHECK-NEXT: {{^}$}}
 
 // CHECK-RECOVERY-LABEL: class E1_MethodWithDisappearingType : MethodWithDisappearingType {
+// CHECK-RECOVERY-NEXT: /* placeholder for boxItUp() */
 // CHECK-RECOVERY-NEXT: init()
 // CHECK-RECOVERY-NEXT: {{^}$}}
 

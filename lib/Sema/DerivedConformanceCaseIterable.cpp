@@ -39,7 +39,8 @@ static bool canDeriveConformance(NominalTypeDecl *type) {
 }
 
 /// Derive the implementation of allCases for a "simple" no-payload enum.
-void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
+std::pair<BraceStmt *, bool>
+deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
   auto *parentDC = funcDecl->getDeclContext();
   auto *parentEnum = parentDC->getSelfEnumDecl();
   auto enumTy = parentDC->getDeclaredTypeInContext();
@@ -57,7 +58,7 @@ void deriveCaseIterable_enum_getter(AbstractFunctionDecl *funcDecl, void *) {
   auto *returnStmt = new (C) ReturnStmt(SourceLoc(), arrayExpr);
   auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                  SourceLoc());
-  funcDecl->setBody(body);
+  return { body, /*isTypeChecked=*/false };
 }
 
 static ArraySliceType *computeAllCasesType(NominalTypeDecl *enumDecl) {
@@ -109,7 +110,7 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 
-  addMembersToConformanceContext({getterDecl, propDecl, pbDecl});
+  addMembersToConformanceContext({propDecl, pbDecl});
 
   return propDecl;
 }

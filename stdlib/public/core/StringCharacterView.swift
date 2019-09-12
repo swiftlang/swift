@@ -201,7 +201,7 @@ extension String: BidirectionalCollection {
 
   @inlinable @inline(__always)
   internal func _characterStride(startingAt i: Index) -> Int {
-    _internalInvariant(i._isScalarAligned)
+    _internalInvariant_5_1(i._isScalarAligned)
 
     // Fast check if it's already been measured, otherwise check resiliently
     if let d = i.characterStride { return d }
@@ -213,7 +213,7 @@ extension String: BidirectionalCollection {
 
   @inlinable @inline(__always)
   internal func _characterStride(endingAt i: Index) -> Int {
-    _internalInvariant(i._isScalarAligned)
+    _internalInvariant_5_1(i._isScalarAligned)
 
     if i == startIndex { return 0 }
 

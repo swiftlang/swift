@@ -1190,7 +1190,7 @@ FUNCTION(IsOptionalType,
 FUNCTION(Once, swift_once, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(OnceTy->getPointerTo(), Int8PtrTy, Int8PtrTy),
-         ATTRS())
+         ATTRS(NoUnwind))
 
 // void swift_registerProtocols(const ProtocolRecord *begin,
 //                              const ProtocolRecord *end)
@@ -1397,6 +1397,17 @@ FUNCTION(IntToFloat64, swift_intToFloat64, SwiftCC, AlwaysAvailable,
          RETURNS(DoubleTy),
          ARGS(SizeTy->getPointerTo(), SizeTy),
          ATTRS(NoUnwind, ReadOnly))
+
+// const Metadata *swift_getTypeByMangledNameInContext(
+//                        const char *typeNameStart,
+//                        size_t typeNameLength,
+//                        const TargetContextDescriptor<InProcess> *context,
+//                        const void * const *genericArgs)
+FUNCTION(GetTypeByMangledNameInContext, swift_getTypeByMangledNameInContext,
+         SwiftCC, AlwaysAvailable,
+         RETURNS(TypeMetadataPtrTy),
+         ARGS(Int8PtrTy, SizeTy, TypeContextDescriptorPtrTy, Int8PtrPtrTy),
+         ATTRS(NoUnwind, ArgMemOnly))
 
 #undef RETURNS
 #undef ARGS

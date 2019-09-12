@@ -185,16 +185,16 @@ extension Character :
   }
 }
 
-extension Character : CustomStringConvertible {
+extension Character: CustomStringConvertible {
  @inlinable
  public var description: String {
    return _str
  }
 }
 
-extension Character : LosslessStringConvertible { }
+extension Character: LosslessStringConvertible { }
 
-extension Character : CustomDebugStringConvertible {
+extension Character: CustomDebugStringConvertible {
  /// A textual representation of the character, suitable for debugging.
  public var debugDescription: String {
    return _str.debugDescription
@@ -211,7 +211,7 @@ extension String {
   }
 }
 
-extension Character : Equatable {
+extension Character: Equatable {
   @inlinable @inline(__always)
   @_effects(readonly)
   public static func == (lhs: Character, rhs: Character) -> Bool {
@@ -219,7 +219,7 @@ extension Character : Equatable {
   }
 }
 
-extension Character : Comparable {
+extension Character: Comparable {
   @inlinable @inline(__always)
   @_effects(readonly)
   public static func < (lhs: Character, rhs: Character) -> Bool {

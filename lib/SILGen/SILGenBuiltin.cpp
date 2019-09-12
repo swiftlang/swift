@@ -618,15 +618,16 @@ static ManagedValue emitBuiltinEndUnpairedAccess(SILGenFunction &SGF,
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
-/// Specialized emitter for Builtin.condfail.
-static ManagedValue emitBuiltinCondFail(SILGenFunction &SGF,
-                                        SILLocation loc,
-                                        SubstitutionMap substitutions,
-                                        ArrayRef<ManagedValue> args,
-                                        SGFContext C) {
+/// Specialized emitter for the legacy Builtin.condfail.
+static ManagedValue emitBuiltinLegacyCondFail(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              ArrayRef<ManagedValue> args,
+                                              SGFContext C) {
   assert(args.size() == 1 && "condfail should be given one argument");
-  
-  SGF.B.createCondFail(loc, args[0].getUnmanagedValue());
+
+  SGF.B.createCondFail(loc, args[0].getUnmanagedValue(),
+    "unknown runtime failure");
   return ManagedValue::forUnmanaged(SGF.emitEmptyTuple(loc));
 }
 
