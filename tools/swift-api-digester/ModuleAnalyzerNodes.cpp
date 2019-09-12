@@ -11,18 +11,6 @@ namespace fs = llvm::sys::fs;
 namespace path = llvm::sys::path;
 
 namespace {
-static StringRef getAttrName(DeclAttrKind Kind) {
-  switch (Kind) {
-#define DECL_ATTR(NAME, CLASS, ...)                                           \
-  case DAK_##CLASS:                                                           \
-      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
-#include "swift/AST/Attr.def"
-  case DAK_Count:
-    llvm_unreachable("unrecognized attribute kind.");
-  }
-  llvm_unreachable("covered switch");
-}
-
 static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   PrintOptions Opts;
   Opts.SynthesizeSugarOnTypes = true;
@@ -33,7 +21,6 @@ static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   }
   return Opts;
 }
-
 } // End of anonymous namespace.
 
 struct swift::ide::api::SDKNodeInitInfo {
@@ -63,20 +50,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
-SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {
-#define ADD(NAME) BreakingAttrs.push_back({DeclAttrKind::DAK_##NAME, \
-      getAttrName(DeclAttrKind::DAK_##NAME)});
-  // Add attributes that both break ABI and API.
-  ADD(Final)
-  if (checkingABI()) {
-    // Add ABI-breaking-specific attributes.
-    ADD(ObjC)
-    ADD(FixedLayout)
-    ADD(Frozen)
-    ADD(Dynamic)
-  }
-#undef ADD
-}
+SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
 
 void SDKNodeRoot::registerDescendant(SDKNode *D) {
   // Operator doesn't have usr
