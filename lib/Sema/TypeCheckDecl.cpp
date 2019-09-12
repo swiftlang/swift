@@ -2360,6 +2360,8 @@ public:
 
     TC.checkDeclAttributes(VD);
 
+    checkForEmptyOptionSet(VD);
+    
     triggerAccessorSynthesis(TC, VD);
 
     // Under the Swift 3 inference rules, if we have @IBInspectable or
@@ -2382,6 +2384,42 @@ public:
 
     if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>())
       TC.checkDynamicReplacementAttribute(VD);
+  }
+    
+  void checkForEmptyOptionSet(VarDecl *VD) {
+    if (!VD->isStatic())
+      return;
+    auto DC = VD->getDeclContext();
+    auto protocols = DC->getLocalProtocols();
+    auto conformsToOptionSet = false;
+    for (auto protocol : protocols) {
+      if (protocol->isSpecificProtocol(KnownProtocolKind::OptionSet)) {
+        conformsToOptionSet = true;
+        break;
+      }
+    }
+    if (!conformsToOptionSet)
+      return;
+    auto type = VD->getType();
+    if (!type->isEqual(DC->getSelfTypeInContext()))
+      return;
+    if (!VD->getParentPatternBinding())
+      return;
+    auto PBD = VD->getParentPatternBinding();
+    for (auto entry : PBD->getPatternList()) {
+      auto ctor = dyn_cast<CallExpr>(entry.getInit());
+      if (!ctor) continue;
+      auto argLabels = ctor->getArgumentLabels();
+      if (!argLabels.front().is(StringRef("rawValue"))) continue;
+      auto *args = cast<TupleExpr>(ctor->getArg());
+      auto intArg = dyn_cast<IntegerLiteralExpr>(args->getElement(0));
+      if (!intArg) continue;
+      auto val = intArg->getValue();
+      if (val == 0) {
+        auto loc = VD->getLoc();
+        TC.diagnose(loc, diag::option_set_zero_constant, type);
+      }
+    }
   }
 
   void visitBoundVars(Pattern *P) {

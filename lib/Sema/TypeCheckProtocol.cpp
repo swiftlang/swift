@@ -4959,33 +4959,6 @@ void TypeChecker::checkConformancesInContext(DeclContext *dc,
         diagnoseMissingAppendInterpolationMethod(*this, typeDecl);
       }
     }
-      
-    if (conformance->getProtocol()->
-          isSpecificProtocol(KnownProtocolKind::OptionSet)) {
-          for (auto member : idc->getMembers()) {
-            if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
-              if (pbd->isStatic())
-                for (auto entry : pbd->getPatternList()) {
-                  if (auto ctor = dyn_cast<CallExpr>(entry.getInit())) {
-                    auto type = ctor->getType();
-                    auto argLabels = ctor->getArgumentLabels();
-                    auto *args = cast<TupleExpr>(ctor->getArg());
-                    if (type->isEqual(dc->getSelfTypeInContext())) {
-                      if (argLabels[0].is(StringRef("rawValue"))) {
-                        if (auto i = dyn_cast<IntegerLiteralExpr>(args->getElement(0))) {
-                          auto a = i->getValue();
-                          if (a == 0) {
-                            auto loc = member->getLoc();
-                            diagnose(loc, diag::option_set_zero_constant, type);
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-          }
-      }
   }
 
   // Check all conformances.
