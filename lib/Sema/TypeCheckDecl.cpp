@@ -1911,11 +1911,24 @@ static bool computeIsGetterMutating(TypeChecker &TC,
   // the "value" property of the outermost wrapper type is mutating and we're
   // in a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.valueVar &&
+    VarDecl *originalVar = var->getOriginalWrappedProperty(
+        PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
+    bool isProjectedValue = true;
+    if (!originalVar) {
+      originalVar = var;
+      isProjectedValue = false;
+    }
+
+    if (auto wrapperInfo = originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      // Figure out which member we're looking through.
+      auto varMember = isProjectedValue
+        ? &PropertyWrapperTypeInfo::projectedValueVar
+        : &PropertyWrapperTypeInfo::valueVar;
+
+      if (wrapperInfo.*varMember &&
           (!storage->getGetter() || storage->getGetter()->isImplicit())) {
-        TC.validateDecl(wrapperInfo.valueVar);
-        return wrapperInfo.valueVar->isGetterMutating() &&
+        TC.validateDecl(wrapperInfo.*varMember);
+        return (wrapperInfo.*varMember)->isGetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
       }
@@ -1946,11 +1959,24 @@ static bool computeIsSetterMutating(TypeChecker &TC,
   // the "value" property of the outermost wrapper type is mutating and we're
   // in a context that has value semantics.
   if (auto var = dyn_cast<VarDecl>(storage)) {
-    if (auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0)) {
-      if (wrapperInfo.valueVar &&
+    VarDecl *originalVar = var->getOriginalWrappedProperty(
+        PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
+    bool isProjectedValue = true;
+    if (!originalVar) {
+      originalVar = var;
+      isProjectedValue = false;
+    }
+
+    if (auto wrapperInfo = originalVar->getAttachedPropertyWrapperTypeInfo(0)) {
+      // Figure out which member we're looking through.
+      auto varMember = isProjectedValue
+        ? &PropertyWrapperTypeInfo::projectedValueVar
+        : &PropertyWrapperTypeInfo::valueVar;
+
+      if (wrapperInfo.*varMember &&
           (!storage->getSetter() || storage->getSetter()->isImplicit())) {
-        TC.validateDecl(wrapperInfo.valueVar);
-        return wrapperInfo.valueVar->isSetterMutating() &&
+        TC.validateDecl(wrapperInfo.*varMember);
+        return (wrapperInfo.*varMember)->isSetterMutating() &&
             var->isInstanceMember() &&
             doesContextHaveValueSemantics(var->getDeclContext());
       }
