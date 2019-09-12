@@ -153,28 +153,66 @@ extension String.UTF8View: BidirectionalCollection {
     return _foreignIndex(before: i)
   }
 
+  /// Returns an index that is the specified distance from the given index.
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  /// - Returns: An index offset by `distance` from the index `i`. If
+  ///   `distance` is positive, this is the same value as the result of
+  ///   `distance` calls to `index(after:)`. If `distance` is negative, this
+  ///   is the same value as the result of `abs(distance)` calls to
+  ///   `index(before:)`.
+  ///
+  /// - Complexity: O(1) if the string is contiguous UTF-8 (see
+  ///   `String.isContiguousUTF8`); otherwise, O(*k*) where *k* is the absolute
+  ///   value of `distance`.
   @inlinable @inline(__always)
-  public func index(_ i: Index, offsetBy n: Int) -> Index {
+  public func index(_ i: Index, offsetBy distance: Int) -> Index {
     if _fastPath(_guts.isFastUTF8) {
-      _precondition(n + i._encodedOffset <= _guts.count)
-      return i.strippingTranscoding.encoded(offsetBy: n)
+      _precondition(distance + i._encodedOffset <= _guts.count)
+      return i.strippingTranscoding.encoded(offsetBy: distance)
     }
 
-    return _foreignIndex(i, offsetBy: n)
+    return _foreignIndex(i, offsetBy: distance)
   }
 
+  /// Returns an index that is the specified distance from the given index,
+  /// unless that distance is beyond a given limiting index.
+  ///
+  /// The value passed as `distance` must not offset `i` beyond the bounds of
+  /// the collection, unless the index passed as `limit` prevents offsetting
+  /// beyond those bounds.
+  ///
+  /// - Parameters:
+  ///   - i: A valid index of the collection.
+  ///   - distance: The distance to offset `i`.
+  ///   - limit: A valid index of the collection to use as a limit. If
+  ///     `distance > 0`, a limit that is less than `i` has no effect.
+  ///     Likewise, if `distance < 0`, a limit that is greater than `i` has no
+  ///     effect.
+  /// - Returns: An index offset by `distance` from the index `i`, unless that
+  ///   index would be beyond `limit` in the direction of movement. In that
+  ///   case, the method returns `nil`.
+  ///
+  /// - Complexity: O(1) if the string is contiguous UTF-8 (see
+  ///   `String.isContiguousUTF8`); otherwise, O(*k*) where *k* is the absolute
+  ///   value of `distance`.
   @inlinable @inline(__always)
   public func index(
-    _ i: Index, offsetBy n: Int, limitedBy limit: Index
+    _ i: Index, offsetBy distance: Int, limitedBy limit: Index
   ) -> Index? {
     if _fastPath(_guts.isFastUTF8) {
       // Check the limit: ignore limit if it precedes `i` (in the correct
       // direction), otherwise must not be beyond limit (in the correct
       // direction).
       let iOffset = i._encodedOffset
-      let result = iOffset + n
+      let result = iOffset + distance
       let limitOffset = limit._encodedOffset
-      if n >= 0 {
+      if distance >= 0 {
         guard limitOffset < iOffset || result <= limitOffset else { return nil }
       } else {
         guard limitOffset > iOffset || result >= limitOffset else { return nil }
@@ -182,9 +220,20 @@ extension String.UTF8View: BidirectionalCollection {
       return Index(_encodedOffset: result)
     }
 
-    return _foreignIndex(i, offsetBy: n, limitedBy: limit)
+    return _foreignIndex(i, offsetBy: distance, limitedBy: limit)
   }
 
+  /// Returns the distance between two indices.
+  ///
+  /// - Parameters:
+  ///   - start: A valid index of the collection.
+  ///   - end: Another valid index of the collection. If `end` is equal to
+  ///     `start`, the result is zero.
+  /// - Returns: The distance between `start` and `end`.
+  ///
+  /// - Complexity: O(1) if the string is contiguous UTF-8 (see
+  ///   `String.isContiguousUTF8`); otherwise, O(*k*) where *k* is the absolute
+  ///   value of the resulting distance.
   @inlinable @inline(__always)
   public func distance(from i: Index, to j: Index) -> Int {
     if _fastPath(_guts.isFastUTF8) {
