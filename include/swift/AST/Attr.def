@@ -121,11 +121,12 @@ DECL_ATTR(available, Available,
   1)
 CONTEXTUAL_SIMPLE_DECL_ATTR(final, Final,
   OnClass | OnFunc | OnAccessor | OnVar | OnSubscript |
-  DeclModifier,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove |
+  APIBreakingToAdd,
   2)
 DECL_ATTR(objc, ObjC,
   OnAbstractFunction | OnClass | OnProtocol | OnExtension | OnVar |
-  OnSubscript | OnEnum | OnEnumElement,
+  OnSubscript | OnEnum | OnEnumElement | ABIBreakingToAdd | ABIBreakingToRemove,
   3)
 CONTEXTUAL_SIMPLE_DECL_ATTR(required, Required,
   OnConstructor |
@@ -187,7 +188,7 @@ DECL_ATTR(_semantics, Semantics,
   21)
 CONTEXTUAL_SIMPLE_DECL_ATTR(dynamic, Dynamic,
   OnFunc | OnAccessor | OnVar | OnSubscript | OnConstructor |
-  DeclModifier,
+  DeclModifier | ABIBreakingToAdd | ABIBreakingToRemove,
   22)
 CONTEXTUAL_SIMPLE_DECL_ATTR(infix, Infix,
   OnFunc | OnOperator |
@@ -212,7 +213,7 @@ SIMPLE_DECL_ATTR(nonobjc, NonObjC,
   30)
 SIMPLE_DECL_ATTR(_fixed_layout, FixedLayout,
   OnVar | OnClass | OnStruct |
-  UserInaccessible,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove,
   31)
 SIMPLE_DECL_ATTR(inlinable, Inlinable,
   OnVar | OnSubscript | OnAbstractFunction,
@@ -362,7 +363,7 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(frozen, Frozen,
-  OnEnum | OnStruct,
+  OnEnum | OnStruct | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToRemove,
   76)
 DECL_ATTR_ALIAS(_frozen, Frozen)
 SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,
