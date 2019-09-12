@@ -199,3 +199,18 @@ struct SR11440 {
     })
   }
 }
+
+func acceptInt(_: Int, _: () -> Void) { }
+
+// SR-11350 crash due to improper recontextualization.
+func erroneousSR11350(x: Int) {
+  tuplify(true) { b in
+    17
+    x + 25
+    Optional(tuplify(false) { b in
+      if b {
+        acceptInt(0) { }
+      }
+    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+  }
+}
