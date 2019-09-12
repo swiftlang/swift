@@ -3675,45 +3675,6 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
                            overloadName, lhsType, rhsType);
       diag.highlight(lhsExpr->getSourceRange())
       .highlight(rhsExpr->getSourceRange());
-
-      auto tryFixIts = [&]() -> bool {
-        if (calleeInfo.size() != 1)
-          return false;
-
-        auto candidate = calleeInfo[0];
-        auto *fnType = candidate.getFunctionType();
-        if (!fnType)
-          return false;
-
-        auto params = fnType->getParams();
-        if (params.size() != 2)
-          return false;
-
-        auto lhsCandidate = params[0].getOldType();
-        auto rhsCandidate = params[1].getOldType();
-        auto lhsIsCandidate = lhsType->isEqual(lhsCandidate);
-        auto rhsIsCandidate = rhsType->isEqual(rhsCandidate);
-
-        if (!lhsIsCandidate && !rhsIsCandidate)
-          return false;
-
-        if (!lhsIsCandidate) {
-          ContextualFailure failure(expr, CS, lhsType, lhsCandidate,
-                                    CS.getConstraintLocator(lhsExpr));
-          return failure.tryIntegerCastFixIts(diag);
-        }
-
-        if (!rhsIsCandidate) {
-          ContextualFailure failure(expr, CS, rhsType, rhsCandidate,
-                                    CS.getConstraintLocator(rhsExpr));
-          return failure.tryIntegerCastFixIts(diag);
-        }
-
-        return false;
-      };
-
-      tryFixIts();
-
     } else {
       diagnose(callExpr->getLoc(), diag::cannot_apply_binop_to_same_args,
                overloadName, lhsType)
