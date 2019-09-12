@@ -2,6 +2,19 @@
 
 This document gives a high-level description of how C and Objective-C declarations are translated to Swift, with particular focus on how names are adjusted. It is not attempting to be a *complete* description of everything the compiler does except with regards to how *names* are transformed; even there, some special cases that only apply to Apple's SDKs have been omitted.
 
+## Word boundaries
+
+Several forms of name translation are defined in terms of word boundaries. The word-splitting algorithm used by the Swift compiler is as follows: there is a boundary after
+
+1. An underscore ("\_").
+2. A series of two or more uppercase ASCII characters and the suffix "s", "es", or "ies" (e.g. "URLs", "VAXes")...unless the last uppercase letter is "I" and the suffix is "s", in which case it's just as likely to be an acronym followed by "Is" (i.e. "URLIs" is treated as "URL Is").
+2. A series of two or more uppercase ASCII characters followed by an uppercase ASCII character and then a lowercase ASCII character ("XMLReader" becomes "XML Reader").
+3. A series of two or more uppercase ASCII characters followed by a non-ASCII-alphabetic character. ("UTF8" becomes "UTF 8")
+4. A series of two or more uppercase ASCII characters at the end of the string.
+5. An uppercase ASCII character and any number of non-ASCII-uppercase, non-underscore characters ("ContrivedExample" becomes "Contrived Example").
+6. Any number of non-ASCII-uppercase, non-underscore characters ("lowercase\_example" becomes "lowercase \_ example").
+
+
 ## Enums
 
 1. Anonymous? Import elements as constants of the underlying type, *except* that Int is used for an inferred underlying type if all the cases fit in an Int32, since integer conversions are explicit in Swift.
@@ -114,15 +127,7 @@ In C, enumerators (enum cases) aren't namespaced under their enum type, so their
 
 1. Collect all *available, non-deprecated* enum cases *without custom names.* If there are no such cases, collect all cases without custom names, whether available or not.
 
-2. Find the common word-boundary prefix __CP__ of these cases. There is a word boundary after
-
-    1. An underscore ("\_").
-    2. A series of two or more uppercase ASCII characters and the suffix "s", "es", or "ies" (e.g. "URLs", "VAXes")...unless the last uppercase letter is "I" and the suffix is "s", in which case it's just as likely to be an acronym followed by "Is" (i.e. "URLIs" is treated as "URL Is").
-    2. A series of two or more uppercase ASCII characters followed by an uppercase ASCII character and then a lowercase ASCII character ("XMLReader" becomes "XML Reader").
-    3. A series of two or more uppercase ASCII characters followed by a non-ASCII-alphabetic character. ("UTF8" becomes "UTF 8")
-    4. A series of two or more uppercase ASCII characters at the end of the string.
-    5. An uppercase ASCII character and any number of non-ASCII-uppercase, non-underscore characters ("ContrivedExample" becomes "Contrived Example").
-    6. Any number of non-ASCII-uppercase, non-underscore characters ("lowercase\_example" becomes "lowercase \_ example").
+2. Find the common word-boundary prefix __CP__ of these cases.
 
 3. If __CP__ starts with "k" followed by an uppercase letter, or if it's *just* "k" and none of the cases have a non-identifier-start character immediately after the 'k', treat that as meaning "constant" and ignore it for the next step.
 
@@ -144,7 +149,7 @@ In C, enumerators (enum cases) aren't namespaced under their enum type, so their
 
 9. ASCII-lowercase the first word of the remaining name if it starts with an uppercase ASCII character.
 
-    _There's a bug here where the special case for "Is" is missing, so "URLIs" will be lowercased to "urlis"._
+    _There's a bug in this step where the special case for "Is" is missing, so "URLIs" will be lowercased to "urlis"._
 
 ## `swift_wrapper` typedefs
 
@@ -189,5 +194,49 @@ extension SecretResourceID {
 ### NSNotificationName
 
 On Apple platforms, whenever Foundation is imported, constants with the type "NSNotificationName" additionally have the suffix "Notification" stripped before performing the above rules unless they have a custom name. Global NSString constants whose name ends in "Notification" will also automatically be treated as if they were declared with the type NSNotificationName unless they have a custom name.
+
+
+## Objective-C Protocols
+
+Protocols in Objective-C are normally in a separate namespace from the "ordinary" identifier namespace used by typedefs and classes. Swift does not have separate namespaces, so if the protocol has the same name as another declaration in the same module, the suffix "Protocol" is appended. (Example: NSObjectProtocol in the ObjectiveC module.)
+
+
+## CF Types
+
+"Core Foundation" is a C-based object-oriented system with strong conventions built around pointers to opaque structs. Creating new Core Foundation types is not generally supported, but Swift will recognize those in Apple's SDKs. If a struct has the `objc_bridge`, `objc_mutable_bridge`, or `objc_bridge_related` Clang attributes, it will be treated as a CF type and a typedef of a pointer to that struct will be imported as a class in Swift. The suffix "Ref" will be dropped from the class's name if present unless doing so would conflict with another declaration in the same module as the typedef.
+
+If the class name contains the word "Mutable" exactly once per the usual word-boundary rules, a corresponding class name without the word "Mutable" will be used as the superclass if present. Otherwise, the CF type is taken to be a root object.
+
+Additionally, typedefs for `void *` or `const void *` that are themselves annotated with `objc_bridge` will be treated as CFTypeRef-like and imported as `Any` rather than `Unsafe[Mutable]RawPointer`.
+
+If a typedef's underlying type is itself a "CF pointer" typedef, the "alias" typedef will be imported as a regular typealias, with the suffix "Ref" still dropped from its name (if present) unless doing so would conflict with another declaration in the same module as the typedef.
+
+
+## `swift_private`
+
+The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override; in that case the name needs to match the overridden declaration.
+
+```objc
+@interface Example : NSObject
+- (instancetype)initWithValue:(int)value __attribute__((swift_private));
+@property(readonly) int value __attribute__((swift_private));
+@end
+
+// Usually seen as NS_REFINED_FOR_SWIFT
+```
+
+```swift
+class Example: NSObject {
+  init(__value: Int32)
+  var __value: Int32 { get }
+}
+```
+
+The purpose of this annotation is to allow a more idiomatic implementation to be provided in Swift. The effect of `swift_private` is inherited from an enum onto its elements if the enum is not imported as an error code enum, an `@objc` enum, or an option set.
+
+_The original intent of the `swift_private` attribute was additionally to limit access to a Swift module with the same name as the owning Clang module, e.g. the Swift half of a mixed-source framework. However, this restriction has not been implemented as of Swift 5.1._
+
+_For "historical reasons", the `swift_private` attribute is ignored on factory methods with no arguments imported as initializers. This is essentially matching the behavior of older Swift compilers for source compatibility in case someone has marked such a factory method as `swift_private`._
+
 
 ## More to come...
