@@ -31,7 +31,7 @@ enum class ModuleLoadingMode {
 };
 
 /// Common functionality shared between \c SerializedModuleLoader and
-/// \c ParseableInterfaceModuleLoader.
+/// \c ModuleInterfaceLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;

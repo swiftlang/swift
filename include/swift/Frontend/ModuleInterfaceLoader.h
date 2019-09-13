@@ -1,4 +1,4 @@
-//===--- ParseableInterfaceModuleLoader.h - Loads .swiftinterface files ---===//
+//===-------- ModuleInterfaceLoader.h - Loads .swiftinterface files -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// \file This implements the logic for loading and building parseable module
+/// \file This implements the logic for loading and building module
 /// interfaces.
 ///
-/// === Loading Parseable Modules ===
+/// === Loading Module Interfaces ===
 ///
 /// If there is a .swiftinterface file corresponding to a given module name
 /// present in the frontend's search paths, then this module loader will look in
@@ -79,18 +79,19 @@
 /// installed 2 forwarding modules. For the other 2 frameworks, we'll have
 /// compiled the interfaces and put them in the module cache.
 ///
-///                                ┌─────┐
-///  ┌─────────────────────────────┤ SDK ├─────────────────────────┐
-///  │          ┌────────────────┐ └─────┘     ┌────────────────┐  │
-///  │  ┌───────┤ Framework Dirs ├────────┐   ┌┤ Prebuilt Cache ├┐ │
-///  │  │       └────────────────┘        │   │└────────────────┘│ │
-///  │  │  ┌───┐   ┌───┐   ┌───┐   ┌───┐  │   │   ┌───┐  ┌───┐   │ │
-///  │  │  │ I │   │ I │   │ I │   │ I │◀─┼───┼───│ P │  │ P │◀═╗│ │
-///  │  │  └───┘   └───┘   └───┘   └───┘  │   │   └───┘  └───┘  ║│ │
-///  │  │    ▲       ▲       ▲            │   │     ▲      │    ║│ │
-///  │  └────┼───────┼───────┼────────────┘   └─────╫──────┼────╫┘ │
-///  │       │       │       └──────────────────────╫──────┘    ║  │
-///  └───────┼───────┼──────────────────────────────╫───────────╫──┘
+///                   ┌─────┐
+///  ┌────────────────┤ SDK ├───────────────┐
+///  │                └─────┘               │
+///  │          ┌────────────────┐          │  ┌────────────────┐
+///  │  ┌───────┤ Framework Dirs ├────────┐ │ ┌┤ Prebuilt Cache ├┐
+///  │  │       └────────────────┘        │ │ │└────────────────┘│
+///  │  │  ┌───┐   ┌───┐   ┌───┐   ┌───┐  │ │ │   ┌───┐  ┌───┐   │
+///  │  │  │ I │   │ I │   │ I │   │ I │◀─┼─┼─┼───│ P │  │ P │◀═╗│
+///  │  │  └───┘   └───┘   └───┘   └───┘  │ │ │   └───┘  └───┘  ║│
+///  │  │    ▲       ▲       ▲            │ │ │     ▲      │    ║│
+///  │  └────┼───────┼───────┼────────────┘ │ └─────╫──────┼────╫┘
+///  │       │       │       └──────────────┼───────╫──────┘    ║
+///  └───────┼───────┼──────────────────────┘       ║           ║
 ///          │       │   ┌───────────────┐          ║           ║
 ///          │  ┌────┼───┤ Module Cache  ├────────┐ ║           ║
 ///          │  │    │   └───────────────┘        │ ║           ║
@@ -103,8 +104,8 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
-#define SWIFT_FRONTEND_PARSEABLEINTERFACEMODULELOADER_H
+#ifndef SWIFT_FRONTEND_ModuleInterfaceLoader_H
+#define SWIFT_FRONTEND_ModuleInterfaceLoader_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
@@ -115,7 +116,7 @@ class CompilerInstance;
 }
 
 namespace unittest {
-class ParseableInterfaceModuleLoaderTest;
+class ModuleInterfaceLoaderTest;
 }
 
 namespace swift {
@@ -127,9 +128,9 @@ class SearchPathOptions;
 /// \c CompilerInstance to convert .swiftinterface files to .swiftmodule
 /// files on the fly, caching the resulting .swiftmodules in the module cache
 /// directory, and loading the serialized .swiftmodules from there.
-class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
-  friend class unittest::ParseableInterfaceModuleLoaderTest;
-  explicit ParseableInterfaceModuleLoader(
+class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
+  friend class unittest::ModuleInterfaceLoaderTest;
+  explicit ModuleInterfaceLoader(
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
@@ -154,13 +155,13 @@ class ParseableInterfaceModuleLoader : public SerializedModuleLoaderBase {
   bool isCached(StringRef DepPath) override;
 
 public:
-  static std::unique_ptr<ParseableInterfaceModuleLoader>
+  static std::unique_ptr<ModuleInterfaceLoader>
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> PreferInterfaceForModules = {},
          bool RemarkOnRebuildFromInterface = false) {
-    return std::unique_ptr<ParseableInterfaceModuleLoader>(
-      new ParseableInterfaceModuleLoader(ctx, cacheDir, prebuiltCacheDir,
+    return std::unique_ptr<ModuleInterfaceLoader>(
+      new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
                                          RemarkOnRebuildFromInterface));
@@ -186,7 +187,7 @@ public:
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in
 /// the clang importer, for reuse as the .swiftmodule cache path when
-/// building a ParseableInterfaceModuleLoader.
+/// building a ModuleInterfaceLoader.
 std::string
 getModuleCachePathFromClang(const clang::CompilerInstance &Instance);
 

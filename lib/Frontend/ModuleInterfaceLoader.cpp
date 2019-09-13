@@ -1,4 +1,4 @@
-//===-- ParseableInterfaceModuleLoader.cpp - Loads .swiftinterface files --===//
+//===------ ModuleInterfaceLoader.cpp - Loads .swiftinterface files -------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "textual-module-interface"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
@@ -41,7 +41,7 @@ using FileDependency = SerializationOptions::FileDependency;
 
 /// Extract the specified-or-defaulted -module-cache-path that winds up in
 /// the clang importer, for reuse as the .swiftmodule cache path when
-/// building a ParseableInterfaceModuleLoader.
+/// building a ModuleInterfaceLoader.
 std::string
 swift::getModuleCachePathFromClang(const clang::CompilerInstance &Clang) {
   if (!Clang.hasPreprocessor())
@@ -339,9 +339,9 @@ struct ModuleRebuildInfo {
 /// do the necessary lookup to determine if we should be loading from the
 /// normal cache, the prebuilt cache, a module adjacent to the interface, or
 /// a module that we'll build from a parseable interface.
-class ParseableInterfaceModuleLoaderImpl {
+class ModuleInterfaceLoaderImpl {
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
-  friend class swift::ParseableInterfaceModuleLoader;
+  friend class swift::ModuleInterfaceLoader;
   ASTContext &ctx;
   llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
@@ -356,7 +356,7 @@ class ParseableInterfaceModuleLoaderImpl {
   const ModuleLoadingMode loadMode;
   const bool remarkOnRebuildFromInterface;
 
-  ParseableInterfaceModuleLoaderImpl(
+  ModuleInterfaceLoaderImpl(
     ASTContext &ctx, StringRef modulePath, StringRef interfacePath,
     StringRef moduleName, StringRef cacheDir, StringRef prebuiltCacheDir,
     SourceLoc diagLoc, bool remarkOnRebuildFromInterface,
@@ -879,7 +879,7 @@ class ParseableInterfaceModuleLoaderImpl {
   /// buffer of the module's contents. Also reports the module's dependencies
   /// to the parent \c dependencyTracker if it came from the cache, or was built
   /// from the given interface. See the main comment in
-  /// \c ParseableInterfaceModuleLoader.h for an explanation of the module
+  /// \c ModuleInterfaceLoader.h for an explanation of the module
   /// loading strategy.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>
   findOrBuildLoadableModule() {
@@ -971,7 +971,7 @@ class ParseableInterfaceModuleLoaderImpl {
 
 } // end anonymous namespace
 
-bool ParseableInterfaceModuleLoader::isCached(StringRef DepPath) {
+bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
   if (!CacheDir.empty() && DepPath.startswith(CacheDir))
     return true;
   return !PrebuiltCacheDir.empty() && DepPath.startswith(PrebuiltCacheDir);
@@ -980,13 +980,13 @@ bool ParseableInterfaceModuleLoader::isCached(StringRef DepPath) {
 /// Load a .swiftmodule associated with a .swiftinterface either from a
 /// cache or by converting it in a subordinate \c CompilerInstance, caching
 /// the results.
-std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
+std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
   StringRef ModuleDocFilename,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
 
-  // If running in OnlySerialized mode, ParseableInterfaceModuleLoader
+  // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
   assert(LoadMode != ModuleLoadingMode::OnlySerialized);
 
@@ -1012,7 +1012,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 
   // Create an instance of the Impl to do the heavy lifting.
   auto ModuleName = ModuleID.first.str();
-  ParseableInterfaceModuleLoaderImpl Impl(
+  ModuleInterfaceLoaderImpl Impl(
                 Ctx, ModPath, InPath, ModuleName,
                 CacheDir, PrebuiltCacheDir, ModuleID.second,
                 RemarkOnRebuildFromInterface, dependencyTracker,
@@ -1043,7 +1043,7 @@ std::error_code ParseableInterfaceModuleLoader::findModuleFilesInDirectory(
 }
 
 
-bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     SourceManager &SourceMgr, DiagnosticEngine &Diags,
     const SearchPathOptions &SearchPathOpts, const LangOptions &LangOpts,
     StringRef CacheDir, StringRef PrebuiltCacheDir,
@@ -1062,7 +1062,7 @@ bool ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
                                   /*ModuleBuffer*/nullptr);
 }
 
-void ParseableInterfaceModuleLoader::collectVisibleTopLevelModuleNames(
+void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
     SmallVectorImpl<Identifier> &names) const {
   collectVisibleTopLevelModuleNamesImpl(
       names,

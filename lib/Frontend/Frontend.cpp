@@ -23,7 +23,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -377,7 +377,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto &FEOpts = Invocation.getFrontendOptions();
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
-    auto PIML = ParseableInterfaceModuleLoader::create(
+    auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
         FEOpts.RemarkOnRebuildFromModuleInterface);

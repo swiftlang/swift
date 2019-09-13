@@ -51,7 +51,7 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ParseableInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
@@ -675,7 +675,7 @@ static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
-  return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangModuleCachePath(),
