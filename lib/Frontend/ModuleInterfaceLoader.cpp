@@ -18,7 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/Validation.h"
 #include "clang/Basic/Module.h"
@@ -335,10 +335,10 @@ struct ModuleRebuildInfo {
   }
 };
 
-/// Handles the details of loading parseable interfaces as modules, and will
+/// Handles the details of loading module interfaces as modules, and will
 /// do the necessary lookup to determine if we should be loading from the
 /// normal cache, the prebuilt cache, a module adjacent to the interface, or
-/// a module that we'll build from a parseable interface.
+/// a module that we'll build from a module interface.
 class ModuleInterfaceLoaderImpl {
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   friend class swift::ModuleInterfaceLoader;
@@ -671,11 +671,11 @@ class ModuleInterfaceLoaderImpl {
     bool shouldLoadAdjacentModule = true;
 
     switch (loadMode) {
-    case ModuleLoadingMode::OnlyParseable:
+    case ModuleLoadingMode::OnlyInterface:
       // Always skip both the caches and adjacent modules, and always build the
-      // parseable interface.
+      // module interface.
       return notFoundError;
-    case ModuleLoadingMode::PreferParseable:
+    case ModuleLoadingMode::PreferInterface:
       // If we're in the load mode that prefers .swiftinterfaces, specifically
       // skip the module adjacent to the interface, but use the caches if
       // they're present.
@@ -997,7 +997,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   ModPath = DirPath;
   path::append(ModPath, ModuleFilename);
 
-  auto Ext = file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile);
+  auto Ext = file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile);
   InPath = ModPath;
   path::replace_extension(InPath, Ext);
   if (!fs.exists(InPath)) {
@@ -1018,7 +1018,7 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
                 RemarkOnRebuildFromInterface, dependencyTracker,
                 llvm::is_contained(PreferInterfaceForModules,
                                    ModuleName) ?
-                  ModuleLoadingMode::PreferParseable : LoadMode);
+                  ModuleLoadingMode::PreferInterface : LoadMode);
 
   // Ask the impl to find us a module that we can load or give us an error
   // telling us that we couldn't load it.
@@ -1066,5 +1066,5 @@ void ModuleInterfaceLoader::collectVisibleTopLevelModuleNames(
     SmallVectorImpl<Identifier> &names) const {
   collectVisibleTopLevelModuleNamesImpl(
       names,
-      file_types::getExtension(file_types::TY_SwiftParseableInterfaceFile));
+      file_types::getExtension(file_types::TY_SwiftModuleInterfaceFile));
 }

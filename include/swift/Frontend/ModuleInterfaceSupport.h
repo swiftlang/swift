@@ -1,4 +1,4 @@
-//===--- ParseableInterfaceSupport.h - swiftinterface files -----*- C++ -*-===//
+//===------ ModuleInterfaceSupport.h - swiftinterface files -----*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FRONTEND_PARSEABLEINTERFACESUPPORT_H
-#define SWIFT_FRONTEND_PARSEABLEINTERFACESUPPORT_H
+#ifndef SWIFT_FRONTEND_MODULEINTERFACESUPPORT_H
+#define SWIFT_FRONTEND_MODULEINTERFACESUPPORT_H
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
@@ -26,7 +26,7 @@ namespace swift {
 class ModuleDecl;
 
 /// Options for controlling the generation of the .swiftinterface output.
-struct ParseableInterfaceOptions {
+struct ModuleInterfaceOptions {
   /// Should we prefer printing TypeReprs when writing out types in a module
   /// interface, or should we fully-qualify them?
   bool PreserveTypesAsWritten = false;
@@ -34,7 +34,7 @@ struct ParseableInterfaceOptions {
   /// Copy of all the command-line flags passed at .swiftinterface
   /// generation time, re-applied to CompilerInvocation when reading
   /// back .swiftinterface and reconstructing .swiftmodule.
-  std::string ParseableInterfaceFlags;
+  std::string Flags;
 };
 
 extern version::Version InterfaceFormatVersion;
@@ -55,9 +55,9 @@ llvm::Regex getSwiftInterfaceModuleFlagsRegex();
 /// \return true if an error occurred
 ///
 /// \sa swift::serialize
-bool emitParseableInterface(raw_ostream &out,
-                            ParseableInterfaceOptions const &Opts,
-                            ModuleDecl *M);
+bool emitSwiftInterface(raw_ostream &out,
+                        ModuleInterfaceOptions const &Opts,
+                        ModuleDecl *M);
 
 } // end namespace swift
 

@@ -66,10 +66,10 @@ public:
 
 class ModuleInterfaceLoaderTest : public testing::Test {
 protected:
-  void setupAndLoadParseableModule() {
+  void setupAndLoadModuleInterface() {
     SmallString<256> tempDir;
     ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory(
-        "ParseableModuleBufferTests.emitModuleInMemory", tempDir));
+        "ModuleInterfaceBufferTests.emitModuleInMemory", tempDir));
     SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
 
     auto cacheDir = createFilename(tempDir, "ModuleCache");
@@ -139,7 +139,7 @@ protected:
 };
 
 TEST_F(ModuleInterfaceLoaderTest, LoadModuleFromBuffer) {
-  setupAndLoadParseableModule();
+  setupAndLoadModuleInterface();
 }
 
 } // end namespace unittest

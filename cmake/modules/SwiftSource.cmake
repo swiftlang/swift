@@ -323,10 +323,10 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
+    if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
       list(APPEND swift_module_flags
-           "-emit-parseable-module-interface-path" "${interface_file}")
+           "-emit-module-interface-path" "${interface_file}")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so

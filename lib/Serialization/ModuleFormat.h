@@ -731,7 +731,7 @@ namespace input_block {
     SEARCH_PATH,
     FILE_DEPENDENCY,
     DEPENDENCY_DIRECTORY,
-    PARSEABLE_INTERFACE_PATH
+    MODULE_INTERFACE_PATH
   };
 
   using ImportedModuleLayout = BCRecordLayout<
@@ -785,8 +785,8 @@ namespace input_block {
     BCBlob
   >;
 
-  using ParseableInterfaceLayout = BCRecordLayout<
-    PARSEABLE_INTERFACE_PATH,
+  using ModuleInterfaceLayout = BCRecordLayout<
+    MODULE_INTERFACE_PATH,
     BCBlob // file path
   >;
 

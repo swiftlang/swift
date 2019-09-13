@@ -21,12 +21,12 @@ namespace swift {
 class ModuleFile;
 class LazyResolver;
 
-/// Spceifies how to load modules when both a parseable interface and serialized
+/// Spceifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
 enum class ModuleLoadingMode {
-  PreferParseable,
+  PreferInterface,
   PreferSerialized,
-  OnlyParseable,
+  OnlyInterface,
   OnlySerialized
 };
 

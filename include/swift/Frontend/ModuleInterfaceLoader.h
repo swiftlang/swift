@@ -104,11 +104,11 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_FRONTEND_ModuleInterfaceLoader_H
-#define SWIFT_FRONTEND_ModuleInterfaceLoader_H
+#ifndef SWIFT_FRONTEND_MODULEINTERFACELOADER_H
+#define SWIFT_FRONTEND_MODULEINTERFACELOADER_H
 
 #include "swift/Basic/LLVM.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace clang {

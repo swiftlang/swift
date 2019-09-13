@@ -1,4 +1,4 @@
-//===--- ParseableInterfaceSupport.cpp - swiftinterface files ------------===//
+//===------- ModuleInterfaceSupport.cpp - swiftinterface files ------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -21,7 +21,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
@@ -38,7 +38,7 @@ using namespace swift;
 version::Version swift::InterfaceFormatVersion({1, 0});
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
-/// access path. These are not yet supported by parseable interfaces, since the
+/// access path. These are not yet supported by module interfaces, since the
 /// information about the declaration kind is not preserved through the binary
 /// serialization that happens as an intermediate step in non-whole-module
 /// builds.
@@ -58,7 +58,7 @@ static void diagnoseScopedImports(DiagnosticEngine &diags,
 /// string as well as any relevant command-line flags in \p Opts used to
 /// construct \p M.
 static void printToolVersionAndFlagsComment(raw_ostream &out,
-                                            ParseableInterfaceOptions const &Opts,
+                                            ModuleInterfaceOptions const &Opts,
                                             ModuleDecl *M) {
   auto &Ctx = M->getASTContext();
   auto ToolsVersion = swift::version::getSwiftFullVersion(
@@ -68,7 +68,7 @@ static void printToolVersionAndFlagsComment(raw_ostream &out,
   out << "// " SWIFT_COMPILER_VERSION_KEY ": "
       << ToolsVersion << "\n";
   out << "// " SWIFT_MODULE_FLAGS_KEY ": "
-      << Opts.ParseableInterfaceFlags << "\n";
+      << Opts.Flags << "\n";
 }
 
 llvm::Regex swift::getSwiftInterfaceFormatVersionRegex() {
@@ -153,7 +153,7 @@ namespace {
 /// Collects protocols that are conformed to by a particular nominal. Since
 /// ASTPrinter will only print the public ones, the non-public ones get left by
 /// the wayside. This is a problem when a non-public protocol inherits from a
-/// public protocol; the generated parseable interface still needs to make that
+/// public protocol; the generated module interface still needs to make that
 /// dependency public.
 ///
 /// The solution implemented here is to generate synthetic extensions that
@@ -431,15 +431,15 @@ const StringLiteral InheritedProtocolCollector::DummyProtocolName =
     "_ConstraintThatIsNotPartOfTheAPIOfThisLibrary";
 } // end anonymous namespace
 
-bool swift::emitParseableInterface(raw_ostream &out,
-                                   ParseableInterfaceOptions const &Opts,
-                                   ModuleDecl *M) {
+bool swift::emitSwiftInterface(raw_ostream &out,
+                               ModuleInterfaceOptions const &Opts,
+                               ModuleDecl *M) {
   assert(M);
 
   printToolVersionAndFlagsComment(out, Opts, M);
   printImports(out, M);
 
-  const PrintOptions printOptions = PrintOptions::printParseableInterfaceFile(
+  const PrintOptions printOptions = PrintOptions::printSwiftInterfaceFile(
       Opts.PreserveTypesAsWritten);
   InheritedProtocolCollector::PerTypeMap inheritedProtocolMap;
 

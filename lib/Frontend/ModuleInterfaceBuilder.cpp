@@ -21,7 +21,7 @@
 #include "llvm/ADT/StringSet.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "clang/Frontend/CompilerInstance.h"
@@ -352,7 +352,7 @@ bool ModuleInterfaceBuilder::buildSwiftModule(
     // Record any non-SDK module interface files for the debug info.
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
     if (!getRelativeDepPath(InPath, SDKPath))
-      SerializationOpts.ParseableInterface = InPath;
+      SerializationOpts.ModuleInterface = InPath;
 
     SmallVector<FileDependency, 16> Deps;
     bool serializeHashes = FEOpts.SerializeModuleInterfaceDependencyHashes;

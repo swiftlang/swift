@@ -11,7 +11,7 @@ import basic
 // CHECK: !DIModule(scope: null, name: "basic", includePath: "
 // CHECK-SAME:      basic.swiftinterface"
 
-// We don;t record any parseable interfaces from the SDK.
+// We don't record any module interfaces from the SDK.
 // They're in the SDK after all.
 // SDK:   !DIModule(scope: null, name: "basic", includePath: "
 // SDK-SAME:        basic{{.*}}.swiftmodule"
