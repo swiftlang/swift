@@ -99,18 +99,20 @@ class DeclAndTypePrinter::Implementation
   friend ASTVisitor;
   friend TypeVisitor;
 
-  // These first two members are accessible through 'owningPrinter',
-  // but it makes the code simpler to have them here too.
-  ModuleDecl &M;
+  // The output stream is accessible through 'owningPrinter',
+  // but it makes the code simpler to have it here too.
   raw_ostream &os;
   DeclAndTypePrinter &owningPrinter;
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
 
+  ASTContext &getASTContext() const {
+    return owningPrinter.M.getASTContext();
+  }
+
 public:
-  explicit Implementation(ModuleDecl &mod, raw_ostream &out,
-                          DeclAndTypePrinter &owner)
-    : M(mod), os(out), owningPrinter(owner) {}
+  explicit Implementation(raw_ostream &out, DeclAndTypePrinter &owner)
+    : os(out), owningPrinter(owner) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -479,7 +481,7 @@ private:
 
     auto result = methodTy->getResult();
     if (result->isUninhabited())
-      return M.getASTContext().TheEmptyTupleType;
+      return getASTContext().TheEmptyTupleType;
     return result;
   }
 
@@ -678,7 +680,7 @@ private:
       // because it's a diagnostic inflicted on /clients/, but it's close
       // enough. It really is invalid to call +new when -init is unavailable.
       StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
-      if (!M.getASTContext().isSwiftVersionAtLeast(5))
+      if (!getASTContext().isSwiftVersionAtLeast(5))
         annotationName = "SWIFT_DEPRECATED_MSG";
       os << "+ (nonnull instancetype)new " << annotationName
          << "(\"-init is unavailable\");\n";
@@ -984,7 +986,7 @@ private:
   }
 
   void printSwift3ObjCDeprecatedInference(ValueDecl *VD) {
-    const LangOptions &langOpts = M.getASTContext().LangOpts;
+    const LangOptions &langOpts = getASTContext().LangOpts;
     if (!langOpts.EnableSwift3ObjCInference ||
         langOpts.WarnSwift3ObjCInference == Swift3ObjCInferenceWarnings::None) {
       return;
@@ -1029,7 +1031,7 @@ private:
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
-    if (!genericTy || genericTy->getDecl() != M.getASTContext().getArrayDecl())
+    if (!genericTy || genericTy->getDecl() != getASTContext().getArrayDecl())
       return false;
 
     assert(genericTy->getGenericArgs().size() == 1);
@@ -1055,7 +1057,7 @@ private:
       return false;
 
     if (owningPrinter.ID_CFTypeRef.empty())
-      owningPrinter.ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
+      owningPrinter.ID_CFTypeRef = getASTContext().getIdentifier("CFTypeRef");
     return TAD->getName() == owningPrinter.ID_CFTypeRef;
   }
 
@@ -1095,7 +1097,7 @@ private:
     if (VD->isStatic())
       os << ", class";
 
-    ASTContext &ctx = M.getASTContext();
+    ASTContext &ctx = getASTContext();
     bool isSettable = VD->isSettable(nullptr);
     if (isSettable && !ctx.isAccessControlDisabled()) {
       isSettable =
@@ -1339,7 +1341,7 @@ private:
 
     // Determine whether this nominal type is _ObjectiveCBridgeable.
     SmallVector<ProtocolConformance *, 2> conformances;
-    if (!nominal->lookupConformance(&M, proto, conformances))
+    if (!nominal->lookupConformance(&owningPrinter.M, proto, conformances))
       return nullptr;
 
     // Dig out the Objective-C type.
@@ -1448,7 +1450,7 @@ private:
   const NameAndOptional *getKnownTypeInfo(const TypeDecl *typeDecl) {
     auto &specialNames = owningPrinter.specialNames;
     if (specialNames.empty()) {
-      ASTContext &ctx = M.getASTContext();
+      ASTContext &ctx = getASTContext();
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
       specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
         { CLANG_REPR, NEEDS_NULLABILITY}
@@ -1561,7 +1563,7 @@ private:
   }
 
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
-    ASTContext &ctx = M.getASTContext();
+    ASTContext &ctx = getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
     return clangTy->isPointerType() || clangTy->isBlockPointerType() ||
@@ -1619,7 +1621,7 @@ private:
     if (clangDecl->getTypedefNameForAnonDecl())
       return;
 
-    ASTContext &ctx = M.getASTContext();
+    ASTContext &ctx = getASTContext();
     auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
     if (importer->hasTypedef(clangDecl))
       return;
@@ -1652,7 +1654,7 @@ private:
   ///
   /// This will print the type as bridged to Objective-C.
   void printCollectionElement(Type ty) {
-    ASTContext &ctx = M.getASTContext();
+    ASTContext &ctx = getASTContext();
 
     auto isSwiftNewtype = [](const StructDecl *SD) -> bool {
       if (!SD)
@@ -1672,7 +1674,7 @@ private:
         SD != ctx.getDictionaryDecl() &&
         SD != ctx.getSetDecl() &&
         !isSwiftNewtype(SD)) {
-      ty = ctx.getBridgedToObjC(&M, ty);
+      ty = ctx.getBridgedToObjC(&owningPrinter.M, ty);
     }
 
     assert(ty && "unknown bridged type");
@@ -1688,7 +1690,7 @@ private:
     if (!SD->getModuleContext()->isStdlibModule())
       return false;
 
-    ASTContext &ctx = M.getASTContext();
+    ASTContext &ctx = getASTContext();
 
     if (SD == ctx.getUnmanagedDecl()) {
       auto args = BGT->getGenericArgs();
@@ -2010,7 +2012,7 @@ public:
   void print(Type ty, Optional<OptionalTypeKind> optionalKind,
              Identifier name = Identifier(),
              IsFunctionParam_t isFuncParam = IsNotFunctionParam) {
-    PrettyStackTraceType trace(M.getASTContext(), "printing", ty);
+    PrettyStackTraceType trace(getASTContext(), "printing", ty);
 
     if (isFuncParam)
       if (auto fnTy = ty->lookThroughAllOptionalTypes()
@@ -2030,7 +2032,7 @@ public:
 };
 
 auto DeclAndTypePrinter::getImpl() -> Implementation {
-  return Implementation(M, os, *this);
+  return Implementation(os, *this);
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
