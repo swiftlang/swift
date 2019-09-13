@@ -966,14 +966,7 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 
 llvm::Expected<Type>
 StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                TypeAliasDecl *typeAlias) const {
-  // Fast path: If the interface type is already resolved, there's no need
-  // to compute the structural type.  This also prevents us from writing
-  // ErrorTypes into otherwise valid ASTs with generated typealiases.
-  if (typeAlias->hasInterfaceType()) {
-    return typeAlias->getInterfaceType()->getMetatypeInstanceType();
-  }
-  
+                                TypeAliasDecl *typeAlias) const {  
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));

@@ -837,9 +837,5 @@ UnderlyingTypeRequest::getCachedResult() const {
 
 void UnderlyingTypeRequest::cacheResult(Type value) const {
   auto *typeAlias = std::get<0>(getStorage());
-  // lldb creates global typealiases containing archetypes
-  // sometimes...
-  if (value->hasArchetype() && typeAlias->isGenericContext())
-    value = value->mapTypeOutOfContext();
   typeAlias->UnderlyingTy.setType(value);
 }

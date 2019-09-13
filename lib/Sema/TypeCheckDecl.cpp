@@ -3492,14 +3492,14 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
     return ErrorType::get(typeAlias->getASTContext());
   }
 
-  if (TypeChecker::validateType(typeAlias->getASTContext(),
-                                typeAlias->getUnderlyingTypeLoc(),
+  auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
+  if (TypeChecker::validateType(typeAlias->getASTContext(), underlyingLoc,
                                 TypeResolution::forInterface(typeAlias),
                                 options)) {
     typeAlias->setInvalid();
     return ErrorType::get(typeAlias->getASTContext());
   }
-  return ty;
+  return underlyingLoc.getType();
 }
 
 /// Bind the given function declaration, which declares an operator, to the corresponding operator declaration.

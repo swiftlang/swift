@@ -3553,6 +3553,13 @@ Type TypeAliasDecl::getUnderlyingType() const {
 }
       
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
+  // lldb creates global typealiases containing archetypes
+  // sometimes...
+  if (underlying->hasArchetype() && isGenericContext())
+    underlying = underlying->mapTypeOutOfContext();
+  getASTContext().evaluator.cacheOutput(
+          StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+          std::move(underlying));
   getASTContext().evaluator.cacheOutput(
           UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
           std::move(underlying));
