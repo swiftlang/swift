@@ -681,6 +681,18 @@ function set_build_options_for_host() {
                 -DSWIFT_DARWIN_DEPLOYMENT_VERSION_WATCHOS="${DARWIN_DEPLOYMENT_VERSION_WATCHOS}"
             )
             ;;
+        android-*)
+            SWIFT_HOST_VARIANT="android"
+            SWIFT_HOST_VARIANT_SDK="ANDROID"
+            case ${host} in
+                android-armv7)
+                    SWIFT_HOST_VARIANT_ARCH="armv7"
+                    ;;
+                android-aarch64)
+                    SWIFT_HOST_VARIANT_ARCH="aarch64"
+                    ;;
+                esac
+        ;;
         *)
             echo "Unknown host tools target: ${host}"
             exit 1
@@ -2933,7 +2945,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 case ${host} in
-                  linux-*|freebsd-*|cygwin-*|haiku-*) ;;
+                  linux-*|freebsd-*|cygwin-*|haiku-*|android-*) ;;
                   *)
                     echo "error: --install-xctest is not supported on this platform"
                     exit 1
