@@ -1407,3 +1407,16 @@ where T: SIMD, T.Scalar: FloatingPoint {
   }
   return result
 }
+
+// Break the ambiguity between AdditiveArithmetic and SIMD for += and -=
+extension SIMD where Self: AdditiveArithmetic, Self.Scalar: FloatingPoint {
+  @_transparent
+  public static func +=(lhs: inout Self, rhs: Self) {
+    lhs = lhs + rhs
+  }
+
+  @_transparent
+  public static func -=(lhs: inout Self, rhs: Self) {
+    lhs = lhs - rhs
+  }
+}
