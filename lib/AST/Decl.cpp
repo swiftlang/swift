@@ -7660,6 +7660,7 @@ ParseAbstractFunctionBodyRequest::getCachedResult() const {
   case BodyKind::Unparsed:
     return None;
   }
+  llvm_unreachable("Unhandled BodyKing in switch");
 }
 
 void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {

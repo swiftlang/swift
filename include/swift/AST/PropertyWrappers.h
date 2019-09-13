@@ -109,6 +109,7 @@ struct PropertyWrapperMutability {
       }
       return std::max(Getter, Setter);
     }
+    llvm_unreachable("Unhandled Value in switch");
   }
   
   bool operator==(PropertyWrapperMutability other) const {

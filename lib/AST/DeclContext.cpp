@@ -1037,6 +1037,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
+  llvm_unreachable("Unhandled DeclCopntextKindin switch");
 }
 
 #define DECL(Id, Parent) \

@@ -86,6 +86,7 @@ ArrayRef<StringRef> getSupportedConditionalCompilationValues(const PlatformCondi
   case PlatformConditionKind::TargetEnvironment:
     return SupportedConditionalCompilationTargetEnvironments;
   }
+  llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
 PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,

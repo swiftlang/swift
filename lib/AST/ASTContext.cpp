@@ -4477,6 +4477,7 @@ bool ASTContext::overrideGenericSignatureReqsSatisfied(
   case OverrideGenericSignatureReqCheck::DerivedReqSatisfiedByBase:
     return derivedSig->requirementsNotSatisfiedBy(sig).empty();
   }
+  llvm_unreachable("Unhandled OverrideGenericSignatureReqCheck in switch");
 }
 
 SILLayout *SILLayout::get(ASTContext &C,

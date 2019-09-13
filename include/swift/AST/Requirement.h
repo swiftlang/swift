@@ -167,6 +167,7 @@ public:
     case RequirementKind::Layout:
       return lhs.getLayoutConstraint() == rhs.getLayoutConstraint();
     }
+    llvm_unreachable("Unhandled RequirementKind in switch");
   }
 };
 
