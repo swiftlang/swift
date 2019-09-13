@@ -1621,7 +1621,7 @@ protected:
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 
   ValueDecl *getDecl() const {
-    auto selectedOverload = getChoiceFor(getRawAnchor());
+    auto selectedOverload = getChoiceFor(getLocator());
     if (!selectedOverload)
       return nullptr;
 

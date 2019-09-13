@@ -2547,63 +2547,6 @@ bool ConstraintSystem::repairFailures(
       }
     }
 
-    break;
-  }
-
-  case ConstraintLocator::FunctionArgument: {
-    auto *argLoc = getConstraintLocator(
-        locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
-
-    // Let's drop the last element which points to a single argument
-    // and see if this is a contextual mismatch.
-    path.pop_back();
-    if (path.empty() ||
-        !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
-          path.back().getKind() == ConstraintLocator::ContextualType))
-      return false;
-
-    auto arg = llvm::find_if(getTypeVariables(),
-                             [&argLoc](const TypeVariableType *typeVar) {
-                               return typeVar->getImpl().getLocator() == argLoc;
-                             });
-
-    // What we have here is a form or tuple splat with no arguments
-    // demonstrated by following example:
-    //
-    // func foo<T: P>(_: T, _: (T.Element) -> Int) {}
-    // foo { 42 }
-    //
-    // In cases like this `T.Element` might be resolved to `Void`
-    // which means that we have to try a single empty tuple argument
-    // as a narrow exception to SE-0110, see `matchFunctionTypes`.
-    //
-    // But if `T.Element` didn't get resolved to `Void` we'd like
-    // to diagnose this as a missing argument which can't be ignored.
-    if (arg != getTypeVariables().end()) {
-      auto fnType = FunctionType::get({FunctionType::Param(lhs)},
-                                      getASTContext().TheEmptyTupleType);
-      conversionsOrFixes.push_back(AddMissingArguments::create(
-          *this, fnType, {FunctionType::Param(*arg)},
-          getConstraintLocator(anchor, path)));
-    }
-
-    if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
-        (!lhs->is<InOutType>() && rhs->is<InOutType>())) {
-      // We want to call matchTypes with the default decomposition options
-      // in case there are type variables that we couldn't bind due to the
-      // inout attribute mismatch.
-      auto result = matchTypes(lhs->getInOutObjectType(),
-                               rhs->getInOutObjectType(), matchKind,
-                               getDefaultDecompositionOptions(TMF_ApplyingFix),
-                               locator);
-
-      if (result.isSuccess()) {
-        conversionsOrFixes.push_back(AllowInOutConversion::create(*this, lhs,
-            rhs, getConstraintLocator(locator)));
-        break;
-      }
-    }
-
     // If parameter type is `Any` the problem might be related to
     // invalid escapiness of the argument.
     if (rhs->isAny())
@@ -2686,6 +2629,63 @@ bool ConstraintSystem::repairFailures(
 
     conversionsOrFixes.push_back(
         AllowArgumentMismatch::create(*this, lhs, rhs, loc));
+    break;
+  }
+
+  case ConstraintLocator::FunctionArgument: {
+    auto *argLoc = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::SynthesizedArgument(0)));
+
+    // Let's drop the last element which points to a single argument
+    // and see if this is a contextual mismatch.
+    path.pop_back();
+    if (path.empty() ||
+        !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
+          path.back().getKind() == ConstraintLocator::ContextualType))
+      return false;
+
+    auto arg = llvm::find_if(getTypeVariables(),
+                             [&argLoc](const TypeVariableType *typeVar) {
+                               return typeVar->getImpl().getLocator() == argLoc;
+                             });
+
+    // What we have here is a form or tuple splat with no arguments
+    // demonstrated by following example:
+    //
+    // func foo<T: P>(_: T, _: (T.Element) -> Int) {}
+    // foo { 42 }
+    //
+    // In cases like this `T.Element` might be resolved to `Void`
+    // which means that we have to try a single empty tuple argument
+    // as a narrow exception to SE-0110, see `matchFunctionTypes`.
+    //
+    // But if `T.Element` didn't get resolved to `Void` we'd like
+    // to diagnose this as a missing argument which can't be ignored.
+    if (arg != getTypeVariables().end()) {
+      auto fnType = FunctionType::get({FunctionType::Param(lhs)},
+                                      getASTContext().TheEmptyTupleType);
+      conversionsOrFixes.push_back(AddMissingArguments::create(
+          *this, fnType, {FunctionType::Param(*arg)},
+          getConstraintLocator(anchor, path)));
+    }
+
+    if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
+        (!lhs->is<InOutType>() && rhs->is<InOutType>())) {
+      // We want to call matchTypes with the default decomposition options
+      // in case there are type variables that we couldn't bind due to the
+      // inout attribute mismatch.
+      auto result = matchTypes(lhs->getInOutObjectType(),
+                               rhs->getInOutObjectType(), matchKind,
+                               getDefaultDecompositionOptions(TMF_ApplyingFix),
+                               locator);
+
+      if (result.isSuccess()) {
+        conversionsOrFixes.push_back(AllowInOutConversion::create(*this, lhs,
+            rhs, getConstraintLocator(locator)));
+        break;
+      }
+    }
+
     break;
   }
 
