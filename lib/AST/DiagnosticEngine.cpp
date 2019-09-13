@@ -1002,14 +1002,38 @@ BufferIndirectlyCausingDiagnosticRAII::BufferIndirectlyCausingDiagnosticRAII(
 
 void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
   for (auto &argument : diagnostic.Args) {
-    if (argument.getKind() != DiagnosticArgumentKind::String)
-      continue;
+    switch (argument.getKind()) {
+      case DiagnosticArgumentKind::String: {
+        auto content = argument.getAsString();
+        if (content.empty())
+          continue;
 
-    auto content = argument.getAsString();
-    if (content.empty())
-      continue;
-
-    auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
-    argument = DiagnosticArgument(StringRef(I->getKeyData()));
+        auto I = TransactionStrings.insert(std::make_pair(content, char())).first;
+        argument = DiagnosticArgument(StringRef(I->getKeyData()));
+        continue;
+      }
+      case DiagnosticArgumentKind::TypeDescription: {
+        TransactionTypeDescriptions.push_back(*argument.getAsTypeDescription());
+        argument = DiagnosticArgument(&TransactionTypeDescriptions.back());
+        continue;
+      }
+      case DiagnosticArgumentKind::Integer:
+      case DiagnosticArgumentKind::Unsigned:
+      case DiagnosticArgumentKind::Identifier:
+      case DiagnosticArgumentKind::ObjCSelector:
+      case DiagnosticArgumentKind::ValueDecl:
+      case DiagnosticArgumentKind::Type:
+      case DiagnosticArgumentKind::TypeRepr:
+      case DiagnosticArgumentKind::PatternKind:
+      case DiagnosticArgumentKind::SelfAccessKind:
+      case DiagnosticArgumentKind::ReferenceOwnership:
+      case DiagnosticArgumentKind::StaticSpellingKind:
+      case DiagnosticArgumentKind::DescriptiveDeclKind:
+      case DiagnosticArgumentKind::DeclAttribute:
+      case DiagnosticArgumentKind::VersionTuple:
+      case DiagnosticArgumentKind::LayoutConstraint:
+        continue;
+    }
+    llvm_unreachable("unhandled DiagnosticArgumentKind");
   }
 }

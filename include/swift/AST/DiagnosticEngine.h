@@ -660,6 +660,11 @@ namespace swift {
     /// This is required because diagnostics are not directly emitted
     /// but rather stored until all transactions complete.
     llvm::StringMap<char, llvm::BumpPtrAllocator &> TransactionStrings;
+    
+    /// All TypeDescriptions involved in the current transactional chain.
+    /// This is required because diagnostics are not directly emitted
+    /// but rather stored until all transactions complete.
+    SmallVector<TypeDescription, 8> TransactionTypeDescriptions;
 
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
@@ -990,6 +995,7 @@ namespace swift {
 
       if (Depth == 0) {
         Engine.TransactionStrings.clear();
+        Engine.TransactionTypeDescriptions.clear();
         Engine.TransactionAllocator.Reset();
       }
     }

@@ -454,17 +454,19 @@ static bool noteFixableMismatchedTypes(ValueDecl *decl, const ValueDecl *base) {
                                               false);
       auto diagKind = diag::override_type_mismatch_with_fixits_init;
       unsigned numArgs = baseInit->getParameters()->size();
+      TypeDescription argTyDesc(argTy, decl->getDeclContext(), decl->getLoc());
       activeDiag.emplace(diags.diagnose(decl, diagKind,
                                         /*plural*/std::min(numArgs, 2U),
-                                        argTy));
+                                        &argTyDesc));
     } else {
       if (isa<AbstractFunctionDecl>(base))
         baseTy = baseTy->getAs<AnyFunctionType>()->getResult();
-
+      TypeDescription baseTyDesc(baseTy, base->getDeclContext(),
+                                 base->getLoc());
       activeDiag.emplace(
         diags.diagnose(decl,
                        diag::override_type_mismatch_with_fixits,
-                       base->getDescriptiveKind(), baseTy));
+                       base->getDescriptiveKind(), &baseTyDesc));
     }
 
     if (fixItOverrideDeclarationTypes(*activeDiag, decl, base))
