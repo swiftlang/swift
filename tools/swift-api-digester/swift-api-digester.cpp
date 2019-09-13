@@ -1144,6 +1144,18 @@ public:
           }
         }
       }
+      if (auto *CD = dyn_cast<SDKNodeDeclConstructor>(Right)) {
+        if (auto *TD = dyn_cast<SDKNodeDeclType>(Right->getParent())) {
+          if (TD->isOpen() && CD->getInitKind() == CtorInitializerKind::Designated) {
+            // If client's subclass provides an implementation of all of its superclass designated
+            // initializers, it automatically inherits all of the superclass convenience initializers.
+            // This means if a new designated init is added to the base class, the inherited
+            // convenience init may be missing and cause breakage.
+            CD->emitDiag(diag::desig_init_added);
+          }
+        }
+      }
+
       return;
     case NodeMatchReason::Removed:
       assert(!Right);

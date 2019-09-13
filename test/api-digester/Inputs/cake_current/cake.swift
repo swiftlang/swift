@@ -208,3 +208,13 @@ public class SwiftObjcClass {
   @objc(NewObjCFool:NewObjCA:NewObjCB:)
   public func foo(a:Int, b:Int, c: Int) {}
 }
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+open class AddingNewDesignatedInit {
+  public init(_ b: Bool) {}
+  public init() {}
+  public convenience init(foo: Int) {
+    self.init()
+    print(foo)
+  }
+}
