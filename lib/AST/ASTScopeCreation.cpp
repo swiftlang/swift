@@ -1802,20 +1802,29 @@ bool TopLevelCodeScope::isCurrent() const {
   return bodyWhenLastExpanded == decl->getBody();
 }
 
+// Try to avoid the work of counting
+static const bool assumeVarsDoNotGetAdded = true;
+
+static unsigned countVars(const PatternBindingEntry &entry) {
+  unsigned varCount = 0;
+  entry.getPattern()->forEachVariable([&](VarDecl *) { ++varCount; });
+  return varCount;
+}
+
 void PatternEntryDeclScope::beCurrent() {
   initWhenLastExpanded = getPatternEntry().getOriginalInit();
-  unsigned varCount = 0;
-  getPatternEntry().getPattern()->forEachVariable(
-      [&](VarDecl *) { ++varCount; });
-  varCountWhenLastExpanded = varCount;
+  if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded)
+    return;
+  varCountWhenLastExpanded = countVars(getPatternEntry());
 }
 bool PatternEntryDeclScope::isCurrent() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
     return false;
-  unsigned varCount = 0;
-  getPatternEntry().getPattern()->forEachVariable(
-      [&](VarDecl *) { ++varCount; });
-  return varCount == varCountWhenLastExpanded;
+  if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
+    assert(varCountWhenLastExpanded == countVars(getPatternEntry()));
+    return true;
+  }
+  return countVars(getPatternEntry()) == varCountWhenLastExpanded;
 }
 
 void WholeClosureScope::beCurrent() {
