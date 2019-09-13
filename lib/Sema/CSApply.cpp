@@ -7688,7 +7688,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
           auto *transformedExpr = result->second.second;
           // Since this closure has been transformed into something
           // else let's look inside transformed expression instead.
-          return {true, transformedExpr};
+          transformedExpr->walk(*this);
+          return {false, E};
         }
       }
 
