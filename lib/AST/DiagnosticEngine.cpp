@@ -379,7 +379,7 @@ static bool isInterestingTypealias(Type type) {
   // Compatibility aliases are only interesting insofar as their underlying
   // types are interesting.
   if (aliasDecl->isCompatibilityAlias()) {
-    auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
+    auto underlyingTy = aliasDecl->getUnderlyingType();
     return isInterestingTypealias(underlyingTy);
   }
 

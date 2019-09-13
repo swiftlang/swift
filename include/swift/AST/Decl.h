@@ -2976,20 +2976,28 @@ public:
 
   void setTypeEndLoc(SourceLoc e) { TypeEndLoc = e; }
 
-  TypeLoc &getUnderlyingTypeLoc() {
-    return UnderlyingTy;
+  /// Retrieve the TypeRepr corresponding to the parsed underlying type.
+  TypeRepr *getUnderlyingTypeRepr() const {
+    return UnderlyingTy.getTypeRepr();
   }
-  const TypeLoc &getUnderlyingTypeLoc() const {
-    return UnderlyingTy;
+  void setUnderlyingTypeRepr(TypeRepr *repr) {
+    UnderlyingTy = repr;
   }
-
+  
+  /// Retrieve the interface type of the underlying type.
+  Type getUnderlyingType() const;
   void setUnderlyingType(Type type);
 
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
+  /// Retrieve a sugared interface type containing the structure of the interface
+  /// type before any semantic validation has occured.
   Type getStructuralType() const;
 
+  /// Set the interface type of this typealias declaration from the underlying type.
+  void computeType();
+  
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }

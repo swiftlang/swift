@@ -3785,9 +3785,8 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
 
 static Type getStructuralType(TypeDecl *typeDecl) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (auto resolved = typealias->getUnderlyingTypeLoc().getType())
-      return resolved;
-
+    if (typealias->hasInterfaceType())
+      return typealias->getDeclaredInterfaceType();
     return typealias->getStructuralType();
   }
 
@@ -4196,11 +4195,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       out << start;
       out << type->getFullName() << " == ";
       if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
-        if (auto underlyingTypeRepr =
-              typealias->getUnderlyingTypeLoc().getTypeRepr())
+        if (auto underlyingTypeRepr = typealias->getUnderlyingTypeRepr())
           underlyingTypeRepr->print(out);
         else
-          typealias->getUnderlyingTypeLoc().getType().print(out);
+          typealias->getUnderlyingType().print(out);
       } else {
         type->print(out);
       }

@@ -333,7 +333,7 @@ void NameBinder::addImport(
             diag::imported_decl_is_wrong_kind_typealias,
             typealias->getDescriptiveKind(),
             TypeAliasType::get(typealias, Type(), SubstitutionMap(),
-                                typealias->getUnderlyingTypeLoc().getType()),
+                                typealias->getUnderlyingType()),
             getImportKindString(ID->getImportKind())));
       } else {
         emittedDiag.emplace(diagnose(ID, diag::imported_decl_is_wrong_kind,
