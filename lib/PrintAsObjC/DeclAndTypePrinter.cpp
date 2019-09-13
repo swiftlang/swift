@@ -99,25 +99,18 @@ class DeclAndTypePrinter::Implementation
   friend ASTVisitor;
   friend TypeVisitor;
 
+  // These first two members are accessible through 'owningPrinter',
+  // but it makes the code simpler to have them here too.
   ModuleDecl &M;
   raw_ostream &os;
-  const DelayedMemberSet &delayedMembers;
-  AccessLevel minRequiredAccess;
+  DeclAndTypePrinter &owningPrinter;
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
 
-  using NameAndOptional = std::pair<StringRef, bool>;
-  llvm::DenseMap<std::pair<Identifier, Identifier>, NameAndOptional>
-    specialNames;
-
-  // Cached for convenience.
-  Identifier ID_CFTypeRef;
-  Optional<Type> NSCopyingType;
-
 public:
   explicit Implementation(ModuleDecl &mod, raw_ostream &out,
-                          const DelayedMemberSet &delayed, AccessLevel access)
-    : M(mod), os(out), delayedMembers(delayed), minRequiredAccess(access) {}
+                          DeclAndTypePrinter &owner)
+    : M(mod), os(out), owningPrinter(owner) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -156,8 +149,7 @@ public:
   }
 
   bool shouldInclude(const ValueDecl *VD) {
-    return isVisibleToObjC(VD, minRequiredAccess) &&
-           !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
+    return owningPrinter.shouldInclude(VD);
   }
 
 private:
@@ -195,7 +187,7 @@ private:
         continue;
       if (isa<AccessorDecl>(VD))
         continue;
-      if (!AllowDelayed && delayedMembers.count(VD)) {
+      if (!AllowDelayed && owningPrinter.delayedMembers.count(VD)) {
         os << "// '" << VD->getFullName() << "' below\n";
         continue;
       }
@@ -619,7 +611,7 @@ private:
     // Swift designated initializers are Objective-C designated initializers.
     if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
       if (ctor->hasStubImplementation()
-          || ctor->getFormalAccess() < minRequiredAccess) {
+          || ctor->getFormalAccess() < owningPrinter.minRequiredAccess) {
         // This will only be reached if the overridden initializer has the
         // required access
         os << " SWIFT_UNAVAILABLE";
@@ -1062,9 +1054,9 @@ private:
     if (!TAD || !TAD->hasClangNode())
       return false;
 
-    if (ID_CFTypeRef.empty())
-      ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
-    return TAD->getName() == ID_CFTypeRef;
+    if (owningPrinter.ID_CFTypeRef.empty())
+      owningPrinter.ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
+    return TAD->getName() == owningPrinter.ID_CFTypeRef;
   }
 
   /// Returns true if \p ty can be used with Objective-C reference-counting
@@ -1105,8 +1097,10 @@ private:
 
     ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);
-    if (isSettable && !ctx.isAccessControlDisabled())
-      isSettable = (VD->getSetterFormalAccess() >= minRequiredAccess);
+    if (isSettable && !ctx.isAccessControlDisabled()) {
+      isSettable =
+          (VD->getSetterFormalAccess() >= owningPrinter.minRequiredAccess);
+    }
     if (!isSettable)
       os << ", readonly";
 
@@ -1393,19 +1387,19 @@ private:
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
       if (ModuleDecl *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
-        if (!NSCopyingType) {
+        if (!owningPrinter.NSCopyingType) {
           SmallVector<ValueDecl *, 1> decls;
           M->lookupQualified(M, ctx.getIdentifier("NSCopying"),
                              NL_OnlyTypes, decls);
           if (decls.size() == 1 && isa<ProtocolDecl>(decls[0])) {
-            NSCopyingType = cast<ProtocolDecl>(decls[0])
+            owningPrinter.NSCopyingType = cast<ProtocolDecl>(decls[0])
               ->getDeclaredInterfaceType();
           } else {
-            NSCopyingType = Type();
+            owningPrinter.NSCopyingType = Type();
           }
         }
-        if (*NSCopyingType) {
-          rewrittenArgsBuf[0] = *NSCopyingType;
+        if (*owningPrinter.NSCopyingType) {
+          rewrittenArgsBuf[0] = *owningPrinter.NSCopyingType;
           rewrittenArgsBuf[1] = typeArgs[1];
           typeArgs = rewrittenArgsBuf;
         }
@@ -1452,6 +1446,7 @@ private:
   ///
   /// Returns null if the name is not one of these known types.
   const NameAndOptional *getKnownTypeInfo(const TypeDecl *typeDecl) {
+    auto &specialNames = owningPrinter.specialNames;
     if (specialNames.empty()) {
       ASTContext &ctx = M.getASTContext();
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
@@ -2035,11 +2030,12 @@ public:
 };
 
 auto DeclAndTypePrinter::getImpl() -> Implementation {
-  return Implementation(M, os, delayedMembers, minRequiredAccess);
+  return Implementation(M, os, *this);
 }
 
 bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
-  return getImpl().shouldInclude(VD);
+  return isVisibleToObjC(VD, minRequiredAccess) &&
+         !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>();
 }
 
 void DeclAndTypePrinter::print(const Decl *D) {

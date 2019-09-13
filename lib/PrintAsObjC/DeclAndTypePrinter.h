@@ -31,11 +31,20 @@ public:
 
 private:
   class Implementation;
+  friend class Implementation;
 
   ModuleDecl &M;
   raw_ostream &os;
   const DelayedMemberSet &delayedMembers;
   AccessLevel minRequiredAccess;
+
+  using NameAndOptional = std::pair<StringRef, bool>;
+  llvm::DenseMap<std::pair<Identifier, Identifier>, NameAndOptional>
+    specialNames;
+
+  // Cached for convenience.
+  Identifier ID_CFTypeRef;
+  Optional<Type> NSCopyingType;
 
   Implementation getImpl();
 
