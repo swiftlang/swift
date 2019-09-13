@@ -172,3 +172,18 @@ func test_51167632() -> some P {
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
 }
+
+func acceptInt(_: Int, _: () -> Void) { }
+
+// SR-11350 crash due to improper recontextualization.
+func erroneousSR11350(x: Int) {
+  tuplify(true) { b in  // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+    17
+    x + 25
+    Optional(tuplify(false) { b in
+      if b {
+        acceptInt(0) { }
+      }
+    }).domap(0)
+  }
+}
