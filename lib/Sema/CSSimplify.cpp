@@ -5397,7 +5397,12 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
 
       auto *fix =
           DefineMemberBasedOnUse::create(*this, baseTy, member, locator);
-      if (recordFix(fix))
+      // Impact is higher if the base is expected to be inferred from context,
+      // because a failure to find a member ultimately means that base type is
+      // not a match in this case.
+      auto impact =
+          locator->findLast<LocatorPathElt::UnresolvedMember>() ? 2 : 1;
+      if (recordFix(fix, impact))
         return SolutionKind::Error;
 
       // Allow member type to default to `Any` to make it possible to form
