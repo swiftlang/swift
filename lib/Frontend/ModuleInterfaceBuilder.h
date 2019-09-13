@@ -31,7 +31,7 @@ class LangOptions;
 class SearchPathOptions;
 class DependencyTracker;
 
-class ParseableInterfaceBuilder {
+class ModuleInterfaceBuilder {
   llvm::vfs::FileSystem &fs;
   DiagnosticEngine &diags;
   const StringRef interfacePath;
@@ -68,7 +68,7 @@ class ParseableInterfaceBuilder {
       SmallVectorImpl<const char *> &SubArgs);
 
 public:
-  ParseableInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
+  ModuleInterfaceBuilder(SourceManager &sourceMgr, DiagnosticEngine &diags,
                             const SearchPathOptions &searchPathOpts,
                             const LangOptions &langOpts,
                             ClangModuleLoader *clangImporter,

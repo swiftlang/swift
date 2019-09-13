@@ -893,7 +893,7 @@ class ModuleInterfaceLoaderImpl {
 
     // Set up a builder if we need to build the module. It'll also set up
     // the subinvocation we'll need to use to compute the cache paths.
-    ParseableInterfaceBuilder builder(
+    ModuleInterfaceBuilder builder(
       ctx.SourceMgr, ctx.Diags, ctx.SearchPathOpts, ctx.LangOpts,
       ctx.getClangModuleLoader(), interfacePath, moduleName, cacheDir,
       prebuiltCacheDir, /*serializeDependencyHashes*/false,
@@ -1050,7 +1050,7 @@ bool ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
     StringRef ModuleName, StringRef InPath, StringRef OutPath,
     bool SerializeDependencyHashes, bool TrackSystemDependencies,
     bool RemarkOnRebuildFromInterface) {
-  ParseableInterfaceBuilder builder(SourceMgr, Diags, SearchPathOpts, LangOpts,
+  ModuleInterfaceBuilder builder(SourceMgr, Diags, SearchPathOpts, LangOpts,
                                     /*clangImporter*/nullptr, InPath,
                                     ModuleName, CacheDir, PrebuiltCacheDir,
                                     SerializeDependencyHashes,

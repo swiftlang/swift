@@ -67,7 +67,7 @@ static Optional<StringRef> getRelativeDepPath(StringRef DepPath,
   return None;
 }
 
-void ParseableInterfaceBuilder::configureSubInvocationInputsAndOutputs(
+void ModuleInterfaceBuilder::configureSubInvocationInputsAndOutputs(
     StringRef OutPath) {
   auto &SubFEOpts = subInvocation.getFrontendOptions();
   SubFEOpts.RequestedAction = FrontendOptions::ActionType::EmitModuleOnly;
@@ -81,7 +81,7 @@ void ParseableInterfaceBuilder::configureSubInvocationInputsAndOutputs(
   .setMainAndSupplementaryOutputs({MainOut}, {SOPs});
 }
 
-void ParseableInterfaceBuilder::configureSubInvocation(
+void ModuleInterfaceBuilder::configureSubInvocation(
     const SearchPathOptions &SearchPathOpts,
     const LangOptions &LangOpts,
     ClangModuleLoader *ClangLoader) {
@@ -133,7 +133,7 @@ void ParseableInterfaceBuilder::configureSubInvocation(
   remarkOnRebuildFromInterface;
 }
 
-bool ParseableInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
+bool ModuleInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
     swift::version::Version &Vers, llvm::StringSaver &SubArgSaver,
     SmallVectorImpl<const char *> &SubArgs) {
   auto FileOrError = swift::vfs::getFileOrSTDIN(fs, interfacePath);
@@ -163,7 +163,7 @@ bool ParseableInterfaceBuilder::extractSwiftInterfaceVersionAndArgs(
   return false;
 }
 
-bool ParseableInterfaceBuilder::collectDepsForSerialization(
+bool ModuleInterfaceBuilder::collectDepsForSerialization(
     CompilerInstance &SubInstance, SmallVectorImpl<FileDependency> &Deps,
     bool IsHashBased) {
   auto &Opts = SubInstance.getASTContext().SearchPathOpts;
@@ -240,7 +240,7 @@ bool ParseableInterfaceBuilder::collectDepsForSerialization(
   return false;
 }
 
-bool ParseableInterfaceBuilder::buildSwiftModule(
+bool ModuleInterfaceBuilder::buildSwiftModule(
     StringRef OutPath, bool ShouldSerializeDeps,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer) {
   bool SubError = false;
@@ -349,7 +349,7 @@ bool ParseableInterfaceBuilder::buildSwiftModule(
     SerializationOpts.OutputPath = OutPathStr.c_str();
     SerializationOpts.ModuleLinkName = FEOpts.ModuleLinkName;
 
-    // Record any non-SDK parseable interface files for the debug info.
+    // Record any non-SDK module interface files for the debug info.
     StringRef SDKPath = SubInstance.getASTContext().SearchPathOpts.SDKPath;
     if (!getRelativeDepPath(InPath, SDKPath))
       SerializationOpts.ParseableInterface = InPath;
