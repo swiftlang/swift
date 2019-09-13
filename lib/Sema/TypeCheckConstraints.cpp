@@ -4041,10 +4041,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
 
   // Check for casts between specific concrete types that cannot succeed.
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-
-  if (auto toElementType = cs.isArrayType(toType)) {
-    if (auto fromElementType = cs.isArrayType(fromType)) {
+  if (auto toElementType = ConstraintSystem::isArrayType(toType)) {
+    if (auto fromElementType = ConstraintSystem::isArrayType(fromType)) {
       switch (typeCheckCheckedCast(*fromElementType, *toElementType,
                                    CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange())) {
@@ -4066,8 +4064,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  if (auto toKeyValue = cs.isDictionaryType(toType)) {
-    if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
+  if (auto toKeyValue = ConstraintSystem::isDictionaryType(toType)) {
+    if (auto fromKeyValue = ConstraintSystem::isDictionaryType(fromType)) {
       bool hasCoercion = false;
       enum { NoBridging, BridgingCoercion }
         hasBridgingConversion = NoBridging;
@@ -4130,8 +4128,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  if (auto toElementType = cs.isSetType(toType)) {
-    if (auto fromElementType = cs.isSetType(fromType)) {
+  if (auto toElementType = ConstraintSystem::isSetType(toType)) {
+    if (auto fromElementType = ConstraintSystem::isSetType(fromType)) {
       switch (typeCheckCheckedCast(*fromElementType, *toElementType,
                                    CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange())) {
@@ -4254,9 +4252,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool toExistentialMetatype = false;
   bool fromExistentialMetatype = false;
   if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
-    toExistentialMetatype = toMetatype->is<ExistentialMetatypeType>();
     if (auto fromMetatype = fromType->getAs<AnyMetatypeType>()) {
-      fromExistentialMetatype = fromMetatype->is<ExistentialMetatypeType>();
+      toExistentialMetatype = toType->is<ExistentialMetatypeType>();
+      fromExistentialMetatype = fromType->is<ExistentialMetatypeType>();
       toType = toMetatype->getInstanceType();
       fromType = fromMetatype->getInstanceType();
     }
@@ -4266,23 +4264,43 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool fromArchetype = fromType->is<ArchetypeType>();
   bool toExistential = toType->isExistentialType();
   bool fromExistential = fromType->isExistentialType();
+
+  bool toRequiresClass;
+  if (toType->isExistentialType())
+    toRequiresClass = toType->getExistentialLayout().requiresClass();
+  else
+    toRequiresClass = toType->mayHaveSuperclass();
+
+  bool fromRequiresClass;
+  if (fromType->isExistentialType())
+    fromRequiresClass = fromType->getExistentialLayout().requiresClass();
+  else
+    fromRequiresClass = fromType->mayHaveSuperclass();
   
-  // If we're doing a metatype cast, it can only be existential if we're
-  // casting to/from the existential metatype. 'T.self as P.Protocol'
-  // can only succeed if T is exactly the type P, so is a concrete cast,
-  // whereas 'T.self as P.Type' succeeds for types conforming to the protocol
-  // P, and is an existential cast.
+  // Casts between protocol metatypes only succeed if the type is existential.
   if (metatypeCast) {
-    toExistential &= toExistentialMetatype;
-    fromExistential &= fromExistentialMetatype;
+    if (toExistential || fromExistential)
+      return failed();
   }
+
+  // Casts from an existential metatype to a protocol metatype always fail,
+  // except when the existential type is 'Any'.
+  if (fromExistentialMetatype &&
+      !fromType->isAny() &&
+      !toExistentialMetatype &&
+      toExistential)
+    return failed();
 
   // Casts to or from generic types can't be statically constrained in most
   // cases, because there may be protocol conformances we don't statically
   // know about.
-  if (toExistential || fromExistential || fromArchetype || toArchetype) {
+  if (toExistential || fromExistential || fromArchetype || toArchetype ||
+      toRequiresClass || fromRequiresClass) {
     // Cast to and from AnyObject always succeed.
-    if (toType->isAnyObject() || fromType->isAnyObject())
+    if (!metatypeCast &&
+        !fromExistentialMetatype &&
+        !toExistentialMetatype &&
+        (toType->isAnyObject() || fromType->isAnyObject()))
       return CheckedCastKind::ValueCast;
 
     // A cast from an existential type to a concrete type does not succeed. For
@@ -4315,18 +4333,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         }
       }
     }
-
-    bool toRequiresClass;
-    if (toType->isExistentialType())
-      toRequiresClass = toType->getExistentialLayout().requiresClass();
-    else
-      toRequiresClass = toType->mayHaveSuperclass();
-
-    bool fromRequiresClass;
-    if (fromType->isExistentialType())
-      fromRequiresClass = fromType->getExistentialLayout().requiresClass();
-    else
-      fromRequiresClass = fromType->mayHaveSuperclass();
 
     // If neither type is class-constrained, anything goes.
     if (!fromRequiresClass && !toRequiresClass)
@@ -4373,44 +4379,29 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         return CheckedCastKind::ValueCast;
 
       // Compare superclass bounds.
-      if (typesSatisfyConstraint(toSuperclass, fromSuperclass,
-                                 /*openArchetypes=*/true,
-                                 ConstraintKind::Subtype, dc))
+      if (fromSuperclass->isBindableToSuperclassOf(toSuperclass))
         return CheckedCastKind::ValueCast;
 
       // An upcast is also OK.
-      if (typesSatisfyConstraint(fromSuperclass, toSuperclass,
-                                 /*openArchetypes=*/true,
-                                 ConstraintKind::Subtype, dc))
+      if (toSuperclass->isBindableToSuperclassOf(fromSuperclass))
         return CheckedCastKind::ValueCast;
     }
   }
 
-  if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
+  if (ConstraintSystem::isAnyHashableType(toType) ||
+      ConstraintSystem::isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;
   }
 
   // If the destination type can be a supertype of the source type, we are
   // performing what looks like an upcast except it rebinds generic
   // parameters.
-  if (!metatypeCast &&
-      typesSatisfyConstraint(fromType, toType,
-                             /*openArchetypes=*/true,
-                             ConstraintKind::Subtype, dc)) {
+  if (fromType->isBindableTo(toType))
     return CheckedCastKind::ValueCast;
-  }
-
-  // If the destination type can be a subtype of the source type, we have
-  // a downcast.
-  if (typesSatisfyConstraint(toType, fromType,
-                             /*openArchetypes=*/true,
-                             ConstraintKind::Subtype, dc)) {
-    return CheckedCastKind::ValueCast;
-  }
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
   // so casts from NSObject to potentially-class metatypes may succeed.
-  if (auto nsObject = cs.TC.getNSObjectType(dc)) {
+  if (auto nsObject = getNSObjectType(dc)) {
     if (fromType->isEqual(nsObject)) {
       if (auto toMeta = toType->getAs<MetatypeType>()) {
         if (toMeta->getInstanceType()->mayHaveSuperclass()
