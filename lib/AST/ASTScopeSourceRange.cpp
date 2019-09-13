@@ -166,6 +166,22 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
   return siblingsAndMe[myIndex - 1];
 }
 
+bool ASTScopeImpl::doesRangeMatch(unsigned start, unsigned end, StringRef file,
+                                  StringRef className) {
+  if (!className.empty() && className != getClassName())
+    return false;
+  const auto &SM = getSourceManager();
+  const auto r = getSourceRangeOfScope(true);
+  if (start && start != SM.getLineNumber(r.Start))
+    return false;
+  if (end && end != SM.getLineNumber(r.End))
+    return false;
+  if (file.empty())
+    return true;
+  const auto buf = SM.findBufferContainingLoc(r.Start);
+  return SM.getIdentifierForBuffer(buf).endswith(file);
+}
+
 #pragma mark getSourceRangeOfThisASTNode
 
 SourceRange SpecializeAttributeScope::getSourceRangeOfThisASTNode(

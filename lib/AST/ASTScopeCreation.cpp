@@ -93,6 +93,26 @@ static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
 
+/// For Debugging
+template <typename T>
+bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
+                             unsigned start, unsigned end,
+                             StringRef file = "") {
+  auto const r = getRangeableSourceRange(x);
+  if (r.isInvalid())
+    return false;
+  if (start && SM.getLineNumber(r.Start) != start)
+    return false;
+  if (end && SM.getLineNumber(r.End) != end)
+    return false;
+  if (file.empty())
+    return true;
+  const auto buf = SM.findBufferContainingLoc(r.Start);
+  return SM.getIdentifierForBuffer(buf).endswith(file);
+}
+
+#pragma mark end of rangeable
+
 static std::vector<ASTNode> asNodeVector(DeclRange dr) {
   std::vector<ASTNode> nodes;
   llvm::transform(dr, std::back_inserter(nodes),
@@ -366,7 +386,7 @@ public:
             parent, vd);
     });
   }
-  // HERE
+
 public:
   /// Create the matryoshka nested generic param scopes (if any)
   /// that are subscopes of the receiver. Return

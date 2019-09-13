@@ -215,6 +215,10 @@ public:
 
   bool checkSourceRangeOfThisASTNode() const;
 
+  /// For debugging
+  bool doesRangeMatch(unsigned start, unsigned end, StringRef file = "",
+                      StringRef className = "");
+
 private:
   SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
   SourceRange
