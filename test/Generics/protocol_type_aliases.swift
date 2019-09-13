@@ -42,14 +42,14 @@ func concreteRequirementOnConcreteNestedTypeAlias<T>(_: T) where T: Q2, S<T.C> =
 protocol P3 {
     typealias T = Int
 }
-protocol Q3: P3 { // expected-error{{generic signature requires types 'Int'}}
+protocol Q3: P3 { // expected-error{{generic signature requires types 'P3.T' (aka 'Int')}}
     typealias T = Float
 }
 
 protocol P3_1 {
     typealias T = Float
 }
-protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types 'Float'}}
+protocol Q3_1: P3, P3_1 {} // expected-error{{generic signature requires types 'P3_1.T' (aka 'Float')}}
 
 
 // Subprotocols can force associated types in their parents to be concrete, and
