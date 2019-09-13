@@ -87,8 +87,6 @@ public:
 // Type relation checking
 //----------------------------------------------------------------------------//
 enum class TypeRelation: uint8_t {
-  EqualTo,
-  PossiblyEqualTo,
   ConvertTo,
 };
 
@@ -158,8 +156,6 @@ struct TypeRelationCheckInput {
     out << " is ";
     switch(owner.Relation) {
 #define CASE(NAME) case TypeRelation::NAME: out << #NAME << " "; break;
-    CASE(EqualTo)
-    CASE(PossiblyEqualTo)
     CASE(ConvertTo)
 #undef CASE
     }

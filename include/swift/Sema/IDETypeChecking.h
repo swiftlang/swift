@@ -47,10 +47,6 @@ namespace swift {
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
 
-  bool isEqual(Type T1, Type T2, DeclContext &DC);
-
-  bool canPossiblyEqual(Type T1, Type T2, DeclContext &DC);
-
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
 
