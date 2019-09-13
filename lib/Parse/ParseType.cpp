@@ -756,7 +756,7 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
     // standalone token.
     } else if (isParsingQualifiedDeclName && startsWithSymbol(Tok, '.') &&
                Tok.getLength() != 1) {
-      consumeStartingCharacterOfCurrentToken(tok::period);
+      Period = consumeStartingCharacterOfCurrentTokenSyntax(tok::period);
       continue;
     }
     break;
@@ -787,9 +787,17 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
     Junk.push_back(consumeTokenSyntax(tok::code_complete));
     return makeParsedCodeCompletion<ParsedTypeSyntax>(Junk);
   }
-  
   if (Status.isError())
     return makeParsedError<ParsedTypeSyntax>(Junk);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // When parsing a qualified decl name (`isParsingQualifiedDeclName`), it is
+  // possible that there are no type qualifications and therefore we have an
+  // empty result. In this case, return an empty parser error.
+  if (!Base) {
+    assert(isParsingQualifiedDeclName);
+    return makeParsedErrorEmpty<ParsedTypeSyntax>();
+  }
 
   return makeParsedSuccess(*Base);
 }

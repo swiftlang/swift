@@ -1219,6 +1219,35 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
 }
 
 /// SWIFT_ENABLE_TENSORFLOW
+/// Helper function that parses 'type-identifier' for `parseQualifiedDeclName`.
+/// Returns true on error. Sets `baseType` to the parsed type, if present, or to
+/// `nullptr` if not. A missing base type is not considered an error.
+static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
+  baseType = nullptr;
+
+  auto currentPosition = P.getParserPosition();
+  bool canParseBaseType = P.canParseTypeIdentifier();
+  P.backtrackToPosition(currentPosition);
+  if (!canParseBaseType)
+    return false;
+
+  SourceLoc loc = P.Tok.getLoc();
+  auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
+
+  // `parseTypeIdentifier` returns an error result with zero nodes in the case
+  // where there is no base type. So we return success if we see zero nodes in
+  // an error result. But we return failure if we see an error result with
+  // nodes.
+  if (!result.isSuccess())
+    return !result.getUnknownNodes().empty();
+
+  P.SyntaxContext->addSyntax(result.getResult());
+  auto node = P.SyntaxContext->topNode<TypeSyntax>();
+  baseType = P.Generator.generate(node, loc);
+  return false;
+}
+
+/// SWIFT_ENABLE_TENSORFLOW
 /// parseQualifiedDeclName
 ///
 ///   qualified-decl-name:
@@ -1230,24 +1259,9 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
 /// Returns true on error (if function decl name could not be parsed).
 bool parseQualifiedDeclName(Parser &P, Diag<> nameParseError,
                             TypeRepr *&baseType, DeclNameWithLoc &original) {
-  // If the current token is an identifier or `Self` or `Any`, then attempt to
-  // parse the base type. Otherwise, base type is null.
-  auto currentPosition = P.getParserPosition();
-  bool canParseBaseType = P.canParseTypeIdentifier();
-  P.backtrackToPosition(currentPosition);
-  if (canParseBaseType) {
-    auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
-    if (!result.isSuccess())
-      return true;
+  if (parseBaseTypeForQualifiedDeclName(P, baseType))
+    return true;
 
-    P.SyntaxContext->addSyntax(result.getResult());
-    auto node = P.SyntaxContext->topNode<TypeSyntax>();
-    auto baseNameLoc = original.Loc.getBaseNameLoc();
-    baseType = P.Generator.generate(node, baseNameLoc);
-  } else {
-    baseType = nullptr;
-  }
-  
   // If base type was parsed and has at least one component, then there was a
   // dot before the current token.
   bool afterDot = false;

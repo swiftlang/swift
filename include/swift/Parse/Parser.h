@@ -1220,9 +1220,16 @@ public:
   TypeResult parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
   TypeResult parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
   // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
-  /// The `isParsingQualifiedDeclName` flag controls whether parsing is done as
-  /// if this type identifier is the prefix to a qualified declaration name. If
-  /// true, backtrack parsing the last identifier.
+  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  ///
+  /// When `isParsingQualifiedDeclName` is true:
+  /// - Parses the type qualifier from a qualified decl name, and returns a
+  ///   parser result for the type of the qualifier.
+  /// - Positions the parser at the final declaration name.
+  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser gets
+  ///   positioned at 'f'.
+  /// - If there is no type qualification (e.g. when parsing just 'f'), returns
+  ///   an empty parser error.
   TypeResult parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
   TypeResult parseAnyType();
   TypeResult parseTypeTupleBody();
