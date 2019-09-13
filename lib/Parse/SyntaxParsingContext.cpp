@@ -54,13 +54,14 @@ size_t SyntaxParsingContext::lookupNode(size_t LexerOffset, SourceLoc Loc) {
     return 0;
   }
   Mode = AccumulationMode::SkippedForIncrementalUpdate;
-  getStorage().push_back(foundNode);
-  return foundNode.getRecordedRange().getByteLength();
+  auto length = foundNode.getRecordedRange().getByteLength();
+  getStorage().push_back(std::move(foundNode));
+  return length;
 }
 
 ParsedRawSyntaxNode
 SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
-                                        ArrayRef<ParsedRawSyntaxNode> Parts) {
+                                        MutableArrayRef<ParsedRawSyntaxNode> Parts) {
   assert(isUnknownKind(Kind));
   if (shouldDefer())
     return ParsedRawSyntaxNode::makeDeferred(Kind, Parts, *this);
@@ -70,12 +71,12 @@ SyntaxParsingContext::makeUnknownSyntax(SyntaxKind Kind,
 
 ParsedRawSyntaxNode
 SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
-                                     ArrayRef<ParsedRawSyntaxNode> Parts,
+                                     MutableArrayRef<ParsedRawSyntaxNode> Parts,
                                      SyntaxNodeCreationKind nodeCreateK) {
   // Try to create the node of the given syntax.
   ParsedRawSyntaxNode rawNode;
   auto &rec = getRecorder();
-  auto formNode = [&](SyntaxKind kind, ArrayRef<ParsedRawSyntaxNode> layout) {
+  auto formNode = [&](SyntaxKind kind, MutableArrayRef<ParsedRawSyntaxNode> layout) {
     if (nodeCreateK == SyntaxNodeCreationKind::Deferred || shouldDefer()) {
       rawNode = ParsedRawSyntaxNode::makeDeferred(kind, layout, *this);
     } else {
@@ -91,9 +92,9 @@ SyntaxParsingContext::createSyntaxAs(SyntaxKind Kind,
 
 Optional<ParsedRawSyntaxNode>
 SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
-                               ArrayRef<ParsedRawSyntaxNode> Parts) {
+                               MutableArrayRef<ParsedRawSyntaxNode> Parts) {
   if (Parts.size() == 1) {
-    auto RawNode = Parts.front();
+    auto &RawNode = Parts.front();
     SyntaxKind RawNodeKind = RawNode.getKind();
     switch (Kind) {
     case SyntaxContextKind::Stmt:
@@ -120,7 +121,7 @@ SyntaxParsingContext::bridgeAs(SyntaxContextKind Kind,
       // We don't need to coerce in this case.
       break;
     }
-    return RawNode;
+    return std::move(RawNode);
   } else if (Parts.empty()) {
     // Just omit the unknown node if it does not have any children
     return None;
@@ -181,7 +182,7 @@ void SyntaxParsingContext::addToken(Token &Tok,
 
 /// Add Syntax to the parts.
 void SyntaxParsingContext::addSyntax(ParsedSyntax Node) {
-  addRawSyntax(Node.getRaw());
+  addRawSyntax(Node.takeRaw());
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N,
@@ -192,12 +193,10 @@ void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind, size_t N,
     return;
   }
 
-  auto I = getStorage().end() - N;
-  *I = createSyntaxAs(Kind, getParts().take_back(N), nodeCreateK);
-
-  // Remove consumed parts.
-  if (N != 1)
-    getStorage().erase(I + 1, getStorage().end());
+  auto node = createSyntaxAs(Kind, getParts().take_back(N), nodeCreateK);
+  auto &storage = getStorage();
+  getStorage().erase(storage.end() - N, getStorage().end());
+  getStorage().emplace_back(std::move(node));
 }
 
 void SyntaxParsingContext::createNodeInPlace(SyntaxKind Kind,
@@ -250,24 +249,24 @@ void SyntaxParsingContext::collectNodesInPlace(SyntaxKind ColletionKind,
 
 ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
   ParsedRawSyntaxRecorder &Recorder = getRecorder();
-  ArrayRef<ParsedRawSyntaxNode> Parts = getParts();
-  std::vector<ParsedRawSyntaxNode> AllTopLevel;
+  auto Parts = getParts();
+  ParsedRawSyntaxNode Layout[2];
 
   assert(!Parts.empty() && Parts.back().isToken(tok::eof));
-  ParsedRawSyntaxNode EOFToken = Parts.back();
+  Layout[1] = std::move(Parts.back());
   Parts = Parts.drop_back();
 
   assert(llvm::all_of(Parts, [](const ParsedRawSyntaxNode& node) {
     return node.getKind() == SyntaxKind::CodeBlockItem;
   }) && "all top level element must be 'CodeBlockItem'");
 
-  auto itemList = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList,
-                                           Parts);
+  Layout[0] = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList, Parts);
+
   return Recorder.recordRawSyntax(SyntaxKind::SourceFile,
-                                  { itemList, EOFToken });
+                                  llvm::makeMutableArrayRef(Layout, 2));
 }
 
-  OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
+OpaqueSyntaxNode SyntaxParsingContext::finalizeRoot() {
   assert(isTopOfContextStack() && "some sub-contexts are not destructed");
   assert(isRoot() && "only root context can finalize the tree");
   assert(Mode == AccumulationMode::Root);
@@ -275,7 +274,7 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
     return nullptr; // already finalized.
   }
   ParsedRawSyntaxNode root = finalizeSourceFile();
-  auto opaqueRoot = getSyntaxCreator().finalizeNode(root.getOpaqueNode());
+  auto opaqueRoot = getSyntaxCreator().finalizeNode(root.takeOpaqueNode());
 
   // Clear the parts because we will call this function again when destroying
   // the root context.
@@ -295,9 +294,12 @@ void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
 
 void SyntaxParsingContext::dumpStorage() const  {
   llvm::errs() << "======================\n";
-  for (auto Node : getStorage()) {
-    Node.dump(llvm::errs());
-    llvm::errs() << "\n--------------\n";
+  auto &storage = getStorage();
+  for (unsigned i = 0; i != storage.size(); ++i) {
+    storage[i].dump(llvm::errs());
+    llvm::errs() << "\n";
+    if (i + 1 == Offset)
+      llvm::errs() << "--------------\n";
   }
 }
 
@@ -329,14 +331,12 @@ SyntaxParsingContext::~SyntaxParsingContext() {
     assert(!isRoot());
     if (Storage.size() == Offset) {
       if (auto BridgedNode = bridgeAs(CtxtKind, {})) {
-        Storage.push_back(BridgedNode.getValue());
+        Storage.push_back(std::move(BridgedNode.getValue()));
       }
     } else {
-      auto I = Storage.begin() + Offset;
-      *I = bridgeAs(CtxtKind, getParts()).getValue();
-      // Remove used parts.
-      if (Storage.size() > Offset + 1)
-        Storage.erase(Storage.begin() + (Offset + 1), Storage.end());
+      auto node = bridgeAs(CtxtKind, getParts()).getValue();
+      Storage.erase(Storage.begin() + Offset, Storage.end());
+      Storage.emplace_back(std::move(node));
     }
     break;
   }
@@ -349,10 +349,12 @@ SyntaxParsingContext::~SyntaxParsingContext() {
   // Remove all parts in this context.
   case AccumulationMode::Discard: {
     auto &nodes = getStorage();
-    for (auto i = nodes.begin()+Offset, e = nodes.end(); i != e; ++i)
+    for (auto i = nodes.begin()+Offset, e = nodes.end(); i != e; ++i) {
+      // FIXME: This should not be needed. This breaks invariant that any
+      // recorded node must be a part of result souce syntax tree.
       if (i->isRecorded())
-        getSyntaxCreator().finalizeNode(i->getOpaqueNode());
-
+        getRecorder().discardRecordedNode(*i);
+    }
     nodes.erase(nodes.begin()+Offset, nodes.end());
     break;
   }
