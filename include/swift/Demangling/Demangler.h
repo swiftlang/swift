@@ -456,9 +456,11 @@ protected:
     int NumWords;
     StringRef Text;
     size_t Pos;
+    std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
     
   public:
-    DemangleInitRAII(Demangler &Dem, StringRef MangledName);
+    DemangleInitRAII(Demangler &Dem, StringRef MangledName,
+         std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver);
     ~DemangleInitRAII();
   };
   friend DemangleInitRAII;
@@ -587,39 +589,35 @@ public:
   
   void clear() override;
 
-  /// Install a resolver for symbolic references in a mangled string.
-  void setSymbolicReferenceResolver(
-                          std::function<SymbolicReferenceResolver_t> resolver) {
-    SymbolicReferenceResolver = resolver;
-  }
-
-  /// Take the symbolic reference resolver.
-  std::function<SymbolicReferenceResolver_t> &&
-  takeSymbolicReferenceResolver() {
-    return std::move(SymbolicReferenceResolver);
-  }
-
   /// Demangle the given symbol and return the parse tree.
   ///
   /// \param MangledName The mangled symbol string, which start with the
   /// mangling prefix $S.
+  /// \param SymbolicReferenceResolver A function invoked to resolve symbolic references in
+  /// the string. If null, then symbolic references will cause the demangle to fail.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// Demangler or with a call of clear().
-  NodePointer demangleSymbol(StringRef MangledName);
+  NodePointer demangleSymbol(StringRef MangledName,
+            std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
+               = nullptr);
 
   /// Demangle the given type and return the parse tree.
   ///
   /// \param MangledName The mangled type string, which does _not_ start with
   /// the mangling prefix $S.
+  /// \param SymbolicReferenceResolver A function invoked to resolve symbolic references in
+  /// the string. If null, then symbolic references will cause the demangle to fail.
   ///
   /// \returns A parse tree for the demangled string - or a null pointer
   /// on failure.
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// Demangler or with a call of clear().
-  NodePointer demangleType(StringRef MangledName);
+  NodePointer demangleType(StringRef MangledName,
+            std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver
+              = nullptr);
 };
 
 /// A demangler which uses stack space for its initial memory.
