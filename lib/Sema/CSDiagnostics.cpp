@@ -570,13 +570,26 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
-  if (nonConformingType->isExistentialType()) {
-    auto diagnostic = diag::protocol_does_not_conform_objc;
-    if (nonConformingType->isObjCExistentialType())
-      diagnostic = diag::protocol_does_not_conform_static;
+  if (nonConformingType->isObjCExistentialType()) {
+    emitDiagnostic(anchor->getLoc(), diag::protocol_does_not_conform_static,
+                   nonConformingType, protocolType);
+    return true;
+  }
 
-    emitDiagnostic(anchor->getLoc(), diagnostic, nonConformingType,
-                   protocolType);
+  // Diagnose types that cannot conform to protocols.
+  Optional<StringRef> prohibitedTypeKind = None;
+  if (nonConformingType->is<AnyFunctionType>())
+    prohibitedTypeKind = "function";
+  else if (nonConformingType->is<TupleType>())
+    prohibitedTypeKind = "tuple";
+  else if (nonConformingType->isExistentialType())
+    prohibitedTypeKind = "protocol";
+  else if (nonConformingType->is<AnyMetatypeType>())
+    prohibitedTypeKind = "metatype";
+
+  if (prohibitedTypeKind.hasValue()) {
+    emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                   *prohibitedTypeKind, nonConformingType, protocolType);
     return true;
   }
 

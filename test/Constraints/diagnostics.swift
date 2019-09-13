@@ -47,7 +47,7 @@ f0(i, i,
 
 
 // Position mismatch
-f5(f4)  // expected-error {{argument type '(Int) -> Int' does not conform to expected type 'P2'}}
+f5(f4)  // expected-error {{function type '(Int) -> Int' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // Tuple element not convertible.
 f0(i,
@@ -97,7 +97,7 @@ func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{argument type 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
+f8((1,2.0), f9) // expected-error {{tuple type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
