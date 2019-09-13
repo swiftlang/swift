@@ -965,15 +965,44 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<Type>
-swift::StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                       TypeAliasDecl *D) const {
-  TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
-  if (!D->getDeclContext()->isCascadingContextForLookup(
-        /*functionsAreNonCascading*/true)) {
+StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                TypeAliasDecl *typeAlias) const {
+  // Fast path: If the interface type is already resolved, there's no need
+  // to compute the structural type.  This also prevents us from writing
+  // ErrorTypes into otherwise valid ASTs with generated typealiases.
+  if (typeAlias->hasInterfaceType()) {
+    return typeAlias->getInterfaceType()->getMetatypeInstanceType();
+  }
+  
+  TypeResolutionOptions options((typeAlias->getGenericParams()
+                                     ? TypeResolverContext::GenericTypeAliasDecl
+                                     : TypeResolverContext::TypeAliasDecl));
+
+  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
+          /*functionsAreNonCascading*/ true)) {
     options |= TypeResolutionFlags::KnownNonCascadingDependency;
   }
+  
+  // This can happen when code completion is attempted inside
+  // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
+  auto &ctx = typeAlias->getASTContext();
+  auto underlyingTypeRepr = typeAlias->getUnderlyingTypeRepr();
+  if (!underlyingTypeRepr) {
+    typeAlias->setInvalid();
+    return ErrorType::get(ctx);
+  }
 
-  auto typeRepr = D->getUnderlyingTypeLoc().getTypeRepr();
-  auto resolution = TypeResolution::forStructural(D);
-  return resolution.resolveType(typeRepr, options);
+  auto resolution = TypeResolution::forStructural(typeAlias);
+  auto type = resolution.resolveType(underlyingTypeRepr, options);
+  
+  auto *genericSig = typeAlias->getGenericSignature();
+  SubstitutionMap subs;
+  if (genericSig)
+    subs = genericSig->getIdentitySubstitutionMap();
+
+  Type parent;
+  auto parentDC = typeAlias->getDeclContext();
+  if (parentDC->isTypeContext())
+    parent = parentDC->getDeclaredInterfaceType();
+  return TypeAliasType::get(typeAlias, parent, subs, type);
 }
