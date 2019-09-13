@@ -2266,6 +2266,45 @@ void ConstraintSystem::partitionDisjunction(
   assert(Ordering.size() == Choices.size());
 }
 
+static Constraint *selectLeafApplyDisjunction(ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
+  // Only do this work for relatively deep search trees.
+  if (disjunctions.size() < 6)
+    return nullptr;
+  
+  SmallDenseMap<Expr *, Constraint *> disjunctionForFnExpr;
+  SmallDenseMap<Constraint *, SourceRange> sourceRangeForDisjunction;
+
+  for (auto *disjunction : disjunctions)
+    disjunctionForFnExpr[disjunction->getLocator()->getAnchor()] = disjunction;
+  
+  for (auto &constraint : cs.getConstraints()) {
+    if (constraint.getKind() != ConstraintKind::ApplicableFunction)
+      continue;
+
+    auto applyExpr = dyn_cast<ApplyExpr>(constraint.getLocator()->getAnchor());
+    if (!applyExpr)
+      continue;
+    
+    if (auto disjunction = disjunctionForFnExpr[applyExpr->getFn()])
+      sourceRangeForDisjunction[disjunction] = applyExpr->getSourceRange();
+  }
+  
+  Constraint *result = nullptr;
+  SourceRange range;
+  for (auto test : sourceRangeForDisjunction) {
+    if (range.isValid()) {
+      auto testRange = range;
+      testRange.widen(test.getSecond());
+      if (testRange != range)
+        continue;
+    }
+    
+    result = test.getFirst();
+    range = test.getSecond();
+  }
+  return result;
+}
+
 Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
@@ -2287,8 +2326,6 @@ Constraint *ConstraintSystem::selectDisjunction() {
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return disjunction;
 
-  // Pick the disjunction with the smallest number of favored, then active choices.
-  auto cs = this;
   auto minDisjunction =
       std::min_element(disjunctions.begin(), disjunctions.end(),
                        [&](Constraint *first, Constraint *second) -> bool {
@@ -2296,10 +2333,15 @@ Constraint *ConstraintSystem::selectDisjunction() {
                                 second->countActiveNestedConstraints();
                        });
 
-  if (minDisjunction != disjunctions.end())
-    return *minDisjunction;
+  if (minDisjunction == disjunctions.end())
+    return nullptr;
 
-  return nullptr;
+  // If the minimum sized disjunction is an overload disjunction, then try to choose a leaf apply expr from the set of disjunctions.
+  // Choosing an overload disjunction for an apply that depends on other disjunctions as arguments will likely not allow short-circuiting.
+  if ((*minDisjunction)->getNestedConstraints().front()->getKind() == ConstraintKind::BindOverload)
+    if (auto apply = selectLeafApplyDisjunction(*this, disjunctions))
+      return apply;
+  return *minDisjunction;
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {

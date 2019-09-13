@@ -334,7 +334,45 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Produce a type variable step.
     return suspend(
         llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));
-  } else if (disjunction) {
+  }
+  
+  // Before stepping into a new disjunction, see if we can short-circuit this part of the solution tree by attempting to show that the last opened typevar is impossible to bind. This prunes exponential behavior when there are multiple generic function/operator overloads in the expression.
+  if (disjunction && CS.OpenedTypes.size()) {
+    auto lastOpenedType = CS.OpenedTypes.back();
+    auto lastOpenedTyvar = CS.getRepresentative(lastOpenedType.second.back().second);
+    if (CS.TypeVariables.count(lastOpenedTyvar) && !CS.getFixedType(lastOpenedTyvar)) {
+      auto bindings = CS.getPotentialBindings(lastOpenedTyvar);
+      if (!bindings.FullyBound && !bindings.PotentiallyIncomplete && bindings.Bindings.size()) {
+        size_t failures = 0;
+        for (auto binding : bindings.Bindings) {
+          // We can't definitively rule out some subtype being possible here.
+          if (binding.Kind == ConstraintSystem::AllowedBindingKind::Subtypes)
+            break;
+          
+          ConstraintSystem::SolverScope scope(CS);
+          if (CS.TC.getLangOpts().DebugConstraintSolver) {
+            auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+            log.indent(CS.solverState ? CS.solverState->depth * 2 : 2)
+            << "(examining for short-circuit)\n";
+          }
+          CS.addConstraint(ConstraintKind::Bind, lastOpenedTyvar, binding.BindingType, lastOpenedType.first);
+          if (CS.simplify())
+            failures++;
+        }
+        if (failures == bindings.Bindings.size()) {
+          if (CS.TC.getLangOpts().DebugConstraintSolver) {
+            auto &log = CS.getASTContext().TypeCheckerDebug->getStream();
+            log.indent(CS.solverState ? CS.solverState->depth * 2 : 2)
+              << "(short-circuit due to last opened type binding failure "
+              << lastOpenedTyvar->getString() << ")\n";
+          }
+          return done(/*isSuccess=*/false);
+        }
+      }
+    }
+  }
+  
+  if (disjunction) {
     // Produce a disjunction step.
     return suspend(
         llvm::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
