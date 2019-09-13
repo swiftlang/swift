@@ -69,18 +69,18 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   return r;
 }
 
-bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
+bool ASTScopeImpl::checkSourceRangeAfterExpansion(const ASTContext &ctx) const {
   assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
          "need to be able to find source range");
   assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
          "Search will fail");
-  assert(checkLazySourceRange() &&
+  assert(checkLazySourceRange(ctx) &&
          "Lazy scopes must have compatible ranges before and after expansion");
 
   return true;
 }
 
-#pragma mark validation
+#pragma mark validation & debugging
 
 bool ASTScopeImpl::hasValidSourceRange() const {
   const auto sourceRange = getSourceRangeOfScope();
@@ -485,8 +485,8 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
   cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
 }
 
-bool ASTScopeImpl::checkLazySourceRange() const {
-  if (!getASTContext().LangOpts.LazyASTScopes)
+bool ASTScopeImpl::checkLazySourceRange(const ASTContext &ctx) const {
+  if (!ctx.LangOpts.LazyASTScopes)
     return true;
   const auto unexpandedRange = sourceRangeForDeferredExpansion();
   const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
@@ -495,12 +495,20 @@ bool ASTScopeImpl::checkLazySourceRange() const {
   if (unexpandedRange == expandedRange)
     return true;
 
-  auto b = getChildren().back()->computeSourceRangeOfScope();
-  llvm::errs() << "*** Lazy range problem. Parent: ***\n";
+  llvm::errs() << "*** Lazy range problem. Parent unexpanded: ***\n";
   unexpandedRange.print(llvm::errs(), getSourceManager(), false);
-  llvm::errs() << "\n*** vs last child: ***\n";
-  b.print(llvm::errs(), getSourceManager(), false);
   llvm::errs() << "\n";
+  if (!getChildren().empty()) {
+    llvm::errs() << "*** vs last child: ***\n";
+    auto b = getChildren().back()->computeSourceRangeOfScope();
+    b.print(llvm::errs(), getSourceManager(), false);
+    llvm::errs() << "\n";
+  }
+  else if (hasValidSourceRangeOfIgnoredASTNodes()) {
+    llvm::errs() << "*** vs ignored AST nodes: ***\n";
+    sourceRangeOfIgnoredASTNodes.print(llvm::errs(), getSourceManager(), false);
+    llvm::errs() << "\n";
+  }
   print(llvm::errs(), 0, false);
   llvm::errs() << "\n";
 
