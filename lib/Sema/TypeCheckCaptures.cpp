@@ -769,6 +769,12 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
       maybeDiagnoseCaptures(expr, AFR);
 }
 
+static bool isLazy(PatternBindingDecl *PBD) {
+  if (auto var = PBD->getSingleVar())
+    return var->getAttrs().hasAttribute<LazyAttr>();
+  return false;
+}
+
 void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
   for (auto member : typeDecl->getMembers()) {
     // Ignore everything other than PBDs.
@@ -791,7 +797,7 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
                               /*ObjC=*/false);
       init->walk(finder);
 
-      if (finder.getDynamicSelfCaptureLoc().isValid()) {
+      if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
         diagnose(finder.getDynamicSelfCaptureLoc(),
                  diag::dynamic_self_stored_property_init);
       }
