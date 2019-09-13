@@ -39,6 +39,7 @@ public struct DispatchWorkItemFlags : OptionSet, RawRepresentable {
 // used in the new runtime. _TtC8Dispatch17_DispatchWorkItem is the
 // mangled name for Dispatch._DispatchWorkItem.
 @available(macOS 10.10, iOS 8.0, *)
+@dynamicCallable
 @_objcRuntimeName(_TtC8Dispatch17_DispatchWorkItem)
 public class DispatchWorkItem {
 	internal var _block: _DispatchBlock
@@ -96,6 +97,10 @@ public class DispatchWorkItem {
 
 	public var isCancelled: Bool {
 		return _swift_dispatch_block_testcancel(_block) != 0
+	}
+
+	public func dynamicallyCall(withArguments: [()]) -> Void {
+		perform()
 	}
 }
 

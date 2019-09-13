@@ -57,15 +57,23 @@ DispatchAPI.test("dispatch_block_t conversions") {
 }
 
 if #available(OSX 10.10, iOS 8.0, *) {
-  DispatchAPI.test("dispatch_block_t identity") {
-    let block = DispatchWorkItem(flags: .inheritQoS) {
-      _ = 1
-    }
+	DispatchAPI.test("dispatch_block_t identity") {
+		let block = DispatchWorkItem(flags: .inheritQoS) {
+			_ = 1
+		}
 
-    DispatchQueue.main.async(execute: block)
-    // This will trap if the block's pointer identity is not preserved.
-    block.cancel()
-  }
+		DispatchQueue.main.async(execute: block)
+		// This will trap if the block's pointer identity is not preserved.
+		block.cancel()
+	}
+
+	DispatchAPI.test("DispatchBlock dynamic call") {
+		let block = DispatchWorkItem(flags: .inheritQoS) {
+			_ = 1
+		}
+
+		block()
+	}
 }
 
 DispatchAPI.test("DispatchTime comparisons") {
