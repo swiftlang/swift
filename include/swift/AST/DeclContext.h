@@ -760,7 +760,7 @@ public:
   void addMember(Decl *member, Decl *hint = nullptr);
 
   /// See \c MemberCount
-  unsigned getMemberCount() const { return MemberCount; }
+  unsigned getMemberCount() const;
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {
