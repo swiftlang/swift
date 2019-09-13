@@ -46,8 +46,10 @@ f0(i, i,
    i) // expected-error{{extra argument in call}}
 
 
-// Position mismatch
+// Cannot conform to protocols.
 f5(f4)  // expected-error {{function type '(Int) -> Int' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5((1, "hello"))  // expected-error {{tuple type '(Int, String)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5(Int.self) // expected-error {{metatype type 'Int.Type' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // Tuple element not convertible.
 f0(i,
