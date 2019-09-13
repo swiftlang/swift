@@ -245,8 +245,7 @@ protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  u + u // expected-error{{argument type 'U' does not conform to expected type 'Addable'}}
   return x+y
 }
 

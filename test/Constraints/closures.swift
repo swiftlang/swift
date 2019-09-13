@@ -583,7 +583,8 @@ let u = rdar33296619().element //expected-error {{use of unresolved identifier '
 
 [1].forEach { _ in
   _ = "\(u)"
-  _ = 1 + "hi" // expected-error {{no exact matches in call to operator function '+'}}
+  _ = 1 + "hi" // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}}
+  // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String)}}
 }
 
 class SR5666 {

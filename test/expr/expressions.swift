@@ -142,6 +142,7 @@ func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func makeTuple() -> (String, Int) { return ("foo", 42) }
 func errorRecovery() {
   testfunc2({ $0 + 1 }) // expected-error {{contextual closure type '((), Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
+  // expected-error@-1 {{cannot convert value of type '()' to expected argument type 'Int'}}
 
   enum union1 {
     case bar
@@ -275,7 +276,7 @@ func test_floating_point() {
 
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
+  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}}
 }
 
 // More realistic examples.
