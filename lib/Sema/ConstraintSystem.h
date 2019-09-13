@@ -1579,9 +1579,10 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
 
-  /// Form a locator with given anchor which then could be used
-  /// to retrieve argument information cached in the constraint system.
-  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+  /// Form a locator that can be used to retrieve argument information cached in
+  /// the constraint system for the callee described by the anchor of the
+  /// passed locator.
+  ConstraintLocator *getArgumentInfoLocator(ConstraintLocator *locator);
 
   /// Retrieve the argument info that is associated with a member
   /// reference at the given locator.
@@ -1589,6 +1590,17 @@ public:
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;
+  }
+
+  ResolvedOverloadSetListItem *
+  findSelectedOverloadFor(ConstraintLocator *locator) const {
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator == locator)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
   }
 
   ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
@@ -2008,10 +2020,26 @@ public:
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
 
-  /// Returns a locator describing the callee for a given expression. For
-  /// a function application, this is a locator describing the function expr.
-  /// For an unresolved dot/member, this is a locator to the member.
-  ConstraintLocator *getCalleeLocator(Expr *expr);
+  /// Returns a locator describing the callee for the anchor of a given locator.
+  ///
+  /// - For an unresolved dot/member anchor, this will be a locator describing
+  /// the member.
+  ///
+  /// - For a subscript anchor, this will be a locator describing the subscript
+  /// member.
+  ///
+  /// - For a key path anchor with a property/subscript component path element,
+  /// this will be a locator describing the decl referenced by the component.
+  ///
+  /// - For a function application anchor, this will be a locator describing the
+  /// 'direct callee' of the call. For example, for the expression \c x.foo?()
+  /// the returned locator will describe the member \c foo.
+  ///
+  /// Note that because this function deals with the anchor, given a locator
+  /// anchored on \c functionA(functionB()) with path elements pointing to the
+  /// argument \c functionB(), the returned callee locator will describe
+  /// \c functionA rather than \c functionB.
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator);
 
 public:
 
@@ -2463,7 +2491,7 @@ public:
   static bool isCollectionType(Type t);
 
   /// Determine if the type in question is AnyHashable.
-  bool isAnyHashableType(Type t);
+  static bool isAnyHashableType(Type t);
 
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the

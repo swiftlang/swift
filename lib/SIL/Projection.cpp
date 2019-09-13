@@ -172,6 +172,37 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
   }
 }
 
+/// Apply this projection to \p BaseType and return the relevant subfield's
+/// SILType if BaseField has less subtypes than projection's offset.
+///
+/// WARNING: This is not a constant time operation because it is implemented
+/// in terms of getVarDecl, which requests all BaseType's stored properties.
+SILType Projection::getType(SILType BaseType, SILModule &M) const {
+  assert(isValid());
+  switch (getKind()) {
+  case ProjectionKind::Struct:
+  case ProjectionKind::Class:
+    return BaseType.getFieldType(getVarDecl(BaseType), M);
+  case ProjectionKind::Enum:
+    return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
+  case ProjectionKind::Box:
+    return getSILBoxFieldType(BaseType.castTo<SILBoxType>(),
+                              M.Types, getIndex());
+  case ProjectionKind::Tuple:
+    return BaseType.getTupleElementType(getIndex());
+  case ProjectionKind::Upcast:
+  case ProjectionKind::RefCast:
+  case ProjectionKind::BitwiseCast:
+  case ProjectionKind::TailElems:
+    return getCastType(BaseType);
+  case ProjectionKind::Index:
+    // Index types do not change the underlying type.
+    return BaseType;
+  }
+
+  llvm_unreachable("Unhandled ProjectionKind in switch.");
+}
+
 NullablePtr<SingleValueInstruction>
 Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
                                    SILValue Base) const {
@@ -306,7 +337,7 @@ void Projection::getFirstLevelProjections(SILType Ty, SILModule &Mod,
                  assert(X.getMostDerivedType(Mod) == Ty);
                  X.append(P);
                  assert(X.getMostDerivedType(Mod)
-                        == Box->getFieldType(Mod, field));
+                        == getSILBoxFieldType(Box, Mod.Types, field));
                  X.verify(Mod););
       (void)Box;
       Out.push_back(P);

@@ -735,124 +735,54 @@ static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
                   ConstraintLocator *>
 getCalleeDeclAndArgs(ConstraintSystem &cs,
                      ConstraintLocatorBuilder callBuilder) {
-  ArrayRef<Identifier> argLabels;
-  bool hasTrailingClosure = false;
-  ConstraintLocator *targetLocator = nullptr;
+  auto formUnknownCallee =
+      []() -> std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
+                         ConstraintLocator *> {
+    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
+                           /*argLabels*/ ArrayRef<Identifier>(),
+                           /*hasTrailingClosure*/ false,
+                           /*calleeLocator*/ nullptr);
+  };
 
   auto *callLocator = cs.getConstraintLocator(callBuilder);
   auto *callExpr = callLocator->getAnchor();
 
   // Break down the call.
   if (!callExpr)
-    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, targetLocator);
+    return formUnknownCallee();
 
-  auto path = callLocator->getPath();
   // Our remaining path can only be 'ApplyArgument'.
+  auto path = callLocator->getPath();
   if (!path.empty() &&
       !(path.size() <= 2 &&
         path.back().getKind() == ConstraintLocator::ApplyArgument))
-    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, targetLocator);
+    return formUnknownCallee();
 
   // Dig out the callee information.
-  if (auto argInfo = cs.getArgumentInfo(callLocator)) {
-    argLabels = argInfo->Labels;
-    hasTrailingClosure = argInfo->HasTrailingClosure;
-    targetLocator = cs.getConstraintLocator(
-        isa<CallExpr>(callExpr) ? cast<CallExpr>(callExpr)->getDirectCallee()
-                                : callExpr);
-  } else if (auto keyPath = dyn_cast<KeyPathExpr>(callExpr)) {
-    if (path.size() != 2)
-      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                             hasTrailingClosure, nullptr);
+  auto argInfo = cs.getArgumentInfo(callLocator);
+  if (!argInfo)
+    return formUnknownCallee();
 
-    // We must have a KeyPathComponent followed by an ApplyArgument.
-    auto componentElt = path[0].getAs<LocatorPathElt::KeyPathComponent>();
-    if (!componentElt || path[1].getKind() != ConstraintLocator::ApplyArgument)
-      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                             hasTrailingClosure, nullptr);
-
-    auto componentIndex = componentElt->getIndex();
-    if (componentIndex >= keyPath->getComponents().size())
-      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                             hasTrailingClosure, nullptr);
-
-    auto &component = keyPath->getComponents()[componentIndex];
-    switch (component.getKind()) {
-    case KeyPathExpr::Component::Kind::Subscript:
-    case KeyPathExpr::Component::Kind::UnresolvedSubscript:
-      targetLocator = cs.getConstraintLocator(callExpr, path[0]);
-      argLabels = component.getSubscriptLabels();
-      hasTrailingClosure = false; // key paths don't support trailing closures
-      break;
-      
-    case KeyPathExpr::Component::Kind::Invalid:
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
-    case KeyPathExpr::Component::Kind::Property:
-    case KeyPathExpr::Component::Kind::OptionalForce:
-    case KeyPathExpr::Component::Kind::OptionalChain:
-    case KeyPathExpr::Component::Kind::OptionalWrap:
-    case KeyPathExpr::Component::Kind::Identity:
-    case KeyPathExpr::Component::Kind::TupleElement:
-      return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                             hasTrailingClosure, nullptr);
-    }
-  } else {
-    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, targetLocator);
-  }
+  auto argLabels = argInfo->Labels;
+  auto hasTrailingClosure = argInfo->HasTrailingClosure;
+  auto calleeLocator = cs.getCalleeLocator(callLocator);
 
   // Find the overload choice corresponding to the callee locator.
   // FIXME: This linearly walks the list of resolved overloads, which is
   // potentially very expensive.
-  Optional<OverloadChoice> choice;
-  ConstraintLocator *calleeLocator = nullptr;
-  for (auto resolved = cs.getResolvedOverloadSets(); resolved;
-       resolved = resolved->Previous) {
-    // FIXME: Workaround null locators.
-    if (!resolved->Locator) continue;
+  auto selectedOverload = cs.findSelectedOverloadFor(calleeLocator);
 
-    auto resolvedLocator = resolved->Locator;
-    SmallVector<LocatorPathElt, 4> resolvedPath(
-                                     resolvedLocator->getPath().begin(),
-                                     resolvedLocator->getPath().end());
-    if (!resolvedPath.empty() &&
-        (resolvedPath.back().getKind() == ConstraintLocator::SubscriptMember ||
-         resolvedPath.back().getKind() == ConstraintLocator::Member ||
-         resolvedPath.back().getKind() == ConstraintLocator::UnresolvedMember ||
-         resolvedPath.back().getKind() ==
-           ConstraintLocator::ConstructorMember)) {
-      resolvedPath.pop_back();
-      resolvedLocator = cs.getConstraintLocator(
-                          resolvedLocator->getAnchor(),
-                          resolvedPath,
-                          resolvedLocator->getSummaryFlags());
-    }
+  // If we didn't find any matching overloads, we're done. Just return the
+  // argument info.
+  if (!selectedOverload)
+    return std::make_tuple(/*decl*/ nullptr, /*hasAppliedSelf*/ false,
+                           argLabels, hasTrailingClosure,
+                           /*calleeLocator*/ nullptr);
 
-    SourceRange range;
-    resolvedLocator = simplifyLocator(cs, resolvedLocator, range);
-
-    if (resolvedLocator == targetLocator) {
-      calleeLocator = resolved->Locator;
-      choice = resolved->Choice;
-      break;
-    }
-  }
-  
-  // If we didn't find any matching overloads, we're done.
-  if (!choice)
-    return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                           hasTrailingClosure, nullptr);
-
-  // If there's a declaration, return it.
-  if (auto *decl = choice->getDeclOrNull()) {
-    return std::make_tuple(decl, hasAppliedSelf(cs, *choice), argLabels,
-                           hasTrailingClosure, calleeLocator);
-  }
-
-  return std::make_tuple(nullptr, /*hasAppliedSelf=*/false, argLabels,
-                         hasTrailingClosure, calleeLocator);
+  // Return the found declaration, assuming there is one.
+  auto choice = selectedOverload->Choice;
+  return std::make_tuple(choice.getDeclOrNull(), hasAppliedSelf(cs, choice),
+                         argLabels, hasTrailingClosure, calleeLocator);
 }
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
@@ -3971,11 +3901,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
-    // Let's not try to fix missing conformance for Void
-    // or Never because that doesn't really make sense.
-    if (type->isVoid() || type->isUninhabited())
-      return SolutionKind::Error;
-
     if (path.back().is<LocatorPathElt::AnyRequirement>()) {
       // If this is a requirement associated with `Self` which is bound
       // to `Any`, let's consider this "too incorrect" to continue.
@@ -4783,7 +4708,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // as representing "dynamic lookup" unless it's a direct call
     // to such subscript (in that case label is expected to match).
     if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (::hasDynamicMemberLookupAttribute(instanceTy,
+      if (memberLocator &&
+          ::hasDynamicMemberLookupAttribute(instanceTy,
                                             DynamicMemberLookupCache) &&
           isValidKeyPathDynamicMemberLookup(subscript, TC)) {
         auto info = getArgumentInfo(memberLocator);
@@ -7237,6 +7163,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   // T1 <c T2 && T2 : Hashable ===> T1 <c AnyHashable
   case ConversionRestrictionKind::HashableToAnyHashable: {
     // We never want to do this if the LHS is already AnyHashable.
+    type1 = simplifyType(type1);
     if (isAnyHashableType(
             type1->getRValueType()->lookThroughAllOptionalTypes())) {
       return SolutionKind::Error;

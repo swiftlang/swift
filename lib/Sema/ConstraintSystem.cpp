@@ -413,14 +413,49 @@ ConstraintLocator *ConstraintSystem::getConstraintLocator(
   return getConstraintLocator(anchor, path, builder.getSummaryFlags());
 }
 
-ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
+ConstraintLocator *
+ConstraintSystem::getCalleeLocator(ConstraintLocator *locator) {
+  auto *anchor = locator->getAnchor();
+  assert(anchor && "Expected an anchor!");
+
+  // If we have a locator that starts with a key path component element, we
+  // may have a callee given by a property or subscript component.
+  if (auto componentElt =
+          locator->getFirstElementAs<LocatorPathElt::KeyPathComponent>()) {
+    auto *kpExpr = cast<KeyPathExpr>(anchor);
+    auto component = kpExpr->getComponents()[componentElt->getIndex()];
+
+    using ComponentKind = KeyPathExpr::Component::Kind;
+    switch (component.getKind()) {
+    case ComponentKind::UnresolvedSubscript:
+    case ComponentKind::Subscript:
+      // For a subscript the callee is given by 'component -> subscript member'.
+      return getConstraintLocator(
+          anchor, {*componentElt, ConstraintLocator::SubscriptMember});
+    case ComponentKind::UnresolvedProperty:
+    case ComponentKind::Property:
+      // For a property, the choice is just given by the component.
+      return getConstraintLocator(anchor, *componentElt);
+    case ComponentKind::TupleElement:
+      llvm_unreachable("Not implemented by CSGen");
+      break;
+    case ComponentKind::Invalid:
+    case ComponentKind::OptionalForce:
+    case ComponentKind::OptionalChain:
+    case ComponentKind::OptionalWrap:
+    case ComponentKind::Identity:
+      // These components don't have any callee associated, so just continue.
+      break;
+    }
+  }
+
   // Make sure we handle subscripts before looking at apply exprs. We don't
   // want to return a subscript member locator for an expression such as x[](y),
   // as its callee is not the subscript, but rather the function it returns.
-  if (isa<SubscriptExpr>(expr))
-    return getConstraintLocator(expr, ConstraintLocator::SubscriptMember);
+  if (isa<SubscriptExpr>(anchor))
+    return getConstraintLocator(anchor, ConstraintLocator::SubscriptMember);
 
-  if (auto *applyExpr = dyn_cast<ApplyExpr>(expr)) {
+  if (auto *applyExpr = dyn_cast<ApplyExpr>(anchor)) {
     auto *fnExpr = applyExpr->getFn();
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
@@ -436,27 +471,27 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
     // Otherwise fall through and look for locators anchored on the function
     // expr. For CallExprs, this can look through things like parens and
     // optional chaining.
-    if (auto *callExpr = dyn_cast<CallExpr>(expr)) {
-      expr = callExpr->getDirectCallee();
+    if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
+      anchor = callExpr->getDirectCallee();
     } else {
-      expr = fnExpr;
+      anchor = fnExpr;
     }
   }
 
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
     return getConstraintLocator(
-        expr, TC.getSelfForInitDelegationInConstructor(DC, UDE)
+        anchor, TC.getSelfForInitDelegationInConstructor(DC, UDE)
                   ? ConstraintLocator::ConstructorMember
                   : ConstraintLocator::Member);
   }
 
-  if (isa<UnresolvedMemberExpr>(expr))
-    return getConstraintLocator(expr, ConstraintLocator::UnresolvedMember);
+  if (isa<UnresolvedMemberExpr>(anchor))
+    return getConstraintLocator(anchor, ConstraintLocator::UnresolvedMember);
 
-  if (isa<MemberRefExpr>(expr))
-    return getConstraintLocator(expr, ConstraintLocator::Member);
+  if (isa<MemberRefExpr>(anchor))
+    return getConstraintLocator(anchor, ConstraintLocator::Member);
 
-  return getConstraintLocator(expr);
+  return getConstraintLocator(anchor);
 }
 
 Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
@@ -693,8 +728,8 @@ Optional<Type> ConstraintSystem::isSetType(Type type) {
 }
 
 bool ConstraintSystem::isCollectionType(Type type) {
-  auto &ctx = type->getASTContext();
   if (auto *structType = type->getAs<BoundGenericStructType>()) {
+    auto &ctx = type->getASTContext();
     auto *decl = structType->getDecl();
     if (decl == ctx.getArrayDecl() || decl == ctx.getDictionaryDecl() ||
         decl == ctx.getSetDecl())
@@ -705,13 +740,9 @@ bool ConstraintSystem::isCollectionType(Type type) {
 }
 
 bool ConstraintSystem::isAnyHashableType(Type type) {
-  if (auto tv = type->getAs<TypeVariableType>()) {
-    auto fixedType = getFixedType(tv);
-    return fixedType && isAnyHashableType(fixedType);
-  }
-
   if (auto st = type->getAs<StructType>()) {
-    return st->getDecl() == TC.Context.getAnyHashableDecl();
+    auto &ctx = type->getASTContext();
+    return st->getDecl() == ctx.getAnyHashableDecl();
   }
 
   return false;
@@ -2462,7 +2493,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
       return false;
 
     const auto *fix = fixes.front();
-    auto *calleeLocator = getCalleeLocator(fix->getAnchor());
+    auto *calleeLocator = getCalleeLocator(fix->getLocator());
     if (commonCalleeLocator && commonCalleeLocator != calleeLocator)
       return false;
 
@@ -2829,7 +2860,9 @@ void ConstraintSystem::generateConstraints(
   }
 }
 
-ConstraintLocator *ConstraintSystem::getArgumentInfoLocator(Expr *anchor) {
+ConstraintLocator *
+ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
+  auto *anchor = locator->getAnchor();
   if (!anchor)
     return nullptr;
 
@@ -2838,12 +2871,15 @@ ConstraintLocator *ConstraintSystem::getArgumentInfoLocator(Expr *anchor) {
     return getConstraintLocator(fnExpr);
   }
 
-  return getCalleeLocator(anchor);
+  return getCalleeLocator(locator);
 }
 
 Optional<ConstraintSystem::ArgumentInfo>
 ConstraintSystem::getArgumentInfo(ConstraintLocator *locator) {
-  if (auto *infoLocator = getArgumentInfoLocator(locator->getAnchor())) {
+  if (!locator)
+    return None;
+
+  if (auto *infoLocator = getArgumentInfoLocator(locator)) {
     auto known = ArgumentInfos.find(infoLocator);
     if (known != ArgumentInfos.end())
       return known->second;

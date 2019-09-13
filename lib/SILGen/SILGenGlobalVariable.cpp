@@ -126,9 +126,8 @@ struct GenGlobalAccessors : public PatternVisitor<GenGlobalAccessors>
     // Find Builtin.once.
     auto &C = SGM.M.getASTContext();
     SmallVector<ValueDecl*, 2> found;
-    C.TheBuiltinModule
-      ->lookupValue({}, C.getIdentifier("once"),
-                    NLKind::QualifiedLookup, found);
+    C.TheBuiltinModule->lookupValue(C.getIdentifier("once"),
+                                    NLKind::QualifiedLookup, found);
 
     assert(found.size() == 1 && "didn't find Builtin.once?!");
 

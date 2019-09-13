@@ -148,11 +148,20 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   return serializationOpts;
 }
 
+Lowering::TypeConverter &CompilerInstance::getSILTypes() {
+  if (auto *tc = TheSILTypes.get())
+    return *tc;
+  
+  auto *tc = new Lowering::TypeConverter(*getMainModule());
+  TheSILTypes.reset(tc);
+  return *tc;
+}
+
 void CompilerInstance::createSILModule() {
   assert(MainModule && "main module not created yet");
   // Assume WMO if a -primary-file option was not provided.
   TheSILModule = SILModule::createEmptyModule(
-      getMainModule(), Invocation.getSILOptions(),
+      getMainModule(), getSILTypes(), Invocation.getSILOptions(),
       Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule());
 }
 
@@ -1074,6 +1083,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
 
 void CompilerInstance::freeASTContext() {
   PersistentState.reset();
+  TheSILTypes.reset();
   Context.reset();
   MainModule = nullptr;
   SML = nullptr;

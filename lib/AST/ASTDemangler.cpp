@@ -97,11 +97,9 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
   if (builtinName.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
     SmallVector<ValueDecl *, 1> decls;
 
-    ModuleDecl::AccessPathTy accessPath;
     StringRef strippedName =
         builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
-    Ctx.TheBuiltinModule->lookupValue(accessPath,
-                                      Ctx.getIdentifier(strippedName),
+    Ctx.TheBuiltinModule->lookupValue(Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,
                                       decls);
     

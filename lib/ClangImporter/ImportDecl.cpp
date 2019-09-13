@@ -4550,7 +4550,7 @@ namespace {
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
                                               objcClass->getDeclaredType());
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
-                                              objcClass);
+                                              std::move(objcClass));
       
       // Determine the type and generic args of the extension.
       if (objcClass->getGenericParams()) {
@@ -4576,7 +4576,7 @@ namespace {
           Impl.SwiftContext.LangOpts.EffectiveLanguageVersion;
 
       SmallVector<ValueDecl *, 4> results;
-      overlay->lookupValue({}, name, NLKind::QualifiedLookup, results);
+      overlay->lookupValue(name, NLKind::QualifiedLookup, results);
       T *found = nullptr;
       for (auto result : results) {
         if (auto singleResult = dyn_cast<T>(result)) {

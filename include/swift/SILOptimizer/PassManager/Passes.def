@@ -312,6 +312,8 @@ PASS(SerializeSILPass, "serialize-sil",
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
+PASS(MandatoryCombine, "mandatory-combine",
+    "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

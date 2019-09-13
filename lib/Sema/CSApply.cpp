@@ -4243,11 +4243,11 @@ namespace {
 
         auto locator = cs.getConstraintLocator(
             E, LocatorPathElt::KeyPathComponent(i));
-        if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          locator =
-            cs.getConstraintLocator(locator,
-                                    ConstraintLocator::SubscriptMember);
-        }
+
+        // Adjust the locator such that it includes any additional elements to
+        // point to the component's callee, e.g a SubscriptMember for a
+        // subscript component.
+        locator = cs.getCalleeLocator(locator);
 
         bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.
@@ -7577,7 +7577,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
           auto *transformedExpr = result->second.second;
           // Since this closure has been transformed into something
           // else let's look inside transformed expression instead.
-          return {true, transformedExpr};
+          transformedExpr->walk(*this);
+          return {false, E};
         }
       }
 

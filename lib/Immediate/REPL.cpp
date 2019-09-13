@@ -874,7 +874,8 @@ private:
     if (!CI.getASTContext().hadError()) {
       // We don't want anything to get stripped, so pretend we're doing a
       // non-whole-module generation.
-      sil = performSILGeneration(*M->getFiles().front(), CI.getSILOptions());
+      sil = performSILGeneration(*M->getFiles().front(), CI.getSILTypes(),
+                                 CI.getSILOptions());
       runSILDiagnosticPasses(*sil);
       runSILOwnershipEliminatorPass(*sil);
       runSILLoweringPasses(*sil);

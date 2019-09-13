@@ -3,6 +3,7 @@
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name available
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name available
 // RUN: %target-sil-opt %t/tmp.2.sib -module-name available | %FileCheck %s
+// UNSUPPORTED: OS=windows-msvc
 
 import Builtin
 

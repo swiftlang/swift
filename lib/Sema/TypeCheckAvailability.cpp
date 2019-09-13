@@ -1775,12 +1775,15 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
   //   argumentLabelIDs = {"w", "x", "", "", "z"}
   auto I = argumentLabelIDs.begin();
 
-  auto updateLabelsForArg = [&](Expr *expr) {
+  auto updateLabelsForArg = [&](Expr *expr) -> bool {
     if (isa<DefaultArgumentExpr>(expr) ||
         isa<CallerDefaultArgumentExpr>(expr)) {
       // Defaulted: remove param label of it.
+      if (I == argumentLabelIDs.end())
+        return true;
+
       I = argumentLabelIDs.erase(I);
-      return;
+      return false;
     }
 
     if (auto *varargExpr = dyn_cast<VarargExpansionExpr>(expr)) {
@@ -1800,19 +1803,26 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
           I = argumentLabelIDs.insert(I, variadicArgsNum, Identifier());
           I += variadicArgsNum;
         }
-        return;
+        return false;
       }
     }
 
     // Normal: Just advance.
+    if (I == argumentLabelIDs.end())
+      return true;
+
     ++I;
+    return false;
   };
 
   if (auto *parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-    updateLabelsForArg(parenExpr->getSubExpr());
+    if (updateLabelsForArg(parenExpr->getSubExpr()))
+      return;
   } else {
-    for (auto *arg : cast<TupleExpr>(argExpr)->getElements())
-      updateLabelsForArg(arg);
+    for (auto *arg : cast<TupleExpr>(argExpr)->getElements()) {
+      if (updateLabelsForArg(arg))
+        return;
+    }
   }
 
   if (argumentLabelIDs.size() != argList.args.size()) {

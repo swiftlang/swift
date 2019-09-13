@@ -104,11 +104,6 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
                                    TypeRelationCheckInput Owner) const {
   Optional<constraints::ConstraintKind> CKind;
   switch (Owner.Relation) {
-  case TypeRelation::EqualTo:
-    return Owner.Pair.FirstTy->isEqual(Owner.Pair.SecondTy);
-  case TypeRelation::PossiblyEqualTo:
-    CKind = constraints::ConstraintKind::Bind;
-    break;
   case TypeRelation::ConvertTo:
     CKind = constraints::ConstraintKind::Conversion;
     break;
