@@ -3901,11 +3901,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
 
-    // Let's not try to fix missing conformance for Void
-    // or Never because that doesn't really make sense.
-    if (type->isVoid() || type->isUninhabited())
-      return SolutionKind::Error;
-
     if (path.back().is<LocatorPathElt::AnyRequirement>()) {
       // If this is a requirement associated with `Self` which is bound
       // to `Any`, let's consider this "too incorrect" to continue.
