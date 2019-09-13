@@ -99,19 +99,20 @@ class DeclAndTypePrinter::Implementation
   friend ASTVisitor;
   friend TypeVisitor;
 
+  ModuleDecl &M;
+  raw_ostream &os;
+  const DelayedMemberSet &delayedMembers;
+  AccessLevel minRequiredAccess;
+
+  SmallVector<const FunctionType *, 4> openFunctionTypes;
+
   using NameAndOptional = std::pair<StringRef, bool>;
   llvm::DenseMap<std::pair<Identifier, Identifier>, NameAndOptional>
     specialNames;
+
+  // Cached for convenience.
   Identifier ID_CFTypeRef;
-
-  ModuleDecl &M;
-  raw_ostream &os;
-
-  SmallVector<const FunctionType *, 4> openFunctionTypes;
-  const DelayedMemberSet &delayedMembers;
-
   Optional<Type> NSCopyingType;
-  AccessLevel minRequiredAccess;
 
 public:
   explicit Implementation(ModuleDecl &mod, raw_ostream &out,
