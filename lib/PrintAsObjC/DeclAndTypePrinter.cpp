@@ -1443,17 +1443,15 @@ private:
   }
 
   /// If \p typeDecl is one of the standard library types used to map in Clang
-  /// primitives and basic types, return the address of the info in
-  /// \c specialNames containing the Clang name and whether it can be optional.
-  ///
-  /// Returns null if the name is not one of these known types.
-  const NameAndOptional *getKnownTypeInfo(const TypeDecl *typeDecl) {
+  /// primitives and basic types, return the info in \c specialNames containing
+  /// the Clang name and whether it can be nullable in C.
+  Optional<CTypeInfo> getKnownTypeInfo(const TypeDecl *typeDecl) {
     auto &specialNames = owningPrinter.specialNames;
     if (specialNames.empty()) {
       ASTContext &ctx = getASTContext();
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
       specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
-        { CLANG_REPR, NEEDS_NULLABILITY}
+        { CLANG_REPR, NEEDS_NULLABILITY }
 
       MAP(CBool, "bool", false);
 
@@ -1534,8 +1532,8 @@ private:
     Identifier name = typeDecl->getName();
     auto iter = specialNames.find({moduleName, name});
     if (iter == specialNames.end())
-      return nullptr;
-    return &iter->second;
+      return None;
+    return iter->second;
   }
 
   /// If \p typeDecl is one of the standard library types used to map in Clang
@@ -1546,11 +1544,11 @@ private:
   /// for interfacing with C and Objective-C.
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               Optional<OptionalTypeKind> optionalKind) {
-    auto *knownTypeInfo = getKnownTypeInfo(typeDecl);
+    Optional<CTypeInfo> knownTypeInfo = getKnownTypeInfo(typeDecl);
     if (!knownTypeInfo)
       return false;
-    os << knownTypeInfo->first;
-    if (knownTypeInfo->second)
+    os << knownTypeInfo->name;
+    if (knownTypeInfo->canBeNullable)
       printNullability(optionalKind);
     return true;
   }

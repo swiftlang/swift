@@ -38,12 +38,28 @@ private:
   const DelayedMemberSet &delayedMembers;
   AccessLevel minRequiredAccess;
 
-  using NameAndOptional = std::pair<StringRef, bool>;
-  llvm::DenseMap<std::pair<Identifier, Identifier>, NameAndOptional>
-    specialNames;
+  struct CTypeInfo {
+    StringRef name;
+    bool canBeNullable;
+  };
 
-  // Cached for convenience.
+  /// A map from {Module, TypeName} pairs to {C name, C nullability} pairs.
+  ///
+  /// This is populated on first use with a list of known Swift types that are
+  /// translated directly by the ObjC printer instead of structurally, allowing
+  /// it to do things like map 'Int' to 'NSInteger' and 'Float' to 'float'.
+  /// In some sense it's the reverse of the ClangImporter's MappedTypes.def.
+  llvm::DenseMap<std::pair<Identifier, Identifier>, CTypeInfo> specialNames;
+
+  /// The name 'CFTypeRef'.
+  ///
+  /// Cached for convenience.
   Identifier ID_CFTypeRef;
+
+  /// The protocol type 'NSCopying', or a null type if Foundation has not been
+  /// imported.
+  ///
+  /// Cached for convenience.
   Optional<Type> NSCopyingType;
 
   Implementation getImpl();
