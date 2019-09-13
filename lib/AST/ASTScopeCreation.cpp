@@ -1752,6 +1752,11 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
 }
 
 NullablePtr<ASTScopeImpl>
+AbstractFunctionBodyScope::insertionPointForDeferredExpansion() {
+  return getParent().get();
+}
+
+NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
 }

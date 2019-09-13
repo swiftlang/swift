@@ -1006,6 +1006,10 @@ protected:
                              DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
+
+public:
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+  SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
 /// Body of methods, functions in types.

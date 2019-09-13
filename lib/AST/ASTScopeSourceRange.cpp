@@ -546,6 +546,13 @@ void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
 
 #pragma mark compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders
 
+static bool isInterpolatedStringLiteral(const Token& tok) {
+  SmallVector<Lexer::StringSegment, 1> Segments;
+  Lexer::getStringLiteralSegments(tok, Segments, nullptr);
+  return Segments.size() != 1 ||
+    Segments.front().Kind != Lexer::StringSegment::Literal;
+}
+
 // If right brace is missing, the source range of the body will end
 // at the last token, which may be a one of the special cases below.
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &SM,
@@ -555,6 +562,8 @@ static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &SM,
   default:
     return endLoc;
   case tok::string_literal:
+    if (!isInterpolatedStringLiteral(tok))
+      return endLoc; // Just the start of the last token
     break;
   case tok::identifier:
     // subtract one to get a closed-range endpoint from a half-open
@@ -570,6 +579,13 @@ SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
 }
 SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
+}
+SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
+  const auto bsr = decl->getBodySourceRange();
+  const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
+      getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);
+  return SourceRange(bsr.Start,
+                     endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral);
 }
 SourceRange
 Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
