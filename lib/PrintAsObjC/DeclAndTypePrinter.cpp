@@ -110,10 +110,8 @@ class DeclAndTypePrinter::Implementation
   SmallVector<const FunctionType *, 4> openFunctionTypes;
   const DelayedMemberSet &delayedMembers;
 
-  AccessLevel minRequiredAccess;
-  bool protocolMembersOptional = false;
-
   Optional<Type> NSCopyingType;
+  AccessLevel minRequiredAccess;
 
 public:
   explicit Implementation(ModuleDecl &mod, raw_ostream &out,
@@ -189,6 +187,7 @@ private:
   /// Prints the members of a class, extension, or protocol.
   template <bool AllowDelayed = false, typename R>
   void printMembers(R &&members) {
+    bool protocolMembersOptional = false;
     for (const Decl *member : members) {
       auto VD = dyn_cast<ValueDecl>(member);
       if (!VD || !shouldInclude(VD) || isa<TypeDecl>(VD))
@@ -199,8 +198,9 @@ private:
         os << "// '" << VD->getFullName() << "' below\n";
         continue;
       }
-      if (VD->getAttrs().hasAttribute<OptionalAttr>() != protocolMembersOptional) {
-        protocolMembersOptional = VD->getAttrs().hasAttribute<OptionalAttr>();
+      if (VD->getAttrs().hasAttribute<OptionalAttr>() !=
+          protocolMembersOptional) {
+        protocolMembersOptional = !protocolMembersOptional;
         os << (protocolMembersOptional ? "@optional\n" : "@required\n");
       }
       ASTVisitor::visit(const_cast<ValueDecl*>(VD));
@@ -364,9 +364,7 @@ private:
 
     printProtocols(PD->getInheritedProtocols());
     os << "\n";
-    assert(!protocolMembersOptional && "protocols start required");
     printMembers(PD->getMembers());
-    protocolMembersOptional = false;
     os << "@end\n";
   }
 
