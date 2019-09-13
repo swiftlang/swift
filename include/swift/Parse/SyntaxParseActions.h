@@ -61,6 +61,13 @@ public:
                                            ArrayRef<OpaqueSyntaxNode> elements,
                                            CharSourceRange range) = 0;
 
+  /// Discard raw syntax node.
+  /// 
+  /// FIXME: This breaks invariant that any recorded node will be a part of the
+  /// result SourceFile syntax. This method is a temporary workaround, and
+  /// should be removed when we fully migrate to libSyntax parsing.
+  virtual void discardRecordedNode(OpaqueSyntaxNode node) = 0;
+
   /// Used for incremental re-parsing.
   virtual std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
