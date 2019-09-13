@@ -363,6 +363,7 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   case SDKNodeKind::TypeWitness:
     return "type witness type";
   }
+  llvm_unreachable("Unhandled SDKNodeKind in switch");
 }
 
 SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {

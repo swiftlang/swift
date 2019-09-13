@@ -1887,6 +1887,7 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
   case CTP_SubscriptAssignSource:
     return diag::cannot_convert_subscript_assign_nil;
   }
+  llvm_unreachable("Unhandled ContextualTypePurpose in switch");
 }
 
 bool ContextualFailure::diagnoseConversionToNil() const {

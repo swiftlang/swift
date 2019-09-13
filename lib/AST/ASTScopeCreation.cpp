@@ -1178,6 +1178,7 @@ ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
     return {ccPatternUseScope,
             "Succeeding code must be in scope of conditional variables"};
   }
+  llvm_unreachable("Unhandled StmtConditionKind in switch");
 }
 
 AnnotatedInsertionPoint
