@@ -2129,6 +2129,7 @@ static ConstraintFix *fixPropertyWrapperFailure(
       return UseWrappedValue::create(cs, decl, baseTy, toType.getValueOr(type),
                                      locator);
     }
+    llvm_unreachable("Unhandled Fix type in switch");
   };
 
   if (auto storageWrapper = cs.getStorageWrapperInformation(resolvedOverload)) {

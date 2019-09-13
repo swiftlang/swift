@@ -2040,6 +2040,7 @@ public:
                              LookUpConformanceInModule(CurrModule));
     }
     }
+    llvm_unreachable("Unhandled DynamicLookupInfo Kind in switch");
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {

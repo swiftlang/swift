@@ -2993,6 +2993,12 @@ void SILCoverageMap::dump() const {
 }
 
 #ifndef NDEBUG
+// Disable the "for use only in debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void SILDebugScope::dump(SourceManager &SM, llvm::raw_ostream &OS,
                          unsigned Indent) const {
   OS << "{\n";
@@ -3025,6 +3031,10 @@ void SILDebugScope::dump(SILModule &Mod) const {
   // We just use the default indent and llvm::errs().
   dump(Mod.getASTContext().SourceMgr);
 }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
 
 #endif
 

@@ -86,7 +86,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
     return body;
   }
   }
-
+  llvm_unreachable("Unhandled BodyKind in switch");
 }
 
 

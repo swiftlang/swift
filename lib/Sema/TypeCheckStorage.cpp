@@ -1818,6 +1818,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("not an opaque accessor");
   }
+  llvm_unreachable("Unhandled AccessorKind in switch");
 }
 
 llvm::Expected<bool>
