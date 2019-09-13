@@ -1,4 +1,4 @@
-// RUN: %scale-test --begin 3 --end 7 --step 1 --select NumLeafScopes %s
+// RUN: %scale-test --begin 3 --end 7 --step 1 --select NumLeafScopes %s --exponential-threshold 11.0
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 
