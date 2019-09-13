@@ -2947,6 +2947,8 @@ public:
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public GenericTypeDecl {
+  friend class UnderlyingTypeRequest;
+  
   /// The location of the 'typealias' keyword
   SourceLoc TypeAliasLoc;
 

@@ -1181,6 +1181,28 @@ public:
   void cacheResult(GenericSignature *value) const;
 };
 
+/// Compute the interface type of the underlying definition type of a typealias declaration.
+class UnderlyingTypeRequest :
+    public SimpleRequest<UnderlyingTypeRequest,
+                         Type(TypeAliasDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator,
+                                TypeAliasDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

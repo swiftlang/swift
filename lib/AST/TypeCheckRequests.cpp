@@ -822,3 +822,24 @@ void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
   auto *GC = std::get<0>(getStorage());
   GC->GenericSigAndBit.setPointerAndInt(value, true);
 }
+
+//----------------------------------------------------------------------------//
+// IsImplicitlyUnwrappedOptionalRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type>
+UnderlyingTypeRequest::getCachedResult() const {
+  auto *typeAlias = std::get<0>(getStorage());
+  if (auto type = typeAlias->UnderlyingTy.getType())
+    return type;
+  return None;
+}
+
+void UnderlyingTypeRequest::cacheResult(Type value) const {
+  auto *typeAlias = std::get<0>(getStorage());
+  // lldb creates global typealiases containing archetypes
+  // sometimes...
+  if (value->hasArchetype() && typeAlias->isGenericContext())
+    value = value->mapTypeOutOfContext();
+  typeAlias->UnderlyingTy.setType(value);
+}
