@@ -1058,10 +1058,12 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Typecheck) {
     if (emitIndexData(Invocation, Instance))
       return true;
-    if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
-                                                            Invocation,
-                                                            moduleIsPublic)) {
-      return true;
+    if (opts.InputsAndOutputs.isWholeModule()) {
+      if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
+                                                              Invocation,
+                                                              moduleIsPublic)) {
+        return true;
+      }
     }
     return false;
   }
