@@ -235,7 +235,7 @@ public func _getErrorDefaultUserInfo<T: Error>(_ error: T)
       _errorDomainUserInfoProviderQueue.sync {
         if NSError.userInfoValueProvider(forDomain: domain) != nil { return }
         NSError.setUserInfoValueProvider(forDomain: domain) { (nsError, key) in
-          let error = nsError as Error
+          let error = nsError 
 
           switch key {
           case NSLocalizedDescriptionKey:

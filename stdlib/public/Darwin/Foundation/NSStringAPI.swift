@@ -353,7 +353,7 @@ extension String {
     usedEncoding: inout Encoding
   ) throws {
     var enc: UInt = 0
-    let ns = try NSString(contentsOf: url as URL, usedEncoding: &enc)
+    let ns = try NSString(contentsOf: url, usedEncoding: &enc)
     usedEncoding = Encoding(rawValue: enc)
     self = String._unconditionallyBridgeFromObjectiveC(ns)
   }

@@ -17,9 +17,9 @@
 extension CKShare {
     @available(swift 4.2)
     public enum SystemFieldKey {
-        public static let title: CKRecord.FieldKey = __CKShareTitleKey as CKRecord.FieldKey
-        public static let thumbnailImageData: CKRecord.FieldKey = __CKShareThumbnailImageDataKey as CKRecord.FieldKey
-        public static let shareType: CKRecord.FieldKey = __CKShareTypeKey as CKRecord.FieldKey
+        public static let title: CKRecord.FieldKey = __CKShareTitleKey
+        public static let thumbnailImageData: CKRecord.FieldKey = __CKShareThumbnailImageDataKey
+        public static let shareType: CKRecord.FieldKey = __CKShareTypeKey
     }
 }
 
