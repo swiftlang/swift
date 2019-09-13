@@ -73,6 +73,7 @@ static StringRef getCategoryName(uint32_t ID) {
   case LocalDiagID::super_class_removed:
   case LocalDiagID::super_class_changed:
   case LocalDiagID::no_longer_open:
+  case LocalDiagID::desig_init_added:
     return "/* Class Inheritance Change */";
   default:
     return StringRef();
