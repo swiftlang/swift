@@ -2491,7 +2491,7 @@ public:
   static bool isCollectionType(Type t);
 
   /// Determine if the type in question is AnyHashable.
-  bool isAnyHashableType(Type t);
+  static bool isAnyHashableType(Type t);
 
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the

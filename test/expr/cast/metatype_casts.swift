@@ -23,15 +23,15 @@ use(any as! P.Protocol)
 
 let anyP: Any.Protocol = Any.self
 use(anyP is Any.Type) // expected-warning{{always true}}
-use(anyP as! Int.Type) // TODO: always fails
+use(anyP as! Int.Type) // expected-warning{{always fails}}
 
 let anyObj: AnyObject.Type = D.self
-use(anyObj as! Int.Type) // TODO: always fails
+use(anyObj as! Int.Type) // expected-warning{{always fails}}
 use(anyObj as! C.Type)
 use(anyObj as! D.Type)
-use(anyObj as! AnyObject.Protocol) // TODO: always fails
+use(anyObj as! AnyObject.Protocol) // expected-warning{{always fails}}
 use(anyObj as! P.Type)
-use(anyObj as! P.Protocol) // TODO: always fails
+use(anyObj as! P.Protocol) // expected-warning{{always fails}}
 
 let c: C.Type = D.self
 use(c as! D.Type)
