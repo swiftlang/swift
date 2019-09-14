@@ -18,7 +18,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SwiftNameTranslation.h"
-#include "swift/AST/TypeVisitor.h"
+#include "swift/AST/TypeDeclFinder.h"
 #include "swift/ClangImporter/ClangImporter.h"
 
 #include "clang/AST/Decl.h"
@@ -39,92 +39,29 @@ static bool isOSObjectType(const clang::Decl *decl) {
 }
 
 namespace {
-class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
-  friend TypeVisitor;
+class ReferencedTypeFinder : public TypeDeclFinder {
+  friend TypeDeclFinder;
 
-  ModuleDecl &M;
   llvm::function_ref<void(ReferencedTypeFinder &, const TypeDecl *)> Callback;
   bool NeedsDefinition = false;
 
-  ReferencedTypeFinder(ModuleDecl &mod, decltype(Callback) callback)
-    : M(mod), Callback(callback) {}
+  explicit ReferencedTypeFinder(decltype(Callback) callback)
+    : Callback(callback) {}
 
-  void visitType(TypeBase *base) {
-    llvm_unreachable("unhandled type");
+  Action visitNominalType(NominalType *nominal) override {
+    Callback(*this, nominal->getDecl());
+    return Action::SkipChildren;
   }
 
-  void visitTypeAliasType(TypeAliasType *aliasTy) {
+  Action visitTypeAliasType(TypeAliasType *aliasTy) override {
     if (aliasTy->getDecl()->hasClangNode() &&
         !aliasTy->getDecl()->isCompatibilityAlias()) {
+      assert(!aliasTy->getGenericSignature());
       Callback(*this, aliasTy->getDecl());
     } else {
-      visit(aliasTy->getSinglyDesugaredType());
+      Type(aliasTy->getSinglyDesugaredType()).walk(*this);
     }
-  }
-
-  void visitParenType(ParenType *parenTy) {
-    visit(parenTy->getSinglyDesugaredType());
-  }
-
-  void visitTupleType(TupleType *tupleTy) {
-    for (auto elemTy : tupleTy->getElementTypes())
-      visit(elemTy);
-  }
-
-  void visitReferenceStorageType(ReferenceStorageType *ty) {
-    visit(ty->getReferentType());
-  }
-
-  void visitNominalType(NominalType *nominal) {
-    Callback(*this, nominal->getDecl());
-  }
-
-  void visitAnyMetatypeType(AnyMetatypeType *metatype) {
-    visit(metatype->getInstanceType());
-  }
-
-  void visitDynamicSelfType(DynamicSelfType *module) {
-    return;
-  }
-
-  void visitArchetypeType(ArchetypeType *archetype) {
-    llvm_unreachable("Should not see archetypes in interface types");
-  }
-
-  void visitGenericTypeParamType(GenericTypeParamType *param) {
-    // Appears in protocols and in generic ObjC classes.
-    return;
-  }
-
-  void visitDependentMemberType(DependentMemberType *member) {
-    // Appears in protocols and in generic ObjC classes.
-    return;
-  }
-
-  void visitAnyFunctionType(AnyFunctionType *fnTy) {
-    for (auto &param : fnTy->getParams())
-      visit(param.getOldType());
-    visit(fnTy->getResult());
-  }
-
-  void visitSyntaxSugarType(SyntaxSugarType *sugar) {
-    visit(sugar->getSinglyDesugaredType());
-  }
-
-  void visitProtocolCompositionType(ProtocolCompositionType *composition) {
-    auto layout = composition->getExistentialLayout();
-    if (auto superclass = layout.explicitSuperclass)
-      visit(superclass);
-    for (auto proto : layout.getProtocols())
-      visit(proto);
-  }
-
-  void visitLValueType(LValueType *lvalue) {
-    llvm_unreachable("LValue types should not appear in interface types");
-  }
-
-  void visitInOutType(InOutType *inout) {
-    visit(inout->getObjectType());
+    return Action::SkipChildren;
   }
 
   /// Returns true if \p paramTy has any constraints other than being
@@ -138,7 +75,7 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     return !conformsTo.empty();
   }
 
-  void visitBoundGenericType(BoundGenericType *boundGeneric) {
+  Action visitBoundGenericType(BoundGenericType *boundGeneric) override {
     auto *decl = boundGeneric->getDecl();
 
     NeedsDefinition = true;
@@ -151,22 +88,22 @@ class ReferencedTypeFinder : public TypeVisitor<ReferencedTypeFinder> {
     for_each(boundGeneric->getGenericArgs(),
              sig->getInnermostGenericParams(),
              [&](Type argTy, GenericTypeParamType *paramTy) {
+      // FIXME: I think there's a bug here with recursive generic types.
       if (isObjCGeneric && isConstrained(sig, paramTy))
         NeedsDefinition = true;
-      visit(argTy);
+      argTy.walk(*this);
       NeedsDefinition = false;
     });
+    return Action::SkipChildren;
   }
 
 public:
-  using TypeVisitor::visit;
-
   bool needsDefinition() const {
     return NeedsDefinition;
   }
 
-  static void walk(ModuleDecl &mod, Type ty, decltype(Callback) callback) {
-    ReferencedTypeFinder(mod, callback).visit(ty);
+  static void walk(Type ty, decltype(Callback) callback) {
+    ty.walk(ReferencedTypeFinder(callback));
   }
 };
 
@@ -330,7 +267,7 @@ public:
       }
 
       bool needsToBeIndividuallyDelayed = false;
-      ReferencedTypeFinder::walk(M, VD->getInterfaceType(),
+      ReferencedTypeFinder::walk(VD->getInterfaceType(),
                                  [&](ReferencedTypeFinder &finder,
                                      const TypeDecl *TD) {
         if (TD == container)
