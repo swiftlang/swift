@@ -4525,7 +4525,8 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
 
   // Try to get the associated type by substituting the base type for a protocol
   // associated type, and return it if found.
-  if (auto assocTy = dependentType->substBaseType(this, lookupConformance))
+  auto assocTy = dependentType->substBaseType(this, lookupConformance);
+  if (!assocTy->hasError())
     return cache(VectorSpace::getVector(assocTy));
 
   // There is no associated vector space.
