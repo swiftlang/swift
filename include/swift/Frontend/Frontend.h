@@ -31,7 +31,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
@@ -78,7 +78,7 @@ class CompilerInvocation {
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
-  ParseableInterfaceOptions ParseableInterfaceOpts;
+  ModuleInterfaceOptions ModuleInterfaceOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -208,8 +208,8 @@ public:
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
 
-  ParseableInterfaceOptions &getParseableInterfaceOptions() { return ParseableInterfaceOpts; }
-  const ParseableInterfaceOptions &getParseableInterfaceOptions() const { return ParseableInterfaceOpts; }
+  ModuleInterfaceOptions &getModuleInterfaceOptions() { return ModuleInterfaceOpts; }
+  const ModuleInterfaceOptions &getModuleInterfaceOptions() const { return ModuleInterfaceOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
@@ -353,10 +353,10 @@ public:
   /// if not in that mode.
   std::string getTBDPathForWholeModule() const;
 
-  /// ParseableInterfaceOutputPath only makes sense in whole module compilation
-  /// mode, so return the ParseableInterfaceOutputPath when in that mode and
+  /// ModuleInterfaceOutputPath only makes sense in whole module compilation
+  /// mode, so return the ModuleInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
-  std::string getParseableInterfaceOutputPathForWholeModule() const;
+  std::string getModuleInterfaceOutputPathForWholeModule() const;
 
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,

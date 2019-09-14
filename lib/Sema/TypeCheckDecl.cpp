@@ -2332,7 +2332,7 @@ public:
         // Static/class declarations require an initializer unless in a
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
-          // ...but don't enforce this for SIL or parseable interface files.
+          // ...but don't enforce this for SIL or module interface files.
           switch (DC->getParentSourceFile()->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
@@ -2969,7 +2969,7 @@ public:
         return false;
     }
 
-    // Declarations in SIL and parseable interface files don't require
+    // Declarations in SIL and module interface files don't require
     // definitions.
     if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
       switch (sourceFile->Kind) {
@@ -4804,7 +4804,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *SF = classDecl->getParentSourceFile()) {
-    // Allow classes without initializers in SIL and parseable interface files.
+    // Allow classes without initializers in SIL and module interface files.
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:

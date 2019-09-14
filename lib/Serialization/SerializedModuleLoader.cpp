@@ -309,7 +309,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     StringRef ModuleDocFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
-  if (LoadMode == ModuleLoadingMode::OnlyParseable)
+  if (LoadMode == ModuleLoadingMode::OnlyInterface)
     return std::make_error_code(std::errc::not_supported);
 
   llvm::SmallString<256> ModulePath{DirPath};
