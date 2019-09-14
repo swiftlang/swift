@@ -483,14 +483,27 @@ private:
   
   uint64_t getRemoteAddrOfTypeRefPointer(const void *pointer);
 
+  std::function<auto (SymbolicReferenceKind kind,
+                      Directness directness,
+                      int32_t offset, const void *base) -> Demangle::Node *>
+    SymbolicReferenceResolver;
+  
+  std::string normalizeReflectionName(StringRef name);
+  bool reflectionNameMatches(StringRef reflectionName,
+                             StringRef searchName);
+  
+  Demangle::Node *demangleTypeRef(StringRef mangledName) {
+    return Dem.demangleType(mangledName, SymbolicReferenceResolver);
+  }
+  
 public:
   template<typename Runtime>
-  void setSymbolicReferenceResolverReader(
+  void setMetadataReader(
                       remote::MetadataReader<Runtime, TypeRefBuilder> &reader) {
     // Have the TypeRefBuilder demangle symbolic references by reading their
     // demangling out of the referenced context descriptors in the target
     // process.
-    Dem.setSymbolicReferenceResolver(
+    SymbolicReferenceResolver =
     [this, &reader](SymbolicReferenceKind kind,
                     Directness directness,
                     int32_t offset, const void *base) -> Demangle::Node * {
@@ -531,7 +544,7 @@ public:
       }
       
       return nullptr;
-    });
+    };
     
     OpaqueUnderlyingTypeReader =
     [&reader](const void *descriptor, unsigned ordinal) -> const TypeRef* {
