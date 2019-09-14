@@ -261,12 +261,12 @@ func rdar19831919() {
 
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions
 func rdar19831698() {
-  var v70 = true + 1 // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
+  var v70 = true + 1 // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Int'}}
   var v71 = true + 1.0 // expected-error{{binary operator '+' cannot be applied to operands of type 'Bool' and 'Double'}}
 // expected-note@-1{{overloads for '+'}}
   var v72 = true + true // expected-error{{binary operator '+' cannot be applied to two 'Bool' operands}}
-  var v73 = true + [] // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
-  var v75 = true + "str" // expected-error {{cannot convert value of type 'Bool' to expected argument type 'String'}}
+  var v73 = true + [] // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'Array<Bool>'}}
+  var v75 = true + "str" // expected-error@:13 {{cannot convert value of type 'Bool' to expected argument type 'String'}}
 }
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions

@@ -182,7 +182,7 @@ func recArea(_ h: Int, w : Int) {
 
 // <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
 func r17224804(_ monthNumber : Int) {
-  // expected-error @+1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+  // expected-error@+1:49 {{cannot convert value of type 'Int' to expected argument type 'String'}}
   let monthString = (monthNumber <= 9) ? ("0" + monthNumber) : String(monthNumber)
 }
 
@@ -720,7 +720,7 @@ func r24251022() {
   _ = a + b // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'UInt32'}} expected-note {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (UInt32, UInt32)}}
   a += a +
     b // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
-  a += b  // expected-error {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
+  a += b  // expected-error@:8 {{cannot convert value of type 'UInt32' to expected argument type 'Int'}}
 }
 
 func overloadSetResultType(_ a : Int, b : Int) -> Int {

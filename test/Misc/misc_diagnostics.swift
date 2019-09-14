@@ -14,7 +14,7 @@ if let realRoomName = roomName as! NSString { // expected-warning{{forced cast f
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
+var dpi:CGFloat = d*pi // expected-error@:21{{cannot convert value of type 'Double' to expected argument type 'CGFloat'}}
 
 let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert value of type 'Float' to specified type 'CGFloat'}}
 
