@@ -407,10 +407,9 @@ private:
   void printSingleMethodParam(StringRef selectorPiece,
                               const ParamDecl *param,
                               const clang::ParmVarDecl *clangParam,
-                              bool isNSUIntegerSubscript,
-                              bool isLastPiece) {
+                              bool forceNSUInteger) {
     os << selectorPiece << ":(";
-    if ((isNSUIntegerSubscript && isLastPiece) ||
+    if (forceNSUInteger ||
         (clangParam && isNSUInteger(clangParam->getType()))) {
       os << "NSUInteger";
     } else {
@@ -602,8 +601,9 @@ private:
         clangParam = clangMethod->parameters()[paramIndex];
 
       // Single-parameter methods.
+      bool forceNSUInteger = isNSUIntegerSubscript && (i == n-1);
       printSingleMethodParam(piece, params[paramIndex], clangParam,
-                             isNSUIntegerSubscript, i == n-1);
+                             forceNSUInteger);
       ++paramIndex;
     }
 
