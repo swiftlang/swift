@@ -1731,7 +1731,9 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 #pragma mark - reexpandIfObsolete
 
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (scopeCreator.getIsFrozen() || isCurrent())
+  if (scopeCreator.getIsFrozen() ||
+      (isCurrent() &&
+          !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup))
     return false;
   reexpand(scopeCreator);
   return true;
