@@ -859,6 +859,7 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
   VISIT_AND_CREATE_WHOLE_PORTION(StructDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(ClassDecl, NominalTypeScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(ProtocolDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(EnumDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(TypeAliasDecl, TypeAliasScope)
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
@@ -869,12 +870,6 @@ public:
   NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *ad, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
     return visitAbstractFunctionDecl(ad, p, scopeCreator);
-  }
-
-  NullablePtr<ASTScopeImpl> visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p,
-                                              ScopeCreator &scopeCreator) {
-    return scopeCreator.ifUniqueConstructWithPortionExpandAndInsert<
-        NominalTypeScope, GenericTypeOrExtensionWholePortion>(p, e);
   }
 
 #pragma mark simple creation with deferred nodes
