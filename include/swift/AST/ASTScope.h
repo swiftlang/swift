@@ -521,6 +521,7 @@ public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
   void addNewDeclsToScopeTree();
+  void buildScopeTreeEagerly();
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }

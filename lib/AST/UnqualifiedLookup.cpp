@@ -536,9 +536,10 @@ bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
 
 bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookupIfEnabled()
     const {
-  return Loc.isValid() && DC->getParentSourceFile() &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::SIL;
+  if (!Loc.isValid())
+    return false;
+  const auto *const SF = DC->getParentSourceFile();
+  return SF && SF->isSuitableForASTScopes();
 }
 
 #pragma mark context-based lookup definitions

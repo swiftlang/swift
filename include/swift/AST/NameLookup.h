@@ -592,6 +592,10 @@ class ASTScope {
 public:
   ASTScope(SourceFile *);
 
+  /// Cannot be lazy during type-checking because it mutates the AST.
+  /// So build eagerly before type-checking
+  void buildScopeTreeEagerly();
+
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>
   unqualifiedLookup(SourceFile *, DeclName, SourceLoc,
