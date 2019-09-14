@@ -4093,7 +4093,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
         unsigned choiceImpact = 0;
         // If this requirement is associated with overload choice let's
-        // tie implact how many times this non-conforming type is mentioned.
+        // tie impact to how many times this non-conforming type is mentioned.
         if (auto *ODRE = dyn_cast_or_null<OverloadedDeclRefExpr>(anchor)) {
           auto *choice = findSelectedOverloadFor(ODRE);
           if (typeVar && choice) {
