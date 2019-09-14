@@ -294,13 +294,13 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
-  auto parseableInterfaceOutput = getSupplementaryFilenamesFromArguments(
+  auto moduleInterfaceOutput = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_module_interface_path);
 
   if (!objCHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
       !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
-      !parseableInterfaceOutput) {
+      !moduleInterfaceOutput) {
     return None;
   }
   std::vector<SupplementaryOutputPaths> result;
@@ -318,7 +318,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
-    sop.ParseableInterfaceOutputPath = (*parseableInterfaceOutput)[i];
+    sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
 
     result.push_back(sop);
   }
@@ -395,8 +395,8 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
       defaultSupplementaryOutputPathExcludingExtension);
 
   // There is no non-path form of -emit-interface-path
-  auto parseableInterfaceOutputPath =
-      pathsFromArguments.ParseableInterfaceOutputPath;
+  auto ModuleInterfaceOutputPath =
+      pathsFromArguments.ModuleInterfaceOutputPath;
 
   ID emitModuleOption;
   std::string moduleExtension;
@@ -419,7 +419,7 @@ SupplementaryOutputPathsComputer::computeOutputPathsForOneInput(
   sop.FixItsOutputPath = fixItsOutputPath;
   sop.LoadedModuleTracePath = loadedModuleTracePath;
   sop.TBDPath = tbdPath;
-  sop.ParseableInterfaceOutputPath = parseableInterfaceOutputPath;
+  sop.ModuleInterfaceOutputPath = ModuleInterfaceOutputPath;
   return sop;
 }
 
@@ -494,8 +494,8 @@ createFromTypeToPathMap(const TypeToPathMap *map) {
       {file_types::TY_SerializedDiagnostics, paths.SerializedDiagnosticsPath},
       {file_types::TY_ModuleTrace, paths.LoadedModuleTracePath},
       {file_types::TY_TBD, paths.TBDPath},
-      {file_types::TY_SwiftParseableInterfaceFile,
-       paths.ParseableInterfaceOutputPath}
+      {file_types::TY_SwiftModuleInterfaceFile,
+       paths.ModuleInterfaceOutputPath}
   };
   for (const std::pair<file_types::ID, std::string &> &typeAndString :
        typesAndStrings) {

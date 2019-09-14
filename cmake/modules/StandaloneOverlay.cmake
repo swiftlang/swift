@@ -58,7 +58,7 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "${TOOLCHAIN_DIR}/usr/bin" CACHE STRING
   "Path to Swift tools that are executable on the build machine.")
 
-option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+option(SWIFT_ENABLE_MODULE_INTERFACES
   "Generate .swiftinterface files alongside .swiftmodule files."
   TRUE)
 
