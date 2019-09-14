@@ -33,7 +33,7 @@ class AttributeDemangler : public Demangle::Demangler {
 public:
   void demangleAndAddAsChildren(StringRef MangledSpecialization,
                                 NodePointer Parent) {
-    DemangleInitRAII state(*this, MangledSpecialization);
+    DemangleInitRAII state(*this, MangledSpecialization, nullptr);
     if (!parseAndPushNodes()) {
       llvm::errs() << "Can't demangle: " << MangledSpecialization << '\n';
       abort();

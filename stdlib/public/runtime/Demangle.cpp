@@ -80,7 +80,8 @@ swift::_buildDemanglingForContext(const ContextDescriptor *context,
     case ContextDescriptorKind::Extension: {
       auto extension = llvm::cast<ExtensionContextDescriptor>(component);
       // Demangle the extension self type.
-      auto selfType = Dem.demangleType(extension->getMangledExtendedContext());
+      auto selfType = Dem.demangleType(extension->getMangledExtendedContext(),
+                                       ResolveToDemanglingForContext(Dem));
       if (selfType->getKind() == Node::Kind::Type)
         selfType = selfType->getChild(0);
       
