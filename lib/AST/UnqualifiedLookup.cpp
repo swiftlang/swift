@@ -474,7 +474,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
-  SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
+  FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
+                                  DC->getParentSourceFile());
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
