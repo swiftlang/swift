@@ -757,8 +757,9 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \returns true if type validation failed, or false otherwise.
-  bool validateType(TypeLoc &Loc, TypeResolution resolution,
-                    TypeResolutionOptions options);
+  static bool validateType(ASTContext &Ctx, TypeLoc &Loc,
+                           TypeResolution resolution,
+                           TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
   void checkUnsupportedProtocolType(Decl *decl);
@@ -1747,7 +1748,6 @@ private:
                                     const DeclContext *DC,
                                     FragileFunctionKind fragileKind);
 
-public:
   /// Given that a type is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if its
   /// generic arguments require the use of conformances that cannot reasonably
@@ -1755,9 +1755,10 @@ public:
   ///
   /// This method \e only checks how generic arguments are used; it is assumed
   /// that the declarations involved have already been checked elsewhere.
-  void diagnoseGenericTypeExportability(const TypeLoc &TL,
-                                        const DeclContext *DC);
+  static void diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                               const DeclContext *DC);
 
+public:
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///

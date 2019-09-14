@@ -129,7 +129,7 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   TypeLoc constraintTypeLoc(repr->getConstraint());
   // Pass along the error type if resolving the repr failed.
   bool validationError
-    = validateType(constraintTypeLoc, resolution, options);
+    = validateType(Context, constraintTypeLoc, resolution, options);
   auto constraintType = constraintTypeLoc.getType();
   if (validationError)
     return constraintType;
@@ -569,7 +569,7 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
       resultTyLoc.setType(
           getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
     } else {
-      validateType(resultTyLoc, resolution,
+      validateType(Context, resultTyLoc, resolution,
                    TypeResolverContext::FunctionResult);
     }
   }

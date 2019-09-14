@@ -1836,7 +1836,8 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (tc.validateType(typeLoc, TypeResolution::forInterface(DC), options))
+  if (TypeChecker::validateType(tc.Context, typeLoc,
+                                TypeResolution::forInterface(DC), options))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -3477,8 +3478,9 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
     return;
   }
 
-  if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                    TypeResolution::forInterface(typeAlias, &tc), options)) {
+  if (TypeChecker::validateType(tc.Context, typeAlias->getUnderlyingTypeLoc(),
+                                TypeResolution::forInterface(typeAlias, &tc),
+                                options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -4202,8 +4204,10 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
              TypeResolverContext::TypeAliasDecl));
           auto &underlyingTL = typealias->getUnderlyingTypeLoc();
           if (underlyingTL.isNull() ||
-              validateType(underlyingTL,
-                           TypeResolution::forStructural(typealias), options)) {
+              TypeChecker::validateType(Context,
+                                        underlyingTL,
+                                        TypeResolution::forStructural(typealias),
+                                        options)) {
             typealias->setInvalid();
             underlyingTL.setInvalidType(Context);
           }
