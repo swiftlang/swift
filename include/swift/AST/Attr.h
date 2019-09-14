@@ -365,6 +365,18 @@ public:
 
     /// Whether removing this attribute can break ABI
     ABIBreakingToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 11),
+
+    /// The opposite of APIBreakingToAdd
+    APIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 12),
+
+    /// The opposite of APIBreakingToRemove
+    APIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 13),
+
+    /// The opposite of ABIBreakingToAdd
+    ABIStableToAdd = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 14),
+
+    /// The opposite of ABIBreakingToRemove
+    ABIStableToRemove = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 15),
   };
 
   LLVM_READNONE
@@ -450,6 +462,12 @@ public:
   static bool isAddingBreakingABI(DeclAttrKind DK) {
     return getOptions(DK) & ABIBreakingToAdd;
   }
+
+#define DECL_ATTR(_, CLASS, OPTIONS, ...)                                                         \
+  static constexpr bool isOptionSetFor##CLASS(DeclAttrOptions Bit) {                              \
+    return (OPTIONS) & Bit;                                                                       \
+  }
+#include "swift/AST/Attr.def"
 
   static bool isAddingBreakingAPI(DeclAttrKind DK) {
     return getOptions(DK) & APIBreakingToAdd;
