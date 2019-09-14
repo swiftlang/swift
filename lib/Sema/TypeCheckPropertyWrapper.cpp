@@ -494,7 +494,8 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (tc.validateType(customAttr->getTypeLoc(), resolution, options))
+  if (TypeChecker::validateType(tc.Context, customAttr->getTypeLoc(),
+                                resolution, options))
     return ErrorType::get(ctx);
 
   return customAttr->getTypeLoc().getType();
