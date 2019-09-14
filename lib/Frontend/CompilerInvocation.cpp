@@ -208,8 +208,8 @@ static void PrintArg(raw_ostream &OS, const char *Arg, StringRef TempDir) {
   OS << '"';
 }
 
-static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
-                                        ArgList &Args) {
+static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
+                                     ArgList &Args) {
   using namespace options;
 
   Opts.PreserveTypesAsWritten |=
@@ -218,17 +218,17 @@ static void ParseParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
 
 /// Save a copy of any flags marked as ModuleInterfaceOption, if running
 /// in a mode that is going to emit a .swiftinterface file.
-static void SaveParseableInterfaceArgs(ParseableInterfaceOptions &Opts,
-                                       FrontendOptions &FOpts,
-                                       ArgList &Args, DiagnosticEngine &Diags) {
-  if (!FOpts.InputsAndOutputs.hasParseableInterfaceOutputPath())
+static void SaveModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
+                                    FrontendOptions &FOpts,
+                                    ArgList &Args, DiagnosticEngine &Diags) {
+  if (!FOpts.InputsAndOutputs.hasModuleInterfaceOutputPath())
     return;
   ArgStringList RenderedArgs;
   for (auto A : Args) {
     if (A->getOption().hasFlag(options::ModuleInterfaceOption))
       A->render(Args, RenderedArgs);
   }
-  llvm::raw_string_ostream OS(Opts.ParseableInterfaceFlags);
+  llvm::raw_string_ostream OS(Opts.Flags);
   interleave(RenderedArgs,
              [&](const char *Argument) { PrintArg(OS, Argument, StringRef()); },
              [&] { OS << " "; });
@@ -1356,9 +1356,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  ParseParseableInterfaceArgs(ParseableInterfaceOpts, ParsedArgs);
-  SaveParseableInterfaceArgs(ParseableInterfaceOpts, FrontendOpts,
-                             ParsedArgs, Diags);
+  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs);
+  SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
 
   if (ParseLangArgs(LangOpts, ParsedArgs, Diags, FrontendOpts)) {
     return true;
