@@ -1133,6 +1133,7 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
+      (void)A;
       assert(A && A->getMemberName().matchesRef(name));
     }
   }
