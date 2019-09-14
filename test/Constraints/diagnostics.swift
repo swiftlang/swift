@@ -1183,23 +1183,30 @@ func sr5081() {
   b = a[2...4] // expected-error {{cannot assign value of type 'ArraySlice<String>' to type '[String]'}}
 }
 
-/**
-* TODO(diagnostics):Figure out what to do when expressions are complex and completely broken
-*
+// TODO(diagnostics):Figure out what to do when expressions are complex and completely broken
 func rdar17170728() {
   var i: Int? = 1
   var j: Int?
   var k: Int? = 2
 
-  let _ = [i, j, k].reduce(0 as Int?) {
+  let _ = [i, j, k].reduce(0 as Int?) { // expected-error 3 {{cannot convert value of type 'Int?' to expected element type 'Bool'}}
+  // expected-error@-1 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
     $0 && $1 ? $0! + $1! : ($0 ? $0! : ($1 ? $1! : nil))
+    // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
+    // expected-error@-2 4 {{cannot force unwrap value of non-optional type 'Bool'}}
+    // expected-error@-3 {{value of optional type 'Bool?' must be unwrapped to a value of type 'Bool'}}
+    // expected-note@-4 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
+    // expected-note@-5 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
 
-  let _ = [i, j, k].reduce(0 as Int?) {
+  let _ = [i, j, k].reduce(0 as Int?) { // expected-error 3 {{cannot convert value of type 'Int?' to expected element type 'Bool'}}
+    // expected-error@-1 {{missing argument label 'into:' in call}}
+    // expected-error@-2 {{optional type 'Int?' cannot be used as a boolean; test for '!= nil' instead}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
+    // expected-error@-1 {{binary operator '+' cannot be applied to operands of type '@lvalue Bool' and 'Bool'}}
+    // expected-error@-2 {{'nil' cannot be used in context expecting type 'Bool'}}
   }
 }
-*/
 
 // https://bugs.swift.org/browse/SR-5934 - failure to emit diagnostic for bad
 // generic constraints
