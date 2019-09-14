@@ -163,8 +163,8 @@ const SyntaxParsingContext *SyntaxParsingContext::getRoot() const {
   return Curr;
 }
 
-ParsedTokenSyntax SyntaxParsingContext::popToken() {
-  return popIf<ParsedTokenSyntax>().getValue();
+ParsedTokenSyntax &&SyntaxParsingContext::popToken() {
+  return std::move(popIf<ParsedTokenSyntax>().getValue());
 }
 
 /// Add Token with Trivia to the parts.
@@ -334,7 +334,7 @@ SyntaxParsingContext::~SyntaxParsingContext() {
         Storage.push_back(std::move(BridgedNode.getValue()));
       }
     } else {
-      auto node = bridgeAs(CtxtKind, getParts()).getValue();
+      auto node(std::move(bridgeAs(CtxtKind, getParts()).getValue()));
       Storage.erase(Storage.begin() + Offset, Storage.end());
       Storage.emplace_back(std::move(node));
     }
