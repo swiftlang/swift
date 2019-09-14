@@ -1140,8 +1140,9 @@ namespace {
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
         if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TC.validateType(PlaceholderE->getTypeLoc(),
-                               TypeResolution::forContextual(DC), None))
+          if (!TypeChecker::validateType(TC.Context, PlaceholderE->getTypeLoc(),
+                                         TypeResolution::forContextual(DC),
+                                         None))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1375,8 +1376,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TC.validateType(closure->getExplicitResultTypeLoc(), resolution,
-                      TypeResolverContext::InExpression)) {
+      TypeChecker::validateType(TC.Context, closure->getExplicitResultTypeLoc(),
+                                resolution,
+                                TypeResolverContext::InExpression)) {
     return false;
   }
 
@@ -1392,7 +1394,7 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   // recurse into.
   assert((closure->getParent() == DC ||
           closure->getParent()->isChildContextOf(DC)) &&
-      "Decl context isn't correct");
+         "Decl context isn't correct");
   DC = closure;
   return true;
 }
@@ -1987,7 +1989,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
     auto &typeLoc = typeExpr->getTypeLoc();
     bool hadError =
-        TC.validateType(typeLoc, TypeResolution::forContextual(DC), options);
+        TypeChecker::validateType(TC.Context, typeLoc,
+                                  TypeResolution::forContextual(DC), options);
 
     if (hadError)
       return nullptr;

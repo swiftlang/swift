@@ -1382,8 +1382,8 @@ namespace {
     Type resolveTypeReferenceInExpression(TypeLoc &loc) {
       TypeResolutionOptions options(TypeResolverContext::InExpression);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      bool hadError = CS.TC.validateType(
-          loc, TypeResolution::forContextual(CS.DC), options);
+      bool hadError = TypeChecker::validateType(
+          CS.TC.Context, loc, TypeResolution::forContextual(CS.DC), options);
       return hadError ? Type() : loc.getType();
     }
 
@@ -1640,7 +1640,8 @@ namespace {
           for (size_t i = 0, size = specializations.size(); i < size; ++i) {
             TypeResolutionOptions options(TypeResolverContext::InExpression);
             options |= TypeResolutionFlags::AllowUnboundGenerics;
-            if (tc.validateType(specializations[i],
+            if (TypeChecker::validateType(tc.Context,
+                                specializations[i],
                                 TypeResolution::forContextual(CS.DC),
                                 options))
               return Type();
@@ -2280,9 +2281,10 @@ namespace {
           // of is-patterns applied to an irrefutable pattern.
           pattern = pattern->getSemanticsProvidingPattern();
           while (auto isp = dyn_cast<IsPattern>(pattern)) {
-            if (CS.TC.validateType(isp->getCastTypeLoc(),
-                                   TypeResolution::forContextual(CS.DC),
-                                   TypeResolverContext::InExpression)) {
+            if (TypeChecker::validateType(CS.TC.Context,
+                                          isp->getCastTypeLoc(),
+                                          TypeResolution::forContextual(CS.DC),
+                                          TypeResolverContext::InExpression)) {
               return false;
             }
 
@@ -2618,8 +2620,10 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(),
-                          TypeResolution::forContextual(CS.DC), options))
+      if (TypeChecker::validateType(tc.Context,
+                                    expr->getCastTypeLoc(),
+                                    TypeResolution::forContextual(CS.DC),
+                                    options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -2648,9 +2652,10 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(),
-                          TypeResolution::forContextual(CS.DC),
-                          options))
+      if (TypeChecker::validateType(tc.Context,
+                                    expr->getCastTypeLoc(),
+                                    TypeResolution::forContextual(CS.DC),
+                                    options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -2684,8 +2689,10 @@ namespace {
       // Validate the resulting type.
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(),
-                          TypeResolution::forContextual(CS.DC), options))
+      if (TypeChecker::validateType(tc.Context,
+                                    expr->getCastTypeLoc(),
+                                    TypeResolution::forContextual(CS.DC),
+                                    options))
         return nullptr;
 
       // Open the type we're casting to.
@@ -2713,8 +2720,10 @@ namespace {
       auto &tc = CS.getTypeChecker();
       TypeResolutionOptions options(TypeResolverContext::ExplicitCastExpr);
       options |= TypeResolutionFlags::AllowUnboundGenerics;
-      if (tc.validateType(expr->getCastTypeLoc(),
-                          TypeResolution::forContextual(CS.DC), options))
+      if (TypeChecker::validateType(tc.Context,
+                                    expr->getCastTypeLoc(),
+                                    TypeResolution::forContextual(CS.DC),
+                                    options))
         return nullptr;
 
       // Open up the type we're checking.
