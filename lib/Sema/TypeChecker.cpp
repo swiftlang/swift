@@ -351,6 +351,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
+  // Eagerly build a scope tree before type checking
+  // because type-checking mutates the AST and that throws off the scope-based
+  // lookups.
+  if (SF.getASTContext().LangOpts.EnableASTScopeLookup &&
+      SF.isSuitableForASTScopes())
+    SF.getScope().buildScopeTreeEagerly();
+
   auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 

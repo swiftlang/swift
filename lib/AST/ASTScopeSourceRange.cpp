@@ -69,18 +69,18 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   return r;
 }
 
-bool ASTScopeImpl::checkSourceRangeAfterExpansion() const {
+bool ASTScopeImpl::checkSourceRangeAfterExpansion(const ASTContext &ctx) const {
   assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
          "need to be able to find source range");
   assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
          "Search will fail");
-  assert(checkLazySourceRange() &&
+  assert(checkLazySourceRange(ctx) &&
          "Lazy scopes must have compatible ranges before and after expansion");
 
   return true;
 }
 
-#pragma mark validation
+#pragma mark validation & debugging
 
 bool ASTScopeImpl::hasValidSourceRange() const {
   const auto sourceRange = getSourceRangeOfScope();
@@ -164,6 +164,22 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
   if (myIndex == 0)
     return nullptr;
   return siblingsAndMe[myIndex - 1];
+}
+
+bool ASTScopeImpl::doesRangeMatch(unsigned start, unsigned end, StringRef file,
+                                  StringRef className) {
+  if (!className.empty() && className != getClassName())
+    return false;
+  const auto &SM = getSourceManager();
+  const auto r = getSourceRangeOfScope(true);
+  if (start && start != SM.getLineNumber(r.Start))
+    return false;
+  if (end && end != SM.getLineNumber(r.End))
+    return false;
+  if (file.empty())
+    return true;
+  const auto buf = SM.findBufferContainingLoc(r.Start);
+  return SM.getIdentifierForBuffer(buf).endswith(file);
 }
 
 #pragma mark getSourceRangeOfThisASTNode
@@ -469,8 +485,8 @@ void ASTScopeImpl::computeAndCacheSourceRangeOfScope(
   cachedSourceRange = computeSourceRangeOfScope(omitAssertions);
 }
 
-bool ASTScopeImpl::checkLazySourceRange() const {
-  if (!getASTContext().LangOpts.LazyASTScopes)
+bool ASTScopeImpl::checkLazySourceRange(const ASTContext &ctx) const {
+  if (!ctx.LangOpts.LazyASTScopes)
     return true;
   const auto unexpandedRange = sourceRangeForDeferredExpansion();
   const auto expandedRange = computeSourceRangeOfScopeWithChildASTNodes();
@@ -479,12 +495,20 @@ bool ASTScopeImpl::checkLazySourceRange() const {
   if (unexpandedRange == expandedRange)
     return true;
 
-  auto b = getChildren().back()->computeSourceRangeOfScope();
-  llvm::errs() << "*** Lazy range problem. Parent: ***\n";
+  llvm::errs() << "*** Lazy range problem. Parent unexpanded: ***\n";
   unexpandedRange.print(llvm::errs(), getSourceManager(), false);
-  llvm::errs() << "\n*** vs last child: ***\n";
-  b.print(llvm::errs(), getSourceManager(), false);
   llvm::errs() << "\n";
+  if (!getChildren().empty()) {
+    llvm::errs() << "*** vs last child: ***\n";
+    auto b = getChildren().back()->computeSourceRangeOfScope();
+    b.print(llvm::errs(), getSourceManager(), false);
+    llvm::errs() << "\n";
+  }
+  else if (hasValidSourceRangeOfIgnoredASTNodes()) {
+    llvm::errs() << "*** vs ignored AST nodes: ***\n";
+    sourceRangeOfIgnoredASTNodes.print(llvm::errs(), getSourceManager(), false);
+    llvm::errs() << "\n";
+  }
   print(llvm::errs(), 0, false);
   llvm::errs() << "\n";
 
@@ -522,6 +546,13 @@ void ASTScopeImpl::clearCachedSourceRangesOfMeAndAncestors() {
 
 #pragma mark compensating for InterpolatedStringLiteralExprs and EditorPlaceHolders
 
+static bool isInterpolatedStringLiteral(const Token& tok) {
+  SmallVector<Lexer::StringSegment, 1> Segments;
+  Lexer::getStringLiteralSegments(tok, Segments, nullptr);
+  return Segments.size() != 1 ||
+    Segments.front().Kind != Lexer::StringSegment::Literal;
+}
+
 // If right brace is missing, the source range of the body will end
 // at the last token, which may be a one of the special cases below.
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &SM,
@@ -531,6 +562,8 @@ static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &SM,
   default:
     return endLoc;
   case tok::string_literal:
+    if (!isInterpolatedStringLiteral(tok))
+      return endLoc; // Just the start of the last token
     break;
   case tok::identifier:
     // subtract one to get a closed-range endpoint from a half-open
@@ -546,6 +579,13 @@ SourceRange ASTScopeImpl::sourceRangeForDeferredExpansion() const {
 }
 SourceRange IterableTypeScope::sourceRangeForDeferredExpansion() const {
   return portion->sourceRangeForDeferredExpansion(this);
+}
+SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
+  const auto bsr = decl->getBodySourceRange();
+  const SourceLoc endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral =
+      getLocEncompassingPotentialLookups(getSourceManager(), bsr.End);
+  return SourceRange(bsr.Start,
+                     endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral);
 }
 SourceRange
 Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
