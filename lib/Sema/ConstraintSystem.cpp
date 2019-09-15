@@ -2731,14 +2731,6 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   return false;
 }
 
-/// Given a subpath of an old locator, compute its summary flags.
-static unsigned recomputeSummaryFlags(ConstraintLocator *oldLocator,
-                                      ArrayRef<LocatorPathElt> path) {
-  if (oldLocator->getSummaryFlags() != 0)
-    return ConstraintLocator::getSummaryFlagsForPath(path);
-  return 0;
-}
-
 ConstraintLocator *
 constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
                              SourceRange &range) {
@@ -2752,10 +2744,12 @@ constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
     return locator;
   }
 
-  // Recompute the summary flags if we had any to begin with.  This is
-  // necessary because we might remove e.g. tuple elements from the path.
-  unsigned summaryFlags = recomputeSummaryFlags(locator, path);
-  return cs.getConstraintLocator(anchor, path, summaryFlags);
+  // If the old locator didn't have any summary flags, neither will the
+  // simplified version, as it must contain a subset of the path elements.
+  if (locator->getSummaryFlags() == 0)
+    return cs.getConstraintLocator(anchor, path, /*summaryFlags*/ 0);
+
+  return cs.getConstraintLocator(anchor, path);
 }
 
 void constraints::simplifyLocator(Expr *&anchor,
