@@ -338,6 +338,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
       Opts.DisableParserLookup;
   Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
+  Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
 

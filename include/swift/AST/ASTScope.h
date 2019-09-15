@@ -215,6 +215,10 @@ public:
 
   bool checkSourceRangeOfThisASTNode() const;
 
+  /// For debugging
+  bool doesRangeMatch(unsigned start, unsigned end, StringRef file = "",
+                      StringRef className = "");
+
 private:
   SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
   SourceRange
@@ -264,7 +268,7 @@ protected:
   getSourceRangeOfEnclosedParamsOfASTNode(bool omitAssertions) const;
 
 private:
-  bool checkSourceRangeAfterExpansion() const;
+  bool checkSourceRangeAfterExpansion(const ASTContext &) const;
 
 #pragma mark common queries
 public:
@@ -318,9 +322,9 @@ protected:
 private:
   /// Compare the pre-expasion range with the post-expansion range and return
   /// false if lazyiness couild miss lookups.
-  bool checkLazySourceRange() const;
+  bool checkLazySourceRange(const ASTContext &) const;
 
-protected:
+public:
   /// Some scopes can be expanded lazily.
   /// Such scopes must: not change their source ranges after expansion, and
   /// their expansion must return an insertion point outside themselves.
@@ -517,6 +521,7 @@ public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
   void addNewDeclsToScopeTree();
+  void buildScopeTreeEagerly();
 
   const SourceFile *getSourceFile() const override;
   NullablePtr<const void> addressForPrinting() const override { return SF; }
@@ -1002,6 +1007,10 @@ protected:
                              DeclConsumer) const override;
   Optional<bool>
   resolveIsCascadingUseForThisScope(Optional<bool>) const override;
+
+public:
+  NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;
+  SourceRange sourceRangeForDeferredExpansion() const override;
 };
 
 /// Body of methods, functions in types.
