@@ -1950,7 +1950,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       }
 
       // `nil` is passed as an argument to a parameter which doesn't
-      // expect it e.g. `foo(a: nil)` or `s[x: nil]` or \S.[x: nil].
+      // expect it e.g. `foo(a: nil)`, `s[x: nil]` or `\S.[x: nil]`.
       // FIXME: Find a more robust way of checking this.
       if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr) ||
           isa<KeyPathExpr>(enclosingExpr))
