@@ -1950,8 +1950,10 @@ bool ContextualFailure::diagnoseConversionToNil() const {
       }
 
       // `nil` is passed as an argument to a parameter which doesn't
-      // expect it e.g. `foo(a: nil)` or `s[x: nil]`.
-      if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr))
+      // expect it e.g. `foo(a: nil)` or `s[x: nil]` or \S.[x: nil].
+      // FIXME: Find a more robust way of checking this.
+      if (isa<ApplyExpr>(enclosingExpr) || isa<SubscriptExpr>(enclosingExpr) ||
+          isa<KeyPathExpr>(enclosingExpr))
         CTP = CTP_CallArgument;
     } else if (auto *CE = dyn_cast<CoerceExpr>(parentExpr)) {
       // `nil` is passed as a left-hand side of the coercion

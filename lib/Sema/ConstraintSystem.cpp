@@ -2911,6 +2911,26 @@ void constraints::simplifyLocator(Expr *&anchor,
       path = path.slice(1);
       continue;
 
+    case ConstraintLocator::KeyPathComponent: {
+      auto elt = path[0].castTo<LocatorPathElt::KeyPathComponent>();
+
+      // If the next element is an ApplyArgument, we can simplify by looking
+      // into the index expression.
+      if (path.size() < 2 ||
+          path[1].getKind() != ConstraintLocator::ApplyArgument)
+        break;
+
+      if (auto *kpe = dyn_cast<KeyPathExpr>(anchor)) {
+        auto component = kpe->getComponents()[elt.getIndex()];
+        auto indexExpr = component.getIndexExpr();
+        assert(indexExpr && "Trying to apply a component without an index?");
+        anchor = indexExpr;
+        path = path.slice(2);
+        continue;
+      }
+      break;
+    }
+
     default:
       // FIXME: Lots of other cases to handle.
       break;
