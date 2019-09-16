@@ -166,7 +166,7 @@ struct Label<L> : P where L : P { // expected-note {{'L' declared as parameter t
 }
 
 func test_51167632() -> some P {
-  AnyP(G { // expected-error {{metatype type 'Label<Any>.Type' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
+  AnyP(G { // expected-error {{type 'Label<Any>.Type' cannot conform to 'P'; only struct/enum/class types can conform to protocols}}
     Text("hello")
     Label  // expected-error {{generic parameter 'L' could not be inferred}}
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}

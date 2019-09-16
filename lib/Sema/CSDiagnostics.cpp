@@ -576,21 +576,8 @@ bool MissingConformanceFailure::diagnoseAsError() {
     return true;
   }
 
-  // Diagnose types that cannot conform to protocols.
-  Optional<StringRef> prohibitedTypeKind = None;
-  if (nonConformingType->is<AnyFunctionType>())
-    prohibitedTypeKind = "function";
-  else if (nonConformingType->is<TupleType>())
-    prohibitedTypeKind = "tuple";
-  else if (nonConformingType->isExistentialType())
-    prohibitedTypeKind = "protocol";
-  else if (nonConformingType->is<AnyMetatypeType>())
-    prohibitedTypeKind = "metatype";
-
-  if (prohibitedTypeKind.hasValue()) {
-    emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
-                   *prohibitedTypeKind, nonConformingType, protocolType);
-    return true;
+  if (diagnoseTypeCannotConform(anchor, nonConformingType, protocolType)) {
+      return true;
   }
 
   if (atParameterPos) {
@@ -606,6 +593,21 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
   return RequirementFailure::diagnoseAsError();
+}
+
+bool MissingConformanceFailure::diagnoseTypeCannotConform(Expr *anchor,
+    Type nonConformingType, Type protocolType) const {
+  if (nonConformingType->is<AnyFunctionType>() ||
+      nonConformingType->is<TupleType>() ||
+      nonConformingType->isExistentialType() ||
+      nonConformingType->is<AnyMetatypeType>()) {
+    emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                   nonConformingType->isExistentialType(), nonConformingType,
+                   protocolType);
+    return true;
+  }
+
+  return false;
 }
 
 Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(

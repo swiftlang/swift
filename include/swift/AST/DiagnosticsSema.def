@@ -1661,8 +1661,9 @@ ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
 ERROR(type_cannot_conform, none,
-      "%0 type %1 cannot conform to %2; only struct/enum/class "
-      "types can conform to protocols", (StringRef, Type, Type))
+      "%select{|protocol }0type %1 cannot conform to %2; "
+      "only struct/enum/class types can conform to protocols",
+      (bool, Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",

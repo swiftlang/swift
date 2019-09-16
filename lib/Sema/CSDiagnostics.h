@@ -356,6 +356,10 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
+
+private:
+  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+                                 Type protocolType) const;
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
