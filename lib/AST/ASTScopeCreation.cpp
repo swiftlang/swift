@@ -747,7 +747,6 @@ void ASTScope::buildScopeTreeEagerly() {
 
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
-  scopeCreator->sourceFileScope->addNewDeclsToScopeTree();
   return scopeCreator->sourceFileScope;
 }
 
