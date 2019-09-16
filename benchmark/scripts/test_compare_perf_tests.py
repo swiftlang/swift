@@ -833,14 +833,14 @@ class TestReportFormatter(OldAndNewLog):
 
     def test_justified_columns(self):
         """Table columns are all formated with same width, defined by the
-        longest value.
+        longest value, except the last column.
         """
         self.assert_markdown_contains([
-            'AnyHashableWithAClass | 247027 | 319065 | 259056  | 10250445',
-            'Array2D               | 335831 | 335831 | +0.0%   | 1.00x'])
+            'AnyHashableWithAClass | 247027 | 319065 | 259056  | 10250445\n',
+            'Array2D               | 335831 | 335831 | +0.0%   | 1.00x\n'])
         self.assert_git_contains([
-            'AnyHashableWithAClass   247027   319065   259056    10250445',
-            'Array2D                 335831   335831   +0.0%     1.00x'])
+            'AnyHashableWithAClass   247027   319065   259056    10250445\n',
+            'Array2D                 335831   335831   +0.0%     1.00x\n'])
 
     def test_column_headers(self):
         """Report contains table headers for ResultComparisons and changed
@@ -857,9 +857,9 @@ class TestReportFormatter(OldAndNewLog):
             ('TEST', 'OLD', 'NEW', 'DELTA', 'RATIO')
         )
         self.assert_markdown_contains([
-            'TEST                  | OLD    | NEW    | DELTA   | RATIO',
-            ':---                  | ---:   | ---:   | ---:    | ---:   ',
-            'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS'])
+            'TEST                  | OLD    | NEW    | DELTA   | RATIO\n'
+            ':---                  | ---:   | ---:   | ---:    | ---:\n',
+            'TEST                  | MIN    | MAX    | MEAN    | MAX_RSS\n'])
         self.assert_git_contains([
             'TEST                    OLD      NEW      DELTA     RATIO',
             'TEST                    MIN      MAX      MEAN      MAX_RSS'])
@@ -881,7 +881,7 @@ class TestReportFormatter(OldAndNewLog):
         self.assert_markdown_contains([
             'BitCount              | 3      | 9      | +199.9% | **0.33x**',
             'ByteSwap              | 4      | 0      | -100.0% | **4001.00x**',
-            'AngryPhonebook        | 10458  | 10458  | +0.0%   | 1.00x ',
+            'AngryPhonebook        | 10458  | 10458  | +0.0%   | 1.00x',
             'ArrayAppend           | 23641  | 20000  | -15.4%  | **1.18x (?)**'
         ])
         self.assert_git_contains([
@@ -978,8 +978,8 @@ class TestReportFormatter(OldAndNewLog):
         self.assertNotIn('): \n', git)  # no sections
         self.assertNotIn('REMOVED', git)
         self.assert_report_contains([
-            '\nREGRESSION ', ' OLD ', ' NEW ', ' DELTA ', ' RATIO ',
-            '\n\nADDED ', ' MIN ', ' MAX ', ' MEAN ', ' MAX_RSS '
+            '\nREGRESSION ', ' OLD ', ' NEW ', ' DELTA ', ' RATIO',
+            '\n\nADDED ', ' MIN ', ' MAX ', ' MEAN ', ' MAX_RSS'
         ], git)
         # Separator before every inline header (new section):
         self.assertEqual(git.count('\n\n'), 2)

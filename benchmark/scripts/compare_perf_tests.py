@@ -617,7 +617,7 @@ class ReportFormatter(object):
         results += self.comparator.added + self.comparator.removed
 
         widths = [
-            map(len, columns) for columns in
+            map(len, row[:-1]) for row in
             [ReportFormatter.PERFORMANCE_TEST_RESULT_HEADER,
              ReportFormatter.RESULT_COMPARISON_HEADER] +
             [ReportFormatter.values(r) for r in results]
@@ -626,7 +626,7 @@ class ReportFormatter(object):
         def max_widths(maximum, widths):
             return map(max, zip(maximum, widths))
 
-        return reduce(max_widths, widths, [0] * 5)
+        return reduce(max_widths, widths, [0] * 4)
 
     def _formatted_text(self, label_formatter, COLUMN_SEPARATOR,
                         DELIMITER_ROW, SEPARATOR, SECTION):
@@ -634,7 +634,8 @@ class ReportFormatter(object):
         self.header_printed = False
 
         def justify_columns(contents):
-            return [c.ljust(w) for w, c in zip(widths, contents)]
+            return ([c.ljust(w) for w, c in zip(widths, contents[:-1])] +
+                    [contents[-1]])
 
         def row(contents):
             return ('' if not contents else
