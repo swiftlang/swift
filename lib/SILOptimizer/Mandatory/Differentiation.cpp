@@ -3749,9 +3749,14 @@ public:
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
-      vjpValue = getBuilder().createAutoDiffFunctionExtract(
+      auto borrowedADFunc =
+          builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
+      auto extractedVJP = getBuilder().createAutoDiffFunctionExtract(
           loc, AutoDiffFunctionExtractInst::Extractee::VJP,
-          /*differentiationOrder*/ 1, autoDiffFuncInst);
+          /*differentiationOrder*/ 1, borrowedADFunc);
+      vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
+      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
     }
 
     // Record desired/actual VJP indices.
@@ -4850,7 +4855,6 @@ public:
     // on the remapped original function operand and `autodiff_function_extract`
     // the JVP. The actual JVP functions will be populated in the
     // `autodiff_function` during the transform main loop.
-    SILValue differentiableFunc;
     if (!jvpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
       // redesign: currently, each original function + attribute pair is mapped
@@ -4911,16 +4915,20 @@ public:
       auto *autoDiffFuncInst =
           context.createAutoDiffFunction(builder, loc, indices.parameters,
                                          /*differentiationOrder*/ 1, original);
-      differentiableFunc = autoDiffFuncInst;
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
-      jvpValue = builder.createAutoDiffFunctionExtract(
+      auto borrowedADFunc =
+          builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
+      auto extractedJVP = builder.createAutoDiffFunctionExtract(
           loc, AutoDiffFunctionExtractInst::Extractee::JVP,
-          /*differentiationOrder*/ 1, autoDiffFuncInst);
+          /*differentiationOrder*/ 1, borrowedADFunc);
+      jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
+      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
     }
 
     // Call the JVP using the original parameters.
