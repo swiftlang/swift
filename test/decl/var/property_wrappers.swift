@@ -244,9 +244,10 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: It would be nice if we had a more detailed diagnostic here.
+  // FIXME: For some reason this is type-checked twice, second time around solver complains about <<error type>> argument
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{'Bool' is not convertible to 'Int'}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -719,6 +720,7 @@ func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
   _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+  // expected-error@-1 {{cannot convert value of type 'Wrapper<Bool>' to expected argument type 'Int'}}
 }
 
 

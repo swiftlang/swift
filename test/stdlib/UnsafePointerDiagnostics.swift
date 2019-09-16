@@ -61,14 +61,14 @@ func unsafePointerConversionAvailability(
   _ = UnsafeMutablePointer<Int>(umpi)
   _ = UnsafeMutablePointer<Int>(oumpi)
 
-  _ = UnsafeMutablePointer<Void>(rp) // expected-warning 4 {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}} expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Void>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{overloads for 'UnsafeMutablePointer<Void>' exist with these partially matching parameter lists: (RawPointer), (UnsafeMutablePointer<Pointee>), (UnsafeMutablePointer<Pointee>?)}}
-  _ = UnsafeMutablePointer<Void>(mrp) // expected-warning 4 {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}} expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Void>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{overloads for 'UnsafeMutablePointer<Void>' exist with these partially matching parameter lists: (RawPointer), (UnsafeMutablePointer<Pointee>), (UnsafeMutablePointer<Pointee>?)}}
+  _ = UnsafeMutablePointer<Void>(rp)  // expected-error {{no exact matches in call to initializer}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
+  _ = UnsafeMutablePointer<Void>(mrp) // expected-error {{no exact matches in call to initializer}} expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(umpv) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(umpi) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
   _ = UnsafeMutablePointer<Void>(umps) // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}
 
-  _ = UnsafePointer<Void>(rp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'RawPointer'}} expected-warning 4 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
-  _ = UnsafePointer<Void>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'RawPointer'}} expected-warning 4 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+  _ = UnsafePointer<Void>(rp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'RawPointer'}} expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+  _ = UnsafePointer<Void>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'RawPointer'}} expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(umpv) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(upv) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(umpi) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
@@ -76,10 +76,10 @@ func unsafePointerConversionAvailability(
   _ = UnsafePointer<Void>(umps) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
   _ = UnsafePointer<Void>(ups) // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
 
-  _ = UnsafeMutablePointer<Int>(rp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeRawPointer)'}} expected-note {{overloads for 'UnsafeMutablePointer<Int>' exist with these partially matching parameter lists: (RawPointer), (UnsafeMutablePointer<Pointee>), (UnsafeMutablePointer<Pointee>?)}}
-  _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeMutableRawPointer)'}} expected-note {{overloads for 'UnsafeMutablePointer<Int>' exist with these partially matching parameter lists: (RawPointer), (UnsafeMutablePointer<Pointee>), (UnsafeMutablePointer<Pointee>?)}}
-  _ = UnsafeMutablePointer<Int>(orp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeRawPointer?)'}} expected-note {{overloads for 'UnsafeMutablePointer<Int>' exist with these partially matching parameter lists: (RawPointer), (UnsafeMutablePointer<Pointee>), (UnsafeMutablePointer<Pointee>?)}}
-  _ = UnsafeMutablePointer<Int>(omrp) // expected-error {{cannot invoke initializer for type 'UnsafeMutablePointer<Int>' with an argument list of type '(UnsafeMutableRawPointer?)'}} expected-note {{overloads for 'UnsafeMutablePointer<Int>' exist with these partially matching parameter lists: (RawPointer), (UnsafeMutablePointer<Pointee>), (UnsafeMutablePointer<Pointee>?)}}
+  _ = UnsafeMutablePointer<Int>(rp) // expected-error {{no exact matches in call to initializer}}
+  _ = UnsafeMutablePointer<Int>(mrp) // expected-error {{no exact matches in call to initializer}}
+  _ = UnsafeMutablePointer<Int>(orp) // expected-error {{no exact matches in call to initializer}}
+  _ = UnsafeMutablePointer<Int>(omrp) // expected-error {{no exact matches in call to initializer}}
 
   _ = UnsafePointer<Int>(rp)  // expected-error {{cannot convert value of type 'UnsafeRawPointer' to expected argument type 'RawPointer'}}
   _ = UnsafePointer<Int>(mrp) // expected-error {{cannot convert value of type 'UnsafeMutableRawPointer' to expected argument type 'RawPointer'}}
@@ -117,7 +117,7 @@ func unsafeRawBufferPointerConversions(
   _ = UnsafeRawBufferPointer(rbp)
   _ = UnsafeMutableRawBufferPointer(mbpi)
   _ = UnsafeRawBufferPointer(mbpi)
-  _ = UnsafeMutableRawBufferPointer(bpi) // expected-error {{cannot invoke initializer for type 'UnsafeMutableRawBufferPointer' with an argument list of type '(UnsafeBufferPointer<Int>)'}} expected-note {{overloads for 'UnsafeMutableRawBufferPointer' exist with these partially matching parameter lists: (UnsafeMutableBufferPointer<T>), (UnsafeMutableRawBufferPointer)}}
+  _ = UnsafeMutableRawBufferPointer(bpi) // expected-error {{cannot convert value of type 'UnsafeBufferPointer<Int>' to expected argument type 'UnsafeMutableRawBufferPointer'}}
   _ = UnsafeRawBufferPointer(bpi)
   _ = UnsafeMutableRawBufferPointer(start: omrp, count: 1)
   _ = UnsafeRawBufferPointer(start: omrp, count: 1)

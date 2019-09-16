@@ -22,7 +22,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
 
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
+  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
   xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
 }
 
@@ -234,9 +234,9 @@ class C_GI : P_GI {
 
 class GI_Diff {}
 func genericInheritsA<T>(_ x: T) where T : P_GI, T.Y : GI_Diff {}
-// expected-note@-1 {{candidate requires that 'GI_Diff' inherit from 'T.Y' (requirement specified as 'T.Y' : 'GI_Diff' [with T = C_GI])}}
+// expected-note@-1 {{where 'T.Y' = 'C_GI.Y' (aka 'Double')}}
 genericInheritsA(C_GI())
-// expected-error@-1 {{cannot invoke 'genericInheritsA(_:)' with an argument list of type '(C_GI)'}}
+// expected-error@-1 {{global function 'genericInheritsA' requires that 'C_GI.Y' (aka 'Double') inherit from 'GI_Diff'}}
 
 //===----------------------------------------------------------------------===//
 // Deduction for member operators
@@ -245,8 +245,7 @@ protocol Addable {
   static func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
-  u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
-  // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: }}
+  u + u // expected-error{{argument type 'U' does not conform to expected type 'Addable'}}
   return x+y
 }
 
@@ -255,7 +254,7 @@ func addAddables<T : Addable, U>(_ x: T, y: T, u: U) -> T {
 //===----------------------------------------------------------------------===//
 struct MyVector<T> { func size() -> Int {} }
 
-func getVectorSize<T>(_ v: MyVector<T>) -> Int {
+func getVectorSize<T>(_ v: MyVector<T>) -> Int { // expected-note {{in call to function 'getVectorSize'}}
   return v.size()
 }
 
@@ -267,7 +266,8 @@ func testGetVectorSize(_ vi: MyVector<Int>, vf: MyVector<Float>) {
   i = getVectorSize(vi)
   i = getVectorSize(vf)
 
-  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<T>'}}
+  getVectorSize(i) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyVector<Any>'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
   var x : X, y : Y
   x = ovlVector(vi)
@@ -323,22 +323,21 @@ func foo() {
 
 infix operator +&
 func +&<R, S>(lhs: inout R, rhs: S) where R : RangeReplaceableCollection, S : Sequence, R.Element == S.Element {}
-// expected-note@-1 {{candidate requires that the types 'String' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'R.Element' == 'S.Element' [with R = [String], S = String])}}
+// expected-note@-1 {{where 'R.Element' = 'String', 'S.Element' = 'String.Element' (aka 'Character')}}
 
 func rdar33477726_1() {
   var arr: [String] = []
   arr +& "hello"
-  // expected-error@-1 {{binary operator '+&(_:_:)' cannot be applied to operands of type '[String]' and 'String'}}
+  // expected-error@-1 {{operator function '+&' requires the types 'String' and 'String.Element' (aka 'Character') be equivalent}}
 }
 
 func rdar33477726_2<R, S>(_: R, _: S) where R: Sequence, S == R.Element {}
-// expected-note@-1 {{candidate requires that the types 'Int' and 'String.Element' (aka 'Character') be equivalent (requirement specified as 'S' == 'R.Element' [with R = String, S = Int])}}
 rdar33477726_2("answer", 42)
-// expected-error@-1 {{cannot invoke 'rdar33477726_2(_:_:)' with an argument list of type '(String, Int)'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String.Element' (aka 'Character')}}
 
 prefix operator +-
 prefix func +-<T>(_: T) where T: Sequence, T.Element == Int {}
-// expected-note@-1 {{candidate requires that the types 'String.Element' (aka 'Character') and 'Int' be equivalent (requirement specified as 'T.Element' == 'Int' [with T = String])}}
+// expected-note@-1 {{where 'T.Element' = 'String.Element' (aka 'Character')}}
 
 +-"hello"
-// expected-error@-1 {{unary operator '+-(_:)' cannot be applied to an operand of type 'String'}}
+// expected-error@-1 {{operator function '+-' requires the types 'String.Element' (aka 'Character') and 'Int' be equivalent}}
