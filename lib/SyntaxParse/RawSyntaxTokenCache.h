@@ -39,8 +39,7 @@ class RawSyntaxCacheNode : public llvm::FoldingSetNode {
   llvm::FoldingSetNodeIDRef IDRef;
 
 public:
-  RawSyntaxCacheNode(RC<syntax::RawSyntax> &Obj,
-                     const llvm::FoldingSetNodeIDRef IDRef)
+  RawSyntaxCacheNode(RC<syntax::RawSyntax> Obj, const llvm::FoldingSetNodeIDRef IDRef)
       : Obj(Obj), IDRef(IDRef) {}
 
   /// Retrieve assciated RawSyntax.

@@ -173,9 +173,3 @@ SyntaxTreeCreator::lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) {
   raw.resetWithoutRelease();
   return {length, opaqueN};
 }
-
-void SyntaxTreeCreator::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
-  if (!opaqueN)
-    return;
-  static_cast<RawSyntax *>(opaqueN)->Release();
-}
