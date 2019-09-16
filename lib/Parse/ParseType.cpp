@@ -408,7 +408,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   }
 
   if (Tok.is(tok::arrow)) {
-    auto InputNode(std::move(SyntaxContext->popIf<ParsedTypeSyntax>().getValue()));
+    auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     // Handle type-function if we have an arrow.
     auto ArrowLoc = Tok.getLoc();
     auto Arrow = consumeTokenSyntax();
@@ -741,7 +741,7 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     if (Base) {
       SyntaxContext->addSyntax(std::move(*Base));
       auto T = SyntaxContext->topNode<TypeSyntax>();
-      Junk.push_back(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
+      Junk.push_back(*SyntaxContext->popIf<ParsedTypeSyntax>());
       ITR = dyn_cast<IdentTypeRepr>(Generator.generate(T, BaseLoc));
     }
 
@@ -1164,10 +1164,9 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       auto InFlight = diagnose(EqualLoc, diag::tuple_type_init);
       if (Init.isNonNull())
         InFlight.fixItRemove(SourceRange(EqualLoc, Init.get()->getEndLoc()));
+      auto Expr = *SyntaxContext->popIf<ParsedExprSyntax>();
       Initializer = ParsedSyntaxRecorder::makeInitializerClause(
-          std::move(*Equal),
-          std::move(*SyntaxContext->popIf<ParsedExprSyntax>()),
-          *SyntaxContext);
+          std::move(*Equal), std::move(Expr), *SyntaxContext);
     }
 
     Comma = consumeTokenSyntaxIf(tok::comma);
