@@ -542,12 +542,12 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   Type sameScalarType;
   bool canDeriveVectorProtocol = !diffProperties.empty() &&
       llvm::all_of(diffProperties, [&](VarDecl *vd) {
-        auto conf = TC.conformsToProtocol(getTangentVectorType(vd, parentDC),
-                                          vectorProto, nominal, None);
+        auto tanType = getTangentVectorType(vd, parentDC);
+        auto conf = TC.conformsToProtocol(tanType, vectorProto, nominal, None);
         if (!conf)
           return false;
         auto scalarType =
-            conf->getTypeWitnessByName(vd->getType(), C.Id_VectorSpaceScalar);
+            conf->getTypeWitnessByName(tanType, C.Id_VectorSpaceScalar);
         if (!sameScalarType) {
           sameScalarType = scalarType;
           return true;
