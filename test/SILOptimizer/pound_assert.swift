@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
 // RUN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
-
-// REQUIRES: optimized_stdlib
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
@@ -39,7 +37,6 @@ func loops1(a: Int) -> Int {
 
 func loops2(a: Int) -> Int {
   var x = 42
-  // expected-note @+1 {{operation not supported by the evaluator}}
   for i in 0 ... a {
     x += i
   }
