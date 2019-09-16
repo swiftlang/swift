@@ -70,8 +70,6 @@ public:
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, syntax::SyntaxKind kind) override;
 
-  void discardRecordedNode(OpaqueSyntaxNode node) override;
-
   OpaqueSyntaxNodeKind getOpaqueKind() override {
     return ExplicitAction->getOpaqueKind();
   }
