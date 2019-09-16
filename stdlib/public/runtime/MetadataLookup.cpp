@@ -730,14 +730,8 @@ _findContextDescriptorInCache(TypeMetadataPrivateState &T,
   $sS ## CHAR ## SUFFIX
 #define DESCRIPTOR_MANGLING(CHAR, SUFFIX) DESCRIPTOR_MANGLING_(CHAR, SUFFIX)
 
-#if defined(_WIN32)
-#define swiftCore_EXPORTS __declspec(dllimport)
-#else
-#define swiftCore_EXPORTS
-#endif
-
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME) \
-  extern "C" swiftCore_EXPORTS const ContextDescriptor DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
+  extern "C" const ContextDescriptor DESCRIPTOR_MANGLING(MANGLING, DESCRIPTOR_MANGLING_SUFFIX(KIND));
 
 #if !SWIFT_OBJC_INTEROP
 # define OBJC_INTEROP_STANDARD_TYPE(KIND, MANGLING, TYPENAME)
