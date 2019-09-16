@@ -57,8 +57,9 @@ ParsedRawSyntaxRecorder::recordMissingToken(tok tokenKind, SourceLoc loc) {
 }
 
 static ParsedRawSyntaxNode
-getRecordedNode(ParsedRawSyntaxNode node, ParsedRawSyntaxRecorder &rec) {
-  assert(!node.isNull() && !node.isRecorded());
+getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
+  if (node.isNull() || node.isRecorded())
+    return node;
   if (node.isDeferredLayout())
     return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
   assert(node.isDeferredToken());
@@ -73,29 +74,24 @@ getRecordedNode(ParsedRawSyntaxNode node, ParsedRawSyntaxRecorder &rec) {
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
-                                         MutableArrayRef<ParsedRawSyntaxNode> elements) {
+                                    ArrayRef<ParsedRawSyntaxNode> elements) {
   CharSourceRange range;
   SmallVector<OpaqueSyntaxNode, 16> subnodes;
   if (!elements.empty()) {
     SourceLoc offset;
     unsigned length = 0;
-    for (auto &subnode : elements) {
-      CharSourceRange localRange;
+    for (const auto &elem : elements) {
+      auto subnode = getRecordedNode(elem, *this);
       if (subnode.isNull()) {
         subnodes.push_back(nullptr);
-      } else if (subnode.isRecorded()) {
-        localRange = subnode.getRecordedRange();
-        subnodes.push_back(subnode.takeOpaqueNode());
       } else {
-        auto recorded = getRecordedNode(subnode.copyDeferred(), *this);
-        localRange = recorded.getRecordedRange();
-        subnodes.push_back(recorded.takeOpaqueNode());
-      }
-
-      if (localRange.isValid()) {
-        if (offset.isInvalid())
-          offset = localRange.getStart();
-        length += localRange.getByteLength();
+        subnodes.push_back(subnode.getOpaqueNode());
+        auto range = subnode.getRecordedRange();
+        if (range.isValid()) {
+          if (offset.isInvalid())
+            offset = range.getStart();
+          length += subnode.getRecordedRange().getByteLength();
+        }
       }
     }
     range = CharSourceRange{offset, length};
@@ -110,10 +106,6 @@ ParsedRawSyntaxRecorder::recordEmptyRawSyntaxCollection(SyntaxKind kind,
   CharSourceRange range{loc, 0};
   OpaqueSyntaxNode n = SPActions->recordRawSyntax(kind, {}, range);
   return ParsedRawSyntaxNode{kind, tok::unknown, range, n};
-}
-
-void ParsedRawSyntaxRecorder::discardRecordedNode(ParsedRawSyntaxNode &node) {
-  SPActions->discardRecordedNode(node.takeOpaqueNode());
 }
 
 ParsedRawSyntaxNode
