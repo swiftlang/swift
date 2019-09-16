@@ -10,7 +10,7 @@
 // match what we actually want.
 
 // CHECK: error: #assert condition not constant
-// CHECK: note: exceeded instruction limit: 512 when evaluating the expression at compile time
+// CHECK: note: exceeded instruction limit: {{.*}} when evaluating the expression at compile time
 // CHECK: limit exceeded here
 func recursive(a: Int) -> Int {
   return a == 0 ? 0 : recursive(a: a-1)

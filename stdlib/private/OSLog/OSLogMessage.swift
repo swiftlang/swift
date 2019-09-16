@@ -95,7 +95,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// argument header. The first two bits are used to indicate privacy and
   /// the other two are reserved.
   @usableFromInline
-  @_frozen
+  @frozen
   internal enum ArgumentFlag {
     case privateFlag
     case publicFlag
@@ -117,7 +117,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// (Note that an auto-generated rawValue is not constant evaluable because
   /// it cannot be annotated so.)
   @usableFromInline
-  @_frozen
+  @frozen
   internal enum ArgumentType {
     case scalar, count, string, pointer, object
 
@@ -147,7 +147,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// mask indicate whether there is an argument that is private, and whether
   /// there is an argument that is non-scalar: String, NSObject or Pointer.
   @usableFromInline
-  @_frozen
+  @frozen
   internal enum PreambleBitMask {
     case privateBitMask
     case nonScalarBitMask
@@ -195,7 +195,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// An internal initializer that should be used only when there are no
   /// interpolated expressions. This function must be constant evaluable.
   @inlinable
-  @_semantics("oslog.interpolation.init")
+  @_semantics("constant_evaluable")
   @_optimize(none)
   internal init() {
     formatString = ""
@@ -216,7 +216,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// Return true if and only if the parameter is .private.
   /// This function must be constant evaluable.
   @inlinable
-  @_semantics("oslog.interpolation.isPrivate")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func isPrivate(_ privacy: Privacy) -> Bool {
@@ -233,7 +233,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// of the header byte, respectively.
   /// This function should be constant evaluable.
   @inlinable
-  @_semantics("oslog.interpolation.getArgumentHeader")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getArgumentHeader(
@@ -248,7 +248,7 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   /// Compute the new preamble based whether the current argument is private
   /// or not. This function must be constant evaluable.
   @inlinable
-  @_semantics("oslog.interpolation.getUpdatedPreamble")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getUpdatedPreamble(
@@ -268,7 +268,8 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
 
 extension String {
   /// Replace all percents "%" in the string by "%%" so that the string can be
-  /// interpreted as a C format string.
+  /// interpreted as a C format string. This function is constant evaluable
+  /// and its semantics is modeled within the evaluator.
   public var percentEscapedString: String {
     @_semantics("string.escapePercent.get")
     @_effects(readonly)
@@ -292,6 +293,7 @@ public struct OSLogMessage :
   @inlinable
   @_optimize(none)
   @_semantics("oslog.message.init_interpolation")
+  @_semantics("constant_evaluable")
   public init(stringInterpolation: OSLogInterpolation) {
     self.interpolation = stringInterpolation
   }
@@ -301,6 +303,7 @@ public struct OSLogMessage :
   @inlinable
   @_optimize(none)
   @_semantics("oslog.message.init_stringliteral")
+  @_semantics("constant_evaluable")
   public init(stringLiteral value: String) {
     var s = OSLogInterpolation()
     s.appendLiteral(value)
@@ -332,7 +335,7 @@ internal struct OSLogArguments {
 
   /// This function must be constant evaluable.
   @inlinable
-  @_semantics("oslog.arguments.init_empty")
+  @_semantics("constant_evaluable")
   @_optimize(none)
   internal init() {
     argumentClosures = nil

@@ -1534,8 +1534,17 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     assert(value.getKind() == SymbolicValue::Enum ||
            value.getKind() == SymbolicValue::EnumWithPayload);
 
-    auto *caseBB = switchInst->getCaseDestination(value.getEnumValue());
+    SILBasicBlock *caseBB =
+        switchInst->getCaseDestination(value.getEnumValue());
+    if (caseBB->getNumArguments() == 0)
+      return {caseBB->begin(), None};
+
     // Set up the arguments.
+
+    // When there are multiple payload components, they form a single
+    // tuple-typed argument.
+    assert(caseBB->getNumArguments() == 1);
+
     if (caseBB->getParent()->hasOwnership() &&
         switchInst->getDefaultBBOrNull() == caseBB) {
       // If we are visiting the default block and we are in ossa, then we may
@@ -1545,13 +1554,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
       return {caseBB->begin(), None};
     }
 
-    if (caseBB->getNumArguments() == 0)
-      return {caseBB->begin(), None};
-
     assert(value.getKind() == SymbolicValue::EnumWithPayload);
-    // When there are multiple payload components, they form a single
-    // tuple-typed argument.
-    assert(caseBB->getNumArguments() == 1);
     auto argument = value.getEnumPayloadValue();
     assert(argument.isConstant());
     setValue(caseBB->getArgument(0), argument);
