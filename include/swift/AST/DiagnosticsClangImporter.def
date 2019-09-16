@@ -41,6 +41,21 @@
   DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 WARNING(warning_from_clang,none,
   "%0", (StringRef))
 ERROR(error_from_clang,none,
@@ -99,4 +114,7 @@ WARNING(implicit_bridging_header_imported_from_module,none,
 # undef WARNING
 # undef ERROR
 # undef REMARK
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
 #endif

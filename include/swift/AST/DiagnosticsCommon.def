@@ -45,6 +45,21 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
@@ -171,4 +186,7 @@ NOTE(kind_declname_declared_here,none,
 # undef WARNING
 # undef ERROR
 # undef FIXIT
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
 #endif

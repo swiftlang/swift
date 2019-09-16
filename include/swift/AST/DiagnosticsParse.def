@@ -40,6 +40,21 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 //==============================================================================
 // MARK: Lexing and Parsing diagnostics
 //==============================================================================
@@ -1645,4 +1660,7 @@ ERROR(unknown_syntax_entity, PointsToFirstBadToken,
 # undef WARNING
 # undef ERROR
 # undef FIXIT
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
 #endif

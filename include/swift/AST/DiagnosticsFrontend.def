@@ -43,6 +43,21 @@
 DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 WARNING(warning_no_such_sdk,none,
         "no such SDK: '%0'", (StringRef))
 
@@ -322,4 +337,7 @@ ERROR(unknown_forced_module_loading_mode,none,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
 #endif

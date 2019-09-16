@@ -36,6 +36,21 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 ERROR(generic_sig_change,none,"%0 has generic signature change from %1 to %2", (StringRef, StringRef, StringRef))
 
 ERROR(raw_type_change,none,"%0(%1) is now %2 representable", (StringRef, StringRef, StringRef))
@@ -107,4 +122,7 @@ ERROR(desig_init_added,none,"%0 has been added as a designated initializer to an
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
 #endif

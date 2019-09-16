@@ -1,0 +1,34 @@
+//===--- PublicDiagnostics.def - Public Diagnostics Index -------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file lists diagnostics which have been assigned a public identifier.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef PUBLICDIAG
+#  error Must define PUBLICDIAG
+#endif
+
+// PUBLICDIAG(NAME, INTRODUCEDIN, REMOVEDIN)
+// NAME - The public name of the diagnostic. May not be changed or removed
+// once added.
+// INTRODUCEDIN - The compiler (not language) version string which added
+// this public diagnostic. If currently unknown, "9999".
+// REMOVEDIN - The compiler (not language) version string which removed
+// all internal diagnostics corresponding to this public diagnostic. If the
+// diagnostic remains supported this should be the empty string.
+
+PUBLICDIAG(none, "", "")
+
+PUBLICDIAG(InvalidRedeclaration, "9999", "")
+
+#undef PUBLICDIAG

@@ -41,6 +41,21 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (DeclName))
 NOTE(kind_declared_here,none,
@@ -731,10 +746,11 @@ ERROR(reserved_member_name,none,
       "type member must not be named %0, since it would conflict with the"
       " 'foo.%1' expression", (DeclName, StringRef))
 
-ERROR(invalid_redecl,none,"invalid redeclaration of %0", (DeclName))
-ERROR(invalid_redecl_init,none,
-      "invalid redeclaration of synthesized %select{|memberwise }1%0",
-      (DeclName, bool))
+PUBLICERROR(InvalidRedeclaration,invalid_redecl,none,
+            "invalid redeclaration of %0", (DeclName))
+PUBLICERROR(InvalidRedeclaration,invalid_redecl_init,none,
+            "invalid redeclaration of synthesized %select{|memberwise }1%0",
+            (DeclName, bool))
 WARNING(invalid_redecl_swift5_warning,none,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (DeclName))
@@ -4658,4 +4674,7 @@ ERROR(function_builder_arguments, none,
 # undef WARNING
 # undef ERROR
 # undef FIXIT
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
 #endif

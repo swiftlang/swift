@@ -42,6 +42,21 @@
 #  define FIXIT(ID, Text, Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 #define DIAG_NO_UNDEF
 
 #include "DiagnosticsCommon.def"
@@ -65,3 +80,6 @@
 #undef ERROR
 #undef REMARK
 #undef FIXIT
+#undef PUBLICERROR
+#undef PUBLICWARNING
+#undef PUBLICNOTE

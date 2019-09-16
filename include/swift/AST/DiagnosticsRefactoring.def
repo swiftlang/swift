@@ -36,6 +36,21 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef PUBLICERROR
+#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICWARNING
+#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
+#ifndef PUBLICNOTE
+#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
+  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
+#endif
+
 //==============================================================================
 // Refactoring diagnostics
 //==============================================================================
@@ -71,3 +86,15 @@ ERROR(no_remaining_cases, none, "no remaining cases to expand", ())
 WARNING(mismatched_rename, none, "the name at the given location cannot be renamed to '%0'", (StringRef))
 
 ERROR(no_insert_position, none, "cannot find inserting position", ())
+
+#ifndef DIAG_NO_UNDEF
+# if defined(DIAG)
+#  undef DIAG
+# endif
+# undef NOTE
+# undef WARNING
+# undef ERROR
+# undef PUBLICERROR
+# undef PUBLICWARNING
+# undef PUBLICNOTE
+#endif

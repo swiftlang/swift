@@ -18,6 +18,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/PublicDiagnostics.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/Twine.h"
@@ -132,7 +133,13 @@ void PrintingDiagnosticConsumer::printDiagnostic(
     DiagnosticEngine::formatDiagnosticText(Out, FormatString, FormatArgs);
   }
 
-  auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
+  llvm::SMDiagnostic Msg;
+  if (auto publicDiag = PublicDiagnostic::forInternalID(Info.ID))
+    Msg = SM.GetMessage(Loc, SMKind, Text + " [" + publicDiag->Name + "]",
+                        Ranges, FixIts);
+  else
+    Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
+
   rawSM.PrintMessage(out, Msg, ForceColors);
 }
 
