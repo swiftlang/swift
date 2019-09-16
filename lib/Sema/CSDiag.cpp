@@ -4092,7 +4092,7 @@ bool FailureDiagnosis::diagnoseClosureExpr(
       }
 
       MissingArgumentsFailure failure(
-          expr, CS, fnType, inferredArgCount - actualArgCount,
+          expr, CS, inferredArgCount - actualArgCount,
           CS.getConstraintLocator(CE, LocatorPathElt::ContextualType()));
       return failure.diagnoseAsError();
     }

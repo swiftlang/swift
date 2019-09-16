@@ -1182,16 +1182,12 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
   unsigned NumSynthesized;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          FunctionType *funcType,
-                          unsigned numSynthesized,
-                          ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), Fn(funcType),
-        NumSynthesized(numSynthesized) {}
+                          unsigned numSynthesized, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NumSynthesized(numSynthesized) {}
 
   bool diagnoseAsError() override;
 
