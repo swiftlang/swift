@@ -44,7 +44,7 @@ public:
 
     auto Recorded = Recorder.recordToken(Kind, Range, LeadingTriviaPieces,
                                          TrailingTriviaPieces);
-    auto Raw = static_cast<RawSyntax *>(Recorded.takeOpaqueNode());
+    auto Raw = static_cast<RawSyntax *>(Recorded.getOpaqueNode());
     return make<TokenSyntax>(Raw);
   }
 
@@ -55,7 +55,7 @@ public:
     auto Children = Node.getDeferredChildren();
 
     auto Recorded = Recorder.recordRawSyntax(Kind, Children);
-    RC<RawSyntax> Raw {static_cast<RawSyntax *>(Recorded.takeOpaqueNode()) };
+    RC<RawSyntax> Raw {static_cast<RawSyntax *>(Recorded.getOpaqueNode()) };
     Raw->Release(); // -1 since it's transfer of ownership.
     return make<SyntaxNode>(Raw);
   }
