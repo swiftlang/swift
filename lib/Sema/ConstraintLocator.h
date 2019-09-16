@@ -359,6 +359,7 @@ public:
     class GenericParameter;
     class OpenedGeneric;
     class KeyPathDynamicMember;
+    class UnresolvedMember;
 
     PathElement(PathElementKind kind)
       : storage(encodeStorage(kind, 0)), storedKind(StoredKindAndValue)
@@ -907,6 +908,15 @@ public:
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::KeyPathDynamicMember;
+  }
+};
+
+class LocatorPathElt::UnresolvedMember final : public LocatorPathElt {
+public:
+  UnresolvedMember() : LocatorPathElt(PathElementKind::UnresolvedMember, 0) {}
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::UnresolvedMember;
   }
 };
 

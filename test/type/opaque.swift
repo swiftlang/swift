@@ -26,7 +26,7 @@ struct GenericProperty<T: P> {
 let (bim, bam): some P = (1, 2) // expected-error{{'some' type can only be declared on a single property declaration}}
 var computedProperty: some P {
   get { return 1 }
-  set { _ = newValue + 1 } // TODO expected-error{{}} expected-note{{}}
+  set { _ = newValue + 1 } // expected-error{{cannot convert value of type 'some P' to expected argument type 'Int'}}
 }
 struct SubscriptTest {
   subscript(_ x: Int) -> some P {
@@ -269,10 +269,10 @@ func associatedTypeIdentity() {
 
   sameType(cr, c.r_out())
   sameType(dr, d.r_out())
-  sameType(cr, dr) // expected-error{{}}
+  sameType(cr, dr) // expected-error{{}} expected-note {{}}
   sameType(gary(candace()).r_out(), gary(candace()).r_out())
   sameType(gary(doug()).r_out(), gary(doug()).r_out())
-  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}}
+  sameType(gary(doug()).r_out(), gary(candace()).r_out()) // expected-error{{}} expected-note {{}}
 }
 
 func redeclaration() -> some P { return 0 } // expected-note 2{{previously declared}}

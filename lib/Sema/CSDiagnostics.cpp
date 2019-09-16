@@ -455,9 +455,6 @@ bool RequirementFailure::isStaticOrInstanceMember(const ValueDecl *decl) {
 }
 
 bool RequirementFailure::diagnoseAsError() {
-  if (!canDiagnoseFailure())
-    return false;
-
   auto *anchor = getRawAnchor();
   const auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
@@ -532,9 +529,6 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 }
 
 bool MissingConformanceFailure::diagnoseAsError() {
-  if (!canDiagnoseFailure())
-    return false;
-
   auto *anchor = getAnchor();
   auto ownerType = getOwnerType();
   auto nonConformingType = getLHS();
@@ -553,6 +547,34 @@ bool MissingConformanceFailure::diagnoseAsError() {
 
     return arg;
   };
+
+  // If this is a requirement of a pattern-matching operator,
+  // let's see whether argument is already has a fix associated
+  // with it and if so skip conformance error, otherwise we'd
+  // produce an unrelated `<type> doesn't conform to Equatable protocol`
+  // diagnostic.
+  if (isPatternMatchingOperator(anchor)) {
+    if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(findParentExpr(anchor))) {
+      auto *caseExpr = binaryOp->getArg()->getElement(0);
+
+      auto &cs = getConstraintSystem();
+      llvm::SmallPtrSet<Expr *, 4> anchors;
+      for (const auto *fix : cs.getFixes())
+        anchors.insert(fix->getAnchor());
+
+      bool hasFix = false;
+      caseExpr->forEachChildExpr([&](Expr *expr) -> Expr * {
+        hasFix |= anchors.count(expr);
+        return hasFix ? nullptr : expr;
+      });
+
+      if (hasFix)
+        return false;
+    }
+  }
+
+  if (diagnoseAsAmbiguousOperatorRef())
+    return true;
 
   Optional<unsigned> atParameterPos;
   // Sometimes fix is recorded by type-checking sub-expression
@@ -593,6 +615,52 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
   return RequirementFailure::diagnoseAsError();
+}
+
+bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
+  auto *anchor = getRawAnchor();
+  auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor);
+  if (!ODRE)
+    return false;
+
+  auto isStdlibType = [](Type type) {
+    if (auto *NTD = type->getAnyNominal()) {
+      auto *DC = NTD->getDeclContext();
+      return DC->isModuleScopeContext() &&
+             DC->getParentModule()->isStdlibModule();
+    }
+
+    return false;
+  };
+
+  auto name = ODRE->getDecls().front()->getBaseName();
+  if (!(name.isOperator() && isStdlibType(getLHS()) && isStdlibType(getRHS())))
+    return false;
+
+  // If this is an operator reference and both types are from stdlib,
+  // let's produce a generic diagnostic about invocation and a note
+  // about missing conformance just in case.
+  auto operatorID = name.getIdentifier();
+
+  auto *applyExpr = cast<ApplyExpr>(findParentExpr(anchor));
+  if (auto *binaryOp = dyn_cast<BinaryExpr>(applyExpr)) {
+    auto lhsType = getType(binaryOp->getArg()->getElement(0));
+    auto rhsType = getType(binaryOp->getArg()->getElement(1));
+
+    if (lhsType->isEqual(rhsType)) {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_same_args,
+                     operatorID.str(), lhsType);
+    } else {
+      emitDiagnostic(anchor->getLoc(), diag::cannot_apply_binop_to_args,
+                     operatorID.str(), lhsType, rhsType);
+    }
+  } else {
+    emitDiagnostic(anchor->getLoc(), diag::cannot_apply_unop_to_arg,
+                   operatorID.str(), getType(applyExpr->getArg()));
+  }
+
+  diagnoseAsNote();
+  return true;
 }
 
 Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
@@ -4446,4 +4514,232 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
   emitDiagnostic(VD->getLoc(), diag::inout_change_var_type_if_possible,
                  actualType, neededType)
       .fixItReplaceChars(startLoc, endLoc, scratch);
+}
+
+bool ArgumentMismatchFailure::diagnoseAsError() {
+  if (diagnoseConversionToBool())
+    return true;
+
+  if (diagnoseArchetypeMismatch())
+    return true;
+
+  if (diagnosePatternMatchingMismatch())
+    return true;
+
+  if (diagnoseUseOfReferenceEqualityOperator())
+    return true;
+
+  auto argType = getFromType();
+  auto paramType = getToType();
+
+  Diag<Type, Type> diagnostic = diag::cannot_convert_argument_value;
+
+  // If parameter type is a protocol value, let's says that
+  // argument doesn't conform to a give protocol.
+  if (paramType->isExistentialType())
+    diagnostic = diag::cannot_convert_argument_value_protocol;
+
+  auto diag = emitDiagnostic(getLoc(), diagnostic, argType, paramType);
+
+  // If argument is an l-value type and parameter is a pointer type,
+  // let's match up its element type to the argument to see whether
+  // it would be appropriate to suggest adding `&`.
+  auto *argExpr = getAnchor();
+  if (getType(argExpr)->is<LValueType>()) {
+    auto elementTy = paramType->getAnyPointerElementType();
+    if (elementTy && argType->isEqual(elementTy)) {
+      diag.fixItInsert(argExpr->getStartLoc(), "&");
+      return true;
+    }
+  }
+
+  tryFixIts(diag);
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
+  auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
+  assert(argToParam);
+
+  if (auto *decl = getDecl()) {
+    emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
+                   getToType(), argToParam->getParamIdx());
+    return true;
+  }
+
+  return false;
+}
+
+bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
+  auto *locator = getLocator();
+
+  if (!isArgumentOfReferenceEqualityOperator(locator))
+    return false;
+
+  auto *binaryOp = cast<BinaryExpr>(getRawAnchor());
+  auto *lhs = binaryOp->getArg()->getElement(0);
+  auto *rhs = binaryOp->getArg()->getElement(1);
+
+  auto name = *getOperatorName(binaryOp->getFn());
+
+  auto lhsType = getType(lhs)->getRValueType();
+  auto rhsType = getType(rhs)->getRValueType();
+
+  // If both arguments where incorrect e.g. both are function types,
+  // let's avoid producing a diagnostic second time, because first
+  // one would cover both arguments.
+  if (getAnchor() == rhs && rhsType->is<FunctionType>()) {
+    auto &cs = getConstraintSystem();
+    if (cs.hasFixFor(cs.getConstraintLocator(
+            binaryOp, {ConstraintLocator::ApplyArgument,
+                       LocatorPathElt::ApplyArgToParam(0, 0)})))
+      return true;
+  }
+
+  // Regardless of whether the type has reference or value semantics,
+  // comparison with nil is illegal, albeit for different reasons spelled
+  // out by the diagnosis.
+  if (isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs)) {
+    std::string revisedName = name.str();
+    revisedName.pop_back();
+
+    auto loc = binaryOp->getLoc();
+    auto nonNilType = isa<NilLiteralExpr>(lhs) ? rhsType : lhsType;
+    auto nonNilExpr = isa<NilLiteralExpr>(lhs) ? rhs : lhs;
+
+    // If we made it here, then we're trying to perform a comparison with
+    // reference semantics rather than value semantics. The fixit will
+    // lop off the extra '=' in the operator.
+    if (nonNilType->getOptionalObjectType()) {
+      emitDiagnostic(loc,
+                     diag::value_type_comparison_with_nil_illegal_did_you_mean,
+                     nonNilType)
+          .fixItReplace(loc, revisedName);
+    } else {
+      emitDiagnostic(loc, diag::value_type_comparison_with_nil_illegal,
+                     nonNilType)
+          .highlight(nonNilExpr->getSourceRange());
+    }
+
+    return true;
+  }
+
+  if (lhsType->is<FunctionType>() || rhsType->is<FunctionType>()) {
+    emitDiagnostic(binaryOp->getLoc(), diag::cannot_reference_compare_types,
+                   name.str(), lhsType, rhsType)
+        .highlight(lhs->getSourceRange())
+        .highlight(rhs->getSourceRange());
+    return true;
+  }
+
+  return false;
+}
+
+bool ArgumentMismatchFailure::diagnosePatternMatchingMismatch() const {
+  if (!isArgumentOfPatternMatchingOperator(getLocator()))
+    return false;
+
+  auto *op = cast<BinaryExpr>(getRawAnchor());
+  auto *lhsExpr = op->getArg()->getElement(0);
+  auto *rhsExpr = op->getArg()->getElement(1);
+
+  auto lhsType = getType(lhsExpr)->getRValueType();
+  auto rhsType = getType(rhsExpr)->getRValueType();
+
+  auto diagnostic =
+      lhsType->is<UnresolvedType>()
+          ? emitDiagnostic(
+                getLoc(), diag::cannot_match_unresolved_expr_pattern_with_value,
+                rhsType)
+          : emitDiagnostic(getLoc(), diag::cannot_match_expr_pattern_with_value,
+                           lhsType, rhsType);
+
+  diagnostic.highlight(lhsExpr->getSourceRange());
+  diagnostic.highlight(rhsExpr->getSourceRange());
+
+  if (auto optUnwrappedType = rhsType->getOptionalObjectType()) {
+    if (lhsType->isEqual(optUnwrappedType)) {
+      diagnostic.fixItInsertAfter(lhsExpr->getEndLoc(), "?");
+    }
+  }
+
+  return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
+  auto *argTy = getFromType()->getAs<ArchetypeType>();
+  auto *paramTy = getToType()->getAs<ArchetypeType>();
+
+  if (!(argTy && paramTy))
+    return false;
+
+  // Produce this diagnostic only if the names
+  // of the generic parameters are the same.
+  if (argTy->getName() != paramTy->getName())
+    return false;
+
+  auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
+    auto paramType = archetype->getInterfaceType();
+
+    if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
+      return GTPT->getDecl();
+
+    if (auto *DMT = paramType->getAs<DependentMemberType>())
+      return DMT->getAssocType();
+
+    return nullptr;
+  };
+
+  auto *argDecl = getGenericTypeDecl(argTy);
+  auto *paramDecl = getGenericTypeDecl(paramTy);
+
+  if (!(paramDecl && argDecl))
+    return false;
+
+  auto describeGenericType = [&](ValueDecl *genericParam,
+                                 bool includeName = false) -> std::string {
+    if (!genericParam)
+      return "";
+
+    Decl *parent = nullptr;
+    if (auto *AT = dyn_cast<AssociatedTypeDecl>(genericParam)) {
+      parent = AT->getProtocol();
+    } else {
+      auto *dc = genericParam->getDeclContext();
+      parent = dc->getInnermostDeclarationDeclContext();
+    }
+
+    if (!parent)
+      return "";
+
+    llvm::SmallString<64> result;
+    llvm::raw_svector_ostream OS(result);
+
+    OS << Decl::getDescriptiveKindName(genericParam->getDescriptiveKind());
+
+    if (includeName && genericParam->hasName())
+      OS << " '" << genericParam->getBaseName() << "'";
+
+    OS << " of ";
+    OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
+    if (auto *decl = dyn_cast<ValueDecl>(parent)) {
+      if (decl->hasName())
+        OS << " '" << decl->getFullName() << "'";
+    }
+
+    return OS.str();
+  };
+
+  emitDiagnostic(
+      getAnchor()->getLoc(), diag::cannot_convert_argument_value_generic, argTy,
+      describeGenericType(argDecl), paramTy, describeGenericType(paramDecl));
+
+  emitDiagnostic(argDecl, diag::descriptive_generic_type_declared_here,
+                 describeGenericType(argDecl, true));
+
+  emitDiagnostic(paramDecl, diag::descriptive_generic_type_declared_here,
+                 describeGenericType(paramDecl, true));
+
+  return true;
 }

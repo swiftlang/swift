@@ -17,16 +17,16 @@ struct YourFoo: Foo {}
 func someTypeIsTheSame() {
   var a = foo(0)
   a = foo(0)
-  a = foo("") // expected-error{{cannot assign}}
+  a = foo("") // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 
   var b = foo("")
-  b = foo(0) // expected-error{{cannot assign}}
+  b = foo(0) // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
   b = foo("")
 
   var c = foo(MyFoo())
-  c = foo(0) // expected-error{{cannot assign}}
+  c = foo(0) // expected-error{{cannot convert value of type 'Int' to expected argument type 'MyFoo'}}
   c = foo(MyFoo())
-  c = foo(YourFoo()) // expected-error{{cannot assign}}
+  c = foo(YourFoo()) // expected-error{{cannot convert value of type 'YourFoo' to expected argument type 'MyFoo'}}
 
   var barInt = Bar<Int>()
   var barString = Bar<String>()
@@ -58,6 +58,6 @@ func someTypeIsTheSame() {
   var f = barInt.foo(MyFoo())
   f = barInt.foo(MyFoo())
   f = barString.foo(MyFoo()) // expected-error{{cannot assign}}
-  f = barInt.foo(YourFoo()) // expected-error{{cannot assign}}
+  f = barInt.foo(YourFoo()) // expected-error{{cannot convert value of type 'YourFoo' to expected argument type 'MyFoo'}}
   f = barString.foo(MyFoo()) // expected-error{{cannot assign}}
 }
