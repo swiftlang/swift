@@ -77,7 +77,10 @@ func testBlockFinal() throws {
 #if !EMIT_SIL
 func testNonBlockFinal() throws {
   ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
+  // TODO(diagnostics): For situations where both label and type where incorrect, we should produce a single error
+  // which would say something like `cannot invoke 'bar' with argument list (count: Int)`.
   ErrorProne.run(count: 0) // expected-error {{incorrect argument label in call (have 'count:', expected 'callback:')}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '(() -> Void)?'}}
 }
 #endif
 

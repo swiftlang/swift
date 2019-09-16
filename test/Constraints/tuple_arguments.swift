@@ -15,6 +15,7 @@ do {
   concreteLabeled(x: 3)
   concreteLabeled(x: (3))
   concreteLabeled((x: 3)) // expected-error {{missing argument label 'x:' in call}}
+  // expected-error@-1 {{cannot convert value of type '(x: Int)' to expected argument type 'Int'}}
 
   concreteTwo(3, 4)
   concreteTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
