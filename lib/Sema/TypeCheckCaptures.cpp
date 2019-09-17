@@ -368,12 +368,6 @@ public:
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
       TypeChecker::computeCaptures(AFD);
       propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
-
-      for (auto *P : *AFD->getParameters())
-        if (P->getDefaultValue())
-          propagateCaptures(P->getDefaultArgumentCaptureInfo(),
-                            P->getLoc());
-
       return false;
     }
 

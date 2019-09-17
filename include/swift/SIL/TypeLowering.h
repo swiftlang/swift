@@ -844,10 +844,13 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
-  
+
+  /// Get the generic environment for a constant.
+  GenericSignature *getConstantGenericSignature(SILDeclRef constant);
+
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
+
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
     return getConstantInfo(constant).getSILType();
@@ -943,17 +946,6 @@ public:
   /// \return - always an address type
   SILType getSubstitutedStorageType(AbstractStorageDecl *value,
                                     Type lvalueType);
-
-  /// Retrieve the set of archetypes closed over by the given function.
-  GenericEnvironment *getEffectiveGenericEnvironment(AnyFunctionRef fn,
-                                                     CaptureInfo captureInfo);
-
-  /// Retrieve the set of generic parameters closed over by the given function.
-  CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
-                                                   CaptureInfo captureInfo);
-
-  /// Retrieve the set of generic parameters closed over by the context.
-  CanGenericSignature getEffectiveGenericSignature(DeclContext *dc);
 
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.

@@ -988,9 +988,17 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+      }
+
+      if (P->getDefaultValue() &&
+        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+        OS << " ";
+        P->getDefaultArgumentCaptureInfo().print(
+          PrintWithColorRAII(OS, CapturesColor).getOS());
+      }
 
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
