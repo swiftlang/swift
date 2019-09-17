@@ -167,15 +167,32 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
 }
 
 namespace {
-  /// Retrieve the "overridden" declaration of this declaration, but only if
-  // it's already been computed.
-  template<typename T>
-  T *getOverriddenDeclIfAvailable(T *decl) {
-    if (!decl->overriddenDeclsComputed()) return nullptr;
+// Retrieve the "overridden" declaration of this declaration, but only if
+// it's already been computed.
+template <typename T> T *getOverriddenDeclIfAvailable(T *decl) {
+  if (!decl->overriddenDeclsComputed())
+    return nullptr;
 
-    return cast_or_null<T>(decl->getOverriddenDecl());
-  }
+  return cast_or_null<T>(decl->getOverriddenDecl());
 }
+
+// Retrieve the generic signature of the innermost context that has been forced
+// so far.
+//
+// This avoids kicking off the request for a generic signature in the verifier.
+static GenericSignature *
+getNearestForcedGenericSignatureOfContext(DeclContext *dc) {
+  do {
+    if (auto decl = dc->getAsDecl())
+      if (auto GC = decl->getAsGenericContext())
+        if (GC->hasComputedGenericSignature())
+          return GC->getGenericSignature();
+  } while ((dc = dc->getParent()));
+
+  return nullptr;
+}
+} // namespace
+
 class Verifier : public ASTWalker {
   PointerUnion<ModuleDecl *, SourceFile *> M;
   ASTContext &Ctx;
@@ -686,14 +703,14 @@ public:
 
     void pushScope(DeclContext *scope) {
       Scopes.push_back(scope);
-      GenericSig.push_back(scope->getGenericSignatureOfContext());
+      GenericSig.push_back(::getNearestForcedGenericSignatureOfContext(scope));
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-      assert(GenericSig.back() == scope->getGenericSignatureOfContext());
+      assert(GenericSig.back() == ::getNearestForcedGenericSignatureOfContext(scope));
       Scopes.pop_back();
       GenericSig.pop_back();
     }

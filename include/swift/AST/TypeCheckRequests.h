@@ -1160,6 +1160,27 @@ public:
   bool isCached() const { return true; }
 };
 
+class GenericSignatureRequest :
+    public SimpleRequest<GenericSignatureRequest,
+                         GenericSignature *(GenericContext *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator, GenericContext *value) const;
+  
+public:              
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<GenericSignature *> getCachedResult() const;
+  void cacheResult(GenericSignature *value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

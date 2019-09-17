@@ -536,9 +536,10 @@ enum SR_10084_E_2 {
   }
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum SR_10084_E_3 {
-  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}} // expected-note {{'A' previously declared here}}
-  case A // expected-error {{invalid redeclaration of 'A'}}
+  protocol A {} //expected-error {{protocol 'A' cannot be nested inside another declaration}}
+  case A
 }
 
 enum SR_10084_E_4 {
@@ -551,9 +552,10 @@ enum SR_10084_E_5 {
   case C // expected-error {{invalid redeclaration of 'C'}}
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol D` is invalid.
 enum SR_10084_E_6 {
-  case D // expected-note {{'D' previously declared here}}
-  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}} // expected-error {{invalid redeclaration of 'D'}}
+  case D
+  protocol D {} //expected-error {{protocol 'D' cannot be nested inside another declaration}}
 }
 
 enum SR_10084_E_7 {

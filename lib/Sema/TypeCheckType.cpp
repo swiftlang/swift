@@ -977,7 +977,7 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
   if (!options.is(TypeResolverContext::ExtensionBinding) ||
       !isa<NominalTypeDecl>(typeDecl)) {
     // Validate the declaration.
-    if (lazyResolver)
+    if (lazyResolver && !typeDecl->hasInterfaceType())
       lazyResolver->resolveDeclSignature(typeDecl);
 
     // If we were not able to validate recursively, bail out.
