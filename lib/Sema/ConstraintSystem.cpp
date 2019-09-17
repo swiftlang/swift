@@ -2794,6 +2794,216 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   return false;
 }
 
+ConstraintLocator *
+constraints::simplifyLocator(ConstraintSystem &cs, ConstraintLocator *locator,
+                             SourceRange &range) {
+  auto path = locator->getPath();
+  auto anchor = locator->getAnchor();
+  simplifyLocator(anchor, path, range);
+
+  // If we didn't simplify anything, just return the input.
+  if (anchor == locator->getAnchor() &&
+      path.size() == locator->getPath().size()) {
+    return locator;
+  }
+
+  // If the old locator didn't have any summary flags, neither will the
+  // simplified version, as it must contain a subset of the path elements.
+  if (locator->getSummaryFlags() == 0)
+    return cs.getConstraintLocator(anchor, path, /*summaryFlags*/ 0);
+
+  return cs.getConstraintLocator(anchor, path);
+}
+
+void constraints::simplifyLocator(Expr *&anchor,
+                                  ArrayRef<LocatorPathElt> &path,
+                                  SourceRange &range) {
+  range = SourceRange();
+
+  while (!path.empty()) {
+    switch (path[0].getKind()) {
+    case ConstraintLocator::ApplyArgument: {
+      // Extract application argument.
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        anchor = applyExpr->getArg();
+        path = path.slice(1);
+        continue;
+      }
+
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        anchor = subscriptExpr->getIndex();
+        path = path.slice(1);
+        continue;
+      }
+
+      if (auto objectLiteralExpr = dyn_cast<ObjectLiteralExpr>(anchor)) {
+        anchor = objectLiteralExpr->getArg();
+        path = path.slice(1);
+        continue;
+      }
+
+      if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        anchor = UME->getArgument();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+    }
+
+    case ConstraintLocator::ApplyFunction:
+      // Extract application function.
+      if (auto applyExpr = dyn_cast<ApplyExpr>(anchor)) {
+        anchor = applyExpr->getFn();
+        path = path.slice(1);
+        continue;
+      }
+
+      // The subscript itself is the function.
+      if (auto subscriptExpr = dyn_cast<SubscriptExpr>(anchor)) {
+        anchor = subscriptExpr;
+        path = path.slice(1);
+        continue;
+      }
+
+      // The unresolved member itself is the function.
+      if (auto unresolvedMember = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        if (unresolvedMember->getArgument()) {
+          anchor = unresolvedMember;
+          path = path.slice(1);
+          continue;
+        }
+      }
+
+      break;
+
+    case ConstraintLocator::AutoclosureResult:
+    case ConstraintLocator::LValueConversion:
+    case ConstraintLocator::RValueAdjustment:
+    case ConstraintLocator::UnresolvedMember:
+      // Arguments in autoclosure positions, lvalue and rvalue adjustments, and
+      // scalar-to-tuple conversions, and unresolved members are
+      // implicit.
+      path = path.slice(1);
+      continue;
+
+    case ConstraintLocator::NamedTupleElement:
+    case ConstraintLocator::TupleElement: {
+      // Extract tuple element.
+      auto elt = path[0].castTo<LocatorPathElt::AnyTupleElement>();
+      unsigned index = elt.getIndex();
+      if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
+        if (index < tupleExpr->getNumElements()) {
+          anchor = tupleExpr->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
+      }
+
+      if (auto *CE = dyn_cast<CollectionExpr>(anchor)) {
+        if (index < CE->getNumElements()) {
+          anchor = CE->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
+      }
+      break;
+    }
+
+    case ConstraintLocator::ApplyArgToParam: {
+      auto elt = path[0].castTo<LocatorPathElt::ApplyArgToParam>();
+      // Extract tuple element.
+      if (auto tupleExpr = dyn_cast<TupleExpr>(anchor)) {
+        unsigned index = elt.getArgIdx();
+        if (index < tupleExpr->getNumElements()) {
+          anchor = tupleExpr->getElement(index);
+          path = path.slice(1);
+          continue;
+        }
+      }
+
+      // Extract subexpression in parentheses.
+      if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
+        assert(elt.getArgIdx() == 0);
+
+        anchor = parenExpr->getSubExpr();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+    }
+    case ConstraintLocator::ConstructorMember:
+      if (auto typeExpr = dyn_cast<TypeExpr>(anchor)) {
+        // This is really an implicit 'init' MemberRef, so point at the base,
+        // i.e. the TypeExpr.
+        range = SourceRange();
+        anchor = typeExpr;
+        path = path.slice(1);
+        continue;
+      }
+      LLVM_FALLTHROUGH;
+
+    case ConstraintLocator::Member:
+    case ConstraintLocator::MemberRefBase:
+      if (auto UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
+        range = UDE->getNameLoc().getSourceRange();
+        anchor = UDE->getBase();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
+    case ConstraintLocator::SubscriptMember:
+      if (isa<SubscriptExpr>(anchor)) {
+        path = path.slice(1);
+        continue;
+      }
+      break;
+
+    case ConstraintLocator::ClosureResult:
+      if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
+        if (CE->hasSingleExpressionBody()) {
+          anchor = CE->getSingleExpressionBody();
+          path = path.slice(1);
+          continue;
+        }
+      }
+      break;
+
+    case ConstraintLocator::ContextualType:
+      // This was just for identifying purposes, strip it off.
+      path = path.slice(1);
+      continue;
+
+    case ConstraintLocator::KeyPathComponent: {
+      auto elt = path[0].castTo<LocatorPathElt::KeyPathComponent>();
+
+      // If the next element is an ApplyArgument, we can simplify by looking
+      // into the index expression.
+      if (path.size() < 2 ||
+          path[1].getKind() != ConstraintLocator::ApplyArgument)
+        break;
+
+      if (auto *kpe = dyn_cast<KeyPathExpr>(anchor)) {
+        auto component = kpe->getComponents()[elt.getIndex()];
+        auto indexExpr = component.getIndexExpr();
+        assert(indexExpr && "Trying to apply a component without an index?");
+        anchor = indexExpr;
+        path = path.slice(2);
+        continue;
+      }
+      break;
+    }
+
+    default:
+      // FIXME: Lots of other cases to handle.
+      break;
+    }
+
+    // If we get here, we couldn't simplify the path further.
+    break;
+  }
+}
+
 Expr *constraints::simplifyLocatorToAnchor(ConstraintLocator *locator) {
   if (!locator)
     return nullptr;
