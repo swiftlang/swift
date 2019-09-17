@@ -1339,7 +1339,7 @@ ModuleFile::ModuleFile(
           SearchPaths.push_back({blobData, isFramework, isSystem});
           break;
         }
-        case input_block::PARSEABLE_INTERFACE_PATH: {
+        case input_block::MODULE_INTERFACE_PATH: {
           ModuleInterfacePath = blobData;
           break;
         }

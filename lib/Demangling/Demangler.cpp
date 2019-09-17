@@ -493,11 +493,13 @@ void Demangler::clear() {
 }
 
 Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
-                                              StringRef MangledName)
+        StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> TheSymbolicReferenceResolver)
 // Save the current demangler state so we can restore it.
   : Dem(Dem),
     NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
-    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos)
+    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
+    SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
   // Reset the demangler state for a nested job.
   Dem.NodeStack.init(Dem, 16);
@@ -505,6 +507,7 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   Dem.NumWords = 0;
   Dem.Text = MangledName;
   Dem.Pos = 0;
+  Dem.SymbolicReferenceResolver = std::move(TheSymbolicReferenceResolver);
 }
 
 Demangler::DemangleInitRAII::~DemangleInitRAII() {
@@ -514,10 +517,13 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   Dem.NumWords = NumWords;
   Dem.Text = Text;
   Dem.Pos = Pos;
+  Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
 }
 
-NodePointer Demangler::demangleSymbol(StringRef MangledName) {
-  DemangleInitRAII state(*this, MangledName);
+NodePointer Demangler::demangleSymbol(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
 
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
@@ -561,8 +567,10 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   return topLevel;
 }
 
-NodePointer Demangler::demangleType(StringRef MangledName) {
-  DemangleInitRAII state(*this, MangledName);
+NodePointer Demangler::demangleType(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
 
   parseAndPushNodes();
 
@@ -701,6 +709,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
   NodePointer resolved = nullptr;
   if (SymbolicReferenceResolver)
     resolved = SymbolicReferenceResolver(kind, direct, value, at);
+    
   // With no resolver, or a resolver that failed, refuse to demangle further.
   if (!resolved)
     return nullptr;

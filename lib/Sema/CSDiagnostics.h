@@ -285,24 +285,6 @@ protected:
   virtual DiagInReference getDiagnosticInRereference() const = 0;
   virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
-  /// Determine whether it would be possible to diagnose
-  /// current requirement failure.
-  bool canDiagnoseFailure() const {
-    // If this is a conditional requirement failure,
-    // we have a lot more information compared to
-    // type requirement case, because we know that
-    // underlying conformance requirement matched.
-    if (isConditional())
-      return true;
-
-    // For static/initializer calls there is going to be
-    // a separate fix, attached to the argument, which is
-    // much easier to diagnose.
-    // For operator calls we can't currently produce a good
-    // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && isOperator(Apply));
-  }
-
   static bool isOperator(const ApplyExpr *apply) {
     return isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
            isa<BinaryExpr>(apply);
@@ -345,6 +327,14 @@ public:
   bool diagnoseAsError() override;
 
 protected:
+  /// Check whether this requirement is associated with one of the
+  /// operator overloads, in cases like that sometimes it makes more
+  /// sense to produce a generic diagnostic about operator reference
+  /// instead of conformance, because it could be something like
+  /// `true + true`, and it doesn't make much sense to suggest to
+  /// add a conformance from one library type to another.
+  bool diagnoseAsAmbiguousOperatorRef();
+
   DiagOnDecl getDiagnosticOnDecl() const override {
     return diag::type_does_not_conform_decl_owner;
   }
@@ -608,7 +598,8 @@ public:
                     ContextualTypePurpose purpose, Type lhs, Type rhs,
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), CTP(purpose),
-        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
+        FromType(resolve(lhs)->getRValueType()),
+        ToType(resolve(rhs)->getRValueType()) {}
 
   Type getFromType() const { return FromType; }
 
@@ -1601,6 +1592,46 @@ public:
       : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
 
   bool diagnoseAsError() override;
+};
+
+/// Diagnose a situation there is a mismatch between argument and parameter
+/// types e.g.:
+///
+/// ```swift
+/// func foo(_: String) {}
+/// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
+/// ```
+class ArgumentMismatchFailure : public ContextualFailure {
+public:
+  ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  /// If both argument and parameter are represented by `ArchetypeType`
+  /// produce a special diagnostic in case their names match.
+  bool diagnoseArchetypeMismatch() const;
+
+  /// Tailored diagnostic for pattern matching with `~=` operator.
+  bool diagnosePatternMatchingMismatch() const;
+
+  /// Tailored diagnostics for argument mismatches associated with
+  /// reference equality operators `===` and `!==`.
+  bool diagnoseUseOfReferenceEqualityOperator() const;
+
+protected:
+  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+
+  ValueDecl *getDecl() const {
+    auto selectedOverload = getChoiceFor(getLocator());
+    if (!selectedOverload)
+      return nullptr;
+
+    auto choice = selectedOverload->choice;
+    return choice.getDeclOrNull();
+  }
 };
 
 /// Provides information about the application of a function argument to a

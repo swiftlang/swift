@@ -261,11 +261,12 @@ func useNested(_ ii: Int, hni: HasNested<Int>,
   var id = hni.f(1, u: 3.14159)
   id = (2, 3.14159)
   hni.f(1.5, 3.14159) // expected-error{{missing argument label 'u:' in call}}
+  // expected-error@-1 {{cannot convert value of type 'Double' to expected argument type 'Int'}}
   hni.f(1.5, u: 3.14159) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   // Generic constructor of a generic struct
   HNI(1, 2.71828) // expected-warning{{unused}}
-  HNI(1.5, 2.71828) // expected-error{{'Double' is not convertible to 'Int'}}
+  HNI(1.5, 2.71828) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
   // Generic function in a nested generic struct
   var ids = xis.g(1, u: "Hello", v: 3.14159)

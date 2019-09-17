@@ -23,7 +23,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -114,12 +114,12 @@ std::string CompilerInvocation::getTBDPathForWholeModule() const {
 }
 
 std::string
-CompilerInvocation::getParseableInterfaceOutputPathForWholeModule() const {
+CompilerInvocation::getModuleInterfaceOutputPathForWholeModule() const {
   assert(getFrontendOptions().InputsAndOutputs.isWholeModule() &&
-         "ParseableInterfaceOutputPath only makes sense when the whole module "
+         "ModuleInterfaceOutputPath only makes sense when the whole module "
          "can be seen");
   return getPrimarySpecificPathsForAtMostOnePrimary()
-      .SupplementaryOutputs.ParseableInterfaceOutputPath;
+      .SupplementaryOutputs.ModuleInterfaceOutputPath;
 }
 
 SerializationOptions CompilerInvocation::computeSerializationOptions(
@@ -334,12 +334,12 @@ bool CompilerInstance::setUpModuleLoaders() {
       llvm::sys::Process::GetEnv("SWIFT_FORCE_MODULE_LOADING")) {
     if (*forceModuleLoadingMode == "prefer-interface" ||
         *forceModuleLoadingMode == "prefer-parseable")
-      MLM = ModuleLoadingMode::PreferParseable;
+      MLM = ModuleLoadingMode::PreferInterface;
     else if (*forceModuleLoadingMode == "prefer-serialized")
       MLM = ModuleLoadingMode::PreferSerialized;
     else if (*forceModuleLoadingMode == "only-interface" ||
              *forceModuleLoadingMode == "only-parseable")
-      MLM = ModuleLoadingMode::OnlyParseable;
+      MLM = ModuleLoadingMode::OnlyInterface;
     else if (*forceModuleLoadingMode == "only-serialized")
       MLM = ModuleLoadingMode::OnlySerialized;
     else {
@@ -377,7 +377,7 @@ bool CompilerInstance::setUpModuleLoaders() {
     std::string ModuleCachePath = getModuleCachePathFromClang(Clang);
     auto &FEOpts = Invocation.getFrontendOptions();
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
-    auto PIML = ParseableInterfaceModuleLoader::create(
+    auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
         FEOpts.RemarkOnRebuildFromModuleInterface);

@@ -57,10 +57,10 @@ protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
 }
 
+// N.B. Redeclaration checks don't see this case because `protocol A` is invalid.
 enum OuterEnum {
   protocol C {} // expected-error{{protocol 'C' cannot be nested inside another declaration}}
-  // expected-note@-1{{'C' previously declared here}}
-  case C(C) // expected-error{{invalid redeclaration of 'C'}}
+  case C(C)
 }
 
 class OuterClass {
@@ -105,7 +105,9 @@ func testLookup(_ x: OuterForUFI.Inner) {
   x.req()
   x.extMethod()
 }
+
+// N.B. Lookup fails here because OuterForUFI.Inner is marked invalid.
 func testLookup<T: OuterForUFI.Inner>(_ x: T) {
-  x.req()
-  x.extMethod()
+  x.req() // expected-error {{value of type 'T' has no member 'req'}}
+  x.extMethod() // expected-error {{value of type 'T' has no member 'extMethod'}}
 }

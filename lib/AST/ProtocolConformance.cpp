@@ -547,17 +547,9 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto extensionSig = ext->getGenericSignature();
-  if (!extensionSig) {
-    if (auto lazyResolver = ctxt.getLazyResolver()) {
-      lazyResolver->resolveExtension(ext);
-      extensionSig = ext->getGenericSignature();
-    }
-  }
-
   // The type is generic, but the extension doesn't have a signature yet, so
   // we might be in a recursive validation situation.
-  if (!extensionSig) {
+  if (!ext->hasComputedGenericSignature()) {
     // If the extension is invalid, it won't ever get a signature, so we
     // "succeed" with an empty result instead.
     if (ext->isInvalid()) {
@@ -568,6 +560,15 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     // Otherwise we'll try again later.
     failure();
     return;
+  }
+  
+  // FIXME: All of this will be removed when validateExtension goes away.
+  auto extensionSig = ext->getGenericSignature();
+  if (!extensionSig) {
+    if (auto lazyResolver = ctxt.getLazyResolver()) {
+      lazyResolver->resolveExtension(ext);
+      extensionSig = ext->getGenericSignature();
+    }
   }
 
   auto canExtensionSig = extensionSig->getCanonicalSignature();

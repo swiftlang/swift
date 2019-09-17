@@ -805,3 +805,20 @@ void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setImplicitlyUnwrappedOptional(value);
 }
+
+//----------------------------------------------------------------------------//
+// GenericSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<GenericSignature *> GenericSignatureRequest::getCachedResult() const {
+  auto *GC = std::get<0>(getStorage());
+  if (GC->GenericSigAndBit.getInt()) {
+    return GC->GenericSigAndBit.getPointer();
+  }
+  return None;
+}
+
+void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
+  auto *GC = std::get<0>(getStorage());
+  GC->GenericSigAndBit.setPointerAndInt(value, true);
+}

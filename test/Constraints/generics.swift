@@ -161,10 +161,7 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      // FIXME(diagnostics): Diagnostic regressed here from `cannot convert value of type 'UInt' to expected argument type 'Int'`.
-      // Once argument-to-parameter mismatch diagnostics are moved to the new diagnostic framework, we'll be able to restore
-      // original contextual conversion failure diagnostic here. Note that this only happens in Swift 4 mode.
-      elems.deinitialize(count: self.value)  // expected-error {{ambiguous reference to member 'deinitialize(count:)'}}
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }

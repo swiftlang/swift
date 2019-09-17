@@ -22,6 +22,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -29,6 +30,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
+
+#define DEBUG_TYPE "Sema"
 using namespace swift;
 
 /// Return true if this expression is an implicit promotion from T to T?.
@@ -1475,9 +1478,13 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  interleave(typeDecl->getInnermostGenericParamTypes(),
-             printGenericParamSummary, [&]{ genericParamText << ", "; });
-
+  // FIXME: We can potentially be in the middle of creating a generic signature
+  // if we get here.  Break this cycle.
+  if (typeDecl->hasComputedGenericSignature()) {
+    interleave(typeDecl->getInnermostGenericParamTypes(),
+               printGenericParamSummary, [&]{ genericParamText << ", "; });
+  }
+  
   genericParamText << ">";
   return true;
 }
@@ -1992,6 +1999,10 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
+
+#ifndef NDEBUG
+  llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
+#endif
   
   bool sawError = false;
   
@@ -2732,12 +2743,18 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
+  STATISTIC(VarDeclUsageCheckerExprVisits,
+            "# of times VarDeclUsageChecker::walkToExprPre is called");
+  ++VarDeclUsageCheckerExprVisits;
+
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
+
+  assert(AllExprsSeen.insert(E).second && "duplicate traversal");
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
@@ -2783,9 +2800,13 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     return { false, E };
   }
   
-  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
-  if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
+  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
+  // and only walk the subexpr.
+  if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
+    oee->getSubExpr()->walk(*this);
+    return { false, E };
+  }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {

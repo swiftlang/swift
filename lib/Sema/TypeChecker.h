@@ -757,8 +757,9 @@ public:
   /// \param options Options that alter type resolution.
   ///
   /// \returns true if type validation failed, or false otherwise.
-  bool validateType(TypeLoc &Loc, TypeResolution resolution,
-                    TypeResolutionOptions options);
+  static bool validateType(ASTContext &Ctx, TypeLoc &Loc,
+                           TypeResolution resolution,
+                           TypeResolutionOptions options);
 
   /// Check for unsupported protocol types in the given declaration.
   void checkUnsupportedProtocolType(Decl *decl);
@@ -863,6 +864,26 @@ public:
   static Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member,
                                       Type baseTy, bool useArchetypes = true);
 
+  /// Determine whether this is a "pass-through" typealias, which has the
+  /// same type parameters as the nominal type it references and specializes
+  /// the underlying nominal type with exactly those type parameters.
+  /// For example, the following typealias \c GX is a pass-through typealias:
+  ///
+  /// \code
+  /// struct X<T, U> { }
+  /// typealias GX<A, B> = X<A, B>
+  /// \endcode
+  ///
+  /// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+  /// different type parameters and \c GX3 doesn't pass its type parameters
+  /// directly through.
+  ///
+  /// \code
+  /// typealias GX2<A> = X<A, A>
+  /// typealias GX3<A, B> = X<B, A>
+  /// \endcode
+  static bool isPassThroughTypealias(TypeAliasDecl *typealias);
+  
   /// Determine whether one type is a subtype of another.
   ///
   /// \param t1 The potential subtype.
@@ -1012,13 +1033,6 @@ public:
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
-  /// Compute the generic signature, generic environment and interface type
-  /// of a generic function or subscript.
-  void validateGenericFuncOrSubscriptSignature(
-              PointerUnion<AbstractFunctionDecl *, SubscriptDecl *>
-                  funcOrSubscript,
-              ValueDecl *decl, GenericContext *genCtx);
-
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
   void checkProtocolSelfRequirements(ValueDecl *decl);
@@ -1053,11 +1067,6 @@ public:
                         bool allowConcreteGenericParams,
                         SmallVector<Requirement, 2> additionalRequirements = {},
                         SmallVector<TypeLoc, 2> inferenceSources = {});
-
-  /// Validate the signature of a generic type.
-  ///
-  /// \param nominal The generic type.
-  void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
   /// Create a text string that describes the bindings of generic parameters
   /// that are relevant to the given set of types, e.g.,
@@ -1747,7 +1756,6 @@ private:
                                     const DeclContext *DC,
                                     FragileFunctionKind fragileKind);
 
-public:
   /// Given that a type is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if its
   /// generic arguments require the use of conformances that cannot reasonably
@@ -1755,9 +1763,10 @@ public:
   ///
   /// This method \e only checks how generic arguments are used; it is assumed
   /// that the declarations involved have already been checked elsewhere.
-  void diagnoseGenericTypeExportability(const TypeLoc &TL,
-                                        const DeclContext *DC);
+  static void diagnoseGenericTypeExportability(const TypeLoc &TL,
+                                               const DeclContext *DC);
 
+public:
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///

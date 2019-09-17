@@ -169,6 +169,7 @@ class RDar16666631 {
    }
 }
 let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{incorrect argument label in call (have 'i:d:', expected 'i:s:')}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 
 struct S {

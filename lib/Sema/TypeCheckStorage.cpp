@@ -1818,6 +1818,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("not an opaque accessor");
   }
+  llvm_unreachable("Unhandled AccessorKind in switch");
 }
 
 llvm::Expected<bool>
@@ -2348,8 +2349,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
-      ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, SourceLoc());
+      ctx, var->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/ nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 

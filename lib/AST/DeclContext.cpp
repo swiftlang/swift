@@ -807,6 +807,12 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
+unsigned IterableDeclContext::getMemberCount() const {
+  if (hasUnparsedMembers())
+    loadAllMembers();
+  return MemberCount;
+}
+
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
@@ -1037,6 +1043,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
+  llvm_unreachable("Unhandled DeclCopntextKindin switch");
 }
 
 #define DECL(Id, Parent) \

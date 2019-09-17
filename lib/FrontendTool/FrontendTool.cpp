@@ -51,8 +51,8 @@
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Frontend/SerializedDiagnosticConsumer.h"
-#include "swift/Frontend/ParseableInterfaceModuleLoader.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Immediate/Immediate.h"
 #include "swift/Index/IndexRecord.h"
 #include "swift/Option/Options.h"
@@ -299,7 +299,7 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
     auto moduleFileType =
       file_types::lookupTypeForExtension(llvm::sys::path::extension(depPath));
     if (moduleFileType == file_types::TY_SwiftModuleFile
-        || moduleFileType == file_types::TY_SwiftParseableInterfaceFile) {
+        || moduleFileType == file_types::TY_SwiftModuleInterfaceFile) {
       auto dep = pathToModuleDecl.find(depPath);
       assert(dep != pathToModuleDecl.end()
              && "Dependency must've been loaded.");
@@ -437,18 +437,18 @@ static bool printAsObjCIfNeeded(StringRef outputPath, ModuleDecl *M,
   });
 }
 
-/// Prints the stable parseable interface for \p M to \p outputPath.
+/// Prints the stable module interface for \p M to \p outputPath.
 ///
 /// ...unless \p outputPath is empty, in which case it does nothing.
 ///
 /// \returns true if there were any errors
 ///
-/// \see swift::emitParseableInterface
+/// \see swift::emitSwiftInterface
 static bool
-printParseableInterfaceIfNeeded(StringRef outputPath,
-                                ParseableInterfaceOptions const &Opts,
-                                LangOptions const &LangOpts,
-                                ModuleDecl *M) {
+printModuleInterfaceIfNeeded(StringRef outputPath,
+                             ModuleInterfaceOptions const &Opts,
+                             LangOptions const &LangOpts,
+                             ModuleDecl *M) {
   if (outputPath.empty())
     return false;
 
@@ -465,7 +465,7 @@ printParseableInterfaceIfNeeded(StringRef outputPath,
   }
   return withOutputFile(diags, outputPath,
                         [M, Opts](raw_ostream &out) -> bool {
-    return swift::emitParseableInterface(out, Opts, M);
+    return swift::emitSwiftInterface(out, Opts, M);
   });
 }
 
@@ -669,13 +669,13 @@ static bool precompileBridgingHeader(CompilerInvocation &Invocation,
           .InputsAndOutputs.getSingleOutputFilename());
 }
 
-static bool buildModuleFromParseableInterface(CompilerInvocation &Invocation,
-                                              CompilerInstance &Instance) {
+static bool buildModuleFromInterface(CompilerInvocation &Invocation,
+                                     CompilerInstance &Instance) {
   const FrontendOptions &FEOpts = Invocation.getFrontendOptions();
   assert(FEOpts.InputsAndOutputs.hasSingleInput());
   StringRef InputPath = FEOpts.InputsAndOutputs.getFilenameOfFirstInput();
   StringRef PrebuiltCachePath = FEOpts.PrebuiltModuleCachePath;
-  return ParseableInterfaceModuleLoader::buildSwiftModuleFromSwiftInterface(
+  return ModuleInterfaceLoader::buildSwiftModuleFromSwiftInterface(
       Instance.getSourceMgr(), Instance.getDiags(),
       Invocation.getSearchPathOptions(), Invocation.getLangOptions(),
       Invocation.getClangModuleCachePath(),
@@ -1002,10 +1002,10 @@ static bool emitAnyWholeModulePostTypeCheckSupplementaryOutputs(
         Instance.getMainModule(), opts.ImplicitObjCHeaderPath, moduleIsPublic);
   }
 
-  if (opts.InputsAndOutputs.hasParseableInterfaceOutputPath()) {
-    hadAnyError |= printParseableInterfaceIfNeeded(
-        Invocation.getParseableInterfaceOutputPathForWholeModule(),
-        Invocation.getParseableInterfaceOptions(),
+  if (opts.InputsAndOutputs.hasModuleInterfaceOutputPath()) {
+    hadAnyError |= printModuleInterfaceIfNeeded(
+        Invocation.getModuleInterfaceOutputPathForWholeModule(),
+        Invocation.getModuleInterfaceOptions(),
         Invocation.getLangOptions(),
         Instance.getMainModule());
   }
@@ -1041,7 +1041,7 @@ static bool performCompile(CompilerInstance &Instance,
     return precompileBridgingHeader(Invocation, Instance);
 
   if (Action == FrontendOptions::ActionType::CompileModuleFromInterface)
-    return buildModuleFromParseableInterface(Invocation, Instance);
+    return buildModuleFromInterface(Invocation, Instance);
 
   if (Invocation.getInputKind() == InputFileKind::LLVM)
     return compileLLVMIR(Invocation, Instance, Stats);
@@ -1122,10 +1122,20 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Typecheck) {
     if (emitIndexData(Invocation, Instance))
       return true;
-    if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
-                                                            Invocation,
-                                                            moduleIsPublic)) {
-      return true;
+    // FIXME: Whole-module outputs with a non-whole-module -typecheck ought to
+    // be disallowed, but the driver implements -index-file mode by generating a
+    // regular whole-module frontend command line and modifying it to index just
+    // one file (by making it a primary) instead of all of them. If that
+    // invocation also has flags to emit whole-module supplementary outputs, the
+    // compiler can crash trying to access information for non-type-checked
+    // declarations in the non-primary files. For now, prevent those crashes by
+    // guarding the emission of whole-module supplementary outputs.
+    if (opts.InputsAndOutputs.isWholeModule()) {
+      if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
+                                                              Invocation,
+                                                              moduleIsPublic)) {
+        return true;
+      }
     }
     return false;
   }

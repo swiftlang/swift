@@ -113,7 +113,7 @@ struct SupplementaryOutputPaths {
   /// \sa swift::writeTBDFile
   std::string TBDPath;
 
-  /// The path to which we should emit a parseable module interface, which can
+  /// The path to which we should emit a module interface, which can
   /// be used by a client source file to import this module.
   ///
   /// This format is similar to the binary format used for #ModuleOutputPath,
@@ -121,8 +121,8 @@ struct SupplementaryOutputPaths {
   ///
   /// Currently only makes sense when the compiler has whole-module knowledge.
   ///
-  /// \sa swift::emitParseableInterface
-  std::string ParseableInterfaceOutputPath;
+  /// \sa swift::emitSwiftInterface
+  std::string ModuleInterfaceOutputPath;
 
   SupplementaryOutputPaths() = default;
   SupplementaryOutputPaths(const SupplementaryOutputPaths &) = default;
@@ -132,7 +132,7 @@ struct SupplementaryOutputPaths {
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
-           TBDPath.empty() && ParseableInterfaceOutputPath.empty();
+           TBDPath.empty() && ModuleInterfaceOutputPath.empty();
   }
 };
 } // namespace swift

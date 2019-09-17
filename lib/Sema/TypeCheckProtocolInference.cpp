@@ -197,10 +197,11 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // Build a generic signature.
     tc.validateExtension(extension);
 
-    // The extension may not have a generic signature set up yet, as a
-    // recursion breaker, in which case we can't yet confidently reject its
-    // witnesses.
-    if (!extension->getGenericSignature())
+    // FIXME: The extension may not have a generic signature set up yet as
+    // resolving signatures may trigger associated type inference.  This cycle
+    // is now detectable and we should look into untangling it
+    // - see rdar://55263708
+    if (!extension->hasComputedGenericSignature())
       return true;
 
     // The condition here is a bit more fickle than

@@ -257,9 +257,17 @@ ParsedRawSyntaxNode SyntaxParsingContext::finalizeSourceFile() {
   ParsedRawSyntaxNode EOFToken = Parts.back();
   Parts = Parts.drop_back();
 
-  assert(llvm::all_of(Parts, [](const ParsedRawSyntaxNode& node) {
-    return node.getKind() == SyntaxKind::CodeBlockItem;
-  }) && "all top level element must be 'CodeBlockItem'");
+  for (auto RawNode : Parts) {
+    if (RawNode.getKind() != SyntaxKind::CodeBlockItem) {
+      // FIXME: Skip toplevel garbage nodes for now. we shouldn't emit them in
+      // the first place.
+      if (RawNode.isRecorded())
+        getSyntaxCreator().finalizeNode(RawNode.getOpaqueNode());
+      continue;
+    }
+
+    AllTopLevel.push_back(RawNode);
+  }
 
   auto itemList = Recorder.recordRawSyntax(SyntaxKind::CodeBlockItemList,
                                            Parts);

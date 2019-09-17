@@ -193,6 +193,27 @@ static void recordShadowedDeclsAfterSignatureMatch(
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
     auto name = firstDecl->getBaseName();
+
+    auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+      for (auto path : paths) {
+        if (ModuleDecl::matchesAccessPath(path, name))
+          return false;
+      }
+
+      return true;
+    };
+
+    auto isScopedImport = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+      for (auto path : paths) {
+        if (path.empty())
+          continue;
+        if (ModuleDecl::matchesAccessPath(path, name))
+          return true;
+      }
+
+      return false;
+    };
+
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
@@ -206,22 +227,28 @@ static void recordShadowedDeclsAfterSignatureMatch(
       if (firstModule != secondModule &&
           firstDecl->getDeclContext()->isModuleScopeContext() &&
           secondDecl->getDeclContext()->isModuleScopeContext()) {
-        // First, scoped imports shadow unscoped imports.
-        bool firstScoped = imports.isScopedImport(firstModule, name, dc);
-        bool secondScoped = imports.isScopedImport(secondModule, name, dc);
-        if (!firstScoped && secondScoped) {
+        auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
+          firstModule, secondModule, dc);
+        auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
+          secondModule, firstModule, dc);
+
+        // Check if one module shadows the other.
+        if (isShadowed(firstPaths)) {
           shadowed.insert(firstDecl);
           break;
-        } else if (firstScoped && !secondScoped) {
+        } else if (isShadowed(secondPaths)) {
           shadowed.insert(secondDecl);
           continue;
         }
 
-        // Now check if one module shadows the other.
-        if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
+        // We might be in a situation where neither module shadows the
+        // other, but one declaration is visible via a scoped import.
+        bool firstScoped = isScopedImport(firstPaths);
+        bool secondScoped = isScopedImport(secondPaths);
+        if (!firstScoped && secondScoped) {
           shadowed.insert(firstDecl);
           break;
-        } else if (imports.isShadowedBy(secondModule, firstModule, name, dc)) {
+        } else if (firstScoped && !secondScoped) {
           shadowed.insert(secondDecl);
           continue;
         }
@@ -278,10 +305,16 @@ static void recordShadowedDeclsAfterSignatureMatch(
       if (firstModule != secondModule &&
           !firstDecl->getDeclContext()->isModuleScopeContext() &&
           !secondDecl->getDeclContext()->isModuleScopeContext()) {
-        if (imports.isShadowedBy(firstModule, secondModule, dc)) {
+        auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
+          firstModule, secondModule, dc);
+        auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
+          secondModule, firstModule, dc);
+
+        // Check if one module shadows the other.
+        if (isShadowed(firstPaths)) {
           shadowed.insert(firstDecl);
           break;
-        } else if (imports.isShadowedBy(secondModule, firstModule, dc)) {
+        } else if (isShadowed(secondPaths)) {
           shadowed.insert(secondDecl);
           continue;
         }
@@ -1133,6 +1166,7 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
+      (void)A;
       assert(A && A->getMemberName().matchesRef(name));
     }
   }

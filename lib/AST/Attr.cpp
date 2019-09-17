@@ -38,6 +38,29 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
 static_assert(IsTriviallyDestructible<TypeAttributes>::value,
               "TypeAttributes are BumpPtrAllocated; the d'tor is never called");
 
+#define DECL_ATTR(Name, Id, ...)                                                                     \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToAdd) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToAdd),     \
+              #Name " needs to specify either ABIBreakingToAdd or ABIStableToAdd");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                        \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIBreakingToRemove) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::ABIStableToRemove),     \
+              #Name " needs to specify either ABIBreakingToRemove or ABIStableToRemove");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                     \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToAdd) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToAdd),     \
+              #Name " needs to specify either APIBreakingToAdd or APIStableToAdd");
+#include "swift/AST/Attr.def"
+
+#define DECL_ATTR(Name, Id, ...)                                                                        \
+static_assert(DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIBreakingToRemove) != \
+              DeclAttribute::isOptionSetFor##Id(DeclAttribute::DeclAttrOptions::APIStableToRemove),     \
+              #Name " needs to specify either APIBreakingToRemove or APIStableToRemove");
+#include "swift/AST/Attr.def"
 
 // Only allow allocation of attributes using the allocator in ASTContext.
 void *AttributeBase::operator new(size_t Bytes, ASTContext &C,
