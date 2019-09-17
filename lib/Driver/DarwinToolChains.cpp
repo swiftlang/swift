@@ -395,7 +395,8 @@ toolchains::Darwin::addArgsToLinkStdlib(ArgStringList &Arguments,
   // exist in `/usr/lib/swift` on Darwin platforms.
   // Relevant Swift-in-Darwin-OSs patch:
   // https://github.com/apple/swift/pull/24787.
-  if (context.Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
+  if (!context.Args.hasArg(options::OPT_no_stdlib_rpath) &&
+      context.Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
                            options::OPT_no_toolchain_stdlib_rpath, true)) {
   // SWIFT_ENABLE_TENSORFLOW END
     // If the user has explicitly asked for a toolchain stdlib, we should
