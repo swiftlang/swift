@@ -501,7 +501,9 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
 
   // If the unbound decl hasn't been validated yet, we have a circular
   // dependency that isn't being diagnosed properly.
-  if (!unboundDecl->getGenericSignature()) {
+  //
+  // FIXME: Delete this condition.  He's dead Jim.
+  if (!unboundDecl->hasComputedGenericSignature()) {
     TC.diagnose(unboundDecl, diag::circular_reference);
     return Type();
   }

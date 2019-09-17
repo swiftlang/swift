@@ -864,6 +864,26 @@ public:
   static Type substMemberTypeWithBase(ModuleDecl *module, TypeDecl *member,
                                       Type baseTy, bool useArchetypes = true);
 
+  /// Determine whether this is a "pass-through" typealias, which has the
+  /// same type parameters as the nominal type it references and specializes
+  /// the underlying nominal type with exactly those type parameters.
+  /// For example, the following typealias \c GX is a pass-through typealias:
+  ///
+  /// \code
+  /// struct X<T, U> { }
+  /// typealias GX<A, B> = X<A, B>
+  /// \endcode
+  ///
+  /// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
+  /// different type parameters and \c GX3 doesn't pass its type parameters
+  /// directly through.
+  ///
+  /// \code
+  /// typealias GX2<A> = X<A, A>
+  /// typealias GX3<A, B> = X<B, A>
+  /// \endcode
+  static bool isPassThroughTypealias(TypeAliasDecl *typealias);
+  
   /// Determine whether one type is a subtype of another.
   ///
   /// \param t1 The potential subtype.
@@ -1013,13 +1033,6 @@ public:
   /// Infer default value witnesses for all requirements in the given protocol.
   void inferDefaultWitnesses(ProtocolDecl *proto);
 
-  /// Compute the generic signature, generic environment and interface type
-  /// of a generic function or subscript.
-  void validateGenericFuncOrSubscriptSignature(
-              PointerUnion<AbstractFunctionDecl *, SubscriptDecl *>
-                  funcOrSubscript,
-              ValueDecl *decl, GenericContext *genCtx);
-
   /// For a generic requirement in a protocol, make sure that the requirement
   /// set didn't add any requirements to Self or its associated types.
   void checkProtocolSelfRequirements(ValueDecl *decl);
@@ -1054,11 +1067,6 @@ public:
                         bool allowConcreteGenericParams,
                         SmallVector<Requirement, 2> additionalRequirements = {},
                         SmallVector<TypeLoc, 2> inferenceSources = {});
-
-  /// Validate the signature of a generic type.
-  ///
-  /// \param nominal The generic type.
-  void validateGenericTypeSignature(GenericTypeDecl *nominal);
 
   /// Create a text string that describes the bindings of generic parameters
   /// that are relevant to the given set of types, e.g.,

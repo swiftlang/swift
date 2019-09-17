@@ -1478,9 +1478,13 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  interleave(typeDecl->getInnermostGenericParamTypes(),
-             printGenericParamSummary, [&]{ genericParamText << ", "; });
-
+  // FIXME: We can potentially be in the middle of creating a generic signature
+  // if we get here.  Break this cycle.
+  if (typeDecl->hasComputedGenericSignature()) {
+    interleave(typeDecl->getInnermostGenericParamTypes(),
+               printGenericParamSummary, [&]{ genericParamText << ", "; });
+  }
+  
   genericParamText << ">";
   return true;
 }

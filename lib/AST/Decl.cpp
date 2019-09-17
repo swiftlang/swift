@@ -855,22 +855,14 @@ GenericParamList *GenericContext::getGenericParams() const {
                                const_cast<GenericContext *>(this)}, nullptr);
 }
 
+bool GenericContext::hasComputedGenericSignature() const {
+  return GenericSigAndBit.getInt();
+}
+
 GenericSignature *GenericContext::getGenericSignature() const {
-  if (GenericSig)
-    return GenericSig;
-
-  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
-  // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    const_cast<GenericContext *>(this)->GenericSig
-      = GenericSignature::get({self}, {req});
-    return GenericSig;
-  }
-
-  return nullptr;
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GenericSignatureRequest{const_cast<GenericContext *>(this)}, nullptr);
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
@@ -881,8 +873,9 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
 }
 
 void GenericContext::setGenericSignature(GenericSignature *genericSig) {
-  assert(GenericSig == nullptr && "Generic signature cannot be changed");
-  this->GenericSig = genericSig;
+  assert(!GenericSigAndBit.getPointer() && "Generic signature cannot be changed");
+  getASTContext().evaluator.cacheOutput(GenericSignatureRequest{this},
+                                        std::move(genericSig));
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
@@ -6159,6 +6152,10 @@ void SubscriptDecl::computeType() {
 
   // Record the interface type.
   setInterfaceType(funcTy);
+      
+  // Make sure that there are no unresolved dependent types in the
+  // generic signature.
+  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6753,6 +6750,10 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   // Compute the type of the 'self' parameter if we're created one already.
   if (hasSelf)
     computeSelfDeclType();
+      
+  // Make sure that there are no unresolved dependent types in the
+  // generic signature.
+  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {
