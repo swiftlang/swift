@@ -684,19 +684,19 @@ void Parser::skipSingleSyntax(SmallVectorImpl<ParsedSyntax> &Skipped) {
     Skipped.push_back(consumeTokenSyntax());
     skipUntilSyntax(Skipped, tok::r_paren);
     if (auto RParen = consumeTokenSyntaxIf(tok::r_paren))
-      Skipped.push_back(*RParen);
+      Skipped.push_back(std::move(*RParen));
     break;
   case tok::l_brace:
     Skipped.push_back(consumeTokenSyntax());
     skipUntilSyntax(Skipped, tok::r_brace);
     if (auto RBrace = consumeTokenSyntaxIf(tok::r_brace))
-      Skipped.push_back(*RBrace);
+      Skipped.push_back(std::move(*RBrace));
     break;
   case tok::l_square:
     Skipped.push_back(consumeTokenSyntax());
     skipUntilSyntax(Skipped, tok::r_square);
     if (auto RSquare = consumeTokenSyntaxIf(tok::r_square))
-      Skipped.push_back(*RSquare);
+      Skipped.push_back(std::move(*RSquare));
     break;
   case tok::pound_if:
   case tok::pound_else:
@@ -708,7 +708,7 @@ void Parser::skipSingleSyntax(SmallVectorImpl<ParsedSyntax> &Skipped) {
     if (Tok.isAny(tok::pound_else, tok::pound_elseif))
       skipSingleSyntax(Skipped);
     else if (auto Endif = consumeTokenSyntaxIf(tok::pound_endif))
-      Skipped.push_back(*Endif);
+      Skipped.push_back(std::move(*Endif));
     break;
 
   default:
@@ -1003,11 +1003,12 @@ void Parser::skipListUntilDeclRBraceSyntax(
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif)) {
     auto Comma = consumeTokenSyntaxIf(tok::comma);
-    if (Comma)
-      Skipped.push_back(*Comma);
-    
+
     bool hasDelimiter = Tok.getLoc() == startLoc || Comma;
     bool possibleDeclStartsLine = Tok.isAtStartOfLine();
+
+    if (Comma)
+      Skipped.push_back(std::move(*Comma));
 
     if (isStartOfDecl()) {
       // Could have encountered something like `_ var:` 
@@ -1020,7 +1021,7 @@ void Parser::skipListUntilDeclRBraceSyntax(
         Parser::BacktrackingScope backtrack(*this);
         // Consume the let or var
         auto LetOrVar = consumeTokenSyntax();
-        Skipped.push_back(LetOrVar);
+        Skipped.push_back(std::move(LetOrVar));
         
         // If the following token is either <identifier> or :, it means that
         // this `var` or `let` should be interpreted as a label
@@ -1338,7 +1339,7 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
       diagnose(Tok, diag::unexpected_separator, ",")
           .fixItRemove(SourceRange(Tok.getLoc()));
       auto Comma = consumeTokenSyntax();
-      Junk.push_back(Comma);
+      Junk.push_back(std::move(Comma));
     }
     SourceLoc StartLoc = Tok.getLoc();
 
