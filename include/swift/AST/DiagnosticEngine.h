@@ -810,6 +810,15 @@ namespace swift {
       return diagnose(decl, Diagnostic(id, std::move(args)...));
     }
 
+    /// Emit a parent diagnostic and attached notes.
+    ///
+    /// \param parentDiag An InFlightDiagnostic representing the parent diag.
+    ///
+    /// \param builder A closure which builds and emits notes to be attached to
+    /// the parent diag.
+    void diagnoseWithNotes(InFlightDiagnostic parentDiag,
+                           llvm::function_ref<void(void)> builder);
+
     /// \returns true if diagnostic is marked with PointsToFirstBadToken
     /// option.
     bool isDiagnosticPointsToFirstBadToken(DiagID id) const;
@@ -905,7 +914,6 @@ namespace swift {
         Depth(Engine.TransactionCount),
         IsOpen(true)
     {
-      assert(!Engine.ActiveDiagnostic);
       Engine.TransactionCount++;
     }
 
@@ -994,6 +1002,14 @@ namespace swift {
       DiagnosticTransaction::commit();
     }
   };
+
+  inline void
+  DiagnosticEngine::diagnoseWithNotes(InFlightDiagnostic parentDiag,
+                                      llvm::function_ref<void(void)> builder) {
+    CompoundDiagnosticTransaction transaction(*this);
+    parentDiag.flush();
+    builder();
+  }
 
 } // end namespace swift
 
