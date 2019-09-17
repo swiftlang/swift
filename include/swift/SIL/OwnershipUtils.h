@@ -170,6 +170,18 @@ public:
              ArrayRef<BranchPropagatedUser> nonConsumingUses,
              ownership::ErrorBehaviorKind errorBehavior,
              SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
+
+  /// Returns true that \p value forms a linear lifetime with consuming uses \p
+  /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
+  /// otherwise.
+  bool validateLifetime(SILValue value,
+                        ArrayRef<BranchPropagatedUser> consumingUses,
+                        ArrayRef<BranchPropagatedUser> nonConsumingUses) {
+    return !checkValue(value, consumingUses, nonConsumingUses,
+                       ownership::ErrorBehaviorKind::ReturnFalse,
+                       nullptr /*leakingBlocks*/)
+                .getFoundError();
+  }
 };
 
 /// Returns true if v is an address or trivial.
