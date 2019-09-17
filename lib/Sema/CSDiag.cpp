@@ -3895,10 +3895,8 @@ bool FailureDiagnosis::diagnoseClosureExpr(
         return true;
       }
 
-      MissingArgumentsFailure failure(
-          expr, CS, fnType, inferredArgCount - actualArgCount,
-          CS.getConstraintLocator(CE, LocatorPathElt::ContextualType()));
-      return failure.diagnoseAsError();
+      // Missing arguments are already diagnosed via new diagnostic framework.
+      return false;
     }
 
     // Coerce parameter types here only if there are no unresolved
