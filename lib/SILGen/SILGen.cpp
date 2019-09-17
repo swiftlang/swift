@@ -798,7 +798,9 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
       auto paramIndices = diffAttr->getParameterIndices();
       auto loweredParamIndices = paramIndices->getLowered(
           getASTContext(), origFnType);
-      SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
+      SILAutoDiffIndices indices(
+          loweredParamIndices,
+          /*results*/ AutoDiffIndexSubset::get(getASTContext(), 1, {0}));
       assert(silDiffAttr->getIndices() == indices &&
              "Expected matching @differentiable and [differentiable]");
 

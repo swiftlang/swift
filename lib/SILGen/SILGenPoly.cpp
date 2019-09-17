@@ -4366,7 +4366,9 @@ getWitnessFunctionRef(SILGenFunction &SGF,
           SGF.getASTContext(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
       auto autoDiffFn = SGF.B.createAutoDiffFunction(
-          loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
+          loc, loweredIndices,
+          AutoDiffIndexSubset::get(SGF.getASTContext(), 1, {0}),
+          /*differentiationOrder*/ 1, originalFn);
       return SGF.B.createAutoDiffFunctionExtract(
           loc,
           AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),

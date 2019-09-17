@@ -537,14 +537,16 @@ struct SILAutoDiffIndices {
     s << "))";
   }
 
-  [[deprecated]]
   std::string mangle() const {
-    llvm_unreachable("Don't call me!");
-//    std::string result = "src_" + llvm::utostr(source) + "_wrt_";
-//    interleave(parameters->getIndices(),
-//               [&](unsigned idx) { result += llvm::utostr(idx); },
-//               [&] { result += '_'; });
-//    return result;
+    std::string result = "_wrt_";
+    interleave(parameters->getIndices(),
+               [&](unsigned idx) { result += llvm::utostr(idx); },
+               [&] { result += '_'; });
+    result += "_results_";
+    interleave(results->getIndices(),
+               [&](unsigned idx) { result += llvm::utostr(idx); },
+               [&] { result += '_'; });
+    return result;
   }
 };
 
