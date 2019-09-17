@@ -50,18 +50,51 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 }
 
 extension String {
-  @usableFromInline
-  internal static func _fromASCII(
-    _ input: UnsafeBufferPointer<UInt8>
-  ) -> String {
+  
+  internal static func _uncheckedFromASCII(_ input: UnsafeBufferPointer<UInt8>)
+  -> String {
     _internalInvariant(_allASCII(input), "not actually ASCII")
 
     if let smol = _SmallString(input) {
       return String(_StringGuts(smol))
     }
-
+    
+    return __StringStorage.create(
+      initializingFrom: input, isASCII: true
+    ).asString
+  }
+  
+  internal static func _fromASCIIRepairing(
+    _ input: UnsafeBufferPointer<UInt8>
+  ) -> (result: String, repairsMade: Bool) {
+    
+    if let smol = _SmallString(input) {
+      return (String(_StringGuts(smol)), false)
+    }
+    
     let storage = __StringStorage.create(initializingFrom: input, isASCII: true)
-    return storage.asString
+    var repaired = false
+    
+    if _slowPath(!_allASCII(input)) {
+      let codeUnits = storage.codeUnits
+      storage.replace(
+        from: codeUnits.startIndex,
+        to: codeUnits.endIndex,
+        with: codeUnits.lazy.map { ($0 & 0x80) != 0 ? 0x1a : 0 },
+        replacementCount: codeUnits.count
+      )
+      repaired = true
+    }
+    
+    return (storage.asString, repaired)
+  }
+  
+  @available(*, deprecated)
+  @usableFromInline
+  internal static func _fromASCII(
+    _ input: UnsafeBufferPointer<UInt8>
+  ) -> String {
+    return String._uncheckedFromASCII(input)
   }
 
   public // SPI(Foundation)
@@ -177,6 +210,20 @@ extension String {
     repair: Bool
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
+    
+    if encoding == Unicode.ASCII.self,
+      let contigBytes = input as? _HasContiguousBytes,
+      contigBytes._providesContiguousBytesNoCopy
+    {
+      return contigBytes.withUnsafeBytes { rawBufPtr in
+        return String._fromASCIIRepairing(
+          UnsafeBufferPointer(
+            start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
+            count: rawBufPtr.count)
+        )
+      }
+    }
+    
     // TODO(String Performance): Attempt to form smol strings
 
     // TODO(String performance): Skip intermediary array, transcode directly

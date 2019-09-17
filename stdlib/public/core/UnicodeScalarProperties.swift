@@ -1110,7 +1110,7 @@ extension Unicode.Scalar.Properties {
         fatalError("Unexpected error case-converting Unicode scalar.")
       }
       _internalInvariant(count == correctSize, "inconsistent ICU behavior")
-      return String._fromASCII(
+      return String._uncheckedFromASCII(
         UnsafeBufferPointer(rebasing: bufPtr[..<count]))
     }
   }

@@ -195,7 +195,7 @@ internal func _int64ToString(
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(
+      return String._uncheckedFromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   } else {
@@ -203,7 +203,7 @@ internal func _int64ToString(
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(
+      return String._uncheckedFromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   }
@@ -224,7 +224,7 @@ func _uint64ToString(
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(
+      return String._uncheckedFromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   } else {
@@ -232,7 +232,7 @@ func _uint64ToString(
     return buffer.withBytes { (bufferPtr) in
       let actualLength
       = _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(
+      return String._uncheckedFromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: Int(actualLength)))
     }
   }

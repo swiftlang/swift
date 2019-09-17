@@ -1552,7 +1552,7 @@ extension BinaryInteger {
 
     result.reverse()
     return result.withUnsafeBufferPointer {
-      return String._fromASCII($0)
+      return String._uncheckedFromASCII($0)
     }
   }
 

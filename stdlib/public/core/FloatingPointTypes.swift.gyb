@@ -84,7 +84,7 @@ extension ${Self}: CustomStringConvertible {
     } else {
       var (buffer, length) = _float${bits}ToString(self, debug: false)
       return buffer.withBytes { (bufferPtr) in
-        String._fromASCII(
+        String._uncheckedFromASCII(
           UnsafeBufferPointer(start: bufferPtr, count: length))
       }
     }
@@ -96,7 +96,7 @@ extension ${Self}: CustomDebugStringConvertible {
   public var debugDescription: String {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
     return buffer.withBytes { (bufferPtr) in
-      String._fromASCII(
+      String._uncheckedFromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: length))
     }
   }

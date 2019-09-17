@@ -81,7 +81,7 @@ extension TextOutputStream {
   public mutating func _unlock() {}
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    write(String._fromASCII(buffer))
+    write(String._uncheckedFromASCII(buffer))
   }
 }
 
