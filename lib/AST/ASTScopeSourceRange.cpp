@@ -52,7 +52,7 @@ SourceRange
 ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
                                           const bool omitAssertions) const {
   if (getChildren().empty()) {
-    ASTScopeAssert(omitAssertions || range.Start.isValid());
+    ASTScopeAssert(omitAssertions || range.Start.isValid(), "Bad range.");
     return range;
   }
   const auto childStart =
@@ -60,7 +60,7 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   const auto childEnd =
       getChildren().back()->getSourceRangeOfScope(omitAssertions).End;
   auto childRange = SourceRange(childStart, childEnd);
-  ASTScopeAssert(omitAssertions || childRange.isValid());
+  ASTScopeAssert(omitAssertions || childRange.isValid(), "Bad range.");
 
   if (range.isInvalid())
     return childRange;
@@ -295,7 +295,7 @@ SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
   auto *d = scope->getDecl();
   auto r = d->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
-    ASTScopeAssert(r.End.isValid());
+    ASTScopeAssert(r.End.isValid(), "Start valid imples end valid.");
     return r;
   }
   return d->getSourceRange();
@@ -324,7 +324,7 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
   // them at the start location of the accessor.
   auto r = decl->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
-    ASTScopeAssert(r.End.isValid());
+    ASTScopeAssert(r.End.isValid(), "Start valid imples end valid.");
     return r;
   }
   return decl->getBodySourceRange();
@@ -461,7 +461,8 @@ ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
 bool ASTScopeImpl::isSourceRangeCached(const bool omitAssertions) const {
   const bool isCached = cachedSourceRange.hasValue();
   ASTScopeAssert(omitAssertions || isCached ||
-                 ensureNoAncestorsSourceRangeIsCached());
+                     ensureNoAncestorsSourceRangeIsCached(),
+                 "Cached ancestor's range likely is obsolete.");
   return isCached;
 }
 

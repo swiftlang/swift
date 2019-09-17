@@ -94,7 +94,8 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     //    fileScope->dump();
     llvm::errs() << "\n\n";
 
-    ASTScopeAssert(fileScope->crossCheckWithAST());
+    ASTScopeAssert(fileScope->crossCheckWithAST(),
+                   "Tree creation missed some DeclContexts.");
   }
 
   ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
@@ -122,7 +123,8 @@ const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
 bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
   const auto r = getSourceRangeOfThisASTNode();
   (void)r;
-  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
+  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start),
+                 "Range is backwards.");
   return true;
 }
 
@@ -134,12 +136,12 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     SourceManager &sourceMgr;
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode());
+      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
       return sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
                                         loc);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode());
+      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode(), "Bad range.");
       return sourceMgr.isBeforeInBuffer(loc,
                                         scope->getSourceRangeOfScope().End);
     }
@@ -382,7 +384,7 @@ bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
 
 bool MethodBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  ASTScopeAssert(isAMethod(decl));
+  ASTScopeAssert(isAMethod(decl), "Asking for members of a non-method.");
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
   return consumer.consume({decl->getImplicitSelfDecl()},
@@ -391,7 +393,9 @@ bool MethodBodyScope::lookupLocalsOrMembers(
 
 bool PureFunctionBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  ASTScopeAssert(!isAMethod(decl));
+  ASTScopeAssert(
+      !isAMethod(decl),
+      "Should have called lookupLocalsOrMembers instead of this function.");
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
 

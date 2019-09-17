@@ -40,9 +40,6 @@
 
 /// In case there's a bug in the ASTScope lookup system, suggest that the user
 /// try disabling it.
-#define ASTScopeAssert(predicate)                                              \
-  assert((predicate) && "Try compiling with '-disable-astScope-lookup'."))
-
 /// \p message must be a string literal
 #define ASTScopeAssert(predicate, message)                                     \
   assert((predicate) && message                                                \
@@ -175,7 +172,7 @@ public:
   void *operator new(size_t bytes, const ASTContext &ctx,
                      unsigned alignment = alignof(ASTScopeImpl));
   void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem);
+    ASTScopeAssert(Mem, "Allocation failed");
     return Mem;
   }
 
@@ -565,7 +562,7 @@ public:
   void *operator new(size_t bytes, const ASTContext &ctx,
                      unsigned alignment = alignof(ASTScopeImpl));
   void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem);
+    ASTScopeAssert(Mem, "Allocation failed");
     return Mem;
   }
 
@@ -1093,7 +1090,8 @@ public:
 
   AttachedPropertyWrapperScope(VarDecl *e)
       : decl(e), sourceRangeWhenCreated(getSourceRangeOfVarDecl(e)) {
-    ASTScopeAssert(sourceRangeWhenCreated.isValid());
+    ASTScopeAssert(sourceRangeWhenCreated.isValid(),
+                   "VarDecls must have ranges to be looked-up");
   }
   virtual ~AttachedPropertyWrapperScope() {}
 

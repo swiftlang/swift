@@ -734,7 +734,7 @@ public:
   void *operator new(size_t bytes, const ASTContext &ctx,
                      unsigned alignment = alignof(ScopeCreator));
   void *operator new(size_t Bytes, void *Mem) {
-    ASTScopeAssert(Mem);
+    ASTScopeAssert(Mem, "Allocation failed");
     return Mem;
   }
 };
@@ -763,8 +763,8 @@ void ASTSourceFileScope::buildScopeTreeEagerly() {
 }
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
-  ASTScopeAssert(false && SF && scopeCreator);
-  ASTScope_unreachable("gazorp");
+  ASTScopeAssert(SF && scopeCreator,
+                 "Must already have a SourceFile and a ScopeCreator.");
   ArrayRef<Decl *> decls = SF->Decls;
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
@@ -1092,10 +1092,13 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
     ASTScopeAssert(!insertionPointForDeferredExpansion() ||
                        insertionPointForDeferredExpansion().get() ==
                            insertionPoint,
-                   "");
+                   "In order for lookups into lazily-expanded scopes to be "
+                   "accurate before expansion, the insertion point before "
+                   "expansion must be the same as after expansion.");
   }
   beCurrent();
-  ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()));
+  ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()),
+                 "Bad range.");
   return insertionPoint;
 }
 
@@ -1490,7 +1493,8 @@ void DefaultArgumentInitializerScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
   auto *initExpr = decl->getDefaultValue();
-  ASTScopeAssert(initExpr);
+  ASTScopeAssert(initExpr,
+                 "Default argument initializer must have an initializer.");
   scopeCreator.addToScopeTree(initExpr, this);
 }
 
@@ -1655,7 +1659,8 @@ bool ASTScopeImpl::isATypeDeclScope() const {
 void ScopeCreator::forEachClosureIn(
     Expr *expr, function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
                     foundClosure) {
-  ASTScopeAssert(expr);
+  ASTScopeAssert(expr,
+                 "If looking for closures, must have an expression to search.");
 
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {
@@ -1872,7 +1877,8 @@ bool PatternEntryDeclScope::isCurrent() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
     return false;
   if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
-    ASTScopeAssert(varCountWhenLastExpanded == countVars(getPatternEntry()));
+    ASTScopeAssert(varCountWhenLastExpanded == countVars(getPatternEntry()),
+                   "Vars were not supposed to be added to a pattern entry.");
     return true;
   }
   return countVars(getPatternEntry()) == varCountWhenLastExpanded;
