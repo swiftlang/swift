@@ -131,6 +131,10 @@ Verbose("v", llvm::cl::desc("Verbose"),
         llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+DebugMapping("debug-mapping", llvm::cl::desc("Dumping information for debug purposes"),
+             llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
 Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false),
     llvm::cl::cat(Category));
 
@@ -1090,7 +1094,7 @@ public:
     ProtocolReqWhitelist(std::move(prWhitelist)) {}
 
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
-    if (options::Verbose)
+    if (options::DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
     case NodeMatchReason::Added:
