@@ -192,6 +192,7 @@ func r22459135() {
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
 _ = [] as Set  // expected-error {{protocol type 'Any' cannot conform to 'Hashable'; only struct/enum/class types can conform to protocols}}
+// expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
 
 
 //<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness

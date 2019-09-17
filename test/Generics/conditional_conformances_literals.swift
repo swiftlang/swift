@@ -16,6 +16,7 @@ extension Array: Conforms where Element: Conforms {}
 // expected-note@-1 5 {{requirement from conditional conformance of '[Fails]' to 'Conforms'}}
 extension Dictionary: Conforms where Value: Conforms {}
 // expected-note@-1 3 {{requirement from conditional conformance of '[Int : Fails]' to 'Conforms'}}
+// expected-note@-2 2 {{requirement from conditional conformance of '[Int : Conforms]' to 'Conforms'}}
 
 let works = Works()
 let fails = Fails()

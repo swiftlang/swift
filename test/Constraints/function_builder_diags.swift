@@ -144,7 +144,7 @@ struct TupleP<U> : P {
 
 @_functionBuilder
 struct Builder {
-  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1)
+  static func buildBlock<S0, S1>(_ stmt1: S0, _ stmt2: S1) // expected-note {{required by static method 'buildBlock' where 'S1' = 'Label<Any>.Type'}}
            -> TupleP<(S0, S1)> where S0: P, S1: P {
     return TupleP((stmt1, stmt2))
   }

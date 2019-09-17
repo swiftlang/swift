@@ -300,6 +300,7 @@ func dependentMemberTypes<T : BaseIntAndP2>(
 
 func conformsToAnyObject<T : AnyObject>(_: T) {}
 func conformsToP1<T : P1>(_: T) {}
+// expected-note@-1 {{required by global function 'conformsToP1' where 'T' = 'P1'}}
 func conformsToP2<T : P2>(_: T) {}
 func conformsToBaseIntAndP2<T : Base<Int> & P2>(_: T) {}
 // expected-note@-1 {{where 'T' = 'FakeDerived'}}

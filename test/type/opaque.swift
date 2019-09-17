@@ -376,8 +376,9 @@ protocol P_51641323 {
 
 func rdar_51641323() {
   struct Foo: P_51641323 {
-    var foo: some P_51641323 { {} }
-    // expected-error@-1 {{type '() -> ()' cannot conform to 'P_51641323'; only struct/enum/class types can conform to protocols}}
+    var foo: some P_51641323 { // expected-note {{required by opaque return type of property 'foo'}}
+      {} // expected-error {{type '() -> ()' cannot conform to 'P_51641323'; only struct/enum/class types can conform to protocols}}
+    }
   }
 }
 

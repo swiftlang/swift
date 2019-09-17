@@ -597,17 +597,54 @@ bool MissingConformanceFailure::diagnoseAsError() {
 
 bool MissingConformanceFailure::diagnoseTypeCannotConform(Expr *anchor,
     Type nonConformingType, Type protocolType) const {
-  if (nonConformingType->is<AnyFunctionType>() ||
+  if (!(nonConformingType->is<AnyFunctionType>() ||
       nonConformingType->is<TupleType>() ||
       nonConformingType->isExistentialType() ||
-      nonConformingType->is<AnyMetatypeType>()) {
-    emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
-                   nonConformingType->isExistentialType(), nonConformingType,
-                   protocolType);
+      nonConformingType->is<AnyMetatypeType>())) {
+    return false;
+  }
+
+  emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                 nonConformingType->isExistentialType(), nonConformingType,
+                 protocolType);
+
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
+    auto *namingDecl = OTD->getNamingDecl();
+    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+      emitDiagnostic(repr->getLoc(), diag::required_by_opaque_return,
+                     namingDecl->getDescriptiveKind(), namingDecl->getFullName())
+          .highlight(repr->getSourceRange());
+    }
     return true;
   }
 
-  return false;
+  auto &req = getRequirement();
+  auto *reqDC = getRequirementDC();
+  auto *genericCtx = getGenericContext();
+  auto noteLocation = reqDC->getAsDecl()->getLoc();
+
+  if (!noteLocation.isValid())
+    noteLocation = anchor->getLoc();
+
+  if (isConditional()) {
+    emitDiagnostic(noteLocation, diag::requirement_implied_by_conditional_conformance,
+                   resolveType(Conformance->getType()),
+                   Conformance->getProtocol()->getDeclaredInterfaceType());
+  } else if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
+                                     isStaticOrInstanceMember(AffectedDecl))) {
+    emitDiagnostic(noteLocation, diag::required_by_decl_ref,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(),
+                   reqDC->getSelfNominalTypeDecl()->getDeclaredType(),
+                   req.getFirstType(), nonConformingType);
+  } else {
+    emitDiagnostic(noteLocation, diag::required_by_decl,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), req.getFirstType(),
+                   nonConformingType);
+  }
+
+  return true;
 }
 
 Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(

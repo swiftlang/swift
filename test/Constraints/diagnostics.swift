@@ -28,6 +28,9 @@ func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 func f4(_ x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
+// expected-note@-1 {{required by global function 'f5' where 'T' = '(Int) -> Int'}}
+// expected-note@-2 {{required by global function 'f5' where 'T' = '(Int, String)'}}
+// expected-note@-3 {{required by global function 'f5' where 'T' = 'Int.Type'}}
 
 func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
@@ -96,6 +99,7 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
+// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }

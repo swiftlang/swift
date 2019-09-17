@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift
 
 func wantsError<T: Error>(_: T) {}
+// expected-note@-1 {{required by global function 'wantsError' where 'T' = 'ErrorRefinement'}}
+// expected-note@-2 {{required by global function 'wantsError' where 'T' = 'Error & OtherProtocol'}}
+// expected-note@-3 {{required by global function 'wantsError' where 'T' = 'C & Error'}}
 
 func testSimple(error: Error) {
   wantsError(error)

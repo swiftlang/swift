@@ -9,7 +9,10 @@ protocol CP : class { }
 }
 
 func fP<T : P>(_ t: T) { }
+// expected-note@-1 {{required by global function 'fP' where 'T' = 'P'}}
+// expected-note@-2 {{required by global function 'fP' where 'T' = 'OP & P'}}
 func fOP<T : OP>(_ t: T) { }
+// expected-note@-1 {{required by global function 'fOP' where 'T' = 'OP & P'}}
 func fOPE(_ t: OP) { }
 func fSP<T : SP>(_ t: T) { }
 func fAO<T : AnyObject>(_ t: T) { }
@@ -73,6 +76,7 @@ protocol Mine {}
 class M1: Mine {}
 class M2: Mine {}
 extension Collection where Iterator.Element : Mine {
+// expected-note@-1 {{required by referencing instance method 'takeAll()' on 'Collection'}}
     func takeAll() {}
 }
 

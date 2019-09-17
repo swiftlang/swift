@@ -221,6 +221,7 @@ func rdar46459603() {
   // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
   _ = [arr.values] == [[e]]
   // expected-error@-1 {{protocol type 'Any' cannot conform to 'Equatable'; only struct/enum/class types can conform to protocols}}
+  // expected-note@-2 {{requirement from conditional conformance of '[Any]' to 'Equatable'}}
 }
 
 // SR-10843
