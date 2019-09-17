@@ -477,18 +477,18 @@ AllowClosureParamDestructuring::create(ConstraintSystem &cs,
 }
 
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
-  MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
-                                  NumSynthesized, getLocator());
+  auto &cs = getConstraintSystem();
+  MissingArgumentsFailure failure(root, cs, NumSynthesized, getLocator());
   return failure.diagnose(asNote);
 }
 
 AddMissingArguments *
-AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
+AddMissingArguments::create(ConstraintSystem &cs,
                             llvm::ArrayRef<Param> synthesizedArgs,
                             ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
-  return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
+  return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
 }
 
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
