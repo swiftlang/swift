@@ -441,9 +441,13 @@ public:
     return path[0].castTo<T>();
   }
 
-  /// Check whether the last element in the path of this locator
-  /// is of a given kind.
-  bool isLastElement(ConstraintLocator::PathElementKind kind) const;
+  /// Check whether the last element in the path of this locator (if any)
+  /// is a given \c LocatorPathElt subclass.
+  template <class T>
+  bool isLastElement() const {
+    auto path = getPath();
+    return !path.empty() && path.back().is<T>();
+  }
 
   /// Attempts to cast the last path element of the locator to a specific
   /// \c LocatorPathElt subclass, returning \c None if either unsuccessful or

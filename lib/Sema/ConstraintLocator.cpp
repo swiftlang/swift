@@ -175,22 +175,16 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
-bool ConstraintLocator::isLastElement(
-    ConstraintLocator::PathElementKind expectedKind) const {
-  auto path = getPath();
-  return !path.empty() && path.back().getKind() == expectedKind;
-}
-
 bool ConstraintLocator::isForGenericParameter() const {
-  return isLastElement(ConstraintLocator::GenericParameter);
+  return isLastElement<LocatorPathElt::GenericParameter>();
 }
 
 bool ConstraintLocator::isForSequenceElementType() const {
-  return isLastElement(ConstraintLocator::SequenceElementType);
+  return isLastElement<LocatorPathElt::SequenceElementType>();
 }
 
 bool ConstraintLocator::isForContextualType() const {
-  return isLastElement(ConstraintLocator::ContextualType);
+  return isLastElement<LocatorPathElt::ContextualType>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
