@@ -48,6 +48,9 @@
   assert((predicate) && message                                                \
          " Try compiling with '-disable-astScope-lookup'.")
 
+#define ASTScope_unreachable(message)                                          \
+  llvm_unreachable(message " Try compiling with '-disable-astScope-lookup'.")
+
 namespace swift {
 
 #pragma mark Forward-references

@@ -335,7 +335,7 @@ public:
                                                          Args... args) {
     if (auto s = ifUniqueConstructExpandAndInsert<Scope>(parent, args...))
       return s.get();
-    llvm_unreachable("Scope should have been unique");
+    ASTScope_unreachable("Scope should have been unique");
   }
 
 private:
@@ -578,13 +578,13 @@ private:
         dumpPBD(pbd, "prev");
       if (auto *pbd = dyn_cast<PatternBindingDecl>(d)) {
         dumpPBD(pbd, "curr");
-        llvm_unreachable("found colliding pattern binding decls");
+        ASTScope_unreachable("found colliding pattern binding decls");
       }
       llvm::errs() << "Two same kind decls at same loc: \n";
       lastD->dump(llvm::errs());
       llvm::errs() << "and\n";
       d->dump(llvm::errs());
-      llvm_unreachable("Two same kind decls; unexpected kinds");
+      ASTScope_unreachable("Two same kind decls; unexpected kinds");
     }
   }
 
@@ -764,6 +764,7 @@ void ASTSourceFileScope::buildScopeTreeEagerly() {
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
   ASTScopeAssert(false && SF && scopeCreator);
+  ASTScope_unreachable("gazorp");
   ArrayRef<Decl *> decls = SF->Decls;
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
@@ -899,7 +900,7 @@ public:
 #pragma mark special-case creation
 
   ASTScopeImpl *visitSourceFile(SourceFile *, ASTScopeImpl *, ScopeCreator &) {
-    llvm_unreachable("SourceFiles are orphans.");
+    ASTScope_unreachable("SourceFiles are orphans.");
   }
 
   NullablePtr<ASTScopeImpl> visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p,
@@ -977,8 +978,9 @@ public:
   NullablePtr<ASTScopeImpl> visitIfConfigDecl(IfConfigDecl *icd,
                                               ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
-    llvm_unreachable("Should be handled inside of "
-                     "expandIfConfigClausesThenCullAndSortElementsOrMembers");
+    ASTScope_unreachable(
+        "Should be handled inside of "
+        "expandIfConfigClausesThenCullAndSortElementsOrMembers");
   }
 
   NullablePtr<ASTScopeImpl> visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -1234,7 +1236,7 @@ ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
     return {ccPatternUseScope,
             "Succeeding code must be in scope of conditional variables"};
   }
-  llvm_unreachable("Unhandled StmtConditionKind in switch");
+  ASTScope_unreachable("Unhandled StmtConditionKind in switch");
 }
 
 AnnotatedInsertionPoint
@@ -1293,7 +1295,7 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
 void ASTSourceFileScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  llvm_unreachable("expanded by addNewDeclsToScopeTree()");
+  ASTScope_unreachable("expanded by addNewDeclsToScopeTree()");
 }
 
 // Create child scopes for every declaration in a body.

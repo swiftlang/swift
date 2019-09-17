@@ -168,7 +168,7 @@ bool ASTScopeImpl::doesContextMatchStartingContext(
   if (auto p = getParent())
     return p.get()->doesContextMatchStartingContext(context);
   // Topmost scope always has a context, the SourceFile.
-  llvm_unreachable("topmost scope always has a context, the SourceFile");
+  ASTScope_unreachable("topmost scope always has a context, the SourceFile");
 }
 
 // For a SubscriptDecl with generic parameters, the call tries to do lookups
@@ -631,7 +631,7 @@ Optional<bool> GenericParamScope::resolveIsCascadingUseForThisScope(
     Optional<bool> isCascadingUse) const {
   if (auto *dc = getDeclContext().getPtrOrNull())
     return ifUnknownIsCascadingUseAccordingTo(isCascadingUse, dc);
-  llvm_unreachable("generic what?");
+  ASTScope_unreachable("generic what?");
 }
 
 Optional<bool> AbstractFunctionDeclScope::resolveIsCascadingUseForThisScope(

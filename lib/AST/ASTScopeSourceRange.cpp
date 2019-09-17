@@ -145,7 +145,7 @@ bool ASTScopeImpl::verifyThatThisNodeComeAfterItsPriorSibling() const {
   //                      .getRangeForBuffer(
   //                          getSourceFile()->getBufferID().getValue())
   //                      .str();
-  llvm_unreachable("unexpected out-of-order nodes");
+  ASTScope_unreachable("unexpected out-of-order nodes");
   return false;
 }
 
@@ -315,7 +315,7 @@ SourceRange IterableTypeBodyPortion::getChildlessSourceRangeOf(
     return e->getBraces();
   if (omitAssertions)
     return SourceRange();
-  llvm_unreachable("No body!");
+  ASTScope_unreachable("No body!");
 }
 
 SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
@@ -470,7 +470,7 @@ bool ASTScopeImpl::ensureNoAncestorsSourceRangeIsCached() const {
     auto r = !p->isSourceRangeCached(true) &&
              p->ensureNoAncestorsSourceRangeIsCached();
     if (!r)
-      llvm_unreachable("found a violation");
+      ASTScope_unreachable("found a violation");
     return true;
   }
   return true;
