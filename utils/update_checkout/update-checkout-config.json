@@ -77,7 +77,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "clang-tools-extra": "stable",
                 "libcxx": "stable",
                 "indexstore-db": "master",
@@ -102,7 +102,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -129,7 +129,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "clang-tools-extra": "upstream-with-swift",
                 "libcxx": "upstream-with-swift",
                 "indexstore-db": "master",
@@ -153,7 +153,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -425,7 +425,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "clang-tools-extra": "apple/stable/20190619",
                 "libcxx": "apple/stable/20190619",
                 "indexstore-db": "master",
