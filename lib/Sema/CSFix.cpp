@@ -478,7 +478,8 @@ AllowClosureParamDestructuring::create(ConstraintSystem &cs,
 
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
-  MissingArgumentsFailure failure(root, cs, NumSynthesized, getLocator());
+  MissingArgumentsFailure failure(root, cs, getSynthesizedArguments(),
+                                  getLocator());
   return failure.diagnose(asNote);
 }
 

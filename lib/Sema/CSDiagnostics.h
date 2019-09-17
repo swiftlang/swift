@@ -1186,12 +1186,14 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  unsigned NumSynthesized;
+  SmallVector<Param, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          unsigned numSynthesized, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), NumSynthesized(numSynthesized) {}
+                          ArrayRef<Param> synthesizedArgs,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {}
 
   bool diagnoseAsError() override;
 

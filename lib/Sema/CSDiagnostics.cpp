@@ -3598,14 +3598,15 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   if (!funcType)
     return false;
 
-  auto diff = funcType->getNumParams() - NumSynthesized;
+  unsigned numSynthesized = SynthesizedArgs.size();
+  auto diff = funcType->getNumParams() - numSynthesized;
 
   // If the closure didn't specify any arguments and it is in a context that
   // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
   if (diff == 0) {
     auto diag =
         emitDiagnostic(closure->getStartLoc(),
-                       diag::closure_argument_list_missing, NumSynthesized);
+                       diag::closure_argument_list_missing, numSynthesized);
 
     std::string fixText; // Let's provide fixits for up to 10 args.
     if (funcType->getNumParams() <= 10) {
@@ -3649,9 +3650,9 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     llvm::raw_svector_ostream OS(fixIt);
 
     OS << ",";
-    for (unsigned i = 0; i != NumSynthesized; ++i) {
+    for (unsigned i = 0; i != numSynthesized; ++i) {
       OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
-      OS << ((i == NumSynthesized - 1) ? " " : ",");
+      OS << ((i == numSynthesized - 1) ? " " : ",");
     }
 
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
