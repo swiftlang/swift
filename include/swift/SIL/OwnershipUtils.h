@@ -127,27 +127,50 @@ private:
   }
 };
 
-/// Returns true if:
+/// A class used to validate linear lifetime with respect to an SSA-like
+/// definition.
 ///
-/// 1. No consuming uses are reachable from any other consuming use, from any
-/// non-consuming uses, or from the producer instruction.
-/// 2. The consuming use set jointly post dominates producers and all non
-/// consuming uses.
+/// This class is able to both validate that a linear lifetime has been properly
+/// constructed (for verification and safety purposes) as well as return to the
+/// caller upon failure, what the failure was. In certain cases (for instance if
+/// there exists a path without a non-consuming use), the class will report back
+/// the specific insertion points needed to insert these compensating releases.
 ///
-/// \p value The value whose lifetime we are checking.
-/// \p consumingUses the array of users that destroy or consume a value.
-/// \p nonConsumingUses regular uses
-/// \p deadEndBlocks a cache for the dead end block computation
-/// \p errorBehavior If we detect an error, should we return false or hard
-/// error.
-/// \p leakingBlocks If non-null a list of blocks where the value was detected
-/// to leak. Can be used to insert missing destroys.
-LinearLifetimeError valueHasLinearLifetime(
-    SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
-    ArrayRef<BranchPropagatedUser> nonConsumingUses,
-    SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
-    DeadEndBlocks &deadEndBlocks, ownership::ErrorBehaviorKind errorBehavior,
-    SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
+/// DISCUSSION: A linear lifetime consists of a starting block or instruction
+/// and a list of non-consuming uses and a set of consuming uses. The consuming
+/// uses must not be reachable from each other and jointly post-dominate all
+/// consuming uses as well as the defining block/instruction.
+class LinearLifetimeChecker {
+  SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
+  DeadEndBlocks &deadEndBlocks;
+
+public:
+  LinearLifetimeChecker(SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks,
+                        DeadEndBlocks &deadEndBlocks)
+      : visitedBlocks(visitedBlocks), deadEndBlocks(deadEndBlocks) {}
+
+  /// Returns true if:
+  ///
+  /// 1. No consuming uses are reachable from any other consuming use, from any
+  /// non-consuming uses, or from the producer instruction.
+  /// 2. The consuming use set jointly post dominates producers and all non
+  /// consuming uses.
+  ///
+  /// Returns false otherwise.
+  ///
+  /// \p value The value whose lifetime we are checking.
+  /// \p consumingUses the array of users that destroy or consume a value.
+  /// \p nonConsumingUses regular uses
+  /// \p errorBehavior If we detect an error, should we return false or hard
+  /// error.
+  /// \p leakingBlocks If non-null a list of blocks where the value was detected
+  /// to leak. Can be used to insert missing destroys.
+  LinearLifetimeError
+  checkValue(SILValue value, ArrayRef<BranchPropagatedUser> consumingUses,
+             ArrayRef<BranchPropagatedUser> nonConsumingUses,
+             ownership::ErrorBehaviorKind errorBehavior,
+             SmallVectorImpl<SILBasicBlock *> *leakingBlocks = nullptr);
+};
 
 /// Returns true if v is an address or trivial.
 bool isValueAddressOrTrivial(SILValue v);

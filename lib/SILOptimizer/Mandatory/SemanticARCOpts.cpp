@@ -671,11 +671,10 @@ public:
     }
     
     SmallPtrSet<SILBasicBlock *, 4> visitedBlocks;
-    
-    auto result = valueHasLinearLifetime(baseObject, baseEndBorrows,
-                                   valueDestroys, visitedBlocks,
-                                   ARCOpt.getDeadEndBlocks(),
-                                   ownership::ErrorBehaviorKind::ReturnFalse);
+
+    LinearLifetimeChecker checker(visitedBlocks, ARCOpt.getDeadEndBlocks());
+    auto result = checker.checkValue(baseObject, baseEndBorrows, valueDestroys,
+                                     ownership::ErrorBehaviorKind::ReturnFalse);
     return answer(result.getFoundError());
   }
   
