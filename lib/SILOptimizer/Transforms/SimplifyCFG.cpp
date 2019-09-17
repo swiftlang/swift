@@ -209,6 +209,79 @@ static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
   return false;
 }
 
+// Populate 'projections' with the chain of address projections leading
+// to and including 'inst'.
+//
+// Populate 'inBlockDefs' with all the non-address value definitions in
+// the block that will be used outside this block after projection sinking.
+//
+// Return true on success, even if projections is empty.
+bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
+  projections.clear();
+  inBlockDefs.clear();
+
+  SILBasicBlock *bb = inst->getParent();
+  auto pushOperandVal = [&](SILValue def) {
+    if (def->getParentBlock() != bb)
+      return true;
+
+    if (!def->getType().isAddress()) {
+      inBlockDefs.insert(def);
+      return true;
+    }
+    if (auto *addressProj = dyn_cast<SingleValueInstruction>(def)) {
+      if (addressProj->isTriviallyDuplicatable()) {
+        projections.push_back(addressProj);
+        return true;
+      }
+    }
+    // Can't handle a multi-value or unclonable address producer.
+    return false;
+  };
+  // Check the given instruction for any address-type results.
+  for (auto result : inst->getResults()) {
+    if (!isUsedOutsideOfBlock(result, bb))
+      continue;
+    if (!pushOperandVal(result))
+      return false;
+  }
+  // Recurse upward through address projections.
+  for (unsigned idx = 0; idx < projections.size(); ++idx) {
+    // Only one address result/operand can be handled per instruction.
+    if (projections.size() != idx + 1)
+      return false;
+
+    for (SILValue operandVal : projections[idx]->getOperandValues())
+      pushOperandVal(operandVal);
+  }
+  return true;
+}
+
+// Clone the projections gathered by 'analyzeAddressProjections' at
+// their use site outside this block.
+bool SinkAddressProjections::cloneProjections() {
+  if (projections.empty())
+    return false;
+
+  SILBasicBlock *bb = projections.front()->getParent();
+  SmallVector<Operand *, 4> usesToReplace;
+  // Clone projections in last-to-first order.
+  for (unsigned idx = 0; idx < projections.size(); ++idx) {
+    auto *oldProj = projections[idx];
+    assert(oldProj->getParent() == bb);
+    usesToReplace.clear();
+    for (Operand *use : oldProj->getUses()) {
+      if (use->getUser()->getParent() != bb)
+        usesToReplace.push_back(use);
+    }
+    for (Operand *use : usesToReplace) {
+      auto *newProj = oldProj->clone(use->getUser());
+      use->set(cast<SingleValueInstruction>(newProj));
+    }
+  }
+  return true;
+}
+
 /// Helper function to perform SSA updates in case of jump threading.
 void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
                                   SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
@@ -1024,20 +1097,31 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
   // If it looks potentially interesting, decide whether we *can* do the
   // operation and whether the block is small enough to be worth duplicating.
   int copyCosts = 0;
-  for (auto &Inst : *DestBB) {
-    copyCosts += getThreadingCost(&Inst);
+  SinkAddressProjections sinkProj;
+  for (auto ii = DestBB->begin(), ie = DestBB->end(); ii != ie;) {
+    copyCosts += getThreadingCost(&*ii);
     if (ThreadingBudget <= copyCosts)
       return false;
 
-    // We need to update ssa if a value is used outside the duplicated block.
-    if (!NeedToUpdateSSA) {
-      for (auto result : Inst.getResults()) {
-        if (isUsedOutsideOfBlock(result, DestBB)) {
-          NeedToUpdateSSA = true;
-          break;
-        }
-      }
-    }
+    // If this is an address projection with outside uses, sink it before
+    // checking for SSA update.
+    if (!sinkProj.analyzeAddressProjections(&*ii))
+      return false;
+
+    sinkProj.cloneProjections();
+    // After cloning check if any of the non-address defs in the cloned block
+    // (including the current instruction) now have uses outside the
+    // block. Do this even if nothing was cloned.
+    if (!sinkProj.getInBlockDefs().empty())
+      NeedToUpdateSSA = true;
+
+    auto nextII = std::next(ii);
+    recursivelyDeleteTriviallyDeadInstructions(
+        &*ii, false, [&nextII](SILInstruction *deadInst) {
+          if (deadInst->getIterator() == nextII)
+            ++nextII;
+        });
+    ii = nextII;
   }
 
   // Don't jump thread through a potential header - this can produce irreducible
