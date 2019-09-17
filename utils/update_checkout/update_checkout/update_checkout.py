@@ -425,6 +425,28 @@ def symlink_llvm_monorepo(args):
             os.symlink(src_path, dst_path)
 
 
+def load_update_config_json_from_buffer(buf):
+    '''
+    >>> load_update_config_json_from_buffer('{"a":1, "a":1}')
+    Traceback (most recent call last):
+        ...
+    ValueError: duplicate key: u'a'
+    >>> load_update_config_json_from_buffer('{"a":1}')
+    {u'a': 1}
+    '''
+    def dict_raise_on_duplicates(ordered_pairs):
+        """Reject duplicate keys."""
+        d = {}
+        for (k, v) in ordered_pairs:
+            if k in d:
+                raise ValueError("duplicate key: %r" % (k,))
+            else:
+                d[k] = v
+        return d
+
+    return json.loads(buf, object_pairs_hook=dict_raise_on_duplicates)
+
+
 def main():
     freeze_support()
     parser = argparse.ArgumentParser(
@@ -531,7 +553,7 @@ By default, updates your checkouts of Swift, SourceKit, LLDB, and SwiftPM.""")
     github_comment = args.github_comment
 
     with open(args.config) as f:
-        config = json.load(f)
+        config = load_update_config_json_from_buffer(f.read())
     validate_config(config)
 
     if args.dump_hashes:
