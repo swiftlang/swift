@@ -598,7 +598,9 @@ bool MissingConformanceFailure::diagnoseAsError() {
     return true;
   }
 
-  if (diagnoseTypeCannotConform(anchor, nonConformingType, protocolType)) {
+  if (diagnoseTypeCannotConform((atParameterPos ?
+                                getArgumentAt(Apply, *atParameterPos) : anchor),
+                                nonConformingType, protocolType)) {
       return true;
   }
 
