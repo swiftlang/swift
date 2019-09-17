@@ -921,27 +921,32 @@ namespace {
             return {};
           }
           if (nsObjectTy && importedType->isEqual(nsObjectTy)) {
-            SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
-              type->qual_begin(), type->qual_end()
-            };
-            auto *nsObjectProto =
-                Impl.getNSObjectProtocolType()->getAnyNominal();
-            if (!nsObjectProto) {
-              // Input is malformed
-              return {};
-            }
-            auto *clangProto =
-                cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
-            protocols.push_back(
-                const_cast<clang::ObjCProtocolDecl *>(clangProto));
+            // Skip if there is no NSObject protocol.
+            auto nsObjectProtoType =
+                Impl.getNSObjectProtocolType();
+            if (nsObjectProtoType) {
+              auto *nsObjectProto = nsObjectProtoType->getAnyNominal();
+              if (!nsObjectProto) {
+                // Input is malformed
+                return {};
+              }
 
-            clang::ASTContext &clangCtx = Impl.getClangASTContext();
-            clang::QualType protosOnlyType =
-                clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
-                                           /*type args*/{},
-                                           protocols,
-                                           /*kindof*/false);
-            return Visit(clangCtx.getObjCObjectPointerType(protosOnlyType));
+              SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
+                type->qual_begin(), type->qual_end()
+              };
+              auto *clangProto =
+                  cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
+              protocols.push_back(
+                  const_cast<clang::ObjCProtocolDecl *>(clangProto));
+
+              clang::ASTContext &clangCtx = Impl.getClangASTContext();
+              clang::QualType protosOnlyType =
+                  clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
+                                             /*type args*/{},
+                                             protocols,
+                                             /*kindof*/false);
+              return Visit(clangCtx.getObjCObjectPointerType(protosOnlyType));
+            }
           }
         }
 
