@@ -780,9 +780,8 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
-    auto error =
-        valueHasLinearLifetime(cvi, {svi}, {}, visitedBlocks, deadEndBlocks,
-                               errorKind, &leakingBlocks);
+    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+    auto error = checker.checkValue(cvi, {svi}, {}, errorKind, &leakingBlocks);
     if (!error.getFoundError())
       continue;
 

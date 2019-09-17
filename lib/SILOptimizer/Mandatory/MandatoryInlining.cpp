@@ -150,9 +150,9 @@ static void fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      auto error =
-          valueHasLinearLifetime(pai, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -201,9 +201,9 @@ static void fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      auto error =
-          valueHasLinearLifetime(pai, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -240,9 +240,9 @@ static void fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      auto error =
-          valueHasLinearLifetime(pai, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
