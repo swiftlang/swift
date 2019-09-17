@@ -207,7 +207,5 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
       [&scratchSpace](SILInstruction *i) { scratchSpace.emplace_back(i); });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-  auto result = checker.checkValue(value, scratchSpace, instructions,
-                                   ownership::ErrorBehaviorKind::ReturnFalse);
-  return !result.getFoundError();
+  return checker.validateLifetime(value, scratchSpace, instructions);
 }
