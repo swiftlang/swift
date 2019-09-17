@@ -1013,6 +1013,18 @@ struct Foo<T> { // expected-note {{arguments to generic parameter 'T' ('W' and '
   }
 }
 
+extension Foo : Equatable where T : Equatable {
+  static func == (lhs: Foo, rhs: Foo) -> Bool {
+    lhs.wrappedValue == rhs.wrappedValue
+  }
+}
+
+extension Foo : Hashable where T : Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(wrappedValue)
+  }
+}
+
 @propertyWrapper
 struct Bar<T, V> {
   var wrappedValue: T
@@ -1061,6 +1073,8 @@ struct MissingPropertyWrapperUnwrap {
   func d(_: W) {}
   func e(_: Foo<W>) {}
 
+  subscript<T : Hashable>(takesFoo x: Foo<T>) -> Foo<T> { x }
+
   func baz() {
     self.x.foo() // expected-error {{referencing instance method 'foo()' requires wrapper 'Foo<Int>'}}{{10-10=_}}
     self.x.prop  // expected-error {{referencing property 'prop' requires wrapper 'Foo<Int>'}} {{10-10=_}}
@@ -1094,6 +1108,10 @@ struct MissingPropertyWrapperUnwrap {
 
     self.x[q: "ultimate question", 42] // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
     self.x[q: "ultimate question", 42] = true // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
+
+    // SR-11476
+    _ = \Self.[takesFoo: self.x] // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'Foo<Int>', use wrapper instead}}{{31-31=_}}
+    _ = \Foo<W>.[x: self._x] // expected-error {{cannot convert value '_x' of type 'Foo<Int>' to expected type 'Int', use wrapped value instead}} {{26-27=}}
   }
 }
 
