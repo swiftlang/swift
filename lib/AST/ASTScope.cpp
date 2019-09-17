@@ -178,7 +178,7 @@ NullablePtr<DeclContext> BraceStmtScope::getDeclContext() const {
 NullablePtr<DeclContext>
 DefaultArgumentInitializerScope::getDeclContext() const {
   auto *dc = decl->getDefaultArgumentInitContext();
-  assert(dc && "If scope exists, this must exist");
+  ASTScopeAssert(dc, "If scope exists, this must exist");
   return dc;
 }
 

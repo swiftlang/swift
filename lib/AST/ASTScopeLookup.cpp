@@ -94,10 +94,10 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     //    fileScope->dump();
     llvm::errs() << "\n\n";
 
-    assert(fileScope->crossCheckWithAST());
+    ASTScopeAssert(fileScope->crossCheckWithAST());
   }
 
-  assert(startingScope && "ASTScopeImpl: could not find startingScope");
+  ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
   return startingScope;
 }
 
@@ -122,7 +122,7 @@ const ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
 bool ASTScopeImpl::checkSourceRangeOfThisASTNode() const {
   const auto r = getSourceRangeOfThisASTNode();
   (void)r;
-  assert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
+  ASTScopeAssert(!getSourceManager().isBeforeInBuffer(r.End, r.Start));
   return true;
 }
 
@@ -134,12 +134,12 @@ ASTScopeImpl::findChildContaining(SourceLoc loc,
     SourceManager &sourceMgr;
 
     bool operator()(const ASTScopeImpl *scope, SourceLoc loc) {
-      assert(scope->checkSourceRangeOfThisASTNode());
+      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode());
       return sourceMgr.isBeforeInBuffer(scope->getSourceRangeOfScope().End,
                                         loc);
     }
     bool operator()(SourceLoc loc, const ASTScopeImpl *scope) {
-      assert(scope->checkSourceRangeOfThisASTNode());
+      ASTScopeAssert(scope->checkSourceRangeOfThisASTNode());
       return sourceMgr.isBeforeInBuffer(loc,
                                         scope->getSourceRangeOfScope().End);
     }
@@ -382,7 +382,7 @@ bool AbstractFunctionBodyScope::lookupLocalsOrMembers(
 
 bool MethodBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  assert(isAMethod(decl));
+  ASTScopeAssert(isAMethod(decl));
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
   return consumer.consume({decl->getImplicitSelfDecl()},
@@ -391,7 +391,7 @@ bool MethodBodyScope::lookupLocalsOrMembers(
 
 bool PureFunctionBodyScope::lookupLocalsOrMembers(
     ArrayRef<const ASTScopeImpl *> history, DeclConsumer consumer) const {
-  assert(!isAMethod(decl));
+  ASTScopeAssert(!isAMethod(decl));
   if (AbstractFunctionBodyScope::lookupLocalsOrMembers(history, consumer))
     return true;
 
@@ -490,7 +490,7 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(Pattern *p,
 NullablePtr<DeclContext>
 GenericTypeOrExtensionWhereOrBodyPortion::computeSelfDC(
     ArrayRef<const ASTScopeImpl *> history) {
-  assert(history.size() != 0 && "includes current scope");
+  ASTScopeAssert(history.size() != 0, "includes current scope");
   size_t i = history.size() - 1; // skip last entry (this scope)
   while (i != 0) {
     Optional<NullablePtr<DeclContext>> maybeSelfDC =

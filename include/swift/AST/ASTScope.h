@@ -38,6 +38,16 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 
+/// In case there's a bug in the ASTScope lookup system, suggest that the user
+/// try disabling it.
+#define ASTScopeAssert(predicate)                                              \
+  assert((predicate) && "Try compiling with '-disable-astScope-lookup'."))
+
+/// \p message must be a string literal
+#define ASTScopeAssert(predicate, message)                                     \
+  assert((predicate) && message                                                \
+         " Try compiling with '-disable-astScope-lookup'.")
+
 namespace swift {
 
 #pragma mark Forward-references
@@ -162,7 +172,7 @@ public:
   void *operator new(size_t bytes, const ASTContext &ctx,
                      unsigned alignment = alignof(ASTScopeImpl));
   void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
+    ASTScopeAssert(Mem);
     return Mem;
   }
 
@@ -552,7 +562,7 @@ public:
   void *operator new(size_t bytes, const ASTContext &ctx,
                      unsigned alignment = alignof(ASTScopeImpl));
   void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
+    ASTScopeAssert(Mem);
     return Mem;
   }
 
@@ -1080,7 +1090,7 @@ public:
 
   AttachedPropertyWrapperScope(VarDecl *e)
       : decl(e), sourceRangeWhenCreated(getSourceRangeOfVarDecl(e)) {
-    assert(sourceRangeWhenCreated.isValid());
+    ASTScopeAssert(sourceRangeWhenCreated.isValid());
   }
   virtual ~AttachedPropertyWrapperScope() {}
 

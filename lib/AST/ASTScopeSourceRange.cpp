@@ -52,7 +52,7 @@ SourceRange
 ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
                                           const bool omitAssertions) const {
   if (getChildren().empty()) {
-    assert(omitAssertions || range.Start.isValid());
+    ASTScopeAssert(omitAssertions || range.Start.isValid());
     return range;
   }
   const auto childStart =
@@ -60,7 +60,7 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
   const auto childEnd =
       getChildren().back()->getSourceRangeOfScope(omitAssertions).End;
   auto childRange = SourceRange(childStart, childEnd);
-  assert(omitAssertions || childRange.isValid());
+  ASTScopeAssert(omitAssertions || childRange.isValid());
 
   if (range.isInvalid())
     return childRange;
@@ -70,12 +70,14 @@ ASTScopeImpl::widenSourceRangeForChildren(const SourceRange range,
 }
 
 bool ASTScopeImpl::checkSourceRangeAfterExpansion(const ASTContext &ctx) const {
-  assert((getSourceRangeOfThisASTNode().isValid() || !getChildren().empty()) &&
-         "need to be able to find source range");
-  assert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()) &&
-         "Search will fail");
-  assert(checkLazySourceRange(ctx) &&
-         "Lazy scopes must have compatible ranges before and after expansion");
+  ASTScopeAssert(getSourceRangeOfThisASTNode().isValid() ||
+                     !getChildren().empty(),
+                 "need to be able to find source range");
+  ASTScopeAssert(verifyThatChildrenAreContainedWithin(getSourceRangeOfScope()),
+                 "Search will fail");
+  ASTScopeAssert(
+      checkLazySourceRange(ctx),
+      "Lazy scopes must have compatible ranges before and after expansion");
 
   return true;
 }
@@ -160,7 +162,7 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::getPriorSibling() const {
       break;
     }
   }
-  assert(myIndex != -1 && "I have been disowned!");
+  ASTScopeAssert(myIndex != -1, "I have been disowned!");
   if (myIndex == 0)
     return nullptr;
   return siblingsAndMe[myIndex - 1];
@@ -293,7 +295,7 @@ SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
   auto *d = scope->getDecl();
   auto r = d->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
-    assert(r.End.isValid());
+    ASTScopeAssert(r.End.isValid());
     return r;
   }
   return d->getSourceRange();
@@ -322,7 +324,7 @@ SourceRange AbstractFunctionDeclScope::getSourceRangeOfThisASTNode(
   // them at the start location of the accessor.
   auto r = decl->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
-    assert(r.End.isValid());
+    ASTScopeAssert(r.End.isValid());
     return r;
   }
   return decl->getBodySourceRange();
@@ -334,9 +336,9 @@ SourceRange ParameterListScope::getSourceRangeOfThisASTNode(
       getSourceRangeOfEnclosedParamsOfASTNode(omitAssertions);
   auto r = SourceRange(rangeForGoodInput.Start,
                        fixupEndForBadInput(rangeForGoodInput));
-  assert(getSourceManager().rangeContains(
-             getParent().get()->getSourceRangeOfThisASTNode(true), r) &&
-         "Parameters not within function?!");
+  ASTScopeAssert(getSourceManager().rangeContains(
+                     getParent().get()->getSourceRangeOfThisASTNode(true), r),
+                 "Parameters not within function?!");
   return r;
 }
 
@@ -423,8 +425,8 @@ CaptureListScope::getSourceRangeOfThisASTNode(const bool omitAssertions) const {
 SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   if (!omitAssertions)
-    assert(closureExpr->getInLoc().isValid() &&
-           "We don't create these if no in loc");
+    ASTScopeAssert(closureExpr->getInLoc().isValid(),
+                   "We don't create these if no in loc");
   return SourceRange(getStartOfFirstParam(closureExpr),
                      closureExpr->getInLoc());
 }
@@ -458,7 +460,8 @@ ASTScopeImpl::getSourceRangeOfScope(const bool omitAssertions) const {
 
 bool ASTScopeImpl::isSourceRangeCached(const bool omitAssertions) const {
   const bool isCached = cachedSourceRange.hasValue();
-  assert(omitAssertions || isCached || ensureNoAncestorsSourceRangeIsCached());
+  ASTScopeAssert(omitAssertions || isCached ||
+                 ensureNoAncestorsSourceRangeIsCached());
   return isCached;
 }
 
