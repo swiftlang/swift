@@ -11,15 +11,15 @@ func testSimple(error: Error) {
 
 protocol ErrorRefinement : Error {}
 func testErrorRefinment(error: ErrorRefinement) {
-  wantsError(error) // expected-error {{protocol type 'ErrorRefinement' cannot conform to 'Error'; only struct/enum/class types can conform to protocols}}
+  wantsError(error) // expected-error {{value of protocol type 'ErrorRefinement' cannot conform to 'Error'; only struct/enum/class types can conform to protocols}}
 }
 
 protocol OtherProtocol {}
 func testErrorComposition(error: Error & OtherProtocol) {
-  wantsError(error) // expected-error {{protocol type 'Error & OtherProtocol' cannot conform to 'Error'; only struct/enum/class types can conform to protocols}}
+  wantsError(error) // expected-error {{value of protocol type 'Error & OtherProtocol' cannot conform to 'Error'; only struct/enum/class types can conform to protocols}}
 }
 
 class C {}
 func testErrorCompositionWithClass(error: Error & C) {
-  wantsError(error) // expected-error {{protocol type 'C & Error' cannot conform to 'Error'; only struct/enum/class types can conform to protocols}}
+  wantsError(error) // expected-error {{value of protocol type 'C & Error' cannot conform to 'Error'; only struct/enum/class types can conform to protocols}}
 }

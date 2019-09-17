@@ -1661,7 +1661,7 @@ ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
 ERROR(type_cannot_conform, none,
-      "%select{|protocol }0type %1 cannot conform to %2; "
+      "%select{|value of protocol }0type %1 cannot conform to %2; "
       "only struct/enum/class types can conform to protocols",
       (bool, Type, Type))
 NOTE(required_by_opaque_return,none,
