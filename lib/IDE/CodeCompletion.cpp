@@ -1213,7 +1213,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
-  AssignExpr *AssignmentExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -1367,7 +1366,6 @@ public:
   void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
@@ -4671,13 +4669,6 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E
   this->DotLoc = DotLoc;
 }
 
-void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
-  AssignmentExpr = E;
-  ParsedExpr = E->getDest();
-  CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::AssignmentRHS;
-}
-
 void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
                                                   bool isFirst) {
   CurDeclContext = P.CurDeclContext;
@@ -4906,7 +4897,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addDeclKeywords(Sink);
     addStmtKeywords(Sink, MaybeFuncBody);
     LLVM_FALLTHROUGH;
-  case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
@@ -5371,14 +5361,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                             ContextInfo.isSingleExpressionBody());
     Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
-    break;
-  }
-  case CompletionKind::AssignmentRHS : {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    if (auto destType = ParsedExpr->getType())
-      Lookup.setExpectedTypes(destType->getRValueType(),
-                              /*isSingleExpressionBody*/ false);
-    Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
     break;
   }
   case CompletionKind::CallArg : {

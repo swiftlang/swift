@@ -279,28 +279,6 @@ parse_operator:
       auto *assign = new (Context) AssignExpr(equalsLoc);
       SequencedExprs.push_back(assign);
       Message = diag::expected_expr_assignment;
-      if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion) {
-          auto RHS = new (Context) ErrorExpr(
-            SourceRange(Tok.getRange().getStart(), Tok.getRange().getEnd()));
-          assign->setSrc(RHS);
-          SequencedExprs.pop_back();
-          assign->setDest(SequencedExprs.back());
-          SequencedExprs.pop_back();
-          SequencedExprs.push_back(assign);
-          CodeCompletion->completeAssignmentRHS(assign);
-        }
-        consumeToken();
-        if (!SequencedExprs.empty() && (SequencedExprs.size() & 1) == 0) {
-          // Make sure we have odd number of sequence exprs.
-          SequencedExprs.pop_back();
-        }
-        auto Result = SequencedExprs.size() == 1 ?
-          makeParserResult(SequencedExprs[0]):
-          makeParserResult(SequenceExpr::create(Context, SequencedExprs));
-        Result.setHasCodeCompletion();
-        return Result;
-      }
       break;
     }
         
