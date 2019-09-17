@@ -1959,7 +1959,9 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
 llvm::Expected<SelfAccessKind>
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
-    if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
+    auto functionDC = FD->getDeclContext();
+    if (!FD->isInstanceMember() ||
+        (functionDC->isTypeContext() && !functionDC->hasValueSemantics())) {
       return SelfAccessKind::NonMutating;
     }
     return SelfAccessKind::Mutating;
@@ -1981,7 +1983,9 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-      if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
+      auto accessorDC = AD->getDeclContext();
+      if (AD->isInstanceMember() && accessorDC->isTypeContext() &&
+          accessorDC->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
 

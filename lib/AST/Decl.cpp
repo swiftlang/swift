@@ -5708,8 +5708,9 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
 
+        auto accessorDC = AD->getDeclContext();
         // Do not suggest the fix-it if `Self` is a class type.
-        if (!AD->getDeclContext()->hasValueSemantics()) {
+        if (accessorDC->isTypeContext() && !accessorDC->hasValueSemantics()) {
           return;
         }
       }
