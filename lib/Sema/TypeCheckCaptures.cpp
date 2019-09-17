@@ -624,6 +624,11 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
                                 /*isObjC=*/false);
         E->walk(finder);
 
+        if (finder.getDynamicSelfCaptureLoc().isValid()) {
+          Context.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                                 diag::dynamic_self_default_arg);
+        }
+
         auto captures = finder.getCaptureInfo();
         if (isGeneric)
           captures.setGenericParamCaptures(true);
