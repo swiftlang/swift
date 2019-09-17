@@ -3506,14 +3506,31 @@ bool MissingArgumentsFailure::diagnoseAsError() {
         path.back().getKind() == ConstraintLocator::ContextualType))
     return false;
 
-  if (auto *closure = dyn_cast<ClosureExpr>(getAnchor()))
-    return diagnoseTrailingClosure(closure);
+  auto *anchor = getAnchor();
+  if (auto *captureList = dyn_cast<CaptureListExpr>(anchor))
+    anchor = captureList->getClosureBody();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(anchor))
+    return diagnoseClosure(closure);
 
   return false;
 }
 
-bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
-  auto diff = Fn->getNumParams() - NumSynthesized;
+bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
+  auto &cs = getConstraintSystem();
+  FunctionType *funcType = nullptr;
+
+  auto *locator = getLocator();
+  if (locator->isForContextualType()) {
+    funcType = cs.getContextualType()->getAs<FunctionType>();
+  } else if (auto info = getFunctionArgApplyInfo(locator)) {
+    funcType = info->getParamType()->getAs<FunctionType>();
+  }
+
+  if (!funcType)
+    return false;
+
+  auto diff = funcType->getNumParams() - NumSynthesized;
 
   // If the closure didn't specify any arguments and it is in a context that
   // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
@@ -3523,10 +3540,10 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
                        diag::closure_argument_list_missing, NumSynthesized);
 
     std::string fixText; // Let's provide fixits for up to 10 args.
-    if (Fn->getNumParams() <= 10) {
+    if (funcType->getNumParams() <= 10) {
       fixText += " ";
       interleave(
-          Fn->getParams(),
+          funcType->getParams(),
           [&fixText](const AnyFunctionType::Param &param) { fixText += '_'; },
           [&fixText] { fixText += ','; });
       fixText += " in ";
@@ -3552,9 +3569,9 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
       std::all_of(params->begin(), params->end(),
                   [](ParamDecl *param) { return !param->hasName(); });
 
-  auto diag =
-      emitDiagnostic(params->getStartLoc(), diag::closure_argument_list_tuple,
-                     resolveType(Fn), Fn->getNumParams(), diff, diff == 1);
+  auto diag = emitDiagnostic(
+      params->getStartLoc(), diag::closure_argument_list_tuple,
+      resolveType(funcType), funcType->getNumParams(), diff, diff == 1);
 
   // If the number of parameters is less than number of inferred
   // let's try to suggest a fix-it with the rest of the missing parameters.

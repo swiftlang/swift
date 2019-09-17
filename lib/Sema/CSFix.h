@@ -1001,13 +1001,12 @@ class AddMissingArguments final
 
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
   unsigned NumSynthesized;
 
-  AddMissingArguments(ConstraintSystem &cs, FunctionType *funcType,
-                      llvm::ArrayRef<AnyFunctionType::Param> synthesizedArgs,
+  AddMissingArguments(ConstraintSystem &cs,
+                      llvm::ArrayRef<Param> synthesizedArgs,
                       ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddMissingArguments, locator), Fn(funcType),
+      : ConstraintFix(cs, FixKind::AddMissingArguments, locator),
         NumSynthesized(synthesizedArgs.size()) {
     std::uninitialized_copy(synthesizedArgs.begin(), synthesizedArgs.end(),
                             getSynthesizedArgumentsBuf().begin());
@@ -1022,7 +1021,7 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AddMissingArguments *create(ConstraintSystem &cs, FunctionType *fnType,
+  static AddMissingArguments *create(ConstraintSystem &cs,
                                      llvm::ArrayRef<Param> synthesizedArgs,
                                      ConstraintLocator *locator);
 
