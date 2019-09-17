@@ -2670,7 +2670,7 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
   // Try to get the `TangentVector` type witness, in case the conformance has
   // not been fully checked and the type witness cannot be resolved.
   Type tanType = conf->getTypeWitnessByName(type, ctx.Id_TangentVector);
-  return !tanType.isNull();
+  return !tanType.isNull() && !tanType->hasError();
 };
 
 // SWIFT_ENABLE_TENSORFLOW
