@@ -3509,12 +3509,12 @@ bool MissingArgumentsFailure::diagnoseAsError() {
     anchor = captureList->getClosureBody();
 
   if (auto *closure = dyn_cast<ClosureExpr>(anchor))
-    return diagnoseTrailingClosure(closure);
+    return diagnoseClosure(closure);
 
   return false;
 }
 
-bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
+bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   auto &cs = getConstraintSystem();
   FunctionType *funcType = nullptr;
 

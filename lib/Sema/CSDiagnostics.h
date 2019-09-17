@@ -1192,9 +1192,9 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  /// If missing arguments come from trailing closure,
+  /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
-  bool diagnoseTrailingClosure(ClosureExpr *closure);
+  bool diagnoseClosure(ClosureExpr *closure);
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
