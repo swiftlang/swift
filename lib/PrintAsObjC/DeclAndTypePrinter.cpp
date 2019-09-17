@@ -1388,23 +1388,16 @@ private:
     // upper-bounded keys.
     else if (swiftNominal == ctx.getDictionaryDecl() &&
              isNSObjectOrAnyHashable(ctx, typeArgs[0])) {
-      if (ModuleDecl *M = ctx.getLoadedModule(ctx.Id_Foundation)) {
-        if (!owningPrinter.NSCopyingType) {
-          SmallVector<ValueDecl *, 1> decls;
-          M->lookupQualified(M, ctx.getIdentifier("NSCopying"),
-                             NL_OnlyTypes, decls);
-          if (decls.size() == 1 && isa<ProtocolDecl>(decls[0])) {
-            owningPrinter.NSCopyingType = cast<ProtocolDecl>(decls[0])
-              ->getDeclaredInterfaceType();
-          } else {
-            owningPrinter.NSCopyingType = Type();
-          }
-        }
-        if (*owningPrinter.NSCopyingType) {
-          rewrittenArgsBuf[0] = *owningPrinter.NSCopyingType;
-          rewrittenArgsBuf[1] = typeArgs[1];
-          typeArgs = rewrittenArgsBuf;
-        }
+      if (!owningPrinter.NSCopyingType) {
+        if (auto proto = ctx.getNSCopyingDecl())
+          owningPrinter.NSCopyingType = proto->getDeclaredInterfaceType();
+        else
+          owningPrinter.NSCopyingType = Type();
+      }
+      if (*owningPrinter.NSCopyingType) {
+        rewrittenArgsBuf[0] = *owningPrinter.NSCopyingType;
+        rewrittenArgsBuf[1] = typeArgs[1];
+        typeArgs = rewrittenArgsBuf;
       }
     }
 
