@@ -3504,7 +3504,11 @@ bool MissingArgumentsFailure::diagnoseAsError() {
         path.back().getKind() == ConstraintLocator::ContextualType))
     return false;
 
-  if (auto *closure = dyn_cast<ClosureExpr>(getAnchor()))
+  auto *anchor = getAnchor();
+  if (auto *captureList = dyn_cast<CaptureListExpr>(anchor))
+    anchor = captureList->getClosureBody();
+
+  if (auto *closure = dyn_cast<ClosureExpr>(anchor))
     return diagnoseTrailingClosure(closure);
 
   return false;
