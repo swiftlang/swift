@@ -1646,3 +1646,22 @@ struct UseNonMutatingProjectedValueSet {
     x = 42  // expected-error{{cannot assign to property: 'self' is immutable}}
   }
 }
+
+// SR-11478
+
+@propertyWrapper
+struct SR_11478_W<Value> {
+  var wrappedValue: Value
+}
+
+class SR_11478_C1 {
+  @SR_11478_W static var bool1: Bool = true // Ok
+  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+}
+
+final class SR_11478_C2 {
+  @SR_11478_W static var bool1: Bool = true // Ok
+  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+}
