@@ -1179,16 +1179,26 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   // tuple e.g. `$0.0`.
   Optional<TypeBase *> argumentTuple;
   if (isa<ClosureExpr>(anchor) && isSingleTupleParam(ctx, args)) {
-    auto isParam = [](const Expr *expr) {
-      if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto *decl = DRE->getDecl())
-          return isa<ParamDecl>(decl);
+    auto argType = args.back().getPlainType();
+    // Let's unpack argument tuple into N arguments, this corresponds
+    // to something like `foo { (bar: (Int, Int)) in }` where `foo`
+    // has a single parameter of type `(Int, Int) -> Void`.
+    if (auto *tuple = argType->getAs<TupleType>()) {
+      args.pop_back();
+      for (const auto &elt : tuple->getElements()) {
+        args.push_back(AnyFunctionType::Param(elt.getType(), elt.getName(),
+                                              elt.getParameterFlags()));
       }
-      return false;
-    };
+    } else if (auto *typeVar = argType->getAs<TypeVariableType>()) {
+      auto isParam = [](const Expr *expr) {
+        if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+          if (auto *decl = DRE->getDecl())
+            return isa<ParamDecl>(decl);
+        }
+        return false;
+      };
 
-    const auto &arg = args.back();
-    if (auto *argTy = arg.getPlainType()->getAs<TypeVariableType>()) {
+      // Something like `foo { x in }` or `foo { $0 }`
       anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
           if (!isParam(UDE->getBase()))
@@ -1200,7 +1210,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
               llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
                 return param.getLabel() == name;
               })) {
-            argumentTuple.emplace(argTy);
+            argumentTuple.emplace(typeVar);
             args.pop_back();
             return nullptr;
           }
