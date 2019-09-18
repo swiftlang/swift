@@ -256,17 +256,6 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   return pat;
 }
 
-/// Build a type-checked integer literal.
-static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
-  Type intType = C.getIntDecl()->getDeclaredType();
-
-  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
-  literal->setType(intType);
-  literal->setBuiltinInitializer(C.getIntBuiltinInitDecl(C.getIntDecl()));
-
-  return literal;
-}
-
 /// Returns a generated guard statement that checks whether the given lhs and
 /// rhs expressions are equal. If not equal, the else block for the guard
 /// returns false.

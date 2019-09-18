@@ -32,7 +32,7 @@
 using namespace swift;
 
 // how does this code ever even get invoked? you can’t compare uninhabited enums...
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
   auto parentDC = ltDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
@@ -47,23 +47,29 @@ deriveBodyComparable_enum_uninhabited_lt(AbstractFunctionDecl *ltDecl, void *) {
   SmallVector<ASTNode, 0> cases;
 
   // switch (a, b) { }
-  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true);
-  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true);
+  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  aParam->getType());
+  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  bParam->getType());
+  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
   auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+                                  /*implicit*/ true,
+                                  TupleType::get(abTupleElts, C));
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
                                        SourceLoc(), cases, SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  ltDecl->setBody(body);
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for a '<' operator for an enum that has no associated
 /// values. This generates code that converts each value to its integer ordinal
 /// and compares them, which produces an optimal single icmp instruction.
-static void
+static std::pair<BraceStmt *, bool>
 deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
                                                void *) {
   auto parentDC = ltDecl->getDeclContext();
@@ -105,29 +111,35 @@ deriveBodyComparable_enum_noAssociatedValues_lt(AbstractFunctionDecl *ltDecl,
                                       fnType);
   }
 
+  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true);
+                                         /*Implicit*/ true,
+                                         TupleType::get(abTupleElts, C));
 
-  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true);
+  auto *cmpExpr = new (C) BinaryExpr(
+      cmpFuncExpr, abTuple, /*implicit*/ true,
+      fnType->castTo<FunctionType>()->getResult());
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  ltDecl->setBody(body);
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive an '<' operator implementation for an enum.
 static ValueDecl *
-deriveComparable_lt(DerivedConformance &derived,
-                   void (*bodySynthesizer)(AbstractFunctionDecl *, void *)) {
+deriveComparable_lt(
+    DerivedConformance &derived,
+    std::pair<BraceStmt *, bool> (*bodySynthesizer)(AbstractFunctionDecl *,
+                                                    void *)) {
   ASTContext &C = derived.TC.Context;
 
   auto parentDC = derived.getConformanceContext();
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(VarDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
     param->setInterfaceType(selfIfaceTy);
@@ -161,7 +173,6 @@ deriveComparable_lt(DerivedConformance &derived,
                      parentDC);
   comparableDecl->setImplicit();
   comparableDecl->setUserAccessible(false);
-  comparableDecl->getAttrs().add(new (C) InfixAttr(/*implicit*/false));
 
   // Add the @_implements(Comparable, < (_:_:)) attribute
   if (generatedIdentifier != C.Id_LessThanOperator) {
@@ -178,9 +189,9 @@ deriveComparable_lt(DerivedConformance &derived,
                                                   DeclNameLoc()));
   }
 
-  if (!C.getEqualIntDecl()) {
+  if (!C.getLessThanIntDecl()) {
     derived.TC.diagnose(derived.ConformanceDecl->getLoc(),
-                        diag::no_equal_overload_for_int);
+                        diag::no_less_than_overload_for_int);
     return nullptr;
   }
 
@@ -216,7 +227,6 @@ DerivedConformance::canDeriveComparable(DeclContext *context, NominalTypeDecl *d
 ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
-
   // Build the necessary decl.
   if (requirement->getBaseName() == "<") {
     if (EnumDecl const *const enumeration = dyn_cast<EnumDecl>(this->Nominal)) {
@@ -228,6 +238,6 @@ ValueDecl *DerivedConformance::deriveComparable(ValueDecl *requirement) {
       llvm_unreachable("todo");
     }
   }
-  TC.diagnose(requirement->getLoc(), diag::broken_equatable_requirement);
+  TC.diagnose(requirement->getLoc(), diag::broken_comparable_requirement);
   return nullptr;
 }

@@ -422,6 +422,9 @@ public:
 private:
   /// Set the lazy resolver for this context.
   void setLazyResolver(LazyResolver *resolver);
+  
+  // get `<` or `==`
+  FuncDecl *getBinaryComparisonOperatorIntDecl(StringRef op, FuncDecl **cached) const;
 
 public:
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
@@ -513,7 +516,7 @@ public:
   ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
                                      KnownProtocolKind builtinProtocol,
                 llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
-
+  
   /// Retrieve the declaration of Swift.<(Int, Int) -> Bool.
   FuncDecl *getLessThanIntDecl() const;
 

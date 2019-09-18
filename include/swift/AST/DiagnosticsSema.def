@@ -2543,6 +2543,8 @@ ERROR(broken_case_iterable_requirement,none,
       "CaseIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_raw_representable_requirement,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
+ERROR(broken_comparable_requirement,none,
+      "Comparable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,none,
       "Equatable protocol is broken: unexpected requirement", ())
 ERROR(broken_hashable_requirement,none,
@@ -2555,6 +2557,8 @@ ERROR(broken_int_hashable_conformance,none,
       "Int type is broken: does not conform to Hashable", ())
 ERROR(broken_int_integer_literal_convertible_conformance,none,
       "Int type is broken: does not conform to ExpressibleByIntegerLiteral", ())
+ERROR(no_less_than_overload_for_int,none,
+      "no overload of '<' for Int", ())
 ERROR(no_equal_overload_for_int,none,
       "no overload of '==' for Int", ())
 ERROR(broken_coding_key_requirement,none,
