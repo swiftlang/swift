@@ -1541,8 +1541,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
 
   // C function pointers cannot capture anything from their context.
-  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
-    *constant.getAnyFunctionRef());
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
 
   if (captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||

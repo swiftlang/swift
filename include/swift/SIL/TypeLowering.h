@@ -689,7 +689,7 @@ class TypeConverter {
   
   llvm::DenseMap<OverrideKey, SILConstantInfo *> ConstantOverrideTypes;
 
-  llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
+  llvm::DenseMap<SILDeclRef, CaptureInfo> LoweredCaptures;
 
   /// Cache of loadable SILType to number of (estimated) fields
   ///
@@ -896,11 +896,6 @@ public:
   SILType getEmptyTupleType() {
     return SILType::getPrimitiveObjectType(TupleType::getEmpty(Context));
   }
-  
-  /// Get a function type curried with its capture context.
-  CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
-                                              CanAnyFunctionType funcType,
-                                              AnyFunctionRef closure);
 
   /// Describes what we're trying to compute a bridged type for.
   ///
@@ -972,10 +967,10 @@ public:
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
 
-  /// Get the capture list from a closure, with transitive function captures
-  /// flattened.
-  CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
-  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
+  /// Get the capture list for a function or default argument, with transitive
+  /// function captures flattened.
+  CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
+  bool hasLoweredLocalCaptures(SILDeclRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.

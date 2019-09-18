@@ -67,8 +67,8 @@ func outer<T>(t: T) {
 
   func inner2(x: Int = 0) { _ = T.self }
 
-  // CHECK: [[ARG_GENERATOR:%.*]] = function_ref @$s25default_arguments_generic5outer1tyx_tlF6inner2L_1xySi_tlFfA_ : $@convention(thin) <τ_0_0> () -> Int
-  // CHECK: [[ARG:%.*]] = apply [[ARG_GENERATOR]]<T>() : $@convention(thin) <τ_0_0> () -> Int
+  // CHECK: [[ARG_GENERATOR:%.*]] = function_ref @$s25default_arguments_generic5outer1tyx_tlF6inner2L_1xySi_tlFfA_ : $@convention(thin) () -> Int
+  // CHECK: [[ARG:%.*]] = apply [[ARG_GENERATOR]]() : $@convention(thin) () -> Int
   _ = inner2()
 }
 
