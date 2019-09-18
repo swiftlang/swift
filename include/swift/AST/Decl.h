@@ -5164,6 +5164,7 @@ class ParamDecl : public VarDecl {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
     Initializer *InitContext = nullptr;
     StringRef StringRepresentation;
+    CaptureInfo Captures;
   };
 
   enum class Flags : uint8_t {
@@ -5248,6 +5249,13 @@ public:
   }
 
   void setDefaultArgumentInitContext(Initializer *initContext);
+
+  const CaptureInfo &getDefaultArgumentCaptureInfo() const {
+    assert(DefaultValueAndFlags.getPointer());
+    return DefaultValueAndFlags.getPointer()->Captures;
+  }
+
+  void setDefaultArgumentCaptureInfo(const CaptureInfo &captures);
 
   /// Extracts the text of the default argument attached to the provided
   /// ParamDecl, removing all inactive #if clauses and providing only the

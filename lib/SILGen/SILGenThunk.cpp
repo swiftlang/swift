@@ -150,7 +150,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   auto *vd = thunk.getDecl();
 
   if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
+    assert(!SGM.M.Types.hasLoweredLocalCaptures(SILDeclRef(fd)) &&
            "methods cannot have captures");
     (void) fd;
   }
