@@ -1,5 +1,4 @@
 // RUN: %scale-test --begin 0 --end 10000 --step 1000 --typecheck --select incrementConstraintsPerContractionCounter %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 
 let _: [Int] = [

@@ -1,6 +1,5 @@
 // FIXME: This should be linear instead of exponential.
 // RUN: %scale-test --begin 1 --end 10 --step 1 --select NumLeafScopes --invert-result %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 
 enum Val {
