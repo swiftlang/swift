@@ -18,8 +18,8 @@
 
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/Evaluator.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/SimpleRequest.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/IDE/Utils.h"
 #include "swift/IDE/IDETypeIDs.h"
 
