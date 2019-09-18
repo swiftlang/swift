@@ -224,6 +224,21 @@ static llvm::cl::opt<bool>
 CompilerStyleDiags("compiler-style-diags",
                    llvm::cl::desc("Print compiler style diagnostics to stderr."),
                    llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+Migrator("migrator",
+         llvm::cl::desc("Dump Json suitable for generating migration script"),
+         llvm::cl::cat(Category));
+
+static llvm::cl::list<std::string>
+PreferInterfaceForModules("use-interface-for-module", llvm::cl::ZeroOrMore,
+                          llvm::cl::desc("Prefer loading these modules via interface"),
+                          llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BaselineFilePath("baseline-path",
+                 llvm::cl::desc("The path to the Json file that we should use as the baseline"),
+                 llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -834,9 +849,24 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   }
   // Diagnose generic signature change
   if (getGenericSignature() != RD->getGenericSignature()) {
-    emitDiag(diag::generic_sig_change,
-             getGenericSignature(), RD->getGenericSignature());
+    // Prefer sugared signature in diagnostics to be more user-friendly.
+    if (Ctx.commonVersionAtLeast(2) &&
+        getSugaredGenericSignature() != RD->getSugaredGenericSignature()) {
+      emitDiag(diag::generic_sig_change,
+               getSugaredGenericSignature(), RD->getSugaredGenericSignature());
+    } else {
+      emitDiag(diag::generic_sig_change,
+               getGenericSignature(), RD->getGenericSignature());
+    }
   }
+
+  // ObjC name changes are considered breakage
+  if (getObjCName() != RD->getObjCName()) {
+    if (Ctx.commonVersionAtLeast(4)) {
+      emitDiag(diag::objc_name_change, getObjCName(), RD->getObjCName());
+    }
+  }
+
   if (isOptional() != RD->isOptional()) {
     if (Ctx.checkingABI()) {
       // Both adding/removing optional is ABI-breaking.
@@ -2161,6 +2191,8 @@ static int diagnoseModuleChange(SDKContext &Ctx, SDKNodeRoot *LeftModule,
     llvm::make_unique<ModuleDifferDiagsConsumer>(true, *OS);
 
   Ctx.getDiags().addConsumer(*pConsumer);
+  Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
+                                RightModule->getJsonFormatVersion()));
   TypeAliasDiffFinder(LeftModule, RightModule,
                       Ctx.getTypeAliasUpdateMap()).search();
   PrunePass Prune(Ctx, std::move(ProtocolReqWhitelist));
@@ -2242,7 +2274,8 @@ static int generateMigrationScript(StringRef LeftPath, StringRef RightPath,
   llvm::errs() << "Finished deserializing" << "\n";
   auto LeftModule = LeftCollector.getSDKRoot();
   auto RightModule = RightCollector.getSDKRoot();
-
+  Ctx.setCommonVersion(std::min(LeftModule->getJsonFormatVersion(),
+                                RightModule->getJsonFormatVersion()));
   // Structural diffs: not merely name changes but changes in SDK tree
   // structure.
   llvm::errs() << "Detecting type member diffs" << "\n";
@@ -2419,6 +2452,9 @@ static int prepareForDump(const char *Main,
   for (auto M : options::ModuleNames) {
     Modules.insert(M);
   }
+  for (auto M: options::PreferInterfaceForModules) {
+    InitInvok.getFrontendOptions().PreferInterfaceForModules.push_back(M);
+  }
   if (Modules.empty()) {
     llvm::errs() << "Need to specify -include-all or -module <name>\n";
     exit(1);
@@ -2473,6 +2509,7 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.AvoidLocation = options::AvoidLocation;
   Opts.AvoidToolArgs = options::AvoidToolArgs;
   Opts.ABI = options::Abi;
+  Opts.Migrator = options::Migrator;
   Opts.Verbose = options::Verbose;
   Opts.AbortOnModuleLoadFailure = options::AbortOnModuleLoadFailure;
   Opts.LocationFilter = options::LocationFilter;
@@ -2497,6 +2534,77 @@ static bool hasBaselineInput() {
     !options::BaselineFrameworkPaths.empty() || !options::BaselineSDK.empty();
 }
 
+enum class ComparisonInputMode: uint8_t {
+  BothJson,
+  BaselineJson,
+  BothLoad,
+};
+
+static ComparisonInputMode checkComparisonInputMode() {
+  if (options::SDKJsonPaths.size() == 2)
+    return ComparisonInputMode::BothJson;
+  else if (hasBaselineInput())
+    return ComparisonInputMode::BothLoad;
+  else
+    return ComparisonInputMode::BaselineJson;
+}
+
+static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
+  SwiftDeclCollector Collector(Ctx);
+  // If the baseline path has been given, honor that.
+  if (!options::BaselineFilePath.empty()) {
+    Collector.deSerialize(options::BaselineFilePath);
+    return Collector.getSDKRoot();
+  }
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  // We need to call prepareForDump to parse target triple.
+  if (prepareForDump(Main, Invok, Modules, true))
+    return nullptr;
+
+  assert(Modules.size() == 1 &&
+         "Cannot find builtin baseline for more than one module");
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
+    reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  llvm::SmallString<128> BaselinePath(ExePath);
+  llvm::sys::path::remove_filename(BaselinePath); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(BaselinePath); // Remove /bin
+  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline",
+                          Modules.begin()->getKey());
+  // Look for ABI or API baseline
+  if (Ctx.checkingABI())
+    llvm::sys::path::append(BaselinePath, "ABI");
+  else
+    llvm::sys::path::append(BaselinePath, "API");
+  // Look for deployment target specific baseline files.
+  auto Triple = Invok.getLangOptions().Target;
+  if (Triple.isMacCatalystEnvironment())
+    llvm::sys::path::append(BaselinePath, "iosmac.json");
+  else if (Triple.isMacOSX())
+    llvm::sys::path::append(BaselinePath, "macos.json");
+  else if (Triple.isiOS())
+    llvm::sys::path::append(BaselinePath, "iphoneos.json");
+  else if (Triple.isTvOS())
+    llvm::sys::path::append(BaselinePath, "appletvos.json");
+  else if (Triple.isWatchOS())
+    llvm::sys::path::append(BaselinePath, "watchos.json");
+  else {
+    llvm::errs() << "Unsupported triple target\n";
+    exit(1);
+  }
+  StringRef Path = BaselinePath.str();
+  if (!fs::exists(Path)) {
+    llvm::errs() << "Baseline at " << Path << " does not exist\n";
+    exit(1);
+  }
+  if (options::Verbose) {
+    llvm::errs() << "Using baseline at " << Path << "\n";
+  }
+  Collector.deSerialize(Path);
+  return Collector.getSDKRoot();
+}
+
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
@@ -2518,32 +2626,39 @@ int main(int argc, char *argv[]) {
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
-    bool CompareJson = options::SDKJsonPaths.size() == 2;
-    if (!CompareJson && !hasBaselineInput()) {
-      llvm::errs() << "Only two SDK versions can be compared\n";
-      llvm::cl::PrintHelpMessage();
-      return 1;
-    }
+    ComparisonInputMode Mode = checkComparisonInputMode();
     llvm::StringSet<> protocolWhitelist;
     if (!options::ProtReqWhiteList.empty()) {
       if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
           return 1;
     }
-    if (options::Action == ActionType::MigratorGen)
+    if (options::Action == ActionType::MigratorGen) {
+      assert(Mode == ComparisonInputMode::BothJson && "Only BothJson mode is supported");
       return generateMigrationScript(options::SDKJsonPaths[0],
                                      options::SDKJsonPaths[1],
                                      options::OutputFile, IgnoredUsrs, Opts);
-    else if (CompareJson)
+    }
+    switch(Mode) {
+    case ComparisonInputMode::BothJson: {
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
                                   options::OutputFile, Opts,
                                   std::move(protocolWhitelist));
-    else {
+    }
+    case ComparisonInputMode::BaselineJson: {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
+                                  getSDKRoot(argv[0], Ctx, false),
+                                  options::OutputFile,
+                                  std::move(protocolWhitelist));
+    }
+    case ComparisonInputMode::BothLoad: {
       SDKContext Ctx(Opts);
       return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
                                   getSDKRoot(argv[0], Ctx, false),
                                   options::OutputFile,
                                   std::move(protocolWhitelist));
+    }
     }
   }
   case ActionType::DeserializeSDK:

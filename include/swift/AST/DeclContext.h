@@ -51,7 +51,6 @@ namespace swift {
   class GenericParamList;
   class LazyResolver;
   class LazyMemberLoader;
-  class LazyMemberParser;
   class GenericSignature;
   class GenericTypeParamDecl;
   class GenericTypeParamType;
@@ -699,8 +698,8 @@ class IterableDeclContext {
   /// time, but I think it's a better trade to just keep a count here.
   unsigned MemberCount : 29;
 
-  /// Whether parsing the members of this context has been delayed.
-  unsigned HasUnparsedMembers : 1;
+  /// Whether we have already added the parsed members into the context.
+  unsigned AddedParsedMembers : 1;
 
   /// Whether delayed parsing detected a possible operator definition
   /// while skipping the body of this context.
@@ -722,8 +721,8 @@ public:
   IterableDeclContext(IterableDeclContextKind kind)
     : LastDeclAndKind(nullptr, kind) {
     MemberCount = 0;
+    AddedParsedMembers = 0;
     HasOperatorDeclarations = 0;
-    HasUnparsedMembers = 0;
     HasNestedClassDeclarations = 0;
   }
 
@@ -732,13 +731,7 @@ public:
     return LastDeclAndKind.getInt();
   }
 
-  bool hasUnparsedMembers() const {
-    return HasUnparsedMembers;
-  }
-
-  void setHasUnparsedMembers() {
-    HasUnparsedMembers = 1;
-  }
+  bool hasUnparsedMembers() const;
 
   bool maybeHasOperatorDeclarations() const {
     return HasOperatorDeclarations;
@@ -839,8 +832,13 @@ void simple_display(llvm::raw_ostream &out, const ParamT *dc) {
     out << "(null)";
 }
 
+void simple_display(llvm::raw_ostream &out, const IterableDeclContext *idc);
+
 /// Extract the source location from the given declaration context.
 SourceLoc extractNearestSourceLoc(const DeclContext *dc);
+
+/// Extract the source location from the given declaration context.
+SourceLoc extractNearestSourceLoc(const IterableDeclContext *idc);
 
 } // end namespace swift
 

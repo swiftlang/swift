@@ -14,8 +14,9 @@
 //  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_TYPEID(IsDeclApplicableRequest)
-SWIFT_TYPEID(TypeRelationCheckRequest)
-SWIFT_TYPEID(RootAndResultTypeOfKeypathDynamicMemberRequest)
-SWIFT_TYPEID(RootTypeOfKeypathDynamicMemberRequest)
-SWIFT_TYPEID(HasDynamicMemberLookupAttributeRequest)
+
+SWIFT_REQUEST(IDETypeChecking, HasDynamicMemberLookupAttributeRequest)
+SWIFT_REQUEST(IDETypeChecking, IsDeclApplicableRequest)
+SWIFT_REQUEST(IDETypeChecking, RootAndResultTypeOfKeypathDynamicMemberRequest)
+SWIFT_REQUEST(IDETypeChecking, RootTypeOfKeypathDynamicMemberRequest)
+SWIFT_REQUEST(IDETypeChecking, TypeRelationCheckRequest)

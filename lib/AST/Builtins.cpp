@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/LLVMContext.h"
 #include "swift/Strings.h"
 #include "llvm/ADT/SmallString.h"
@@ -435,7 +436,6 @@ static GenericTypeParamDecl*
 createGenericParam(ASTContext &ctx, const char *name, unsigned index) {
   ModuleDecl *M = ctx.TheBuiltinModule;
   Identifier ident = ctx.getIdentifier(name);
-  SmallVector<ProtocolDecl *, 1> protos;
   auto genericParam =
     new (ctx) GenericTypeParamDecl(&M->getMainFile(FileUnitKind::Builtin),
                                    ident, SourceLoc(), 0, index);
@@ -466,22 +466,30 @@ namespace {
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
     // SWIFT_ENABLE_TENSORFLOW
-    GenericSignatureBuilder Builder;
+    // Deleted `GenericSig` because we make that later, when `build()` is
+    // called.
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
+
     // SWIFT_ENABLE_TENSORFLOW
+    // Accumulate params and requirements here, so that we can make the
+    // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
     bool Rethrows = false;
+    SmallVector<GenericTypeParamType *, 2> addedParameters;
+    SmallVector<Requirement, 2> addedRequirements;
 
   public:
     BuiltinGenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
-    // SWIFT_ENABLE_TENSORFLOW
-        : Context(ctx), Builder(ctx) {
+        : Context(ctx) {
       TheGenericParamList = getGenericParams(ctx, numGenericParams,
                                              GenericTypeParams);
 
+      // SWIFT_ENABLE_TENSORFLOW
       for (auto gp : GenericTypeParams) {
-        Builder.addGenericParameter(gp);
+        addedParameters.push_back(
+            gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
+
     }
 
     template <class G>
@@ -503,9 +511,7 @@ namespace {
       Requirement req(RequirementKind::Conformance,
                       generator.build(*this),
                       proto->getDeclaredType());
-      auto source =
-          GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-      Builder.addRequirement(req, source, Context.getStdlibModule());
+      addedRequirements.push_back(req);
     }
 
     void setRethrows(bool rethrows = true) {
@@ -513,12 +519,15 @@ namespace {
     }
 
     ValueDecl *build(Identifier name) {
-      auto GenericSig = std::move(Builder).computeGenericSignature(SourceLoc());
-      auto GenericEnv = GenericSig->createGenericEnvironment();
+      auto GenericSig = evaluateOrDefault(
+          Context.evaluator,
+          AbstractGenericSignatureRequest{
+            nullptr, std::move(addedParameters), std::move(addedRequirements)},
+          nullptr);
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericEnv,
+                                       GenericSig->createGenericEnvironment(),
                                        /*Rethrows*/ Rethrows);
     }
 
@@ -751,6 +760,13 @@ static ValueDecl *getSizeOrAlignOfOperation(ASTContext &Context,
 }
 
 static ValueDecl *getIsPODOperation(ASTContext &Context, Identifier Id) {
+  BuiltinGenericSignatureBuilder builder(Context);
+  builder.addParameter(makeMetatype(makeGenericParam()));
+  builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
+  return builder.build(Id);
+}
+
+static ValueDecl *getIsConcrete(ASTContext &Context, Identifier Id) {
   BuiltinGenericSignatureBuilder builder(Context);
   builder.addParameter(makeMetatype(makeGenericParam()));
   builder.setResult(makeConcrete(BuiltinIntegerType::get(1,Context)));
@@ -1956,6 +1972,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::IsPOD:
     return getIsPODOperation(Context, Id);
+
+  case BuiltinValueKind::IsConcrete:
+    return getIsConcrete(Context, Id);
 
   case BuiltinValueKind::IsBitwiseTakable:
     return getIsBitwiseTakable(Context, Id);

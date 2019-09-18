@@ -14,6 +14,7 @@
 //  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_TYPEID(AccessLevelRequest)
-SWIFT_TYPEID(SetterAccessLevelRequest)
-SWIFT_TYPEID(DefaultAndMaxAccessLevelRequest)
+
+SWIFT_REQUEST(AccessControl, AccessLevelRequest)
+SWIFT_REQUEST(AccessControl, DefaultAndMaxAccessLevelRequest)
+SWIFT_REQUEST(AccessControl, SetterAccessLevelRequest)

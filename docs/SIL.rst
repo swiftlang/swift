@@ -2802,6 +2802,21 @@ It is expected that the strong reference count of the object is one.
 Furthermore, no other thread may increment the strong reference count during
 execution of this instruction.
 
+copy_unowned_value
+``````````````````
+::
+
+  sil-instruction ::= 'copy_unowned_value' sil-operand
+
+  %1 = copy_unowned_value %0 : $@unowned T
+  // %1 will be a strong @owned value of type $T.
+  // $T must be a reference type
+
+Asserts that the strong reference count of the heap object referenced by ``%0``
+is still positive, then increments the reference count and returns a new strong
+reference to ``%0``. The intention is that this instruction is used as a "safe
+ownership conversion" from ``unowned`` to ``strong``.
+
 strong_retain_unowned
 `````````````````````
 ::
@@ -3711,6 +3726,21 @@ This instruction has the same local semantics as ``retain_value`` but:
 
 The intention is that this instruction is used to implement unmanaged
 constructs.
+
+copy_unmanaged_value
+``````````````````````
+
+::
+
+  sil-instruction ::= 'copy_unmanaged_value' sil-value
+
+  %1 = copy_unmanaged_value %0 : $@sil_unmanaged A
+  // %1 will be a strong @owned $A.
+
+This instruction has the same semantics as ``copy_value`` except that its input
+is a trivial ``@sil_unmanaged`` type that doesn't require ref counting. This is
+intended to be used semantically as a "conversion" like instruction from
+``unmanaged`` to ``strong`` and thus should never be removed by the optimizer.
 
 copy_value
 ``````````

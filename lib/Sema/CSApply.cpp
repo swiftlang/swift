@@ -1068,9 +1068,12 @@ namespace {
     Expr *finishApply(ApplyExpr *apply, Type openedType,
                       ConstraintLocatorBuilder locator);
 
-    // Resolve @dynamicCallable applications.
-    Expr *finishApplyDynamicCallable(const Solution &solution, ApplyExpr *apply,
-                                     ConstraintLocatorBuilder locator);
+    // Resolve `@dynamicCallable` applications.
+    Expr *finishApplyDynamicCallable(ApplyExpr *apply,
+                                     SelectedOverload selected,
+                                     FuncDecl *method,
+                                     AnyFunctionType *methodType,
+                                     ConstraintLocatorBuilder applyFunctionLoc);
 
   private:
     /// Simplify the given type by substituting all occurrences of
@@ -2306,6 +2309,17 @@ namespace {
 
       auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
           ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
+
+      // We won't have a disjunction choice if we have an IUO function call
+      // wrapped in parens (i.e. '(s.foo)()'), because we only create a
+      // single constraint to bind to an optional type. So, we can just return
+      // false here as there's no need to force unwrap.
+      if (!solution.DisjunctionChoices.count(choiceLocator)) {
+        auto type = choice.getDecl()->getInterfaceType();
+        assert((type && type->is<AnyFunctionType>()) &&
+               "expected a function type");
+        return false;
+      }
 
       return solution.getDisjunctionChoice(choiceLocator);
     }
@@ -6913,7 +6927,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Extract the literal type.
     Type builtinLiteralType =
         conformance->getTypeWitnessByName(type, literalType);
-    if (!builtinLiteralType)
+    if (builtinLiteralType->hasError())
       return nullptr;
 
     // Perform the builtin conversion.
@@ -6948,11 +6962,62 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   return literal;
 }
 
-// Resolve @dynamicCallable applications.
+// Returns true if the given method and method type are a valid
+// `@dynamicCallable` required `func dynamicallyCall` method.
+static bool isValidDynamicCallableMethod(FuncDecl *method,
+                                         AnyFunctionType *methodType) {
+  auto &ctx = method->getASTContext();
+  if (method->getName() != ctx.Id_dynamicallyCall)
+    return false;
+  if (methodType->getParams().size() != 1)
+    return false;
+  auto argumentLabel = methodType->getParams()[0].getLabel();
+  if (argumentLabel != ctx.Id_withArguments &&
+      argumentLabel != ctx.Id_withKeywordArguments)
+    return false;
+  return true;
+}
+
+// Resolve `callAsFunction` method applications.
+static Expr *finishApplyCallAsFunctionMethod(
+    ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
+    AnyFunctionType *openedMethodType,
+    ConstraintLocatorBuilder applyFunctionLoc) {
+  auto &cs = rewriter.cs;
+  auto *fn = apply->getFn();
+  auto choice = selected.choice;
+  // Create direct reference to `callAsFunction` method.
+  bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  auto *declRef = rewriter.buildMemberRef(
+      fn, selected.openedFullType, /*dotLoc*/ SourceLoc(), choice,
+      DeclNameLoc(fn->getEndLoc()), selected.openedType, applyFunctionLoc,
+      applyFunctionLoc, /*implicit*/ true, choice.getFunctionRefKind(),
+      AccessSemantics::Ordinary, isDynamic);
+  if (!declRef)
+    return nullptr;
+  declRef->setImplicit(apply->isImplicit());
+  apply->setFn(declRef);
+  // Coerce argument to input type of the `callAsFunction` method.
+  SmallVector<Identifier, 2> argLabelsScratch;
+  auto *arg = rewriter.coerceCallArguments(
+      apply->getArg(), openedMethodType, apply,
+      apply->getArgumentLabels(argLabelsScratch), apply->hasTrailingClosure(),
+      applyFunctionLoc);
+  if (!arg)
+    return nullptr;
+  apply->setArg(arg);
+  cs.setType(apply, openedMethodType->getResult());
+  cs.cacheExprTypes(apply);
+  return apply;
+}
+
+// Resolve `@dynamicCallable` applications.
 Expr *
-ExprRewriter::finishApplyDynamicCallable(const Solution &solution,
-                                         ApplyExpr *apply,
-                                         ConstraintLocatorBuilder locator) {
+ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
+                                         SelectedOverload selected,
+                                         FuncDecl *method,
+                                         AnyFunctionType *methodType,
+                                         ConstraintLocatorBuilder loc) {
   auto &ctx = cs.getASTContext();
   auto *fn = apply->getFn();
 
@@ -6961,27 +7026,16 @@ ExprRewriter::finishApplyDynamicCallable(const Solution &solution,
     arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
 
   // Get resolved `dynamicallyCall` method and verify it.
-  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
-  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
-  auto *method = dyn_cast<FuncDecl>(selected.choice.getDecl());
-  auto methodType = simplifyType(selected.openedType)->castTo<AnyFunctionType>();
-  assert(method->getName() == ctx.Id_dynamicallyCall &&
-         "Expected 'dynamicallyCall' method");
+  assert(isValidDynamicCallableMethod(method, methodType));
   auto params = methodType->getParams();
-  assert(params.size() == 1 &&
-         "Expected 'dynamicallyCall' method with one parameter");
   auto argumentType = params[0].getParameterType();
-  auto argumentLabel = params[0].getLabel();
-  assert((argumentLabel == ctx.Id_withArguments ||
-          argumentLabel == ctx.Id_withKeywordArguments) &&
-         "Expected 'dynamicallyCall' method argument label 'withArguments' or "
-         "'withKeywordArguments'");
 
   // Determine which method was resolved: a `withArguments` method or a
   // `withKeywordArguments` method.
+  auto argumentLabel = methodType->getParams()[0].getLabel();
   bool useKwargsMethod = argumentLabel == ctx.Id_withKeywordArguments;
 
-  // Construct expression referencing the `dynamicallyCall` method.	
+  // Construct expression referencing the `dynamicallyCall` method.
   bool isDynamic =
       selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
   auto member = buildMemberRef(fn, selected.openedFullType,
@@ -7188,11 +7242,24 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Save the original potentially lvalue function for rewriting
-  // 'callAsFunction' method applications.
-  auto *originalFn = fn;
-  // SWIFT_ENABLE_TENSORFLOW END
+  // Resolve `callAsFunction` and `@dynamicCallable` applications.
+  auto applyFunctionLoc =
+      locator.withPathElement(ConstraintLocator::ApplyFunction);
+  if (auto selected = solution.getOverloadChoiceIfAvailable(
+          cs.getConstraintLocator(applyFunctionLoc))) {
+    auto *method = dyn_cast<FuncDecl>(selected->choice.getDecl());
+    auto methodType =
+        simplifyType(selected->openedType)->getAs<AnyFunctionType>();
+    if (method && methodType) {
+      if (method->isCallAsFunctionMethod())
+        return finishApplyCallAsFunctionMethod(
+            *this, apply, *selected, methodType, applyFunctionLoc);
+      if (methodType && isValidDynamicCallableMethod(method, methodType))
+        return finishApplyDynamicCallable(
+            apply, *selected, method, methodType, applyFunctionLoc);
+    }
+  }
+
   // The function is always an rvalue.
   fn = cs.coerceToRValue(fn);
 
@@ -7293,109 +7360,51 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We have a type constructor.
-  if (auto metaTy = cs.getType(fn)->getAs<AnyMetatypeType>()) {
-    auto ty = metaTy->getInstanceType();
+  auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
+  auto ty = metaTy->getInstanceType();
 
-    // If we're "constructing" a tuple type, it's simply a conversion.
-    if (auto tupleTy = ty->getAs<TupleType>()) {
-      // FIXME: Need an AST to represent this properly.
-      return coerceToType(apply->getArg(), tupleTy, locator);
-    }
-
-    // We're constructing a value of nominal type. Look for the constructor or
-    // enum element to use.
-    auto ctorLocator = cs.getConstraintLocator(
-        locator.withPathElement(ConstraintLocator::ApplyFunction)
-               .withPathElement(ConstraintLocator::ConstructorMember));
-    auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
-    if (!selected) {
-      assert(ty->hasError() || ty->hasUnresolvedType());
-      cs.setType(apply, ty);
-      return apply;
-    }
-
-    assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-           ty->isExistentialType() || ty->is<ArchetypeType>());
-
-    // We have the constructor.
-    auto choice = selected->choice;
-
-    // Consider the constructor decl reference expr 'implicit', but the
-    // constructor call expr itself has the apply's 'implicitness'.
-    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-    Expr *declRef = buildMemberRef(fn, selected->openedFullType,
-                                   /*dotLoc=*/SourceLoc(), choice,
-                                   DeclNameLoc(fn->getEndLoc()),
-                                   selected->openedType, locator, ctorLocator,
-                                   /*Implicit=*/true,
-                                   choice.getFunctionRefKind(),
-                                   AccessSemantics::Ordinary, isDynamic);
-    if (!declRef)
-      return nullptr;
-    declRef->setImplicit(apply->isImplicit());
-    apply->setFn(declRef);
-
-    // Tail-recur to actually call the constructor.
-    return finishApply(apply, openedType, locator);
+  // If we're "constructing" a tuple type, it's simply a conversion.
+  if (auto tupleTy = ty->getAs<TupleType>()) {
+    // FIXME: Need an AST to represent this properly.
+    return coerceToType(apply->getArg(), tupleTy, locator);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Handle 'callAsFunction' method applications.
-  auto &ctx = cs.getASTContext();
-
-  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
-  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
-    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
-
-  // Get resolved call method and verify it.
-  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
-  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
-  auto choice = selected.choice;
-  auto *callMethod = dyn_cast<FuncDecl>(selected.choice.getDecl());
-  if (callMethod && callMethod->isCallable()) {
-    auto methodType =
-        simplifyType(selected.openedType)->castTo<AnyFunctionType>();
-    auto selfParam = callMethod->getImplicitSelfDecl();
-    // Diagnose `mutating` method call on immutable value.
-    if (!cs.getType(originalFn)->hasLValueType() && selfParam->isInOut()) {
-      AssignmentFailure failure(originalFn, cs, originalFn->getLoc(),
-                                diag::cannot_pass_rvalue_mutating_subelement,
-                                diag::cannot_pass_rvalue_mutating);
-      failure.diagnose();
-      return nullptr;
-    }
-    // Create direct reference to call method.
-    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-    Expr *declRef = buildMemberRef(originalFn, selected.openedFullType,
-                                   /*dotLoc=*/SourceLoc(), choice,
-                                   DeclNameLoc(fn->getEndLoc()),
-                                   selected.openedType, loc, loc,
-                                   /*Implicit=*/true,
-                                   choice.getFunctionRefKind(),
-                                   AccessSemantics::Ordinary, isDynamic);
-    if (!declRef)
-      return nullptr;
-    declRef->setImplicit(apply->isImplicit());
-    apply->setFn(declRef);
-    // Coerce argument to input type of call method.
-    SmallVector<Identifier, 2> argLabelsScratch;
-    auto *arg = coerceCallArguments(apply->getArg(), methodType, apply,
-                                    apply->getArgumentLabels(argLabelsScratch),
-                                    apply->hasTrailingClosure(), loc);
-    if (!arg)
-      return nullptr;
-    apply->setArg(arg);
-    cs.setType(apply, methodType->getResult());
-    cs.cacheExprTypes(apply);
+  // We're constructing a value of nominal type. Look for the constructor or
+  // enum element to use.
+  auto ctorLocator = cs.getConstraintLocator(
+      locator.withPathElement(ConstraintLocator::ApplyFunction)
+             .withPathElement(ConstraintLocator::ConstructorMember));
+  auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
+  if (!selected) {
+    assert(ty->hasError() || ty->hasUnresolvedType());
+    cs.setType(apply, ty);
     return apply;
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
-  // Handle @dynamicCallable applications.
-  // At this point, all other ApplyExpr cases have been handled.
-  return finishApplyDynamicCallable(solution, apply, locator);
+  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+         ty->isExistentialType() || ty->is<ArchetypeType>());
+
+  // We have the constructor.
+  auto choice = selected->choice;
+
+  // Consider the constructor decl reference expr 'implicit', but the
+  // constructor call expr itself has the apply's 'implicitness'.
+  bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  Expr *declRef = buildMemberRef(fn, selected->openedFullType,
+                                 /*dotLoc=*/SourceLoc(), choice,
+                                 DeclNameLoc(fn->getEndLoc()),
+                                 selected->openedType, locator, ctorLocator,
+                                 /*Implicit=*/true,
+                                 choice.getFunctionRefKind(),
+                                 AccessSemantics::Ordinary, isDynamic);
+  if (!declRef)
+    return nullptr;
+  declRef->setImplicit(apply->isImplicit());
+  apply->setFn(declRef);
+
+  // Tail-recur to actually call the constructor.
+  return finishApply(apply, openedType, locator);
 }
-
 
 // Return the precedence-yielding parent of 'expr', along with the index of
 // 'expr' as the child of that parent. The precedence-yielding parent is the

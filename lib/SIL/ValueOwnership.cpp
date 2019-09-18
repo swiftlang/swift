@@ -58,9 +58,10 @@ public:
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  CONSTANT_OWNERSHIP_INST(Any, RefTo##Name) \
-  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  CONSTANT_OWNERSHIP_INST(Any, RefTo##Name)                                    \
+  CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
+  CONSTANT_OWNERSHIP_INST(Owned, Copy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
@@ -451,6 +452,7 @@ CONSTANT_OWNERSHIP_BUILTIN(Any, Sizeof)
 CONSTANT_OWNERSHIP_BUILTIN(Any, Strideof)
 CONSTANT_OWNERSHIP_BUILTIN(Any, StringObjectOr)
 CONSTANT_OWNERSHIP_BUILTIN(Any, IsPOD)
+CONSTANT_OWNERSHIP_BUILTIN(Any, IsConcrete)
 CONSTANT_OWNERSHIP_BUILTIN(Any, IsBitwiseTakable)
 CONSTANT_OWNERSHIP_BUILTIN(Any, IsSameMetatype)
 CONSTANT_OWNERSHIP_BUILTIN(Any, Alignof)

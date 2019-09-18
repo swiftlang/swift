@@ -186,6 +186,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   Context.reset(ASTContext::get(Invocation.getLangOptions(),
                                 Invocation.getSearchPathOptions(), SourceMgr,
                                 Diagnostics));
+  registerParseRequestFunctions(Context->evaluator);
   registerTypeCheckerRequestFunctions(Context->evaluator);
 
   // Migrator, indexing and typo correction need some IDE requests.
@@ -314,12 +315,9 @@ void CompilerInstance::setUpDiagnosticOptions() {
 
 bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
-    bool immediate = FrontendOptions::isActionImmediate(
-        Invocation.getFrontendOptions().RequestedAction);
     bool enableLibraryEvolution =
       Invocation.getFrontendOptions().EnableLibraryEvolution;
     Context->addModuleLoader(SourceLoader::create(*Context,
-                                                  !immediate,
                                                   enableLibraryEvolution,
                                                   getDependencyTracker()));
   }
@@ -373,7 +371,8 @@ bool CompilerInstance::setUpModuleLoaders() {
     StringRef PrebuiltModuleCachePath = FEOpts.PrebuiltModuleCachePath;
     auto PIML = ParseableInterfaceModuleLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
-        getDependencyTracker(), MLM, FEOpts.RemarkOnRebuildFromModuleInterface);
+        getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
+        FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
   Context->addModuleLoader(std::move(SML));
@@ -780,7 +779,7 @@ void CompilerInstance::parseAndCheckTypesUpTo(
   std::unique_ptr<DelayedParsingCallbacks> DelayedCB{
       computeDelayedParsingCallback()};
 
-  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+  PersistentState = llvm::make_unique<PersistentParserState>();
 
   bool hadLoadError = parsePartialModulesAndLibraryFiles(
       implicitImports, DelayedCB.get());
@@ -1051,7 +1050,7 @@ void CompilerInstance::performParseOnly(bool EvaluateConditionals,
                                   MainBufferID);
   }
 
-  PersistentState = llvm::make_unique<PersistentParserState>(getASTContext());
+  PersistentState = llvm::make_unique<PersistentParserState>();
 
   SWIFT_DEFER {
     if (ParseDelayedBodyOnEnd)

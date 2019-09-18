@@ -764,8 +764,7 @@ void EagerSpecializerTransform::run() {
     // TODO: Use a decision-tree to reduce the amount of dynamic checks being
     // performed.
     for (auto *SA : F.getSpecializeAttrs()) {
-      auto AttrRequirements = SA->getRequirements();
-      ReInfoVec.emplace_back(&F, AttrRequirements);
+      ReInfoVec.emplace_back(&F, SA->getSpecializedSignature());
       auto *NewFunc = eagerSpecialize(FuncBuilder, &F, *SA, ReInfoVec.back());
 
       SpecializedFuncs.push_back(NewFunc);

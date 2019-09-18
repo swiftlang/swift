@@ -137,7 +137,9 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
         return false;
     }
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange SR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      SR = repr->getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);
@@ -645,7 +647,9 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
 
     if (!ExtDecls.empty() && BaseNameLoc.isValid()) {
-      auto ExtTyLoc = ExtDecls.back()->getExtendedTypeLoc().getLoc();
+      SourceLoc ExtTyLoc = SourceLoc();
+      if (auto *repr = ExtDecls.back()->getExtendedTypeRepr())
+        ExtTyLoc = repr->getLoc();
       if (ExtTyLoc.isValid() && ExtTyLoc == BaseNameLoc) {
         ExtDecl = ExtDecls.back();
       }

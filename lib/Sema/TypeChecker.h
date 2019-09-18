@@ -235,9 +235,6 @@ enum class TypeCheckExprFlags {
   /// that we force for style or other reasons.
   DisableStructuralChecks = 0x02,
 
-  /// Set if the client wants diagnostics suppressed.
-  SuppressDiagnostics = 0x04,
-
   /// If set, the client wants a best-effort solution to the constraint system,
   /// but can tolerate a solution where all of the constraints are solved, but
   /// not all type variables have been determined.  In this case, the constraint
@@ -2125,7 +2122,8 @@ bool isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)`.
 bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
-                                         TypeChecker &TC);
+                                         TypeChecker &TC,
+                                         bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
@@ -2133,14 +2131,16 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl, DeclContext *DC,
 /// takes a single non-variadic parameter that conforms to
 /// `ExpressibleByStringLiteral` protocol.
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl, DeclContext *DC,
-                                      TypeChecker &TC);
+                                      TypeChecker &TC,
+                                      bool ignoreLabel = false);
 
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
 /// @dynamicMemberLookup.
 /// The method is given to be defined as `subscript(dynamicMember:)` which
 /// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC);
+bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl, TypeChecker &TC,
+                                       bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.

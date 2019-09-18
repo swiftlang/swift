@@ -109,8 +109,7 @@ namespace {
 
     hash_value_type ComputeHash(key_type_ref key) {
       assert(!key.empty());
-      // FIXME: DJB seed=0, audit whether the default seed could be used.
-      return llvm::djbHash(key, 0);
+      return llvm::djbHash(key, SWIFTMODULE_HASH_SEED);
     }
 
     std::pair<unsigned, unsigned> EmitKeyDataLength(raw_ostream &out,
@@ -391,7 +390,7 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // If we have a body, we might have a generic environment.
-  GenericEnvironmentID genericEnvID = 0;
+  GenericSignatureID genericEnvID = 0;
   if (!NoBody)
     genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
 
@@ -428,10 +427,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   for (auto *SA : F.getSpecializeAttrs()) {
     unsigned specAttrAbbrCode = SILAbbrCodes[SILSpecializeAttrLayout::Code];
-    SILSpecializeAttrLayout::emitRecord(Out, ScratchRecord, specAttrAbbrCode,
-                                        (unsigned)SA->isExported(),
-                                        (unsigned)SA->getSpecializationKind());
-    S.writeGenericRequirements(SA->getRequirements(), SILAbbrCodes);
+    SILSpecializeAttrLayout::emitRecord(
+        Out, ScratchRecord, specAttrAbbrCode,
+        (unsigned)SA->isExported(),
+        (unsigned)SA->getSpecializationKind(),
+        S.addGenericSignatureRef(SA->getSpecializedSignature()));
   }
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -1282,6 +1282,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         ListOfValues);
     break;
   }
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Load##Name##Inst:
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

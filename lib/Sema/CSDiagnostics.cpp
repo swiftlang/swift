@@ -310,8 +310,12 @@ Type RequirementFailure::getOwnerType() const {
 const GenericContext *RequirementFailure::getGenericContext() const {
   if (auto *genericCtx = AffectedDecl->getAsGenericContext())
     return genericCtx;
-  auto decl = AffectedDecl->getDeclContext()->getAsDecl();
-  return decl ? decl->getAsGenericContext() : nullptr;
+
+  auto parentDecl = AffectedDecl->getDeclContext()->getAsDecl();
+  if (!parentDecl)
+    return nullptr;
+
+  return parentDecl->getAsGenericContext();
 }
 
 const Requirement &RequirementFailure::getRequirement() const {
@@ -1565,17 +1569,7 @@ bool AssignmentFailure::diagnoseAsError() {
     Type neededType = contextualType->getInOutObjectType();
     Type actualType = getType(immInfo.first)->getInOutObjectType();
     if (!neededType->isEqual(actualType)) {
-      if (DeclDiagnostic.ID == diag::cannot_pass_rvalue_inout_subelement.ID) {
-        // We have a special diagnostic with tailored wording for this
-        // common case.
-        emitDiagnostic(Loc, diag::cannot_pass_rvalue_inout_converted,
-                       actualType, neededType)
-            .highlight(immInfo.first->getSourceRange());
-
-        if (auto inoutExpr = dyn_cast<InOutExpr>(immInfo.first))
-          fixItChangeInoutArgType(inoutExpr->getSubExpr(), actualType,
-                                  neededType);
-      } else {
+      if (DeclDiagnostic.ID != diag::cannot_pass_rvalue_inout_subelement.ID) {
         emitDiagnostic(Loc, DeclDiagnostic,
                        "implicit conversion from '" + actualType->getString() +
                            "' to '" + neededType->getString() +
@@ -1597,68 +1591,6 @@ bool AssignmentFailure::diagnoseAsError() {
   emitDiagnostic(Loc, TypeDiagnostic, getType(destExpr))
       .highlight(immInfo.first->getSourceRange());
   return true;
-}
-
-void AssignmentFailure::fixItChangeInoutArgType(const Expr *arg,
-                                                Type actualType,
-                                                Type neededType) const {
-  auto *DC = getDC();
-  auto *DRE = dyn_cast<DeclRefExpr>(arg);
-  if (!DRE)
-    return;
-
-  auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-  if (!VD)
-    return;
-
-  // Don't emit for non-local variables.
-  // (But in script-mode files, we consider module-scoped
-  // variables in the same file to be local variables.)
-  auto VDC = VD->getDeclContext();
-  bool isLocalVar = VDC->isLocalContext();
-  if (!isLocalVar && VDC->isModuleScopeContext()) {
-    auto argFile = DC->getParentSourceFile();
-    auto varFile = VDC->getParentSourceFile();
-    isLocalVar = (argFile == varFile && argFile->isScriptMode());
-  }
-  if (!isLocalVar)
-    return;
-
-  SmallString<32> scratch;
-  SourceLoc endLoc;   // Filled in if we decide to diagnose this
-  SourceLoc startLoc; // Left invalid if we're inserting
-
-  auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
-    if (auto VP = dyn_cast_or_null<VarPattern>(P))
-      P = VP->getSubPattern();
-    return P && isa<NamedPattern>(P);
-  };
-
-  auto typeRange = VD->getTypeSourceRangeForDiagnostics();
-  if (typeRange.isValid()) {
-    startLoc = typeRange.Start;
-    endLoc = typeRange.End;
-  } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
-    endLoc = VD->getNameLoc();
-    scratch += ": ";
-  }
-
-  if (endLoc.isInvalid())
-    return;
-
-  scratch += neededType.getString();
-
-  // Adjust into the location where we actually want to insert
-  endLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, endLoc);
-
-  // Since we already adjusted endLoc, this will turn an insertion
-  // into a zero-character replacement.
-  if (!startLoc.isValid())
-    startLoc = endLoc;
-
-  emitDiagnostic(VD->getLoc(), diag::inout_change_var_type_if_possible,
-                 actualType, neededType)
-      .fixItReplaceChars(startLoc, endLoc, scratch);
 }
 
 std::pair<Expr *, Optional<OverloadChoice>>
@@ -2861,18 +2793,6 @@ bool MissingMemberFailure::diagnoseAsError() {
   if (!anchor || !baseExpr)
     return false;
 
-  if (auto *typeVar = getBaseType()->getAs<TypeVariableType>()) {
-    auto &CS = getConstraintSystem();
-    auto *memberLoc = typeVar->getImpl().getLocator();
-    // Don't try to diagnose anything besides first missing
-    // member in the chain. e.g. `x.foo().bar()` let's make
-    // sure to diagnose only `foo()` as missing because we
-    // don't really know much about what `bar()` is supposed
-    // to be.
-    if (CS.MissingMembers.count(memberLoc))
-      return false;
-  }
-
   auto baseType = resolveType(getBaseType())->getWithoutSpecifierType();
 
   DeclNameLoc nameLoc(anchor->getStartLoc());
@@ -2938,6 +2858,27 @@ bool MissingMemberFailure::diagnoseAsError() {
       diagnostic.highlight(baseExpr->getSourceRange())
           .highlight(nameLoc.getSourceRange());
       correction->addFixits(diagnostic);
+    } else if (instanceTy->getAnyNominal() &&
+               getName().getBaseName() == DeclBaseName::createConstructor()) {
+      auto &cs = getConstraintSystem();
+
+      auto memberName = getName().getBaseName();
+      auto result = cs.performMemberLookup(
+          ConstraintKind::ValueMember, memberName, metatypeTy,
+          FunctionRefKind::DoubleApply, getLocator(),
+          /*includeInaccessibleMembers=*/true);
+
+      // If there are no `init` members at all produce a tailored
+      // diagnostic for that, otherwise fallback to generic
+      // "no such member" one.
+      if (result.ViableCandidates.empty() &&
+          result.UnviableCandidates.empty()) {
+        emitDiagnostic(anchor->getLoc(), diag::no_accessible_initializers,
+                       instanceTy)
+            .highlight(baseExpr->getSourceRange());
+      } else {
+        emitBasicError(baseType);
+      }
     } else {
       emitBasicError(baseType);
     }
@@ -3474,21 +3415,6 @@ bool MissingArgumentsFailure::diagnoseTrailingClosure(ClosureExpr *closure) {
 
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
-
-  return true;
-}
-
-bool DefaultArgumentTypeMismatch::diagnoseAsError() {
-  auto choice = getChoiceFor(getRawAnchor());
-  if (!choice.hasValue())
-    return false;
-
-  auto declName = choice.getValue().choice.getName();
-  auto declKind = choice.getValue().choice.getDecl()->getDescriptiveKind();
-
-  emitDiagnostic(getAnchor()->getLoc(),
-                 diag::default_argument_literal_cannot_convert, declKind,
-                 declName, FromType, ToType);
 
   return true;
 }
@@ -4336,4 +4262,80 @@ bool ThrowingFunctionConversionFailure::diagnoseAsError() {
   emitDiagnostic(anchor->getLoc(), diag::throws_functiontype_mismatch,
                  getFromType(), getToType());
   return true;
+}
+
+bool InOutConversionFailure::diagnoseAsError() {
+  auto *anchor = getAnchor();
+  emitDiagnostic(anchor->getLoc(), diag::cannot_pass_rvalue_inout_converted,
+                 getFromType(), getToType());
+  fixItChangeArgumentType();
+  return true;
+}
+
+void InOutConversionFailure::fixItChangeArgumentType() const {
+  auto *argExpr = getAnchor();
+  auto *DC = getDC();
+
+  if (auto *IOE = dyn_cast<InOutExpr>(argExpr))
+    argExpr = IOE->getSubExpr();
+
+  auto *DRE = dyn_cast<DeclRefExpr>(argExpr);
+  if (!DRE)
+    return;
+
+  auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+  if (!VD)
+    return;
+
+  // Don't emit for non-local variables.
+  // (But in script-mode files, we consider module-scoped
+  // variables in the same file to be local variables.)
+  auto VDC = VD->getDeclContext();
+  bool isLocalVar = VDC->isLocalContext();
+  if (!isLocalVar && VDC->isModuleScopeContext()) {
+    auto argFile = DC->getParentSourceFile();
+    auto varFile = VDC->getParentSourceFile();
+    isLocalVar = (argFile == varFile && argFile->isScriptMode());
+  }
+  if (!isLocalVar)
+    return;
+
+  auto actualType = getFromType();
+  auto neededType = getToType();
+
+  SmallString<32> scratch;
+  SourceLoc endLoc;   // Filled in if we decide to diagnose this
+  SourceLoc startLoc; // Left invalid if we're inserting
+
+  auto isSimpleTypelessPattern = [](Pattern *P) -> bool {
+    if (auto VP = dyn_cast_or_null<VarPattern>(P))
+      P = VP->getSubPattern();
+    return P && isa<NamedPattern>(P);
+  };
+
+  auto typeRange = VD->getTypeSourceRangeForDiagnostics();
+  if (typeRange.isValid()) {
+    startLoc = typeRange.Start;
+    endLoc = typeRange.End;
+  } else if (isSimpleTypelessPattern(VD->getParentPattern())) {
+    endLoc = VD->getNameLoc();
+    scratch += ": ";
+  }
+
+  if (endLoc.isInvalid())
+    return;
+
+  scratch += neededType.getString();
+
+  // Adjust into the location where we actually want to insert
+  endLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr, endLoc);
+
+  // Since we already adjusted endLoc, this will turn an insertion
+  // into a zero-character replacement.
+  if (!startLoc.isValid())
+    startLoc = endLoc;
+
+  emitDiagnostic(VD->getLoc(), diag::inout_change_var_type_if_possible,
+                 actualType, neededType)
+      .fixItReplaceChars(startLoc, endLoc, scratch);
 }

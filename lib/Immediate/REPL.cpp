@@ -964,7 +964,7 @@ public:
       IRGenOpts(),
       SILOpts(),
       Input(*this),
-      PersistentState(CI.getASTContext())
+      PersistentState()
   {
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;

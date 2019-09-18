@@ -97,24 +97,21 @@ public:
   void cacheResult(DefaultAndMax value) const;
 };
 
-/// The zone number for access-control requests.
-#define SWIFT_ACCESS_REQUESTS_TYPEID_ZONE 11
-
-#define SWIFT_TYPEID_ZONE SWIFT_ACCESS_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE AccessControl
 #define SWIFT_TYPEID_HEADER "swift/AST/AccessTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
+#define SWIFT_REQUEST(Zone, RequestType)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
 #include "swift/AST/AccessTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

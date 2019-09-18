@@ -24,6 +24,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/ModuleLoader.h"
@@ -54,6 +55,11 @@
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
+
+static_assert(IsTriviallyDestructible<FileUnit>::value,
+              "FileUnits are BumpPtrAllocated; the d'tor may not be called");
+static_assert(IsTriviallyDestructible<LoadedFile>::value,
+              "LoadedFiles are BumpPtrAllocated; the d'tor may not be called");
 
 //===----------------------------------------------------------------------===//
 // Builtin Module Name lookup
@@ -1249,10 +1255,6 @@ StringRef ModuleDecl::getModuleFilename() const {
   // per-file names. Modules can consist of more than one file.
   StringRef Result;
   for (auto F : getFiles()) {
-    Result = F->getParseableInterface();
-    if (!Result.empty())
-      return Result;
-
     if (auto SF = dyn_cast<SourceFile>(F)) {
       if (!Result.empty())
         return StringRef();
@@ -1373,109 +1375,47 @@ bool ModuleDecl::registerEntryPointFile(FileUnit *file, SourceLoc diagLoc,
   return true;
 }
 
-template<bool respectVisibility>
-static bool
-forAllImportedModules(ModuleDecl *topLevel, ModuleDecl::AccessPathTy thisPath,
-                      llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
-  using ImportedModule = ModuleDecl::ImportedModule;
-  using AccessPathTy = ModuleDecl::AccessPathTy;
-  
-  llvm::SmallSet<ImportedModule, 32, ModuleDecl::OrderImportedModules> visited;
-  SmallVector<ImportedModule, 32> stack;
-
-  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
-  if (!respectVisibility)
-    filter |= ModuleDecl::ImportFilterKind::Private;
-
-  ModuleDecl::ImportFilter topLevelFilter = filter;
-  if (!respectVisibility)
-    topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-  topLevel->getImportedModules(stack, topLevelFilter);
-
-  // Make sure the top-level module is first; we want pre-order-ish traversal.
-  AccessPathTy overridingPath;
-  if (respectVisibility)
-    overridingPath = thisPath;
-  stack.push_back(ImportedModule(overridingPath, topLevel));
-
-  while (!stack.empty()) {
-    auto next = stack.pop_back_val();
-
-    // Filter any whole-module imports, and skip specific-decl imports if the
-    // import path doesn't match exactly.
-    if (next.first.empty() || !respectVisibility)
-      next.first = overridingPath;
-    else if (!overridingPath.empty() &&
-             !ModuleDecl::isSameAccessPath(next.first, overridingPath)) {
-      // If we ever allow importing non-top-level decls, it's possible the rule
-      // above isn't what we want.
-      assert(next.first.size() == 1 && "import of non-top-level decl");
-      continue;
-    }
-
-    if (!visited.insert(next).second)
-      continue;
-
-    if (!fn(next))
-      return false;
-
-    if (respectVisibility)
-      next.second->getImportedModulesForLookup(stack);
-    else
-      next.second->getImportedModules(stack, filter);
-  }
-
-  return true;
-}
-
-bool
-ModuleDecl::forAllVisibleModules(AccessPathTy thisPath,
-                                 llvm::function_ref<bool(ImportedModule)> fn) {
-  return forAllImportedModules<true>(this, thisPath, fn);
-}
-
-bool FileUnit::forAllVisibleModules(
-    llvm::function_ref<bool(ModuleDecl::ImportedModule)> fn) {
-  if (!getParentModule()->forAllVisibleModules(ModuleDecl::AccessPathTy(), fn))
-    return false;
-
-  if (auto SF = dyn_cast<SourceFile>(this)) {
-    // Handle privately visible modules as well.
-    ModuleDecl::ImportFilter importFilter;
-    importFilter |= ModuleDecl::ImportFilterKind::Private;
-    importFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
-    SmallVector<ModuleDecl::ImportedModule, 4> imports;
-    SF->getImportedModules(imports, importFilter);
-    for (auto importPair : imports)
-      if (!importPair.second->forAllVisibleModules(importPair.first, fn))
-        return false;
-  }
-
-  return true;
-}
-
-void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) {
+void ModuleDecl::collectLinkLibraries(LinkLibraryCallback callback) const {
   // FIXME: The proper way to do this depends on the decls used.
   FORWARD(collectLinkLibraries, (callback));
 }
 
 void
 SourceFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const {
-  forAllImportedModules<false>(getParentModule(), /*thisPath*/{},
-                               [=](ModuleDecl::ImportedModule import) -> bool {
-    swift::ModuleDecl *next = import.second;
-    if (next->getName() == getParentModule()->getName())
-      return true;
+  llvm::SmallDenseSet<ModuleDecl *, 32> visited;
+  SmallVector<ModuleDecl::ImportedModule, 32> stack;
 
-    // Hack: Assume other REPL files already have their libraries linked.
-    if (!next->getFiles().empty())
-      if (auto *nextSource = dyn_cast<SourceFile>(next->getFiles().front()))
-        if (nextSource->Kind == SourceFileKind::REPL)
-          return true;
+  ModuleDecl::ImportFilter filter = ModuleDecl::ImportFilterKind::Public;
+  filter |= ModuleDecl::ImportFilterKind::Private;
 
-    next->collectLinkLibraries(callback);
-    return true;
-  });
+  auto *topLevel = getParentModule();
+
+  ModuleDecl::ImportFilter topLevelFilter = filter;
+  topLevelFilter |= ModuleDecl::ImportFilterKind::ImplementationOnly;
+  topLevel->getImportedModules(stack, topLevelFilter);
+
+  // Make sure the top-level module is first; we want pre-order-ish traversal.
+  stack.emplace_back(ModuleDecl::AccessPathTy(),
+                     const_cast<ModuleDecl *>(topLevel));
+
+  while (!stack.empty()) {
+    auto next = stack.pop_back_val().second;
+
+    if (!visited.insert(next).second)
+      continue;
+
+    if (next->getName() != getParentModule()->getName()) {
+      // Hack: Assume other REPL files already have their libraries linked.
+      if (!next->getFiles().empty())
+        if (auto *nextSource = dyn_cast<SourceFile>(next->getFiles().front()))
+          if (nextSource->Kind == SourceFileKind::REPL)
+            continue;
+
+      next->collectLinkLibraries(callback);
+    }
+
+    next->getImportedModules(stack, filter);
+  }
 }
 
 bool ModuleDecl::walk(ASTWalker &Walker) {
@@ -1608,20 +1548,7 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
   if (!hasImplementationOnlyImports())
     return false;
 
-  auto isImportedBy = [](const ModuleDecl *dest, const ModuleDecl *src) {
-    // Fast path.
-    if (dest == src) return true;
-
-    // Walk the transitive imports, respecting visibility.
-    // This return true if the search *didn't* short-circuit, and it short
-    // circuits if we found `dest`, so we need to invert the sense before
-    // returning.
-    return !const_cast<ModuleDecl*>(src)
-              ->forAllVisibleModules({}, [dest](ModuleDecl::ImportedModule im) {
-      // Continue searching as long as we haven't found `dest` yet.
-      return im.second != dest;
-    });
-  };
+  auto &imports = getASTContext().getImportCache();
 
   // Look at the imports of this source file.
   for (auto &desc : Imports) {
@@ -1631,15 +1558,17 @@ bool SourceFile::isImportedImplementationOnly(const ModuleDecl *module) const {
 
     // If the module is imported this way, it's not imported
     // implementation-only.
-    if (isImportedBy(module, desc.module.second))
+    if (imports.isImportedBy(module, desc.module.second))
       return false;
   }
 
   // Now check this file's enclosing module in case there are re-exports.
-  return !isImportedBy(module, getParentModule());
+  return !imports.isImportedBy(module, getParentModule());
 }
 
 void ModuleDecl::clearLookupCache() {
+  getASTContext().getImportCache().clear();
+
   if (!Cache)
     return;
 

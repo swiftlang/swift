@@ -24,6 +24,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -2141,7 +2142,7 @@ private:
 
   void maybeProduceFallbackDiagnostic(Expr *expr) const {
     if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        Options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+        DiagnosticSuppression::isEnabled(TC.Diags))
       return;
 
     // Before producing fatal error here, let's check if there are any "error"
@@ -2183,7 +2184,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
 
-  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+  if (DiagnosticSuppression::isEnabled(Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))

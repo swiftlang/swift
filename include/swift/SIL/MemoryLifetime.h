@@ -183,6 +183,11 @@ public:
     return &locations[index];
   }
 
+  /// Registers an address projection instruction for a location.
+  void registerProjection(SingleValueInstruction *projection, unsigned locIdx) {
+    addr2LocIdx[projection] = locIdx;
+  }
+
   /// Sets the location bits os \p addr in \p bits, if \p addr is associated
   /// with a location.
   void setBits(Bits &bits, SILValue addr) {
@@ -341,13 +346,29 @@ public:
   /// Calculates the BlockState::exitReachable flags.
   void exitReachableAnalysis();
 
+  using JoinOperation = std::function<void (Bits &dest, const Bits &src)>;
+
   /// Derives the block exit sets from the entry sets by applying the gen and
   /// kill sets.
-  void solveDataflowForward();
+  /// At control flow joins, the \p join operation is applied.
+  void solveForward(JoinOperation join);
+
+  /// Calls solveForward() with a bit-intersection as join operation.
+  void solveForwardWithIntersect();
+
+  /// Calls solveForward() with a bit-union as join operation.
+  void solveForwardWithUnion();
 
   /// Derives the block entry sets from the exit sets by applying the gen and
   /// kill sets.
-  void solveDataflowBackward();
+  /// At control flow joins, the \p join operation is applied.
+  void solveBackward(JoinOperation join);
+
+  /// Calls solveBackward() with a bit-intersection as join operation.
+  void solveBackwardWithIntersect();
+
+  /// Calls solveBackward() with a bit-union as join operation.
+  void solveBackwardWithUnion();
 
   /// Debug dump the MemoryLifetime internals.
   void dump() const;

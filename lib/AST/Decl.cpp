@@ -26,7 +26,6 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ASTMangler.h"
@@ -34,6 +33,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -1054,7 +1054,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
-                             TypeLoc extendedType,
+                             TypeRepr *extendedType,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
@@ -1062,7 +1062,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     Decl(DeclKind::Extension, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
-    ExtendedType(extendedType),
+    ExtendedTypeRepr(extendedType),
     Inherited(inherited)
 {
   Bits.ExtensionDecl.DefaultAndMaxAccessLevel = 0;
@@ -1071,7 +1071,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
-                                     TypeLoc extendedType,
+                                     TypeRepr *extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
@@ -1151,6 +1151,13 @@ AccessLevel ExtensionDecl::getMaxAccessLevel() const {
   return evaluateOrDefault(ctx.evaluator,
     DefaultAndMaxAccessLevelRequest{const_cast<ExtensionDecl *>(this)},
     {AccessLevel::Private, AccessLevel::Private}).second;
+}
+      
+Type ExtensionDecl::getExtendedType() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    ExtendedTypeRequest{const_cast<ExtensionDecl *>(this)},
+    ErrorType::get(ctx));
 }
 
 /// Clone the given generic parameters in the given list. We don't need any
@@ -3446,18 +3453,6 @@ Type NominalTypeDecl::getDeclaredType() const {
   return DeclaredTy;
 }
 
-Type NominalTypeDecl::getDeclaredTypeInContext() const {
-  if (DeclaredTyInContext)
-    return DeclaredTyInContext;
-
-  auto *decl = const_cast<NominalTypeDecl *>(this);
-
-  auto interfaceType = getDeclaredInterfaceType();
-  decl->DeclaredTyInContext = mapTypeIntoContext(interfaceType);
-
-  return DeclaredTyInContext;
-}
-
 Type NominalTypeDecl::getDeclaredInterfaceType() const {
   if (DeclaredInterfaceTy)
     return DeclaredInterfaceTy;
@@ -3893,8 +3888,6 @@ ClassDecl::ClassDecl(SourceLoc ClassLoc, Identifier Name, SourceLoc NameLoc,
     = static_cast<unsigned>(CircularityCheck::Unchecked);
   Bits.ClassDecl.InheritsSuperclassInits = 0;
   Bits.ClassDecl.RawForeignKind = 0;
-  Bits.ClassDecl.Ancestry = 0;
-  Bits.ClassDecl.AncestryComputed = 0;
   Bits.ClassDecl.HasMissingDesignatedInitializers = 0;
   Bits.ClassDecl.HasMissingVTableEntries = 0;
   Bits.ClassDecl.IsIncompatibleWithWeakReferences = 0;
@@ -4029,16 +4022,20 @@ bool ClassDecl::inheritsSuperclassInitializers() {
   return Bits.ClassDecl.InheritsSuperclassInits;
 }
 
-AncestryOptions ClassDecl::checkAncestry() const {
-  // See if we've already computed this.
-  if (Bits.ClassDecl.AncestryComputed)
-    return AncestryOptions(Bits.ClassDecl.Ancestry);
 
+AncestryOptions ClassDecl::checkAncestry() const {
+  return AncestryOptions(evaluateOrDefault(getASTContext().evaluator,
+                           ClassAncestryFlagsRequest{const_cast<ClassDecl *>(this)},
+                           AncestryFlags()));
+}
+        
+llvm::Expected<AncestryFlags>
+ClassAncestryFlagsRequest::evaluate(Evaluator &evaluator, ClassDecl *value) const {
   llvm::SmallPtrSet<const ClassDecl *, 8> visited;
 
   AncestryOptions result;
-  const ClassDecl *CD = this;
-  auto *M = getParentModule();
+  const ClassDecl *CD = value;
+  auto *M = value->getParentModule();
 
   do {
     // If we hit circularity, we will diagnose at some point in typeCheckDecl().
@@ -4073,10 +4070,39 @@ AncestryOptions ClassDecl::checkAncestry() const {
     CD = CD->getSuperclassDecl();
   } while (CD != nullptr);
 
-  // Save the result for later.
-  const_cast<ClassDecl *>(this)->Bits.ClassDecl.Ancestry = result.toRaw();
-  const_cast<ClassDecl *>(this)->Bits.ClassDecl.AncestryComputed = 1;
-  return result;
+  return AncestryFlags(result.toRaw());
+}
+      
+void swift::simple_display(llvm::raw_ostream &out, AncestryFlags value) {
+  AncestryOptions opts(value);
+  out << "{ ";
+  // If we have more than one bit set, we need to print the separator.
+  bool wantsSeparator = false;
+  auto printBit = [&wantsSeparator, &out](bool val, StringRef name) {
+    if (wantsSeparator) {
+      out << ", ";
+    }
+      
+    if (!wantsSeparator) {
+      wantsSeparator = true;
+    }
+      
+    out << name;
+    if (val) {
+      out << " = true";
+    } else {
+      out << " = false";
+    }
+  };
+  printBit(opts.contains(AncestryFlags::ObjC), "ObjC");
+  printBit(opts.contains(AncestryFlags::ObjCMembers), "ObjCMembers");
+  printBit(opts.contains(AncestryFlags::Generic), "Generic");
+  printBit(opts.contains(AncestryFlags::Resilient), "Resilient");
+  printBit(opts.contains(AncestryFlags::ResilientOther), "ResilientOther");
+  printBit(opts.contains(AncestryFlags::ClangImported), "ClangImported");
+  printBit(opts.contains(AncestryFlags::RequiresStoredPropertyInits),
+           "RequiresStoredPropertyInits");
+  out << " }";
 }
 
 bool ClassDecl::isSuperclassOf(ClassDecl *other) const {
@@ -5752,19 +5778,19 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(Specifier specifier,
-                     SourceLoc specifierLoc, SourceLoc argumentNameLoc,
-                     Identifier argumentName, SourceLoc parameterNameLoc,
-                     Identifier parameterName, DeclContext *dc)
-  : VarDecl(DeclKind::Param,
-            /*IsStatic*/false,
-            specifier == ParamDecl::Specifier::Default
-            ? VarDecl::Introducer::Let
-            : VarDecl::Introducer::Var,
-            /*IsCaptureList*/false, parameterNameLoc, parameterName, dc,
-            StorageIsMutable_t(!isImmutableSpecifier(specifier))),
-  ArgumentName(argumentName), ArgumentNameLoc(argumentNameLoc),
-  SpecifierLoc(specifierLoc) {
+ParamDecl::ParamDecl(Specifier specifier, SourceLoc specifierLoc,
+                     SourceLoc argumentNameLoc, Identifier argumentName,
+                     SourceLoc parameterNameLoc, Identifier parameterName,
+                     DeclContext *dc)
+    : VarDecl(DeclKind::Param,
+              /*IsStatic*/ false,
+              specifier == ParamDecl::Specifier::Default
+                  ? VarDecl::Introducer::Let
+                  : VarDecl::Introducer::Var,
+              /*IsCaptureList*/ false, parameterNameLoc, parameterName, dc,
+              StorageIsMutable_t(!isImmutableSpecifier(specifier))),
+      ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
+      ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
 
   Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
   Bits.ParamDecl.IsTypeLocImplicit = false;
@@ -6359,37 +6385,22 @@ bool AbstractFunctionDecl::argumentNameIsAPIByDefault() const {
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
-  switch (getBodyKind()) {
-  case BodyKind::Deserialized:
-  case BodyKind::MemberwiseInitializer:
-  case BodyKind::None:
-  case BodyKind::Skipped:
+  if ((getBodyKind() == BodyKind::Synthesize ||
+       getBodyKind() == BodyKind::Unparsed) &&
+      !canSynthesize)
     return nullptr;
 
-  case BodyKind::Parsed:
-  case BodyKind::TypeChecked:
-    return Body;
+  ASTContext &ctx = getASTContext();
 
-  case BodyKind::Unparsed:
-    // FIXME: Go parse now!
+  // Don't allow getBody() to trigger parsing of an unparsed body containing the
+  // code completion location.
+  if (getBodyKind() == BodyKind::Unparsed &&
+      ctx.SourceMgr.rangeContainsCodeCompletionLoc(getBodySourceRange())) {
     return nullptr;
-
-  case BodyKind::Synthesize: {
-    if (!canSynthesize)
-      return nullptr;
-
-    const_cast<AbstractFunctionDecl *>(this)->setBodyKind(BodyKind::None);
-    BraceStmt *body;
-    bool isTypeChecked;
-
-    auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-    std::tie(body, isTypeChecked) = (Synthesizer.Fn)(
-        mutableThis, Synthesizer.Context);
-    mutableThis->setBody(
-        body, isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
-    return body;
   }
-  }
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator, ParseAbstractFunctionBodyRequest{mutableThis}, nullptr);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -6856,11 +6867,15 @@ bool AbstractFunctionDecl::hasInlinableBodyText() const {
   switch (getBodyKind()) {
   case BodyKind::Deserialized:
     return true;
+
+  case BodyKind::Unparsed:
   case BodyKind::Parsed:
   case BodyKind::TypeChecked:
-    return getBody() && !getBody()->isImplicit();
+    if (auto body = getBody())
+      return !body->isImplicit();
+    return false;
+
   case BodyKind::None:
-  case BodyKind::Unparsed:
   case BodyKind::Synthesize:
   case BodyKind::Skipped:
   case BodyKind::MemberwiseInitializer:
@@ -6939,6 +6954,18 @@ FuncDecl *FuncDecl::create(ASTContext &Context, SourceLoc StaticLoc,
   FD->getBodyResultTypeLoc() = FnRetType;
   return FD;
 }
+      
+OperatorDecl *FuncDecl::getOperatorDecl() const {
+  // Fast-path: Most functions are not operators.
+  if (!isOperator()) {
+    return nullptr;
+  }
+  return evaluateOrDefault(getASTContext().evaluator,
+                           FunctionOperatorRequest{
+                             const_cast<FuncDecl *>(this)
+                           },
+                           nullptr);
+ }
 
 AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,
@@ -7078,6 +7105,10 @@ SelfAccessKind FuncDecl::getSelfAccessKind() const {
   return evaluateOrDefault(ctx.evaluator,
                            SelfAccessKindRequest{const_cast<FuncDecl *>(this)},
                            SelfAccessKind::NonMutating);
+}
+
+bool FuncDecl::isCallAsFunctionMethod() const {
+  return getName() == getASTContext().Id_callAsFunction && isInstanceMember();
 }
 
 ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
@@ -7677,7 +7708,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Decl *decl) {
     simple_display(out, value);
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     out << "extension of ";
-    if (auto typeRepr = ext->getExtendedTypeLoc().getTypeRepr())
+    if (auto typeRepr = ext->getExtendedTypeRepr())
       typeRepr->print(out);
     else
       ext->getSelfNominalTypeDecl()->dumpRef(out);
@@ -7711,4 +7742,50 @@ SourceLoc swift::extractNearestSourceLoc(const Decl *decl) {
     return loc;
 
   return extractNearestSourceLoc(decl->getDeclContext());
+}
+
+Optional<BraceStmt *>
+ParseAbstractFunctionBodyRequest::getCachedResult() const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    return nullptr;
+
+  case BodyKind::TypeChecked:
+  case BodyKind::Parsed:
+    return afd->Body;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    return None;
+  }
+}
+
+void ParseAbstractFunctionBodyRequest::cacheResult(BraceStmt *value) const {
+  using BodyKind = AbstractFunctionDecl::BodyKind;
+  auto afd = std::get<0>(getStorage());
+  switch (afd->getBodyKind()) {
+  case BodyKind::Deserialized:
+  case BodyKind::MemberwiseInitializer:
+  case BodyKind::None:
+  case BodyKind::Skipped:
+    // The body is always empty, so don't cache anything.
+    assert(value == nullptr);
+    return;
+
+  case BodyKind::Parsed:
+  case BodyKind::TypeChecked:
+    afd->Body = value;
+    return;
+
+  case BodyKind::Synthesize:
+  case BodyKind::Unparsed:
+    llvm_unreachable("evaluate() did not set the body kind");
+    return;
+  }
+
 }

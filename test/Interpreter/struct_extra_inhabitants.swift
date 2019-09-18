@@ -11,6 +11,7 @@
 // REQUIRES: swift_stdlib_asserts
 
 // REQUIRES: executable_test
+// UNSUPPORTED: use_os_stdlib
 
 // CHECK-NOT: Type verification
 

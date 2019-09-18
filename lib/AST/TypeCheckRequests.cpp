@@ -23,7 +23,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the type checker type zone (zone 10).
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE

@@ -142,6 +142,16 @@ func testAllMembersVectorProtocol() {
   assertConformsToVectorProtocol(AllMembersVectorProtocol.TangentVector.self)
 }
 
+// Test generic `VectorProtocol`-conforming members.
+protocol Module: Differentiable where TangentVector: VectorProtocol {}
+struct Sequential<Layer1: Module, Layer2: Module>: Module
+where
+  Layer1.TangentVector.VectorSpaceScalar == Layer2.TangentVector.VectorSpaceScalar
+{
+  var layer1: Layer1
+  var layer2: Layer2
+}
+
 // Test type `AllMembersElementaryFunctions` whose members conforms to `ElementaryFunctions`,
 // in which case we should make `TangentVector` conform to `ElementaryFunctions`.
 struct MyVector2 : ElementaryFunctions, Differentiable, EuclideanDifferentiable {

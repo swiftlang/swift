@@ -257,6 +257,17 @@ enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
   return pat;
 }
 
+/// Build a type-checked integer literal.
+static IntegerLiteralExpr *buildIntegerLiteral(ASTContext &C, unsigned index) {
+  Type intType = C.getIntDecl()->getDeclaredType();
+
+  auto literal = IntegerLiteralExpr::createFromUnsigned(C, index);
+  literal->setType(intType);
+  literal->setBuiltinInitializer(C.getIntBuiltinInitDecl(C.getIntDecl()));
+
+  return literal;
+}
+
 /// Create AST statements which convert from an enum to an Int with a switch.
 /// \p stmts The generated statements are appended to this vector.
 /// \p parentDC Either an extension or the enum itself.
@@ -298,15 +309,20 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
                                           SourceLoc(), SourceLoc(),
                                           Identifier(), elt, nullptr);
     pat->setImplicit();
+    pat->setType(enumType);
 
     auto labelItem = CaseLabelItem(pat);
 
     // generate: indexVar = <index>
-    auto indexExpr = IntegerLiteralExpr::createFromUnsigned(C, index++);
+    auto indexExpr = buildIntegerLiteral(C, index++);
+
     auto indexRef = new (C) DeclRefExpr(indexVar, DeclNameLoc(),
-                                        /*implicit*/true);
+                                        /*implicit*/true,
+                                        AccessSemantics::Ordinary,
+                                        LValueType::get(intType));
     auto assignExpr = new (C) AssignExpr(indexRef, SourceLoc(),
                                          indexExpr, /*implicit*/ true);
+    assignExpr->setType(TupleType::getEmpty(C));
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
     cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
@@ -316,7 +332,9 @@ static DeclRefExpr *convertEnumToIndex(SmallVectorImpl<ASTNode> &stmts,
 
   // generate: switch enumVar { }
   auto enumRef = new (C) DeclRefExpr(enumVarDecl, DeclNameLoc(),
-                                     /*implicit*/true);
+                                     /*implicit*/true,
+                                     AccessSemantics::Ordinary,
+                                     enumVarDecl->getType());
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), enumRef,
                                        SourceLoc(), cases, SourceLoc(), C);
 
@@ -381,17 +399,23 @@ deriveBodyEquatable_enum_uninhabited_eq(AbstractFunctionDecl *eqDecl, void *) {
   SmallVector<ASTNode, 0> cases;
 
   // switch (a, b) { }
-  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true);
-  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true);
+  auto aRef = new (C) DeclRefExpr(aParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  aParam->getType());
+  auto bRef = new (C) DeclRefExpr(bParam, DeclNameLoc(), /*implicit*/ true,
+                                  AccessSemantics::Ordinary,
+                                  bParam->getType());
+  TupleTypeElt abTupleElts[2] = { aParam->getType(), bParam->getType() };
   auto abExpr = TupleExpr::create(C, SourceLoc(), {aRef, bRef}, {}, {},
                                   SourceLoc(), /*HasTrailingClosure*/ false,
-                                  /*implicit*/ true);
+                                  /*implicit*/ true,
+                                  TupleType::get(abTupleElts, C));
   auto switchStmt = SwitchStmt::create(LabeledStmtInfo(), SourceLoc(), abExpr,
                                        SourceLoc(), cases, SourceLoc(), C);
   statements.push_back(switchStmt);
 
   auto body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/false };
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for an '==' operator for an enum that has no associated
@@ -439,16 +463,20 @@ deriveBodyEquatable_enum_noAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
                                       fnType);
   }
 
+  TupleTypeElt abTupleElts[2] = { aIndex->getType(), bIndex->getType() };
   TupleExpr *abTuple = TupleExpr::create(C, SourceLoc(), { aIndex, bIndex },
                                          { }, { }, SourceLoc(),
                                          /*HasTrailingClosure*/ false,
-                                         /*Implicit*/ true);
+                                         /*Implicit*/ true,
+                                         TupleType::get(abTupleElts, C));
 
-  auto *cmpExpr = new (C) BinaryExpr(cmpFuncExpr, abTuple, /*implicit*/ true);
+  auto *cmpExpr = new (C) BinaryExpr(
+      cmpFuncExpr, abTuple, /*implicit*/ true,
+      fnType->castTo<FunctionType>()->getResult());
   statements.push_back(new (C) ReturnStmt(SourceLoc(), cmpExpr));
 
   BraceStmt *body = BraceStmt::create(C, SourceLoc(), statements, SourceLoc());
-  return { body, /*isTypeChecked=*/false };
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive the body for an '==' operator for an enum where at least one of the
@@ -1132,19 +1160,49 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
   ASTContext &C = parentDC->getASTContext();
 
   // return _hashValue(for: self)
-  auto *hashFunc = C.getHashValueForDecl();
-  auto hashExpr = new (C) DeclRefExpr(hashFunc, DeclNameLoc(),
-                                      /*implicit*/ true);
+
+  // 'self'
   auto selfDecl = hashValueDecl->getImplicitSelfDecl();
+  Type selfType = selfDecl->getType();
   auto selfRef = new (C) DeclRefExpr(selfDecl, DeclNameLoc(),
-                                     /*implicit*/ true);
+                                     /*implicit*/ true,
+                                     AccessSemantics::Ordinary,
+                                     selfType);
+
+  // _hashValue(for:)
+  auto *hashFunc = C.getHashValueForDecl();
+  if (!hashFunc->hasInterfaceType())
+    static_cast<TypeChecker *>(C.getLazyResolver())->validateDecl(hashFunc);
+
+  auto substitutions = SubstitutionMap::get(
+      hashFunc->getGenericSignature(),
+      [&](SubstitutableType *dependentType) {
+        if (auto gp = dyn_cast<GenericTypeParamType>(dependentType)) {
+          if (gp->getDepth() == 0 && gp->getIndex() == 0)
+            return selfType;
+        }
+
+        return Type(dependentType);
+      },
+      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+  ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
+
+  Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
+  auto hashExpr = new (C) DeclRefExpr(hashFuncRef, DeclNameLoc(),
+                                      /*implicit*/ true,
+                                      AccessSemantics::Ordinary,
+                                      hashFuncType);
+  Type hashFuncResultType =
+      hashFuncType->castTo<AnyFunctionType>()->getResult();
   auto callExpr = CallExpr::createImplicit(C, hashExpr,
                                            { selfRef }, { C.Id_for });
+  callExpr->setType(hashFuncResultType);
+
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), callExpr);
 
   auto body = BraceStmt::create(C, SourceLoc(), {returnStmt}, SourceLoc(),
                                 /*implicit*/ true);
-  return { body, /*isTypeChecked=*/false };
+  return { body, /*isTypeChecked=*/true };
 }
 
 /// Derive a 'hashValue' implementation.

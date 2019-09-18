@@ -2857,7 +2857,7 @@ public:
       return Param(getType(), Identifier(), getFlags().asParamFlags());
     }
 
-    Yield subst(SubstitutionMap subs, SubstOptions options = None) const {
+    Yield subst(SubstitutionMap subs, SubstOptions options=None) const {
       return Yield(getType().subst(subs, options), getFlags());
     }
 
@@ -2878,7 +2878,7 @@ public:
     CanType getType() const { return CanType(Yield::getType()); }
     CanParam asParam() const { return CanParam::getFromParam(Yield::asParam());}
 
-    CanYield subst(SubstitutionMap subs, SubstOptions options = None) const {
+    CanYield subst(SubstitutionMap subs, SubstOptions options=None) const {
       return CanYield(getType().subst(subs, options)->getCanonicalType(),
                       getFlags());
     }

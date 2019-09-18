@@ -147,6 +147,8 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Name##RetainInst: \
   case SILInstructionKind::StrongRetain##Name##Inst: \

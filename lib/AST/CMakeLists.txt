@@ -52,6 +52,7 @@ add_swift_host_library(swiftAST STATIC
   GenericSignature.cpp
   GenericSignatureBuilder.cpp
   Identifier.cpp
+  ImportCache.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
   Module.cpp
