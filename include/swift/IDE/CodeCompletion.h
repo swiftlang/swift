@@ -498,7 +498,6 @@ enum class CompletionKind {
   AttributeBegin,
   AttributeDeclParen,
   PoundAvailablePlatform,
-  AssignmentRHS,
   CallArg,
   ReturnStmtExpr,
   YieldStmtExpr,
