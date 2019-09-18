@@ -172,11 +172,11 @@ public:
 
   /// Returns the first non-missing token in this syntax. Returns None if there
   /// is no non-missing token.
-  Optional<TokenSyntax> getFirstToken();
+  Optional<TokenSyntax> getFirstToken() const;
 
   /// Returns the last non-missing token in this syntax. Returns None if there
   /// is no non-missing token.
-  Optional<TokenSyntax> getLastToken();
+  Optional<TokenSyntax> getLastToken() const;
 
   /// Print the syntax node with full fidelity to the given output stream.
   void print(llvm::raw_ostream &OS, SyntaxPrintOptions Opts = SyntaxPrintOptions()) const;
