@@ -236,8 +236,13 @@ function(_compile_swift_files
     if(NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "TensorFlow" AND
        NOT "${SWIFTFILE_MODULE_NAME}" STREQUAL "DifferentiationUnittest")
       list(APPEND swift_flags "-enable-library-evolution")
-      list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
     endif()
+    # FIXME(SR-11336): `-enable-ownership-stripping-after-serialization` for
+    # swiftCore causes test/AutoDiff/array.swift to crash, related to
+    # Array and key paths.
+    # Disabling the flag for swiftCore requires disabling the flag for all
+    # other standard library modules.
+    # list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)
