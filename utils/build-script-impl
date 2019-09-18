@@ -2582,15 +2582,18 @@ for host in "${ALL_HOSTS[@]}"; do
                     TF_LIB_DIR="${SWIFT_LIB_PATH}/swift/${SWIFT_HOST_VARIANT}"
                     call mkdir -p "${TF_LIB_DIR}"
 
-                    # Bazel-built libraries do not have write permission, which is
-                    # problematic for overwriting/stripping symbols. Thus, write
-                    # permission is added here.
                     for lib_name in tensorflow; do
-                        lib=".*lib${lib_name}.so[0-9.]*"
-                        dylib=".*lib${lib_name}[0-9.]*.dylib"
-                        find "${TF_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec rm -f {} \;
-                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec chmod +w {} +
-                        find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -p {} "${TF_LIB_DIR}" \;
+                        lib_full_name="lib${lib_name}.so"
+                        # Wipe existing TensorFlow libraries in the destination
+                        # directory. This ensures that old versions of libraries
+                        # are not copied, taking up unnecessary space.
+                        call rm -rf "${TF_LIB_DIR}/${lib_full_name}"*
+                        # Copy TensorFlow libraries, preserving symlinks.
+                        call find "${TENSORFLOW_HOST_LIB_DIR}" \( -regex ".*${lib_full_name}[0-9.]*" \) -exec cp -a -v {} "${TF_LIB_DIR}" \;
+                        # Bazel-built libraries do not have write permission, which is
+                        # problematic for overwriting/stripping symbols. Thus, write
+                        # permission is added here.
+                        call chmod +w "${TF_LIB_DIR}/${lib_full_name}"*
                     done
 
                     cmake_options=(
@@ -4007,15 +4010,17 @@ for host in "${ALL_HOSTS[@]}"; do
                     exit 1
                 fi
                 echo "--- Installing ${product} ---"
-                TF_BUILD_DIR="$(build_directory ${host} ${product})"
-                TF_LIBDIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}"
+                TF_LIB_DIR="$(build_directory ${host} swift)/lib/swift/${SWIFT_HOST_VARIANT}"
                 TF_DEST_DIR="$(get_host_install_destdir ${host})$(get_host_install_prefix ${host})lib/swift/${SWIFT_HOST_VARIANT}"
                 mkdir -p "${TF_DEST_DIR}"
                 for lib_name in tensorflow; do
-                    lib=".*lib${lib_name}.so[0-9.]*"
-                    dylib=".*lib${lib_name}[0-9.]*.dylib"
-                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec echo "{} => ${TF_DEST_DIR}" \;
-                    find "${TF_LIBDIR}" \( -regex "${lib}" -o -regex "${dylib}" \) -exec cp -a {} "${TF_DEST_DIR}" \;
+                    lib_full_name="lib${lib_name}.so"
+                    # Wipe existing TensorFlow libraries in the destination
+                    # directory. This ensures that old versions of libraries
+                    # are not copied, taking up unnecessary space.
+                    call rm -rf "${TF_DEST_DIR}/${lib_full_name}"*
+                    # Copy TensorFlow libraries, preserving symlinks.
+                    call find "${TF_LIB_DIR}" \( -regex ".*${lib_full_name}[0-9.]*" \) -exec cp -a -v {} "${TF_DEST_DIR}" \;
                 done
                 continue
                 ;;
