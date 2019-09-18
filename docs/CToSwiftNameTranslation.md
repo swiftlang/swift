@@ -1,6 +1,6 @@
 # Name Translation from C to Swift
 
-This document gives a high-level description of how C and Objective-C declarations are translated to Swift, with particular focus on how names are adjusted. It is not attempting to be a *complete* description of everything the compiler does except with regards to how *names* are transformed; even there, some special cases that only apply to Apple's SDKs have been omitted.
+This document gives a high-level description of how C and Objective-C declarations are translated to Swift, with particular focus on how names are adjusted. It is not attempting to be a *complete* description of everything the compiler does except with regards to how *names* are transformed; even there, some special cases that only apply to Apple's SDKs have been omitted. The example code shown is for illustrative purposes and does not always include all parts of an imported API's interface.
 
 ## Word boundaries
 
@@ -238,5 +238,209 @@ _The original intent of the `swift_private` attribute was additionally to limit 
 
 _For "historical reasons", the `swift_private` attribute is ignored on factory methods with no arguments imported as initializers. This is essentially matching the behavior of older Swift compilers for source compatibility in case someone has marked such a factory method as `swift_private`._
 
+
+## Custom names
+
+The `swift_name` Clang attribute can be used to control how a declaration imports into Swift. If it's valid, the value of the `swift_name` attribute always overrides any other name transformation rules (prefix-stripping, underscore-prepending, etc.)
+
+### Types and globals
+
+The `swift_name` attribute can be used to give a type or a global a custom name. In the simplest form, the value of the attribute must be a valid Swift identifier.
+
+```objc
+__attribute__((swift_name("SpacecraftCoordinates")))
+struct SPKSpacecraftCoordinates {
+  double x, y, z, t; // space and time, of course
+};
+```
+
+```swift
+struct SpacecraftCoordinates {
+  var x, y, z, t: Double
+}
+```
+
+### Import-as-member
+
+A custom name that starts with an identifier followed by a period is taken to be a member name. The identifier should be the imported Swift name of a C/Objective-C type in the same module. In this case, the type or global will be imported as a static member of the named type.
+
+```objc
+__attribute__((swift_name("SpacecraftCoordinates.earth")))
+extern const struct SPKSpacecraftCoordinates SPKSpacecraftCoordinatesEarth;
+```
+
+```swift
+extension SpacecraftCoordinates {
+  static var earth: SpacecraftCoordinates { get }
+}
+```
+
+Note that types cannot be imported as members of protocols.
+
+_The "in the same module" restriction is considered a technical limitation; a forward declaration of the base type will work around it._
+
+
+### C functions with custom names
+
+The `swift_name` attribute can be used to give a C function a custom name. The value of the attribute must be a full Swift function name, including parameter labels.
+
+```objc
+__attribute__((swift_name("doSomething(to:bar:)")))
+void doSomethingToFoo(Foo *foo, int bar);
+
+// Usually seen as NS_SWIFT_NAME.
+```
+
+```swift
+func doSomething(foo: UnsafeMutablePointer<Foo>, bar: Int32)
+```
+
+An underscore can be used in place of an empty parameter label, as in Swift.
+
+A C function with zero arguments and a non-`void` return type can also be imported as a computed variable by using the `getter:` prefix on the name. A function with one argument and a `void` return type can optionally serve as the setter for that variable using `setter:`.
+
+```objc
+__attribute__((swift_name("getter:globalCounter()")))
+int getGlobalCounter(void);
+__attribute__((swift_name("setter:globalCounter(_:)")))
+void setGlobalCounter(int newValue);
+```
+
+```swift
+var globalCounter: Int32 { get set }
+```
+
+Note that the argument lists must still be present even though the name used is the name of the variable. (Also note the `void` parameter list to specify a C function with zero arguments. This is required!)
+
+Variables with setters and no getters are not supported.
+
+
+#### Import-as-member
+
+Like types and globals, functions can be imported as static members of types.
+
+```objc
+__attribute__((swift_name("NSSound.beep()")))
+void NSBeep(void);
+```
+
+```swift
+extension NSSound {
+  static func beep()
+}
+```
+
+However, by giving a parameter the label `self`, a function can also be imported as an instance member of a type __T__. In this case, the parameter labeled `self` must either have the type __T__ itself, or be a pointer to __T__. The latter is only valid if __T__ is imported as a value type; if the pointer is non-`const`, the resulting method will be `mutating`. If __T__ is a class, the function will be `final`.
+
+```objc
+typedef struct {
+  int value;
+} Counter;
+
+__attribute__((swift_name("Counter.printValue(self:)")))
+void CounterPrintValue(Counter c);
+__attribute__((swift_name("Counter.printValue2(self:)")))
+void CounterPrintValue2(const Counter *c);
+__attribute__((swift_name("Counter.resetValue(self:)")))
+void CounterResetValue(Counter *c);
+```
+
+```swift
+struct Counter {
+  var value: Int32 { get set }
+}
+
+extension Counter {
+  func printValue()
+  func printValue2()
+  mutating func resetValue()
+}
+```
+
+This also applies to getters and setters, to be imported as instance properties.
+
+```objc
+__attribute__((swift_name("getter:Counter.absoluteValue(self:)")))
+int CounterGetAbsoluteValue(Counter c);
+```
+
+```swift
+extension Counter {
+  var absoluteValue: Int32 { get }
+}
+```
+
+The getter/setter syntax also allows for subscripts by using the base name `subscript`.
+
+```objc
+__attribute__((swift_name("getter:LinkedListOfInts.subscript(self:_:)")))
+int LinkedListGetAtIndex(const LinkedListOfInts *head, int index);
+```
+
+```swift
+extension LinkedListOfInts {
+  subscript(_ index: Int32) -> Int32 { get }
+}
+```
+
+Finally, functions can be imported as initializers as well by using the base name `init`. These are considered "factory" initializers and are never inherited or overridable. They must not have a `self` parameter.
+
+```objc
+__attribute__((swift_name("Counter.init(initialValue:)")))
+Counter CounterCreateWithInitialValue(int value);
+```
+
+```swift
+extension Counter {
+  /* non-inherited */ init(initialValue value: Int32)
+}
+```
+
+
+### Enumerators (enum cases)
+
+The `swift_name` attribute can be used to rename enumerators. As mentioned above, not only does no further prefix-stripping occur on the resulting name, but the presence of a custom name removes the enum case from the computation of a prefix for the other cases.
+
+```
+// Actual example from Apple's SDKs; in fact, the first shipping example of
+// swift_name on an enumerator at all!
+typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
+  NSXMLInvalidKind = 0,
+  NSXMLDocumentKind,
+  NSXMLElementKind,
+  NSXMLAttributeKind,
+  NSXMLNamespaceKind,
+  NSXMLProcessingInstructionKind,
+  NSXMLCommentKind,
+  NSXMLTextKind,
+  NSXMLDTDKind NS_SWIFT_NAME(DTDKind),
+  NSXMLEntityDeclarationKind,
+  NSXMLAttributeDeclarationKind,
+  NSXMLElementDeclarationKind,
+  NSXMLNotationDeclarationKind
+};
+```
+
+```
+public enum Kind : UInt {
+  case invalid
+  case document
+  case element
+  case attribute
+  case namespace
+  case processingInstruction
+  case comment
+  case text
+  case DTDKind
+  case entityDeclaration
+  case attributeDeclaration
+  case elementDeclaration
+  case notationDeclaration
+}
+```
+
+Although enumerators always have global scope in C, they are often imported as members in Swift, and thus the `swift_name` attribute cannot be used to import them as members of another type unless the enum type is anonymous.
+
+_Currently, `swift_name` does not even allow importing an enum case as a member of the enum type itself, even if the enum is not recognized as an `@objc` enum, error code enum, or option set (i.e. the situation where a case is imported as a global constant)._
 
 ## More to come...
