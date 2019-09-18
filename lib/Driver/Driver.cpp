@@ -1782,6 +1782,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       }
       case file_types::TY_SwiftModuleFile:
       case file_types::TY_SwiftModuleDocFile:
+      case file_types::TY_SwiftSourceInfoFile:
         if (OI.ShouldGenerateModule && !OI.shouldLink()) {
           // When generating a .swiftmodule as a top-level output (as opposed
           // to, for example, linking an image), treat .swiftmodule files as
@@ -2541,9 +2542,11 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
     chooseSwiftModuleOutputPath(C, OutputMap, workingDirectory, Output.get());
 
   if (OI.ShouldGenerateModule &&
-      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA)))
-    chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory,
-                                   Output.get());
+      (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
+    chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory, Output.get());
+    choosePrivateOutputFilePath(C, OutputMap, workingDirectory, Output.get(),
+                                file_types::TY_SwiftSourceInfoFile);
+  }
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path))
@@ -2781,6 +2784,41 @@ void Driver::chooseSwiftModuleOutputPath(Compilation &C,
     llvm::sys::path::replace_extension(
         Path, file_types::getExtension(TY_SwiftModuleFile));
     Output->setAdditionalOutputForType(TY_SwiftModuleFile, Path);
+    if (isTempFile)
+      C.addTemporaryFile(Path);
+  }
+}
+
+void Driver::choosePrivateOutputFilePath(Compilation &C,
+                                         const TypeToPathMap *OutputMap,
+                                         StringRef workingDirectory,
+                                         CommandOutput *Output,
+                                         file_types::ID fileID) const {
+  if (hasExistingAdditionalOutput(*Output, fileID))
+    return;
+
+  StringRef OFMOutputPath;
+  if (OutputMap) {
+    auto iter = OutputMap->find(fileID);
+    if (iter != OutputMap->end())
+      OFMOutputPath = iter->second;
+  }
+  if (!OFMOutputPath.empty()) {
+    // Prefer a path from the OutputMap.
+    Output->setAdditionalOutputForType(fileID, OFMOutputPath);
+  } else if (Output->getPrimaryOutputType() != file_types::TY_Nothing) {
+    auto ModulePath = Output->getAnyOutputForType(file_types::TY_SwiftModuleFile);
+    bool isTempFile = C.isTemporaryFile(ModulePath);
+    auto ModuleName = llvm::sys::path::filename(ModulePath);
+    llvm::SmallString<128> Path(llvm::sys::path::parent_path(ModulePath));
+    llvm::sys::path::append(Path, "Private");
+    // If the build system has created a Private dir for us to include the file, use it.
+    if (!llvm::sys::fs::exists(Path)) {
+      llvm::sys::path::remove_filename(Path);
+    }
+    llvm::sys::path::append(Path, ModuleName);
+    llvm::sys::path::replace_extension(Path, file_types::getExtension(fileID));
+    Output->setAdditionalOutputForType(fileID, Path);
     if (isTempFile)
       C.addTemporaryFile(Path);
   }

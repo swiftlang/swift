@@ -310,9 +310,11 @@ function(_compile_swift_files
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
+      set(specific_module_private_dir "${specific_module_dir}/Private")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
     else()
       set(specific_module_dir)
+      set(specific_module_private_dir)
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -490,6 +492,7 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
+          ${specific_module_private_dir}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"

@@ -354,6 +354,12 @@ private:
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
 
+  void choosePrivateOutputFilePath(Compilation &C,
+                                   const TypeToPathMap *OutputMap,
+                                   StringRef workingDirectory,
+                                   CommandOutput *Output,
+                                   file_types::ID fileID) const;
+
   void chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                  StringRef workingDirectory,
                                  llvm::SmallString<128> &buffer,
