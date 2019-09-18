@@ -556,7 +556,8 @@ static Type formExtensionInterfaceType(
   }
 
   // If we have a typealias, try to form type sugar.
-  if (typealias && TypeChecker::isPassThroughTypealias(typealias, typealias->getUnderlyingType(), nominal)) {
+  if (typealias && TypeChecker::isPassThroughTypealias(
+                       typealias, typealias->getUnderlyingType(), nominal)) {
     auto typealiasSig = typealias->getGenericSignature();
     SubstitutionMap subMap;
     if (typealiasSig) {
@@ -565,9 +566,9 @@ static Type formExtensionInterfaceType(
       mustInferRequirements = true;
     }
 
-    resultType = TypeAliasType::get(typealias, parentType, subMap,
-                                    resultType);
+    resultType = TypeAliasType::get(typealias, parentType, subMap, resultType);
   }
+
 
   return resultType;
 }
