@@ -1665,10 +1665,19 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(type_cannot_conform, none,
+      "%select{|value of protocol }0type %1 cannot conform to %2; "
+      "only struct/enum/class types can conform to protocols",
+      (bool, Type, Type))
+NOTE(required_by_opaque_return,none,
+    "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
+NOTE(required_by_decl,none,
+     "required by %0 %1 where %2 = %3",
+     (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(required_by_decl_ref,none,
+     "required by referencing %0 %1 on %2 where %3 = %4",
+     (DescriptiveDeclKind, DeclName, Type, Type, Type))
 
-ERROR(protocol_does_not_conform_objc,none,
-      "protocol type %0 cannot conform to %1 because only concrete "
-      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",

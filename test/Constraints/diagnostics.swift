@@ -28,6 +28,9 @@ func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 func f4(_ x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
+// expected-note@-1 {{required by global function 'f5' where 'T' = '(Int) -> Int'}}
+// expected-note@-2 {{required by global function 'f5' where 'T' = '(Int, String)'}}
+// expected-note@-3 {{required by global function 'f5' where 'T' = 'Int.Type'}}
 
 func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
@@ -46,8 +49,10 @@ f0(i, i,
    i) // expected-error{{extra argument in call}}
 
 
-// Position mismatch
-f5(f4)  // expected-error {{argument type '(Int) -> Int' does not conform to expected type 'P2'}}
+// Cannot conform to protocols.
+f5(f4)  // expected-error {{type '(Int) -> Int' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5((1, "hello"))  // expected-error {{type '(Int, String)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5(Int.self) // expected-error {{type 'Int.Type' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // Tuple element not convertible.
 f0(i,
@@ -94,10 +99,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
+// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{argument type 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
+f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
