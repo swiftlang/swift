@@ -2559,13 +2559,22 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   // rdar://problem/50968433: Unnamed_addr constants appear to get emitted
   // with incorrect alignment by the LLVM JIT in some cases. Don't use
   // unnamed_addr as a workaround.
-  if (!IGM.getOptions().UseJIT) {
+  // rdar://problem/53836960: LLVM miscompiles relative references to local
+  // symbols.
+  if (!IGM.getOptions().UseJIT
+      && (!IGM.Triple.isOSDarwin()
+          || (IGM.Triple.getArch() != llvm::Triple::x86 &&
+              IGM.Triple.getArchName() != "armv7" &&
+              IGM.Triple.getArchName() != "armv7s" &&
+              IGM.Triple.getArchName() != "thumbv7" &&
+              IGM.Triple.getArchName() != "thumbv7s" &&
+              !IGM.Triple.isWatchABI()))) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
       .to(gotEquivalent);
   }
-  
+
   return gotEquivalent;
 }
 
