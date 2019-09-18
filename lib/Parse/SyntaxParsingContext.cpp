@@ -163,8 +163,9 @@ const SyntaxParsingContext *SyntaxParsingContext::getRoot() const {
   return Curr;
 }
 
-ParsedTokenSyntax &&SyntaxParsingContext::popToken() {
-  return std::move(popIf<ParsedTokenSyntax>().getValue());
+ParsedTokenSyntax SyntaxParsingContext::popToken() {
+  auto tok = popIf<ParsedTokenSyntax>();
+  return std::move(tok.getValue());
 }
 
 /// Add Token with Trivia to the parts.
