@@ -1131,3 +1131,17 @@ struct UseNonMutatingProjectedValueSet {
     x = 42  // expected-error{{cannot assign to property: 'self' is immutable}}
   }
 }
+
+// SR-11381
+
+@propertyWrapper
+struct SR_11381_W<T> {
+  init(wrappedValue: T) {}
+  var wrappedValue: T {
+    fatalError()
+  }
+}
+
+struct SR_11381_S {
+  @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+}
