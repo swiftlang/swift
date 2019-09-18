@@ -2633,7 +2633,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                           emptyLocator);
         return propertyType;
       }
-      
+
       // Otherwise, compute the wrapped value type directly.
       return computeWrappedValueType(wrappedVar, initType);
     }
@@ -2654,10 +2654,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         // is the initialization of the property wrapper instance.
         initType = cs.getType(expr);
 
-        // Add a conversion constraint between the pattern type and the
+        // Add an equal constraint between the pattern type and the
         // property wrapper's "value" type.
-        cs.addConstraint(ConstraintKind::Conversion, patternType,
-                         getPatternInitType(&cs), Locator, /*isFavored*/true);
+        cs.addConstraint(ConstraintKind::Equal, patternType,
+                         getPatternInitType(&cs), Locator, /*isFavored*/ true);
       } else {
         // The initializer type is the type of the pattern.
         initType = patternType;
