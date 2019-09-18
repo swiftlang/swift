@@ -325,11 +325,8 @@ public:
     return { false, DRE };
   }
 
-  void propagateCaptures(AnyFunctionRef innerClosure, SourceLoc captureLoc) {
-    TypeChecker::computeCaptures(innerClosure);
-
-    auto &captureInfo = innerClosure.getCaptureInfo();
-
+  void propagateCaptures(const CaptureInfo &captureInfo,
+                         SourceLoc loc) {
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl()->getDeclContext() == CurDC)
@@ -347,18 +344,19 @@ public:
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      addCapture(CapturedValue(capture.getDecl(), Flags, captureLoc));
+      addCapture(CapturedValue(capture.getDecl(), Flags, capture.getLoc()));
     }
 
     if (GenericParamCaptureLoc.isInvalid())
       if (captureInfo.hasGenericParamCaptures())
-        GenericParamCaptureLoc = innerClosure.getLoc();
+        GenericParamCaptureLoc = loc;
 
-    if (DynamicSelfCaptureLoc.isInvalid())
+    if (DynamicSelfCaptureLoc.isInvalid()) {
       if (captureInfo.hasDynamicSelfCapture()) {
-        DynamicSelfCaptureLoc = innerClosure.getLoc();
+        DynamicSelfCaptureLoc = loc;
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
+    }
 
     if (!OpaqueValue) {
       if (captureInfo.hasOpaqueValueCapture())
@@ -368,14 +366,8 @@ public:
 
   bool walkToDeclPre(Decl *D) override {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      propagateCaptures(AFD, AFD->getLoc());
-
-      // Can default parameter initializers capture state?  That seems like
-      // a really bad idea.
-      for (auto *param : *AFD->getParameters())
-        if (auto E = param->getDefaultValue())
-          E->walk(*this);
-
+      TypeChecker::computeCaptures(AFD);
+      propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
       return false;
     }
 
@@ -569,7 +561,8 @@ public:
     // list computed; we just propagate it, filtering out stuff that they
     // capture from us.
     if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
-      propagateCaptures(SubCE, SubCE->getStartLoc());
+      TypeChecker::computeCaptures(SubCE);
+      propagateCaptures(SubCE->getCaptureInfo(), SubCE->getLoc());
       return { false, E };
     }
 
@@ -609,16 +602,41 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     finder.checkType(AFR.getType(), AFR.getLoc());
   }
 
-  auto captures = finder.getCaptureInfo();
-
   // A generic function always captures outer generic parameters.
+  bool isGeneric = false;
   auto *AFD = AFR.getAbstractFunctionDecl();
-  if (AFD) {
-    if (AFD->getGenericParams())
-      captures.setGenericParamCaptures(true);
-  }
+  if (AFD)
+    isGeneric = AFD->isGeneric();
 
+  auto captures = finder.getCaptureInfo();
+  if (isGeneric)
+    captures.setGenericParamCaptures(true);
   AFR.setCaptureInfo(captures);
+
+  // Compute captures for default argument expressions.
+  if (auto *AFD = AFR.getAbstractFunctionDecl()) {
+    for (auto *P : *AFD->getParameters()) {
+      if (auto E = P->getDefaultValue()) {
+        FindCapturedVars finder(Context,
+                                E->getLoc(),
+                                AFD,
+                                /*isNoEscape=*/false,
+                                /*isObjC=*/false);
+        E->walk(finder);
+
+        if (!AFD->getDeclContext()->isLocalContext() &&
+            finder.getDynamicSelfCaptureLoc().isValid()) {
+          Context.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                                 diag::dynamic_self_default_arg);
+        }
+
+        auto captures = finder.getCaptureInfo();
+        if (isGeneric)
+          captures.setGenericParamCaptures(true);
+        P->setDefaultArgumentCaptureInfo(captures);
+      }
+    }
+  }
 
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.

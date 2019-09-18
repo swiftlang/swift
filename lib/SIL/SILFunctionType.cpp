@@ -715,7 +715,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 /// If we ever add that ability, it will be a different capture list
 /// from the function to which the argument is attached.
 static void
-lowerCaptureContextParameters(TypeConverter &TC, AnyFunctionRef function,
+lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
                               CanGenericSignature genericSig,
                               ResilienceExpansion expansion,
                               SmallVectorImpl<SILParameterInfo> &inputs) {
@@ -725,8 +725,7 @@ lowerCaptureContextParameters(TypeConverter &TC, AnyFunctionRef function,
   // canonicalize references to the generic parameters that may appear in
   // non-canonical types in that context. We need the original generic
   // signature from the AST for that.
-  auto origGenericSig = function.getGenericSignature();
-
+  auto origGenericSig = function.getAnyFunctionRef()->getGenericSignature();
   auto loweredCaptures = TC.getLoweredLocalCaptures(function);
 
   for (auto capture : loweredCaptures.getCaptures()) {
@@ -999,18 +998,12 @@ static CanSILFunctionType getSILFunctionType(
                                 yields, coroutineKind);
   
   // Lower the capture context parameters, if any.
-  //
-  // *NOTE* Currently default arg generators can not capture anything.
-  // If we ever add that ability, it will be a different capture list
-  // from the function to which the argument is attached.
-  if (constant && !constant->isDefaultArgGenerator()) {
-    if (auto function = constant->getAnyFunctionRef()) {
-      auto expansion = ResilienceExpansion::Maximal;
-      if (constant->isSerialized())
-        expansion = ResilienceExpansion::Minimal;
-      lowerCaptureContextParameters(TC, *function, genericSig, expansion,
-                                    inputs);
-    }
+  if (constant && constant->getAnyFunctionRef()) {
+    auto expansion = ResilienceExpansion::Maximal;
+    if (constant->isSerialized())
+      expansion = ResilienceExpansion::Minimal;
+    lowerCaptureContextParameters(TC, *constant, genericSig, expansion,
+                                  inputs);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;

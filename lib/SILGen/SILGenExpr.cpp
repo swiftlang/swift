@@ -1541,8 +1541,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
 
   // C function pointers cannot capture anything from their context.
-  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
-    *constant.getAnyFunctionRef());
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
 
   if (captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||
@@ -2190,9 +2189,6 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
-
-  // TODO: Should apply the default arg generator's captures, but Sema doesn't
-  // track them.
   
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
@@ -2207,8 +2203,13 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
+
+  SmallVector<ManagedValue, 4> captures;
+  emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
+               captures);
+
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, captures, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
