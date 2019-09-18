@@ -485,12 +485,17 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   
   auto DC = VD->getDeclContext();
   
-  auto *optionSetProto = tc.Context.getProtocol(KnownProtocolKind::OptionSet);
-  auto protocolConformance = tc.containsProtocol(DC->getSelfTypeInContext(), optionSetProto, DC, /*Flags*/None);
-  if (!protocolConformance)
+  if (!VD->getType()->isEqual(DC->getSelfTypeInContext()))
     return;
   
-  if (!VD->getType()->isEqual(DC->getSelfTypeInContext()))
+  auto *optionSetProto = tc.Context.getProtocol(KnownProtocolKind::OptionSet);
+  auto protocolConformance = !tc.containsProtocol(
+                                                  DC->getSelfTypeInContext(),
+                                                  optionSetProto,
+                                                  DC,
+                                                  /*Flags*/None);
+  
+  if (!protocolConformance)
     return;
   
   auto PBD = VD->getParentPatternBinding();
@@ -514,7 +519,8 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
     
     auto loc = VD->getLoc();
     tc.diagnose(loc, diag::option_set_zero_constant, VD->getName());
-    tc.diagnose(loc, diag::option_set_empty_set_init).fixItReplace(args->getSourceRange(), "([])");
+    tc.diagnose(loc, diag::option_set_empty_set_init)
+      .fixItReplace(args->getSourceRange(), "([])");
   }
 }
 
