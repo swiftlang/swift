@@ -10,6 +10,7 @@ silopt_register_sources(
   ComputeDominanceInfo.cpp
   ComputeLoopInfo.cpp
   ConstantEvaluatorTester.cpp
+  ConstantEvaluableSubsetChecker.cpp
   EpilogueARCMatcherDumper.cpp
   EpilogueRetainReleaseMatcherDumper.cpp
   EscapeAnalysisDumper.cpp
