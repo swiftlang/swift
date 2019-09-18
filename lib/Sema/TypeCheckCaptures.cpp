@@ -624,7 +624,8 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
                                 /*isObjC=*/false);
         E->walk(finder);
 
-        if (finder.getDynamicSelfCaptureLoc().isValid()) {
+        if (!AFD->getDeclContext()->isLocalContext() &&
+            finder.getDynamicSelfCaptureLoc().isValid()) {
           Context.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
                                  diag::dynamic_self_default_arg);
         }
