@@ -84,3 +84,11 @@ func f<T : StaticIntValue>(_: T) {
   // CHECK-LABEL: sil private [ossa] @$s25default_arguments_generic1fyyxAA14StaticIntValueRzlF5otherL_yyAaCRzlF : $@convention(thin) <T where T : StaticIntValue> () -> ()
   func other() { inner() }
 }
+
+func g<T>(_: T) {
+  { inner() }()
+
+  func inner() {
+    _ = T.self
+  }
+}
