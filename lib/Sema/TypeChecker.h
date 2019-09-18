@@ -783,9 +783,6 @@ public:
   void validateDecl(OperatorDecl *decl);
   void validateDecl(PrecedenceGroupDecl *decl);
 
-  /// Perform just enough validation for looking up names using the Decl.
-  void validateDeclForNameLookup(ValueDecl *D);
-
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
   void validateExtension(ExtensionDecl *ext);
@@ -882,7 +879,9 @@ public:
   /// typealias GX2<A> = X<A, A>
   /// typealias GX3<A, B> = X<B, A>
   /// \endcode
-  static bool isPassThroughTypealias(TypeAliasDecl *typealias);
+  static bool isPassThroughTypealias(TypeAliasDecl *typealias,
+                                     Type underlyingType,
+                                     NominalTypeDecl *nominal);
   
   /// Determine whether one type is a subtype of another.
   ///
@@ -1011,7 +1010,7 @@ public:
   void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
-    validateDeclForNameLookup(VD);
+    validateDecl(VD);
   }
 
   virtual void resolveProtocolEnvironment(ProtocolDecl *proto) override {

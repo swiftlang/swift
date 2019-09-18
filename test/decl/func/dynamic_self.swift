@@ -437,3 +437,11 @@ class Iterable : Sequence {
     return DummyIterator()
   }
 }
+
+// Default arguments of methods cannot capture 'Self' or 'self'
+class MathClass {
+  func invalidDefaultArg(s: Int = Self.intMethod()) {}
+  // expected-error@-1 {{covariant 'Self' type cannot be referenced from a default argument expression}}
+
+  static func intMethod() -> Int { return 0 }
+}

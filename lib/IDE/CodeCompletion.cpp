@@ -2793,7 +2793,7 @@ public:
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasInterfaceType()) {
-      auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
+      auto underlyingType = TAD->getUnderlyingType();
       if (underlyingType->hasError()) {
         Type parentType;
         if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {

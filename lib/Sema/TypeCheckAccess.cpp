@@ -572,7 +572,8 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     checkGenericParamAccess(TAD->getGenericParams(), TAD);
 
-    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD, /*mayBeInferred*/false,
+    checkTypeAccess(TAD->getUnderlyingType(),
+                    TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1194,7 +1195,8 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     checkGenericParamAccess(TAD->getGenericParams(), TAD);
 
-    checkTypeAccess(TAD->getUnderlyingTypeLoc(), TAD, /*mayBeInferred*/false,
+    checkTypeAccess(TAD->getUnderlyingType(),
+                    TAD->getUnderlyingTypeRepr(), TAD, /*mayBeInferred*/false,
                     [&](AccessScope typeAccessScope,
                         const TypeRepr *complainRepr,
                         DowngradeToWarning downgradeToWarning) {
@@ -1832,7 +1834,8 @@ public:
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     checkGenericParams(TAD->getGenericParams(), TAD);
-    checkType(TAD->getUnderlyingTypeLoc(), TAD, getDiagnoseCallback(TAD),
+    checkType(TAD->getUnderlyingType(),
+              TAD->getUnderlyingTypeRepr(), TAD, getDiagnoseCallback(TAD),
               getDiagnoseCallback(TAD));
   }
 

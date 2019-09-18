@@ -2316,10 +2316,22 @@ public:
                                               SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
-    alias->setGenericSignature(MF.getGenericSignature(genericSigID));
+    auto *genericSig = MF.getGenericSignature(genericSigID);
+    alias->setGenericSignature(genericSig);
 
-    alias->setUnderlyingType(MF.getType(underlyingTypeID));
-
+    auto underlying = MF.getType(underlyingTypeID);
+    alias->setUnderlyingType(underlying);
+    SubstitutionMap subs;
+    if (genericSig) {
+      subs = genericSig->getIdentitySubstitutionMap();
+    }
+    Type parent;
+    if (DC->isTypeContext())
+      parent = DC->getDeclaredInterfaceType();
+    auto sugaredType = TypeAliasType::get(alias, parent, subs, underlying);
+    alias->setInterfaceType(MetatypeType::get(sugaredType, ctx));
+    alias->setValidationToChecked();
+    
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
     else
@@ -4427,7 +4439,7 @@ public:
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType();
+      return alias->getUnderlyingType();
     }
 
     return alias->getDeclaredInterfaceType();
@@ -4495,7 +4507,7 @@ public:
     if (alias &&
         alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      return alias->getUnderlyingType().subst(subMap);
     }
 
     auto parentType = parentTypeOrError.get();
@@ -4523,7 +4535,7 @@ public:
       // using the Type wrapper.
       const TypeBase *underlyingTy = nullptr;
       while (alias->isCompatibilityAlias()) {
-        underlyingTy = alias->getUnderlyingTypeLoc().getType().getPointer();
+        underlyingTy = alias->getUnderlyingType().getPointer();
 
         // If the underlying type is itself a typealias, it might be another
         // compatibility alias, meaning we need to go around the loop again.

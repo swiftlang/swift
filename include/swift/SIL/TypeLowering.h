@@ -689,7 +689,7 @@ class TypeConverter {
   
   llvm::DenseMap<OverrideKey, SILConstantInfo *> ConstantOverrideTypes;
 
-  llvm::DenseMap<AnyFunctionRef, CaptureInfo> LoweredCaptures;
+  llvm::DenseMap<SILDeclRef, CaptureInfo> LoweredCaptures;
 
   /// Cache of loadable SILType to number of (estimated) fields
   ///
@@ -844,10 +844,13 @@ public:
   /// Returns the formal type, lowered AST type, and SILFunctionType
   /// for a constant reference.
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
-  
+
+  /// Get the generic environment for a constant.
+  GenericSignature *getConstantGenericSignature(SILDeclRef constant);
+
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
-  
+
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(SILDeclRef constant) {
     return getConstantInfo(constant).getSILType();
@@ -893,11 +896,6 @@ public:
   SILType getEmptyTupleType() {
     return SILType::getPrimitiveObjectType(TupleType::getEmpty(Context));
   }
-  
-  /// Get a function type curried with its capture context.
-  CanAnyFunctionType getFunctionInterfaceTypeWithCaptures(
-                                              CanAnyFunctionType funcType,
-                                              AnyFunctionRef closure);
 
   /// Describes what we're trying to compute a bridged type for.
   ///
@@ -944,17 +942,6 @@ public:
   SILType getSubstitutedStorageType(AbstractStorageDecl *value,
                                     Type lvalueType);
 
-  /// Retrieve the set of archetypes closed over by the given function.
-  GenericEnvironment *getEffectiveGenericEnvironment(AnyFunctionRef fn,
-                                                     CaptureInfo captureInfo);
-
-  /// Retrieve the set of generic parameters closed over by the given function.
-  CanGenericSignature getEffectiveGenericSignature(AnyFunctionRef fn,
-                                                   CaptureInfo captureInfo);
-
-  /// Retrieve the set of generic parameters closed over by the context.
-  CanGenericSignature getEffectiveGenericSignature(DeclContext *dc);
-
   /// Push a generic function context. See GenericContextScope for an RAII
   /// interface to this function.
   ///
@@ -980,10 +967,10 @@ public:
   CanType get##BridgedType##Type();
 #include "swift/SIL/BridgedTypes.def"
 
-  /// Get the capture list from a closure, with transitive function captures
-  /// flattened.
-  CaptureInfo getLoweredLocalCaptures(AnyFunctionRef fn);
-  bool hasLoweredLocalCaptures(AnyFunctionRef fn);
+  /// Get the capture list for a function or default argument, with transitive
+  /// function captures flattened.
+  CaptureInfo getLoweredLocalCaptures(SILDeclRef fn);
+  bool hasLoweredLocalCaptures(SILDeclRef fn);
 
   enum class ABIDifference : uint8_t {
     // No ABI differences, function can be trivially bitcast to result type.

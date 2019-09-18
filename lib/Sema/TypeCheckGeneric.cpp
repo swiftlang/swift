@@ -525,7 +525,7 @@ static Type formExtensionInterfaceType(
   auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
   auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
   if (!nominal) {
-    Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
+    Type underlyingType = typealias->getUnderlyingType();
     nominal = underlyingType->getNominalOrBoundGenericNominal();
   }
 
@@ -556,7 +556,7 @@ static Type formExtensionInterfaceType(
   }
 
   // If we have a typealias, try to form type sugar.
-  if (typealias && TypeChecker::isPassThroughTypealias(typealias)) {
+  if (typealias && TypeChecker::isPassThroughTypealias(typealias, typealias->getUnderlyingType(), nominal)) {
     auto typealiasSig = typealias->getGenericSignature();
     SubstitutionMap subMap;
     if (typealiasSig) {
@@ -965,15 +965,37 @@ RequirementRequest::evaluate(Evaluator &evaluator,
 }
 
 llvm::Expected<Type>
-swift::StructuralTypeRequest::evaluate(Evaluator &evaluator,
-                                       TypeAliasDecl *D) const {
-  TypeResolutionOptions options(TypeResolverContext::TypeAliasDecl);
-  if (!D->getDeclContext()->isCascadingContextForLookup(
-        /*functionsAreNonCascading*/true)) {
+StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                TypeAliasDecl *typeAlias) const {  
+  TypeResolutionOptions options((typeAlias->getGenericParams()
+                                     ? TypeResolverContext::GenericTypeAliasDecl
+                                     : TypeResolverContext::TypeAliasDecl));
+
+  if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
+          /*functionsAreNonCascading*/ true)) {
     options |= TypeResolutionFlags::KnownNonCascadingDependency;
   }
+  
+  // This can happen when code completion is attempted inside
+  // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
+  auto &ctx = typeAlias->getASTContext();
+  auto underlyingTypeRepr = typeAlias->getUnderlyingTypeRepr();
+  if (!underlyingTypeRepr) {
+    typeAlias->setInvalid();
+    return ErrorType::get(ctx);
+  }
 
-  auto typeRepr = D->getUnderlyingTypeLoc().getTypeRepr();
-  auto resolution = TypeResolution::forStructural(D);
-  return resolution.resolveType(typeRepr, options);
+  auto resolution = TypeResolution::forStructural(typeAlias);
+  auto type = resolution.resolveType(underlyingTypeRepr, options);
+  
+  auto *genericSig = typeAlias->getGenericSignature();
+  SubstitutionMap subs;
+  if (genericSig)
+    subs = genericSig->getIdentitySubstitutionMap();
+
+  Type parent;
+  auto parentDC = typeAlias->getDeclContext();
+  if (parentDC->isTypeContext())
+    parent = parentDC->getDeclaredInterfaceType();
+  return TypeAliasType::get(typeAlias, parent, subs, type);
 }

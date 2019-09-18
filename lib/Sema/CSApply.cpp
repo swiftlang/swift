@@ -1927,7 +1927,7 @@ namespace {
       }
 
       tc.validateDecl(maxFloatTypeDecl);
-      auto maxType = maxFloatTypeDecl->getUnderlyingTypeLoc().getType();
+      auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_floatLiteral });

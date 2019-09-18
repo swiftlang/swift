@@ -3528,34 +3528,42 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
-void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setValidationToChecked();
+void TypeAliasDecl::computeType() {
+  assert(!hasInterfaceType());
+      
+  // Set the interface type of this declaration.
+  ASTContext &ctx = getASTContext();
 
+  auto *genericSig = getGenericSignature();
+  SubstitutionMap subs;
+  if (genericSig)
+    subs = genericSig->getIdentitySubstitutionMap();
+
+  Type parent;
+  auto parentDC = getDeclContext();
+  if (parentDC->isTypeContext())
+    parent = parentDC->getDeclaredInterfaceType();
+  auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
+  setInterfaceType(MetatypeType::get(sugaredType, ctx));
+}
+
+Type TypeAliasDecl::getUnderlyingType() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+           UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
+           Type());
+}
+      
+void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
   if (underlying->hasArchetype() && isGenericContext())
     underlying = underlying->mapTypeOutOfContext();
-  UnderlyingTy.setType(underlying);
-
-  // FIXME -- if we already have an interface type, we're changing the
-  // underlying type. See the comment in the ProtocolDecl case of
-  // validateDecl().
-  if (!hasInterfaceType()) {
-    // Set the interface type of this declaration.
-    ASTContext &ctx = getASTContext();
-
-    auto *genericSig = getGenericSignature();
-    SubstitutionMap subs;
-    if (genericSig)
-      subs = genericSig->getIdentitySubstitutionMap();
-
-    Type parent;
-    auto parentDC = getDeclContext();
-    if (parentDC->isTypeContext())
-      parent = parentDC->getDeclaredInterfaceType();
-    auto sugaredType = TypeAliasType::get(this, parent, subs, underlying);
-    setInterfaceType(MetatypeType::get(sugaredType, ctx));
-  }
+  getASTContext().evaluator.cacheOutput(
+          StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+          std::move(underlying));
+  getASTContext().evaluator.cacheOutput(
+          UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
+          std::move(underlying));
 }
 
 UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
@@ -3572,12 +3580,10 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type TypeAliasDecl::getStructuralType() const {
-  assert(!getGenericParams());
-  
   auto &context = getASTContext();
-  return evaluateOrDefault(context.evaluator,
-                           StructuralTypeRequest { const_cast<TypeAliasDecl *>(this) },
-                           Type());
+  return evaluateOrDefault(
+      context.evaluator,
+      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)}, Type());
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -5864,6 +5870,11 @@ CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   assert(DefaultValueAndFlags.getPointer());
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
+}
+
+void ParamDecl::setDefaultArgumentCaptureInfo(const CaptureInfo &captures) {
+  assert(DefaultValueAndFlags.getPointer());
+  DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
 /// Return nullptr if there is no property wrapper
