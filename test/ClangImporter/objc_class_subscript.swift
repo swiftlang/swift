@@ -8,11 +8,11 @@
 import ObjCSubscripts
 
 func testClass() {
-  _ = NoClassSubscript[0] // expected-error{{value of type 'NoClassSubscript.Type' has no subscripts}}
-  NoClassSubscript[0] = "" // expected-error{{value of type 'NoClassSubscript.Type' has no subscripts}}
+  _ = NoClassSubscript[0] // expected-error{{type 'NoClassSubscript' has no member 'subscript'}}
+  NoClassSubscript[0] = "" // expected-error{{type 'NoClassSubscript' has no member 'subscript'}}
   
-  _ = NoClassSubscript["foo"] // expected-error{{value of type 'NoClassSubscript.Type' has no subscripts}}
-  NoClassSubscript["foo"] = "" // expected-error{{value of type 'NoClassSubscript.Type' has no subscripts}}
+  _ = NoClassSubscript["foo"] // expected-error{{type 'NoClassSubscript' has no member 'subscript'}}
+  NoClassSubscript["foo"] = "" // expected-error{{type 'NoClassSubscript' has no member 'subscript'}}
 }
 
 func testInstance(x: NoClassSubscript) {

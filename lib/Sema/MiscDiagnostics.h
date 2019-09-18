@@ -43,7 +43,8 @@ void performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
 void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
-                                        AbstractFunctionDecl *AFD);
+                                        AbstractFunctionDecl *AFD,
+                                        BraceStmt *body);
 
 /// Perform diagnostics on the top level code declaration.
 void performTopLevelDeclDiagnostics(TypeChecker &TC, TopLevelCodeDecl *TLCD);

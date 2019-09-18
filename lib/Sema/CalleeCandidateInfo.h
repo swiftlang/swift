@@ -116,6 +116,20 @@ namespace swift {
       assert(hasParameters());
       return getFunctionType()->getParams();
     }
+
+    ParameterListInfo
+    getParameterListInfo(ArrayRef<AnyFunctionType::Param> params) const {
+      auto *decl = getDecl();
+
+      // FIXME: Subscript interface types don't have curried self parameters,
+      // however CalleeCandidateInfo curries them with self. Therefore if we're
+      // not supposed to skip the curried self parameter of a subscript,
+      // return a zeroed ParameterListInfo.
+      if (decl && isa<SubscriptDecl>(decl) && !skipCurriedSelf)
+        return ParameterListInfo(params, nullptr, skipCurriedSelf);
+
+      return ParameterListInfo(params, decl, skipCurriedSelf);
+    }
     
     /// Given a function candidate with an uncurry level, return the parameter
     /// type at the specified uncurry level.  If there is an error getting to
@@ -125,10 +139,6 @@ namespace swift {
         return funcTy->getResult();
       return Type();
     }
-    
-    /// Retrieve the argument labels that should be used to invoke this
-    /// candidate.
-    ArrayRef<Identifier> getArgumentLabels(SmallVectorImpl<Identifier> &scratch);
 
     void dump() const LLVM_ATTRIBUTE_USED;
   };
@@ -213,13 +223,7 @@ namespace swift {
     /// arguments, emit a diagnostic indicating any partially matching
     /// overloads.
     void suggestPotentialOverloads(SourceLoc loc, bool isResult = false);
-    
-    
-    /// If the candidate set has been narrowed to a single parameter or single
-    /// archetype that has argument type errors, diagnose that error and
-    /// return true.
-    bool diagnoseGenericParameterErrors(Expr *badArgExpr);
-    
+
     /// Emit a diagnostic and return true if this is an error condition we can
     /// handle uniformly.  This should be called after filtering the candidate
     /// list.

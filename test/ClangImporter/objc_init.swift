@@ -121,6 +121,7 @@ func checkInitWithCoder(_ coder: NSCoder) {
   MyViewController(coder: coder) // expected-warning{{unused}}
   MyTableViewController(coder: coder) // expected-warning{{unused}}
   MyOtherTableViewController(coder: coder) // expected-error{{incorrect argument label in call (have 'coder:', expected 'int:')}}
+  // expected-error@-1 {{cannot convert value of type 'NSCoder' to expected argument type 'Int'}}
   MyThirdTableViewController(coder: coder) // expected-warning{{unused}}
 }
 

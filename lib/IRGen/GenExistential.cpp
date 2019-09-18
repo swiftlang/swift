@@ -30,6 +30,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
 
+#include "BitPatternBuilder.h"
 #include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -583,8 +584,11 @@ namespace {
                               .getFixedExtraInhabitantMask(IGM);
 
       // Zext out to the size of the existential.
-      bits = bits.zextOrTrunc(asDerived().getFixedSize().getValueInBits());
-      return bits;
+      auto totalSize = asDerived().getFixedSize().getValueInBits();
+      auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+      mask.append(bits);
+      mask.padWithClearBitsTo(totalSize);
+      return mask.build().getValue();
     }
   };
 
@@ -649,8 +653,10 @@ namespace {
                                                      ReferenceOwnership::Name, \
                                                      Refcounting); \
         /* Zext out to the size of the existential. */ \
-        bits = bits.zextOrTrunc(getFixedSize().getValueInBits()); \
-        return bits; \
+        auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian()); \
+        mask.append(bits); \
+        mask.padWithClearBitsTo(getFixedSize().getValueInBits()); \
+        return mask.build().getValue(); \
       } else { \
         return Super::getFixedExtraInhabitantMask(IGM); \
       } \
@@ -783,12 +789,10 @@ namespace {
 
 
 static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy);
+    IRGenModule &IGM, OpaqueExistentialLayout existLayout);
 
 static llvm::Constant *getDestroyBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy);
+    IRGenModule &IGM, OpaqueExistentialLayout existLayout);
 
 static llvm::Constant *
 getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
@@ -837,13 +841,14 @@ public:
   void assignWithCopy(IRGenFunction &IGF, Address dest, Address src, SILType T,
                       bool isOutlined) const override {
 
-    auto objPtrTy = dest.getAddress()->getType();
-
     // Use copy-on-write existentials?
     auto fn = getAssignBoxedOpaqueExistentialBufferFunction(
-        IGF.IGM, getLayout(), objPtrTy);
+        IGF.IGM, getLayout());
+    auto *type = IGF.IGM.getExistentialPtrTy(getLayout().getNumTables());
+    auto *destAddr = IGF.Builder.CreateBitCast(dest.getAddress(), type);
+    auto *srcAddr = IGF.Builder.CreateBitCast(src.getAddress(), type);
     auto call =
-        IGF.Builder.CreateCall(fn, {dest.getAddress(), src.getAddress()});
+        IGF.Builder.CreateCall(fn, {destAddr, srcAddr});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotThrow();
     return;
@@ -898,12 +903,15 @@ public:
     }
   }
 
-  void destroy(IRGenFunction &IGF, Address addr, SILType T,
+  void destroy(IRGenFunction &IGF, Address buffer, SILType T,
                bool isOutlined) const override {
     // Use copy-on-write existentials?
     auto fn = getDestroyBoxedOpaqueExistentialBufferFunction(
-        IGF.IGM, getLayout(), addr.getAddress()->getType());
-    auto call = IGF.Builder.CreateCall(fn, {addr.getAddress()});
+        IGF.IGM, getLayout());
+    auto *addr = IGF.Builder.CreateBitCast(
+        buffer.getAddress(),
+        IGF.IGM.getExistentialPtrTy(getLayout().getNumTables()));
+    auto call = IGF.Builder.CreateCall(fn, {addr});
     call->setCallingConv(IGF.IGM.DefaultCC);
     call->setDoesNotThrow();
     return;
@@ -922,10 +930,11 @@ public:
     return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, offset);
   }
   APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-    auto mask = APInt::getAllOnesValue(IGM.getPointerSize().getValueInBits());
-    mask = mask.zext(getFixedSize().getValueInBits());
-    mask = mask.shl(getLayout().getMetadataRefOffset(IGM).getValueInBits());
-    return mask;
+    auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
+    mask.appendClearBits(getLayout().getMetadataRefOffset(IGM).getValueInBits());
+    mask.appendSetBits(IGM.getPointerSize().getValueInBits());
+    mask.padWithClearBitsTo(getFixedSize().getValueInBits());
+    return mask.build().getValue();
   }
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src, SILType T,
@@ -1135,17 +1144,20 @@ public:
   const TypeInfo * \
   create##Name##StorageType(TypeConverter &TC, \
                             bool isOptional) const override { \
-    auto spareBits = TC.IGM.getReferenceStorageSpareBits( \
-                                                     ReferenceOwnership::Name, \
-                                                     Refcounting); \
-    for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) \
+    auto spareBits = BitPatternBuilder(TC.IGM.Triple.isLittleEndian()); \
+    auto ref = TC.IGM.getReferenceStorageSpareBits( \
+                                                   ReferenceOwnership::Name, \
+                                                   Refcounting); \
+    spareBits.append(ref); \
+    for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) { \
       spareBits.append(TC.IGM.getWitnessTablePtrSpareBits()); \
+    } \
     auto storageTy = buildReferenceStorageType(TC.IGM, \
                               TC.IGM.Name##ReferencePtrTy->getElementType()); \
     return AddressOnly##Name##ClassExistentialTypeInfo::create( \
                                                  getStoredProtocols(), \
                                                  storageTy, \
-                                                 std::move(spareBits), \
+                                                 spareBits.build(), \
                                                  getFixedSize(), \
                                                  getFixedAlignment(), \
                                                  Refcounting, \
@@ -1157,18 +1169,21 @@ public:
   const TypeInfo * \
   create##Name##StorageType(TypeConverter &TC, \
                             bool isOptional) const override { \
-    auto spareBits = TC.IGM.getReferenceStorageSpareBits( \
-                                                     ReferenceOwnership::Name, \
-                                                     Refcounting); \
-    for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) \
+    auto ref = TC.IGM.getReferenceStorageSpareBits( \
+                                                   ReferenceOwnership::Name, \
+                                                   Refcounting); \
+    auto spareBits = BitPatternBuilder(TC.IGM.Triple.isLittleEndian()); \
+    spareBits.append(ref); \
+    for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) { \
       spareBits.append(TC.IGM.getWitnessTablePtrSpareBits()); \
+    } \
     auto storageTy = buildReferenceStorageType(TC.IGM, \
                               TC.IGM.Name##ReferencePtrTy->getElementType()); \
     if (TC.IGM.isLoadableReferenceAddressOnly(Refcounting)) { \
       return AddressOnly##Name##ClassExistentialTypeInfo::create( \
                                                    getStoredProtocols(), \
                                                    storageTy, \
-                                                   std::move(spareBits), \
+                                                   spareBits.build(), \
                                                    getFixedSize(), \
                                                    getFixedAlignment(), \
                                                    Refcounting, \
@@ -1178,7 +1193,7 @@ public:
                                                    getStoredProtocols(), \
                                                    getValueType(), \
                                                    storageTy, \
-                                                   std::move(spareBits), \
+                                                   spareBits.build(), \
                                                    getFixedSize(), \
                                                    getFixedAlignment(), \
                                                    Refcounting, \
@@ -1191,18 +1206,21 @@ public:
   create##Name##StorageType(TypeConverter &TC, \
                             bool isOptional) const override { \
     assert(Refcounting == ReferenceCounting::Native); \
-    auto spareBits = TC.IGM.getReferenceStorageSpareBits( \
+    auto ref = TC.IGM.getReferenceStorageSpareBits( \
                                                    ReferenceOwnership::Name, \
                                                    ReferenceCounting::Native); \
-    for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) \
+    auto spareBits = BitPatternBuilder(TC.IGM.Triple.isLittleEndian()); \
+    spareBits.append(ref); \
+    for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) { \
       spareBits.append(TC.IGM.getWitnessTablePtrSpareBits()); \
+    } \
     auto storageTy = buildReferenceStorageType(TC.IGM, \
                               TC.IGM.Name##ReferencePtrTy->getElementType()); \
     return Loadable##Name##ClassExistentialTypeInfo::create( \
                                                   getStoredProtocols(), \
                                                   getValueType(), \
                                                   storageTy, \
-                                                  std::move(spareBits), \
+                                                  spareBits.build(), \
                                                   getFixedSize(), \
                                                   getFixedAlignment(), \
                                                   ReferenceCounting::Native, \
@@ -1339,6 +1357,36 @@ createErrorExistentialTypeInfo(IRGenModule &IGM,
                                       refcounting);
 }
 
+llvm::Type *TypeConverter::getExistentialType(unsigned numWitnessTables) {
+  llvm::StructType *&type = OpaqueExistentialTypes[numWitnessTables];
+  if (type)
+    return type;
+  
+  SmallVector<llvm::Type*, 5> fields;
+
+  fields.push_back(IGM.getFixedBufferTy());
+  fields.push_back(IGM.TypeMetadataPtrTy);
+
+  for (auto i : range(numWitnessTables)) {
+    fields.push_back(IGM.WitnessTablePtrTy);
+    (void) i;
+  }
+
+  llvm::SmallString<40> typeName;
+  llvm::raw_svector_ostream(typeName)
+      << "__opaque_existential_type_"
+      << numWitnessTables;
+
+  type = llvm::StructType::create(IGM.getLLVMContext(), StringRef(typeName));
+  type->setBody(fields);
+
+  return type;
+}
+
+llvm::PointerType *IRGenModule::getExistentialPtrTy(unsigned numTables) {
+  return Types.getExistentialType(numTables)->getPointerTo();
+}
+
 static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   auto layout = T.getExistentialLayout();
 
@@ -1414,7 +1462,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     Alignment align = IGM.getPointerAlignment();
     Size size = classFields.size() * IGM.getPointerSize();
 
-    SpareBitVector spareBits;
+    auto spareBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
 
     // The class pointer is an unknown heap object, so it may be a tagged
     // pointer, if the platform has those.
@@ -1430,9 +1478,8 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     for (unsigned i = 1, e = classFields.size(); i < e; ++i) {
       spareBits.append(IGM.getWitnessTablePtrSpareBits());
     }
-
     return ClassExistentialTypeInfo::create(protosWithWitnessTables, type,
-                                            size, std::move(spareBits), align,
+                                            size, spareBits.build(), align,
                                             refcounting);
   }
 
@@ -1446,23 +1493,11 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   Size size = opaque.getSize(IGM);
   // There are spare bits in the metadata pointer and witness table pointers
   // consistent with a native object reference.
-  SpareBitVector spareBits;
-  spareBits.appendClearBits(size.getValueInBits());
-  /* TODO: There are spare bits we could theoretically use in the type metadata
-     and witness table pointers, but opaque existentials are currently address-
-     only, and we can't soundly take advantage of spare bits for in-memory
-     representations.
-   
-  auto metadataOffset = opaque.getMetadataRefOffset(IGM);
-  spareBits.appendClearBits(metadataOffset.getValueInBits());
-  auto typeSpareBits = IGM.getHeapObjectSpareBits();
-  spareBits.append(typeSpareBits);
-  auto witnessSpareBits =
-    IGM.getWitnessTablePtrSpareBits();
-  for (unsigned i = 0, e = protosWithWitnessTables.size(); i < e; ++i)
-    spareBits.append(witnessSpareBits);
-  assert(spareBits.size() == size.getValueInBits());
-   */
+  // TODO: There are spare bits we could theoretically use in the type metadata
+  // and witness table pointers, but opaque existentials are currently address-
+  // only, and we can't soundly take advantage of spare bits for in-memory
+  // representations.
+  auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
   return OpaqueExistentialTypeInfo::create(protosWithWitnessTables, type, size,
                                            std::move(spareBits),
                                            align);
@@ -1491,12 +1526,12 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   SmallVector<const ProtocolDecl *, 4> protosWithWitnessTables;
   SmallVector<llvm::Type*, 4> fields;
 
-  SpareBitVector spareBits;
-
   assert(T->getRepresentation() != MetatypeRepresentation::Thin &&
          "existential metatypes cannot have thin representation");
   auto &baseTI = cast<LoadableTypeInfo>(getMetatypeTypeInfo(T->getRepresentation()));
   fields.push_back(baseTI.getStorageType());
+
+  auto spareBits = BitPatternBuilder(IGM.Triple.isLittleEndian());
   spareBits.append(baseTI.getSpareBits());
 
   for (auto protoTy : layout.getProtocols()) {
@@ -1517,7 +1552,7 @@ TypeConverter::convertExistentialMetatypeType(ExistentialMetatypeType *T) {
   Alignment align = IGM.getPointerAlignment();
 
   return ExistentialMetatypeTypeInfo::create(protosWithWitnessTables, type,
-                                             size, std::move(spareBits), align,
+                                             size, spareBits.build(), align,
                                              baseTI);
 }
 
@@ -1559,7 +1594,7 @@ ContainedAddress irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                               CanType projectedType) {
   // TODO: Non-ErrorType boxed existentials.
   assert(baseTy.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
   
   // Get the reference to the existential box.
   llvm::Value *box = base.claimNext();
@@ -1613,7 +1648,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                 ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-Error boxed existentials.
   assert(destType.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
 
   auto &destTI = IGF.getTypeInfo(destType).as<ErrorExistentialTypeInfo>();
   auto srcMetadata = IGF.emitTypeMetadataRef(formalSrcType);
@@ -1653,7 +1688,7 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
                                                       CanType valueType) {
   // TODO: Non-Error boxed existentials.
   assert(containerType.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
 
   auto box = container.claimNext();
   auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
@@ -1764,7 +1799,7 @@ void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
                               });
 }
 
-void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
+void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address buffer,
                                             SILType type, Explosion &out) {
   assert(type.isExistentialType());
   assert(!type.isClassExistentialType());
@@ -1772,16 +1807,18 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
 
   // Get the static metadata.
   auto existLayout = baseTI.getLayout();
-  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, addr);
+  llvm::Value *metadata = existLayout.loadMetadataRef(IGF, buffer);
 
   // Project the buffer and apply the 'typeof' value witness.
-  Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
   llvm::Value *object;
 
+  auto *addr = IGF.Builder.CreateBitCast(
+      buffer.getAddress(),
+      IGF.IGM.getExistentialPtrTy(existLayout.getNumTables()));
   auto *projectFunc = getProjectBoxedOpaqueExistentialFunction(
       IGF, OpenedExistentialAccess::Immutable, existLayout);
   auto *addrOfValue =
-      IGF.Builder.CreateCall(projectFunc, {buffer.getAddress(), metadata});
+      IGF.Builder.CreateCall(projectFunc, {addr, metadata});
   addrOfValue->setCallingConv(IGF.IGM.DefaultCC);
   addrOfValue->setDoesNotThrow();
   object = addrOfValue;
@@ -1793,14 +1830,14 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
   out.add(dynamicType);
 
   // Get the witness tables.
-  baseTI.emitLoadOfTables(IGF, addr, out);
+  baseTI.emitLoadOfTables(IGF, buffer, out);
 }
 
 void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType type, Explosion &out) {
   // TODO: Non-Error boxed existentials.
   assert(type.canUseExistentialRepresentation(
-           IGF.getSILModule(), ExistentialRepresentation::Boxed, Type()));
+           ExistentialRepresentation::Boxed, Type()));
 
   // Get the reference to the existential box.
   llvm::Value *box = value.claimNext();
@@ -1853,11 +1890,13 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
   auto metaTy = metatypeTy.castTo<ExistentialMetatypeType>();
   auto repr = metaTy->getRepresentation();
   assert(repr != MetatypeRepresentation::Thin &&
-         "Class metatypes should have a thin representation");
+         "Class metatypes should not have a thin representation");
   assert((IGF.IGM.ObjCInterop || repr != MetatypeRepresentation::ObjC) &&
          "Class metatypes should not have ObjC representation without runtime");
 
-  auto dynamicType = emitDynamicTypeOfOpaqueHeapObject(IGF, instance, repr);
+  auto dynamicType = emitDynamicTypeOfHeapObject(IGF, instance, repr,
+                                                 existentialTy,
+                                                 /*allow artificial*/ false);
   out.add(dynamicType);
 
   // Get the witness tables.
@@ -1895,8 +1934,10 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   ArrayRef<llvm::Value*> wtables;
   llvm::Value *value;
   std::tie(wtables, value) = baseTI.getWitnessTablesAndValue(base);
-  auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
-                                                MetatypeRepresentation::Thick);
+  auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
+                                              MetatypeRepresentation::Thick,
+                                              baseTy,
+                                              /*allow artificial*/ false);
   IGF.bindArchetype(openedArchetype, metadata, MetadataState::Complete,
                     wtables);
 
@@ -1960,10 +2001,9 @@ static Address castToOpaquePtr(IRGenFunction &IGF, Address addr) {
 }
 
 static llvm::Constant *getAllocateBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy) {
+    IRGenModule &IGM, OpaqueExistentialLayout existLayout) {
 
-  llvm::Type *argTys[] = {existContainerPointerTy};
+  llvm::Type *argTys[] = {IGM.getExistentialPtrTy(existLayout.getNumTables())};
 
   // __swift_allocate_boxed_opaque_existential__N is the well-known function for
   // allocating buffers in existential containers of types with N witness
@@ -2044,9 +2084,12 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
   }
   /// Call a function to handle the non-fixed case.
   auto *allocateFun = getAllocateBoxedOpaqueExistentialBufferFunction(
-      IGF.IGM, existLayout, existentialContainer.getAddress()->getType());
+      IGF.IGM, existLayout);
+  auto *existentialAddr = IGF.Builder.CreateBitCast(
+      existentialContainer.getAddress(),
+      IGF.IGM.getExistentialPtrTy(existLayout.getNumTables()));
   auto *call =
-      IGF.Builder.CreateCall(allocateFun, {existentialContainer.getAddress()});
+      IGF.Builder.CreateCall(allocateFun, {existentialAddr});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   auto addressOfValue = IGF.Builder.CreateBitCast(call, valuePointerType);
@@ -2054,10 +2097,9 @@ Address irgen::emitAllocateBoxedOpaqueExistentialBuffer(
 }
 
 static llvm::Constant *getDeallocateBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy) {
+    IRGenModule &IGM, OpaqueExistentialLayout existLayout) {
 
-  llvm::Type *argTys[] = {existContainerPointerTy};
+  llvm::Type *argTys[] = {IGM.getExistentialPtrTy(existLayout.getNumTables())};
 
   // __swift_deallocate_boxed_opaque_existential_N is the well-known function
   // for deallocating buffers in existential containers of types with N witness
@@ -2134,9 +2176,11 @@ void irgen::emitDeallocateBoxedOpaqueExistentialBuffer(
   OpaqueExistentialLayout existLayout = existentialTI.getLayout();
 
   auto *deallocateFun = getDeallocateBoxedOpaqueExistentialBufferFunction(
-      IGF.IGM, existLayout, existentialContainer.getAddress()->getType());
-  auto *call = IGF.Builder.CreateCall(deallocateFun,
-                                      {existentialContainer.getAddress()});
+      IGF.IGM, existLayout);
+  auto *bufferAddr = IGF.Builder.CreateBitCast(
+      existentialContainer.getAddress(),
+      IGF.IGM.getExistentialPtrTy(existLayout.getNumTables()));
+  auto *call = IGF.Builder.CreateCall(deallocateFun, {bufferAddr});
   call->setCallingConv(IGF.IGM.DefaultCC);
   call->setDoesNotThrow();
   return;
@@ -2148,7 +2192,7 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
                                          OpaqueExistentialLayout existLayout) {
 
   auto &IGM = IGF.IGM;
-  auto *existentialBufferTy = IGM.getFixedBufferTy()->getPointerTo();
+  auto *existentialBufferTy = IGM.getExistentialPtrTy(existLayout.getNumTables());
   llvm::Type *argTys[] = {existentialBufferTy, IGM.TypeMetadataPtrTy};
 
   // __swift_project_boxed_opaque_existential_N is the well-known function for
@@ -2234,8 +2278,10 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
         IGF.getTypeInfo(existentialTy).as<ClassExistentialTypeInfo>();
     auto valueAddr = baseTI.projectValue(IGF, base);
     auto value = IGF.Builder.CreateLoad(valueAddr);
-    auto metadata = emitDynamicTypeOfOpaqueHeapObject(IGF, value,
-                                                MetatypeRepresentation::Thick);
+    auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
+                                                MetatypeRepresentation::Thick,
+                                                existentialTy,
+                                                /*allow artificial*/ false);
 
     // If we are projecting into an opened archetype, capture the
     // witness tables.
@@ -2269,11 +2315,13 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
                       wtables);
   }
 
-  Address buffer = layout.projectExistentialBuffer(IGF, base);
   auto *projectFunc =
       getProjectBoxedOpaqueExistentialFunction(IGF, accessKind, layout);
+  auto *bufferAddr = IGF.Builder.CreateBitCast(
+      base.getAddress(),
+      IGF.IGM.getExistentialPtrTy(layout.getNumTables()));
   auto *addrOfValue =
-      IGF.Builder.CreateCall(projectFunc, {buffer.getAddress(), metadata});
+      IGF.Builder.CreateCall(projectFunc, {bufferAddr, metadata});
   addrOfValue->setCallingConv(IGF.IGM.DefaultCC);
   addrOfValue->setDoesNotThrow();
 
@@ -2300,10 +2348,10 @@ static void initBufferWithCopyOfReference(IRGenFunction &IGF,
 }
 
 static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy) {
+    IRGenModule &IGM, OpaqueExistentialLayout existLayout) {
 
-  llvm::Type *argTys[] = {existContainerPointerTy, existContainerPointerTy};
+  llvm::Type *argTys[] = {IGM.getExistentialPtrTy(existLayout.getNumTables()),
+                          IGM.getExistentialPtrTy(existLayout.getNumTables())};
 
   // __swift_assign_box_in_existentials_N is the well-known function for
   // assigning buffers in existential containers of types with N witness
@@ -2519,10 +2567,9 @@ static llvm::Constant *getAssignBoxedOpaqueExistentialBufferFunction(
 }
 
 static llvm::Constant *getDestroyBoxedOpaqueExistentialBufferFunction(
-    IRGenModule &IGM, OpaqueExistentialLayout existLayout,
-    llvm::Type *existContainerPointerTy) {
+    IRGenModule &IGM, OpaqueExistentialLayout existLayout) {
 
-  llvm::Type *argTys[] = {existContainerPointerTy};
+  llvm::Type *argTys[] = {IGM.getExistentialPtrTy(existLayout.getNumTables())};
 
   llvm::SmallString<40> fnName;
   llvm::raw_svector_ostream(fnName)

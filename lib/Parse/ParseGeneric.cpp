@@ -64,8 +64,7 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
     DeclAttributes attributes;
     if (Tok.hasComment())
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
-    bool foundCCTokenInAttr;
-    parseDeclAttributeList(attributes, foundCCTokenInAttr);
+    parseDeclAttributeList(attributes);
 
     // Parse the name of the parameter.
     Identifier Name;
@@ -372,7 +371,7 @@ ParserStatus Parser::parseGenericWhereClause(
 /// Parse a free-standing where clause attached to a declaration, adding it to
 /// a generic parameter list that may (or may not) already exist.
 ParserStatus Parser::
-parseFreestandingGenericWhereClause(GenericParamList *&genericParams,
+parseFreestandingGenericWhereClause(GenericParamList *genericParams,
                                     WhereClauseKind kind) {
   assert(Tok.is(tok::kw_where) && "Shouldn't call this without a where");
   

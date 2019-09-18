@@ -1205,7 +1205,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
-  if (!Class || !Class->hasDestructor())
+  if (!Class || Class->hasClangNode())
     return false;
   auto Destructor = Class->getDestructor();
   SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
@@ -1305,12 +1305,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         break;
     }
 
-    if (FAS.getReferencedFunction()
-        && FAS.getReferencedFunction()->hasSemanticsAttr(
-               "self_no_escaping_closure")
-        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)
-            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2))
-        && FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunctionOrNull() &&
+        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
+            "self_no_escaping_closure") &&
+        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3) ||
+         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 2)) &&
+        FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1320,12 +1320,12 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       return;
     }
 
-    if (FAS.getReferencedFunction()
-        && FAS.getReferencedFunction()->hasSemanticsAttr(
-               "pair_no_escaping_closure")
-        && ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4)
-            || (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3))
-        && FAS.hasSelfArgument()) {
+    if (FAS.getReferencedFunctionOrNull() &&
+        FAS.getReferencedFunctionOrNull()->hasSemanticsAttr(
+            "pair_no_escaping_closure") &&
+        ((FAS.hasIndirectSILResults() && FAS.getNumArguments() == 4) ||
+         (!FAS.hasIndirectSILResults() && FAS.getNumArguments() == 3)) &&
+        FAS.hasSelfArgument()) {
       // The programmer has guaranteed that the closure will not capture the
       // self pointer passed to it or anything that is transitively reachable
       // from the pointer.
@@ -1342,7 +1342,7 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         return;
     }
 
-    if (auto *Fn = FAS.getReferencedFunction()) {
+    if (auto *Fn = FAS.getReferencedFunctionOrNull()) {
       if (Fn->getName() == "swift_bufferAllocate")
         // The call is a buffer allocation, e.g. for Array.
         return;
@@ -1376,6 +1376,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->getNode(cast<SingleValueInstruction>(I), this);
       return;
 
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     case SILInstructionKind::Name##RetainInst: \
     case SILInstructionKind::StrongRetain##Name##Inst: \
@@ -1413,8 +1415,13 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
         // the object itself (because it will be a dangling pointer after
         // deallocation).
         CGNode *CapturedByDeinit = ConGraph->getContentNode(AddrNode);
+        // Get the content node for the object's properties. The object header
+        // itself cannot escape from the deinit.
         CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         if (deinitIsKnownToNotCapture(OpV)) {
+          // Presumably this is necessary because, even though the deinit
+          // doesn't escape the immediate properties of this class, it may
+          // indirectly escape some other memory content(?)
           CapturedByDeinit = ConGraph->getContentNode(CapturedByDeinit);
         }
         ConGraph->setEscapesGlobal(CapturedByDeinit);

@@ -55,6 +55,7 @@
 /// UNCHECKED_REF_STORAGE
 ///   Name##RetainValueInst
 ///   Name##ReleaseValueInst
+///   Copy##Name##ValueInst
 /// LOADABLE_REF_STORAGE
 ///   Ref*ToNameInst
 ///   Name*ToRefInst
@@ -98,6 +99,10 @@
 /// storage type, and SOMETIMES_LOADABLE_CHECKED_REF_STORAGE needs *two*
 /// TypeInfos to be created. One for the loadable scenario, and one for the
 /// address-only scenario.
+///
+/// TODO: We should change Copy##Name##ValueInst to be defined on
+/// LOADABLE_REF_STORAGE. It just will require us to go through, refactor, and
+/// fix up this code.
 
 
 #ifndef REF_STORAGE

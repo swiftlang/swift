@@ -20,6 +20,7 @@
 
 #include "llvm/Support/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 
@@ -58,6 +59,17 @@ class PrettyStackTraceDecl : public llvm::PrettyStackTraceEntry {
 public:
   PrettyStackTraceDecl(const char *action, const Decl *D)
     : TheDecl(D), Action(action) {}
+  virtual void print(llvm::raw_ostream &OS) const;
+};
+
+/// PrettyStackTraceAnyFunctionRef - Observe that we are processing a specific
+/// function or closure literal.
+class PrettyStackTraceAnyFunctionRef : public llvm::PrettyStackTraceEntry {
+  AnyFunctionRef TheRef;
+  const char *Action;
+public:
+  PrettyStackTraceAnyFunctionRef(const char *action, AnyFunctionRef ref)
+    : TheRef(ref), Action(action) {}
   virtual void print(llvm::raw_ostream &OS) const;
 };
 

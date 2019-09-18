@@ -171,6 +171,14 @@ public class ChildToFixedParent : OutsideParent {
   // CHECK: } // end sil function '$s5super18ChildToFixedParentC11returnsSelfACXDyFZ'
 }
 
+// https://bugs.swift.org/browse/SR-10260 - super.foo() call across a module
+// boundary from a subclass that does not override foo().
+public class SuperCallToNonOverriddenMethod : OutsideParent {
+  public func newMethod() {
+    super.method()
+  }
+}
+
 public extension ResilientOutsideChild {
   public func callSuperMethod() {
     super.method()

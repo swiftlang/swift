@@ -25,7 +25,7 @@ func arg_tuple(x: Int, y: Float) {}
 arg_tuple(x: i, y: f)
 
 func arg_deep_tuples(x: Int, y: (Float, UnicodeScalar)) {}
-// CHECK-LABEL: sil hidden [ossa] @$ss15arg_deep_tuples1x1yySi_Sf_ScttF
+// CHECK-LABEL: sil hidden [ossa] @$ss15arg_deep_tuples1x1yySi_Sf_s13UnicodeScalarVttF
 // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y_0:%[0-9]+]] : $Float, [[Y_1:%[0-9]+]] : $UnicodeScalar):
 
 arg_deep_tuples(x:i, y:(f, c))
@@ -37,7 +37,7 @@ var named_subtuple = (x:f, y:c)
 arg_deep_tuples(x:i, y: named_subtuple)
 
 func arg_deep_tuples_2(x: Int, _: (y: Float, z: UnicodeScalar)) {}
-// CHECK-LABEL: sil hidden [ossa] @$ss17arg_deep_tuples_21x_ySi_Sf1y_Sc1zttF
+// CHECK-LABEL: sil hidden [ossa] @$ss17arg_deep_tuples_21x_ySi_Sf1y_s13UnicodeScalarV1zttF
 // CHECK: bb0([[X:%[0-9]+]] : $Int, [[Y:%[0-9]+]] : $Float, [[Z:%[0-9]+]] : $UnicodeScalar):
 
 arg_deep_tuples_2(x: i, (f, c))

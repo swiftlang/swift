@@ -264,6 +264,8 @@ public:
 
   bool isSpecial() const { return getKind() != Kind::Normal; }
 
+  bool isSubscript() const { return getKind() == Kind::Subscript; }
+
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {
@@ -588,7 +590,7 @@ public:
   llvm::raw_ostream &printPretty(llvm::raw_ostream &os) const;
 
   /// Dump this name to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 };
 
@@ -670,7 +672,7 @@ public:
   }
 
   /// Dump this selector to standard error.
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
                             "only for use within the debugger");
 
   /// Compare two Objective-C selectors, producing -1 if \c *this comes before

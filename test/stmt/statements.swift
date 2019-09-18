@@ -39,12 +39,12 @@ func funcdecl5(_ a: Int, y: Int) {
   x = y
   (x) = y
 
-  1 = x        // expected-error {{cannot assign to a literal value}}
-  (1) = x      // expected-error {{cannot assign to a literal value}}
-  "string" = "other"    // expected-error {{cannot assign to a literal value}}
+  1 = x        // expected-error {{cannot assign to value: literals are not mutable}}
+  (1) = x      // expected-error {{cannot assign to value: literals are not mutable}}
+  "string" = "other"    // expected-error {{cannot assign to value: literals are not mutable}}
   [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
   1.0 = x               // expected-error {{cannot assign to a literal value}}
-  nil = 1               // expected-error {{cannot assign to a literal value}}
+  nil = 1               // expected-error {{cannot assign to value: literals are not mutable}}
 
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
   var tup : (x:Int, y:Int)
@@ -158,6 +158,7 @@ func tuple_assign() {
   (a,b) = (1,2)
   func f() -> (Int,Int) { return (1,2) }
   ((a,b), (c,d)) = (f(), f())
+  _ = (a,b,c,d)
 }
 
 func missing_semicolons() {
@@ -165,6 +166,7 @@ func missing_semicolons() {
   func g() {}
   g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{string literal is unused}}
+  // expected-warning@-1 {{initialization of variable 'z' was never used; consider replacing with assignment to '_' or removing it}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
@@ -350,9 +352,9 @@ func test_defer(_ a : Int) {
 
   // Not ok.
   while false { defer { break } }   // expected-error {{'break' cannot transfer control out of a defer statement}}
-  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{17-22=do}}
+  // expected-warning@-1 {{'defer' statement at end of scope always executes immediately}}{{17-22=do}}
   defer { return }  // expected-error {{'return' cannot transfer control out of a defer statement}}
-  // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{3-8=do}}
+  // expected-warning@-1 {{'defer' statement at end of scope always executes immediately}}{{3-8=do}}
 }
 
 class SomeTestClass {
@@ -360,7 +362,7 @@ class SomeTestClass {
  
   func method() {
     defer { x = 97 }  // self. not required here!
-    // expected-warning@-1 {{'defer' statement before end of scope always executes immediately}}{{5-10=do}}
+    // expected-warning@-1 {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
   }
 }
 
@@ -635,6 +637,6 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=out
 
 // Errors in case syntax
 class
-case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
-case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}}
+case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser

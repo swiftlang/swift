@@ -47,7 +47,7 @@ def disassemble_asm_cfg(debugger, command, exec_ctx, result, internal_dict):
     d = exec_ctx.frame.Disassemble()
 
     with tempfile.TemporaryFile() as f:
-        f.write(d)
+        f.write(bytes(d, 'utf-8'))
         f.flush()
         f.seek(0)
         p1 = subprocess.Popen([BLOCKIFYASM_PATH], stdin=f,

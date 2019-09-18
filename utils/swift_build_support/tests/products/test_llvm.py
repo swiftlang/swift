@@ -89,7 +89,7 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertIn('-DLLVM_ENABLE_ASSERTIONS=TRUE', llvm.cmake_options)
+        self.assertIn('-DLLVM_ENABLE_ASSERTIONS:BOOL=TRUE', llvm.cmake_options)
 
         self.args.llvm_assertions = False
         llvm = LLVM(
@@ -97,7 +97,8 @@ class LLVMTestCase(unittest.TestCase):
             toolchain=self.toolchain,
             source_dir='/path/to/src',
             build_dir='/path/to/build')
-        self.assertIn('-DLLVM_ENABLE_ASSERTIONS=FALSE', llvm.cmake_options)
+        self.assertIn('-DLLVM_ENABLE_ASSERTIONS:BOOL=FALSE',
+                      llvm.cmake_options)
 
     def test_compiler_vendor_flags(self):
         self.args.compiler_vendor = "none"

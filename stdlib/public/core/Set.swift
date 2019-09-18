@@ -146,7 +146,7 @@
 /// unspecified. The instances of `NSSet` and `Set` share buffer using the
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
-@_fixed_layout
+@frozen
 public struct Set<Element: Hashable> {
   @usableFromInline
   internal var _variant: _Variant
@@ -1265,7 +1265,7 @@ extension Set {
 
 extension Set {
   /// The position of an element in a set.
-  @_fixed_layout
+  @frozen
   public struct Index {
     // Index for native buffer is efficient.  Index for bridged NSSet is
     // not, because neither NSEnumerator nor fast enumeration support moving
@@ -1274,7 +1274,7 @@ extension Set {
     // safe to copy the state.  So, we cannot implement Index that is a value
     // type for bridged NSSet in terms of Cocoa enumeration facilities.
 
-    @_frozen
+    @frozen
     @usableFromInline
     internal enum _Variant {
       case native(_HashTable.Index)
@@ -1451,7 +1451,7 @@ extension Set.Index: Hashable {
 
 extension Set {
   /// An iterator over the members of a `Set<Element>`.
-  @_fixed_layout
+  @frozen
   public struct Iterator {
     // Set has a separate IteratorProtocol and Index because of efficiency
     // and implementability reasons.
@@ -1463,7 +1463,7 @@ extension Set {
     // IteratorProtocol, which is being consumed as iteration proceeds.
 
     @usableFromInline
-    @_frozen
+    @frozen
     internal enum _Variant {
       case native(_NativeSet<Element>.Iterator)
 #if _runtime(_ObjC)

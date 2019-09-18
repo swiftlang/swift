@@ -501,8 +501,9 @@ static bool isTypeErasedGenericClassType(CanType type) {
 }
 
 // Get the type that exists at runtime to represent a compile-time type.
-CanType
-irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
+CanType IRGenModule::getRuntimeReifiedType(CanType type) {
+  // Leave type-erased ObjC generics with their generic arguments unbound, since
+  // the arguments do not exist at runtime.
   return CanType(type.transform([&](Type t) -> Type {
     if (isTypeErasedGenericClassType(CanType(t))) {
       return t->getAnyNominal()->getDeclaredType()->getCanonicalType();
@@ -510,6 +511,53 @@ irgen::getRuntimeReifiedType(IRGenModule &IGM, CanType type) {
     return t;
   }));
 }
+
+CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
+  // Substitute away opaque types whose underlying types we're allowed to
+  // assume are constant.
+  if (type->hasOpaqueArchetype()) {
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
+                                                  ResilienceExpansion::Maximal);
+    type = type.subst(replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes)
+      ->getCanonicalType();
+  }
+
+  return type;
+}
+
+SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
+    SILType type, CanGenericSignature genericSig) {
+  // Substitute away opaque types whose underlying types we're allowed to
+  // assume are constant.
+  if (type.getASTType()->hasOpaqueArchetype()) {
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
+                                                  ResilienceExpansion::Maximal);
+    type = type.subst(getSILModule(), replacer, replacer, genericSig,
+                      /*substitute opaque*/ true);
+  }
+
+  return type;
+}
+
+std::pair<CanType, ProtocolConformanceRef>
+IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                           ProtocolConformanceRef conformance) {
+  // Substitute away opaque types whose underlying types we're allowed to
+  // assume are constant.
+  if (type->hasOpaqueArchetype()) {
+    ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
+                                                  ResilienceExpansion::Maximal);
+    conformance = conformance.subst(type, replacer, replacer,
+                                    SubstFlags::SubstituteOpaqueArchetypes);
+    type = type.subst(replacer, replacer,
+                      SubstFlags::SubstituteOpaqueArchetypes)
+      ->getCanonicalType();
+  }
+
+  return std::make_pair(type, conformance);
+}
+
 
 /// Attempts to return a constant heap metadata reference for a
 /// class type.  This is generally only valid for specific kinds of
@@ -641,11 +689,6 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
 /// need a cache variable in its accessor.
 bool irgen::isTypeMetadataAccessTrivial(IRGenModule &IGM, CanType type) {
   assert(!type->hasArchetype());
-
-  // Support dynamically replacing opaque result types. Don't cache the
-  // accessor result.
-  if (!IGM.getOptions().shouldOptimize() && type->hasOpaqueArchetype())
-    return true;
 
   // Value type metadata only requires dynamic initialization on first
   // access if it contains a resilient type.
@@ -1405,6 +1448,12 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
                                     bool isReadNone) {
   assert((cacheStrategy == CacheStrategy::None) == (cacheVariable == nullptr));
   accessor->setDoesNotThrow();
+  // Don't inline cache functions, since doing so has little impact on
+  // overall performance.
+  accessor->addAttribute(llvm::AttributeList::FunctionIndex,
+                         llvm::Attribute::NoInline);
+  // Accessor functions don't need frame pointers.
+  IGM.setHasFramePointer(accessor, false);
 
   // This function is logically 'readnone': the caller does not need
   // to reason about any side effects or stores it might perform.
@@ -1489,6 +1538,7 @@ void irgen::emitCacheAccessFunction(IRGenModule &IGM,
 
   // If the load yielded null, emit the type metadata.
   IGF.Builder.emitBlock(isNullBB);
+  
   MetadataResponse response = getValue(IGF, parameters);
 
   // Ensure that we have a dynamically-correct state value.
@@ -1637,59 +1687,119 @@ emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF,
                                       Explosion &params,
                                       NominalTypeDecl *nominal,
                                       GenericArguments &genericArgs) {
-  llvm::Value *descriptor =
-    IGF.IGM.getAddrOfTypeContextDescriptor(nominal, RequireMetadata);
+  auto &IGM = IGF.IGM;
+  
+  llvm::Constant *descriptor =
+    IGM.getAddrOfTypeContextDescriptor(nominal, RequireMetadata);
 
   auto request = params.claimNext();
 
   auto numArguments = genericArgs.Types.size();
 
-  bool allocatedBuffer = false;
-  Address argsBuffer;
+  llvm::Value *result;
   if (numArguments > NumDirectGenericTypeMetadataAccessFunctionArgs) {
-    // The caller provided a buffer with enough space for all of the arguments;
-    // use that.
-    argsBuffer = Address(params.claimNext(), IGF.IGM.getPointerAlignment());
+    // swift_getGenericMetadata's calling convention is already cleverly
+    // laid out to minimize the assembly language size of the thunk.
+    // The caller passed us an appropriate buffer with the arguments.
+    auto argsBuffer = Address(params.claimNext(), IGM.getPointerAlignment());
+    llvm::Value *arguments =
+      IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGM.Int8PtrTy);
+
+    // Make the call.
+    auto call = IGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                         {request, arguments, descriptor});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGM.SwiftCC);
+    call->addAttribute(llvm::AttributeList::FunctionIndex,
+                         llvm::Attribute::ReadOnly);
+    result = call;
   } else {
-    // Allocate a buffer with enough storage for the arguments.
-    auto argsBufferTy =
-      llvm::StructType::get(IGF.IGM.LLVMContext, genericArgs.Types);
-    argsBuffer = IGF.createAlloca(argsBufferTy,
-                                  IGF.IGM.getPointerAlignment(),
-                                  "generic.arguments");
-    IGF.Builder.CreateLifetimeStart(argsBuffer,
-                            IGF.IGM.getPointerSize() * genericArgs.Values.size());
-    allocatedBuffer = true;
+    static_assert(NumDirectGenericTypeMetadataAccessFunctionArgs == 3,
+                  "adjust this if you change "
+                  "NumDirectGenericTypeMetadataAccessFunctionArgs");
+    // Factor out the buffer shuffling for metadata accessors that take their
+    // arguments directly, so that the accessor function itself only needs to
+    // materialize the nominal type descriptor and call this thunk.
+    auto thunkFn = cast<llvm::Function>(
+      IGM.getModule()
+        ->getOrInsertFunction("__swift_instantiateGenericMetadata",
+                IGM.TypeMetadataResponseTy,
+                IGM.SizeTy, // request
+                IGM.Int8PtrTy, // arg 0
+                IGM.Int8PtrTy, // arg 1
+                IGM.Int8PtrTy, // arg 2
+                IGM.TypeContextDescriptorPtrTy) // type context descriptor
+        ->stripPointerCasts());
 
-    // Store direct arguments into the buffer.
-    for (auto i : range(numArguments)) {
-      Address elt = IGF.Builder.CreateStructGEP(argsBuffer, i,
-                                                IGF.IGM.getPointerSize() * i);
-
-      auto *arg =
-        IGF.Builder.CreateBitCast(params.claimNext(),
-                                  elt.getType()->getPointerElementType());
-      IGF.Builder.CreateStore(arg, elt);
+    if (thunkFn->empty()) {
+      ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
+          .to(thunkFn);
+      thunkFn->setDoesNotAccessMemory();
+      thunkFn->setDoesNotThrow();
+      thunkFn->setCallingConv(IGM.SwiftCC);
+      thunkFn->addAttribute(llvm::AttributeList::FunctionIndex,
+                            llvm::Attribute::NoInline);
+      IGM.setHasFramePointer(thunkFn, false);
+      
+      [&IGM, thunkFn]{
+        IRGenFunction subIGF(IGM, thunkFn);
+    
+        auto params = subIGF.collectParameters();
+        auto request = params.claimNext();
+        auto arg0 = params.claimNext();
+        auto arg1 = params.claimNext();
+        auto arg2 = params.claimNext();
+        auto descriptor = params.claimNext();
+        
+        // Allocate a buffer with enough storage for the arguments.
+        auto argsBufferTy =
+          llvm::ArrayType::get(IGM.Int8PtrTy,
+                               NumDirectGenericTypeMetadataAccessFunctionArgs);
+        auto argsBuffer = subIGF.createAlloca(argsBufferTy,
+                                           IGM.getPointerAlignment(),
+                                           "generic.arguments");
+        subIGF.Builder.CreateLifetimeStart(argsBuffer,
+         IGM.getPointerSize() * NumDirectGenericTypeMetadataAccessFunctionArgs);
+        
+        auto arg0Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
+                                                 argsBuffer.getAddress(), 0, 0);
+        subIGF.Builder.CreateStore(arg0, arg0Buf, IGM.getPointerAlignment());
+        auto arg1Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
+                                                 argsBuffer.getAddress(), 0, 1);
+        subIGF.Builder.CreateStore(arg1, arg1Buf, IGM.getPointerAlignment());
+        auto arg2Buf = subIGF.Builder.CreateConstInBoundsGEP2_32(argsBufferTy,
+                                                 argsBuffer.getAddress(), 0, 2);
+        subIGF.Builder.CreateStore(arg2, arg2Buf, IGM.getPointerAlignment());
+        
+        // Make the call.
+        auto argsAddr = subIGF.Builder.CreateBitCast(argsBuffer.getAddress(),
+                                                     IGM.Int8PtrTy);
+        auto result = subIGF.Builder.CreateCall(IGM.getGetGenericMetadataFn(),
+                                               {request, argsAddr, descriptor});
+        subIGF.Builder.CreateRet(result);
+      }();
     }
+    
+    // Call out to the helper.
+    auto arg0 = numArguments >= 1
+      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      : llvm::UndefValue::get(IGM.Int8PtrTy);
+    auto arg1 = numArguments >= 2
+      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      : llvm::UndefValue::get(IGM.Int8PtrTy);
+    auto arg2 = numArguments >= 3
+      ? IGF.Builder.CreateBitCast(params.claimNext(), IGM.Int8PtrTy)
+      : llvm::UndefValue::get(IGM.Int8PtrTy);
+    
+    auto call = IGF.Builder.CreateCall(thunkFn,
+                                       {request, arg0, arg1, arg2, descriptor});
+    call->setDoesNotAccessMemory();
+    call->setDoesNotThrow();
+    call->setCallingConv(IGM.SwiftCC);
+    
+    result = call;
   }
-
-  llvm::Value *arguments =
-    IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGF.IGM.Int8PtrTy);
-
-  // Make the call.
-  auto result = IGF.Builder.CreateCall(IGF.IGM.getGetGenericMetadataFn(),
-                                       {request, arguments, descriptor});
-  result->setDoesNotThrow();
-  result->setCallingConv(IGF.IGM.SwiftCC);
-  result->addAttribute(llvm::AttributeList::FunctionIndex,
-                       llvm::Attribute::ReadOnly);
-
-  // If we allocated the array ourselves, end its lifetime.
-  if (allocatedBuffer) {
-    IGF.Builder.CreateLifetimeEnd(argsBuffer,
-                          IGF.IGM.getPointerSize() * genericArgs.Values.size());
-  }
-
+  
   return MetadataResponse::handle(IGF, DynamicMetadataRequest(request), result);
 }
 
@@ -1818,8 +1928,7 @@ irgen::createTypeMetadataAccessFunction(IRGenModule &IGM, CanType type,
 
     // For lazy initialization, the cache variable is just a pointer.
     case CacheStrategy::Lazy:
-      cacheVariable =
-        IGM.getAddrOfTypeMetadataLazyCacheVariable(type, ForDefinition);
+      cacheVariable = IGM.getAddrOfTypeMetadataLazyCacheVariable(type);
       break;
 
     // For in-place initialization, drill down to the first element.
@@ -1892,6 +2001,331 @@ irgen::getGenericTypeMetadataAccessFunction(IRGenModule &IGM,
   return accessor;
 }
 
+static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
+  // A nongeneric nominal type with nontrivial metadata has an accessor
+  // already we can just call.
+  if (auto nom = dyn_cast<NominalType>(type)) {
+    if (!isa<ProtocolDecl>(nom->getDecl())
+        && (!nom->getDecl()->isGenericContext()
+            || nom->getDecl()->getGenericSignature()->areAllParamsConcrete())
+        && (!nom->getClassOrBoundGenericClass()
+            || !nom->getClassOrBoundGenericClass()->hasClangNode()
+            || nom->getClassOrBoundGenericClass()->isForeign())) {
+      return false;
+    }
+  }
+  
+  // The Swift 5.1 runtime fails to demangle associated types of opaque types.
+  auto hasNestedOpaqueArchetype = type.findIf([](CanType sub) -> bool {
+    if (auto archetype = dyn_cast<NestedArchetypeType>(sub)) {
+      if (isa<OpaqueTypeArchetypeType>(archetype->getRoot())) {
+        return true;
+      }
+    }
+    return false;
+  });
+  
+  if (hasNestedOpaqueArchetype)
+    return false;
+  
+  return true;
+
+// The visitor below can be used to fine-tune a heuristic to decide whether
+// demangling might be better for code size than open-coding an access. In
+// my experiments on the Swift standard library and Apple SDK overlays,
+// always demangling seemed to have the biggest code size benefit.
+#if false
+  // Guess the number of calls and addresses we need to materialize a
+  // metadata record in code.
+  struct OpenCodedMetadataAccessWeightVisitor
+      : CanTypeVisitor<OpenCodedMetadataAccessWeightVisitor>
+  {
+    IRGenModule &IGM;
+    unsigned NumCalls = 0, NumAddresses = 0;
+    
+    OpenCodedMetadataAccessWeightVisitor(IRGenModule &IGM)
+      : IGM(IGM) {}
+    
+    void visitBoundGenericType(CanBoundGenericType bgt) {
+      // Need to materialize all the arguments, then call the metadata
+      // accessor.
+      //
+      // TODO: Also need to count the parent type's generic arguments.
+      for (auto arg : bgt->getGenericArgs()) {
+        visit(arg);
+      }
+      NumCalls += 1;
+    }
+
+    void visitNominalType(CanNominalType nom) {
+      // Some nominal types have trivially-referenceable metadata symbols,
+      // others may require accessors to trigger instantiation.
+      //
+      // TODO: Also need to count the parent type's generic arguments.
+      if (isTypeMetadataAccessTrivial(IGM, nom)) {
+        NumAddresses += 1;
+      } else {
+        NumCalls += 1;
+      }
+    }
+
+    void visitTupleType(CanTupleType tup) {
+      // The empty tuple has trivial metadata.
+      if (tup->getNumElements() == 0) {
+        NumAddresses += 1;
+        return;
+      }
+      // Need to materialize the element types, then call the getTupleMetadata
+      // accessor.
+      for (auto elt : tup.getElementTypes()) {
+        visit(elt);
+      }
+      NumCalls += 1;
+    }
+    
+    void visitAnyFunctionType(CanAnyFunctionType fun) {
+      // Need to materialize the arguments and return, then call the
+      // getFunctionMetadata accessor.
+      for (auto arg : fun.getParams()) {
+        visit(arg.getPlainType());
+      }
+      visit(fun.getResult());
+      
+      NumCalls += 1;
+    }
+    
+    void visitMetatypeType(CanMetatypeType meta) {
+      // Need to materialize the instance type, then call the
+      // getMetatypeMetadata accessor.
+      visit(meta.getInstanceType());
+      NumCalls += 1;
+    }
+    
+    void visitProtocolType(CanProtocolType proto) {
+      // Need to reference the protocol descriptor, then call the
+      // getExistentialTypeMetadata accessor.
+      NumAddresses += 1;
+      NumCalls += 1;
+    }
+    
+    void visitBuiltinType(CanBuiltinType b) {
+      // Builtins always have trivial metadata.
+      NumAddresses += 1;
+    }
+    
+    void visitProtocolCompositionType(CanProtocolCompositionType comp) {
+      unsigned numMembers = comp->getMembers().size();
+      // The empty compositions Any and AnyObject are trivial.
+      if (numMembers == 0) {
+        NumAddresses += 1;
+        return;
+      }
+      // Need to materialize the base class, if any.
+      if (comp->getMembers().front()->getClassOrBoundGenericClass()) {
+        visit(CanType(comp->getMembers().front()));
+        numMembers -= 1;
+      }
+      // Need to reference the protocol descriptors for each protocol.
+      NumAddresses += numMembers;
+      // Finally, call the getExistentialTypeMetadata accessor.
+      NumCalls += 1;
+    }
+    
+    void visitExistentialMetatypeType(CanExistentialMetatypeType meta) {
+      // The number of accesses turns out the same as the instance type,
+      // but instead of getExistentialTypeMetadata, we call
+      // getExistentialMetatypeMetadata
+      visit(meta.getInstanceType());
+    }
+    
+    // Shouldn't emit metadata for other kinds of types.
+    void visitType(CanType t) {
+      llvm_unreachable("unhandled type?!");
+    }
+  };
+  
+  OpenCodedMetadataAccessWeightVisitor visitor(IGM);
+  
+  visitor.visit(type);
+  
+  // If we need more than one accessor call, or the access requires too many
+  // arguments, the mangled name accessor is probably more compact.
+  return visitor.NumCalls > 1 || visitor.NumAddresses > 1;
+#endif
+  
+}
+
+/// Emit a call to a type metadata accessor using a mangled name.
+static MetadataResponse
+emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
+                                DynamicMetadataRequest request) {
+  // TODO: We can only answer blocking complete metadata requests with the
+  // <=5.1 runtime ABI entry points.
+  assert(request.isStaticallyBlockingComplete()
+         && "can only form complete metadata by mangled name");
+  
+  auto &IGM = IGF.IGM;
+  llvm::Constant *mangledString;
+  unsigned mangledStringSize;
+  std::tie(mangledString, mangledStringSize) =
+    IGM.getTypeRef(type, CanGenericSignature(), MangledTypeRefRole::Metadata);
+  
+  assert(mangledStringSize < 0x80000000u
+         && "2GB of mangled name ought to be enough for anyone");
+  
+  // Get or create the cache variable if necessary.
+  auto cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type,
+                                                                ConstantInit());
+  
+  if (cast<llvm::GlobalVariable>(cache->stripPointerCasts())->isDeclaration()) {
+    ConstantInitBuilder builder(IGM);
+    auto structBuilder = builder.beginStruct();
+    
+    // A "negative" 64-bit value in the cache indicates the uninitialized state.
+    // Which word has that bit in the {i32, i32} layout depends on endianness.
+
+    if (IGM.getModule()->getDataLayout().isBigEndian()) {
+      structBuilder.addInt32(-mangledStringSize);
+      structBuilder.addRelativeAddress(mangledString);
+    } else {
+      structBuilder.addRelativeAddress(mangledString);
+      structBuilder.addInt32(-mangledStringSize);
+    }
+
+    auto init = structBuilder.finishAndCreateFuture();
+    cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type, init);
+  }
+
+  // Get or create a shared helper function to do the instantiation.
+  auto instantiationFn = cast<llvm::Function>(
+       IGM.getModule()
+         ->getOrInsertFunction("__swift_instantiateConcreteTypeFromMangledName",
+                               IGF.IGM.TypeMetadataPtrTy, cache->getType())
+         ->stripPointerCasts());
+  if (instantiationFn->empty()) {
+    ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
+      .to(instantiationFn);
+    instantiationFn->setDoesNotAccessMemory();
+    instantiationFn->setDoesNotThrow();
+    instantiationFn->addAttribute(llvm::AttributeList::FunctionIndex,
+                                  llvm::Attribute::NoInline);
+    IGM.setHasFramePointer(instantiationFn, false);
+
+    [&IGM, instantiationFn]{
+      IRGenFunction subIGF(IGM, instantiationFn);
+      
+      auto params = subIGF.collectParameters();
+      auto cache = params.claimNext();
+      
+      // Load the existing cache value.
+      // Conceptually, this needs to establish memory ordering with the
+      // store we do later in the function: if the metadata value is
+      // non-null, we must be able to see any stores performed by the
+      // initialization of the metadata.  However, any attempt to read
+      // from the metadata will be address-dependent on the loaded
+      // metadata pointer, which is sufficient to provide adequate
+      // memory ordering guarantees on all the platforms we care about:
+      // ARM has special rules about address dependencies, and x86's
+      // memory ordering is strong enough to guarantee the visibility
+      // even without the address dependency.
+      //
+      // And we do not need to worry about the compiler because the
+      // address dependency naturally forces an order to the memory
+      // accesses.
+      //
+      // Therefore, we can perform a completely naked load here.
+      // FIXME: Technically should be "consume", but that introduces barriers
+      // in the current LLVM ARM backend.
+      auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache,
+                                                   IGM.Int64Ty->getPointerTo());
+      auto load = subIGF.Builder.CreateLoad(cacheWordAddr, Alignment(8));
+      // Make this barrier explicit when building for TSan to avoid false positives.
+      if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
+        load->setOrdering(llvm::AtomicOrdering::Acquire);
+      else
+        load->setOrdering(llvm::AtomicOrdering::Monotonic);
+
+      // Compare the load result to see if it's negative.
+      auto isUnfilledBB = subIGF.createBasicBlock("");
+      auto contBB = subIGF.createBasicBlock("");
+      llvm::Value *comparison = subIGF.Builder.CreateICmpSLT(load,
+                                        llvm::ConstantInt::get(IGM.Int64Ty, 0));
+      comparison = subIGF.Builder.CreateExpect(comparison,
+                                         llvm::ConstantInt::get(IGM.Int1Ty, 0));
+      subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
+      auto loadBB = subIGF.Builder.GetInsertBlock();
+
+      // If the load is negative, emit the call to instantiate the type
+      // metadata.
+      subIGF.Builder.SetInsertPoint(&subIGF.CurFn->back());
+      subIGF.Builder.emitBlock(isUnfilledBB);
+      
+      // Break up the loaded value into size and relative address to the
+      // string.
+      auto size = subIGF.Builder.CreateAShr(load, 32);
+      size = subIGF.Builder.CreateTruncOrBitCast(size, IGM.SizeTy);
+      size = subIGF.Builder.CreateNeg(size);
+      
+      auto stringAddrOffset = subIGF.Builder.CreateTrunc(load,
+                                                         IGM.Int32Ty);
+      stringAddrOffset = subIGF.Builder.CreateSExtOrBitCast(stringAddrOffset,
+                                                            IGM.SizeTy);
+      auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
+      if (IGM.getModule()->getDataLayout().isBigEndian()) {
+        stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
+                                        llvm::ConstantInt::get(IGM.SizeTy, 4));
+      }
+      auto stringAddr = subIGF.Builder.CreateAdd(stringAddrBase,
+                                                 stringAddrOffset);
+      stringAddr = subIGF.Builder.CreateIntToPtr(stringAddr, IGM.Int8PtrTy);
+      
+      auto call =
+        subIGF.Builder.CreateCall(IGM.getGetTypeByMangledNameInContextFn(),
+               {stringAddr,
+                size,
+                // TODO: Use mangled name lookup in generic
+                // contexts?
+                llvm::ConstantPointerNull::get(IGM.TypeContextDescriptorPtrTy),
+                llvm::ConstantPointerNull::get(IGM.Int8PtrPtrTy)});
+      call->setDoesNotThrow();
+      call->setDoesNotAccessMemory();
+      call->setCallingConv(IGM.SwiftCC);
+
+      // Store the result back to the cache. Metadata instantatiation should
+      // already have emitted the necessary barriers to publish the instantiated
+      // metadata to other threads, so we only need to expose the pointer.
+      // Worst case, another thread might race with us and reinstantiate the
+      // exact same metadata pointer.
+      auto resultWord = subIGF.Builder.CreatePtrToInt(call, IGM.SizeTy);
+      resultWord = subIGF.Builder.CreateZExtOrBitCast(resultWord, IGM.Int64Ty);
+      auto store = subIGF.Builder.CreateStore(resultWord, cacheWordAddr,
+                                              Alignment(8));
+      store->setOrdering(llvm::AtomicOrdering::Monotonic);
+      subIGF.Builder.CreateBr(contBB);
+      
+      subIGF.Builder.SetInsertPoint(loadBB);
+      subIGF.Builder.emitBlock(contBB);
+      auto phi = subIGF.Builder.CreatePHI(IGM.Int64Ty, 2);
+      phi->addIncoming(load, loadBB);
+      phi->addIncoming(resultWord, isUnfilledBB);
+      
+      auto resultAddr = subIGF.Builder.CreateTruncOrBitCast(phi, IGM.SizeTy);
+      resultAddr = subIGF.Builder.CreateIntToPtr(resultAddr,
+                                                 IGM.TypeMetadataPtrTy);
+      subIGF.Builder.CreateRet(resultAddr);
+    }();
+  }
+  
+  auto call = IGF.Builder.CreateCall(instantiationFn, cache);
+  call->setDoesNotThrow();
+  call->setDoesNotAccessMemory();
+  
+  auto response = MetadataResponse::forComplete(call);
+  
+  IGF.setScopedLocalTypeMetadata(type, response);
+  return response;
+}
+
 /// Emit a call to the type metadata accessor for the given function.
 static MetadataResponse
 emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF, CanType type,
@@ -1900,6 +2334,18 @@ emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF, CanType type,
   if (auto local = IGF.tryGetLocalTypeMetadata(type, request))
     return local;
 
+  // If the metadata would require multiple runtime calls to build, emit a
+  // single access by mangled name instead, if we're asking for complete
+  // metadata.
+  //
+  // TODO: The getTypeByMangledNameInContext entry point in Swift <=5.1 can
+  // only answer requests for complete metadata. We could introduce new
+  // entry points that could answer all metadata requests.
+  if (request.isStaticallyBlockingComplete()
+      && shouldAccessByMangledName(IGF.IGM, type)) {
+    return emitMetadataAccessByMangledName(IGF, type, request);
+  }
+    
   llvm::Constant *accessor =
     getOrCreateTypeMetadataAccessFunction(IGF.IGM, type);
   llvm::CallInst *call = IGF.Builder.CreateCall(accessor, { request.get(IGF) });
@@ -1928,8 +2374,16 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  type = getRuntimeReifiedType(IGM, type);
+  type = IGM.getRuntimeReifiedType(type);
+  // Look through any opaque types we're allowed to.
+  type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
 
+  // If we're asking for the metadata of the type that dynamic Self is known
+  // to be equal to, we can just use the self metadata.
+  if (LocalSelfIsExact && LocalSelfType == type) {
+    return MetadataResponse::forComplete(getLocalSelfMetadata());
+  }
+  
   if (type->hasArchetype() ||
       isTypeMetadataAccessTrivial(IGM, type)) {
     // FIXME: propagate metadata request!
@@ -1943,7 +2397,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
 /// for the given non-dependent type.
 llvm::Function *irgen::getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                              CanType type) {
-  type = getRuntimeReifiedType(IGM, type);
+  type = IGM.getRuntimeReifiedType(type);
 
   assert(!type->hasArchetype() &&
          "cannot create global function to return dependent type metadata");

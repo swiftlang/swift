@@ -33,8 +33,8 @@ extension String: RangeReplaceableCollection {
 
   // This initializer disambiguates between the following intitializers, now
   // that String conforms to Collection:
-  // - init<T>(_ value: T) where T : LosslessStringConvertible
-  // - init<S>(_ characters: S) where S : Sequence, S.Element == Character
+  // - init<T>(_ value: T) where T: LosslessStringConvertible
+  // - init<S>(_ characters: S) where S: Sequence, S.Element == Character
 
   /// Creates a new string containing the characters in the given sequence.
   ///
@@ -53,7 +53,7 @@ extension String: RangeReplaceableCollection {
   ///   characters.
   @_specialize(where S == String)
   @_specialize(where S == Substring)
-  public init<S : Sequence & LosslessStringConvertible>(_ other: S)
+  public init<S: Sequence & LosslessStringConvertible>(_ other: S)
   where S.Element == Character {
     if let str = other as? String {
       self = str
@@ -80,7 +80,7 @@ extension String: RangeReplaceableCollection {
   @_specialize(where S == String)
   @_specialize(where S == Substring)
   @_specialize(where S == Array<Character>)
-  public init<S : Sequence>(_ characters: S)
+  public init<S: Sequence>(_ characters: S)
   where S.Iterator.Element == Character {
     if let str = characters as? String {
       self = str
@@ -162,7 +162,7 @@ extension String: RangeReplaceableCollection {
   @_specialize(where S == String)
   @_specialize(where S == Substring)
   @_specialize(where S == Array<Character>)
-  public mutating func append<S : Sequence>(contentsOf newElements: S)
+  public mutating func append<S: Sequence>(contentsOf newElements: S)
   where S.Iterator.Element == Character {
     if let str = newElements as? String {
       self.append(str)
@@ -197,7 +197,7 @@ extension String: RangeReplaceableCollection {
   public mutating func replaceSubrange<C>(
     _ bounds: Range<Index>,
     with newElements: C
-  ) where C : Collection, C.Iterator.Element == Character {
+  ) where C: Collection, C.Iterator.Element == Character {
     _guts.replaceSubrange(bounds, with: newElements)
   }
 
@@ -233,7 +233,7 @@ extension String: RangeReplaceableCollection {
   @_specialize(where S == String)
   @_specialize(where S == Substring)
   @_specialize(where S == Array<Character>)
-  public mutating func insert<S : Collection>(
+  public mutating func insert<S: Collection>(
     contentsOf newElements: S, at i: Index
   ) where S.Element == Character {
     self.replaceSubrange(i..<i, with: newElements)
@@ -324,14 +324,14 @@ extension String {
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
   @_transparent
-  public func max<T : Comparable>(_ x: T, _ y: T) -> T {
+  public func max<T: Comparable>(_ x: T, _ y: T) -> T {
     return Swift.max(x,y)
   }
 
   // This is needed because of the issue described in SR-4660 which causes
   // source compatibility issues when String becomes a collection
   @_transparent
-  public func min<T : Comparable>(_ x: T, _ y: T) -> T {
+  public func min<T: Comparable>(_ x: T, _ y: T) -> T {
     return Swift.min(x,y)
   }
 }

@@ -1,4 +1,4 @@
-//===--- MetadataSource.h - Swift Metadata Sources for Reflection ---------===//
+//===- MetadataSource.h - Swift Metadata Sources for Reflection -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

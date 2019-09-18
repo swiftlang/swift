@@ -287,7 +287,7 @@ public:
   void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
 
   /// Emit a non-mergeable trap call, optionally followed by a terminator.
-  void emitTrap(bool EmitUnreachable);
+  void emitTrap(StringRef failureMessage, bool EmitUnreachable);
 
 private:
   llvm::Instruction *AllocaIP;
@@ -644,7 +644,8 @@ public:
   };
 
   llvm::Value *getLocalSelfMetadata();
-  void setLocalSelfMetadata(llvm::Value *value, LocalSelfKind kind);
+  void setLocalSelfMetadata(CanType selfBaseTy, bool selfIsExact,
+                            llvm::Value *value, LocalSelfKind kind);
 
 private:
   LocalTypeDataCache &getOrCreateLocalTypeData();
@@ -660,7 +661,9 @@ private:
   
   /// The value that satisfies metadata lookups for dynamic Self.
   llvm::Value *LocalSelf = nullptr;
-  
+  /// If set, the dynamic Self type is assumed to be equivalent to this exact class.
+  CanType LocalSelfType;
+  bool LocalSelfIsExact = false;
   LocalSelfKind SelfKind;
 };
 

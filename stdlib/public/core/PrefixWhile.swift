@@ -13,7 +13,14 @@
 
 /// A sequence whose elements consist of the initial consecutive elements of
 /// some base sequence that satisfy a given predicate.
-@_fixed_layout // lazy-performance
+///
+/// - Note: When `LazyPrefixWhileSequence` wraps a collection type, the 
+///   performance of accessing `endIndex` depends on how many 
+///   elements satisfy the predicate at the start of the collection, and might 
+///   not offer the usual performance given by the `Collection` protocol.
+///   Accessing `endIndex`, the `last` property, or calling methods that
+///   depend on moving indices might not have the documented complexity.
+@frozen // lazy-performance
 public struct LazyPrefixWhileSequence<Base: Sequence> {
   public typealias Element = Base.Element
   
@@ -37,7 +44,7 @@ extension LazyPrefixWhileSequence {
   /// This is the associated iterator for the `LazyPrefixWhileSequence`,
   /// `LazyPrefixWhileCollection`, and `LazyPrefixWhileBidirectionalCollection`
   /// types.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     public typealias Element = Base.Element
 
@@ -98,21 +105,20 @@ extension LazySequenceProtocol {
   }
 }
 
-/// A lazy `${Collection}` wrapper that includes the initial consecutive
+/// A lazy collection wrapper that includes the initial consecutive
 /// elements of an underlying collection that satisfy a predicate.
 ///
-/// - Note: The performance of accessing `endIndex`, `last`, any methods that
-///   depend on `endIndex`, or moving an index depends on how many elements
-///   satisfy the predicate at the start of the collection, and may not offer
-///   the usual performance given by the `Collection` protocol. Be aware,
-///   therefore, that general operations on `${Self}` instances may not have
-///   the documented complexity.
+/// - Note: The performance of accessing `endIndex` depends on how many 
+///   elements satisfy the predicate at the start of the collection, and might 
+///   not offer the usual performance given by the `Collection` protocol.
+///   Accessing `endIndex`, the `last` property, or calling methods that
+///   depend on moving indices might not have the documented complexity.
 public typealias LazyPrefixWhileCollection<T: Collection> = LazyPrefixWhileSequence<T>
 
 extension LazyPrefixWhileCollection {
   /// A position in the base collection of a `LazyPrefixWhileCollection` or the
   /// end of that collection.
-  @_frozen // lazy-performance
+  @frozen // lazy-performance
   @usableFromInline
   internal enum _IndexRepresentation {
     case index(Base.Index)
@@ -121,7 +127,7 @@ extension LazyPrefixWhileCollection {
   
   /// A position in a `LazyPrefixWhileCollection` or
   /// `LazyPrefixWhileBidirectionalCollection` instance.
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Index {
     /// The position corresponding to `self` in the underlying collection.
     @usableFromInline // lazy-performance

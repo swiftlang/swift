@@ -292,12 +292,14 @@ struct PrintOptions {
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
                                               DAK_FixedLayout,
-                                              DAK_ShowInInterface,
-                                              DAK_ImplicitlyUnwrappedOptional};
+                                              DAK_ShowInInterface};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
   std::vector<AnyAttrKind> ExclusiveAttrList;
+
+  /// List of decls that should be printed even if they are implicit and \c SkipImplicit is set to true.
+  std::vector<const Decl*> TreatAsExplicitDeclList;
 
   /// Whether to print function @convention attribute on function types.
   bool PrintFunctionRepresentationAttrs = true;
@@ -349,7 +351,7 @@ struct PrintOptions {
 
   /// Whether to print the doc-comment from the conformance if a member decl
   /// has no associated doc-comment by itself.
-  bool ElevateDocCommentFromConformance = false;
+  bool CascadeDocComment = false;
 
   /// Whether to print the content of an extension decl inside the type decl where it
   /// extends from.
@@ -480,7 +482,7 @@ struct PrintOptions {
     result.SkipDeinit = true;
     result.ExcludeAttrList.push_back(DAK_DiscardableResult);
     result.EmptyLineBetweenMembers = true;
-    result.ElevateDocCommentFromConformance = true;
+    result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
     result.PrintDocumentationComments = true;
@@ -488,14 +490,17 @@ struct PrintOptions {
     return result;
   }
 
-  /// Retrieve the set of options suitable for parseable module interfaces.
+  /// Retrieve the set of options suitable for module interfaces.
   ///
   /// This is a format that will be parsed again later, so the output must be
   /// consistent and well-formed.
   ///
-  /// \see swift::emitParseableInterface
-  static PrintOptions printParseableInterfaceFile();
+  /// \see swift::emitSwiftInterface
+  static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr);
 
+  /// Retrieve the set of options suitable for "Generated Interfaces", which
+  /// are a prettified representation of the public API of a module, to be
+  /// displayed to users in an editor.
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
 

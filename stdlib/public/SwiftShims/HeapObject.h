@@ -20,7 +20,7 @@
 #define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_64 16
 #define SWIFT_ABI_HEAP_OBJECT_HEADER_SIZE_32 8
 
-#ifdef __cplusplus
+#ifndef __swift__
 #include <type_traits>
 #include "swift/Basic/type_traits.h"
 
@@ -48,7 +48,7 @@ struct HeapObject {
 
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
 
-#ifdef __cplusplus
+#ifndef __swift__
   HeapObject() = default;
 
   // Initialize a HeapObject header as appropriate for a newly-allocated object.
@@ -68,7 +68,7 @@ struct HeapObject {
   void dump() const LLVM_ATTRIBUTE_USED;
 #endif
 
-#endif // __cplusplus
+#endif // __swift__
 };
 
 #ifdef __cplusplus
@@ -92,7 +92,7 @@ __swift_size_t swift_weakRetainCount(HeapObject *obj);
 } // extern "C"
 #endif
 
-#ifdef __cplusplus
+#ifndef __swift__
 static_assert(std::is_trivially_destructible<HeapObject>::value,
               "HeapObject must be trivially destructible");
 

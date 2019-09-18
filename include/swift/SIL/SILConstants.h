@@ -41,63 +41,119 @@ extern llvm::cl::opt<unsigned> ConstExprLimit;
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
 /// SymbolicValue representation also includes a pointer to the SILNode in
 /// question that was problematic.
-enum class UnknownReason {
-  // TODO: Eliminate the default code, by making classifications for each
-  // failure mode.
-  Default,
+class UnknownReason {
+public:
+  enum UnknownKind {
+    // TODO: Eliminate the default kind, by making classifications for each
+    // failure mode.
+    Default,
 
-  /// The constant expression was too big.  This is reported on a random
-  /// instruction within the constexpr that triggered the issue.
-  TooManyInstructions,
+    /// The constant expression was too big.  This is reported on a random
+    /// instruction within the constexpr that triggered the issue.
+    TooManyInstructions,
 
-  /// A control flow loop was found.
-  Loop,
+    /// A control flow loop was found.
+    Loop,
 
-  /// Integer overflow detected.
-  Overflow,
+    /// Integer overflow detected.
+    Overflow,
 
-  /// Unspecified trap detected.
-  Trap,
+    /// Unspecified trap detected.
+    Trap,
 
-  /// An operation was applied over operands whose symbolic values were
-  /// constants but were not valid for the operation.
-  InvalidOperandValue,
+    /// Assertion failure detected. These have an associated message unlike
+    /// traps.
+    AssertionFailure,
 
-  /// Encountered an instruction not supported by the interpreter.
-  UnsupportedInstruction,
+    /// An operation was applied over operands whose symbolic values were
+    /// constants but were not valid for the operation.
+    InvalidOperandValue,
 
-  /// Encountered a function call where the body of the called function is
-  /// not available.
-  CalleeImplementationUnknown,
+    /// Encountered an instruction not supported by the interpreter.
+    UnsupportedInstruction,
 
-  /// Attempted to load from/store into a SIL value that was not tracked by
-  /// the interpreter.
-  UntrackedSILValue,
+    /// Encountered a function call where the body of the called function is
+    /// not available.
+    CalleeImplementationUnknown,
 
-  /// Attempted to find a concrete protocol conformance for a witness method
-  /// and failed.
-  UnknownWitnessMethodConformance,
+    /// Attempted to load from/store into a SIL value that was not tracked by
+    /// the interpreter.
+    UntrackedSILValue,
 
-  /// Attempted to determine the SIL function of a witness method (based on a
-  /// concrete protocol conformance) and failed.
-  UnresolvableWitnessMethod,
+    /// Attempted to find a concrete protocol conformance for a witness method
+    /// and failed.
+    UnknownWitnessMethodConformance,
 
-  /// The value of a top-level variable cannot be determined to be a constant.
-  /// This is only relevant in the backward evaluation mode, which is used by
-  /// #assert.
-  NotTopLevelConstant,
+    /// Attempted to determine the SIL function of a witness method  and failed.
+    NoWitnesTableEntry,
 
-  /// A top-level value has multiple writers. This is only relevant in the
-  /// non-flow-sensitive evaluation mode,  which is used by #assert.
-  MutipleTopLevelWriters,
+    /// The value of a top-level variable cannot be determined to be a constant.
+    /// This is only relevant in the backward evaluation mode, which is used by
+    /// #assert.
+    NotTopLevelConstant,
 
-  /// Indicates the return value of an instruction that was not evaluated during
-  /// interpretation.
-  ReturnedByUnevaluatedInstruction,
+    /// A top-level value has multiple writers. This is only relevant in the
+    /// non-flow-sensitive evaluation mode,  which is used by #assert.
+    MutipleTopLevelWriters,
 
-  /// Indicates that the value was possibly modified by an instruction
-  /// that was not evaluated during the interpretation.
-  MutatedByUnevaluatedInstruction,
+    /// Indicates the return value of an instruction that was not evaluated
+    /// during interpretation.
+    ReturnedByUnevaluatedInstruction,
+
+    /// Indicates that the value was possibly modified by an instruction
+    /// that was not evaluated during the interpretation.
+    MutatedByUnevaluatedInstruction,
+  };
+
+private:
+  UnknownKind kind;
+
+  // Auxiliary information for different unknown kinds.
+  union {
+    SILFunction *function;
+    const char *failedAssertMessage;
+  } payload;
+
+public:
+  UnknownKind getKind() { return kind; }
+
+  static bool isUnknownKindWithPayload(UnknownKind kind) {
+    return kind == UnknownKind::CalleeImplementationUnknown;
+  }
+
+  static UnknownReason create(UnknownKind kind) {
+    assert(!isUnknownKindWithPayload(kind));
+    UnknownReason reason;
+    reason.kind = kind;
+    return reason;
+  }
+
+  static UnknownReason createCalleeImplementationUnknown(SILFunction *callee) {
+    assert(callee);
+    UnknownReason reason;
+    reason.kind = UnknownKind::CalleeImplementationUnknown;
+    reason.payload.function = callee;
+    return reason;
+  }
+
+  SILFunction *getCalleeWithoutImplmentation() {
+    assert(kind == UnknownKind::CalleeImplementationUnknown);
+    return payload.function;
+  }
+
+  static UnknownReason createAssertionFailure(const char *message,
+                                              size_t size) {
+    assert(message[size] == '\0' && "message must be null-terminated");
+    UnknownReason reason;
+    reason.kind = UnknownKind::AssertionFailure;
+    reason.payload.failedAssertMessage = message;
+    return reason;
+  }
+
+  const char *getAssertionFailureMessage() {
+    assert(kind == UnknownKind::AssertionFailure);
+    return payload.failedAssertMessage;
+  }
 };
 
 /// An abstract class that exposes functions for allocating symbolic values.
@@ -241,9 +297,6 @@ private:
   RepresentationKind representationKind : 8;
 
   union {
-    /// This is the reason code for RK_Unknown values.
-    UnknownReason unknownReason : 32;
-
     /// This is the number of bits in an RK_Integer or RK_IntegerInline
     /// representation, which makes the number of entries in the list derivable.
     unsigned integerBitwidth;

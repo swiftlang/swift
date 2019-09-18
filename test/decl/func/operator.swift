@@ -11,7 +11,27 @@ struct Y {}
 
 func +(lhs: X, rhs: X) -> X {} // okay
 
-func +++(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}
+func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+
+extension X {
+    static func <=>(lhs: X, rhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+}
+
+extension X {
+    struct Z {
+        static func <=> (lhs: Z, rhs: Z) -> Z {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=infix operator <=> : <# Precedence Group #>\n}}
+    }
+}
+
+extension X {
+    static prefix func <=>(lhs: X) -> X {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+}
+
+extension X {
+    struct ZZ {
+        static prefix func <=>(lhs: ZZ) -> ZZ {} // expected-error {{operator implementation without matching operator declaration}}{{1-1=prefix operator <=> : <# Precedence Group #>\n}}
+    }
+}
 
 infix operator ++++ : ReallyHighPrecedence
 precedencegroup ReallyHighPrecedence {
@@ -390,7 +410,8 @@ func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
   _ = (§)foo
   // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
-  // expected-warning@-3 {{expression of type '(A, (B, B), A)' is unused}}
+  // expected-error@-3 {{generic parameter 'U' could not be inferred}}
+  // expected-warning@-4 {{expression of type '(A, (B, B), A)' is unused}}
   _ = (§)(foo)
   _ = (a, (b, b), a)§
   _ = (§)(a, (b, b), a) // expected-error {{operator function '§' expects a single parameter of type '(T, (U, U), T)'}}

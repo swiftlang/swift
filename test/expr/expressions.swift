@@ -139,8 +139,10 @@ func funcdecl7(_ a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
+func makeTuple() -> (String, Int) { return ("foo", 42) }
 func errorRecovery() {
   testfunc2({ $0 + 1 }) // expected-error {{contextual closure type '((), Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
+  // expected-error@-1 {{cannot convert value of type '()' to expected argument type 'Int'}}
 
   enum union1 {
     case bar
@@ -149,12 +151,14 @@ func errorRecovery() {
   var a: Int = .hello // expected-error {{type 'Int' has no member 'hello'}}
   var b: union1 = .bar // ok
   var c: union1 = .xyz  // expected-error {{type 'union1' has no member 'xyz'}}
-  var d: (Int,Int,Int) = (1,2) // expected-error {{cannot convert value of type '(Int, Int)' to specified type '(Int, Int, Int)'}}
-  var e: (Int,Int) = (1, 2, 3) // expected-error {{cannot convert value of type '(Int, Int, Int)' to specified type '(Int, Int)'}}
-  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{cannot convert value of type '(Int, Int, f: Int)' to specified type '(Int, Int)'}}
+  var d: (Int,Int,Int) = (1,2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Int)', tuples have a different number of elements}}
+  var e: (Int,Int) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var f: (Int,Int) = (1, 2, f : 3) // expected-error {{'(Int, Int, f: Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
   
   // <rdar://problem/22426860> CrashTracer: [USER] swift at …mous_namespace::ConstraintGenerator::getTypeForPattern + 698
-  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(_, _, _)', tuples have a different number of elements}}
+  var (g1, g2, g3) = (1, 2) // expected-error {{'(Int, Int)' is not convertible to '(Int, Int, Any)', tuples have a different number of elements}}
+  var (h1, h2) = (1, 2, 3) // expected-error {{'(Int, Int, Int)' is not convertible to '(Int, Int)', tuples have a different number of elements}}
+  var i: (Bool, Bool) = makeTuple() // expected-error {{tuple type '(String, Int)' is not convertible to tuple '(Bool, Bool)'}}
 }
 
 func acceptsInt(_ x: Int) {}
@@ -185,7 +189,7 @@ func test4() -> ((_ arg1: Int, _ arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{cannot convert value of type '(Int, Int)' to specified type '((Int) -> Int, Int)'}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{tuple type '(Int, Int)' is not convertible to tuple '((Int) -> Int, Int)'}}
 
 
   let c: (a: Int, b: Int) = (1,2)
@@ -272,7 +276,7 @@ func test_floating_point() {
 
 func test_nonassoc(_ x: Int, y: Int) -> Bool {
   // FIXME: the second error and note here should arguably disappear
-  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}} expected-note {{overloads for '==' exist with these partially matching parameter lists:}}
+  return x == y == x // expected-error {{adjacent operators are in non-associative precedence group 'ComparisonPrecedence'}}  expected-error {{binary operator '==' cannot be applied to operands of type 'Bool' and 'Int'}}
 }
 
 // More realistic examples.
@@ -606,6 +610,7 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 _ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
 
 //===----------------------------------------------------------------------===//
@@ -740,7 +745,9 @@ func invalidDictionaryLiteral() {
 
 
 [4].joined(separator: [1]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{cannot convert value of type '[Int]' to expected argument type 'String'}}
 [4].joined(separator: [[[1]]]) // expected-error {{cannot convert value of type 'Int' to expected element type 'String'}}
+// expected-error@-1 {{cannot convert value of type '[[[Int]]]' to expected argument type 'String'}}
 
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
@@ -794,11 +801,10 @@ func testParenExprInTheWay() {
   
   if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
 
-  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
+  if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
-  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  //expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
-
+  if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
   
   if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
 }

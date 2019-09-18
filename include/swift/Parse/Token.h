@@ -198,11 +198,7 @@ public:
 
   /// True if the token is any keyword.
   bool isKeyword() const {
-    switch (Kind) {
-#define KEYWORD(X) case tok::kw_##X: return true;
-#include "swift/Syntax/TokenKinds.def"
-    default: return false;
-    }
+    return isTokenKeyword(Kind);
   }
 
   /// True if the token is any literal.
@@ -250,17 +246,6 @@ public:
 
   CharSourceRange getRange() const {
     return CharSourceRange(getLoc(), getLength());
-  }
-
-  CharSourceRange getRangeWithoutBackticks() const {
-    SourceLoc TokLoc = getLoc();
-    unsigned TokLength = getLength();
-    if (isEscapedIdentifier()) {
-      // Adjust to account for the backticks.
-      TokLoc = TokLoc.getAdvancedLoc(1);
-      TokLength -= 2;
-    }
-    return CharSourceRange(TokLoc, TokLength);
   }
 
   bool hasComment() const {

@@ -90,18 +90,6 @@ void emitStoreEnumTagToAddress(IRGenFunction &IGF,
                                 SILType enumTy,
                                 Address enumAddr,
                                 EnumElementDecl *theCase);
-  
-/// Interleave the occupiedValue and spareValue bits, taking a bit from one
-/// or the other at each position based on the spareBits mask.
-APInt
-interleaveSpareBits(IRGenModule &IGM, const SpareBitVector &spareBits,
-                    unsigned bits, unsigned spareValue, unsigned occupiedValue);
-
-/// A version of the above where the tag value is dynamic.
-EnumPayload interleaveSpareBits(IRGenFunction &IGF,
-                                const EnumPayloadSchema &schema,
-                                const SpareBitVector &spareBitVector,
-                                llvm::Value *value);
 
 /// Pack masked bits into the low bits of an integer value.
 /// Equivalent to a parallel bit extract instruction (PEXT),
@@ -111,6 +99,11 @@ llvm::Value *emitGatherBits(IRGenFunction &IGF,
                             llvm::Value *source,
                             unsigned resultLowBit,
                             unsigned resultBitWidth);
+
+/// Pack masked bits into the low bits of an integer value.
+llvm::APInt gatherBits(const llvm::APInt &mask,
+                       const llvm::APInt &value);
+
 /// Unpack bits from the low bits of an integer value and
 /// move them to the bit positions indicated by the mask.
 /// Equivalent to a parallel bit deposit instruction (PDEP),
@@ -119,7 +112,11 @@ llvm::Value *emitScatterBits(IRGenFunction &IGF,
                              llvm::APInt mask,
                              llvm::Value *packedBits,
                              unsigned packedLowBit);
-  
+
+/// Unpack bits from the low bits of an integer value and
+/// move them to the bit positions indicated by the mask.
+llvm::APInt scatterBits(const llvm::APInt &mask, unsigned value);
+
 /// An implementation strategy for an enum, which handles how the enum is
 /// laid out and how to perform TypeInfo operations on values of the enum.
 class EnumImplStrategy {

@@ -17,9 +17,8 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "llvm/Support/DataTypes.h"
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
@@ -28,13 +27,15 @@
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/DataTypes.h"
 #include <functional>
 #include <memory>
 #include <utility>
@@ -48,11 +49,14 @@ namespace clang {
 }
 
 namespace swift {
+  class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class ClangModuleLoader;
   class ClangNode;
+  class ConcreteDeclRef;
   class ConstructorDecl;
   class Decl;
   class DeclContext;
@@ -64,10 +68,8 @@ namespace swift {
   class InFlightDiagnostic;
   class IterableDeclContext;
   class LazyContextData;
-  class LazyGenericContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class LazyMemberParser;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -109,6 +111,10 @@ namespace swift {
   class UnifiedStatsReporter;
 
   enum class KnownProtocolKind : uint8_t;
+
+namespace namelookup {
+  class ImportCache;
+}
 
 namespace syntax {
   class SyntaxArena;
@@ -253,13 +259,6 @@ public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
-
-  /// The list of external definitions imported by this context.
-  llvm::SetVector<Decl *> ExternalDefinitions;
-
-  /// FIXME: HACK HACK HACK
-  /// This state should be tracked somewhere else.
-  unsigned LastCheckedExternalDefinition = 0;
 
   /// A consumer of type checker debug output.
   std::unique_ptr<TypeCheckerDebugConsumer> TypeCheckerDebug;
@@ -418,13 +417,6 @@ public:
     return true;
   }
 
-  /// Remove the lazy resolver, if there is one.
-  ///
-  /// FIXME: We probably don't ever want to do this.
-  void removeLazyResolver() {
-    setLazyResolver(nullptr);
-  }
-
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -433,12 +425,6 @@ private:
   void setLazyResolver(LazyResolver *resolver);
 
 public:
-  /// Add a lazy parser for resolving members later.
-  void addLazyParser(LazyMemberParser *parser);
-
-  /// Remove a lazy parser.
-  void removeLazyParser(LazyMemberParser *parser);
-
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
@@ -514,7 +500,20 @@ public:
   bool hasArrayLiteralIntrinsics() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
-  ConstructorDecl *getBoolBuiltinInitDecl() const;
+  ConcreteDeclRef getBoolBuiltinInitDecl() const;
+
+  /// Retrieve the witness for init(_builtinIntegerLiteral:).
+  ConcreteDeclRef getIntBuiltinInitDecl(NominalTypeDecl *intDecl) const;
+
+  /// Retrieve the witness for init(_builtinFloatLiteral:).
+  ConcreteDeclRef getFloatBuiltinInitDecl(NominalTypeDecl *floatDecl) const;
+
+  /// Retrieve the witness for (_builtinStringLiteral:utf8CodeUnitCount:isASCII:).
+  ConcreteDeclRef getStringBuiltinInitDecl(NominalTypeDecl *stringDecl) const;
+
+  ConcreteDeclRef getBuiltinInitDecl(NominalTypeDecl *decl,
+                                     KnownProtocolKind builtinProtocol,
+                llvm::function_ref<DeclName (ASTContext &ctx)> initName) const;
 
   /// Retrieve the declaration of Swift.==(Int, Int) -> Bool.
   FuncDecl *getEqualIntDecl() const;
@@ -566,14 +565,8 @@ public:
                                ForeignLanguage language,
                                const DeclContext *dc);
 
-  /// Add a declaration to a list of declarations that need to be emitted
-  /// as part of the current module or source file, but are otherwise not
-  /// nested within it.
-  void addExternalDecl(Decl *decl);
-
   /// Add a declaration that was synthesized to a per-source file list if
-  /// if is part of a source file, or the external declarations list if
-  /// it is part of an imported type context.
+  /// if is part of a source file.
   void addSynthesizedDecl(Decl *decl);
 
   /// Add a cleanup function to be called when the ASTContext is deallocated.
@@ -588,6 +581,10 @@ public:
   
   /// Get the runtime availability of the opaque types language feature for the target platform.
   AvailabilityContext getOpaqueTypeAvailability();
+
+  /// Get the runtime availability of features introduced in the Swift 5.1
+  /// compiler for the target platform.
+  AvailabilityContext getSwift51Availability();
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
@@ -633,8 +630,10 @@ public:
   /// \param isClang \c true if this module loader is responsible for loading
   ///                Clang modules, which are special-cased in some parts of the
   ///                compiler.
+  /// \param isDWARF \c true if this module loader can load Clang modules
+  ///                from DWARF.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
-                       bool isClang = false);
+                       bool isClang = false, bool isDWARF = false);
 
   /// Load extensions to the given nominal type from the external
   /// module loaders.
@@ -676,6 +675,14 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getClangModuleLoader() const;
+
+  /// Retrieve the DWARF module loader for this ASTContext.
+  ///
+  /// If there is no Clang module loader, returns a null pointer.
+  /// The loader is owned by the AST context.
+  ClangModuleLoader *getDWARFModuleLoader() const;
+
+  namelookup::ImportCache &getImportCache() const;
 
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
@@ -809,25 +816,6 @@ public:
   LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
                                               LazyMemberLoader *lazyLoader);
 
-  /// Use the lazy parsers associated with the context to populate the members
-  /// of the given decl context.
-  ///
-  /// \param IDC The context whose member decls should be lazily parsed.
-  void parseMembers(IterableDeclContext *IDC);
-
-  /// Use the lazy parsers associated with the context to check whether the decl
-  /// context has been parsed.
-  bool hasUnparsedMembers(const IterableDeclContext *IDC) const;
-
-  /// Get the lazy function data for the given generic context.
-  ///
-  /// \param lazyLoader If non-null, the lazy loader to use when creating the
-  /// function data. The pointer must either be null or be consistent
-  /// across all calls for the same \p func.
-  LazyGenericContextData *getOrCreateLazyGenericContextData(
-                                              const GenericContext *dc,
-                                              LazyMemberLoader *lazyLoader);
-
   /// Get the lazy iterable context for the given iterable declaration context.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -837,11 +825,11 @@ public:
                                               const IterableDeclContext *idc,
                                               LazyMemberLoader *lazyLoader);
 
-  /// Access the side cache for property delegate backing property types,
+  /// Access the side cache for property wrapper backing property types,
   /// used because TypeChecker::typeCheckBinding() needs somewhere to stash
   /// the backing property type.
-  Type getSideCachedPropertyDelegateBackingPropertyType(VarDecl *var) const;
-  void setSideCachedPropertyDelegateBackingPropertyType(VarDecl *var,
+  Type getSideCachedPropertyWrapperBackingPropertyType(VarDecl *var) const;
+  void setSideCachedPropertyWrapperBackingPropertyType(VarDecl *var,
                                                         Type type);
   
   /// Returns memory usage of this ASTContext.
@@ -878,12 +866,6 @@ public:
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
                                                      CanGenericSignature sig);
 
-  /// Retrieve or create the canonical generic environment of a canonical
-  /// generic signature builder.
-  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                       GenericSignatureBuilder *builder,
-                                       GenericSignature *sig);
-
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.
   CanGenericSignature getSingleGenericParameterSignature() const;
@@ -892,6 +874,21 @@ public:
   /// to the given existential type.
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
+
+  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
+                                                const ValueDecl *derived);
+
+  enum class OverrideGenericSignatureReqCheck {
+    /// Base method's generic requirements are satisifed by derived method
+    BaseReqSatisfiedByDerived,
+
+    /// Derived method's generic requirements are satisifed by base method
+    DerivedReqSatisfiedByBase
+  };
+
+  bool overrideGenericSignatureReqsSatisfied(
+      const ValueDecl *base, const ValueDecl *derived,
+      const OverrideGenericSignatureReqCheck direction);
 
   /// Whether our effective Swift version is at least 'major'.
   ///

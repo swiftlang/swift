@@ -4,7 +4,7 @@
 
 // RUN: cp %S/Inputs/custom-modules/module.map %t/module.map
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %S/resilient-ancestry.swift -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution -enable-resilient-objc-class-stubs
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %S/resilient-ancestry.swift -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution -target %target-next-stable-abi-triple
 // RUN: %FileCheck %S/resilient-ancestry.swift < %t/resilient.h
 // RUN: %check-in-clang %t/resilient.h -I %t
 

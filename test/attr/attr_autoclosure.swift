@@ -255,7 +255,7 @@ func autoclosure_param_returning_func_type() {
 
   func bar_1(_ fn: @autoclosure @escaping () -> Int) { foo(fn) } // Ok
   func bar_2(_ fn: @autoclosure () -> Int) { foo(fn) } // expected-note {{parameter 'fn' is implicitly non-escaping}}
-  // expected-error@-1 {{using non-escaping parameter 'fn' in a context expecting an @escaping closure}}
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
   func baz_1(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn) }   // Ok (T is inferred as () -> Int)
   func baz_2(_ fn: @autoclosure @escaping () -> Int) { generic_foo(fn()) } // Ok (T is inferred as Int)
   func baz_3(_ fn: @autoclosure () -> Int) { generic_foo(fn) } // Fails because fn is not marked as @escaping

@@ -292,33 +292,8 @@ public:
   ///
   /// WARNING: This is not a constant time operation because it is implemented
   /// in terms of getVarDecl, which requests all BaseType's stored properties.
-  SILType getType(SILType BaseType, SILModule &M) const {
-    assert(isValid());
-    switch (getKind()) {
-    case ProjectionKind::Struct:
-    case ProjectionKind::Class:
-      return BaseType.getFieldType(getVarDecl(BaseType), M);
-    case ProjectionKind::Enum:
-      return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
-    case ProjectionKind::Box:
-      return BaseType.castTo<SILBoxType>()->getFieldType(M, getIndex());
-    case ProjectionKind::Tuple:
-      return BaseType.getTupleElementType(getIndex());
-    case ProjectionKind::Upcast:
-    case ProjectionKind::RefCast:
-    case ProjectionKind::BitwiseCast:
-    case ProjectionKind::TailElems:
-      return getCastType(BaseType);
-    case ProjectionKind::Index:
-      // Index types do not change the underlying type.
-      return BaseType;
-    }
+  SILType getType(SILType BaseType, SILModule &M) const;
 
-    llvm_unreachable("Unhandled ProjectionKind in switch.");
-  }
-
-  /// WARNING: This is not a constant time operation because it requests all
-  /// BaseType's stored properties.
   VarDecl *getVarDecl(SILType BaseType) const {
     assert(isValid());
     assert((getKind() == ProjectionKind::Struct ||
@@ -326,9 +301,7 @@ public:
     assert(BaseType.getNominalOrBoundGenericNominal() &&
            "This should only be called with a nominal type");
     auto *NDecl = BaseType.getNominalOrBoundGenericNominal();
-    auto Iter = NDecl->getStoredProperties().begin();
-    std::advance(Iter, getIndex());
-    return *Iter;
+    return NDecl->getStoredProperties()[getIndex()];
   }
 
   EnumElementDecl *getEnumElementDecl(SILType BaseType) const {
@@ -377,15 +350,15 @@ public:
 
   /// Returns true if this instruction projects from an address type to an
   /// address subtype.
-  static SingleValueInstruction *isAddressProjection(SILValue V) {
-    switch (V->getKind()) {
+  static SingleValueInstruction *isAddressProjection(SILValue v) {
+    switch (v->getKind()) {
     default:
       return nullptr;
     case ValueKind::IndexAddrInst: {
-      auto I = cast<IndexAddrInst>(V);
-      unsigned Scalar;
-      if (getIntegerIndex(I->getIndex(), Scalar))
-        return I;
+      auto *i = cast<IndexAddrInst>(v);
+      unsigned scalar;
+      if (getIntegerIndex(i->getIndex(), scalar))
+        return i;
       return nullptr;
     }
     case ValueKind::StructElementAddrInst:
@@ -394,8 +367,15 @@ public:
     case ValueKind::ProjectBoxInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
-      return cast<SingleValueInstruction>(V);
+      return cast<SingleValueInstruction>(v);
     }
+  }
+
+  static SingleValueInstruction *isAddressProjection(SILInstruction *i) {
+    auto *svi = dyn_cast<SingleValueInstruction>(i);
+    if (!svi)
+      return nullptr;
+    return isAddressProjection(SILValue(svi));
   }
 
   /// Returns true if this instruction projects from an object type to an object

@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
 
-@_fixed_layout
+@frozen
 public struct UnicodeScalar {
   var _value: UInt32
   public var value: UInt32 { return _value }

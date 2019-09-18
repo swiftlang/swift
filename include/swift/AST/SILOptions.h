@@ -50,9 +50,6 @@ public:
   /// Remove all runtime assertions during optimizations.
   bool RemoveRuntimeAsserts = false;
 
-  /// Enable existential specializer optimization.
-  bool ExistentialSpecializer = false;
-
   /// Controls whether the SIL ARC optimizations are run.
   bool EnableARCOptimizations = true;
 
@@ -128,6 +125,16 @@ public:
 
   /// Emit extra exclusvity markers for memory access and verify coverage.
   bool VerifyExclusivity = false;
+
+  /// Calls to the replaced method inside of the replacement method will call
+  /// the previous implementation.
+  ///
+  /// @_dynamicReplacement(for: original())
+  /// func replacement() {
+  ///   if (...)
+  ///     original() // calls original() implementation if true
+  /// }
+  bool EnableDynamicReplacementCanCallPreviousImplementation = true;
 
   /// Enable large loadable types IRGen pass.
   bool EnableLargeLoadableTypes = true;

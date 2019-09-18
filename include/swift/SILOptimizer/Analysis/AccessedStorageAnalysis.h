@@ -25,8 +25,8 @@
 // that use AccessedStorageAnalysis do not currently need SideEffectAnalysis.
 //
 //===----------------------------------------------------------------------===//
-#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
-#define SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
 
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -357,4 +357,4 @@ public:
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H_
+#endif // SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H

@@ -30,7 +30,7 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxRecorder::recordToken(const Token &tok,
                                      const ParsedTrivia &leadingTrivia,
                                      const ParsedTrivia &trailingTrivia) {
-  return recordToken(tok.getKind(), tok.getRangeWithoutBackticks(),
+  return recordToken(tok.getKind(), tok.getRange(),
                      leadingTrivia.Pieces, trailingTrivia.Pieces);
 }
 
@@ -63,7 +63,7 @@ getRecordedNode(const ParsedRawSyntaxNode &node, ParsedRawSyntaxRecorder &rec) {
   if (node.isDeferredLayout())
     return rec.recordRawSyntax(node.getKind(), node.getDeferredChildren());
   assert(node.isDeferredToken());
-  CharSourceRange tokRange = node.getDeferredTokenRangeWithoutBackticks();
+  CharSourceRange tokRange = node.getDeferredTokenRange();
   tok tokKind = node.getTokenKind();
   if (node.isMissing())
     return rec.recordMissingToken(tokKind, tokRange.getStart());
@@ -86,11 +86,11 @@ ParsedRawSyntaxRecorder::recordRawSyntax(SyntaxKind kind,
         subnodes.push_back(nullptr);
       } else {
         subnodes.push_back(subnode.getOpaqueNode());
-        auto range = subnode.getRange();
+        auto range = subnode.getRecordedRange();
         if (range.isValid()) {
           if (offset.isInvalid())
             offset = range.getStart();
-          length += subnode.getRange().getByteLength();
+          length += subnode.getRecordedRange().getByteLength();
         }
       }
     }

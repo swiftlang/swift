@@ -102,4 +102,4 @@ public:
 };
 } // namespace swift
 
-#endif /* SWIFT_FRONTEND_INPUTFILE_H */
+#endif // SWIFT_FRONTEND_INPUTFILE_H

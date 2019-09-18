@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILArgument.h"
@@ -95,15 +96,14 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!requirement) return None;
 
   // Retrieve the _bridgeToObjectiveC witness.
-  auto witness = conformance->getWitnessDecl(requirement, nullptr);
+  auto witness = conformance->getWitnessDecl(requirement);
   assert(witness);
 
   // Determine the type we're bridging to.
   auto objcTypeReq = SGF.SGM.getBridgedObjectiveCTypeRequirement(loc);
   if (!objcTypeReq) return None;
 
-  Type objcType = conformance->getTypeWitness(objcTypeReq, nullptr);
-  assert(objcType);
+  Type objcType = conformance->getTypeWitness(objcTypeReq);
 
   // Create a reference to the witness.
   SILDeclRef witnessConstant(witness);
@@ -187,12 +187,11 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
   if (!objcTypeRequirement) return None;
 
   // Retrieve the _unconditionallyBridgeFromObjectiveC witness.
-  auto witness = conformance->getWitnessDeclRef(requirement, nullptr);
+  auto witness = conformance->getWitnessDeclRef(requirement);
   assert(witness);
 
   // Retrieve the _ObjectiveCType witness.
-  auto objcType = conformance->getTypeWitness(objcTypeRequirement, nullptr);
-  assert(objcType);
+  auto objcType = conformance->getTypeWitness(objcTypeRequirement);
 
   // Create a reference to the witness.
   SILDeclRef witnessConstant(witness.getDecl());

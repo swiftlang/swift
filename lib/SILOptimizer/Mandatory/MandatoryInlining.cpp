@@ -46,9 +46,9 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
   Context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
 }
 
-static SILValue stripCopies(SILValue v) {
-  while (auto *cvi = dyn_cast<CopyValueInst>(v)) {
-    v = cvi->getOperand();
+static SILValue stripCopiesAndBorrows(SILValue v) {
+  while (isa<CopyValueInst>(v) || isa<BeginBorrowInst>(v)) {
+    v = cast<SingleValueInstruction>(v)->getOperand(0);
   }
   return v;
 }
@@ -137,10 +137,22 @@ static void fixupReferenceCounts(
       }
 
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(copy, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -175,12 +187,23 @@ static void fixupReferenceCounts(
     // TODO: Do we need to lifetime extend here?
     case ParameterConvention::Direct_Unowned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(v, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -203,12 +226,23 @@ static void fixupReferenceCounts(
     // apply has another use that would destroy our value first.
     case ParameterConvention::Direct_Owned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(v, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -329,7 +363,7 @@ static void cleanupCalleeValue(SILValue calleeValue) {
     }
   }
 
-  calleeValue = stripCopies(calleeValue);
+  calleeValue = stripCopiesAndBorrows(calleeValue);
 
   // Inline constructor
   auto calleeSource = ([&]() -> SILValue {
@@ -339,12 +373,12 @@ static void cleanupCalleeValue(SILValue calleeValue) {
     // will delete any uses of the closure, including a
     // convert_escape_to_noescape conversion.
     if (auto *cfi = dyn_cast<ConvertFunctionInst>(calleeValue))
-      return stripCopies(cfi->getOperand());
+      return stripCopiesAndBorrows(cfi->getOperand());
 
     if (auto *cvt = dyn_cast<ConvertEscapeToNoEscapeInst>(calleeValue))
-      return stripCopies(cvt->getOperand());
+      return stripCopiesAndBorrows(cvt->getOperand());
 
-    return stripCopies(calleeValue);
+    return stripCopiesAndBorrows(calleeValue);
   })();
 
   if (auto *pai = dyn_cast<PartialApplyInst>(calleeSource)) {
@@ -359,7 +393,7 @@ static void cleanupCalleeValue(SILValue calleeValue) {
     calleeValue = callee;
   }
 
-  calleeValue = stripCopies(calleeValue);
+  calleeValue = stripCopiesAndBorrows(calleeValue);
 
   // Handle function_ref -> convert_function -> partial_apply/thin_to_thick.
   if (auto *cfi = dyn_cast<ConvertFunctionInst>(calleeValue)) {
@@ -579,7 +613,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
   // Then grab a first approximation of our apply by stripping off all copy
   // operations.
-  SILValue CalleeValue = stripCopies(AI.getCallee());
+  SILValue CalleeValue = stripCopiesAndBorrows(AI.getCallee());
 
   // If after stripping off copy_values, we have a load then see if we the
   // function we want to inline has a simple available value through a simple
@@ -588,7 +622,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     CalleeValue = getLoadedCalleeValue(li);
     if (!CalleeValue)
       return nullptr;
-    CalleeValue = stripCopies(CalleeValue);
+    CalleeValue = stripCopiesAndBorrows(CalleeValue);
   }
 
   // PartialApply/ThinToThick -> ConvertFunction patterns are generated
@@ -599,7 +633,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   // a cast.
   auto skipFuncConvert = [](SILValue CalleeValue) {
     // Skip any copies that we see.
-    CalleeValue = stripCopies(CalleeValue);
+    CalleeValue = stripCopiesAndBorrows(CalleeValue);
 
     // We can also allow a thin @escape to noescape conversion as such:
     // %1 = function_ref @thin_closure_impl : $@convention(thin) () -> ()
@@ -619,7 +653,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
           ToCalleeTy->getExtInfo().withNoEscape(false));
       if (FromCalleeTy != EscapingCalleeTy)
         return CalleeValue;
-      return stripCopies(ThinToNoescapeCast->getOperand());
+      return stripCopiesAndBorrows(ThinToNoescapeCast->getOperand());
     }
 
     // Ignore mark_dependence users. A partial_apply [stack] uses them to mark
@@ -635,7 +669,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
 
     auto *CFI = dyn_cast<ConvertEscapeToNoEscapeInst>(CalleeValue);
     if (!CFI)
-      return stripCopies(CalleeValue);
+      return stripCopiesAndBorrows(CalleeValue);
 
     // TODO: Handle argument conversion. All the code in this file needs to be
     // cleaned up and generalized. The argument conversion handling in
@@ -651,9 +685,9 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     auto EscapingCalleeTy =
       ToCalleeTy->getWithExtInfo(ToCalleeTy->getExtInfo().withNoEscape(false));
     if (FromCalleeTy != EscapingCalleeTy)
-      return stripCopies(CalleeValue);
+      return stripCopiesAndBorrows(CalleeValue);
 
-    return stripCopies(CFI->getOperand());
+    return stripCopiesAndBorrows(CFI->getOperand());
   };
 
   // Look through a escape to @noescape conversion.
@@ -666,11 +700,11 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
     // Collect the applied arguments and their convention.
     collectPartiallyAppliedArguments(PAI, CapturedArgConventions, FullArgs);
 
-    CalleeValue = stripCopies(PAI->getCallee());
+    CalleeValue = stripCopiesAndBorrows(PAI->getCallee());
     IsThick = true;
     PartialApply = PAI;
   } else if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CalleeValue)) {
-    CalleeValue = stripCopies(TTTFI->getOperand());
+    CalleeValue = stripCopiesAndBorrows(TTTFI->getOperand());
     IsThick = true;
   }
 
@@ -680,7 +714,7 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   if (!FRI)
     return nullptr;
 
-  SILFunction *CalleeFunction = FRI->getReferencedFunction();
+  SILFunction *CalleeFunction = FRI->getReferencedFunctionOrNull();
 
   switch (CalleeFunction->getRepresentation()) {
   case SILFunctionTypeRepresentation::Thick:
@@ -945,6 +979,7 @@ class MandatoryInlining : public SILModuleTransform {
     ClassHierarchyAnalysis *CHA = getAnalysis<ClassHierarchyAnalysis>();
     SILModule *M = getModule();
     bool ShouldCleanup = !getOptions().DebugSerialization;
+    bool SILVerifyAll = getOptions().VerifyAll;
     DenseFunctionSet FullyInlinedSet;
     ImmutableFunctionSet::Factory SetFactory;
 
@@ -965,6 +1000,13 @@ class MandatoryInlining : public SILModuleTransform {
       // The inliner splits blocks at call sites. Re-merge trivial branches
       // to reestablish a canonical CFG.
       mergeBasicBlocks(&F);
+
+      // If we are asked to perform SIL verify all, perform that now so that we
+      // can discover the immediate inlining trigger of the problematic
+      // function.
+      if (SILVerifyAll) {
+        F.verify();
+      }
     }
 
     if (!ShouldCleanup)

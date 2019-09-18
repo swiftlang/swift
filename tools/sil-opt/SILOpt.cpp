@@ -169,11 +169,6 @@ SILInlineThreshold("sil-inline-threshold", llvm::cl::Hidden,
                    llvm::cl::init(-1));
 
 static llvm::cl::opt<bool>
-SILExistentialSpecializer("enable-sil-existential-specializer", 
-                          llvm::cl::Hidden,
-                          llvm::cl::init(false));
-
-static llvm::cl::opt<bool>
 EnableSILVerifyAll("enable-sil-verify-all",
                    llvm::cl::Hidden,
                    llvm::cl::init(true),
@@ -332,7 +327,6 @@ int main(int argc, char **argv) {
   // Setup the SIL Options.
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
-  SILOpts.ExistentialSpecializer = SILExistentialSpecializer;
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
@@ -395,8 +389,7 @@ int main(int argc, char **argv) {
   if (Invocation.hasSerializedAST()) {
     assert(!CI.hasSILModule() &&
            "performSema() should not create a SILModule.");
-    CI.setSILModule(SILModule::createEmptyModule(
-        CI.getMainModule(), CI.getSILOptions(), PerformWMO));
+    CI.createSILModule();
     std::unique_ptr<SerializedSILLoader> SL = SerializedSILLoader::create(
         CI.getASTContext(), CI.getSILModule(), nullptr);
 

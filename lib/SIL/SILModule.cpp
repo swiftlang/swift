@@ -89,11 +89,13 @@ class SILModule::SerializationCallback final
   }
 };
 
-SILModule::SILModule(ModuleDecl *SwiftModule, SILOptions &Options,
-                     const DeclContext *associatedDC, bool wholeModule)
-    : TheSwiftModule(SwiftModule), AssociatedDeclContext(associatedDC),
+SILModule::SILModule(ModuleDecl *SwiftModule, TypeConverter &TC,
+                     SILOptions &Options, const DeclContext *associatedDC,
+                     bool wholeModule)
+    : TheSwiftModule(SwiftModule),
+      AssociatedDeclContext(associatedDC),
       Stage(SILStage::Raw), wholeModule(wholeModule), Options(Options),
-      serialized(false), SerializeSILAction(), Types(*this) {
+      serialized(false), SerializeSILAction(), Types(TC) {
   // We always add the base SILModule serialization callback.
   std::unique_ptr<DeserializationNotificationHandler> callback(
       new SILModule::SerializationCallback());
@@ -118,10 +120,10 @@ SILModule::~SILModule() {
 }
 
 std::unique_ptr<SILModule>
-SILModule::createEmptyModule(ModuleDecl *M, SILOptions &Options,
+SILModule::createEmptyModule(ModuleDecl *M, TypeConverter &TC, SILOptions &Options,
                              bool WholeModule) {
   return std::unique_ptr<SILModule>(
-      new SILModule(M, Options, M, WholeModule));
+      new SILModule(M, TC, Options, M, WholeModule));
 }
 
 ASTContext &SILModule::getASTContext() const {

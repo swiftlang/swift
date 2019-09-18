@@ -127,7 +127,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
     if (isPartialApplyOfReabstractionThunk(PAI)) {
       // However, first check for withoutActuallyEscaping, which is always
       // a valid non-escaping use.
-      SILFunction *thunkDef = PAI->getReferencedFunction();
+      SILFunction *thunkDef = PAI->getReferencedFunctionOrNull();
+      if (!thunkDef)
+        return true;
       if (!thunkDef->isWithoutActuallyEscapingThunk())
         followUses(PAI);
       return false;

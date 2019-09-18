@@ -66,6 +66,8 @@ function write_linkfile {
 -latomic
 -lswiftImageInspectionShared
 $ICU_LIBS
+-lstdc++
+-lm
 -Xlinker
 -export-dynamic
 -Xlinker

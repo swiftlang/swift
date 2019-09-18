@@ -195,12 +195,12 @@ internal extension Base {
 
 public class PublicSub: Base {
   private required init() {} // expected-error {{'required' initializer must be accessible wherever class 'PublicSub' can be subclassed}} {{3-10=internal}}
-  override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{12-12=public }}
-  override var bar: Int { // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{12-12=public }}
+  override func foo() {} // expected-error {{overriding instance method must be as accessible as the declaration it overrides}} {{3-3=public }}
+  override var bar: Int { // expected-error {{overriding property must be as accessible as the declaration it overrides}} {{3-3=public }}
     get { return 0 }
     set {}
   }
-  override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{12-12=public }}
+  override subscript () -> () { return () } // expected-error {{overriding subscript must be as accessible as the declaration it overrides}} {{3-3=public }}
 }
 
 public class PublicSubGood: Base {

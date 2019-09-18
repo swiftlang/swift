@@ -59,6 +59,12 @@ public:
   void setCurrentLoc(IRBuilder &Builder, const SILDebugScope *DS,
                      SILLocation Loc);
 
+  /// Replace the current debug location in \p Builder with the same location, but contained in an
+  /// inlined function which is named like \p failureMsg.
+  ///
+  /// This lets the debugger display the \p failureMsg as an inlined function frame.
+  void addFailureMessageToCurrentLoc(IRBuilder &Builder, StringRef failureMsg);
+
   void clearLoc(IRBuilder &Builder);
 
   /// Push the current debug location onto a stack and initialize the

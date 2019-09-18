@@ -142,22 +142,14 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
     return SILDeclRef();
 
   auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
   // bridgeToObjectiveC
   DeclName Name(Ctx, Ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+    Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
-  auto Witness = Conformance->getWitnessDecl(Requirement, nullptr);
+  auto Witness = Conformance->getWitnessDecl(Requirement);
   return SILDeclRef(Witness);
 }
 
@@ -173,23 +165,15 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
   if (!ConformanceRef)
     return SILDeclRef();
   auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+      Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
-  auto Witness = Conformance->getWitnessDecl(Requirement, nullptr);
+  auto Witness = Conformance->getWitnessDecl(Requirement);
   return SILDeclRef(Witness);
 }
 
@@ -492,7 +476,7 @@ static bool matchSwitch(SwitchInfo &SI, SILInstruction *Inst,
 
   // Check that we call the _unconditionallyBridgeFromObjectiveC witness.
   auto NativeType = Apply->getType().getASTType();
-  auto *BridgeFun = FunRef->getReferencedFunction();
+  auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeFromObjectiveC(NativeType, SwiftModule);
   if (BridgeFun->getName() != bridgeWitness.mangle())
@@ -737,7 +721,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // release_value %17 : $Optional<NSString>
   //
   auto *Enum = dyn_cast<EnumInst>(Arg);
-  if (!Enum)
+  if (!Enum || !Enum->hasOperand())
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())
@@ -780,7 +764,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 
   // Make sure we are calling the actual bridge witness.
   auto NativeType = BridgedValue->getType().getASTType();
-  auto *BridgeFun = FunRef->getReferencedFunction();
+  auto *BridgeFun = FunRef->getInitiallyReferencedFunction();
   auto *SwiftModule = BridgeFun->getModule().getSwiftModule();
   auto bridgeWitness = getBridgeToObjectiveC(NativeType, SwiftModule);
   if (BridgeFun->getName() != bridgeWitness.mangle())

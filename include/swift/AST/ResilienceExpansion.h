@@ -13,6 +13,8 @@
 #ifndef SWIFT_AST_RESILIENCE_EXPANSION_H
 #define SWIFT_AST_RESILIENCE_EXPANSION_H
 
+#include "llvm/Support/raw_ostream.h"
+
 namespace swift {
 
 /// A specification for how much to expand resilient types.
@@ -43,6 +45,17 @@ enum class ResilienceExpansion : unsigned {
 
   Last_ResilienceExpansion = Maximal
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                                     ResilienceExpansion expansion) {
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    return os << "Minimal";
+  case ResilienceExpansion::Maximal:
+    return os << "Maximal";
+  }
+  llvm_unreachable("Unhandled ResilienceExpansion in switch");
+}
 
 } // namespace swift
 

@@ -293,3 +293,40 @@ myFunc(foo: 0,
        bar: baz == 0)
 // CHECK: <call><name>myFunc</name>(<arg><name>foo</name>: 0</arg>,
 // CHECK:        <arg><name>bar</name>: baz == 0</arg>)</call>
+
+
+enum FooEnum {
+// CHECK: <enum>enum <name>FooEnum</name> {
+  case blah(x: () -> () = {
+  // CHECK: <enum-case>case <enum-elem><name>blah(<param><name>x</name>: <type>() -> ()</type> = <closure><brace>{
+    @Tuples func foo(x: MyStruc) {}
+    // CHECK: @Tuples <ffunc>func <name>foo(<param><name>x</name>: <type>MyStruc</type></param>)</name> {}</ffunc>
+  })
+  // CHECK: }</brace></closure></param>)</name></enum-elem></enum-case>
+}
+// CHECK: }</enum>
+
+firstCall("\(1)", 1)
+// CHECK: <call><name>firstCall</name>(<arg>"\(1)"</arg>, <arg>1</arg>)</call>
+
+secondCall("\(a: {struct Foo {let x = 10}; return Foo().x}())", 1)
+// CHECK: <call><name>secondCall</name>(<arg>"\(a: <call><name><closure><brace>{<struct>struct <name>Foo</name> {<property>let <name>x</name> = 10</property>}</struct>; return <call><name>Foo</name>()</call>.x}</brace></closure></name>()</call>)"</arg>, <arg>1</arg>)</call>
+
+thirdCall("""
+\("""
+  \({
+  return a()
+  }())
+  """)
+""")
+// CHECK: <call><name>thirdCall</name>("""
+// CHECK-NEXT: \("""
+// CHECK-NEXT:   \(<call><name><closure>{
+// CHECK-NEXT:   return <call><name>a</name>()</call>
+// CHECK-NEXT:   }</closure></name>()</call>)
+// CHECK-NEXT:   """)
+// CHECK-NEXT: """)</call>
+
+fourthCall(a: @escaping () -> Int)
+// CHECK: <call><name>fourthCall</name>(<arg><name>a</name>: @escaping () -> Int</arg>)</call>
+

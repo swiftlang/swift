@@ -47,8 +47,8 @@ public final class NWListener: CustomDebugStringConvertible {
 			} else {
 				description = String("\(description).*")
 			}
-			if txtRecord != nil && txtRecord!.count > 0 {
-				description = String("\(description) <\(txtRecord!.count) bytes of txt>")
+			if let txtRecord = txtRecord, !txtRecord.isEmpty {
+				description = String("\(description) <\(txtRecord.count) bytes of txt>")
 			}
 			return description
 		}

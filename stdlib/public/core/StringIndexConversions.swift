@@ -103,7 +103,7 @@ extension String.Index {
   ///     `sourcePosition` must be a valid index of at least one of the views
   ///     of `target`.
   ///   - target: The string referenced by the resulting index.
-  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
   public init?<S: StringProtocol>(
     _ sourcePosition: String.Index, within target: S
   ) {

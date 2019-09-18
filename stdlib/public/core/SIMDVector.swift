@@ -10,19 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-infix operator .== : ComparisonPrecedence
-infix operator .!= : ComparisonPrecedence
-infix operator .< : ComparisonPrecedence
-infix operator .<= : ComparisonPrecedence
-infix operator .> : ComparisonPrecedence
-infix operator .>= : ComparisonPrecedence
+infix operator .==: ComparisonPrecedence
+infix operator .!=: ComparisonPrecedence
+infix operator .<: ComparisonPrecedence
+infix operator .<=: ComparisonPrecedence
+infix operator .>: ComparisonPrecedence
+infix operator .>=: ComparisonPrecedence
 
-infix operator .& : LogicalConjunctionPrecedence
-infix operator .^ : LogicalDisjunctionPrecedence
-infix operator .| : LogicalDisjunctionPrecedence
-infix operator .&= : AssignmentPrecedence
-infix operator .^= : AssignmentPrecedence
-infix operator .|= : AssignmentPrecedence
+infix operator .&: LogicalConjunctionPrecedence
+infix operator .^: LogicalDisjunctionPrecedence
+infix operator .|: LogicalDisjunctionPrecedence
+infix operator .&=: AssignmentPrecedence
+infix operator .^=: AssignmentPrecedence
+infix operator .|=: AssignmentPrecedence
 prefix operator .!
 
 /// A type that can function as storage for a SIMD vector type.
@@ -607,7 +607,7 @@ where Scalar: BinaryFloatingPoint, Scalar.RawSignificand: FixedWidthInteger {
   }
 }
 
-@_fixed_layout
+@frozen
 public struct SIMDMask<Storage>: SIMD
                   where Storage: SIMD,
                  Storage.Scalar: FixedWidthInteger & SignedInteger {
@@ -1406,4 +1406,17 @@ where T: SIMD, T.Scalar: FloatingPoint {
     result[i] = T.Scalar.maximum(a[i], b[i])
   }
   return result
+}
+
+// Break the ambiguity between AdditiveArithmetic and SIMD for += and -=
+extension SIMD where Self: AdditiveArithmetic, Self.Scalar: FloatingPoint {
+  @_alwaysEmitIntoClient
+  public static func +=(lhs: inout Self, rhs: Self) {
+    lhs = lhs + rhs
+  }
+
+  @_alwaysEmitIntoClient
+  public static func -=(lhs: inout Self, rhs: Self) {
+    lhs = lhs - rhs
+  }
 }

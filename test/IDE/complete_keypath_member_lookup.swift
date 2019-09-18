@@ -17,6 +17,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid3 | %FileCheck %s -check-prefix=testInvalid3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testInvalid4 | %FileCheck %s -check-prefix=testInvalid4
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericRoot1 | %FileCheck %s -check-prefix=testGenericRoot1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testGenericResult1 | %FileCheck %s -check-prefix=testGenericResult1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testAnyObjectRoot1 | %FileCheck %s -check-prefix=testAnyObjectRoot1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested1 | %FileCheck %s -check-prefix=testNested1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=testNested2 | %FileCheck %s -check-prefix=testNested2
@@ -51,18 +52,16 @@ func testMembersPostfix1(r: Lens<Rectangle>) {
 // testMembersPostfix1: Begin completions
 // testMembersPostfix1-DAG: Decl[Subscript]/CurrNominal:        [{#dynamicMember: WritableKeyPath<Rectangle, U>#}][#Lens<U>#];
 
-// FIXME: the type should be Lens<Point>
-// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .topLeft[#Point#];
-// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .bottomRight[#Point#];
+// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .topLeft[#Lens<Point>#];
+// testMembersPostfix1-DAG: Decl[InstanceVar]/CurrNominal:      .bottomRight[#Lens<Point>#];
 // testMembersPostfix1: End completions
 
 func testMembersDot1(r: Lens<Rectangle>) {
   r.#^testMembersDot1^#
 }
 // testMembersDot1: Begin completions
-// FIXME: the type should be Lens<Point>
-// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
-// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Point#];
+// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      topLeft[#Lens<Point>#];
+// testMembersDot1-DAG: Decl[InstanceVar]/CurrNominal:      bottomRight[#Lens<Point>#];
 // testMembersDot1: End completions
 
 func testMembersDot2(r: Lens<Rectangle>) {
@@ -70,9 +69,8 @@ func testMembersDot2(r: Lens<Rectangle>) {
 }
 
 // testMembersDot2: Begin completions
-// FIXME: the type should be Lens<Int>
-// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
-// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
+// testMembersDot2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
 // testMembersDot2: End completions
 
 @dynamicMemberLookup
@@ -227,7 +225,7 @@ extension Lens where T: HalfRect {
   }
 }
 // testSelfExtension1-NOT: bottomRight
-// testSelfExtension1: Decl[InstanceVar]/CurrNominal:      topLeft[#Point#];
+// testSelfExtension1: Decl[InstanceVar]/CurrNominal:      topLeft[#Lens<Point>#];
 // testSelfExtension1-NOT: bottomRight
 
 struct Invalid1 {
@@ -289,8 +287,26 @@ struct GenericRoot<T> {
 func testGenericRoot1(r: GenericRoot<Point>) {
   r.#^testGenericRoot1^#
 }
-// FIXME: Type should be substituted to Int.
-// testGenericRoot1: Decl[InstanceVar]/CurrNominal:      foo[#T#];
+// testGenericRoot1: Decl[InstanceVar]/CurrNominal:      foo[#Int#];
+
+@dynamicMemberLookup
+struct GenericResult<T> {
+  subscript<U>(dynamicMember member: KeyPath<T, Gen1<U>>) -> GenericResult<U> {
+    fatalError()
+  }
+}
+struct BoxedCircle {
+  var center: Gen1<Point>
+  var radius: Gen1<Int>
+}
+func testGenericResult1(r: GenericResult<BoxedCircle>) {
+  r.#^testGenericResult1^#
+}
+// testGenericResult1: Begin completions
+// FIXME: the type should be 'GenericResult<Point>'
+// testGenericResult1-DAG: Decl[InstanceVar]/CurrNominal:      center[#Gen1<Point>#]; name=center
+// testGenericResult1-DAG: Decl[InstanceVar]/CurrNominal:      radius[#Gen1<Int>#]; name=radius
+// testGenericResult1: End completions
 
 class C {
   var someUniqueName: Int = 0
@@ -312,16 +328,18 @@ func testAnyObjectRoot1(r: AnyObjectRoot) {
 func testNested1(r: Lens<Lens<Point>>) {
   r.#^testNested1^#
 // testNested1: Begin completions
-// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
-// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// FIXME: The type should be 'Lens<Lens<Int>>'
+// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
+// testNested1-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
 // testNested1: End completions
 }
 
 func testNested2(r: Lens<Lens<Lens<Point>>>) {
   r.#^testNested2^#
 // testNested2: Begin completions
-// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Int#];
-// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Int#];
+// FIXME: The type should be 'Lens<Lens<Lens<Int>>>'
+// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      x[#Lens<Int>#];
+// testNested2-DAG: Decl[InstanceVar]/CurrNominal:      y[#Lens<Int>#];
 // testNested2: End completions
 }
 

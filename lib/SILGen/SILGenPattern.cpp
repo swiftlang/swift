@@ -1370,6 +1370,7 @@ getManagedSubobject(SILGenFunction &SGF, SILValue value,
   case CastConsumptionKind::TakeOnSuccess:
     return {SGF.emitManagedRValueWithCleanup(value, valueTL), consumption};
   }
+  llvm_unreachable("covered switch");
 }
 
 static ConsumableManagedValue
@@ -1539,6 +1540,7 @@ emitTupleDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
             "Borrow always can only occur along object only code paths");
       }
       }
+      llvm_unreachable("covered switch");
     }());
 
     // If we aren't loadable, add to the unforward array.
@@ -2339,7 +2341,7 @@ void PatternMatchEmission::initSharedCaseBlockDest(CaseStmt *caseBlock,
     // We don't pass address-only values in basic block arguments.
     SILType ty = SGF.getLoweredType(vd->getType());
     if (ty.isAddressOnly(SGF.F))
-      return;
+      continue;
     block->createPhiArgument(ty, ValueOwnershipKind::Owned, vd);
   }
 }

@@ -16,7 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImage_Buffer {
     
     /// The size of the vImage buffer.
@@ -105,7 +105,7 @@ extension vImage_Buffer {
 
 // MARK: Core Graphics Support
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vImage_Buffer {
     
     /// Initialize a vImage buffer with the contents of a Core Graphics image.

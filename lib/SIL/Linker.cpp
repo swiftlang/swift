@@ -170,17 +170,17 @@ void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
 }
 
 void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
-  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
+  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
 }
 
 void SILLinkerVisitor::visitDynamicFunctionRefInst(
     DynamicFunctionRefInst *FRI) {
-  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
+  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
 }
 
 void SILLinkerVisitor::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *FRI) {
-  maybeAddFunctionToWorklist(FRI->getReferencedFunction());
+  maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction());
 }
 
 // Eagerly visiting all used conformances leads to a large blowup

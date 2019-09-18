@@ -1154,9 +1154,9 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
       if (conf->isInvalid())
         continue;
 
-      conf->forEachTypeWitness(nullptr, [&](const AssociatedTypeDecl *assoc,
-                                            Type type,
-                                            TypeDecl *typeDecl) -> bool {
+      conf->forEachTypeWitness([&](const AssociatedTypeDecl *assoc,
+                                   Type type,
+                                   TypeDecl *typeDecl) -> bool {
         if (typeDecl == member)
           reqs.push_back(const_cast<AssociatedTypeDecl*>(assoc));
         return false;
@@ -1168,8 +1168,7 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
         continue;
 
       auto root = conf->getRootConformance();
-      root->forEachValueWitness(nullptr,
-                                [&](ValueDecl *req, Witness witness) {
+      root->forEachValueWitness([&](ValueDecl *req, Witness witness) {
         if (witness.getDecl() == member)
           reqs.push_back(req);
       });

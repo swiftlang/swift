@@ -29,7 +29,7 @@ func foo(a: Int, b: Int, c: Int) {
         case foo(x: LocalStruct)
         // LOCAL: [[@LINE-1]]:14 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR:.*]] | Def,RelChild | rel: 1
         // CHECK-NOT: [[@LINE-2]]:14 | enumerator(local)/Swift | foo(x:) | [[LocalEnum_foo_USR:.*]] | Def,RelChild | rel: 1
-        // LOCAL: [[@LINE-3]]:21 | struct(local)/Swift | LocalStruct | [[LocalStruct_USR]] | Ref | rel: 0
+        // LOCAL: [[@LINE-3]]:21 | struct(local)/Swift | LocalStruct | [[LocalStruct_USR]] | Ref,RelCont | rel: 1
     }
 
     let _ = LocalEnum.foo(x: LocalStruct())

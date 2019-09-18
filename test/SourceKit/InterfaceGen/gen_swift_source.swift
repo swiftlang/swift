@@ -14,8 +14,5 @@
 // CHECK1: s:4Foo219FooOverlayClassBaseC
 // CHECK1: FooOverlayClassBase.Type
 
-// RUN: %sourcekitd-test -req=interface-gen %S/Inputs/UnresolvedExtension.swift -- %S/Inputs/UnresolvedExtension.swift | %FileCheck -check-prefix=CHECK2 %s
-// CHECK2: extension ET
-
 // RUN: %sourcekitd-test -req=interface-gen %S/Inputs/Foo3.swift -- %S/Inputs/Foo3.swift | %FileCheck -check-prefix=CHECK3 %s
 // CHECK3: public class C {

@@ -509,8 +509,8 @@ public:
     // resolve the type mismatch between SILArgument* and SILValue.
     SmallVector<SILValue, 8> entryArgs;
     entryArgs.reserve(newF->getArguments().size());
-    transform(newF->getArguments(), std::back_inserter(entryArgs),
-              [](SILArgument *arg) -> SILValue { return arg; });
+    llvm::transform(newF->getArguments(), std::back_inserter(entryArgs),
+                    [](SILArgument *arg) -> SILValue { return arg; });
 
     SuperTy::cloneFunctionBody(origF, newEntryBB, entryArgs);
   }
@@ -950,7 +950,8 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  SILFunction *OpFunction =
+      getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
@@ -959,7 +960,8 @@ SILCloner<ImplClass>::visitFunctionRefInst(FunctionRefInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  SILFunction *OpFunction =
+      getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createDynamicFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
@@ -968,7 +970,8 @@ SILCloner<ImplClass>::visitDynamicFunctionRefInst(DynamicFunctionRefInst *Inst) 
 template <typename ImplClass>
 void SILCloner<ImplClass>::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *Inst) {
-  SILFunction *OpFunction = getOpFunction(Inst->getReferencedFunction());
+  SILFunction *OpFunction =
+      getOpFunction(Inst->getInitiallyReferencedFunction());
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(Inst, getBuilder().createPreviousDynamicFunctionRef(
                                     getOpLocation(Inst->getLoc()), OpFunction));
@@ -1208,10 +1211,10 @@ void SILCloner<ImplClass>::visitAssignInst(AssignInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAssignByDelegateInst(AssignByDelegateInst *Inst) {
+void SILCloner<ImplClass>::visitAssignByWrapperInst(AssignByWrapperInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createAssignByDelegate(getOpLocation(Inst->getLoc()),
+      Inst, getBuilder().createAssignByWrapper(getOpLocation(Inst->getLoc()),
                                       getOpValue(Inst->getSrc()),
                                       getOpValue(Inst->getDest()),
                                       getOpValue(Inst->getInitializer()),
@@ -1305,6 +1308,14 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
         Inst, getBuilder().create##Name##ToRef(getOpLocation(Inst->getLoc()),  \
                                                getOpValue(Inst->getOperand()), \
                                                getOpType(Inst->getType())));   \
+  }                                                                            \
+  template <typename ImplClass>                                                \
+  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
+      Copy##Name##ValueInst *Inst) {                                           \
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
+    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
+                                      getOpLocation(Inst->getLoc()),           \
+                                      getOpValue(Inst->getOperand())));        \
   }
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...)                   \
   LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
@@ -1333,14 +1344,6 @@ SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
                                       getOpLocation(Inst->getLoc()),           \
                                       getOpValue(Inst->getOperand()),          \
                                       Inst->getAtomicity()));                  \
-  }                                                                            \
-  template <typename ImplClass>                                                \
-  void SILCloner<ImplClass>::visitCopy##Name##ValueInst(                       \
-      Copy##Name##ValueInst *Inst) {                                           \
-    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));      \
-    recordClonedInstruction(Inst, getBuilder().createCopy##Name##Value(        \
-                                      getOpLocation(Inst->getLoc()),           \
-                                      getOpValue(Inst->getOperand())));        \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
@@ -2086,7 +2089,7 @@ visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *Inst) {
   remapOpenedType(cast<OpenedArchetypeType>(openedType));
 
   if (!Inst->getOperand()->getType().canUseExistentialRepresentation(
-          Inst->getModule(), ExistentialRepresentation::Class)) {
+          ExistentialRepresentation::Class)) {
     getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
     recordClonedInstruction(Inst, getBuilder().createOpenExistentialMetatype(
                                       getOpLocation(Inst->getLoc()),
@@ -2444,7 +2447,8 @@ SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createCondFail(getOpLocation(Inst->getLoc()),
-                                        getOpValue(Inst->getOperand())));
+                                        getOpValue(Inst->getOperand()),
+                                        Inst->getMessage()));
 }
 
 template<typename ImplClass>

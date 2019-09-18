@@ -62,7 +62,7 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
 }
 
 // Implement the APIs required by NSArray 
-extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
+extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
@@ -232,13 +232,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage : _NSArrayCore {
   /// bridging of array elements.
   @objc
   internal override var count: Int {
-    if let bridgedStorage = _heapBufferBridged {
-      return _BridgingBuffer(bridgedStorage).count
-    }
-
-    // Check if elements are bridged verbatim.
-    return _nativeStorage._withVerbatimBridgedUnsafeBuffer { $0.count }
-      ?? _nativeStorage._getNonVerbatimBridgedCount()
+    return _nativeStorage.countAndCapacity.count
   }
 }
 #else
@@ -292,12 +286,6 @@ internal class __ContiguousArrayStorageBase
   ) rethrows -> R? {
     _internalInvariantFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
-  }
-
-  @nonobjc
-  internal func _getNonVerbatimBridgedCount() -> Int {
-    _internalInvariantFailure(
-      "Concrete subclasses must implement _getNonVerbatimBridgedCount")
   }
 
   internal func _getNonVerbatimBridgingBuffer() -> _BridgingBuffer {

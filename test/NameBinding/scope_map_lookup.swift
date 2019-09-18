@@ -1,10 +1,14 @@
+// XFAIL: *
 // RUN: %target-typecheck-verify-swift -enable-astscope-lookup
 
 // Name binding in default arguments
 
-// FIXME: Semantic analysis should produce an error here, because 'x'
-// is not actually available.
+// FIXME: Semantic analysis should not recommend 'x' or 'y' here, because they
+// are not actually available.
 func functionParamScopes(x: Int, y: Int = x) -> Int {
+  // expected-error@-1 {{use of unresolved identifier 'x'}}
+  // expected-note@-2 {{did you mean 'x'?}}
+  // expected-note@-2 {{did you mean 'y'?}}
   return x + y
 }
 

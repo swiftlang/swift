@@ -15,7 +15,7 @@ e1 = .Third(5, 3.14159)
 e1 = .default  // SE-0071
 
 // Generic enumeration type
-enum E2<T> {
+enum E2<T> { // expected-note {{'T' declared as parameter to type 'E2'}}
   case First
   case Second(T)
 }

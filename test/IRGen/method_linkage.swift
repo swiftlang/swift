@@ -10,8 +10,8 @@
 // - internal initializer descriptor has hidden linkage when class is public:
 // CHECK-LABEL: @"$s14method_linkage11PublicClassCACycfCTq" = hidden alias
 
-// - internal initializer descriptor has public linkage when class is open:
-// CHECK-LABEL: @"$s14method_linkage9OpenClassCACycfCTq" ={{( dllexport)?}}{{( protected)?}} alias
+// - internal initializer descriptor has hidden linkage when class is open:
+// CHECK-LABEL: @"$s14method_linkage9OpenClassCACycfCTq" = hidden alias
 
 // - private method descriptor has internal linkage even though class is open:
 // CHECK: @"$s14method_linkage9OpenClassC4pfoo0{{.*}}FTq" = internal alias

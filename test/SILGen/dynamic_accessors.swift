@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-parseable-module-interface-path %t/dynamic_accessors.swiftinterface %s
+// RUN: %target-swift-frontend -emit-module -o /dev/null -disable-objc-attr-requires-foundation-module -enable-objc-interop -emit-module-interface-path %t/dynamic_accessors.swiftinterface %s
 // RUN: %target-swift-emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 // RUN: %target-swift-frontend -emit-silgen -disable-objc-attr-requires-foundation-module -enable-objc-interop %t/dynamic_accessors.swiftinterface | %FileCheck %s
 
@@ -10,7 +10,7 @@ public class MyObjCClass {
     // CHECK: }
     get { return 4 }
 
-    // CHECK-LABEL sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivsTo : $@convention(objc_method) (Int, MyObjCClass) -> () {
+    // CHECK-LABEL: sil [thunk] [ossa] @$s17dynamic_accessors11MyObjCClassC1aSivsTo : $@convention(objc_method) (Int, MyObjCClass) -> () {
     // CHECK: function_ref @$s17dynamic_accessors11MyObjCClassC1aSivs
     // CHECK: }
     set {}

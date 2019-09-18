@@ -97,8 +97,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
   // CHECK: [[X:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL:%.*]] = alloca %T13generic_casts10ObjCProto1P
   // CHECK: [[LOCAL_OPAQUE:%.*]] = bitcast %T13generic_casts10ObjCProto1P* [[LOCAL]] to %swift.opaque*
-  // CHECK: [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s13generic_casts10ObjCProto1_pMa"(i64 0)
-  // CHECK: [[PROTO_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+  // CHECK: [[PROTO_TYPE:%.*]] = call {{.*}}@"$s13generic_casts10ObjCProto1_pMD"
   // CHECK: call i1 @swift_dynamicCast(%swift.opaque* %0, %swift.opaque* [[LOCAL_OPAQUE]], %swift.type* [[PROTO_TYPE]], %swift.type* %T, i64 7)
   return x as! T
 }

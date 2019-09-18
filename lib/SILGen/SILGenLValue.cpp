@@ -26,7 +26,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -850,13 +850,13 @@ namespace {
       assert(base.getType().isExistentialType() &&
              "base for open existential component must be an existential");
       assert((base.getType().isAddress() ||
-              base.getType().getPreferredExistentialRepresentation(SGF.SGM.M) ==
+              base.getType().getPreferredExistentialRepresentation() ==
                   ExistentialRepresentation::Boxed) &&
              "base value of open-existential component was not an address or a "
              "boxed existential?");
       SILValue addr;
 
-      auto rep = base.getType().getPreferredExistentialRepresentation(SGF.SGM.M);
+      auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
       case ExistentialRepresentation::Opaque:
         addr = SGF.B.createOpenExistentialAddr(
@@ -922,14 +922,14 @@ namespace {
              "base for open existential component must be an existential");
       ManagedValue ref;
       if (refType.is<ExistentialMetatypeType>()) {
-        assert(refType.getPreferredExistentialRepresentation(SGF.SGM.M)
+        assert(refType.getPreferredExistentialRepresentation()
                  == ExistentialRepresentation::Metatype);
         ref = ManagedValue::forUnmanaged(
                 SGF.B.createOpenExistentialMetatype(loc,
                                                     result.getUnmanagedValue(),
                                                     getTypeOfRValue()));
       } else {
-        assert(refType.getPreferredExistentialRepresentation(SGF.SGM.M)
+        assert(refType.getPreferredExistentialRepresentation()
                  == ExistentialRepresentation::Class);
         ref = SGF.B.createOpenExistentialRef(loc, result, getTypeOfRValue());
       }
@@ -1293,22 +1293,24 @@ namespace {
     {
     }
 
-    bool hasPropertyDelegate() const {
+    bool hasPropertyWrapper() const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
-        if (auto delegateInfo = VD->getAttachedPropertyDelegateTypeInfo()) {
-          // If there is no init(initialValue:), we cannot rewrite an
+        // FIXME: Handle composition of property wrappers.
+        if (VD->getAttachedPropertyWrappers().size() == 1) {
+          auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
+          
+          // If there is no init(wrapperValue:), we cannot rewrite an
           // assignment into an initialization.
-          if (!delegateInfo.initialValueInit)
+          if (!wrapperInfo.wrappedValueInit)
             return false;
 
           // If we have a nonmutating setter on a value type, the call
           // captures all of 'self' and we cannot rewrite an assignment
           // into an initialization.
-          auto setter = VD->getSetter();
-          if (setter->isNonMutating() &&
-              setter->getDeclContext()->getSelfNominalTypeDecl() &&
-              setter->isInstanceMember() &&
-              !setter->getDeclContext()->getDeclaredInterfaceType()
+          if (!VD->isSetterMutating() &&
+              VD->getDeclContext()->getSelfNominalTypeDecl() &&
+              VD->isInstanceMember() &&
+              !VD->getDeclContext()->getDeclaredInterfaceType()
                   ->hasReferenceSemantics()) {
             return false;
           }
@@ -1372,15 +1374,15 @@ namespace {
       assert(getAccessorDecl()->isSetter());
       SILDeclRef setter = Accessor;
 
-      if (hasPropertyDelegate() && IsOnSelfParameter) {
-        // This is delegated property. Instead of emitting a setter, emit an
-        // assign_by_delegate with the allocating initializer function and the
+      if (hasPropertyWrapper() && IsOnSelfParameter) {
+        // This is wrapped property. Instead of emitting a setter, emit an
+        // assign_by_wrapper with the allocating initializer function and the
         // setter function as arguments. DefiniteInitializtion will then decide
         // between the two functions, depending if it's an initialization or a
         // re-assignment.
         //
         VarDecl *field = dyn_cast<VarDecl>(Storage);
-        VarDecl *backingVar = field->getPropertyDelegateBackingProperty();
+        VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
         assert(backingVar);
         CanType ValType = backingVar->getType()->getCanonicalType();
         SILType varStorageType =
@@ -1401,18 +1403,21 @@ namespace {
         }
 
         // Create the allocating initializer function. It captures the metadata.
-        auto delegateInfo = field->getAttachedPropertyDelegateTypeInfo();
-        auto ctor = delegateInfo.initialValueInit;
+        // FIXME: Composition.
+        assert(field->getAttachedPropertyWrappers().size() == 1);
+        auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
+        auto ctor = wrapperInfo.wrappedValueInit;
         SubstitutionMap subs = backingVar->getType()->getMemberSubstitutionMap(
                         SGF.getModule().getSwiftModule(), ctor);
 
         Type ity = ctor->getInterfaceType();
-        AnyFunctionType *substIty = ity.subst(subs)->castTo<AnyFunctionType>();
+        AnyFunctionType *substIty =
+          ity.subst(subs)->getCanonicalType()->castTo<AnyFunctionType>();
 
         auto initRef = SILDeclRef(ctor, SILDeclRef::Kind::Allocator)
           .asForeign(requiresForeignEntryPoint(ctor));
         RValue initFuncRV =
-          SGF.emitApplyPropertyDelegateAllocator(loc, subs,initRef,
+          SGF.emitApplyPropertyWrapperAllocator(loc, subs,initRef,
                                                  backingVar->getType(),
                                                  CanAnyFunctionType(substIty));
         ManagedValue initFn = std::move(initFuncRV).getAsSingleValue(SGF, loc);
@@ -1439,11 +1444,11 @@ namespace {
                                    ParameterConvention::Direct_Guaranteed);
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 
-        // Create the assign_by_delegate with the allocator and setter.
+        // Create the assign_by_wrapper with the allocator and setter.
         assert(value.isRValue());
         ManagedValue Mval = std::move(value).asKnownRValue(SGF).
                               getAsSingleValue(SGF, loc);
-        SGF.B.createAssignByDelegate(loc, Mval.forward(SGF), proj.forward(SGF),
+        SGF.B.createAssignByWrapper(loc, Mval.forward(SGF), proj.forward(SGF),
                                      initFn.getValue(), setterFn.getValue(),
                                      AssignOwnershipQualifier::Unknown);
         return;
@@ -2479,7 +2484,7 @@ namespace {
 
     void emitUsingAccessor(AccessorKind accessorKind, bool isDirect) {
       auto accessor =
-        SGF.SGM.getAccessorDeclRef(Storage->getAccessor(accessorKind));
+        SGF.SGM.getAccessorDeclRef(Storage->getOpaqueAccessor(accessorKind));
 
       switch (accessorKind) {
       case AccessorKind::Get:
@@ -2909,7 +2914,7 @@ static SGFAccessKind getBaseAccessKind(SILGenModule &SGM,
 
   case AccessStrategy::DirectToAccessor:
   case AccessStrategy::DispatchToAccessor: {
-    auto accessor = member->getAccessor(strategy.getAccessor());
+    auto accessor = member->getOpaqueAccessor(strategy.getAccessor());
     return getBaseAccessKindForAccessor(SGM, accessor, baseFormalType);
   }
     
@@ -2962,10 +2967,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   // dynamic replacement directly call the implementation.
   if (isContextRead && isOnSelfParameter && strategy.hasAccessor() &&
       strategy.getAccessor() == AccessorKind::Get &&
-      var->getAccessor(AccessorKind::Read)) {
+      var->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(var->getAccessor(AccessorKind::Read));
+        SGF.SGM.getAccessorDeclRef(var->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3133,10 +3138,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   // dynamic replacement directly call the implementation.
   if (isContextRead && isOnSelfParameter && strategy.hasAccessor() &&
       strategy.getAccessor() == AccessorKind::Get &&
-      decl->getAccessor(AccessorKind::Read)) {
+      decl->getOpaqueAccessor(AccessorKind::Read)) {
     bool isObjC = false;
     auto readAccessor =
-        SGF.SGM.getAccessorDeclRef(decl->getAccessor(AccessorKind::Read));
+        SGF.SGM.getAccessorDeclRef(decl->getOpaqueAccessor(AccessorKind::Read));
     if (isCallToReplacedInDynamicReplacement(
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
@@ -3436,8 +3441,8 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   lv.add<ValueComponent>(base, None, baseTypeData,
                          /*isRValue=*/!base.isLValue());
 
-  auto substFormalType = ivar->getInterfaceType().subst(subMap)
-    ->getCanonicalType().getReferenceStorageReferent();
+  auto substFormalType = ivar->getValueInterfaceType().subst(subMap)
+    ->getCanonicalType();
 
   lv.addMemberVarComponent(*this, loc, ivar, subMap, options, /*super*/ false,
                            accessKind, strategy, substFormalType);
@@ -3612,15 +3617,11 @@ SILValue SILGenFunction::emitConversionToSemanticRValue(SILLocation loc,
                                                ResilienceExpansion::Maximal)); \
     return B.createCopy##Name##Value(loc, src); \
   }
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: { \
-    /* For static reference storage types, we need to strip the box and */ \
-    /* then do an (unsafe) retain. */ \
-    auto type = storageType.castTo<Name##StorageType>(); \
-    auto result = B.create##Name##ToRef(loc, src, \
-              SILType::getPrimitiveObjectType(type.getReferentType())); \
-    /* SEMANTIC ARC TODO: Does this need a cleanup? */ \
-    return B.createCopyValue(loc, result); \
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case ReferenceOwnership::Name: {                                             \
+    /* For static reference storage types, we need to strip the box and */     \
+    /* then do an (unsafe) retain. */                                          \
+    return B.createCopy##Name##Value(loc, src);                                \
   }
 #include "swift/AST/ReferenceStorage.def"
   }
@@ -3642,10 +3643,10 @@ ManagedValue SILGenFunction::emitConversionToSemanticRValue(
   case ReferenceOwnership::Name: \
     /* Generate a strong retain and strip the box. */ \
     return B.createCopy##Name##Value(loc, src);
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: \
-    /* Strip the box and then do an (unsafe) retain. */ \
-    return B.createUnsafeCopy##Name##Value(loc, src);
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case ReferenceOwnership::Name:                                               \
+    /* Strip the box and then do an (unsafe) retain. */                        \
+    return B.createCopy##Name##Value(loc, src);
 #include "swift/AST/ReferenceStorage.def"
   }
   llvm_unreachable("impossible");
@@ -3697,15 +3698,11 @@ static SILValue emitLoadOfSemanticRValue(SILGenFunction &SGF,
     } \
     ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name) \
   }
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  case ReferenceOwnership::Name: { \
-    /* For static reference storage types, we need to strip the box. */ \
-    auto type = storageType.castTo<Name##StorageType>(); \
-    auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial); \
-    auto result = SGF.B.create##Name##ToRef(loc, value, \
-            SILType::getPrimitiveObjectType(type.getReferentType())); \
-    /* SEMANTIC ARC TODO: Does this need a cleanup? */ \
-    return SGF.B.createCopyValue(loc, result); \
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case ReferenceOwnership::Name: {                                             \
+    /* For static reference storage types, we need to strip the box. */        \
+    auto value = SGF.B.createLoad(loc, src, LoadOwnershipQualifier::Trivial);  \
+    return SGF.B.createCopy##Name##Value(loc, value);                          \
   }
 #include "swift/AST/ReferenceStorage.def"
 #undef ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE_HELPER
@@ -4191,7 +4188,7 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
 
   // Open up the existential.
   auto rep = lv.getTypeOfRValue()
-    .getPreferredExistentialRepresentation(SGM.M);
+    .getPreferredExistentialRepresentation();
   switch (rep) {
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {
@@ -4231,7 +4228,7 @@ static bool trySetterPeephole(SILGenFunction &SGF, SILLocation loc,
   }
 
   auto &setterComponent = static_cast<GetterSetterComponent&>(component);
-  if (setterComponent.hasPropertyDelegate())
+  if (setterComponent.hasPropertyWrapper())
     return false;
   setterComponent.emitAssignWithSetter(SGF, loc, std::move(dest),
                                        std::move(src));

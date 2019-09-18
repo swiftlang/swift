@@ -1,8 +1,7 @@
 // RUN: %swift -typecheck -target i386-apple-watchos2.0 -verify -sdk %sdk %s
 // REQUIRES: CPU=i386, OS=watchos
-// REQUIRES: objc_interop
+// REQUIRES: libdispatch
 
-import Foundation
 import Dispatch
 
 // These are deprecated on all versions of watchOS.

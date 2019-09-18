@@ -454,12 +454,13 @@ class Wotsit<T> : Gizmo {
     return "Hello, world."
   }
 
+  // Ivar destroyer
+  // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6WotsitCfETo
+
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6WotsitCACyxGSgycfcTo : $@convention(objc_method) <T> (@owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 
   // CHECK-LABEL: sil hidden [thunk] [ossa] @$s11objc_thunks6WotsitC7bellsOnACyxGSgSi_tcfcTo : $@convention(objc_method) <T> (Int, @owned Wotsit<T>) -> @owned Optional<Wotsit<T>>
 
-  // Ivar destroyer
-  // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6WotsitCfETo
 }
 
 // CHECK-NOT: sil hidden [thunk] [ossa] @_TToF{{.*}}Wotsit{{.*}}

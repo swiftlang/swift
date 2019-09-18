@@ -23,6 +23,37 @@
 - (id) doSomething2 : (NSArray<NSString*>*) arr;
 @end
 
+typedef NS_ENUM(NSUInteger, MyEventType) {
+    MyEventTypeA = 1,
+    MyEventTypeB = 2
+};
+
+@interface MyWindow : NSObject
+@property NSInteger windowNumber;
+@end
+
+@interface MyView : NSObject
+@property (nonatomic, nullable, readonly, strong) MyWindow *window;
+@end
+
+typedef struct MyPoint {
+NSInteger x;
+NSInteger y;
+} MyPoint;
+
+@interface MyGraphicsContext : NSObject
+@end
+
+@interface MyEvent : NSObject
++ (nullable MyEvent *)mouseEventWithType:(MyEventType)type
+                                location:(MyPoint)pt
+                            windowNumber:(NSInteger)wNum
+                                 context:(nullable MyGraphicsContext * __unused)context
+                             eventNumber:(NSInteger)eNum
+                              clickCount:(NSInteger)cnt
+                                pressure:(float)pressure;
+@end
+
 NS_ASSUME_NONNULL_BEGIN
 @protocol Treeish <NSObject>
 - (nullable NSArray *) treeishChildren;

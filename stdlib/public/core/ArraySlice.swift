@@ -113,7 +113,7 @@
 /// - Note: To safely reference the starting and ending indices of a slice,
 ///   always use the `startIndex` and `endIndex` properties instead of
 ///   specific values.
-@_fixed_layout
+@frozen
 public struct ArraySlice<Element>: _DestructorSafeContainer {
   @usableFromInline
   internal typealias _Buffer = _SliceBuffer<Element>

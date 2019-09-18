@@ -158,7 +158,7 @@ void SILInstruction::dropAllReferences() {
   // If we have a function ref inst, we need to especially drop its function
   // argument so that it gets a proper ref decrement.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(this)) {
-    if (!FRI->getReferencedFunction())
+    if (!FRI->getInitiallyReferencedFunction())
       return;
     FRI->dropReferencedFunction();
     return;
@@ -465,16 +465,19 @@ namespace {
 
     bool visitFunctionRefInst(const FunctionRefInst *RHS) {
       auto *X = cast<FunctionRefInst>(LHS);
-      return X->getReferencedFunction() == RHS->getReferencedFunction();
+      return X->getInitiallyReferencedFunction() ==
+             RHS->getInitiallyReferencedFunction();
     }
     bool visitDynamicFunctionRefInst(const DynamicFunctionRefInst *RHS) {
       auto *X = cast<DynamicFunctionRefInst>(LHS);
-      return X->getReferencedFunction() == RHS->getReferencedFunction();
+      return X->getInitiallyReferencedFunction() ==
+             RHS->getInitiallyReferencedFunction();
     }
     bool visitPreviousDynamicFunctionRefInst(
         const PreviousDynamicFunctionRefInst *RHS) {
       auto *X = cast<PreviousDynamicFunctionRefInst>(LHS);
-      return X->getReferencedFunction() == RHS->getReferencedFunction();
+      return X->getInitiallyReferencedFunction() ==
+             RHS->getInitiallyReferencedFunction();
     }
 
     bool visitAllocGlobalInst(const AllocGlobalInst *RHS) {
@@ -731,9 +734,10 @@ namespace {
       return true;
     }
 
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-    bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; } \
-    bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  bool visit##Name##ToRefInst(Name##ToRefInst *RHS) { return true; }           \
+  bool visitRefTo##Name##Inst(RefTo##Name##Inst *RHS) { return true; }         \
+  bool visitCopy##Name##ValueInst(Copy##Name##ValueInst *RHS) { return true; }
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     LOADABLE_REF_STORAGE_HELPER(Name) \
     bool visitStrongRetain##Name##Inst(const StrongRetain##Name##Inst *RHS) { \

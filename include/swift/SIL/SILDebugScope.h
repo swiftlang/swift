@@ -65,8 +65,10 @@ public:
   SILFunction *getParentFunction() const;
 
 #ifndef NDEBUG
-  void dump(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
-            unsigned Indent = 0) const;
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
+                            unsigned Indent = 0) const,
+                  "only for use in the debugger");
+  LLVM_ATTRIBUTE_DEPRECATED(void dump(SILModule &Mod) const, "only for use in the debugger");
 #endif
 };
 

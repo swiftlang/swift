@@ -487,6 +487,7 @@ class TypeDecoder {
       auto index = Node->getChild(1)->getIndex();
       return Builder.createGenericTypeParameterType(depth, index);
     }
+    case NodeKind::EscapingObjCBlock:
     case NodeKind::ObjCBlock:
     case NodeKind::CFunctionPointer:
     case NodeKind::ThinFunctionType:
@@ -498,7 +499,8 @@ class TypeDecoder {
         return BuiltType();
 
       FunctionTypeFlags flags;
-      if (Node->getKind() == NodeKind::ObjCBlock) {
+      if (Node->getKind() == NodeKind::ObjCBlock ||
+          Node->getKind() == NodeKind::EscapingObjCBlock) {
         flags = flags.withConvention(FunctionMetadataConvention::Block);
       } else if (Node->getKind() == NodeKind::CFunctionPointer) {
         flags =
@@ -524,7 +526,8 @@ class TypeDecoder {
               .withParameterFlags(hasParamFlags)
               .withEscaping(
                           Node->getKind() == NodeKind::FunctionType ||
-                          Node->getKind() == NodeKind::EscapingAutoClosureType);
+                          Node->getKind() == NodeKind::EscapingAutoClosureType ||
+                          Node->getKind() == NodeKind::EscapingObjCBlock);
 
       auto result = decodeMangledType(Node->getChild(isThrow ? 2 : 1));
       if (!result) return BuiltType();
@@ -789,9 +792,11 @@ class TypeDecoder {
         return BuiltType();
       auto ordinal = ordinalNode->getIndex();
 
-      std::vector<BuiltType> genericArgs;
+      std::vector<BuiltType> genericArgsBuf;
+      std::vector<unsigned> genericArgsLevels;
       auto boundGenerics = Node->getChild(2);
       for (unsigned i = 0; i < boundGenerics->getNumChildren(); ++i) {
+        genericArgsLevels.push_back(genericArgsBuf.size());
         auto genericsNode = boundGenerics->getChild(i);
         if (genericsNode->getKind() != NodeKind::TypeList)
           break;
@@ -799,8 +804,15 @@ class TypeDecoder {
           auto arg = decodeMangledType(argNode);
           if (!arg)
             return BuiltType();
-          genericArgs.push_back(arg);
+          genericArgsBuf.push_back(arg);
         }
+      }
+      genericArgsLevels.push_back(genericArgsBuf.size());
+      std::vector<ArrayRef<BuiltType>> genericArgs;
+      for (unsigned i = 0; i < genericArgsLevels.size() - 1; ++i) {
+        auto start = genericArgsLevels[i], end = genericArgsLevels[i+1];
+        genericArgs.emplace_back(genericArgsBuf.data() + start,
+                                 end - start);
       }
       
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);

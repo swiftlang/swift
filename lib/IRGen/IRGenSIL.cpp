@@ -60,6 +60,7 @@
 #include "GenCast.h"
 #include "GenClass.h"
 #include "GenConstant.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenFunc.h"
@@ -856,7 +857,7 @@ public:
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
   void bindArchetypes(swift::Type Ty) {
-    auto runtimeTy = getRuntimeReifiedType(IGM, Ty->getCanonicalType());
+    auto runtimeTy = IGM.getRuntimeReifiedType(Ty->getCanonicalType());
     if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))
@@ -933,8 +934,8 @@ public:
   void visitAssignInst(AssignInst *i) {
     llvm_unreachable("assign is not valid in canonical SIL");
   }
-  void visitAssignByDelegateInst(AssignByDelegateInst *i) {
-    llvm_unreachable("assign_by_delegate is not valid in canonical SIL");
+  void visitAssignByWrapperInst(AssignByWrapperInst *i) {
+    llvm_unreachable("assign_by_wrapper is not valid in canonical SIL");
   }
   void visitMarkUninitializedInst(MarkUninitializedInst *i) {
     llvm_unreachable("mark_uninitialized is not valid in canonical SIL");
@@ -1122,19 +1123,18 @@ public:
   
   void visitKeyPathInst(KeyPathInst *I);
 
-
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitRefTo##Name##Inst(RefTo##Name##Inst *i); \
-  void visit##Name##ToRefInst(Name##ToRefInst *i);
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
+  void visit##Name##ToRefInst(Name##ToRefInst *i);                             \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *i); \
   void visitStore##Name##Inst(Store##Name##Inst *i);
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i); \
-  void visit##Name##RetainInst(Name##RetainInst *i); \
-  void visit##Name##ReleaseInst(Name##ReleaseInst *i); \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i);             \
+  void visit##Name##RetainInst(Name##RetainInst *i);                           \
+  void visit##Name##ReleaseInst(Name##ReleaseInst *i);
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
@@ -1243,6 +1243,10 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
   // replacement.
   if (f->getDynamicallyReplacedFunction()) {
     IGM.emitDynamicReplacementOriginalFunctionThunk(f);
+  }
+
+  if (f->isDynamicallyReplaceable()) {
+    IGM.createReplaceableProlog(*this, f);
   }
 }
 
@@ -1579,23 +1583,36 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
     return;
   
   const SILArgument *selfArg = IGF.CurSILFn->getSelfMetadataArgument();
+  auto selfTy = selfArg->getType().getASTType();
   CanMetatypeType metaTy =
-    dyn_cast<MetatypeType>(selfArg->getType().getASTType());
+    dyn_cast<MetatypeType>(selfTy);
   IRGenFunction::LocalSelfKind selfKind;
   if (!metaTy)
     selfKind = IRGenFunction::ObjectReference;
-  else switch (metaTy->getRepresentation()) {
-  case MetatypeRepresentation::Thin:
-    llvm_unreachable("class metatypes are never thin");
-  case MetatypeRepresentation::Thick:
-    selfKind = IRGenFunction::SwiftMetatype;
-    break;
-  case MetatypeRepresentation::ObjC:
-    selfKind = IRGenFunction::ObjCMetatype;
-    break;
+  else {
+    selfTy = metaTy.getInstanceType();
+    switch (metaTy->getRepresentation()) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("class metatypes are never thin");
+    case MetatypeRepresentation::Thick:
+      selfKind = IRGenFunction::SwiftMetatype;
+      break;
+    case MetatypeRepresentation::ObjC:
+      selfKind = IRGenFunction::ObjCMetatype;
+      break;
+    }
   }
   llvm::Value *value = IGF.getLoweredExplosion(selfArg).claimNext();
-  IGF.setLocalSelfMetadata(value, selfKind);
+  if (auto dynSelfTy = dyn_cast<DynamicSelfType>(selfTy))
+    selfTy = dynSelfTy.getSelfType();
+
+  // Specify the exact Self type if we know it, either because the class
+  // is final, or because the function we're emitting is a method with the
+  // [exact_self_class] attribute set on it during the SIL pipeline.
+  bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
+    || IGF.CurSILFn->isExactSelfClass();
+
+  IGF.setLocalSelfMetadata(selfTy, isExact, value, selfKind);
 }
 
 /// Emit the definition for the given SIL constant.
@@ -1625,6 +1642,9 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
+  if (CurSILFn->isThunk())
+    IGM.setHasFramePointer(CurFn, false);
+  
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
@@ -1646,7 +1666,7 @@ void IRGenSILFunction::emitSILFunction() {
     IGM.DebugInfo->emitFunction(*CurSILFn, CurFn);
 
   // Map the entry bb.
-  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&*CurFn->begin(), {});
+  LoweredBBs[&*CurSILFn->begin()] = LoweredBB(&CurFn->back(), {});
   // Create LLVM basic blocks for the other bbs.
   for (auto bi = std::next(CurSILFn->begin()), be = CurSILFn->end(); bi != be;
        ++bi) {
@@ -1842,7 +1862,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
-  auto fn = i->getReferencedFunction();
+  auto fn = i->getInitiallyReferencedFunction();
 
   llvm::Constant *fnPtr = IGM.getAddrOfSILFunction(
       fn, NotForDefinition, false /*isDynamicallyReplaceableImplementation*/,
@@ -1870,6 +1890,11 @@ void IRGenSILFunction::visitDynamicFunctionRefInst(DynamicFunctionRefInst *i) {
 
 void IRGenSILFunction::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *i) {
+  if (UseBasicDynamicReplacement) {
+    IGM.unimplemented(i->getLoc().getSourceLoc(),
+      ": calling the original implementation of a dynamic function is not "
+      "supported with -Xllvm -basic-dynamic-replacement");
+  }
   visitFunctionRefBaseInst(i);
 }
 
@@ -2011,7 +2036,7 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILValue op = i->getOperand();
   SILType opType = op->getType();
 
-  switch (opType.getPreferredExistentialRepresentation(IGM.getSILModule())) {
+  switch (opType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
@@ -3852,6 +3877,31 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
+  void IRGenSILFunction::visitCopy##Name##ValueInst(                           \
+      swift::Copy##Name##ValueInst *i) {                                       \
+    Explosion in = getLoweredExplosion(i->getOperand());                       \
+    auto silTy = i->getOperand()->getType();                                   \
+    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
+    auto &ti = getReferentTypeInfo(*this, silTy);                              \
+    /* Since we are unchecked, we just use strong retain here. We do not       \
+     * perform any checks */                                                   \
+    ti.strongRetain(*this, in, irgen::Atomicity::Atomic);                      \
+    /* Semantically we are just passing through the input parameter but as a   \
+     */                                                                        \
+    /* strong reference... at LLVM IR level these type differences don't */    \
+    /* matter. So just set the lowered explosion appropriately. */             \
+    Explosion output = getLoweredExplosion(i->getOperand());                   \
+    if (isOptional) {                                                          \
+      auto values = output.claimAll();                                         \
+      output.reset();                                                          \
+      for (auto value : values) {                                              \
+        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
+      }                                                                        \
+    }                                                                          \
+    setLoweredExplosion(i, output);                                            \
+  }
 #include "swift/AST/ReferenceStorage.def"
 #undef COMMON_CHECKED_REF_STORAGE
 
@@ -3870,7 +3920,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
                                  SourceLoc loc) {
   if (!hasReferenceSemantics(IGF, operand->getType())) {
-    IGF.emitTrap(/*EmitUnreachable=*/false);
+    IGF.emitTrap("isUnique called for a non-reference", /*EmitUnreachable=*/false);
     return llvm::UndefValue::get(IGF.IGM.Int1Ty);
   }
 
@@ -4138,8 +4188,8 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(i->getBoxType()
-                                      ->getFieldType(IGM.getSILModule(), 0));
+  const TypeInfo &type = getTypeInfo(
+      getSILBoxFieldType(i->getBoxType(), IGM.getSILModule().Types, 0));
 
   // Derive name from SIL location.
   bool IsAnonymous = false;
@@ -4174,7 +4224,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   assert(i->getBoxType()->getLayout()->getFields().size() == 1 &&
          "box for a local variable should only have one field");
-  auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
+  auto SILTy = getSILBoxFieldType(i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
   auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
@@ -4530,7 +4580,7 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
   IGF.FailBBs.push_back(failBB);
   
   IGF.Builder.emitBlock(failBB);
-  IGF.emitTrap(/*EmitUnreachable=*/true);
+  IGF.emitTrap("mismatching type layouts", /*EmitUnreachable=*/true);
 
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
   IGF.Builder.emitBlock(contBB);
@@ -5431,7 +5481,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
     // debug location. This is because zero is not an artificial line location
     // in CodeView.
     IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
-  emitTrap(/*EmitUnreachable=*/true);
+  emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);
 }

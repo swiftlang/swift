@@ -74,7 +74,6 @@ namespace {
     LookupResult &Result;
     DeclContext *DC;
     NameLookupOptions Options;
-    bool IsMemberLookup;
 
     /// The vector of found declarations.
     SmallVector<ValueDecl *, 4> FoundDecls;
@@ -86,53 +85,20 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        NameLookupOptions options,
-                        bool isMemberLookup)
-      : Result(result), DC(dc), Options(options),
-        IsMemberLookup(isMemberLookup) {
+                        NameLookupOptions options)
+      : Result(result), DC(dc), Options(options) {
       if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
 
-    /// Determine whether we should filter out the results by removing
-    /// overridden and shadowed declarations.
-    /// FIXME: We should *always* do this, but there are weird assumptions
-    /// about the results of unqualified name lookup, e.g., that a local
-    /// variable not having a type indicates that it hasn't been seen yet.
-    bool shouldFilterResults() const {
-      // Member lookups always filter results.
-      if (IsMemberLookup) return true;
-
-      bool allAreInOtherModules = true;
-      auto currentModule = DC->getParentModule();
-      for (const auto &found : Result) {
-        // We found a member, so we need to filter.
-        if (found.getBaseDecl() != nullptr)
-          return true;
-
-        // We found something in our own module.
-        if (found.getValueDecl()->getDeclContext()->getParentModule() ==
-              currentModule)
-          allAreInOtherModules = false;
-      }
-
-      // FIXME: Only perform shadowing if we found things from other modules.
-      // This prevents us from introducing additional type-checking work
-      // during name lookup.
-      return allAreInOtherModules;
-    }
-
     ~LookupResultBuilder() {
-      // Check whether we should do this filtering aat all.
-      if (!shouldFilterResults()) return;
-
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
       removeOverriddenDecls(FoundOuterDecls);
 
       // Remove any shadowed declarations from the found-declarations set.
-      removeShadowedDecls(FoundDecls, DC->getParentModule());
-      removeShadowedDecls(FoundOuterDecls, DC->getParentModule());
+      removeShadowedDecls(FoundDecls, DC);
+      removeShadowedDecls(FoundOuterDecls, DC);
 
       // Filter out those results that have been removed from the
       // found-declarations set.
@@ -231,11 +197,9 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto resolver = DC->getASTContext().getLazyResolver();
-      assert(resolver && "Need an active resolver");
-      auto &tc = *static_cast<TypeChecker *>(resolver);
-      auto conformance = tc.conformsToProtocol(conformingType, foundProto, DC,
-                                               conformanceOptions);
+      auto conformance = TypeChecker::conformsToProtocol(conformingType,
+                                                         foundProto, DC,
+                                                         conformanceOptions);
       if (!conformance) {
         // If there's no conformance, we have an existential
         // and we found a member from one of the protocols, and
@@ -257,10 +221,10 @@ namespace {
       ValueDecl *witness = nullptr;
       auto concrete = conformance->getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType, nullptr)
+        witness = concrete->getTypeWitnessAndDecl(assocType)
           .second;
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found, nullptr);
+        witness = concrete->getWitnessDecl(found);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -303,11 +267,11 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
 LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclName name,
                                             SourceLoc loc,
                                             NameLookupOptions options) {
-  UnqualifiedLookup lookup(name, dc, nullptr, loc,
+  UnqualifiedLookup lookup(name, dc, loc,
                            convertToUnqualifiedLookupOptions(options));
 
   LookupResult result;
-  LookupResultBuilder builder(result, dc, options, /*memberLookup*/false);
+  LookupResultBuilder builder(result, dc, options);
   for (auto idx : indices(lookup.Results)) {
     const auto &found = lookup.Results[idx];
     // Determine which type we looked through to find this result.
@@ -338,7 +302,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
   {
     // Try lookup without ProtocolMembers first.
     UnqualifiedLookup lookup(
-        name, dc, nullptr, loc,
+        name, dc, loc,
         ulOptions - UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     if (!lookup.Results.empty() ||
@@ -354,7 +318,7 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclName name,
     // is called too early, we start resolving extensions -- even those
     // which do provide not conformances.
     UnqualifiedLookup lookup(
-        name, dc, nullptr, loc,
+        name, dc, loc,
         ulOptions | UnqualifiedLookup::Flags::AllowProtocolMembers);
 
     return LookupResult(lookup.Results, lookup.IndexOfFirstOuterResult);
@@ -383,10 +347,9 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   subOptions &= ~NL_RemoveOverridden;
   subOptions &= ~NL_RemoveNonVisible;
 
-  LookupResultBuilder builder(result, dc, options,
-                              /*memberLookup*/true);
+  LookupResultBuilder builder(result, dc, options);
   SmallVector<ValueDecl *, 4> lookupResults;
-  dc->lookupQualified(type, name, subOptions, nullptr, lookupResults);
+  dc->lookupQualified(type, name, subOptions, lookupResults);
 
   for (auto found : lookupResults)
     builder.add(found, nullptr, type, /*isOuter=*/false);
@@ -450,7 +413,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   if (options.contains(NameLookupFlags::IgnoreAccessControl))
     subOptions |= NL_IgnoreAccessControl;
 
-  if (!dc->lookupQualified(type, name, subOptions, nullptr, decls))
+  if (!dc->lookupQualified(type, name, subOptions, decls))
     return result;
 
   // Look through the declarations, keeping only the unique type declarations.
@@ -553,11 +516,12 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
           ProtocolConformanceState::CheckingTypeWitnesses)
         continue;
 
-      auto lazyResolver = dc->getASTContext().getLazyResolver();
       auto typeDecl =
-        concrete->getTypeWitnessAndDecl(assocType, lazyResolver).second;
+        concrete->getTypeWitnessAndDecl(assocType).second;
 
-      assert(typeDecl && "Missing type witness?");
+      // Circularity.
+      if (!typeDecl)
+        continue;
 
       auto memberType =
           substMemberTypeWithBase(dc->getParentModule(), typeDecl, type);
@@ -671,10 +635,10 @@ void TypeChecker::performTypoCorrection(DeclContext *DC, DeclRefKind refKind,
   });
 
   if (baseTypeOrNull) {
-    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC, this,
+    lookupVisibleMemberDecls(consumer, baseTypeOrNull, DC,
                              /*include instance members*/ true, gsb);
   } else {
-    lookupVisibleDecls(consumer, DC, this, /*top level*/ true,
+    lookupVisibleDecls(consumer, DC, /*top level*/ true,
                        corrections.Loc.getBaseNameLoc());
   }
 

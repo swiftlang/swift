@@ -7,9 +7,6 @@
 // CoreMedia is not present on watchOS.
 // UNSUPPORTED: OS=watchos
 
-// Requires swift-version 5
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import AVFoundation
 import StdlibUnittest
 

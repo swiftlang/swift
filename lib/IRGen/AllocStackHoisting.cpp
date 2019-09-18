@@ -62,8 +62,7 @@ static bool isHoistable(AllocStackInst *Inst, irgen::IRGenModule &Mod) {
   bool foundWeaklyImported =
       SILTy.getASTType().findIf([&Mod](CanType type) -> bool {
         if (auto nominal = type->getNominalOrBoundGenericNominal())
-          if (nominal->isWeakImported(Mod.getSwiftModule(),
-                                      Mod.getAvailabilityContext())) {
+          if (nominal->isWeakImported(Mod.getSwiftModule())) {
             return true;
           }
         return false;
@@ -352,7 +351,7 @@ bool indicatesDynamicAvailabilityCheckUse(SILInstruction *I) {
     return false;
   if (Apply->hasSemantics("availability.osversion"))
     return true;
-  auto *FunRef = Apply->getReferencedFunction();
+  auto *FunRef = Apply->getReferencedFunctionOrNull();
   if (!FunRef)
     return false;
   if (FunRef->getName().equals("_swift_stdlib_operatingSystemVersion"))

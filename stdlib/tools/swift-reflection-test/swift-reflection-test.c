@@ -34,6 +34,14 @@
 #include <fcntl.h>
 #endif
 
+#if defined(__clang__) || defined(__GNUC__)
+#define NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define NORETURN __declspec(noreturn)
+#else
+#define NORETURN
+#endif
+
 typedef struct PipeMemoryReader {
   int to_child[2];
   int from_child[2];
@@ -56,11 +64,13 @@ typedef struct RemoteReflectionInfo {
   size_t TotalSize;
 } RemoteReflectionInfo;
 
+NORETURN
 static void errorAndExit(const char *message) {
   fprintf(stderr, "%s\n", message);
   abort();
 }
 
+NORETURN
 static void errnoAndExit(const char *message) {
   fprintf(stderr, "%s: %s\n", message, strerror(errno));
   abort();
@@ -575,11 +585,16 @@ int main(int argc, char *argv[]) {
     printUsageAndExit();
 
   const char *BinaryFilename = argv[1];
-  
+
+#if defined(_WIN32)
+  // FIXME(compnerd) weak linking is not permitted on PE/COFF, we should fall
+  // back to GetProcAddress to see if the symbol is present.
+#else
   // swift_reflection_classIsSwiftMask is weak linked so we can work
   // with older Remote Mirror dylibs.
   if (&swift_reflection_classIsSwiftMask != NULL)
     swift_reflection_classIsSwiftMask = computeClassIsSwiftMask();
+#endif
 
   uint16_t Version = swift_reflection_getSupportedMetadataVersion();
   printf("Metadata version: %u\n", Version);

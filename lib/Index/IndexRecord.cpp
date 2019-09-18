@@ -164,9 +164,7 @@ public:
     // FIXME: expose errors?
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }
@@ -203,9 +201,7 @@ public:
     // FIXME: expose errors?
   }
 
-  bool recordHash(StringRef hash, bool isKnown) override { return true; }
-  bool startDependency(StringRef name, StringRef path, bool isClangModule,
-                       bool isSystem, StringRef hash) override {
+  bool startDependency(StringRef name, StringRef path, bool isClangModule, bool isSystem) override {
     return true;
   }
   bool finishDependency(bool isClangModule) override { return true; }
@@ -342,7 +338,7 @@ recordSourceFile(SourceFile *SF, StringRef indexStorePath,
   bool failed = false;
   auto consumer = makeRecordingConsumer(SF->getFilename(), indexStorePath,
                                         &diags, &recordFile, &failed);
-  indexSourceFile(SF, /*Hash=*/"", *consumer);
+  indexSourceFile(SF, *consumer);
 
   if (!failed && !recordFile.empty())
     callback(recordFile, SF->getFilename());
@@ -482,7 +478,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
     bool failed = false;
     auto consumer = makeRecordingConsumer(filename, indexStorePath,
                                           &diags, &recordFile, &failed);
-    indexModule(module, /*Hash=*/"", *consumer);
+    indexModule(module, *consumer);
 
     if (failed)
       return true;
@@ -531,7 +527,7 @@ emitDataForSwiftSerializedModule(ModuleDecl *module,
       records.emplace_back(outRecordFile, moduleName.str());
       return true;
     });
-    indexModule(module, /*Hash=*/"", groupIndexConsumer);
+    indexModule(module, groupIndexConsumer);
     if (failed)
       return true;
   }

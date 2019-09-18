@@ -48,14 +48,13 @@ public struct S<A: P> where A.T == S<A> {
 // expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
     g(a: id(t: a))
-    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<_>'}}
+    // expected-error@-1 {{cannot convert value of type 'A.T' to expected argument type 'S<A>'}}
     _ = A.T.self
   }
 
   func g(a: S<A>) {
     f(a: id(t: a))
-    // expected-note@-1 {{expected an argument list of type '(a: A.T)'}}
-    // expected-error@-2 {{cannot invoke 'f' with an argument list of type '(a: S<A>)'}}
+    // expected-error@-1 {{cannot convert value of type 'S<A>' to expected argument type 'A.T'}}
     _ = S<A>.self
   }
 

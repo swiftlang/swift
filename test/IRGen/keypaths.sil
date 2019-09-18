@@ -553,6 +553,25 @@ entry:
   return undef : $()
 }
 
+public class GC2<T> {
+  public final var x: T
+  public var y: String
+}
+
+sil @class_constrainted : $@convention(thin) <V where V : C> () -> () {
+bb0:
+  %k = keypath $KeyPath<V, String>, <τ_0_0 where τ_0_0 : C> (root $τ_0_0; stored_property #C.y : $String) <V>
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @generic_class_constrainted : $@convention(thin) <U, V where V : GC2<U>> () -> () {
+bb0:
+  %k = keypath $KeyPath<V, String>, <τ_0_0, τ_0_1 where τ_0_1 : GC2<τ_0_0>> (root $τ_0_1; stored_property #GC2.y : $String) <U, V>
+  %t = tuple ()
+  return %t : $()
+}
+
 sil @s_get : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed A, UnsafeRawPointer) -> @out B
 sil @s_set : $@convention(thin) <A: Hashable, B: Hashable> (@in_guaranteed B, @in_guaranteed A, UnsafeRawPointer) -> ()
 sil @s_equals : $@convention(thin) <A: Hashable, B: Hashable> (UnsafeRawPointer, UnsafeRawPointer) -> Bool

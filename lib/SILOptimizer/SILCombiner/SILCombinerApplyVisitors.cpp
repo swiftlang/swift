@@ -633,7 +633,7 @@ static SILValue createKeypathProjections(SILValue keyPath, SILValue root,
 ///   ...
 ///   load/store %addr
 bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
-  SILFunction *callee = AI->getReferencedFunction();
+  SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
 
@@ -687,7 +687,7 @@ bool SILCombiner::tryOptimizeKeypath(ApplyInst *AI) {
 ///   %addr = struct_element_addr/ref_element_addr %root_object
 ///   // use %inout_addr
 bool SILCombiner::tryOptimizeInoutKeypath(BeginApplyInst *AI) {
-  SILFunction *callee = AI->getReferencedFunction();
+  SILFunction *callee = AI->getReferencedFunctionOrNull();
   if (!callee)
     return false;
 
@@ -999,14 +999,6 @@ static bool canReplaceCopiedArg(FullApplySite Apply, SILValue Arg,
   if (!IEA)
     return false;
 
-  // If the witness method does not take the value as guaranteed, we cannot
-  // replace Arg with the source of a copy. Otherwise the call would modify
-  // another value than the original argument (in the case of indirect mutating)
-  // or create a use-after-free (in the case of indirect consuming).
-  auto origConv = Apply.getOrigCalleeConv();
-  if (!origConv.getParamInfoForSILArg(ArgIdx).isIndirectInGuaranteed())
-    return false;
-
   auto *DT = DA->get(Apply.getFunction());
   auto *AI = Apply.getInstruction();
   SILValue existentialAddr = IEA->getOperand();
@@ -1095,8 +1087,16 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
       return false;
     }
   }
-  // The apply can only be rewritten in terms of the concrete value if it is
-  // legal to pass that value as the Arg argument.
+  // If the convention is mutating, then the existential must have been
+  // initialized by copying the concrete value (regardless of whether
+  // CEI.isConcreteValueCopied is true). Replacing the existential address with
+  // the concrete address would result in mutation of the wrong object.
+  auto origConv = Apply.getOrigCalleeConv();
+  if (origConv.getParamInfoForSILArg(ArgIdx).isIndirectMutating())
+    return false;
+
+  // If either the initialized existential or opened existential was copied,
+  // then check that the original value can be passed as the new argument.
   if (CEI.isConcreteValueCopied
       && (!CEI.ConcreteValue
           || !canReplaceCopiedArg(Apply, CEI.ConcreteValue, DA, ArgIdx))) {
@@ -1105,6 +1105,61 @@ bool SILCombiner::canReplaceArg(FullApplySite Apply,
   // It is safe to replace Arg.
   return true;
 }
+
+/// Track temporary copies required for argument substitution when rewritting an
+/// apply's argument types from an opened existential types to concrete types.
+///
+/// This is relevant for non-mutating arguments that are consumed by the call
+/// (@in or @owned convention).
+struct ConcreteArgumentCopy {
+  SILValue origArg;
+  CopyAddrInst *tempArgCopy;
+
+  ConcreteArgumentCopy(SILValue origArg, CopyAddrInst *tempArgCopy)
+      : origArg(origArg), tempArgCopy(tempArgCopy) {
+    assert(origArg->getType().isAddress());
+  }
+
+  static Optional<ConcreteArgumentCopy>
+  generate(const ConcreteExistentialInfo &CEI, ApplySite apply, unsigned argIdx,
+           SILBuilderContext &BuilderCtx) {
+    SILParameterInfo paramInfo =
+        apply.getOrigCalleeConv().getParamInfoForSILArg(argIdx);
+    // Mutation should have been checked before we get this far.
+    assert(!paramInfo.isIndirectMutating()
+           && "A mutated opened existential value can't be replaced");
+
+    if (!paramInfo.isConsumed())
+      return None;
+
+    SILValue origArg = apply.getArgument(argIdx);
+    // FIXME_opaque: With SIL opaque values, a formally indirect argument may be
+    // passed as a SIL object. In this case, generate a copy_value for the new
+    // argument and a destroy_value for the old argument, as should also be done
+    // for owned references.
+    assert(origArg->getType().isAddress() == paramInfo.isFormalIndirect());
+
+    // If argument convention is direct, then the existential reference was
+    // originally consumed by the call. After substitution, the concrete
+    // reference will be consumed by the call. This maintains the correct
+    // reference count.
+    //
+    // FIXME_ownership: to maintain ownership SSA, generate a copy_value from
+    // the concrete reference for the new argument (record this copy as a
+    // union with tempArgCopy above). After emitting the apply, emit a
+    // destroy_value of the existential, which is no longer consumed by the
+    // call.
+    if (!paramInfo.isFormalIndirect())
+      return None;
+
+    SILBuilderWithScope B(apply.getInstruction(), BuilderCtx);
+    auto loc = apply.getLoc();
+    auto *ASI = B.createAllocStack(loc, CEI.ConcreteValue->getType());
+    auto *CAI = B.createCopyAddr(loc, CEI.ConcreteValue, ASI, IsNotTake,
+                                 IsInitialization_t::IsInitialization);
+    return ConcreteArgumentCopy(origArg, CAI);
+  }
+};
 
 /// Rewrite the given method apply instruction in terms of the provided conrete
 /// type information.
@@ -1148,6 +1203,7 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
       NewArgs.push_back(Apply.getArgument(ArgIdx));
   }
   // Transform the parameter arguments.
+  SmallVector<ConcreteArgumentCopy, 4> concreteArgCopies;
   for (unsigned EndIdx = Apply.getNumArguments(); ArgIdx < EndIdx; ++ArgIdx) {
     auto ArgIt = COAIs.find(ArgIdx);
     if (ArgIt == COAIs.end()) {
@@ -1167,7 +1223,14 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
     UpdatedArgs = true;
     // Ensure that we have a concrete value to propagate.
     assert(CEI.ConcreteValue);
-    NewArgs.push_back(CEI.ConcreteValue);
+    auto argSub =
+        ConcreteArgumentCopy::generate(CEI, Apply, ArgIdx, BuilderCtx);
+    if (argSub) {
+      concreteArgCopies.push_back(*argSub);
+      NewArgs.push_back(argSub->tempArgCopy->getDest());
+    } else
+      NewArgs.push_back(CEI.ConcreteValue);
+
     // Form a new set of substitutions where the argument is
     // replaced with a concrete type.
     NewCallSubs = NewCallSubs.subst(
@@ -1213,8 +1276,29 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
   if (auto NewAI = dyn_cast<ApplyInst>(NewApply))
     replaceInstUsesWith(*cast<ApplyInst>(Apply.getInstruction()), NewAI);
 
-  eraseInstFromFunction(*Apply.getInstruction());
+  auto nextI = std::next(NewApply.getInstruction()->getIterator());
+  eraseInstFromFunction(*Apply.getInstruction(), nextI);
 
+  // cleanup immediately after the call on all paths reachable from the call.
+  SmallVector<SILInstruction *, 2> cleanupPositions;
+  if (nextI != NewApply.getParent()->end())
+    cleanupPositions.push_back(&*nextI);
+  else {
+    for (auto &succ : NewApply.getParent()->getSuccessors())
+      cleanupPositions.push_back(&*succ.getBB()->begin());
+  }
+  for (SILInstruction *cleanupPos : cleanupPositions) {
+    // For any argument that was copied from the original value, destroy the old
+    // argument (was must have been previously consumed by the call) and
+    // deallocate the temporary copy.
+    SILBuilder cleanupBuilder(cleanupPos, NewApply.getDebugScope(), BuilderCtx);
+    auto cleanupLoc = RegularLocation::getAutoGeneratedLocation();
+    for (ConcreteArgumentCopy &argCopy : concreteArgCopies) {
+      cleanupBuilder.createDestroyAddr(cleanupLoc, argCopy.origArg);
+      cleanupBuilder.createDeallocStack(cleanupLoc,
+                                        argCopy.tempArgCopy->getDest());
+    }
+  }
   return NewApply.getInstruction();
 }
 
@@ -1362,8 +1446,12 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
   if (Call->getNumArguments() != 1)
     return false;
 
-  FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
-  SILFunction *F = FRI->getReferencedFunction();
+  // FIXME: We could handle dynamic_function_ref instructions here because the
+  // code only looks at the function type.
+  FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(Call->getCallee());
+  if (!FRI)
+    return false;
+  SILFunction *F = FRI->getReferencedFunctionOrNull();
   auto FnTy = F->getLoweredFunctionType();
 
   // Look at the result type.
@@ -1386,7 +1474,7 @@ static bool knowHowToEmitReferenceCountInsts(ApplyInst *Call) {
 /// Add reference counting operations equal to the effect of the call.
 static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
   FunctionRefInst *FRI = cast<FunctionRefInst>(Call->getCallee());
-  SILFunction *F = FRI->getReferencedFunction();
+  SILFunction *F = FRI->getReferencedFunctionOrNull();
   auto FnTy = F->getLoweredFunctionType();
   assert(FnTy->getNumResults() == 1);
   auto ResultInfo = FnTy->getResults()[0];
@@ -1517,7 +1605,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *SF = AI->getReferencedFunction();
+  SILFunction *SF = AI->getReferencedFunctionOrNull();
   if (SF && SF->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (recursivelyCollectARCUsers(Users, AI)) {
@@ -1648,7 +1736,7 @@ SILInstruction *SILCombiner::visitTryApplyInst(TryApplyInst *AI) {
   }
 
   // Optimize readonly functions with no meaningful users.
-  SILFunction *Fn = AI->getReferencedFunction();
+  SILFunction *Fn = AI->getReferencedFunctionOrNull();
   if (Fn && Fn->getEffectsKind() < EffectsKind::ReleaseNone) {
     UserListTy Users;
     if (isTryApplyResultNotUsed(Users, AI)) {

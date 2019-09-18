@@ -15,6 +15,7 @@ import argparse
 import glob
 import os
 import pipes
+import platform
 import shlex
 import shutil
 import subprocess
@@ -25,7 +26,10 @@ VERBOSE = True
 
 def verbose_print_command(command):
     if VERBOSE:
-        print(" ".join(pipes.quote(c) for c in command))
+        if platform.system() == 'Windows':
+            print(subprocess.list2cmdline(command))
+        else:
+            print(" ".join(pipes.quote(c) for c in command))
         sys.stdout.flush()
 
 
@@ -33,7 +37,7 @@ class ResilienceTest(object):
 
     def __init__(self, target_build_swift, target_run, target_codesign,
                  target_nm, tmp_dir, test_dir, test_src, lib_prefix,
-                 lib_suffix, additional_compile_flags,
+                 lib_suffix, additional_compile_flags, triple,
                  backward_deployment, no_symbol_diff):
         self.target_build_swift = shlex.split(target_build_swift)
         self.target_run = shlex.split(target_run)
@@ -45,6 +49,7 @@ class ResilienceTest(object):
         self.lib_prefix = lib_prefix
         self.lib_suffix = lib_suffix
         self.additional_compile_flags = shlex.split(additional_compile_flags)
+        self.triple = triple
 
         self.before_dir = os.path.join(self.tmp_dir, 'before')
         self.after_dir = os.path.join(self.tmp_dir, 'after')
@@ -73,7 +78,10 @@ class ResilienceTest(object):
         os.makedirs(self.before_dir)
 
     def is_apple_platform(self):
-        return any('-apple-' in arg for arg in self.target_build_swift)
+        return self.triple.split('-')[1] == 'apple'
+
+    def is_windows_host(self):
+        return self.triple.split('-')[2] == 'windows'
 
     def compile_library(self):
         for config in self.config_dir_map:
@@ -171,7 +179,10 @@ class ResilienceTest(object):
                                       config1_lower + '_' + config2_lower)
             if self.is_apple_platform():
                 rpath_origin = '@executable_path'
+            elif self.is_windows_host():
+                pass
             else:
+                # assume it is an ELF host
                 rpath_origin = '$ORIGIN'
 
             compiler_flags = [
@@ -179,12 +190,20 @@ class ResilienceTest(object):
                 '-l' + self.lib_name,
                 os.path.join(self.config_dir_map[config2],
                              'main.o'),
-                '-Xlinker', '-rpath', '-Xlinker',
-                os.path.join(rpath_origin,
-                             os.path.relpath(self.config_dir_map[config1],
-                                             self.tmp_dir)),
                 '-o', output_obj
             ]
+
+            if self.is_windows_host():
+                # Emulate RPATH by changing to the location as `PATH` is what
+                # drives library searching on Windows
+                os.chdir(self.config_dir_map[config1])
+            else:
+                compiler_flags.extend([
+                    '-Xlinker', '-rpath', '-Xlinker',
+                    os.path.join(rpath_origin,
+                                 os.path.relpath(self.config_dir_map[config1],
+                                                 self.tmp_dir)),
+                ])
 
             if self.is_apple_platform():
                 compiler_flags += ['-Xlinker', '-bind_at_load']
@@ -209,6 +228,10 @@ class ResilienceTest(object):
                 os.path.join(self.tmp_dir, self.config_dir_map[config1], '*'))
             command = self.target_run + [output_obj] + tmp_dir_contents
             verbose_print_command(command)
+            # Windows does not have RPATH, make sure that we change the current
+            # working directory before we execute the test.
+            if platform.system() == 'Windows':
+                os.chdir(self.config_dir_map[config1])
             returncode = subprocess.call(command)
             assert returncode == 0, str(command)
 
@@ -229,6 +252,7 @@ def main():
                         action='store_true')
     parser.add_argument('--no-symbol-diff', default=False,
                         action='store_true')
+    parser.add_argument('--triple', required=True)
 
     args = parser.parse_args()
 
@@ -237,6 +261,7 @@ def main():
                                      args.t, args.S, args.s, args.lib_prefix,
                                      args.lib_suffix,
                                      args.additional_compile_flags,
+                                     args.triple,
                                      args.backward_deployment,
                                      args.no_symbol_diff)
 

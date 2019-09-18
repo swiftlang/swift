@@ -1,4 +1,4 @@
-// RUN: %sourcekitd-test -req=track-compiles == -req=cursor %s -offset=0 -- %s | %FileCheck %s -check-prefix=COMPILE_1
+// RUN: %sourcekitd-test -req=track-compiles == -req=cursor %s -offset=0 -- %s | %FileCheck %s -check-prefix=COMPILE_1 --enable-yaml-compatibility
 // COMPILE_1: {
 // COMPILE_1:  key.notification: source.notification.compile-will-start,
 // COMPILE_1:  key.filepath: "SOURCE_DIR{{.*}}cursor-info.swift",

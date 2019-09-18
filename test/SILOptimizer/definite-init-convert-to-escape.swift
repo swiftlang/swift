@@ -46,8 +46,8 @@ public func returnOptionalEscape() -> (() ->())?
 // CHECK:  switch_enum [[V1]] : $Optional<{{.*}}>, case #Optional.some!enumelt.1: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 //
 // CHECK: [[SOME_BB]]([[V2:%.*]] : $@callee_guaranteed () -> ()):
-// CHECK:  [[CVT_MARK_DEP:%.*]] = mark_dependence [[V2]] : $@callee_guaranteed () -> () on [[V1]]
-// CHECK:  [[CVT:%.*]] = convert_escape_to_noescape [[CVT_MARK_DEP]]
+// CHECK:  [[V1_UNWRAPPED:%.*]] = unchecked_enum_data [[V1]]
+// CHECK:  [[CVT:%.*]] = convert_escape_to_noescape [[V1_UNWRAPPED]]
 // CHECK:  [[SOME:%.*]] = enum $Optional<{{.*}}>, #Optional.some!enumelt.1, [[CVT]]
 // CHECK:  strong_release [[V2]]
 // CHECK:  br [[NEXT_BB:bb[0-9]+]]([[SOME]] :

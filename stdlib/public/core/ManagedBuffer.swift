@@ -44,6 +44,10 @@ open class ManagedBuffer<Header, Element> {
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
   public final var header: Header
 
+  // This is really unfortunate. In Swift 5.0, the method descriptor for this
+  // initializer was public and subclasses would "inherit" it, referencing its
+  // method descriptor from their class override table.
+  @usableFromInline
   internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("Only initialize these by calling create")
   }
@@ -171,7 +175,7 @@ extension ManagedBuffer {
 ///        }
 ///      }
 ///
-@_fixed_layout
+@frozen
 public struct ManagedBufferPointer<Header, Element> {
 
   @usableFromInline
@@ -368,9 +372,10 @@ extension ManagedBufferPointer {
     return try body(_headerPointer, _elementPointer)
   }
 
-  /// Returns `true` iff `self` holds the only strong reference to its buffer.
+  /// Returns `true` if `self` holds the only strong reference to its
+  /// buffer. Otherwise, returns `false`.
   ///
-  /// See `isUniquelyReferenced` for details.
+  /// See `isKnownUniquelyReferenced` for details.
   @inlinable
   public mutating func isUniqueReference() -> Bool {
     return _isUnique(&_nativeBuffer)
@@ -547,7 +552,7 @@ extension ManagedBufferPointer: Equatable {
 /// - Returns: `true` if `object` is known to have a single strong reference;
 ///   otherwise, `false`.
 @inlinable
-public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
+public func isKnownUniquelyReferenced<T: AnyObject>(_ object: inout T) -> Bool
 {
   return _isUnique(&object)
 }
@@ -583,7 +588,7 @@ public func isKnownUniquelyReferenced<T : AnyObject>(_ object: inout T) -> Bool
 /// - Returns: `true` if `object` is known to have a single strong reference;
 ///   otherwise, `false`. If `object` is `nil`, the return value is `false`.
 @inlinable
-public func isKnownUniquelyReferenced<T : AnyObject>(
+public func isKnownUniquelyReferenced<T: AnyObject>(
   _ object: inout T?
 ) -> Bool {
   return _isUnique(&object)

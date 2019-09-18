@@ -229,6 +229,7 @@ function(_compile_swift_files
   # The standard library and overlays are always built resiliently.
   if(SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-enable-library-evolution")
+    list(APPEND swift_flags "-Xfrontend" "-enable-ownership-stripping-after-serialization")
   endif()
 
   if(SWIFT_STDLIB_USE_NONATOMIC_RC)
@@ -253,18 +254,23 @@ function(_compile_swift_files
     list(APPEND swift_flags "-module-name" "${SWIFTFILE_MODULE_NAME}")
   endif()
 
-  # Force swift 5 mode for Standard Library.
+  # Force swift 5 mode for Standard Library and overlays.
   if (SWIFTFILE_IS_STDLIB)
     list(APPEND swift_flags "-swift-version" "5")
   endif()
-
-  # Force swift 4 compatibility mode for overlays.
   if (SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-swift-version" "5")
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
     list(APPEND swift_flags "-autolink-force-load")
+  endif()
+
+  # Don't need to link runtime compatibility libraries for older runtimes 
+  # into the new runtime.
+  if (SWIFTFILE_IS_STDLIB OR SWIFTFILE_IS_SDK_OVERLAY)
+    list(APPEND swift_flags "-runtime-compatibility-version" "none")
+    list(APPEND swift_flags "-disable-autolinking-runtime-compatibility-dynamic-replacements")
   endif()
 
   if (SWIFTFILE_IS_STDLIB_CORE OR SWIFTFILE_IS_SDK_OVERLAY)
@@ -317,10 +323,10 @@ function(_compile_swift_files
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
 
-    if(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES)
+    if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
       list(APPEND swift_module_flags
-           "-emit-parseable-module-interface-path" "${interface_file}")
+           "-emit-module-interface-path" "${interface_file}")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so

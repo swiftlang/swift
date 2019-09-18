@@ -11,8 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILType.h"
+#include "swift/AST/ASTMangler.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -98,6 +101,11 @@ bool SILType::isNoReturnFunction() const {
   return false;
 }
 
+std::string SILType::getMangledName() const {
+  Mangle::ASTMangler mangler(false/*use dwarf mangling*/);
+  return mangler.mangleTypeWithoutPrefix(getASTType());
+}
+
 std::string SILType::getAsString() const {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
@@ -129,20 +137,23 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
     && toTy.isHeapObjectReferenceType();
 }
 
-SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
+SILType SILType::getFieldType(VarDecl *field,
+                              TypeConverter &TC) const {
   auto baseTy = getASTType();
 
-  AbstractionPattern origFieldTy = M.Types.getAbstractionPattern(field);
+  if (!field->hasInterfaceType())
+    TC.Context.getLazyResolver()->resolveDeclSignature(field);
+
+  AbstractionPattern origFieldTy = TC.getAbstractionPattern(field);
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      baseTy->getTypeOfMember(M.getSwiftModule(),
-                              field, nullptr)->getCanonicalType();
+      baseTy->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
   }
 
-  auto loweredTy = M.Types.getLoweredRValueType(origFieldTy, substFieldTy);
+  auto loweredTy = TC.getLoweredRValueType(origFieldTy, substFieldTy);
   if (isAddress() || getClassOrBoundGenericClass() != nullptr) {
     return SILType::getPrimitiveAddressType(loweredTy);
   } else {
@@ -150,30 +161,42 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
   }
 }
 
-SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
+SILType SILType::getFieldType(VarDecl *field, SILModule &M) const {
+  return getFieldType(field, M.Types);
+}
+
+SILType SILType::getEnumElementType(EnumElementDecl *elt,
+                                    TypeConverter &TC) const {
   assert(elt->getDeclContext() == getEnumOrBoundGenericEnum());
   assert(elt->hasAssociatedValues());
 
   if (auto objectType = getASTType().getOptionalObjectType()) {
-    assert(elt == M.getASTContext().getOptionalSomeDecl());
+    assert(elt == TC.Context.getOptionalSomeDecl());
     return SILType(objectType, getCategory());
   }
 
+  if (!elt->hasInterfaceType())
+    TC.Context.getLazyResolver()->resolveDeclSignature(elt);
+
   // If the case is indirect, then the payload is boxed.
   if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
-    auto box = M.Types.getBoxTypeForEnumElement(*this, elt);
+    auto box = TC.getBoxTypeForEnumElement(*this, elt);
     return SILType(SILType::getPrimitiveObjectType(box).getASTType(),
                    getCategory());
   }
 
   auto substEltTy =
-    getASTType()->getTypeOfMember(M.getSwiftModule(), elt,
-                                          elt->getArgumentInterfaceType());
+    getASTType()->getTypeOfMember(&TC.M, elt,
+                                  elt->getArgumentInterfaceType());
   auto loweredTy =
-    M.Types.getLoweredRValueType(M.Types.getAbstractionPattern(elt),
-                                 substEltTy);
+    TC.getLoweredRValueType(TC.getAbstractionPattern(elt),
+                            substEltTy);
 
   return SILType(loweredTy, getCategory());
+}
+
+SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
+  return getEnumElementType(elt, M.Types);
 }
 
 bool SILType::isLoadableOrOpaque(const SILFunction &F) const {
@@ -283,10 +306,9 @@ SILType SILType::unwrapOptionalType() const {
 /// True if the given type value is nonnull, and the represented type is NSError
 /// or CFError, the error classes for which we support "toll-free" bridging to
 /// Error existentials.
-static bool isBridgedErrorClass(SILModule &M,
-                                Type t) {
+static bool isBridgedErrorClass(ASTContext &ctx, Type t) {
   // There's no bridging if ObjC interop is disabled.
-  if (!M.getASTContext().LangOpts.EnableObjCInterop)
+  if (!ctx.LangOpts.EnableObjCInterop)
     return false;
 
   if (!t)
@@ -296,8 +318,9 @@ static bool isBridgedErrorClass(SILModule &M,
     t = archetypeType->getSuperclass();
 
   // NSError (TODO: and CFError) can be bridged.
-  auto nsErrorType = M.Types.getNSErrorType();
-  if (t && nsErrorType && nsErrorType->isExactSuperclassOf(t)) {
+  auto nsErrorType = ctx.getNSErrorDecl();
+  if (t && nsErrorType &&
+      nsErrorType->getDeclaredType()->isExactSuperclassOf(t)) {
     return true;
   }
   
@@ -305,8 +328,7 @@ static bool isBridgedErrorClass(SILModule &M,
 }
 
 ExistentialRepresentation
-SILType::getPreferredExistentialRepresentation(SILModule &M,
-                                               Type containedType) const {
+SILType::getPreferredExistentialRepresentation(Type containedType) const {
   // Existential metatypes always use metatype representation.
   if (is<ExistentialMetatypeType>())
     return ExistentialRepresentation::Metatype;
@@ -320,7 +342,7 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
   if (layout.isErrorExistential()) {
     // NSError or CFError references can be adopted directly as Error
     // existentials.
-    if (isBridgedErrorClass(M, containedType)) {
+    if (isBridgedErrorClass(getASTContext(), containedType)) {
       return ExistentialRepresentation::Class;
     } else {
       return ExistentialRepresentation::Boxed;
@@ -337,8 +359,7 @@ SILType::getPreferredExistentialRepresentation(SILModule &M,
 }
 
 bool
-SILType::canUseExistentialRepresentation(SILModule &M,
-                                         ExistentialRepresentation repr,
+SILType::canUseExistentialRepresentation(ExistentialRepresentation repr,
                                          Type containedType) const {
   switch (repr) {
   case ExistentialRepresentation::None:
@@ -363,7 +384,7 @@ SILType::canUseExistentialRepresentation(SILModule &M,
     case ExistentialLayout::Kind::Error:
       return repr == ExistentialRepresentation::Boxed
         || (repr == ExistentialRepresentation::Class
-            && isBridgedErrorClass(M, containedType));
+            && isBridgedErrorClass(getASTContext(), containedType));
     case ExistentialLayout::Kind::Opaque:
       return repr == ExistentialRepresentation::Opaque;
     }
@@ -383,14 +404,15 @@ SILType SILType::mapTypeOutOfContext() const {
 }
 
 CanType
-SILBoxType::getFieldLoweredType(SILModule &M, unsigned index) const {
-  auto fieldTy = getLayout()->getFields()[index].getLoweredType();
+swift::getSILBoxFieldLoweredType(SILBoxType *type, TypeConverter &TC,
+                                 unsigned index) {
+  auto fieldTy = type->getLayout()->getFields()[index].getLoweredType();
   
   // Apply generic arguments if the layout is generic.
-  if (auto subMap = getSubstitutions()) {
-    auto sig = getLayout()->getGenericSignature();
+  if (auto subMap = type->getSubstitutions()) {
+    auto sig = type->getLayout()->getGenericSignature();
     return SILType::getPrimitiveObjectType(fieldTy)
-      .subst(M,
+      .subst(TC,
              QuerySubstitutionMap{subMap},
              LookUpConformanceInSubstitutionMap(subMap),
              sig)
