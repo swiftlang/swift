@@ -449,10 +449,7 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
     default:
       break;
     case BuiltinValueKind::AssertConf:
-      // Pretend that asserts are enabled during evaluation so that assertion
-      // failures during interpretation are caught and reported.
-      // Int32(0) - represents a debug assert configuration.
-      return SymbolicValue::getInteger(0, 32);
+      return SymbolicValue::getInteger(evaluator.getAssertConfig(), 32);
     }
   }
 
@@ -557,11 +554,12 @@ ConstExprFunctionState::computeConstantValueBuiltin(BuiltinInst *inst) {
       }
       return SymbolicValue::getInteger(result, evaluator.getAllocator());
     }
-    case BuiltinValueKind::PtrToInt: {
-      // This is operation is supported only for string constants. This is
-      // because this builtin is used by the initializer of StaticString which
-      // is used in preconditions and assertion failures. Supporting this
-      // enables the evaluator to handle assertion/precondition failures.
+    // The two following builtins are supported only for string constants. This
+    // is because this builtin is used by StaticString which is used in
+    // preconditions and assertion failures. Supporting this enables the
+    // evaluator to handle assertion/precondition failures.
+    case BuiltinValueKind::PtrToInt:
+    case BuiltinValueKind::IntToPtr: {
       if (operand.getKind() != SymbolicValue::String) {
         return getUnknown(evaluator, SILValue(inst),
                           UnknownReason::UnsupportedInstruction);
@@ -721,6 +719,19 @@ ConstExprFunctionState::computeOpaqueCallResult(ApplyInst *apply,
       UnknownReason::createCalleeImplementationUnknown(callee));
 }
 
+/// Given a symbolic value representing an instance of StaticString, look into
+/// the aggregate and extract the static string value stored inside it.
+static Optional<StringRef>
+extractStaticStringValue(SymbolicValue staticString) {
+  if (staticString.getKind() != SymbolicValue::Aggregate)
+    return None;
+  ArrayRef<SymbolicValue> staticStringProps = staticString.getAggregateValue();
+  if (staticStringProps.empty() ||
+      staticStringProps[0].getKind() != SymbolicValue::String)
+    return None;
+  return staticStringProps[0].getStringValue();
+}
+
 /// Given a call to a well known function, collect its arguments as constants,
 /// fold it, and return None.  If any of the arguments are not constants, marks
 /// the call's results as Unknown, and return an Unknown with information about
@@ -731,32 +742,32 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
   auto conventions = apply->getSubstCalleeConv();
   switch (callee) {
   case WellKnownFunction::AssertionFailure: {
-    // Extract the strings from the StaticString arguments and create a
-    // null-terminated assertion failure message.
     SmallString<4> message;
-    for (SILValue argument : apply->getArguments()) {
+    for (unsigned i = 0; i < apply->getNumArguments(); i++) {
+      SILValue argument = apply->getArgument(i);
       SymbolicValue argValue = getConstantValue(argument);
-      if (argValue.getKind() != SymbolicValue::Aggregate)
-        continue;
+      Optional<StringRef> stringOpt = extractStaticStringValue(argValue);
 
-      ArrayRef<SymbolicValue> staticStringProps = argValue.getAggregateValue();
-      if (staticStringProps.empty() ||
-          staticStringProps[0].getKind() != SymbolicValue::String)
+      // The first argument is a prefix that specifies the kind of failure
+      // this is.
+      if (i == 0) {
+        if (stringOpt) {
+          message += stringOpt.getValue();
+        } else {
+          // Use a generic prefix here, as the actual prefix is not a constant.
+          message += "assertion failed";
+        }
         continue;
+      }
 
-      message += staticStringProps[0].getStringValue();
-      message += ": ";
+      if (stringOpt) {
+        message += ": ";
+        message += stringOpt.getValue();
+      }
     }
-    if (message.empty())
-      message += "<unknown>";
-
-    size_t size = message.size();
-    char *messagePtr = evaluator.getAllocator().allocate<char>(size + 1);
-    std::uninitialized_copy(message.begin(), message.end(), messagePtr);
-    messagePtr[size] = '\0';
     return evaluator.getUnknown(
         (SILInstruction *)apply,
-        UnknownReason::createAssertionFailure(messagePtr, size));
+        UnknownReason::createTrap(message, evaluator.getAllocator()));
   }
   case WellKnownFunction::StringInitEmpty: { // String.init()
     assert(conventions.getNumDirectSILResults() == 1 &&
@@ -1399,13 +1410,17 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
   if (isa<DeallocStackInst>(inst))
     return None;
 
-  if (isa<CondFailInst>(inst)) {
+  if (CondFailInst *condFail = dyn_cast<CondFailInst>(inst)) {
     auto failed = getConstantValue(inst->getOperand(0));
     if (failed.getKind() == SymbolicValue::Integer) {
       if (failed.getIntegerValue() == 0)
         return None;
       // Conditional fail actually failed.
-      return getUnknown(evaluator, inst, UnknownReason::Trap);
+      return evaluator.getUnknown(
+          (SILInstruction *)inst,
+          UnknownReason::createTrap(
+              (Twine("trap: ") + condFail->getMessage()).str(),
+              evaluator.getAllocator()));
     }
   }
 
@@ -1649,8 +1664,8 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 //===----------------------------------------------------------------------===//
 
 ConstExprEvaluator::ConstExprEvaluator(SymbolicValueAllocator &alloc,
-                                       bool trackCallees)
-    : allocator(alloc), trackCallees(trackCallees) {}
+                                       unsigned assertConf, bool trackCallees)
+    : allocator(alloc), assertConfig(assertConf), trackCallees(trackCallees) {}
 
 ConstExprEvaluator::~ConstExprEvaluator() {}
 
@@ -1690,9 +1705,11 @@ void ConstExprEvaluator::computeConstantValues(
 
 ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
                                                SILFunction *fun,
+                                               unsigned assertConf,
                                                bool trackCallees)
-    : evaluator(alloc, trackCallees), internalState(new ConstExprFunctionState(
-                                          evaluator, fun, {}, stepsEvaluated)) {
+    : evaluator(alloc, assertConf, trackCallees),
+      internalState(
+          new ConstExprFunctionState(evaluator, fun, {}, stepsEvaluated)) {
   assert(fun);
 }
 
