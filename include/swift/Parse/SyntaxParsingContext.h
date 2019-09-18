@@ -300,7 +300,7 @@ public:
     return SyntaxNode(std::move(rawNode));
   }
 
-  ParsedTokenSyntax &&popToken();
+  ParsedTokenSyntax popToken();
 
   /// Create a node using the tail of the collected parts. The number of parts
   /// is automatically determined from \c Kind. Node: limited number of \c Kind
