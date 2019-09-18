@@ -490,8 +490,7 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
   if (!protocolConformance)
     return;
   
-  auto type = VD->getType();
-  if (!type->isEqual(DC->getSelfTypeInContext()))
+  if (!VD->getType()->isEqual(DC->getSelfTypeInContext()))
     return;
   
   auto PBD = VD->getParentPatternBinding();
@@ -506,20 +505,16 @@ static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
     if (!isa<ConstructorDecl>(ctor->getCalledValue())) continue;
     
     if (ctor->getNumArguments() != 1) continue;
-    auto argLabels = ctor->getArgumentLabels();
-    if (argLabels.front() != tc.Context.Id_rawValue) continue;
+    if (ctor->getArgumentLabels().front() != tc.Context.Id_rawValue) continue;
     
     auto *args = cast<TupleExpr>(ctor->getArg());
     auto intArg = dyn_cast<IntegerLiteralExpr>(args->getElement(0));
     if (!intArg) continue;
-    
-    auto val = intArg->getValue();
-    if (val != 0) continue;
+    if (intArg->getValue() != 0) continue;
     
     auto loc = VD->getLoc();
-    tc.diagnose(loc, diag::option_set_zero_constant, DescriptiveDeclKind::StaticProperty, VD->getName());
-    auto range = ctor->getArg()->getSourceRange();
-    tc.diagnose(loc, diag::option_set_empty_set_init).fixItReplace(range, "([])");
+    tc.diagnose(loc, diag::option_set_zero_constant, VD->getName());
+    tc.diagnose(loc, diag::option_set_empty_set_init).fixItReplace(args->getSourceRange(), "([])");
   }
 }
 
