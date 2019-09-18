@@ -30,7 +30,7 @@ namespace swift {
 class ParsedRawSyntaxRecorder;
 class SyntaxParsingContext;
 
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
 %   if node.is_buildable():
 %     child_count = len(node.children)
 class Parsed${node.name}Builder {
