@@ -38,7 +38,7 @@ class SILNode;
 class SymbolicValue;
 class SymbolicValueAllocator;
 class ConstExprFunctionState;
-enum class UnknownReason;
+class UnknownReason;
 
 /// This class is the main entrypoint for evaluating constant expressions.  It
 /// also handles caching of previously computed constexpr results.
@@ -162,8 +162,6 @@ public:
 
   Optional<SymbolicValue> lookupConstValue(SILValue value);
 
-  bool isKnownFunction(SILFunction *fun);
-
   /// Returns true if and only if `errorVal` denotes an error that requires
   /// aborting interpretation and returning the error. Skipping an instruction
   /// that produces such errors is not a valid behavior.
@@ -176,6 +174,8 @@ public:
   /// as an evaluation.
   unsigned instructionsEvaluatedByLastEvaluation() { return stepsEvaluated; }
 };
+
+bool isKnownConstantEvaluableFunction(SILFunction *fun);
 
 } // end namespace swift
 #endif
