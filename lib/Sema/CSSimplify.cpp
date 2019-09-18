@@ -590,7 +590,14 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
-      listener.missingArgument(paramIdx);
+      if (potentiallyOutOfOrder)
+        return true;
+
+      if (auto newArgIdx = listener.missingArgument(paramIdx)) {
+        parameterBindings[paramIdx].push_back(*newArgIdx);
+        continue;
+      }
+
       return true;
     }
   }
@@ -790,19 +797,57 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
-  ArrayRef<AnyFunctionType::Param> Arguments;
+  SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
+  unsigned NumSynthesizedArgs = 0;
+
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
-                         ArrayRef<AnyFunctionType::Param> args,
+                         SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
                          SmallVectorImpl<ParamBinding> &bindings,
                          ConstraintLocatorBuilder locator)
       : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
         Locator(locator) {}
+
+  ~ArgumentFailureTracker() override {
+    if (NumSynthesizedArgs > 0) {
+      ArrayRef<AnyFunctionType::Param> argRef(Arguments);
+
+      auto *fix =
+          AddMissingArguments::create(CS, argRef.take_back(NumSynthesizedArgs),
+                                      CS.getConstraintLocator(Locator));
+
+      // Not having an argument is the same impact as having a type mismatch.
+      (void)CS.recordFix(fix, /*impact=*/NumSynthesizedArgs * 2);
+    }
+  }
+
+  Optional<unsigned> missingArgument(unsigned paramIdx) override {
+    if (!CS.shouldAttemptFixes())
+      return None;
+
+    const auto &param = Parameters[paramIdx];
+
+    unsigned newArgIdx = Arguments.size();
+    auto argLoc =
+        Locator
+            .withPathElement(
+                LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx))
+            .withPathElement(LocatorPathElt::SynthesizedArgument(newArgIdx));
+
+    auto *argType = CS.createTypeVariable(
+        CS.getConstraintLocator(argLoc),
+        TVO_CanBindToInOut | TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+
+    Arguments.push_back(param.withType(argType));
+    ++NumSynthesizedArgs;
+
+    return newArgIdx;
+  }
 
   bool missingLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
@@ -883,19 +928,19 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
-  ArgumentFailureTracker listener(cs, argsWithLabels, params, parameterBindings,
-                                  locator);
-  if (constraints::matchCallArguments(argsWithLabels, params,
-                                      paramInfo,
-                                      hasTrailingClosure,
-                                      cs.shouldAttemptFixes(), listener,
-                                      parameterBindings)) {
-    if (!cs.shouldAttemptFixes())
-      return cs.getTypeMatchFailure(locator);
+  {
+    ArgumentFailureTracker listener(cs, argsWithLabels, params,
+                                    parameterBindings, locator);
+    if (constraints::matchCallArguments(
+            argsWithLabels, params, paramInfo, hasTrailingClosure,
+            cs.shouldAttemptFixes(), listener, parameterBindings)) {
+      if (!cs.shouldAttemptFixes())
+        return cs.getTypeMatchFailure(locator);
 
-    if (AllowTupleSplatForSingleParameter::attempt(cs, argsWithLabels, params,
-                                                   parameterBindings, locator))
-      return cs.getTypeMatchFailure(locator);
+      if (AllowTupleSplatForSingleParameter::attempt(
+              cs, argsWithLabels, params, parameterBindings, locator))
+        return cs.getTypeMatchFailure(locator);
+    }
   }
 
   // If this application is part of an operator, then we allow an implicit
@@ -903,6 +948,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   // assignment operators.
   auto *anchor = locator.getAnchor();
   assert(anchor && "locator without anchor expression?");
+
+  auto isSynthesizedArgument = [](const AnyFunctionType::Param &arg) -> bool {
+    if (auto *typeVar = arg.getPlainType()->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      return locator->isLastElement(ConstraintLocator::SynthesizedArgument);
+    }
+
+    return false;
+  };
 
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
@@ -918,10 +972,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
           argIdx, paramIdx, param.getParameterFlags()));
-      auto argTy = argsWithLabels[argIdx].getOldType();
+      const auto &argument = argsWithLabels[argIdx];
+      auto argTy = argument.getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
-      if (param.isAutoClosure()) {
+      if (param.isAutoClosure() && !isSynthesizedArgument(argument)) {
         auto &ctx = cs.getASTContext();
         auto *fnType = paramTy->castTo<FunctionType>();
         auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
@@ -960,7 +1015,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // If argument comes for declaration it should loose
       // `@autoclosure` flag, because in context it's used
       // as a function type represented by autoclosure.
-      assert(!argsWithLabels[argIdx].isAutoClosure());
+      //
+      // Special case here are synthesized arguments because
+      // they mirror parameter flags to ease diagnosis.
+      assert(!argsWithLabels[argIdx].isAutoClosure() ||
+             isSynthesizedArgument(argument));
 
       cs.addConstraint(
           subKind, argTy, paramTy,
