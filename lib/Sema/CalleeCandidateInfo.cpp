@@ -284,8 +284,9 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     void extraArgument(unsigned argIdx) override {
       result = CC_ArgumentCountMismatch;
     }
-    void missingArgument(unsigned paramIdx) override {
+    Optional<unsigned> missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
+      return None;
     }
     bool missingLabel(unsigned paramIdx) override {
       result = CC_ArgumentLabelMismatch;

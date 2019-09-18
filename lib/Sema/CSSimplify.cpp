@@ -36,7 +36,10 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
 
-void MatchCallArgumentListener::missingArgument(unsigned paramIdx) { }
+Optional<unsigned>
+MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
+  return None;
+}
 
 bool MatchCallArgumentListener::missingLabel(unsigned paramIdx) { return true; }
 bool MatchCallArgumentListener::extraneousLabel(unsigned paramIdx) {

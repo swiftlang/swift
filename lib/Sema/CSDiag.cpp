@@ -2211,7 +2211,7 @@ public:
     Diagnosed = true;
   }
 
-  void missingArgument(unsigned missingParamIdx) override {
+  Optional<unsigned> missingArgument(unsigned missingParamIdx) override {
     auto &param = Parameters[missingParamIdx];
     Identifier name = param.getLabel();
 
@@ -2341,6 +2341,7 @@ public:
                   candidate.getDecl()->getFullName());
 
     Diagnosed = true;
+    return None;
   }
 
   bool isPropertyWrapperImplicitInit() {
