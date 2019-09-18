@@ -287,7 +287,7 @@ public:
     auto iter = ArgInstMap.find(arg);
     if (iter == ArgInstMap.end())
       return false;
-    return iter->second.foundSomeButNotAllReleases();
+    return iter->second.getPartiallyPostDomReleases().hasValue();
   }
 
   bool isSingleRelease(SILArgument *arg) const {
@@ -330,6 +330,17 @@ public:
     if (!completeList)
       return {};
     return completeList.getValue();
+  }
+
+  Optional<ArrayRef<SILInstruction *>>
+  getPartiallyPostDomReleaseSet(SILArgument *arg) const {
+    auto iter = ArgInstMap.find(arg);
+    if (iter == ArgInstMap.end())
+      return None;
+    auto partialList = iter->second.getPartiallyPostDomReleases();
+    if (!partialList)
+      return None;
+    return partialList;
   }
 
   ArrayRef<SILInstruction *> getReleasesForArgument(SILValue value) const {

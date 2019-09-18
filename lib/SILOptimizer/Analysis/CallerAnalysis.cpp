@@ -33,7 +33,8 @@ CallerAnalysis::FunctionInfo::FunctionInfo(SILFunction *f)
       // TODO: Make this more aggressive by considering
       // final/visibility/etc.
       mayHaveIndirectCallers(f->getDynamicallyReplacedFunction() ||
-                             canBeCalledIndirectly(f->getRepresentation())) {}
+                             canBeCalledIndirectly(f->getRepresentation())),
+      mayHaveExternalCallers(hasPublicVisibility(f->getLinkage())) {}
 
 //===----------------------------------------------------------------------===//
 //                   CallerAnalysis::ApplySiteFinderVisitor

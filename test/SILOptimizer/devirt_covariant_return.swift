@@ -176,12 +176,11 @@ final class C2:C {
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
-// CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver1ys5Int32VAA2C1CF
-// CHECK: integer_literal $Builtin.Int32, 2
-// CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
-// CHECK-NOT: class_method
-// CHECK-NOT: function_ref
-// CHECK: return
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @$s23devirt_covariant_return7driver1ys5Int32VAA2C1CF
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s23devirt_covariant_return7driver1ys5Int32VAA2C1CFTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s23devirt_covariant_return7driver1ys5Int32VAA2C1CF'
 @inline(never)
 func driver1(_ c: C1) -> Int32 {
   return c.doSomething().getValue()
@@ -348,3 +347,13 @@ public class H: F {
     return nil
   }
 }
+
+
+// CHECK-LABEL: sil shared [noinline] @$s23devirt_covariant_return7driver1ys5Int32VAA2C1CFTf4d_n
+// CHECK: integer_literal $Builtin.Int32, 2
+// CHECK: struct $Int32 (%{{.*}} : $Builtin.Int32)
+// CHECK-NOT: class_method
+// CHECK-NOT: function_ref
+// CHECK: return
+// CHECK-LABEL: } // end sil function '$s23devirt_covariant_return7driver1ys5Int32VAA2C1CFTf4d_n'
+
