@@ -33,7 +33,7 @@ namespace swift {
 /// to transformation.
 struct ExistentialTransformArgumentDescriptor {
   OpenedExistentialAccess AccessType;
-  bool DestroyAddrUse;
+  bool isConsumed;
 };
 
 /// ExistentialTransform creates a protocol constrained generic and a thunk.
@@ -65,7 +65,9 @@ class ExistentialTransform {
 
   /// Create new generic arguments from existential arguments.
   void
-  convertExistentialArgTypesToGenericArgTypes(GenericSignatureBuilder &Builder);
+  convertExistentialArgTypesToGenericArgTypes(
+      SmallVectorImpl<GenericTypeParamType *> &genericParams,
+      SmallVectorImpl<Requirement> &requirements);
 
   /// Create a name for the inner function.
   std::string createExistentialSpecializedFunctionName();

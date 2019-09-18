@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
-#define SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
+#ifndef SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H
+#define SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H
 
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILInstruction.h"
@@ -452,4 +452,4 @@ public:
 
 } // end namespace swift
 
-#endif // SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H_
+#endif // SWIFT_SILOPTIMIZER_ANALYSIS_SIDEEFFECTANALYSIS_H

@@ -90,53 +90,6 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
   }
 }
 
-ArrayRef<Identifier>
-OverloadCandidate::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) {
-  scratch.clear();
-  if (auto decl = getDecl()) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (func->hasImplicitSelfDecl()) {
-        if (!skipCurriedSelf) {
-          scratch.push_back(Identifier());
-          return scratch;
-        }
-
-        skipCurriedSelf = false;
-      }
-
-      if (!skipCurriedSelf) {
-        // Retrieve the argument labels of the corresponding parameter list.
-        for (auto param : *func->getParameters()) {
-          scratch.push_back(param->getArgumentName());
-        }
-        return scratch;
-      }
-    } else if (auto enumElt = dyn_cast<EnumElementDecl>(decl)) {
-      // 'self'
-      if (!skipCurriedSelf) {
-        scratch.push_back(Identifier());
-        return scratch;
-      }
-      
-      // The associated data of the case.
-      auto *paramList = enumElt->getParameterList();
-      if (!paramList) return { };
-      for (auto param : *paramList) {
-        scratch.push_back(param->getArgumentName());
-      }
-      return scratch;
-    }
-  }
-
-  if (!hasParameters())
-    return {};
-
-  for (const auto &param : getParameters())
-    scratch.push_back(param.getLabel());
-
-  return scratch;
-}
-
 void OverloadCandidate::dump() const {
   if (auto decl = getDecl())
     decl->dumpRef(llvm::errs());
@@ -320,9 +273,8 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     return {CC_GeneralMismatch, {}};
 
   auto candArgs = candidate.getParameters();
-  SmallBitVector candDefaultMap =
-    computeDefaultMap(candArgs, candidate.getDecl(), candidate.skipCurriedSelf);
-  
+  auto candParamInfo = candidate.getParameterListInfo(candArgs);
+
   struct OurListener : public MatchCallArgumentListener {
     CandidateCloseness result = CC_ExactMatch;
   public:
@@ -356,7 +308,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
       return true;
     }
     bool trailingClosureMismatch(unsigned paramIdx, unsigned argIdx) override {
-      result = CC_ArgumentMismatch;
+      result = CC_ArgumentCountMismatch;
       return true;
     }
   } listener;
@@ -366,7 +318,7 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
   // types of the arguments, looking only at the argument labels etc.
   SmallVector<ParamBinding, 4> paramBindings;
   if (matchCallArguments(actualArgs, candArgs,
-                         candDefaultMap,
+                         candParamInfo,
                          hasTrailingClosure,
                          /*allowFixes:*/ true,
                          listener, paramBindings))
@@ -638,8 +590,8 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     
     // TODO: figure out right value for isKnownPrivate
     if (instanceType->mayHaveMembers()) {
-      auto ctors = CS.TC.lookupConstructors(
-                                            CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
+      auto ctors = TypeChecker::lookupConstructors(
+          CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
         if (!ctor.getValueDecl()->hasInterfaceType())
           CS.getTypeChecker().validateDeclForNameLookup(ctor.getValueDecl());
@@ -749,8 +701,10 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
     // initializing, provide it.
     if (UDE->getName().getBaseName() == DeclBaseName::createConstructor()) {
       auto selfTy = CS.getType(UDE->getBase())->getWithoutSpecifierType();
+      if (auto *dynamicSelfTy = selfTy->getAs<DynamicSelfType>())
+        selfTy = dynamicSelfTy->getSelfType();
       if (!selfTy->hasTypeVariable())
-        declName = selfTy->eraseDynamicSelfType().getString() + "." + declName;
+        declName = selfTy.getString() + "." + declName;
     }
     
     // Otherwise, look for a disjunction constraint explaining what the set is.
@@ -983,127 +937,6 @@ suggestPotentialOverloads(SourceLoc loc, bool isResult) {
     CS.TC.diagnose(loc, diag::suggest_partial_overloads, isResult, declName,
                    suggestionText);
   }
-}
-
-/// If the candidate set has been narrowed to a single parameter or single
-/// archetype that has argument type errors, diagnose that error and
-/// return true.
-bool CalleeCandidateInfo::diagnoseGenericParameterErrors(Expr *badArgExpr) {
-  TypeChecker &TC = CS.TC;
-  Type argType = CS.getType(badArgExpr);
-  
-  // FIXME: For protocol argument types, could add specific error
-  // similar to could_not_use_member_on_existential.
-  if (argType->hasTypeVariable() || argType->is<ProtocolType>() ||
-      argType->is<ProtocolCompositionType>())
-    return false;
-  
-  bool foundFailure = false;
-  TypeSubstitutionMap archetypesMap;
-  
-  if (!findGenericSubstitutions(failedArgument.declContext,
-                                failedArgument.parameterType,
-                                argType, archetypesMap))
-    return false;
-  
-  auto getGenericTypeDecl = [&](ArchetypeType *archetype) -> ValueDecl * {
-    auto paramType = archetype->getInterfaceType();
-    
-    if (auto *GTPT = paramType->getAs<GenericTypeParamType>())
-      return GTPT->getDecl();
-    
-    if (auto *DMT = paramType->getAs<DependentMemberType>())
-      return DMT->getAssocType();
-    
-    return nullptr;
-  };
-  
-  auto describeGenericType = [&](ValueDecl *genericParam,
-                                 bool includeName = false) -> std::string {
-    if (!genericParam)
-      return "";
-    
-    Decl *parent = nullptr;
-    if (auto *AT = dyn_cast<AssociatedTypeDecl>(genericParam)) {
-      parent = AT->getProtocol();
-    } else {
-      auto *dc = genericParam->getDeclContext();
-      parent = dc->getInnermostDeclarationDeclContext();
-    }
-    
-    if (!parent)
-      return "";
-    
-    llvm::SmallString<64> result;
-    llvm::raw_svector_ostream OS(result);
-    
-    OS << Decl::getDescriptiveKindName(genericParam->getDescriptiveKind());
-    
-    if (includeName && genericParam->hasName())
-      OS << " '" << genericParam->getBaseName() << "'";
-    
-    OS << " of ";
-    OS << Decl::getDescriptiveKindName(parent->getDescriptiveKind());
-    if (auto *decl = dyn_cast<ValueDecl>(parent)) {
-      if (decl->hasName())
-        OS << " '" << decl->getFullName() << "'";
-    }
-    
-    return OS.str();
-  };
-  
-  for (auto pair : archetypesMap) {
-    auto paramArchetype = pair.first->castTo<ArchetypeType>();
-    auto substitution = pair.second;
-    
-    // FIXME: Add specific error for not subclass, if the archetype has a superclass?
-    
-    for (auto proto : paramArchetype->getConformsTo()) {
-      if (!CS.TC.conformsToProtocol(substitution, proto, CS.DC,
-                                    ConformanceCheckFlags::InExpression)) {
-        if (substitution->isEqual(argType)) {
-          CS.TC.diagnose(badArgExpr->getLoc(),
-                         diag::cannot_convert_argument_value_protocol,
-                         substitution, proto->getDeclaredType());
-        } else {
-          CS.TC.diagnose(badArgExpr->getLoc(),
-                         diag::cannot_convert_partial_argument_value_protocol,
-                         argType, substitution, proto->getDeclaredType());
-        }
-        foundFailure = true;
-        break;
-      }
-    }
-    
-    if (auto *argArchetype = substitution->getAs<ArchetypeType>()) {
-      // Produce this diagnostic only if the names
-      // of the generic parameters are the same.
-      if (argArchetype->getName() != paramArchetype->getName())
-        continue;
-      
-      auto *paramDecl = getGenericTypeDecl(paramArchetype);
-      auto *argDecl = getGenericTypeDecl(argArchetype);
-      
-      if (!paramDecl || !argDecl)
-        continue;
-      
-      TC.diagnose(badArgExpr->getLoc(),
-                  diag::cannot_convert_argument_value_generic, argArchetype,
-                  describeGenericType(argDecl), paramArchetype,
-                  describeGenericType(paramDecl));
-      
-      TC.diagnose(paramDecl, diag::descriptive_generic_type_declared_here,
-                  describeGenericType(paramDecl, true));
-      
-      TC.diagnose(argDecl, diag::descriptive_generic_type_declared_here,
-                  describeGenericType(argDecl, true));
-      
-      foundFailure = true;
-      break;
-    }
-  }
-  
-  return foundFailure;
 }
 
 /// Emit a diagnostic and return true if this is an error condition we can

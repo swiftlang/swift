@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1 -solver-disable-shrink -disable-constraint-solver-performance-hacks -solver-enable-operator-designated-types
+// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 // REQUIRES: rdar48061151

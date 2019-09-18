@@ -21,6 +21,7 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILArgument.h"
@@ -573,9 +574,11 @@ void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
   assert(!isUsed() && "r-value already used");
+  SWIFT_DEFER {
+    makeUsed();
+  };
 
   if (isInContext()) {
-    makeUsed();
     return ManagedValue::forInContext();
   }
 
@@ -583,9 +586,7 @@ ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
   // tuple.
   if (!isa<TupleType>(type)) {
     assert(values.size() == 1 && "exploded non-tuple?!");
-    ManagedValue result = values[0];
-    makeUsed();
-    return result;
+    return values[0];
   }
 
   // *NOTE* Inside implodeTupleValues, we copy our values if they are not at +1.

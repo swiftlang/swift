@@ -106,9 +106,6 @@ class CircularityChecker {
   /// The maximum circularity depth.
   unsigned MaxDepth;
 
-  /// Whether we encountered an unchecked declaration.
-  bool RequireDelayedChecking = false;
-
   llvm::DenseMap<CanType, TrackingInfo> TrackingMap;
   SmallVector<WorkItem, 8> Workstack;
 
@@ -202,12 +199,6 @@ void CircularityChecker::run() {
       return;
     }
   }
-
-  // If we didn't report an error, but we encountered a property that
-  // hadn't been type-checked, queue the type for delayed checking.
-  if (RequireDelayedChecking) {
-    TC.DelayedCircularityChecks.push_back(OriginalDecl);
-  }
 }
 
 /// Visit a type and try to expand it one level.
@@ -254,15 +245,17 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
                                       unsigned depth) {
   startExpandingType(type);
 
+  auto subMap = type->getContextSubstitutionMap(
+      S->getModuleContext(), S);
+
   for (auto field: S->getStoredProperties()) {
-    // Ignore unchecked fields, but flag that we'll need more checking later.
     if (!field->hasInterfaceType()) {
-      RequireDelayedChecking = true;
-      continue;
+      TC.validateDecl(field);
+      if (!field->hasInterfaceType())
+        continue;
     }
 
-    auto fieldType =
-      type->getTypeOfMember(S->getModuleContext(), field, nullptr);
+    auto fieldType =field->getInterfaceType().subst(subMap);
     if (addMember(type, field, fieldType, depth))
       return true;
   }
@@ -282,25 +275,24 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
 
   startExpandingType(type);
 
-  for (auto elt: E->getAllElements()) {
-    // Ignore unchecked elements, but flag that we'll need more checking later.
-    if (!elt->hasInterfaceType()) {
-      RequireDelayedChecking = true;
-      continue;
-    }
+  auto subMap = type->getContextSubstitutionMap(
+      E->getModuleContext(), E);
 
+  for (auto elt: E->getAllElements()) {
     // Indirect elements are representational leaves.
     if (elt->isIndirect())
       continue;
 
-    // Ignore elements with no payload.
-    auto eltIfaceType = elt->getArgumentInterfaceType();
-    if (!eltIfaceType)
+    if (!elt->hasAssociatedValues())
       continue;
 
-    auto eltType =
-      type->getTypeOfMember(E->getModuleContext(), elt, eltIfaceType);
+    if (!elt->hasInterfaceType()) {
+      TC.validateDecl(elt);
+      if (!elt->hasInterfaceType())
+        continue;
+    }
 
+    auto eltType = elt->getArgumentInterfaceType().subst(subMap);
     if (addMember(type, elt, eltType, depth))
       return true;
   }
@@ -621,14 +613,20 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
     }
     return false;
   };
-  auto isNonWellFounded = [containsType, E]() -> bool {
+
+  auto isNonWellFounded = [&]() -> bool {
     auto elts = E->getAllElements();
     if (elts.empty())
       return false;
 
     for (auto elt: elts) {
-      if (!elt->hasInterfaceType() ||
-          !(elt->isIndirect() || E->isIndirect()))
+      if (!elt->hasInterfaceType()) {
+        TC.validateDecl(elt);
+        if (!elt->hasInterfaceType())
+          return false;
+      }
+
+      if (!elt->isIndirect() && !E->isIndirect())
         return false;
 
       auto argTy = elt->getArgumentInterfaceType();

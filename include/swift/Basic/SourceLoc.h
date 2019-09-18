@@ -78,6 +78,14 @@ public:
   }
 
   void dump(const SourceManager &SM) const;
+
+	friend size_t hash_value(SourceLoc loc) {
+		return reinterpret_cast<uintptr_t>(loc.getOpaquePointerValue());
+	}
+
+	friend void simple_display(raw_ostream &OS, const SourceLoc &loc) {
+		// Nothing meaningful to print.
+	}
 };
 
 /// SourceRange in swift is a pair of locations.  However, note that the end

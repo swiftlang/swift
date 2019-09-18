@@ -12,6 +12,8 @@
 
 import abc
 
+from .. import cmake
+
 
 class Product(object):
     @classmethod
@@ -54,12 +56,19 @@ class Product(object):
         """
         raise NotImplementedError
 
+    def install(self, host_target):
+        """install() -> void
+
+        Install to the toolchain, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args
         self.toolchain = toolchain
         self.source_dir = source_dir
         self.build_dir = build_dir
-        self.cmake_options = []
+        self.cmake_options = cmake.CMakeOptions()
 
 
 class ProductBuilder(object):

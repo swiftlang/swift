@@ -223,6 +223,7 @@ class ModuleDepGraph {
     ModuleDepGraphNode *nodeActuallyErased = nodeMap.findAndErase(
         nodeToErase->getSwiftDeps().getValueOr(std::string()),
         nodeToErase->getKey());
+    (void)nodeActuallyErased;
     assert(
         nodeToErase == nodeActuallyErased ||
         mapCorruption("Node found from key must be same as node holding key."));
@@ -468,4 +469,4 @@ private:
 } // namespace experimental_dependencies
 } // namespace swift
 
-#endif /* ExperimentalDependencyGraph_h */
+#endif // ExperimentalDependencyGraph_h

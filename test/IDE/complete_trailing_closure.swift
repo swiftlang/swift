@@ -56,6 +56,7 @@ func test1() {
 struct S {
   func method1(_: ()->()) {}
   static func method2(_: ()->()) {}
+  static func method3(_ a: Int = 0, _: ()->()) {}
   func nonTrivial1(_: (Int)->()) {}
   func nonTrivial2(_: @autoclosure ()->()) {}
   func test2() {
@@ -81,6 +82,7 @@ func test5() {
 }
 // STATIC_METHOD_1-NOT: {|}
 // STATIC_METHOD_1: Decl[StaticMethod]/CurrNominal:     method2 {|}[#Void#]
+// STATIC_METHOD_1: Decl[StaticMethod]/CurrNominal:     method3 {|}[#Void#]
 // STATIC_METHOD_1-NOT: {|}
 
 class C {

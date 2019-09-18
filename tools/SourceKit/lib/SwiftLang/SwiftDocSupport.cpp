@@ -241,10 +241,12 @@ public:
     deinitDefaultMapToUse(D);
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     unsigned StartOffset = OS.tell();
     References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 };
 
@@ -969,6 +971,7 @@ static bool reportModuleDocInfo(CompilerInvocation Invocation,
     return true;
 
   ASTContext &Ctx = CI.getASTContext();
+  registerIDERequestFunctions(Ctx.evaluator);
   (void)createTypeChecker(Ctx);
 
   SourceTextInfo IFaceInfo;
@@ -1345,7 +1348,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken);
+  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
+                                   llvm::vfs::getRealFileSystem());
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(

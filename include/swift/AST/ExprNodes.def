@@ -191,6 +191,7 @@ EXPR(EditorPlaceholder, Expr)
 EXPR(ObjCSelector, Expr)
 EXPR(KeyPath, Expr)
 UNCHECKED_EXPR(KeyPathDot, Expr)
+UNCHECKED_EXPR(OneWay, Expr)
 EXPR(Tap, Expr)
 LAST_EXPR(Tap)
 

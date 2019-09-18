@@ -125,4 +125,4 @@ raw_ostream &operator<<(raw_ostream &OS, SILPrintContext::ID i);
 
 } // end namespace swift
 
-#endif /* SWIFT_SIL_PRINTCONTEXT_H */
+#endif // SWIFT_SIL_PRINTCONTEXT_H

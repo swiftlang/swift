@@ -1,9 +1,6 @@
 // RUN: %target-resilience-test
 // REQUIRES: executable_test
 
-// Use swift-version 4.
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 // Check for the 'rth' tool itself, to make sure it's doing what we expect.
 
 import rth
@@ -15,8 +12,11 @@ let clientIsAfter = true
 #endif
 
 let execPath = CommandLine.arguments.first!
-// FIXME: Don't hardcode "/" here.
+#if os(Windows)
+let execName = execPath.split(separator: "\\").last!
+#else
 let execName = execPath.split(separator: "/").last!
+#endif
 switch execName {
 case "after_after":
   precondition(clientIsAfter)

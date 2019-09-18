@@ -97,6 +97,12 @@ protected:
     if (F->isPossiblyUsedExternally())
       return true;
 
+    if (F->getDynamicallyReplacedFunction())
+      return true;
+
+    if (F->isDynamicallyReplaceable())
+      return true;
+
     // ObjC functions are called through the runtime and are therefore alive
     // even if not referenced inside SIL.
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
@@ -350,11 +356,11 @@ protected:
           MethodInfo *mi = getMethodInfo(funcDecl, /*isWitnessTable*/ false);
           ensureAliveClassMethod(mi, dyn_cast<FuncDecl>(funcDecl), MethodCl);
         } else if (auto *FRI = dyn_cast<FunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *FRI = dyn_cast<DynamicFunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *FRI = dyn_cast<PreviousDynamicFunctionRefInst>(&I)) {
-          ensureAlive(FRI->getReferencedFunction());
+          ensureAlive(FRI->getInitiallyReferencedFunction());
         } else if (auto *KPI = dyn_cast<KeyPathInst>(&I)) {
           for (auto &component : KPI->getPattern()->getComponents())
             ensureKeyPathComponentIsAlive(component);
@@ -529,13 +535,10 @@ class DeadFunctionElimination : FunctionLivenessComputation {
         SILFunction *F = entry.Implementation;
         auto *fd = getBase(cast<AbstractFunctionDecl>(entry.Method.getDecl()));
 
-        if (// A conservative approach: if any of the overridden functions is
-            // visible externally, we mark the whole method as alive.
-            isPossiblyUsedExternally(entry.Linkage, Module->isWholeModule())
-            // We also have to check the method declaration's access level.
+        if (// We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
-            || isVisibleExternally(fd)
+            isVisibleExternally(fd)
             // Declarations are always accessible externally, so they are alive.
             || !F->isDefinition()) {
           MethodInfo *mi = getMethodInfo(fd, /*isWitnessTable*/ false);

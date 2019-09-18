@@ -36,6 +36,10 @@ protocol FakeProtocol {
   func requirement()
 }
 
+struct MyInt {
+  var value: Builtin.Int32
+}
+
 sil [global_init] @global_init_fun : $@convention(thin) () -> Builtin.RawPointer
 
 sil @user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
@@ -622,7 +626,7 @@ sil @test_closure : $@convention(thin) (@guaranteed C) -> ()
 // CHECK-NOT:  strong_release
 // CHECK:      bb2:
 // CHECK-NEXT:   strong_release %0
-// CHECK         return
+// CHECK:         return
 sil @dead_closure_elimination : $@convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %1 = function_ref @test_closure : $@convention(thin) (@guaranteed C) -> ()
@@ -3722,4 +3726,27 @@ bb0(%2 : $TestObjCInit):
   %14 = apply %13(%12) : $@convention(objc_method) (@owned TestObjCInit) -> @owned TestObjCInit
   %19 = enum $Optional<TestObjCInit>, #Optional.some!enumelt.1, %14 : $TestObjCInit
   return %19 : $Optional<TestObjCInit>
+}
+
+// CHECK-LABEL: sil @isConcrete_true : $@convention(thin) (@thin MyInt.Type) -> Builtin.Int1 {
+// CHECK:       bb0(%0 : $@thin MyInt.Type):
+// CHECK:         [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[RESULT]]
+// CHECK:       } // end sil function 'isConcrete_true'
+sil @isConcrete_true : $@convention(thin) (@thin MyInt.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin MyInt.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin MyInt.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+// CHECK:       bb0(%0 : $@thin T.Type):
+// CHECK:         [[RESULT:%.*]] = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+// CHECK:         return [[RESULT]]
+// CHECK:       } // end sil function 'isConcrete_false'
+sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  // FIXME: Explicit specialization is required here when it shouldn't be
+  %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
 }

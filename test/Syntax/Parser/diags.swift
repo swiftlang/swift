@@ -25,4 +25,10 @@ if (5 ‒ 5) == 0 {}
 // CHECK-NEXT: ([[@LINE-4]]:7,[[@LINE-4]]:10) Fixit: "-"
 // CHECK-NEXT: [[@LINE-5]]:11 Error: expected ',' separator
 // CHECK-NEXT: ([[@LINE-6]]:6,[[@LINE-6]]:6) Fixit: ","
+
+let dateFormatter: DateFormatter = {
+    let dateFormatter = DateFormatter()
+    return dateFormatter
+}()
+
 // CHECK-NEXT: 7 error(s) 0 warnings(s) 2 note(s)

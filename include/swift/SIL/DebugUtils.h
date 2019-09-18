@@ -212,4 +212,4 @@ bool hasNonTrivialNonDebugTransitiveUsers(
 
 } // end namespace swift
 
-#endif /* SWIFT_SIL_DEBUGUTILS_H */
+#endif // SWIFT_SIL_DEBUGUTILS_H

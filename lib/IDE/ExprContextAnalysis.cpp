@@ -57,14 +57,15 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::Initializer:
     if (auto *patternInit = dyn_cast<PatternBindingInitializer>(DC)) {
-      auto *PBD = patternInit->getBinding();
-      auto i = patternInit->getBindingIndex();
-      if (PBD->getInit(i)) {
-        PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-          typeCheckCompletionDecl(VD);
-        });
-        if (!PBD->isInitializerChecked(i))
-          typeCheckPatternBinding(PBD, i);
+      if (auto *PBD = patternInit->getBinding()) {
+        auto i = patternInit->getBindingIndex();
+        if (PBD->getInit(i)) {
+          PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
+            typeCheckCompletionDecl(VD);
+          });
+          if (!PBD->isInitializerChecked(i))
+            typeCheckPatternBinding(PBD, i);
+        }
       }
     }
     break;
@@ -272,9 +273,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  auto resolver = DC.getASTContext().getLazyResolver();
   if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
-                          NL_QualifiedDefault | NL_ProtocolMembers, resolver,
+                          NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
 
@@ -284,10 +284,14 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
-    resolver->resolveDeclSignature(VD);
-    if (!VD->hasInterfaceType())
-      continue;
+    if (!VD->hasInterfaceType()) {
+      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
+      if (!VD->hasInterfaceType())
+        continue;
+    }
     Type declaredMemberType = VD->getInterfaceType();
+    if (!declaredMemberType->is<AnyFunctionType>())
+      continue;
     if (VD->getDeclContext()->isTypeContext()) {
       if (isa<FuncDecl>(VD)) {
         if (!isOnMetaType && VD->isStatic())
@@ -306,9 +310,10 @@ static void collectPossibleCalleesByQualifiedLookup(
       }
     }
 
-    auto fnType = baseTy->getMetatypeInstanceType()->getTypeOfMember(
-        DC.getParentModule(), VD, declaredMemberType);
-
+    auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
+        DC.getParentModule(), VD,
+        VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
+    auto fnType = declaredMemberType.subst(subs);
     if (!fnType)
       continue;
 
@@ -352,28 +357,38 @@ static bool collectPossibleCalleesForApply(
   auto *fnExpr = callExpr->getFn();
 
   if (auto type = fnExpr->getType()) {
-    if (auto *funcType = type->getAs<AnyFunctionType>()) {
-      auto refDecl = fnExpr->getReferencedDecl();
-      if (!refDecl)
-        if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
-          refDecl = apply->getFn()->getReferencedDecl();
-      candidates.emplace_back(funcType, refDecl.getDecl());
+    if (!type->hasUnresolvedType() && !type->hasError()) {
+      if (auto *funcType = type->getAs<AnyFunctionType>()) {
+        auto refDecl = fnExpr->getReferencedDecl();
+        if (!refDecl)
+          if (auto apply = dyn_cast<ApplyExpr>(fnExpr))
+            refDecl = apply->getFn()->getReferencedDecl();
+        candidates.emplace_back(funcType, refDecl.getDecl());
+        return true;
+      }
     }
-  } else if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     if (auto *decl = DRE->getDecl()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *OSRE = dyn_cast<OverloadSetRefExpr>(fnExpr)) {
     for (auto *decl : OSRE->getDecls()) {
-      auto declType = decl->getInterfaceType();
-      if (auto *funcType = declType->getAs<AnyFunctionType>())
-        candidates.emplace_back(funcType, decl);
+      if (decl->hasInterfaceType())
+        if (auto *funcType = decl->getInterfaceType()->getAs<AnyFunctionType>())
+          candidates.emplace_back(funcType, decl);
     }
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+  } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+    collectPossibleCalleesByQualifiedLookup(
+        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+    }
   }
 
   if (candidates.empty()) {
@@ -576,6 +591,15 @@ class ExprContextAnalyzer {
     case ExprKind::Array: {
       if (auto type = ParsedExpr->getType()) {
         recordPossibleType(type);
+        break;
+      }
+
+      // Check context types of the array literal expression.
+      ExprContextInfo arrayCtxtInfo(DC, Parent);
+      for (auto arrayT : arrayCtxtInfo.getPossibleTypes()) {
+        if (auto boundGenericT = arrayT->getAs<BoundGenericType>())
+          if (boundGenericT->getDecl() == Context.getArrayDecl())
+            recordPossibleType(boundGenericT->getGenericArgs()[0]);
       }
       break;
     }
@@ -712,6 +736,31 @@ class ExprContextAnalyzer {
     }
   }
 
+  void analyzeInitializer(Initializer *initDC) {
+    switch (initDC->getInitializerKind()) {
+    case swift::InitializerKind::PatternBinding: {
+      auto initDC = cast<PatternBindingInitializer>(DC);
+      auto PBD = initDC->getBinding();
+      if (!PBD)
+        break;
+      auto pat = PBD->getPattern(initDC->getBindingIndex());
+      if (pat->hasType())
+        recordPossibleType(pat->getType());
+      break;
+    }
+    case InitializerKind::DefaultArgument: {
+      auto initDC = cast<DefaultArgumentInitializer>(DC);
+      auto AFD = dyn_cast<AbstractFunctionDecl>(initDC->getParent());
+      if (!AFD)
+        return;
+      auto param = AFD->getParameters()->get(initDC->getIndex());
+      if (param->hasInterfaceType())
+        recordPossibleType(AFD->mapTypeIntoContext(param->getInterfaceType()));
+      break;
+    }
+    }
+  }
+
   /// Whether the given \c BraceStmt, which must be the body of a function or
   /// closure, should be treated as a single-expression return for the purposes
   /// of code-completion.
@@ -807,13 +856,17 @@ public:
         return false;
     });
 
-    // For 'Initializer' context, we need to look into its parent because it
-    // might constrain the initializer's type.
+    // For 'Initializer' context, we need to look into its parent.
     auto analyzeDC = isa<Initializer>(DC) ? DC->getParent() : DC;
     analyzeDC->walkContext(Finder);
 
-    if (Finder.Ancestors.empty())
+    if (Finder.Ancestors.empty()) {
+      // There's no parent context in DC. But still, the parent of the
+      // initializer might constrain the initializer's type.
+      if (auto initDC = dyn_cast<Initializer>(DC))
+        analyzeInitializer(initDC);
       return;
+    }
 
     auto &P = Finder.Ancestors.back();
     if (auto Parent = P.getAsExpr()) {
@@ -865,13 +918,7 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
 
   // Only non-failable constructors are implicitly referenceable.
   if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-    switch (CD->getFailability()) {
-      case OTK_None:
-      case OTK_ImplicitlyUnwrappedOptional:
-        return true;
-      case OTK_Optional:
-        return false;
-    }
+    return (!CD->isFailable() || CD->isImplicitlyUnwrappedOptional());
   }
 
   // Otherwise, check the result type matches the contextual type.
@@ -888,7 +935,13 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
     // because we are emitting all `.init()`s.
     if (declTy->isEqual(T))
       return false;
-    return swift::isConvertibleTo(declTy, T, *DC);
+
+    // Only non-protocol nominal type can be instantiated.
+    auto nominal = declTy->getAnyNominal();
+    if (!nominal || isa<ProtocolDecl>(nominal))
+      return false;
+
+    return swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
   }
 
   // Only static member can be referenced.
@@ -905,5 +958,6 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
     // FIXME: This emits just 'factory'. We should emit 'factory()' instead.
     declTy = FT->getResult();
   }
-  return declTy->isEqual(T) || swift::isConvertibleTo(declTy, T, *DC);
+  return declTy->isEqual(T) ||
+         swift::isConvertibleTo(declTy, T, /*openArchetypes=*/true, *DC);
 }

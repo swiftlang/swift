@@ -1,18 +1,11 @@
 // RUN: %empty-directory(%t)
 //
 // RUN: %gyb %s -o %t/main.swift
-// RUN: if [ %target-runtime == "objc" ]; then \
-// RUN:   %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o; \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control -swift-version 4.2; \
-// RUN: else \
-// RUN:   %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -o %t/Set -Xfrontend -disable-access-control -swift-version 4.2; \
-// RUN: fi
+// RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
+// RUN: %line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %S/Inputs/DictionaryKeyValueTypesObjC.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Set -Xfrontend -disable-access-control -swift-version 4.2
 //
 // RUN: %target-codesign %t/Set && %line-directive %t/main.swift -- %target-run %t/Set
 // REQUIRES: executable_test
-
-// Requires swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
 
 import StdlibUnittest
 import StdlibCollectionUnittest
@@ -1983,7 +1976,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAll") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAll") {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+  if #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
     // Identity of empty sets changed in https://github.com/apple/swift/pull/22527
     var s = getBridgedNonverbatimSet([])
     expectTrue(isNativeSet(s))
@@ -2175,7 +2168,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
 }
 
 SetTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
-  guard #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) else {
+  guard #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) else {
     // Identity of empty sets changed in https://github.com/apple/swift/pull/22527
     return
   }
@@ -4674,7 +4667,7 @@ SetTestSuite.test("IndexValidation.RemoveAt.AfterGrow") {
 }
 
 #if _runtime(_ObjC)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedNonverbatimBridge.Trap.String")
   .skip(.custom(
@@ -4697,7 +4690,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedNonverbatimBridge.Trap.Int")
   .skip(.custom(
@@ -4829,7 +4822,7 @@ SetTestSuite.test("ForcedVerbatimDowncast.Trap.Int")
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.String")
   .skip(.custom(
@@ -4853,7 +4846,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // https://github.com/apple/swift/pull/23174
   SetTestSuite.test("ForcedBridgingNonverbatimDowncast.Trap.Int")
   .skip(.custom(
@@ -4878,7 +4871,7 @@ if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
 #endif
 
 #if _runtime(_ObjC)
-if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *) {
+if #available(macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
   // https://github.com/apple/swift/pull/23683
   SetTestSuite.test("Upcast.StringEqualityMismatch") {
     // Upcasting from NSString to String keys changes their concept of equality,

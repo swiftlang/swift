@@ -117,6 +117,9 @@ private:
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
   llvm::DenseMap<NominalTypeDecl *, std::string> DeclMangledNames;
 
+  /// The key is the number of witness tables.
+  llvm::DenseMap<unsigned, llvm::StructType *> OpaqueExistentialTypes;
+
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
   const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
@@ -181,6 +184,8 @@ public:
                                             ReferenceCounting style, \
                                             bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
+
+  llvm::Type *getExistentialType(unsigned numWitnessTables);
 
   /// Enter a generic context for lowering the parameters of a generic function
   /// type.

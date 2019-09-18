@@ -51,11 +51,31 @@ extension String {
 }
 
 extension String.Encoding : Hashable {
+    public var hashValue: Int {
+        // Note: This is effectively the same hashValue definition that
+        // RawRepresentable provides on its own. We only need to keep this to
+        // ensure ABI compatibility with 5.0.
+        return rawValue.hashValue
+    }
+
+    @_alwaysEmitIntoClient // Introduced in 5.1
     public func hash(into hasher: inout Hasher) {
+        // Note: `hash(only:)` is only defined here because we also define
+        // `hashValue`.
+        //
+        // In 5.0, `hash(into:)` was resolved to RawRepresentable's functionally
+        // equivalent definition; we added this definition in 5.1 to make it
+        // clear this `hash(into:)` isn't synthesized by the compiler.
+        // (Otherwise someone may be tempted to define it, possibly breaking the
+        // hash encoding and thus the ABI. RawRepresentable's definition is
+        // inlinable.)
         hasher.combine(rawValue)
     }
 
     public static func ==(lhs: String.Encoding, rhs: String.Encoding) -> Bool {
+        // Note: This is effectively the same == definition that
+        // RawRepresentable provides on its own. We only need to keep this to
+        // ensure ABI compatibility with 5.0.
         return lhs.rawValue == rhs.rawValue
     }
 }

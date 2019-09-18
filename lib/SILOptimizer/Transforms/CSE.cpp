@@ -122,7 +122,8 @@ public:
   }
 
   hash_code visitFunctionRefInst(FunctionRefInst *X) {
-    return llvm::hash_combine(X->getKind(), X->getReferencedFunction());
+    return llvm::hash_combine(X->getKind(),
+                              X->getInitiallyReferencedFunction());
   }
 
   hash_code visitGlobalAddrInst(GlobalAddrInst *X) {
@@ -934,6 +935,8 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::OpenExistentialRefInst:
   case SILInstructionKind::WitnessMethodInst:
+    // Intentionally we don't handle (prev_)dynamic_function_ref.
+    // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \
   case SILInstructionKind::RefTo##Name##Inst: \
   case SILInstructionKind::Name##ToRefInst:

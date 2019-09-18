@@ -249,6 +249,19 @@ public:
   const ContextDescriptor *
   _searchConformancesByMangledTypeName(Demangle::NodePointer node);
 
+  /// Iterate over protocol conformance sections starting from the given index.
+  /// The index is updated to the current number of protocol sections. Passing
+  /// the same index to the next call will iterate over any sections that were
+  /// added after the previous call.
+  ///
+  /// Takes a function to call for each section found. The two parameters are
+  /// the start and end of the section.
+  void
+  _forEachProtocolConformanceSectionAfter(
+    size_t *start, 
+    const std::function<void(const ProtocolConformanceRecord *,
+                             const ProtocolConformanceRecord *)> &f);
+
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                       Demangle::Demangler &Dem);
 
@@ -309,7 +322,8 @@ public:
     ///
     /// \returns a pair containing the number of key generic parameters in
     /// the path up to this point.
-    unsigned buildDescriptorPath(const ContextDescriptor *context) const;
+    unsigned buildDescriptorPath(const ContextDescriptor *context,
+                                 Demangler &demangler) const;
 
     /// Builds a path from the generic environment.
     unsigned buildEnvironmentPath(
@@ -462,6 +476,24 @@ public:
 #else
     return c;
 #endif
+  }
+  
+  template<> inline const ClassMetadata *
+  Metadata::getClassObject() const {
+    switch (getKind()) {
+    case MetadataKind::Class: {
+      // Native Swift class metadata is also the class object.
+      return static_cast<const ClassMetadata *>(this);
+    }
+    case MetadataKind::ObjCClassWrapper: {
+      // Objective-C class objects are referenced by their Swift metadata wrapper.
+      auto wrapper = static_cast<const ObjCClassWrapperMetadata *>(this);
+      return wrapper->Class;
+    }
+    // Other kinds of types don't have class objects.
+    default:
+      return nullptr;
+    }
   }
 
   void *allocateMetadata(size_t size, size_t align);

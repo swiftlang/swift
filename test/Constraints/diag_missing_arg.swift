@@ -34,9 +34,8 @@ trailingClosureSingle1 { 1 } // expected-error {{missing argument for parameter 
 trailingClosureSingle1() { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{24-24=x: <#Int#>}}
 
 func trailingClosureSingle2(x: () -> Int, y: Int) {} // expected-note * {{here}}
-// FIXME: Bad diagnostics.
-trailingClosureSingle2 { 1 } // expected-error {{cannot convert value of type '() -> Int' to expected argument type '(x: () -> Int, y: Int)'}}
-trailingClosureSingle2() { 1 } // expected-error {{cannot convert value of type '() -> Int' to expected argument type '(x: () -> Int, y: Int)'}}
+trailingClosureSingle2 { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureSingle2() { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
 
 func trailingClosureMulti1(x: Int, y: Int, z: () -> Int) {} // expected-note * {{here}}
 trailingClosureMulti1(y: 1) { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{23-23=x: <#Int#>, }}
@@ -44,11 +43,9 @@ trailingClosureMulti1(x: 1) { 1 } // expected-error {{missing argument for param
 trailingClosureMulti1(x: 1, y: 1) // expected-error {{missing argument for parameter 'z' in call}} {{33-33=, z: <#() -> Int#>}}
 
 func trailingClosureMulti2(x: Int, y: () -> Int, z: Int) {} // expected-note * {{here}}
-trailingClosureMulti2 { 1 } // expected-error {{cannot convert value of type '() -> Int' to expected argument type '(x: Int, y: () -> Int, z: Int)'}}
-// FIXME: Bad diagnostics.
-trailingClosureMulti2() { 1 } // expected-error {{cannot convert value of type '() -> Int' to expected argument type '(x: Int, y: () -> Int, z: Int)'}}
-trailingClosureMulti2(x: 1) { 1 } // expected-error {{cannot invoke 'trailingClosureMulti2' with an argument list of type '(x: Int, @escaping () -> Int)'}}
-// expected-note@-1{{expected an argument list of type '(x: Int, y: () -> Int, z: Int)'}}
+trailingClosureMulti2 { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureMulti2() { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
+trailingClosureMulti2(x: 1) { 1 } // expected-error {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}
 
 func param2Func(x: Int, y: Int) {} // expected-note * {{here}}
 param2Func(x: 1) // expected-error {{missing argument for parameter 'y' in call}} {{16-16=, y: <#Int#>}}

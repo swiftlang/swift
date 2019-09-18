@@ -8,9 +8,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_interpreter
 
-// JIT runs in swift-version 4
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import complex
 
 func printDensity(_ d: Int) {

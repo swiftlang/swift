@@ -169,6 +169,7 @@ class RDar16666631 {
    }
 }
 let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{incorrect argument label in call (have 'i:d:', expected 'i:s:')}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 
 struct S {
@@ -546,4 +547,14 @@ struct MultipleMemberAccesses {
     y.x.init() // expected-error {{'init' is a member of the type; use assignment to initalize the value instead}} {{8-8= = }}
     y2.x2.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{5-5=type(of: }} {{10-10=)}}
   }
+}
+
+func sr10670() {
+  struct S {
+    init(_ x: inout String) {}
+    init(_ x: inout [Int]) {}
+  }
+  var a = 0
+  S.init(&a) // expected-error {{cannot invoke 'S.Type.init' with an argument list of type '(inout Int)'}}
+  // expected-note@-1 {{overloads for 'S.Type.init' exist with these partially matching parameter lists: (inout String), (inout [Int])}}
 }

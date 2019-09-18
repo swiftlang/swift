@@ -103,6 +103,13 @@ public:
            rangeContainsTokenLoc(Enclosing, Inner.End);
   }
 
+  /// Returns true if range \p R contains the code-completion location, if any.
+  bool rangeContainsCodeCompletionLoc(SourceRange R) const {
+    return CodeCompletionBufferID
+               ? rangeContainsTokenLoc(R, getCodeCompletionLoc())
+               : false;
+  }
+
   /// Returns the buffer ID for the specified *valid* location.
   ///
   /// Because a valid source location always corresponds to a source buffer,
@@ -224,8 +231,13 @@ public:
   void verifyAllBuffers() const;
 
   /// Translate line and column pair to the offset.
+  /// If the column number is the maximum unsinged int, return the offset of the end of the line.
   llvm::Optional<unsigned> resolveFromLineCol(unsigned BufferId, unsigned Line,
                                               unsigned Col) const;
+
+  /// Translate the end position of the given line to the offset.
+  llvm::Optional<unsigned> resolveOffsetForEndOfLine(unsigned BufferId,
+                                                     unsigned Line) const;
 
   SourceLoc getLocForLineCol(unsigned BufferId, unsigned Line, unsigned Col) const {
     auto Offset = resolveFromLineCol(BufferId, Line, Col);

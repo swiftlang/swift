@@ -391,4 +391,4 @@ struct ObjectTraits<syntax::RawSyntax> {
 
 } // end namespace swift
 
-#endif /* SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H */
+#endif // SWIFT_SYNTAX_SERIALIZATION_SYNTAXSERIALIZATION_H

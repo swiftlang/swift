@@ -153,6 +153,15 @@ bb0:
   return %2 : $(Builtin.Int8)
 } // CHECK: Returns int: -1
 
+// CHECK-LABEL: @interpretSignedTruncWithIntLiteral
+sil @interpretSignedTruncWithIntLiteral : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.IntLiteral, 5
+  %1 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0 : $Builtin.IntLiteral) : $(Builtin.Int64, Builtin.Int1)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int1), 0
+  return %2 : $(Builtin.Int64)
+} // CHECK: Returns int: 5
+
 // CHECK-LABEL: @interpretSignedExtend
 sil @interpretSignedExtend : $@convention(thin) () -> Builtin.Int64 {
 bb0:
@@ -455,7 +464,7 @@ bb0:
   // function_ref readLine(strippingNewline:)
   %2 = function_ref @$ss8readLine16strippingNewlineSSSgSb_tF : $@convention(thin) (Bool) -> @owned Optional<String>
   %3 = apply %2(%1) : $@convention(thin) (Bool) -> @owned Optional<String>
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to a function whose body is not available
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to 'Swift.readLine(strippingNewline: Swift.Bool) -> Swift.Optional<Swift.String>' whose body is not available
   release_value %3 : $Optional<String>
   %5 = tuple ()
   return %5 : $()
@@ -486,7 +495,7 @@ bb3:
 
 // Test stack allocation and memory access.
 
-// CHECK-LABEL @interpretLoadStore
+// CHECK-LABEL: @interpretLoadStore
 sil hidden @interpretLoadStore : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -497,7 +506,7 @@ bb0:
   return %3 : $Builtin.Int64
 } // CHECK: Returns int: 11
 
-// CHECK-LABEL @interpretBeginEndAccess
+// CHECK-LABEL: @interpretBeginEndAccess
 sil hidden @interpretBeginEndAccess : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Builtin.Int64, var, name "i"
@@ -1076,3 +1085,131 @@ bb0:
   %9 = apply %8(%6) : $@convention(method) (@guaranteed String) -> @owned String
   return %9 : $String
 } // CHECK: Returns string: "%%%%%%a%% %%%%b%%"
+
+// Tests for Ownership SIL.
+
+// CHECK-LABEL: @interpretDestructureInt64
+sil [ossa] @interpretDestructureInt64 : $@convention(thin) () -> Builtin.Int64 {
+  %1 = integer_literal $Builtin.Int64, 12
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = destructure_struct %2 : $Int64
+  return %3 : $Builtin.Int64
+} // CHECK: Returns int: 12
+
+struct IntPair {
+  var first: Builtin.Int64
+  var second: Builtin.Int64
+}
+
+// CHECK-LABEL: @interpretIntPairStruct
+sil [ossa] @interpretIntPairStruct : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 17
+  %1 = integer_literal $Builtin.Int64, 34
+  %2 = struct $IntPair (%0: $Builtin.Int64, %1: $Builtin.Int64)
+  (%3, %4) = destructure_struct %2 : $IntPair
+  return %4 : $Builtin.Int64
+} // CHECK: Returns int: 34
+
+sil [ossa] @constructCustomStructOSSA : $@convention(thin) () -> CustomStruct {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 11
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 12
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %6 = integer_literal $Builtin.Int64, 13
+  %7 = struct $Int64 (%6 : $Builtin.Int64)
+  %8 = integer_literal $Builtin.Int1, 0
+  %9 = struct $Bool (%8 : $Builtin.Int1)
+
+  %10 = struct $InnerStruct (%7 : $Int64, %9 : $Bool)
+  %11 = tuple (%2 : $Int64, %4 : $Int64)
+  %12 = struct $CustomStruct (%11 : $(Int64, Int64), %10 : $InnerStruct)
+  return %12 : $CustomStruct
+}
+
+// CHECK-LABEL: @interpretCustomStructOSSA
+sil [ossa] @interpretCustomStructOSSA : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = function_ref @constructCustomStructOSSA : $@convention(thin) () -> CustomStruct
+  %2 = apply %1() : $@convention(thin) () -> CustomStruct
+  (%3, %4) = destructure_struct %2 : $CustomStruct
+  (%5, %6) = destructure_tuple %3 : $(Int64, Int64)
+  (%7, %8) = destructure_struct %4 : $InnerStruct
+  %9 = destructure_struct %5 : $Int64
+  %10 = destructure_struct %6 : $Int64
+  %11 = destructure_struct %7 : $Int64
+  %12 = destructure_struct %8 : $Bool
+  cond_fail %12 : $Builtin.Int1
+
+  %13 = integer_literal $Builtin.Int1, -1
+  %14 = builtin "sadd_with_overflow_Int64"(%9 : $Builtin.Int64, %10 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%15, %16) = destructure_tuple %14 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %16 : $Builtin.Int1
+
+  %17 = builtin "sadd_with_overflow_Int64"(%15 : $Builtin.Int64, %11 : $Builtin.Int64, %13 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  (%18, %19) = destructure_tuple %17 : $(Builtin.Int64, Builtin.Int1)
+  cond_fail %19 : $Builtin.Int1
+  return %18 : $Builtin.Int64
+} // CHECK: Returns int: 36
+
+// Tests for builtin "ptrtoint_Word", which is supported only for string
+// constants in order to handle 'StaticString' construction.
+
+// CHECK-LABEL: @interpretPtrToInt
+sil @interpretPtrToInt : $@convention(thin) () -> Builtin.Word {
+  %0 = string_literal utf8 "Fatal error"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  return %1 : $Builtin.Word
+} // CHECK: Returns string: "Fatal error"
+
+// CHECK-LABEL: @interpretStaticStringInit
+sil @interpretStaticStringInit : $@convention(thin) () -> Builtin.Word {
+  %0 = string_literal utf8 "static error message"
+  %1 = integer_literal $Builtin.Word, 11
+  %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = integer_literal $Builtin.Int8, 2
+  %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
+  %5 = struct_extract %4 : $StaticString, #StaticString._startPtrOrData
+  return %5 : $Builtin.Word
+} // CHECK: Returns string: "static error message"
+
+// Tests for builtin "assert_configuration". Constant evaluator evaluates this
+// builtin to 0, meaning that the the configuration is "debug".
+
+// CHECK-LABEL: @interpretAssertConfiguration
+sil @interpretAssertConfiguration : $@convention(thin) () -> Builtin.Int32 {
+  %0 = builtin "assert_configuration"() : $Builtin.Int32
+  return %0 : $Builtin.Int32
+} // CHECK: Returns int: 0
+
+// Tests for "assertionFailure" stdlib functions. Such functions have the
+// @_semantics attribute: "programtermination_point"
+
+sil [noinline] [_semantics "programtermination_point"] [canonical] @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+
+// CHECK-LABEL: @interpretAssertionFailure
+sil @interpretAssertionFailure : $@convention(thin) () -> Never {
+  // Construct error prefix.
+  %0 = string_literal utf8 "prefix"
+  %1 = integer_literal $Builtin.Word, 6
+  %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = integer_literal $Builtin.Int8, 2
+  %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
+
+  // Construct error message.
+  %10 = string_literal utf8 "message"
+  %11 = integer_literal $Builtin.Word, 7
+  %12 = builtin "ptrtoint_Word"(%10 : $Builtin.RawPointer) : $Builtin.Word
+  %13 = integer_literal $Builtin.Int8, 2
+  %14 = struct $StaticString (%12 : $Builtin.Word, %11 : $Builtin.Word, %13 : $Builtin.Int8)
+
+  // Construct line number.
+  %20 = integer_literal $Builtin.Int64, 1208
+  %21 = struct $UInt64 (%20 : $Builtin.Int64)
+
+  %22 = function_ref @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+  %23 = apply %22(%4, %14, %21) : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: assertion failed with message: prefix: message:
+  unreachable
+}

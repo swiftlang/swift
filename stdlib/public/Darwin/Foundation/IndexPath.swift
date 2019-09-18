@@ -39,16 +39,12 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             switch elements.count {
             case 0:
                 self = .empty
-                break
             case 1:
                 self = .single(elements[0])
-                break
             case 2:
                 self = .pair(elements[0], elements[1])
-                break
             default:
                 self = .array(elements)
-                break
             }
         }
         
@@ -74,16 +70,12 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
             switch self {
             case .empty:
                 self = .single(other)
-                break
             case .single(let first):
                 self = .pair(first, other)
-                break
             case .pair(let first, let second):
                 self = .array([first, second, other])
-                break
             case .array(let indexes):
                 self = .array(indexes + [other])
-                break
             }
         }
         
@@ -96,15 +88,11 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 case .single(let rhsIndex):
                     self = .single(rhsIndex)
-                    break
                 case .pair(let rhsFirst, let rhsSecond):
                     self = .pair(rhsFirst, rhsSecond)
-                    break
                 case .array(let rhsIndexes):
                     self = .array(rhsIndexes)
-                    break
                 }
-                break
             case .single(let lhsIndex):
                 switch other {
                 case .empty:
@@ -112,15 +100,11 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 case .single(let rhsIndex):
                     self = .pair(lhsIndex, rhsIndex)
-                    break
                 case .pair(let rhsFirst, let rhsSecond):
                     self = .array([lhsIndex, rhsFirst, rhsSecond])
-                    break
                 case .array(let rhsIndexes):
                     self = .array([lhsIndex] + rhsIndexes)
-                    break
                 }
-                break
             case .pair(let lhsFirst, let lhsSecond):
                 switch other {
                 case .empty:
@@ -128,15 +112,11 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 case .single(let rhsIndex):
                     self = .array([lhsFirst, lhsSecond, rhsIndex])
-                    break
                 case .pair(let rhsFirst, let rhsSecond):
                     self = .array([lhsFirst, lhsSecond, rhsFirst, rhsSecond])
-                    break
                 case .array(let rhsIndexes):
                     self = .array([lhsFirst, lhsSecond] + rhsIndexes)
-                    break
                 }
-                break
             case .array(let lhsIndexes):
                 switch other {
                 case .empty:
@@ -144,15 +124,11 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 case .single(let rhsIndex):
                     self = .array(lhsIndexes + [rhsIndex])
-                    break
                 case .pair(let rhsFirst, let rhsSecond):
                     self = .array(lhsIndexes + [rhsFirst, rhsSecond])
-                    break
                 case .array(let rhsIndexes):
                     self = .array(lhsIndexes + rhsIndexes)
-                    break
                 }
-                break
             }
         }
         
@@ -165,15 +141,11 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 case 1:
                     self = .single(other[0])
-                    break
                 case 2:
                     self = .pair(other[0], other[1])
-                    break
                 default:
                     self = .array(other)
-                    break
                 }
-                break
             case .single(let first):
                 switch other.count {
                 case 0:
@@ -181,12 +153,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 case 1:
                     self = .pair(first, other[0])
-                    break
                 default:
                     self = .array([first] + other)
-                    break
                 }
-                break
             case .pair(let first, let second):
                 switch other.count {
                 case 0:
@@ -194,12 +163,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     break
                 default:
                     self = .array([first, second] + other)
-                    break
                 }
-                break
             case .array(let indexes):
                 self = .array(indexes + other)
-                break
             }
         }
         
@@ -208,7 +174,6 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                 switch self {
                 case .empty:
                     fatalError("Index \(index) out of bounds of count 0")
-                    break
                 case .single(let first):
                     precondition(index == 0, "Index \(index) out of bounds of count 1")
                     return first
@@ -223,11 +188,9 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                 switch self {
                 case .empty:
                     fatalError("Index \(index) out of bounds of count 0")
-                    break
                 case .single(_):
                     precondition(index == 0, "Index \(index) out of bounds of count 1")
                     self = .single(newValue)
-                    break
                 case .pair(let first, let second):
                     precondition(index >= 0 && index < 2, "Index \(index) out of bounds of count 2")
                     if index == 0 {
@@ -235,12 +198,10 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     } else {
                         self = .pair(first, newValue)
                     }
-                    break
                 case .array(let indexes_):
                     var indexes = indexes_
                     indexes[index] = newValue
                     self = .array(indexes)
-                    break
                 }
             }
         }
@@ -257,8 +218,8 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                     }
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0): fallthrough
-                    case (1, 1):
+                    case (0, 0),
+                         (1, 1):
                         return .empty
                     case (0, 1):
                         return .single(index)
@@ -266,13 +227,10 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                         fatalError("Range \(range) is out of bounds of count 1")
                     }
                 case .pair(let first, let second):
-                    
                     switch (range.lowerBound, range.upperBound) {
-                    case (0, 0):
-                        fallthrough
-                    case (1, 1):
-                        fallthrough
-                    case (2, 2):
+                    case (0, 0),
+                         (1, 1),
+                         (2, 2):
                         return .empty
                     case (0, 1):
                         return .single(first)
@@ -302,39 +260,28 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                 case .empty:
                     precondition(range.lowerBound == 0 && range.upperBound == 0, "Range \(range) is out of bounds of count 0")
                     self = newValue
-                    break
                 case .single(let index):
                     switch (range.lowerBound, range.upperBound, newValue) {
-                    case (0, 0, .empty):
-                        fallthrough
-                    case (1, 1, .empty):
+                    case (0, 0, .empty),
+                         (1, 1, .empty):
                         break
                     case (0, 0, .single(let other)):
                         self = .pair(other, index)
-                        break
                     case (0, 0, .pair(let first, let second)):
                         self = .array([first, second, index])
-                        break
                     case (0, 0, .array(let other)):
                         self = .array(other + [index])
-                        break
-                    case (0, 1, .empty):
-                        fallthrough
-                    case (0, 1, .single):
-                        fallthrough
-                    case (0, 1, .pair):
-                        fallthrough
-                    case (0, 1, .array):
+                    case (0, 1, .empty),
+                         (0, 1, .single),
+                         (0, 1, .pair),
+                         (0, 1, .array):
                         self = newValue
                     case (1, 1, .single(let other)):
                         self = .pair(index, other)
-                        break
                     case (1, 1, .pair(let first, let second)):
                         self = .array([index, first, second])
-                        break
                     case (1, 1, .array(let other)):
                         self = .array([index] + other)
-                        break
                     default:
                         fatalError("Range \(range) is out of bounds of count 1")
                     }
@@ -346,63 +293,46 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                             break
                         case .single(let other):
                             self = .array([other, first, second])
-                            break
                         case .pair(let otherFirst, let otherSecond):
                             self = .array([otherFirst, otherSecond, first, second])
-                            break
                         case .array(let other):
                             self = .array(other + [first, second])
-                            break
                         }
-                        break
                     case (0, 1):
                         switch newValue {
                         case .empty:
                             self = .single(second)
-                            break
                         case .single(let other):
                             self = .pair(other, second)
-                            break
                         case .pair(let otherFirst, let otherSecond):
                             self = .array([otherFirst, otherSecond, second])
-                            break
                         case .array(let other):
                             self = .array(other + [second])
-                            break
                         }
-                        break
                     case (0, 2):
                         self = newValue
-                        break
                     case (1, 2):
                         switch newValue {
                         case .empty:
                             self = .single(first)
-                            break
                         case .single(let other):
                             self = .pair(first, other)
-                            break
                         case .pair(let otherFirst, let otherSecond):
                             self = .array([first, otherFirst, otherSecond])
-                            break
                         case .array(let other):
                             self = .array([first] + other)
                         }
-                        break
                     case (2, 2):
                         switch newValue {
                         case .empty:
                             break
                         case .single(let other):
                             self = .array([first, second, other])
-                            break
                         case .pair(let otherFirst, let otherSecond):
                             self = .array([first, second, otherFirst, otherSecond])
-                            break
                         case .array(let other):
                             self = .array([first, second] + other)
                         }
-                        break
                     default:
                         fatalError("Range \(range) is out of bounds of count 2")
                     }
@@ -414,17 +344,13 @@ public struct IndexPath : ReferenceConvertible, Equatable, Hashable, MutableColl
                         break
                     case .single(let index):
                         newIndexes.insert(index, at: range.lowerBound)
-                        break
                     case .pair(let first, let second):
                         newIndexes.insert(first, at: range.lowerBound)
                         newIndexes.insert(second, at: range.lowerBound + 1)
-                        break
                     case .array(let other):
                         newIndexes.insert(contentsOf: other, at: range.lowerBound)
-                        break
                     }
                     self = Storage(newIndexes)
-                    break
                 }
             }
         }

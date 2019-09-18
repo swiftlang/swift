@@ -35,6 +35,7 @@ namespace swift {
   class ForeignErrorConvention;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
+  class ModuleDecl;
   class SILBuilder;
   class SILLocation;
   class SILModule;
@@ -249,6 +250,12 @@ public:
   TypeLowering &operator=(const TypeLowering &) = delete;
 
   virtual ~TypeLowering() {}
+
+  /// Print out the internal state of this type lowering into \p os.
+  void print(llvm::raw_ostream &os) const;
+
+  /// Dump out the internal state of this type lowering to llvm::dbgs().
+  LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "Only for use in the debugger");
 
   /// Are r-values of this type passed as arguments indirectly by formal
   /// convention?
@@ -568,8 +575,6 @@ struct SILConstantInfo {
 
 /// Different ways in which a function can capture context.
 enum class CaptureKind {
-  /// No context arguments are necessary.
-  None,
   /// A local value captured as a mutable box.
   Box,
   /// A local value captured as a single pointer to storage (formed with
@@ -708,10 +713,10 @@ class TypeConverter {
                               const TypeLowering *lowering);
 
 public:
-  SILModule &M;
+  ModuleDecl &M;
   ASTContext &Context;
 
-  TypeConverter(SILModule &m);
+  TypeConverter(ModuleDecl &m);
   ~TypeConverter();
   TypeConverter(TypeConverter const &) = delete;
   TypeConverter &operator=(TypeConverter const &) = delete;
@@ -799,7 +804,8 @@ public:
   }
 
   SILType getLoweredLoadableType(Type t,
-                                 ResilienceExpansion forExpansion) {
+                                 ResilienceExpansion forExpansion,
+                                 SILModule &M) {
     const TypeLowering &ti = getTypeLowering(t, forExpansion);
     assert(
         (ti.isLoadable() || !SILModuleConventions(M).useLoweredAddresses()) &&

@@ -368,6 +368,10 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     TypeMetadataLazyCacheVariable,
 
+    /// A lazy cache variable for fetching type metadata from a mangled name.
+    /// The pointer is a canonical TypeBase*.
+    TypeMetadataDemanglingCacheVariable,
+
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -468,11 +472,12 @@ class LinkEntity {
   // in order to avoid bloating LinkEntity out to three key pointers.
   static unsigned getAssociatedTypeIndex(const ProtocolConformance *conformance,
                                          AssociatedTypeDecl *associate) {
-    assert(conformance->getProtocol() == associate->getProtocol());
+    auto *proto = associate->getProtocol();
+    assert(conformance->getProtocol() == proto);
     unsigned result = 0;
-    for (auto requirement : associate->getProtocol()->getMembers()) {
+    for (auto requirement : proto->getAssociatedTypeMembers()) {
       if (requirement == associate) return result;
-      if (isa<AssociatedTypeDecl>(requirement)) result++;
+      result++;
     }
     llvm_unreachable("didn't find associated type in protocol?");
   }
@@ -480,11 +485,9 @@ class LinkEntity {
   static AssociatedTypeDecl *
   getAssociatedTypeByIndex(const ProtocolConformance *conformance,
                            unsigned index) {
-    for (auto requirement : conformance->getProtocol()->getMembers()) {
-      if (auto associate = dyn_cast<AssociatedTypeDecl>(requirement)) {
-        if (index == 0) return associate;
-        index--;
-      }
+    for (auto associate : conformance->getProtocol()->getAssociatedTypeMembers()) {
+      if (index == 0) return associate;
+      index--;
     }
     llvm_unreachable("didn't find associated type in protocol?");
   }
@@ -703,6 +706,12 @@ public:
   static LinkEntity forTypeMetadataLazyCacheVariable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataLazyCacheVariable, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataDemanglingCacheVariable(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataDemanglingCacheVariable, type);
     return entity;
   }
 
@@ -1102,8 +1111,7 @@ public:
   }
 
   /// Determine whether this entity will be weak-imported.
-  bool isWeakImported(ModuleDecl *module,
-                      AvailabilityContext fromContext) const;
+  bool isWeakImported(ModuleDecl *module) const;
   
   /// Return the source file whose codegen should trigger emission of this
   /// link entity, if one can be identified.
@@ -1173,7 +1181,6 @@ public:
 
   static LinkInfo get(const UniversalLinkageInfo &linkInfo,
                       ModuleDecl *swiftModule,
-                      AvailabilityContext availabilityContext,
                       const LinkEntity &entity,
                       ForDefinition_t forDefinition);
 

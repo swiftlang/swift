@@ -9,6 +9,140 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// EscapeAnalysis provides information about whether the lifetime of an object
+/// exceeds the scope of a function.
+///
+/// We compute escape analysis by building a connection graph for each
+/// function. For interprocedural analysis the connection graphs are merged
+/// in bottom-up order of the call graph.
+/// The idea is based on "Escape analysis for Java." by J.-D. Choi, M. Gupta, M.
+/// Serrano, V. C. Sreedhar, and S. Midkiff
+/// http://dx.doi.org/10.1145/320384.320386
+///
+/// This design is customized for SIL and the Swift memory model as follows:
+///
+/// Each SILValue holding a memory address or object reference is mapped to a
+/// node in the connection graph. The node's type depends on the value's
+/// origin. SILArguments have "argument" type. Locally allocated storage and
+/// values of unknown origin have "value" type. Loaded values have "content"
+/// type. A "return" type node represents the returned value and has no
+/// associated SILValue.
+///
+/// "Content" nodes are special in that they represent the identity of some set
+/// of memory locations. Content nodes are created to represent the memory
+/// pointed to by one of the other node types. So, except for loads, SILValues
+/// do not directly map to content nodes. For debugging purposes only, content
+/// nodes do refer back to the SILValue that originally pointed to them. When
+/// content nodes are merged, only one of those SILValue back-references is
+/// arbitrarily preserved. The content of the returned value is the only content
+/// node that has no back-reference to a SILValue.
+///
+/// This code:
+///   let a = SomeClass()
+///   return a
+///
+/// Generates the following connection graph, where 'a' is in the SILValue %0:
+///   Val %0 Esc: R, Succ: (%0.1) // Represents 'a', and points to 'a's content
+///   Con %0.1 Esc: G, Succ:      // Represents the content of 'a'
+///   Ret  Esc: R, Succ: %0       // The returned value, aliased with 'a'
+///
+/// Each node has an escaping state: None, (R)eturn, (A)rguments, or (G)lobal.
+/// These states form a lattice in which None is the most refined, or top, state
+/// and Global is the least refined, or bottom, state. Merging nodes performs a
+/// meet operation on their escaping states. At a call site, the callee graph is
+/// merged with the callee graph by merging the respective call argument
+/// nodes. A node has a "Return" escaping state if it only escapes by being
+/// returned from the current function. A node has an "Argument" escaping state
+/// if only escapes by being passed as an incoming argument to this function.
+///
+/// A directed edge between two connection graph nodes indicates that the memory
+/// represented by the destination node memory is reachable via an address
+/// contained in the source node. A node may only have one "pointsTo" edge,
+/// whose destination is always a content node. Additional "defer" edges allow a
+/// form of aliasing between nodes. A single content node represents any and all
+/// memory that any other node may point to. This content node can be found by
+/// following any path of defer edges until the path terminates in a pointsTo
+/// edge. The final pointsTo edge refers to the representative content node, and
+/// all such paths in the graph must reach the same content node. To maintain
+/// this invariant, the algorithm that builds the connection graph must
+/// incrementally merge content nodes.
+///
+/// Note that a defer edge may occur between any node types. A value node that
+/// holds a reference may defer to another value or content node whose value was
+/// merged via a phi; a content node that holds a reference may defer to a value
+/// node that was stored into the content; a content node may defer to another
+/// content node that was loaded and stored.
+///
+/// Now consider the same example, but declaring a 'var' instead of a 'let':
+///
+///   var a = SomeClass()
+///   return a
+///
+/// Generates the following connection graph, where the alloc_stack for variable
+/// 'a' is in the SILValue %0 and class allocation returns SILValue %3.
+///   Val %0 Esc: G, Succ: (%0.1)
+///   Con %0.1 Esc: G, Succ: %3
+///   Val %3 Esc: G, Succ: (%3.1)
+///   Con %3.1 Esc: G, Succ:
+///   Ret  Esc: R, Succ: %3
+///
+/// The value node for variable 'a' now points to local variable storage
+/// (%0.1). That local variable storage contains a reference. Assignment into
+/// that reference creates a defer edge to the allocated reference (%3). The
+/// allocated reference in turn points to the object storage (%3.1).
+///
+/// Note that a variable holding a single class reference and a variable
+/// holding a non-trivial struct has the same graph representation. The
+/// variable's content node only represents the value of the references, not the
+/// memory pointed-to by the reference.
+///
+/// A pointsTo edge does not necessarily indicate pointer indirection. It may
+/// simply represent a derived address within the same object. This allows
+/// escape analysis to view an object's memory in layers, each with separate
+/// escaping properties. For example, a class object's first-level content node
+/// represents the object header including the metadata pointer and reference
+/// count. An object's second level content node only represents the
+/// reference-holding fields within that object. Consider the connection graph
+/// for a class with properties:
+///
+///   class HasObj {
+///     var obj: AnyObject
+///   }
+///   func assignProperty(h: HasObj, o: AnyObject) {
+///     h.obj = o
+///   }
+///
+/// Which generates this graph where the argument 'h' is %0, and 'o' is %1:
+///   Arg %0 Esc: A, Succ: (%0.1)
+///   Con %0.1 Esc: A, Succ: (%0.2)
+///   Con %0.2 Esc: A, Succ: %1
+///   Arg %1 Esc: A, Succ: (%1.1)
+///   Con %1.1 Esc: A, Succ: (%1.2)
+///   Con %1.2 Esc: G, Succ:
+///
+/// Node %0.1 represents the header of 'h', including reference count and
+/// metadata pointer. This node points to %0.2 which represents the 'obj'
+/// property. The assignment 'h.obj = o' creates a defer edge from %0.2 to
+/// %1. Similarly, %1.1 represents the header of 'o', and %1.2 represents any
+/// potential nontrivial properties in 'o' which may have escaped globally when
+/// 'o' was released.
+///
+/// The connection graph is constructed by summarizing all memory operations in
+/// a flow-insensitive way. Hint: ConGraph->viewCG() displays the Dot-formatted
+/// connection graph.
+///
+/// In addition to the connection graph, EscapeAnalysis stores information about
+/// "use points". Each release operation is a use points. These instructions are
+/// recorded in a table and given an ID. Each connection graph node stores a
+/// bitset indicating the use points reachable via the CFG by that node. This
+/// provides some flow-sensitive information on top of the otherwise flow
+/// insensitive connection graph.
+///
+/// Note: storing bitsets in each node may be unnecessary overhead since the
+/// same information can be obtained with a graph traversal, typically of only
+/// 1-3 hops.
+// ===---------------------------------------------------------------------===//
 
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ESCAPEANALYSIS_H_
@@ -28,15 +162,9 @@ namespace swift {
 
 class BasicCalleeAnalysis;
 
-/// The EscapeAnalysis provides information if the lifetime of an object exceeds
-/// the scope of a function.
-///
-/// We compute the escape analysis by building a connection graph for each
-/// function. For the interprocedural analysis the connection graphs are merged
-/// in bottom-up order of the call graph.
-/// The idea is based on "Escape analysis for Java." by J.-D. Choi, M. Gupta, M.
-/// Serrano, V. C. Sreedhar, and S. Midkiff
-/// http://dx.doi.org/10.1145/320384.320386
+/// The EscapeAnalysis results for functions in the current module, computed
+/// bottom-up in the call graph. Each function with valid EscapeAnalysis
+/// information is associated with a ConnectionGraph.
 class EscapeAnalysis : public BottomUpIPAnalysis {
 
   /// The types of edges in the connection graph.
@@ -169,8 +297,21 @@ public:
     NodeType Type;
     
     /// The constructor.
-    CGNode(ValueBase *V, NodeType Type) :
-        V(V), UsePoints(0), Type(Type) { }
+    CGNode(ValueBase *V, NodeType Type) : V(V), UsePoints(0), Type(Type) {
+      switch (Type) {
+      case NodeType::Argument:
+      case NodeType::Value:
+        assert(V);
+        break;
+      case NodeType::Return:
+        assert(!V);
+        break;
+      case NodeType::Content:
+        // A content node representing the returned value has no associated
+        // SILValue.
+        break;
+      }
+    }
 
     /// Merges the state from another state and returns true if it changed.
     bool mergeEscapeState(EscapeState OtherState) {
@@ -452,7 +593,11 @@ public:
     /// Returns null, if V is not a "pointer".
     CGNode *getNode(ValueBase *V, EscapeAnalysis *EA, bool createIfNeeded = true);
 
-    /// Gets or creates a content node to which \a AddrNode points to.
+    /// Gets or creates a content node to which \a AddrNode points to during
+    /// initial graph construction. This may not be called after defer edges
+    /// have been created. Doing so would break the invariant that all
+    /// non-content nodes ultimately have a pointsTo edge to a single content
+    /// node.
     CGNode *getContentNode(CGNode *AddrNode);
 
     /// Get or creates a pseudo node for the function return value.

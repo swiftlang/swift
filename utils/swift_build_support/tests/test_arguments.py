@@ -12,6 +12,7 @@
 
 import argparse
 import os
+import platform
 import sys
 import unittest
 try:
@@ -85,6 +86,9 @@ class ArgumentsTypeTestCase(unittest.TestCase):
             "1..2")
 
     def test_executable(self):
+        if platform.system() == 'Windows':
+            self.skipTest('Every file is considered executable in Windows')
+
         python = sys.executable
         self.assertTrue(os.path.isabs(argtype.executable(python)))
 

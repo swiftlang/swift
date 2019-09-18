@@ -150,8 +150,10 @@ StringRef TailAllocatedDebugVariable::getName(const char *buf) const {
 AllocStackInst::AllocStackInst(SILDebugLocation Loc, SILType elementType,
                                ArrayRef<SILValue> TypeDependentOperands,
                                SILFunction &F,
-                               Optional<SILDebugVariable> Var)
-    : InstructionBase(Loc, elementType.getAddressType()) {
+                               Optional<SILDebugVariable> Var,
+                               bool hasDynamicLifetime)
+    : InstructionBase(Loc, elementType.getAddressType()),
+    dynamicLifetime(hasDynamicLifetime) {
   SILInstruction::Bits.AllocStackInst.NumOperands =
     TypeDependentOperands.size();
   assert(SILInstruction::Bits.AllocStackInst.NumOperands ==
@@ -166,14 +168,16 @@ AllocStackInst *
 AllocStackInst::create(SILDebugLocation Loc,
                        SILType elementType, SILFunction &F,
                        SILOpenedArchetypesState &OpenedArchetypes,
-                       Optional<SILDebugVariable> Var) {
+                       Optional<SILDebugVariable> Var,
+                       bool hasDynamicLifetime) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                elementType.getASTType());
   void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
       F.getModule(), Var, TypeDependentOperands);
   return ::new (Buffer)
-      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var);
+      AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
+                     hasDynamicLifetime);
 }
 
 VarDecl *AllocStackInst::getDecl() const {
@@ -256,24 +260,32 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
 
 AllocBoxInst::AllocBoxInst(SILDebugLocation Loc, CanSILBoxType BoxType,
                            ArrayRef<SILValue> TypeDependentOperands,
-                           SILFunction &F, Optional<SILDebugVariable> Var)
+                           SILFunction &F, Optional<SILDebugVariable> Var,
+                           bool hasDynamicLifetime)
     : InstructionBaseWithTrailingOperands(TypeDependentOperands, Loc,
                                       SILType::getPrimitiveObjectType(BoxType)),
-      VarInfo(Var, getTrailingObjects<char>()) {
+      VarInfo(Var, getTrailingObjects<char>()),
+      dynamicLifetime(hasDynamicLifetime) {
 }
 
 AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                    CanSILBoxType BoxType,
                                    SILFunction &F,
                                    SILOpenedArchetypesState &OpenedArchetypes,
-                                   Optional<SILDebugVariable> Var) {
+                                   Optional<SILDebugVariable> Var,
+                                   bool hasDynamicLifetime) {
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, OpenedArchetypes, F,
                                BoxType);
   auto Sz = totalSizeToAlloc<swift::Operand, char>(TypeDependentOperands.size(),
                                                    Var ? Var->Name.size() : 0);
   auto Buf = F.getModule().allocateInst(Sz, alignof(AllocBoxInst));
-  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var);
+  return ::new (Buf) AllocBoxInst(Loc, BoxType, TypeDependentOperands, F, Var,
+                                  hasDynamicLifetime);
+}
+
+SILType AllocBoxInst::getAddressType() const {
+  return getSILBoxFieldType(getBoxType(), getModule().Types, 0).getAddressType();
 }
 
 VarDecl *AllocBoxInst::getDecl() const {
@@ -489,7 +501,7 @@ BeginApplyInst::create(SILDebugLocation loc, SILValue callee,
 
 bool swift::doesApplyCalleeHaveSemantics(SILValue callee, StringRef semantics) {
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(callee))
-    if (auto *F = FRI->getReferencedFunction())
+    if (auto *F = FRI->getReferencedFunctionOrNull())
       return F->hasSemanticsAttr(semantics);
   return false;
 }
@@ -573,14 +585,14 @@ FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
 }
 
 void FunctionRefBaseInst::dropReferencedFunction() {
-  if (auto *Function = getReferencedFunction())
+  if (auto *Function = getInitiallyReferencedFunction())
     Function->decrementRefCount();
   f = nullptr;
 }
 
 FunctionRefBaseInst::~FunctionRefBaseInst() {
-  if (getReferencedFunction())
-    getReferencedFunction()->decrementRefCount();
+  if (getInitiallyReferencedFunction())
+    getInitiallyReferencedFunction()->decrementRefCount();
 }
 
 FunctionRefInst::FunctionRefInst(SILDebugLocation Loc, SILFunction *F)
@@ -773,6 +785,21 @@ StringLiteralInst *StringLiteralInst::create(SILDebugLocation Loc,
   return ::new (buf) StringLiteralInst(Loc, text, encoding, Ty);
 }
 
+CondFailInst::CondFailInst(SILDebugLocation DebugLoc, SILValue Operand,
+                           StringRef Message)
+      : UnaryInstructionBase(DebugLoc, Operand),
+        MessageSize(Message.size()) {
+  memcpy(getTrailingObjects<char>(), Message.data(), Message.size());
+}
+
+CondFailInst *CondFailInst::create(SILDebugLocation DebugLoc, SILValue Operand,
+                                   StringRef Message, SILModule &M) {
+
+  auto Size = totalSizeToAlloc<char>(Message.size());
+  auto Buffer = M.allocateInst(Size, alignof(CondFailInst));
+  return ::new (Buffer) CondFailInst(DebugLoc, Operand, Message);
+}
+
 uint64_t StringLiteralInst::getCodeUnitCount() {
   auto E = unsigned(Encoding::UTF16);
   if (SILInstruction::Bits.StringLiteralInst.TheEncoding == E)
@@ -818,14 +845,14 @@ AssignInst::AssignInst(SILDebugLocation Loc, SILValue Src, SILValue Dest,
   SILInstruction::Bits.AssignInst.OwnershipQualifier = unsigned(Qualifier);
 }
 
-AssignByDelegateInst::AssignByDelegateInst(SILDebugLocation Loc,
+AssignByWrapperInst::AssignByWrapperInst(SILDebugLocation Loc,
                                            SILValue Src, SILValue Dest,
                                            SILValue Initializer,
                                            SILValue Setter,
                                           AssignOwnershipQualifier Qualifier) :
     AssignInstBase(Loc, Src, Dest, Initializer, Setter) {
   assert(Initializer->getType().is<SILFunctionType>());
-  SILInstruction::Bits.AssignByDelegateInst.OwnershipQualifier =
+  SILInstruction::Bits.AssignByWrapperInst.OwnershipQualifier =
       unsigned(Qualifier);
 }
 

@@ -69,8 +69,6 @@ private:
 
 public:
   enum LocationKind : unsigned {
-    // FIXME: NoneKind is to be removed.
-    NoneKind = 0,
     RegularKind = 1,
     ReturnKind = 2,
     ImplicitReturnKind = 3,

@@ -19,6 +19,7 @@
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseMapInfo.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ArrayRefView.h"
@@ -38,7 +39,6 @@ class ClassDecl;
 class CanType;
 class EnumDecl;
 class GenericSignature;
-class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -137,19 +137,16 @@ public:
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// If a type cannot be produced because some member type is
-  /// missing, place an 'error' type into the position of the base.
-  UseErrorType = 0x01,
   /// Allow substitutions to recurse into SILFunctionTypes.
   /// Normally, SILType::subst() should be used for lowered
   /// types, however in special cases where the substitution
   /// is just changing between contextual and interface type
   /// representations, using Type::subst() is allowed.
-  AllowLoweredTypes = 0x02,
+  AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
-  DesugarMemberTypes = 0x04,
+  DesugarMemberTypes = 0x02,
   /// Substitute types involving opaque type archetypes.
-  SubstituteOpaqueArchetypes = 0x08,
+  SubstituteOpaqueArchetypes = 0x04,
 };
 
 /// Options for performing substitutions into a type.
@@ -296,7 +293,7 @@ public:
   ///
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(SubstitutionMap substitutions,
-             SubstOptions options = None) const;
+             SubstOptions options=None) const;
 
   /// Replace references to substitutable types with new, concrete types and
   /// return the substituted result.
@@ -311,7 +308,7 @@ public:
   /// \returns the substituted type, or a null type if an error occurred.
   Type subst(TypeSubstitutionFn substitutions,
              LookupConformanceFn conformances,
-             SubstOptions options = None) const;
+             SubstOptions options=None) const;
 
   /// Replace references to substitutable types with error types.
   Type substDependentTypesWithErrorTypes() const;
@@ -326,6 +323,11 @@ public:
 
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
+
+  friend llvm::hash_code hash_value(Type type) {
+    using llvm::hash_value;
+    return hash_value(type.getPointer());
+  }
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
@@ -375,7 +377,8 @@ private:
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, bool functionsCount);
+  static bool isReferenceTypeImpl(CanType type, GenericSignature *sig,
+                                  bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
   static bool isObjCExistentialTypeImpl(CanType type);
@@ -409,8 +412,26 @@ public:
   // Provide a few optimized accessors that are really type-class queries.
 
   /// Do values of this type have reference semantics?
+  ///
+  /// This includes isAnyClassReferenceType(), as well as function types.
   bool hasReferenceSemantics() const {
-    return isReferenceTypeImpl(*this, /*functions count*/ true);
+    return isReferenceTypeImpl(*this,
+                               /*signature*/ nullptr,
+                               /*functions count*/ true);
+  }
+
+  /// Are variables of this type permitted to have
+  /// ownership attributes?
+  ///
+  /// This includes:
+  ///   - class types, generic or not
+  ///   - archetypes with class or class protocol bounds
+  ///   - existentials with class or class protocol bounds
+  /// But not:
+  ///   - function types
+  bool allowsOwnership(GenericSignature *sig) const {
+    return isReferenceTypeImpl(*this, sig,
+                               /*functions count*/ false);
   }
 
   /// Are values of this type essentially just class references,
@@ -420,10 +441,13 @@ public:
   ///   - a class type
   ///   - a bound generic class type
   ///   - a class-bounded archetype type
+  ///   - a class-bounded type parameter
   ///   - a class-bounded existential type
   ///   - a dynamic Self type
   bool isAnyClassReferenceType() const {
-    return isReferenceTypeImpl(*this, /*functions count*/ false);
+    return isReferenceTypeImpl(*this,
+                               /*signature*/ nullptr,
+                               /*functions count*/ false);
   }
 
   /// Is this type existential?
@@ -580,10 +604,6 @@ public:
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
 
-  /// Retrieve the canonical generic environment associated with this
-  /// generic signature.
-  GenericEnvironment *getGenericEnvironment() const;
-
   GenericSignature *operator->() const {
     return Signature;
   }
@@ -596,7 +616,7 @@ public:
     return Signature;
   }
 
-  bool operator==(const swift::CanGenericSignature& other) {
+  bool operator==(const swift::CanGenericSignature &other) {
     return Signature == other.Signature;
   }
 };
@@ -612,7 +632,6 @@ inline T *staticCastHelper(const Type &Ty) {
 template <typename T>
 using TypeArrayView = ArrayRefView<Type, T*, staticCastHelper,
                                    /*AllowOrigAccess*/true>;
-
 } // end namespace swift
 
 namespace llvm {

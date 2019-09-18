@@ -250,3 +250,143 @@ func test_recursive_dynamic_lookup(_ lens: Lens<Lens<Point>>) {
   // CHECK-NEXT: keypath $KeyPath<Lens<Lens<Rectangle>>, Lens<Lens<Int>>>, (root $Lens<Lens<Rectangle>>; settable_property $Lens<Lens<Point>>,  id @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig : {{.*}})
   _ = \Lens<Lens<Rectangle>>.topLeft.x
 }
+
+@dynamicMemberLookup
+struct RefWritableBox<T> {
+  var obj: T
+
+  init(_ obj: T) {
+    self.obj = obj
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return obj[keyPath: member] }
+  }
+
+  subscript<U>(dynamicMember member: ReferenceWritableKeyPath<T, U>) -> U {
+    get { return obj[keyPath: member] }
+    set { obj[keyPath: member] = newValue }
+  }
+}
+
+func prefer_readonly_keypath_over_reference_writable() {
+  class C {
+    let foo: Int
+
+    init(_ foo: Int) {
+      self.foo = foo
+    }
+  }
+
+  var box = RefWritableBox(C(42))
+  // expected-warning@-1 {{variable 'box' was never mutated; consider changing to 'let' constant}}
+
+  // CHECK: function_ref RefWritableBox.subscript.getter
+  // CHECK-NEXT: function_ref @$s29keypath_dynamic_member_lookup14RefWritableBoxV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = box.foo
+}
+
+
+// rdar://problem/52779809 - condiitional conformance shadows names of members reachable through dynamic lookup
+
+protocol P {
+  var foo: Int { get }
+}
+
+@dynamicMemberLookup struct Ref<T> {
+  var value: T
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+extension P {
+  var foo: Int { return 42 }
+}
+
+struct S {
+  var foo: Int { return 0 }
+  var baz: Int { return 1 }
+}
+
+struct Q {
+  var bar: Int { return 1 }
+}
+
+extension Ref : P where T == Q {
+  var baz: String { return "hello" }
+}
+
+func rdar52779809(_ ref1: Ref<S>, _ ref2: Ref<Q>) {
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = ref1.foo // Ok
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = ref1.baz // Ok
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup1PPAAE3fooSivg
+  _ = ref2.foo // Ok
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
+  _ = ref2.bar // Ok
+}
+
+func make_sure_delayed_keypath_dynamic_member_works() {
+  @propertyWrapper @dynamicMemberLookup
+  struct Wrapper<T> {
+    var storage: T? = nil
+
+    var wrappedValue: T {
+      get { storage! }
+    }
+
+    var projectedValue: Wrapper<T> { self }
+
+    init() { }
+
+    init(wrappedValue: T) {
+      storage = wrappedValue
+    }
+
+    subscript<Property>(dynamicMember keyPath: KeyPath<T, Property>) -> Wrapper<Property> {
+      get { .init() }
+    }
+  }
+
+  struct Field {
+    @Wrapper var v: Bool = true
+  }
+
+  struct Arr {
+    var fields: [Field] = []
+  }
+
+  struct Test {
+    @Wrapper var data: Arr
+
+    func test(_ index: Int) {
+      let _ = self.$data.fields[index].v.wrappedValue
+    }
+  }
+}
+
+
+// SR-11465 - Ambiguity in expression which matches both dynamic member lookup and declaration from constrained extension
+
+@dynamicMemberLookup
+struct SR_11465<RawValue> {
+  var rawValue: RawValue
+
+  subscript<Subject>(dynamicMember keyPath: KeyPath<RawValue, Subject>) -> Subject {
+    rawValue[keyPath: keyPath]
+  }
+}
+
+extension SR_11465: Hashable, Equatable where RawValue: Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(self.rawValue)
+  }
+}
+
+func test_constrained_ext_vs_dynamic_member() {
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup8SR_11465VAASHRzlE9hashValueSivg
+  _ = SR_11465<Int>(rawValue: 1).hashValue // Ok, keep choice from constrained extension
+}

@@ -60,7 +60,7 @@
 /// we can build a sequence that lazily computes the elements in the
 /// result of `scan`:
 ///
-///     struct LazyScanIterator<Base : IteratorProtocol, ResultElement>
+///     struct LazyScanIterator<Base: IteratorProtocol, ResultElement>
 ///       : IteratorProtocol {
 ///       mutating func next() -> ResultElement? {
 ///         return nextElement.map { result in
@@ -68,9 +68,9 @@
 ///           return result
 ///         }
 ///       }
-///       private var nextElement: ResultElement? // The next result of next().
-///       private var base: Base                  // The underlying iterator.
-///       private let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
+///       var nextElement: ResultElement? // The next result of next().
+///       var base: Base                  // The underlying iterator.
+///       let nextPartialResult: (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: Sequence, ResultElement>
@@ -78,11 +78,12 @@
 ///     {
 ///       func makeIterator() -> LazyScanIterator<Base.Iterator, ResultElement> {
 ///         return LazyScanIterator(
-///           nextElement: initial, base: base.makeIterator(), nextPartialResult)
+///           nextElement: initial, base: base.makeIterator(),
+///           nextPartialResult: nextPartialResult)
 ///       }
-///       private let initial: ResultElement
-///       private let base: Base
-///       private let nextPartialResult:
+///       let initial: ResultElement
+///       let base: Base
+///       let nextPartialResult:
 ///         (ResultElement, Base.Element) -> ResultElement
 ///     }
 ///
@@ -101,10 +102,10 @@
 ///       /// - Complexity: O(1)
 ///       func scan<ResultElement>(
 ///         _ initial: ResultElement,
-///         _ nextPartialResult: (ResultElement, Element) -> ResultElement
+///         _ nextPartialResult: @escaping (ResultElement, Element) -> ResultElement
 ///       ) -> LazyScanSequence<Self, ResultElement> {
 ///         return LazyScanSequence(
-///           initial: initial, base: self, nextPartialResult)
+///           initial: initial, base: self, nextPartialResult: nextPartialResult)
 ///       }
 ///     }
 ///
@@ -127,7 +128,7 @@
 ///   [We don't recommend that you use `map` this way, because it
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
-public protocol LazySequenceProtocol : Sequence {
+public protocol LazySequenceProtocol: Sequence {
   /// A `Sequence` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
@@ -176,8 +177,8 @@ extension LazySequenceProtocol where Elements: LazySequenceProtocol {
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceProtocol`
-@_fixed_layout // lazy-performance
-public struct LazySequence<Base : Sequence> {
+@frozen // lazy-performance
+public struct LazySequence<Base: Sequence> {
   @usableFromInline
   internal var _base: Base
 

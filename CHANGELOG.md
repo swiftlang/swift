@@ -26,27 +26,104 @@ CHANGELOG
 Swift Next
 ----------
 
-* [SR-8974][]:
+* [SR-11298][]:
 
-  Duplicate tuple element labels are no longer allowed, because it leads
-  to incorrect behavior. For example:
+  A class-constrained protocol extension, where the extended protocol does
+  not impose a class constraint, will now infer the constraint implicitly.
+
+  ```swift
+  protocol Foo {}
+  class Bar: Foo {
+    var someProperty: Int = 0
+  }
+
+  // Even though 'Foo' does not impose a class constraint, it is automatically
+  // inferred due to the Self: Bar constraint.
+  extension Foo where Self: Bar {
+    var anotherProperty: Int {
+      get { return someProperty }
+      // As a result, the setter is now implicitly nonmutating, just like it would
+      // be if 'Foo' had a class constraint.
+      set { someProperty = newValue }
+    }
+  }
+  ```
+  
+  As a result, this could lead to code that currently compiles today to throw an error.
+  
+  ```swift
+  protocol Foo {
+    var someProperty: Int { get set }
+  }
+  
+  class Bar: Foo {
+    var someProperty = 0
+  }
+  
+  extension Foo where Self: Bar {
+    var anotherProperty1: Int {
+      get { return someProperty }
+      // This will now error, because the protocol requirement
+      // is implicitly mutating and the setter is implicitly 
+      // nonmutating.
+      set { someProperty = newValue } // Error
+    }
+  }
+  ```
+
+  **Workaround**: Define a new mutable variable inside the setter that has a reference to `self`:
+  
+  ```swift
+  var anotherProperty1: Int {
+    get { return someProperty }
+    set {
+      var mutableSelf = self
+      mutableSelf.someProperty = newValue // Okay
+    }
+  }
+```
+
+* [SE-0253][]:
+
+  Values of types that declare `func callAsFunction` methods can be called
+  like functions. The call syntax is shorthand for applying
+  `func callAsFunction` methods.
+
+  ```swift
+  struct Adder {
+    var base: Int
+    func callAsFunction(_ x: Int) -> Int {
+      return x + base
+    }
+  }
+  var adder = Adder(base: 3)
+  adder(10) // returns 13, same as `adder.callAsFunction(10)`
+  ```
+
+  * `func callAsFunction` argument labels are required at call sites.
+  * Multiple `func callAsFunction` methods on a single type are supported.
+  * `mutating func callAsFunction` is supported.
+  * `func callAsFunction` works with `throws` and `rethrows`.
+  * `func callAsFunction` works with trailing closures.
+
+* [SR-4206][]:
+
+  A method override is no longer allowed to have a generic signature with
+  requirements not imposed by the base method. For example:
 
   ```
-  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
-
-  enum Foo { case bar(x: Int, x: Int) }
-  let f: Foo = .bar(x: 0, x: 1)
+  protocol P {}
+  
+  class Base {
+    func foo<T>(arg: T) {}
+  }
+  
+  class Derived: Base {
+    override func foo<T: P>(arg: T) {}
+  }
   ```
 
-  will now be diagnosed as an error. 
-
-  Note: You can still use duplicate labels when declaring functions and
-  subscripts, as long as the internal labels are different. For example:
-
-  ```
-  func foo(bar x: Int, bar y: Int) {}
-  subscript(a x: Int, a y: Int) -> Int {}
-  ```
+  will now be diagnosed as an error.
 
 * [SR-6118][]:
 
@@ -67,6 +144,28 @@ Swift Next
 
 Swift 5.1
 ---------
+
+* [SR-8974][]:
+
+  Duplicate tuple element labels are no longer allowed, because it leads
+  to incorrect behavior. For example:
+
+  ```
+  let dupLabels: (foo: Int, foo: Int) = (foo: 1, foo: 2)
+
+  enum Foo { case bar(x: Int, x: Int) }
+  let f: Foo = .bar(x: 0, x: 1)
+  ```
+
+  will now be diagnosed as an error. 
+
+  Note: You can still use duplicate argument labels when declaring functions and
+  subscripts, as long as the internal parameter names are different. For example:
+
+  ```
+  func foo(bar x: Int, bar y: Int) {}
+  subscript(a x: Int, a y: Int) -> Int {}
+  ```
 
 * [SE-0244][]:
 
@@ -7692,6 +7791,7 @@ Swift 1.0
 [SE-0244]: <https://github.com/apple/swift-evolution/blob/master/proposals/0244-opaque-result-types.md>
 [SE-0245]: <https://github.com/apple/swift-evolution/blob/master/proposals/0245-array-uninitialized-initializer.md>
 [SE-0252]: <https://github.com/apple/swift-evolution/blob/master/proposals/0252-keypath-dynamic-member-lookup.md>
+[SE-0253]: <https://github.com/apple/swift-evolution/blob/master/proposals/0253-callable.md>
 [SE-0254]: <https://github.com/apple/swift-evolution/blob/master/proposals/0254-static-subscripts.md>
 
 [SR-106]: <https://bugs.swift.org/browse/SR-106>
@@ -7708,6 +7808,7 @@ Swift 1.0
 [SR-2608]: <https://bugs.swift.org/browse/SR-2608>
 [SR-2672]: <https://bugs.swift.org/browse/SR-2672>
 [SR-2688]: <https://bugs.swift.org/browse/SR-2688>
+[SR-4206]: <https://bugs.swift.org/browse/SR-4206>
 [SR-4248]: <https://bugs.swift.org/browse/SR-4248>
 [SR-5581]: <https://bugs.swift.org/browse/SR-5581>
 [SR-5719]: <https://bugs.swift.org/browse/SR-5719>
@@ -7721,3 +7822,4 @@ Swift 1.0
 [SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
+[SR-11298]: <https://bugs.swift.org/browse/SR-11298>

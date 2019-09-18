@@ -1426,6 +1426,7 @@ private:
       // we could try to fish it out of the generic signature constraints on the
       // base.
       NodePointer ID = demangleIdentifier();
+      if (!ID) return nullptr;
       assocTy = Factory.createNode(Node::Kind::DependentAssociatedTypeRef);
       if (!assocTy) return nullptr;
       assocTy->addChild(ID, Factory);

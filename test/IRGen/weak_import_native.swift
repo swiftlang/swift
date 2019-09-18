@@ -180,7 +180,7 @@ extension S : RefinesP {}
 
 // We should not hoist the metadata accessor accross the version check.
 
-// CHECK-DAG-LABEL: define{{.*}} void @"$s18weak_import_native28test_not_hoist_weakly_linkedyyF"()
+// CHECK-LABEL: define{{.*}} void @"$s18weak_import_native28test_not_hoist_weakly_linkedyyF"()
 // CHECK-NOT: 15ResilientStructVMa
 // CHECK: getVersion
 // CHECK: br
@@ -193,7 +193,7 @@ public func test_not_hoist_weakly_linked() {
   }
 }
 
-// CHECK-DAG-LABEL: define{{.*}} void @"$s18weak_import_native29test_not_hoist_weakly_linked2yyF"()
+// CHECK-LABEL: define{{.*}} void @"$s18weak_import_native29test_not_hoist_weakly_linked2yyF"()
 // CHECK-NOT: 15ResilientStructVMa
 // CHECK: getVersion
 // CHECK: br
@@ -209,7 +209,7 @@ struct One<T> {
   var elt : T?
 }
 
-// CHECK-DAG-LABEL: define{{.*}} void @"$s18weak_import_native29test_not_hoist_weakly_linked3yyF"()
+// CHECK-LABEL: define{{.*}} void @"$s18weak_import_native29test_not_hoist_weakly_linked3yyF"()
 // CHECK-NOT: 15ResilientStructVMa
 // CHECK: getVersion
 // CHECK: br
@@ -221,7 +221,7 @@ public func test_not_hoist_weakly_linked3() {
   }
 }
 
-// CHECK-DAG-LABEL: define{{.*}} void @"$s18weak_import_native29test_not_hoist_weakly_linked4yyF"()
+// CHECK-LABEL: define{{.*}} void @"$s18weak_import_native29test_not_hoist_weakly_linked4yyF"()
 // CHECK-NOT: 15ResilientStructVMa
 // CHECK: getVersion
 // CHECK: br
@@ -233,7 +233,7 @@ public func test_not_hoist_weakly_linked4() {
   }
 }
 
-// CHECK-DAG-LABEL: define{{.*}} @"$s18weak_import_native29test_weakly_linked_enum_cases1eSi0a1_b1_C7_helper1EO_t
+// CHECK-LABEL: define{{.*}} @"$s18weak_import_native29test_weakly_linked_enum_cases1eSi0a1_b1_C7_helper1EO_t
 // CHECK:  [[TAG:%.*]] = call i32 %getEnumTag(
 // CHECK:  [[STRONG_CASE:%.*]] = load i32, i32* @"$s25weak_import_native_helper1EO6strongyA2CmFWC"
 // CHECK:  [[IS_STRONG:%.*]] = icmp eq i32 [[TAG]], [[STRONG_CASE]]

@@ -145,7 +145,7 @@ func eleven_two() {
 enum Twelve { case Payload(Int) }
 func twelve_helper(_ fn: (Int, Int) -> ()) {}
 func twelve() {
-  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
+  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(Int, Int) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
     } catch Twelve.Payload(a...b) {
@@ -158,7 +158,7 @@ func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
 
 func thirteen_helper(_ fn: (Thirteen) -> ()) {}
 func thirteen() {
-  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
+  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(Thirteen) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {
       try thrower()
     } catch a {
@@ -209,17 +209,37 @@ class SR_6400_B: SR_6400_FakeApplicationDelegate & Error {}
 func sr_6400_4() {
   do {
     throw SR_6400_E.castError
-  } catch let error as SR_6400_A { // expected-warning {{cast from 'Error' to unrelated type 'SR_6400_A' always fails}} // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
-    print("Foo")
+  } catch let error as SR_6400_A { // Okay
+    print(error)
   } catch {
     print("Bar")
   }
   
   do {
     throw SR_6400_E.castError
-  } catch let error as SR_6400_B { // expected-warning {{immutable value 'error' was never used; consider replacing with '_' or removing it}}
-    print("Foo")
+  } catch let error as SR_6400_B { // Okay
+    print(error)
   } catch {
     print("Bar")
+  }
+}
+
+// SR-11402
+
+protocol SR_11402_P {}
+class SR_11402_Superclass {}
+class SR_11402_Subclass: SR_11402_Superclass, SR_11402_P {}
+
+func sr_11402_func1(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Superclass { // Okay
+    print(y)
+  }
+}
+
+final class SR_11402_Final {}
+
+func sr_11402_func2(_ x: SR_11402_P) {
+  if let y = x as? SR_11402_Final { // expected-warning {{cast from 'SR_11402_P' to unrelated type 'SR_11402_Final' always fails}}
+    print(y)
   }
 }

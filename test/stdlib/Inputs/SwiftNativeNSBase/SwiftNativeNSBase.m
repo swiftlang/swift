@@ -69,14 +69,17 @@ BOOL TestSwiftNativeNSBase_UnwantedCdtors()
       @"__SwiftNativeNSSetBase",
       @"__SwiftNativeNSStringBase",
       @"__SwiftNativeNSEnumeratorBase",
-      @"__SwiftNativeNSDataBase",
-      @"__SwiftNativeNSIndexSetBase",
       nil];
 
   for (unsigned int i = 0; i < classCount; i++) {
     Class cls = classes[i];
     NSString *name = @(class_getName(cls));
     if (! ([name hasPrefix:@"__SwiftNativeNS"] && [name hasSuffix:@"Base"])) {
+      continue;
+    }
+    if ([name isEqual: @"__SwiftNativeNSDataBase"] ||
+        [name isEqual: @"__SwiftNativeNSIndexSetBase"]) {
+      //These two were removed but are still present when back-deploying
       continue;
     }
     if (! [expectedClasses containsObject:name]) {

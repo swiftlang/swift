@@ -1,0 +1,54 @@
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output > %t.txt
+RUN: %FileCheck %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
+
+CHECK-DAG: System/Library/Frameworks{{\\|/}}Simple.framework{{\\|/}}Modules{{\\|/}}Simple.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Simple.swiftmodule{{\\|/}}xyz.swiftmodule
+CHECK-DAG: usr/lib/swift{{\\|/}}Flat.swiftinterface -o {{.+}}output{{\\|/}}Flat.swiftmodule
+CHECK-DAG: usr/lib/swift{{\\|/}}Normal.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Normal.swiftmodule{{\\|/}}xyz.swiftmodule
+CHECK-DAG: System/iOSSupport/System/Library/Frameworks{{\\|/}}Simple.framework{{\\|/}}Modules{{\\|/}}Simple.swiftmodule{{\\|/}}xyzzy.swiftinterface -o {{.+}}output{{\\|/}}Simple.swiftmodule{{\\|/}}xyzzy.swiftmodule
+CHECK-DAG: System/iOSSupport/usr/lib/swift{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz.swiftmodule
+
+NEGATIVE-NOT: BAD
+
+RUN: env SDKROOT=%S/Inputs/mock-sdk/ %swift_build_sdk_interfaces -v -n -o %t/output > %t.txt
+RUN: %FileCheck %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
+
+# Make sure the stdlib is processed first.
+RUN: %empty-directory(%t)
+RUN: cp -r %S/Inputs/mock-sdk %t/sdk
+RUN: mkdir %t/sdk/usr/lib/swift/Swift.swiftmodule
+RUN: touch %t/sdk/usr/lib/swift/Swift.swiftmodule/abc.swiftinterface
+RUN: touch %t/sdk/usr/lib/swift/Swift.swiftmodule/def.swiftinterface
+RUN: %swift_build_sdk_interfaces -sdk %t/sdk -v -n -o %t/output | %FileCheck -check-prefix CHECK-WITH-STDLIB %s
+
+CHECK-WITH-STDLIB-NOT: .swiftinterface -o
+CHECK-WITH-STDLIB: Swift.swiftmodule{{\\|/}}{{abc|def}}.swiftinterface -o
+CHECK-WITH-STDLIB-NOT: .swiftinterface -o
+CHECK-WITH-STDLIB: Swift.swiftmodule{{\\|/}}{{abc|def}}.swiftinterface -o
+CHECK-WITH-STDLIB: .swiftinterface -o
+
+# ...unless we pass -skip-stdlib.
+RUN: %swift_build_sdk_interfaces -sdk %t/sdk -v -n -o %t/output -skip-stdlib > %t.txt
+RUN: %FileCheck -check-prefix CHECK-SKIP-STDLIB %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE-SKIP-STDLIB %s < %t.txt
+
+CHECK-SKIP-STDLIB: .swiftinterface -o
+NEGATIVE-SKIP-STDLIB-NOT: Swift.swiftmodule
+
+# Check custom searching based on positional arguments.
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output System/Library/PrivateFrameworks > %t.txt
+RUN: %FileCheck -check-prefix CHECK-CUSTOM-PATHS %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE-CUSTOM-PATHS %s < %t.txt
+
+CHECK-CUSTOM-PATHS-DAG: System/Library/PrivateFrameworks{{\\|/}}PrivateSimple.framework{{\\|/}}Modules{{\\|/}}PrivateSimple.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}PrivateSimple.swiftmodule{{\\|/}}xyz.swiftmodule
+CHECK-CUSTOM-PATHS-DAG: usr/lib/swift{{\\|/}}Flat.swiftinterface -o {{.+}}output{{\\|/}}Flat.swiftmodule
+CHECK-CUSTOM-PATHS-DAG: usr/lib/swift{{\\|/}}Normal.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Normal.swiftmodule{{\\|/}}xyz.swiftmodule
+CHECK-CUSTOM-PATHS-DAG: System/iOSSupport/usr/lib/swift{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Caramel.swiftmodule{{\\|/}}xyz.swiftmodule
+NEGATIVE-CUSTOM-PATHS-NOT: System/Library/Frameworks/
+
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/mock-sdk/ -v -n -o %t/output System/Library/Frameworks System/Library/PrivateFrameworks > %t.txt
+RUN: %FileCheck -check-prefix CHECK-CUSTOM-PATHS -check-prefix CHECK-NORMAL-PATHS %s < %t.txt
+RUN: %FileCheck -check-prefix NEGATIVE %s < %t.txt
+
+CHECK-NORMAL-PATHS-DAG: System/Library/Frameworks{{\\|/}}Simple.framework{{\\|/}}Modules{{\\|/}}Simple.swiftmodule{{\\|/}}xyz.swiftinterface -o {{.+}}output{{\\|/}}Simple.swiftmodule{{\\|/}}xyz.swiftmodule

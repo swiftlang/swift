@@ -15,11 +15,18 @@ module WinSDK [system] [extern_c] {
     header "WinSock2.h"
     header "WS2tcpip.h"
     export *
+
+    link "WS2_32.Lib"
   }
 
   module core {
     module acl {
       header "AclAPI.h"
+      export *
+    }
+
+    module compress {
+      header "compressapi.h"
       export *
     }
 
@@ -58,9 +65,12 @@ module WinSDK [system] [extern_c] {
       export *
     }
 
+    // iphlpapi.dll
     module iphlp {
       header "iphlpapi.h"
       export *
+
+      link "iphlpapi.lib"
     }
 
     // api-ms-win-core-libloader-l1-1-0.dll
@@ -106,6 +116,13 @@ module WinSDK [system] [extern_c] {
     }
   }
 
+  module AuthZ {
+    header "AuthZ.h"
+    export *
+
+    link "AuthZ.Lib"
+  }
+
   module CommCtrl {
     header "CommCtrl.h"
     export *
@@ -117,9 +134,26 @@ module WinSDK [system] [extern_c] {
     export *
   }
 
+  module DFS {
+    header "LMDFS.h"
+    header "LM.h"
+    export *
+
+    link "NetAPI32.Lib"
+  }
+
   module DbgHelp {
     header "DbgHelp.h"
     export *
+
+    link "DbgHelp.Lib"
+  }
+
+  module FCI {
+    header "fci.h"
+    export *
+
+    link "Cabinet.Lib"
   }
 
   module Shell {
@@ -130,6 +164,15 @@ module WinSDK [system] [extern_c] {
   module ShellAPI {
     header "Shlwapi.h"
     export *
+
+    link "ShLwApi.Lib"
+  }
+
+  module OLE32 {
+    header "oaidl.h"
+    export *
+
+    link "OleAut32.Lib"
   }
 
   module User {
@@ -140,6 +183,22 @@ module WinSDK [system] [extern_c] {
   module WinCrypt {
     header "wincrypt.h"
     export *
+
+    link "Crypt32.Lib"
+  }
+
+  module WinDNS {
+    header "WinDNS.h"
+    export *
+
+    link "DnsAPI.Lib"
+  }
+
+  module WinReg {
+    header "winreg.h"
+    export *
+
+    link "AdvAPI32.Lib"
   }
 }
 

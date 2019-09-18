@@ -49,12 +49,16 @@ validateModule(llvm::StringRef data, bool Verbose,
                swift::serialization::ValidationInfo &info,
                swift::serialization::ExtendedValidationInfo &extendedInfo) {
   info = swift::serialization::validateSerializedAST(data, &extendedInfo);
-  if (info.status != swift::serialization::Status::Valid)
+  if (info.status != swift::serialization::Status::Valid) {
+    llvm::outs() << "error: validateSerializedAST() failed\n";
     return false;
+  }
 
   swift::CompilerInvocation CI;
-  if (CI.loadFromSerializedAST(data) != swift::serialization::Status::Valid)
+  if (CI.loadFromSerializedAST(data) != swift::serialization::Status::Valid) {
+    llvm::outs() << "error: loadFromSerializedAST() failed\n";
     return false;
+  }
 
   if (Verbose) {
     if (!info.shortVersion.empty())
@@ -216,9 +220,9 @@ int main(int argc, char **argv) {
       desc("The directory that holds the compiler resource files"),
       cat(Visible));
 
-  opt<bool> EnableDWARFImporter(
-      "enable-dwarf-importer",
-      desc("Import with LangOptions.EnableDWARFImporter = true"), cat(Visible));
+  opt<bool> DummyDWARFImporter(
+      "dummy-dwarfimporter",
+      desc("Install a dummy DWARFImporterDelegate"), cat(Visible));
 
   ParseCommandLineOptions(argc, argv);
 
@@ -260,6 +264,8 @@ int main(int argc, char **argv) {
   swift::serialization::ValidationInfo info;
   swift::serialization::ExtendedValidationInfo extendedInfo;
   for (auto &Module : Modules) {
+    info = {};
+    extendedInfo = {};
     if (!validateModule(StringRef(Module.first, Module.second), Verbose, info,
                         extendedInfo)) {
       llvm::errs() << "Malformed module!\n";
@@ -277,25 +283,36 @@ int main(int argc, char **argv) {
           reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   // Infer SDK and Target triple from the module.
-  Invocation.setSDKPath(extendedInfo.getSDKPath());
+  if (!extendedInfo.getSDKPath().empty())
+    Invocation.setSDKPath(extendedInfo.getSDKPath());
   Invocation.setTargetTriple(info.targetTriple);
 
   Invocation.setModuleName("lldbtest");
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.getLangOptions().EnableMemoryBufferImporter = true;
-  Invocation.getLangOptions().EnableDWARFImporter = EnableDWARFImporter;
 
   if (!ResourceDir.empty()) {
     Invocation.setRuntimeResourcePath(ResourceDir);
   }
 
-  if (CI.setup(Invocation))
+  if (CI.setup(Invocation)) {
+    llvm::errs() << "error: Failed setup invocation!\n";
     return 1;
+  }
+
+  swift::DWARFImporterDelegate dummyDWARFImporter;
+  if (DummyDWARFImporter) {
+    auto *ClangImporter = static_cast<swift::ClangImporter *>(
+        CI.getASTContext().getClangModuleLoader());
+    ClangImporter->setDWARFImporterDelegate(dummyDWARFImporter);
+  }
 
   for (auto &Module : Modules)
     if (!parseASTSection(*CI.getMemoryBufferSerializedModuleLoader(),
-                         StringRef(Module.first, Module.second), modules))
+                         StringRef(Module.first, Module.second), modules)) {
+      llvm::errs() << "error: Failed to parse AST section!\n";
       return 1;
+    }
 
   // Attempt to import all modules we found.
   for (auto path : modules) {

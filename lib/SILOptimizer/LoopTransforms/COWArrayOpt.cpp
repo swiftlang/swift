@@ -309,7 +309,7 @@ static bool isRelease(SILInstruction *Inst, SILValue RetainedValue,
       }
 
   if (auto *AI = dyn_cast<ApplyInst>(Inst)) {
-    if (auto *F = AI->getReferencedFunction()) {
+    if (auto *F = AI->getReferencedFunctionOrNull()) {
       auto Params = F->getLoweredFunctionType()->getParameters();
       auto Args = AI->getArguments();
       for (unsigned ArgIdx = 0, ArgEnd = Params.size(); ArgIdx != ArgEnd;

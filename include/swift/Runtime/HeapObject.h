@@ -23,7 +23,7 @@
 
 #if SWIFT_OBJC_INTEROP
 #include <objc/objc.h>
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 // Bring in the definition of HeapObject 
 #include "../../../stdlib/public/SwiftShims/HeapObject.h"
@@ -665,7 +665,7 @@ static inline void *swift_nonatomic_unknownObjectRetain_n(void *value, int n) {
 }
 
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 SWIFT_RUNTIME_EXPORT
 void swift_bridgeObjectRelease(void *value);
@@ -721,7 +721,7 @@ static inline void swift_nonatomic_unknownObjectRelease_n(void *value, int n) {
   swift_nonatomic_release_n(static_cast<HeapObject *>(value), n);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 /*****************************************************************************/
 /************************** UNKNOWN WEAK REFERENCES **************************/
@@ -744,7 +744,7 @@ static inline WeakReference *swift_unknownObjectWeakInit(WeakReference *ref,
   return swift_weakInit(ref, static_cast<HeapObject *>(value));
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -763,7 +763,7 @@ static inline WeakReference *swift_unknownObjectWeakAssign(WeakReference *ref,
   return swift_weakAssign(ref, static_cast<HeapObject *>(value));
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -781,7 +781,7 @@ static inline void *swift_unknownObjectWeakLoadStrong(WeakReference *ref) {
   return static_cast<void *>(swift_weakLoadStrong(ref));
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -800,7 +800,7 @@ static inline void *swift_unknownObjectWeakTakeStrong(WeakReference *ref) {
   return static_cast<void *>(swift_weakTakeStrong(ref));
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -815,7 +815,7 @@ static inline void swift_unknownObjectWeakDestroy(WeakReference *object) {
   swift_weakDestroy(object);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -833,7 +833,7 @@ swift_unknownObjectWeakCopyInit(WeakReference *dest, WeakReference *src) {
   return swift_weakCopyInit(dest, src);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -851,7 +851,7 @@ swift_unknownObjectWeakTakeInit(WeakReference *dest, WeakReference *src) {
   return swift_weakTakeInit(dest, src);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -869,7 +869,7 @@ swift_unknownObjectWeakCopyAssign(WeakReference *dest, WeakReference *src) {
   return swift_weakCopyAssign(dest, src);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -887,7 +887,7 @@ swift_unknownObjectWeakTakeAssign(WeakReference *dest, WeakReference *src) {
   return swift_weakTakeAssign(dest, src);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 /*****************************************************************************/
 /************************ UNKNOWN UNOWNED REFERENCES *************************/
@@ -910,7 +910,7 @@ swift_unknownObjectUnownedInit(UnownedReference *ref, void *value) {
   return ref;
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -929,7 +929,7 @@ swift_unknownObjectUnownedAssign(UnownedReference *ref, void *value) {
   return ref;
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -945,7 +945,7 @@ swift_unknownObjectUnownedLoadStrong(UnownedReference *ref) {
   return swift_unownedLoadStrong(ref);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -961,7 +961,7 @@ swift_unknownObjectUnownedTakeStrong(UnownedReference *ref) {
   return swift_unownedTakeStrong(ref);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
   
@@ -975,7 +975,7 @@ static inline void swift_unknownObjectUnownedDestroy(UnownedReference *ref) {
   swift_unownedDestroy(ref);
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -995,7 +995,7 @@ swift_unknownObjectUnownedCopyInit(UnownedReference *dest,
   return dest;
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -1014,7 +1014,7 @@ swift_unknownObjectUnownedTakeInit(UnownedReference *dest,
   return dest;
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -1034,7 +1034,7 @@ swift_unknownObjectUnownedCopyAssign(UnownedReference *dest,
   return dest;
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -1054,7 +1054,7 @@ swift_unknownObjectUnownedTakeAssign(UnownedReference *dest,
   return dest;
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
 
@@ -1070,7 +1070,7 @@ static inline bool swift_unknownObjectUnownedIsEqual(UnownedReference *ref,
   return swift_unownedIsEqual(ref, static_cast<HeapObject *>(value));
 }
 
-#endif /* SWIFT_OBJC_INTEROP */
+#endif // SWIFT_OBJC_INTEROP
 
 struct TypeNamePair {
   const char *data;
@@ -1086,4 +1086,4 @@ swift_getTypeName(const Metadata *type, bool qualified);
 
 } // end namespace swift
 
-#endif /* SWIFT_RUNTIME_ALLOC_H */
+#endif // SWIFT_RUNTIME_ALLOC_H

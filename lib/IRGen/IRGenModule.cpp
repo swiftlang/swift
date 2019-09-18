@@ -266,7 +266,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
-    SizeTy                  // size_t Offset;
+    Int32Ty                 // int32_t Offset;
   });
   TupleTypeMetadataPtrTy = createStructPointerType(*this, "swift.tuple_type", {
     TypeMetadataStructTy,   // (base)
@@ -535,21 +535,38 @@ static bool isReturnAttribute(llvm::Attribute::AttrKind Attr);
 namespace RuntimeConstants {
   const auto ReadNone = llvm::Attribute::ReadNone;
   const auto ReadOnly = llvm::Attribute::ReadOnly;
+  const auto ArgMemOnly = llvm::Attribute::ArgMemOnly;
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
   const auto FirstParamReturned = llvm::Attribute::Returned;
-  
-  bool AlwaysAvailable(ASTContext &Context) {
-    return false;
+
+  RuntimeAvailability AlwaysAvailable(ASTContext &Context) {
+    return RuntimeAvailability::AlwaysAvailable;
   }
-  
-  bool OpaqueTypeAvailability(ASTContext &Context) {
+
+  bool
+  isDeploymentAvailabilityContainedIn(ASTContext &Context,
+                                      AvailabilityContext featureAvailability) {
     auto deploymentAvailability =
       AvailabilityContext::forDeploymentTarget(Context);
+    return deploymentAvailability.isContainedIn(featureAvailability);
+  }
+
+  RuntimeAvailability OpaqueTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getOpaqueTypeAvailability();
-    
-    return !deploymentAvailability.isContainedIn(featureAvailability);
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability DynamicReplacementAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getSwift51Availability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::AvailableByCompatibilityLibrary;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
   }
 } // namespace RuntimeConstants
 
@@ -594,13 +611,31 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                       llvm::Constant *&cache,
                       const char *name,
                       llvm::CallingConv::ID cc,
-                      bool isWeakLinked,
+                      RuntimeAvailability availability,
                       llvm::ArrayRef<llvm::Type*> retTypes,
                       llvm::ArrayRef<llvm::Type*> argTypes,
                       ArrayRef<Attribute::AttrKind> attrs) {
+
   if (cache)
     return cache;
-  
+
+  bool isWeakLinked = false;
+  std::string functionName(name);
+
+  switch (availability) {
+  case RuntimeAvailability::AlwaysAvailable:
+    // Nothing to do.
+    break;
+  case RuntimeAvailability::ConditionallyAvailable: {
+    isWeakLinked = true;
+    break;
+  }
+  case RuntimeAvailability::AvailableByCompatibilityLibrary: {
+    functionName.append("50");
+    break;
+  }
+  }
+
   llvm::Type *retTy;
   if (retTypes.size() == 1)
     retTy = *retTypes.begin();
@@ -612,7 +647,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  cache = Module.getOrInsertFunction(name, fnTy);
+  cache = Module.getOrInsertFunction(functionName.c_str(), fnTy);
 
   // Add any function attributes and set the calling convention.
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
@@ -667,7 +702,7 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
-                        (AVAILABILITY)(this->Context),                         \
+                        AVAILABILITY(this->Context),                          \
                         RETURNS, ARGS, ATTRS);                                 \
   }
 
@@ -856,17 +891,30 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
   return feature == "+thumb-mode";
 }
 
+void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
+                                     bool HasFramePointer) {
+  if (HasFramePointer) {
+    Attrs.addAttribute("no-frame-pointer-elim", "true");
+    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
+  } else {
+    Attrs.addAttribute("no-frame-pointer-elim", "false");
+    Attrs.removeAttribute("no-frame-pointer-elim-non-leaf");
+  }
+}
+
+void IRGenModule::setHasFramePointer(llvm::Function *F,
+                                     bool HasFramePointer) {
+  llvm::AttrBuilder b;
+  setHasFramePointer(b, HasFramePointer);
+  F->addAttributes(llvm::AttributeList::FunctionIndex, b);
+}
+
 /// Construct initial function attributes from options.
 void IRGenModule::constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                                OptimizationMode FuncOptMode) {
-  // Add DisableFPElim. 
-  if (!IRGen.Opts.DisableFPElim) {
-    Attrs.addAttribute("no-frame-pointer-elim", "false");
-  } else {
-    Attrs.addAttribute("no-frame-pointer-elim", "true");
-    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
-  }
-
+  // Add frame pointer attributes.
+  setHasFramePointer(Attrs, IRGen.Opts.DisableFPElim);
+  
   // Add target-cpu and target-features if they are non-null.
   auto *Clang = static_cast<ClangImporter *>(Context.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();
@@ -975,6 +1023,12 @@ llvm::SmallString<32> getTargetDependentLibraryOption(const llvm::Triple &T,
 void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   llvm::LLVMContext &ctx = Module.getContext();
 
+  // The debugger gets the autolink information directly from
+  // the LinkLibraries of the module, so there's no reason to
+  // emit it into the IR of debugger expressions.
+  if (Context.LangOpts.DebuggerSupport)
+    return;
+  
   switch (linkLib.getKind()) {
   case LibraryKind::Library: {
     llvm::SmallString<32> opt =
@@ -1112,7 +1166,13 @@ void IRGenModule::emitAutolinkInfo() {
     }
     auto EntriesConstant = llvm::ConstantDataArray::getString(
         LLVMContext, EntriesString, /*AddNull=*/false);
-
+    // Mark the swift1_autolink_entries section with the SHF_EXCLUDE attribute
+    // to get the linker to drop it in the final linked binary.
+    // LLVM doesn't provide an interface to specify section attributs in the IR
+    // so we pass the attribute with inline assembly.
+    if (TargetInfo.OutputObjectFormat == llvm::Triple::ELF)
+      Module.appendModuleInlineAsm(".section .swift1_autolink_entries,"
+                                   "\"0x80000000\"");
     auto var =
         new llvm::GlobalVariable(*getModule(), EntriesConstant->getType(), true,
                                  llvm::GlobalValue::PrivateLinkage,
@@ -1124,7 +1184,7 @@ void IRGenModule::emitAutolinkInfo() {
   }
 
   if (!IRGen.Opts.ForceLoadSymbolName.empty() &&
-      isFirstObjectFileInModule(*this)) {
+      (Triple.supportsCOMDAT() || isFirstObjectFileInModule(*this))) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, IRGen.Opts.ForceLoadSymbolName);
     auto ForceImportThunk =
@@ -1132,6 +1192,9 @@ void IRGenModule::emitAutolinkInfo() {
                                llvm::GlobalValue::ExternalLinkage, buf,
                                &Module);
     ApplyIRLinkage(IRLinkage::ExternalExport).to(ForceImportThunk);
+    if (Triple.supportsCOMDAT())
+      if (auto *GO = cast<llvm::GlobalObject>(ForceImportThunk))
+        GO->setComdat(Module.getOrInsertComdat(ForceImportThunk->getName()));
 
     auto BB = llvm::BasicBlock::Create(getLLVMContext(), "", ForceImportThunk);
     llvm::IRBuilder<> IRB(BB);

@@ -38,7 +38,11 @@ PATTERN_NODES = [
     # identifier-pattern -> identifier
     Node('IdentifierPattern', kind='Pattern',
          children=[
-             Child('Identifier', kind='IdentifierToken')
+             Child('Identifier', kind='Token',
+                   token_choices=[
+                       'SelfToken',
+                       'IdentifierToken',
+                   ]),
          ]),
 
     # as-pattern -> pattern 'as' type

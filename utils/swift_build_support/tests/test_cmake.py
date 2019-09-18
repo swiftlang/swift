@@ -9,6 +9,7 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import os
+import platform
 import unittest
 from argparse import Namespace
 
@@ -22,8 +23,11 @@ class CMakeTestCase(unittest.TestCase):
     def mock_distcc_path(self):
         """Return a path string of mock distcc executable
         """
-        return os.path.join(os.path.dirname(__file__),
-                            'mock-distcc')
+        if platform.system() == 'Windows':
+            executable = 'mock-distcc.cmd'
+        else:
+            executable = 'mock-distcc'
+        return os.path.join(os.path.dirname(__file__), executable)
 
     def default_args(self):
         """Return new args object with default values
@@ -495,6 +499,47 @@ class CMakeOptionsTestCase(unittest.TestCase):
             "-G", "Ninja",
             "-DOPT1_1=VAL1",
             "-DOPT1_2=VAL2"])
+
+    def test_initial_options_with_tuples(self):
+        options = CMakeOptions([('FOO', 'foo'), ('BAR', True)])
+        self.assertIn('-DFOO=foo', options)
+        self.assertIn('-DBAR=TRUE', options)
+
+    def test_initial_options_with_other_options(self):
+        options = CMakeOptions()
+        options.define('FOO', 'foo')
+        options.define('BAR', True)
+        derived = CMakeOptions(options)
+        self.assertIn('-DFOO=foo', derived)
+        self.assertIn('-DBAR=TRUE', derived)
+
+    def test_booleans_are_translated(self):
+        options = CMakeOptions()
+        options.define('A_BOOLEAN_OPTION', True)
+        options.define('ANOTHER_BOOLEAN_OPTION', False)
+        self.assertIn('-DA_BOOLEAN_OPTION=TRUE', options)
+        self.assertIn('-DANOTHER_BOOLEAN_OPTION=FALSE', options)
+
+    def test_extend_with_other_options(self):
+        options = CMakeOptions()
+        options.define('FOO', 'foo')
+        options.define('BAR', True)
+        derived = CMakeOptions()
+        derived.extend(options)
+        self.assertIn('-DFOO=foo', derived)
+        self.assertIn('-DBAR=TRUE', derived)
+
+    def test_extend_with_tuples(self):
+        options = CMakeOptions()
+        options.extend([('FOO', 'foo'), ('BAR', True)])
+        self.assertIn('-DFOO=foo', options)
+        self.assertIn('-DBAR=TRUE', options)
+
+    def test_contains(self):
+        options = CMakeOptions()
+        self.assertTrue('-DFOO=foo' not in options)
+        options.define('FOO', 'foo')
+        self.assertTrue('-DFOO=foo' in options)
 
 
 if __name__ == '__main__':

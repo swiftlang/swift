@@ -116,7 +116,7 @@
 // RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CLOSURE_2 > %t.super.txt
-// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT < %t.super.txt
+// RUN: %FileCheck %s -check-prefix=COMMON_BASE_A_DOT_CONTEXT < %t.super.txt
 // RUN: %FileCheck %s -check-prefix=CLOSURE_2 < %t.super.txt
 // RUN: %FileCheck %s -check-prefix=NO_CONSTRUCTORS < %t.super.txt
 
@@ -226,6 +226,15 @@ extension SuperBaseA {
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceVar]/CurrNominal:    baseExtProp[#Int#]{{; name=.+$}}
 // COMMON_BASE_A_DOT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
 // COMMON_BASE_A_DOT: End completions
+
+// COMMON_BASE_A_DOT_CONTEXT: Begin completions
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseInstanceVar[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseFunc1({#(a): Int#})[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Identical]: baseExtProp[#Int#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal: baseExtFunc0()[#Void#]{{; name=.+$}}
+// COMMON_BASE_A_DOT_CONTEXT: End completions
 
 class SuperDerivedA : SuperBaseA {
   var derivedInstanceVar: Int
@@ -514,7 +523,7 @@ class Closures : SuperBaseA {
   }
 
   func bar() {
-    let inner = { () -> Void in
+    let inner = { () -> Int in
       // CLOSURE_2: Begin completions, 6 items
       // CLOSURE_2: End completions
       super.#^CLOSURE_2^#

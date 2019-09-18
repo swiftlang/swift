@@ -66,6 +66,22 @@ public:
   void setType(Type Ty);
 
   TypeLoc clone(ASTContext &ctx) const;
+  
+  friend llvm::hash_code hash_value(const TypeLoc &owner) {
+    return hash_combine(llvm::hash_value(owner.Ty.getPointer()),
+                        llvm::hash_value(owner.TyR));
+  }
+
+  friend bool operator==(const TypeLoc &lhs,
+                         const TypeLoc &rhs) {
+    return lhs.Ty.getPointer() == rhs.Ty.getPointer()
+        && lhs.TyR == rhs.TyR;
+  }
+
+  friend bool operator!=(const TypeLoc &lhs,
+                         const TypeLoc &rhs) {
+    return !(lhs == rhs);
+  }
 };
 
 } // end namespace llvm

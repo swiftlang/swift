@@ -112,7 +112,7 @@ class KlassWithBuffer {
   var buffer: Buffer
 
   // Make sure that the allocating init forwards into the initializing init at +1.
-  // CHECK-LABEL: sil hidden [ossa] @$ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
+  // CHECK-LABEL: sil hidden [exact_self_class] [ossa] @$ss15KlassWithBufferC3inKABs0A0C_tcfC : $@convention(method) (@owned Klass, @thick KlassWithBuffer.Type) -> @owned KlassWithBuffer {
   // CHECK: bb0([[ARG:%.*]] : @owned $Klass,
   // CHECK:   [[INITIALIZING_INIT:%.*]] = function_ref @$ss15KlassWithBufferC3inKABs0A0C_tcfc : $@convention(method) (@owned Klass, @owned KlassWithBuffer) -> @owned KlassWithBuffer
   // CHECK:   apply [[INITIALIZING_INIT]]([[ARG]],

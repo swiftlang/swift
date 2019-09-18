@@ -14,8 +14,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_ABI_SYSTEM_H
-#define SWIFT_ABI_SYSTEM_H
+#ifndef SWIFT_STDLIB_SHIMS_ABI_SYSTEM_H
+#define SWIFT_STDLIB_SHIMS_ABI_SYSTEM_H
 
 // In general, these macros are expected to expand to host-independent
 // integer constant expressions.  This allows the same data to feed
@@ -192,4 +192,4 @@
 #define SWIFT_ABI_S390X_OBJC_WEAK_REFERENCE_MARKER_VALUE \
   (1<<SWIFT_ABI_S390X_OBJC_NUM_RESERVED_LOW_BITS)
 
-#endif /* SWIFT_ABI_SYSTEM_H */
+#endif // SWIFT_STDLIB_SHIMS_ABI_SYSTEM_H

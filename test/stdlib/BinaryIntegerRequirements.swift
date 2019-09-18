@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conform to protocol 'BinaryInteger'}}
+struct MyInt: FixedWidthInteger { // expected-error {{type 'MyInt' does not conform to protocol 'BinaryInteger'}} expected-note 3 {{do you want to add protocol stubs?}}
   typealias IntegerLiteralType = Int
   static let isSigned = false
   init(integerLiteral value: Int) { fatalError() }

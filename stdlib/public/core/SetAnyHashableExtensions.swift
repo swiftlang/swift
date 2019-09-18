@@ -16,7 +16,7 @@
 
 extension Set where Element == AnyHashable {
   @inlinable
-  public mutating func insert<ConcreteElement : Hashable>(
+  public mutating func insert<ConcreteElement: Hashable>(
     _ newMember: __owned ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {
     let (inserted, memberAfterInsert) =
@@ -28,7 +28,7 @@ extension Set where Element == AnyHashable {
 
   @inlinable
   @discardableResult
-  public mutating func update<ConcreteElement : Hashable>(
+  public mutating func update<ConcreteElement: Hashable>(
     with newMember: __owned ConcreteElement
   ) -> ConcreteElement? {
     return update(with: AnyHashable(newMember))
@@ -37,7 +37,7 @@ extension Set where Element == AnyHashable {
 
   @inlinable
   @discardableResult
-  public mutating func remove<ConcreteElement : Hashable>(
+  public mutating func remove<ConcreteElement: Hashable>(
     _ member: ConcreteElement
   ) -> ConcreteElement? {
     return remove(AnyHashable(member))

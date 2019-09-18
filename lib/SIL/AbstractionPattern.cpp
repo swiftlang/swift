@@ -16,13 +16,15 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "libsil"
-#include "swift/SIL/TypeLowering.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/GenericSignature.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/GenericSignature.h"
+#include "swift/AST/ModuleLoader.h"
+#include "swift/SIL/TypeLowering.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/PrettyPrinter.h"
 #include "llvm/Support/Debug.h"
@@ -153,6 +155,13 @@ AbstractionPattern::getCurriedCFunctionAsMethod(CanType origType,
 }
 
 AbstractionPattern
+AbstractionPattern::getCurriedCXXMethod(CanType origType,
+                                        const AbstractFunctionDecl *function) {
+  auto clangMethod = cast<clang::CXXMethodDecl>(function->getClangDecl());
+  return getCurriedCXXMethod(origType, clangMethod);
+}
+
+AbstractionPattern
 AbstractionPattern::getOptional(AbstractionPattern object) {
   switch (object.getKind()) {
   case Kind::Invalid:
@@ -164,6 +173,9 @@ AbstractionPattern::getOptional(AbstractionPattern object) {
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
     llvm_unreachable("cannot add optionality to non-type abstraction");
   case Kind::Opaque:
     return AbstractionPattern::getOpaque();
@@ -223,6 +235,9 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
   case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
     return false;
   case Kind::Opaque:
     return true;
@@ -285,6 +300,9 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
   case Kind::ObjCMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
     llvm_unreachable("function types are not tuples");
   case Kind::Opaque:
     return *this;
@@ -341,6 +359,25 @@ AbstractionPattern::getCFunctionAsMethodSelfPattern(CanType selfType) const {
                            getGenericSignatureForFunctionComponent(), selfType);
 }
 
+AbstractionPattern
+AbstractionPattern::getCXXMethodSelfPattern(CanType selfType) const {
+  assert(hasStoredCXXMethod());
+  auto CXXMethod = getCXXMethod();
+  if (CXXMethod->isInstance()) {
+    // Use the clang type for the receiver type.  If this is ever
+    // insufficient --- if we have interesting bridging to do to
+    // 'self' --- we have the right information to be more exact.
+    auto clangSelfType =
+        CXXMethod->getThisType(CXXMethod->getASTContext()).getTypePtr();
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              selfType, clangSelfType);
+  }
+  // The formal metatype parameter to a C++ function imported as a static method
+  // is dropped on the floor. Leave it untransformed.
+  return AbstractionPattern::getDiscard(
+      getGenericSignatureForFunctionComponent(), selfType);
+}
+
 static CanType getResultType(CanType type) {
   return cast<AnyFunctionType>(type).getResult();
 }
@@ -368,6 +405,11 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                               getResultType(getType()),
                               clangFunctionType->getReturnType().getTypePtr());    
   }
+  case Kind::CXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              getResultType(getType()),
+                              getCXXMethod()->getReturnType().getTypePtr());
   case Kind::CurriedObjCMethodType:
     return getPartialCurriedObjCMethod(
                               getGenericSignatureForFunctionComponent(),
@@ -380,6 +422,9 @@ AbstractionPattern AbstractionPattern::getFunctionResultType() const {
                                       getResultType(getType()),
                                       getClangType(),
                                       getImportAsMemberStatus());
+  case Kind::CurriedCXXMethodType:
+    return getPartialCurriedCXXMethod(getGenericSignatureForFunctionComponent(),
+                                      getResultType(getType()), getCXXMethod());
   case Kind::PartialCurriedObjCMethodType:
   case Kind::ObjCMethodType:
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
@@ -405,6 +450,11 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     auto params = cast<AnyFunctionType>(getType()).getParams();
     assert(params.size() == 1);
     return getCFunctionAsMethodSelfPattern(params[0].getParameterType());
+  }
+  case Kind::CurriedCXXMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+    assert(params.size() == 1);
+    return getCXXMethodSelfPattern(params[0].getParameterType());
   }
   case Kind::CFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType: {
@@ -434,6 +484,31 @@ AbstractionPattern::getFunctionParamType(unsigned index) const {
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               paramType,
                      getClangFunctionParameterType(getClangType(), clangIndex));
+  }
+  case Kind::CXXMethodType:
+  case Kind::PartialCurriedCXXMethodType: {
+    auto params = cast<AnyFunctionType>(getType()).getParams();
+
+    // Only the full method type has a 'self' parameter.
+    if (getKind() == Kind::CXXMethodType) {
+      assert(params.size() > 0);
+
+      // The last parameter is 'self'.
+      if (index == params.size() - 1) {
+        return getCXXMethodSelfPattern(params.back().getParameterType());
+      }
+    }
+
+    // A parameter of type () does not correspond to a Clang parameter.
+    auto paramType = params[index].getParameterType();
+    if (paramType->isVoid())
+      return AbstractionPattern(paramType);
+
+    // Otherwise, we're talking about the formal parameter clause.
+    auto methodType = getCXXMethod()->getType().getTypePtr();
+    return AbstractionPattern(getGenericSignatureForFunctionComponent(),
+                              paramType,
+                              getClangFunctionParameterType(methodType, index));
   }
   case Kind::CurriedObjCMethodType: {
     auto params = cast<AnyFunctionType>(getType()).getParams();
@@ -509,6 +584,9 @@ AbstractionPattern AbstractionPattern::getOptionalObjectType() const {
   case Kind::CFunctionAsMethodType:
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
   case Kind::Tuple:
     llvm_unreachable("pattern for function or tuple cannot be for optional");
 
@@ -545,6 +623,9 @@ AbstractionPattern AbstractionPattern::getReferenceStorageReferentType() const {
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
   case Kind::Tuple:
     return *this;
   case Kind::Type:
@@ -600,12 +681,21 @@ void AbstractionPattern::print(raw_ostream &out) const {
   case Kind::CurriedCFunctionAsMethodType:
   case Kind::PartialCurriedCFunctionAsMethodType:
   case Kind::CFunctionAsMethodType:
+  case Kind::CXXMethodType:
+  case Kind::CurriedCXXMethodType:
+  case Kind::PartialCurriedCXXMethodType:
     out << (getKind() == Kind::ClangType
               ? "AP::ClangType(" :
             getKind() == Kind::CurriedCFunctionAsMethodType
               ? "AP::CurriedCFunctionAsMethodType(" :
             getKind() == Kind::CFunctionAsMethodType
-              ? "AP::CFunctionAsMethodType("
+              ? "AP::CFunctionAsMethodType(" :
+            getKind() == Kind::CXXMethodType
+              ? "AP::CXXMethodType(" :
+            getKind() == Kind::CurriedCXXMethodType
+              ? "AP::CurriedCXXMethodType(" :
+            getKind() == Kind::PartialCurriedCXXMethodType
+              ? "AP::PartialCurriedCXXMethodType("
               : "AP::PartialCurriedCFunctionAsMethodType(");
     getType().dump(out);
     out << ", ";

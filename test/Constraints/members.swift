@@ -465,7 +465,7 @@ struct Outer {
 }
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
-print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+print("hello")[0] // expected-error {{value of type '()' has no subscripts}}
 
 
 func rdar40537782() {
@@ -522,7 +522,7 @@ class A {}
 
 enum B {
   static func foo() {
-    bar(A()) // expected-error {{'A' is not convertible to 'B'}}
+    bar(A()) // expected-error {{instance member 'bar' cannot be used on type 'B'}}
   }
 
   func bar(_: A) {}
@@ -602,8 +602,10 @@ func rdar50679161() {
         var _ = Q(
           a: v + foo.w,
           // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
           b: v + foo.h
           // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
         )
       }
     }
@@ -626,4 +628,31 @@ func rdar_50467583_and_50909555() {
   func test(_ s: S) {
     s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
   }
+}
+
+// SR-9396 (rdar://problem/46427500) - Nonsensical error message related to constrained extensions
+struct SR_9396<A, B> {}
+
+extension SR_9396 where A == Bool {  // expected-note {{where 'A' = 'Int'}}
+  func foo() {}
+}
+
+func test_sr_9396(_ s: SR_9396<Int, Double>) {
+  s.foo() // expected-error {{referencing instance method 'foo()' on 'SR_9396' requires the types 'Int' and 'Bool' be equivalent}}
+}
+
+// rdar://problem/34770265 - Better diagnostic needed for constrained extension method call
+extension Dictionary where Key == String { // expected-note {{where 'Key' = 'Int'}}
+  func rdar_34770265_key() {}
+}
+
+extension Dictionary where Value == String { // expected-note {{where 'Value' = 'Int'}}
+  func rdar_34770265_val() {}
+}
+
+func test_34770265(_ dict: [Int: Int]) {
+  dict.rdar_34770265_key()
+  // expected-error@-1 {{referencing instance method 'rdar_34770265_key()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
+  dict.rdar_34770265_val()
+  // expected-error@-1 {{referencing instance method 'rdar_34770265_val()' on 'Dictionary' requires the types 'Int' and 'String' be equivalent}}
 }

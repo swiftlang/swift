@@ -39,6 +39,6 @@ test()
 // FIXME: We need a way to distinguish the different types of coverage instrumentation
 // that isn't really fragile. For now just check there's at least one call to the function
 // used to increment coverage count at a particular PC.
-// SANCOV: call void @__sanitizer_cov
-
 // SANCOV_TRACE_CMP: call void @__sanitizer_cov_trace_cmp
+
+// SANCOV: call void @__sanitizer_cov

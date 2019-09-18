@@ -118,9 +118,10 @@ public:
   using SILBuilder::createCopy##Name##Value;                             \
   ManagedValue createCopy##Name##Value(SILLocation loc,                        \
                                        ManagedValue originalValue);
-#define UNCHECKED_REF_STORAGE(Name, ...) \
-  ManagedValue createUnsafeCopy##Name##Value(SILLocation loc, \
-                                             ManagedValue originalValue);
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  using SILBuilder::createCopy##Name##Value;                                   \
+  ManagedValue createCopy##Name##Value(SILLocation loc,                        \
+                                       ManagedValue originalValue);
 #include "swift/AST/ReferenceStorage.def"
 
   ManagedValue createOwnedPhiArgument(SILType type);

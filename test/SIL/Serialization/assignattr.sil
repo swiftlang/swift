@@ -2,21 +2,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name assignattr
 // RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name assignattr
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name assignattr | %FileCheck %s
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name assignattr -emit-sorted-sil | %FileCheck %s
 
 sil_stage raw
 
 import Builtin
-
-// CHECK-LABEL: sil [serialized] [ossa] @trivial_assign : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
-// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.Int32, [[ARG2:%[0-9]+]] : $Builtin.Int32):
-// CHECK: assign [[ARG2]] to [init] [[ARG1]] : $*Builtin.Int32
-sil [serialized] [ossa] @trivial_assign : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
-bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
-  assign %1 to [init] %0 : $*Builtin.Int32
-  %2 = tuple()
-  return %2 : $()
-}
 
 // CHECK-LABEL: sil [serialized] [ossa] @non_trivial_assign : $@convention(thin) (@in Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.NativeObject, [[ARG2:%[0-9]+]] : @owned $Builtin.NativeObject):
@@ -30,4 +20,14 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   assign %1 to [reinit] %0 : $*Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @trivial_assign : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
+// CHECK: bb0([[ARG1:%[0-9]+]] : $*Builtin.Int32, [[ARG2:%[0-9]+]] : $Builtin.Int32):
+// CHECK: assign [[ARG2]] to [init] [[ARG1]] : $*Builtin.Int32
+sil [serialized] [ossa] @trivial_assign : $@convention(thin) (@in Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0 : $*Builtin.Int32, %1 : $Builtin.Int32):
+  assign %1 to [init] %0 : $*Builtin.Int32
+  %2 = tuple()
+  return %2 : $()
 }

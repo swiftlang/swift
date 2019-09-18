@@ -28,6 +28,7 @@ class SubscriptDecl;
 class TypeChecker;
 class ValueDecl;
 class VarDecl;
+class InFlightDiagnostic;
 
 using llvm::Optional;
 
@@ -49,6 +50,8 @@ public:
     ExplicitlyIBOutlet,
     /// Has an explicit '@IBAction' attribute.
     ExplicitlyIBAction,
+    /// Has an explicit '@IBSegueAction' attribute.
+    ExplicitlyIBSegueAction,
     /// Has an explicit '@NSManaged' attribute.
     ExplicitlyNSManaged,
     /// Is a member of an @objc protocol.
@@ -136,6 +139,26 @@ bool canBeRepresentedInObjC(const ValueDecl *decl);
 ///
 /// NOTE: This is only here to support the --enable-source-import hack.
 void checkBridgedFunctions(ASTContext &ctx);
+
+/// Attach Fix-Its to the given diagnostic that updates the name of the
+/// given declaration to the desired target name.
+///
+/// \returns false if the name could not be fixed.
+bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
+                        DeclName targetName);
+
+/// Fix the Objective-C name of the given declaration to match the provided
+/// Objective-C selector.
+///
+/// \param ignoreImpliedName When true, ignore the implied name of the
+/// given declaration, because it no longer applies.
+///
+/// For properties, the selector should be a zero-parameter selector of the
+/// given property's name.
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
+                            Optional<ObjCSelector> nameOpt,
+                            Optional<ObjCSelector> targetNameOpt,
+                            bool ignoreImpliedName = false);
 
 } // end namespace swift
 

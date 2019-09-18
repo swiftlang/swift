@@ -1,6 +1,6 @@
 // REQUIRES: no_asan
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking %S/Inputs/TypeLowering.swift -parse-as-library -emit-module -emit-library -module-name TypeLowering -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) -binary-filename %platform-module-dir/%target-library-name(swiftCore) -dump-type-lowering < %s | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
 
 12TypeLowering11BasicStructV
@@ -1140,3 +1140,51 @@ BO
 
 // CHECK-32:      (builtin Builtin.UnknownObject)
 // CHECK-32-NEXT: (reference kind=strong refcounting=unknown)
+
+12TypeLowering22RefersToOtherAssocTypeV
+// CHECK-64:      (struct TypeLowering.RefersToOtherAssocType)
+// CHECK-64-NEXT: (struct size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:   (field name=x offset=0
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:       (field name=_value offset=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=y offset=4
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:       (field name=_value offset=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+
+// CHECK-32:      (struct TypeLowering.RefersToOtherAssocType)
+// CHECK-32-NEXT: (struct size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:   (field name=x offset=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:       (field name=_value offset=0
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:   (field name=y offset=4
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:       (field name=_value offset=0
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+
+12TypeLowering18GenericOnAssocTypeVyAA13OpaqueWitnessVG
+// CHECK-64:      (bound_generic_struct TypeLowering.GenericOnAssocType
+// CHECK-64-NEXT:   (struct TypeLowering.OpaqueWitness))
+// CHECK-64-NEXT: (struct size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:   (field name=x offset=0
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:       (field name=_value offset=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-64-NEXT:   (field name=y offset=4
+// CHECK-64-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:       (field name=_value offset=0
+// CHECK-64-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))
+
+// CHECK-32:      (bound_generic_struct TypeLowering.GenericOnAssocType
+// CHECK-32-NEXT:   (struct TypeLowering.OpaqueWitness))
+// CHECK-32-NEXT: (struct size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:   (field name=x offset=0
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:       (field name=_value offset=0
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
+// CHECK-32-NEXT:   (field name=y offset=4
+// CHECK-32-NEXT:     (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:       (field name=_value offset=0
+// CHECK-32-NEXT:         (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1)))))

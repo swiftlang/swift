@@ -64,7 +64,7 @@ public struct Reference {
   public var n: Class
 }
 
-@_frozen public enum Either {
+@frozen public enum Either {
   case Left(Reference)
   case Right(Reference)
 }
@@ -79,11 +79,11 @@ enum InternalEither {
   case Right(Reference)
 }
 
-@_fixed_layout public struct ReferenceFast {
+@frozen public struct ReferenceFast {
   public var n: Class
 }
 
-@_frozen public enum EitherFast {
+@frozen public enum EitherFast {
   case Left(ReferenceFast)
   case Right(ReferenceFast)
 }

@@ -88,7 +88,7 @@ def main():
         help='In addition to stdout, write the results into a markdown file')
     argparser.add_argument(
         '-threshold', type=float,
-        help='The performance threshold in % which triggers a re-run',
+        help='The performance threshold in %% which triggers a re-run',
         default=5)
     argparser.add_argument(
         '-num-samples', type=int,

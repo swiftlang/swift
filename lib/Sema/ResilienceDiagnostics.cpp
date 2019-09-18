@@ -228,7 +228,7 @@ static bool diagnoseDeclExportability(SourceLoc loc, const ValueDecl *D,
 
 static bool
 diagnoseGenericArgumentsExportability(SourceLoc loc,
-                                      const SubstitutionMap &subs,
+                                      SubstitutionMap subs,
                                       const SourceFile &userSF) {
   bool hadAnyIssues = false;
   for (ProtocolConformanceRef conformance : subs.getConformances()) {
@@ -265,6 +265,7 @@ void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
   public:
     GenericTypeFinder(const SourceFile &SF, Callback callback)
         : SF(SF), callback(callback) {}
+
 
     Action visitBoundGenericType(BoundGenericType *ty) override {
       ModuleDecl *useModule = SF.getParentModule();

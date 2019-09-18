@@ -20,7 +20,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/PropertyDelegates.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
@@ -42,7 +42,7 @@ static SILValue emitConstructorMetatypeArg(SILGenFunction &SGF,
   auto *DC = ctor->getInnermostDeclContext();
   auto &AC = SGF.getASTContext();
   auto VD =
-      new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                          AC.getIdentifier("$metatype"), SourceLoc(),
                          AC.getIdentifier("$metatype"), DC);
   VD->setInterfaceType(metatype);
@@ -69,7 +69,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   }
 
   auto &AC = SGF.getASTContext();
-  auto VD = new (AC) ParamDecl(VarDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+  auto VD = new (AC) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
                                SourceLoc(),
                                AC.getIdentifier("$implicit_value"),
@@ -98,33 +98,33 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
   return RValue(SGF, loc, type, mvArg);
 }
 
-/// If the field has a property delegate for which we will need to call the
-/// delegate type's init(initialValue:), set up that evaluation and call the
-/// \c body with the expression to form the property delegate instance from
+/// If the field has a property wrapper for which we will need to call the
+/// wrapper type's init(wrapperValue:), set up that evaluation and call the
+/// \c body with the expression to form the property wrapper instance from
 /// the initial value type.
 ///
-/// \returns true if this was such a delegate, \c false otherwise.
-static bool maybeEmitPropertyDelegateInitFromValue(
+/// \returns true if this was such a wrapper, \c false otherwise.
+static bool maybeEmitPropertyWrapperInitFromValue(
     SILGenFunction &SGF,
     SILLocation loc,
     VarDecl *field,
     RValue &&arg,
     llvm::function_ref<void(Expr *)> body) {
-  auto originalProperty = field->getOriginalDelegatedProperty();
+  auto originalProperty = field->getOriginalWrappedProperty();
   if (!originalProperty ||
-      !originalProperty->isPropertyDelegateInitializedWithInitialValue())
+      !originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
     return false;
 
-  auto delegateInfo = originalProperty->getPropertyDelegateBackingPropertyInfo();
-  if (!delegateInfo || !delegateInfo.initializeFromOriginal)
+  auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
+  if (!wrapperInfo || !wrapperInfo.initializeFromOriginal)
     return false;
 
   SILGenFunction::OpaqueValueRAII opaqueValue(
       SGF,
-      delegateInfo.underlyingValue,
+      wrapperInfo.underlyingValue,
       std::move(arg).getAsSingleValue(SGF, loc));
 
-  body(delegateInfo.initializeFromOriginal);
+  body(wrapperInfo.initializeFromOriginal);
   return true;
 }
 
@@ -142,7 +142,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
   SILValue resultSlot;
   if (SILModuleConventions::isReturnedIndirectlyInSIL(selfTy, SGF.SGM.M)) {
     auto &AC = SGF.getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -183,7 +183,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                "number of args does not match number of fields");
         (void)eltEnd;
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-        if (!maybeEmitPropertyDelegateInitFromValue(
+        if (!maybeEmitPropertyWrapperInitFromValue(
               SGF, Loc, field, std::move(*elti),
               [&](Expr *expr) {
                 SGF.emitExprInto(expr, init.get());
@@ -221,7 +221,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      if (!maybeEmitPropertyDelegateInitFromValue(
+      if (!maybeEmitPropertyWrapperInitFromValue(
             SGF, Loc, field, std::move(*elti),
             [&](Expr *expr) {
               v = SGF.emitRValue(expr)
@@ -303,7 +303,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
   auto resultType = ctor->mapTypeIntoContext(ctor->getResultInterfaceType());
   auto &resultLowering = getTypeLowering(resultType);
 
-  if (ctor->getFailability() != OTK_None) {
+  if (ctor->isFailable()) {
     SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
 
     // On failure, we'll clean up everything (except self, which should have
@@ -366,7 +366,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                                     LoadOwnershipQualifier::Copy);
 
       // Inject the self value into an optional if the constructor is failable.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         selfValue = B.createEnum(cleanupLoc, selfValue,
                                  getASTContext().getOptionalSomeDecl(),
                                  getLoweredLoadableType(resultType));
@@ -379,19 +379,15 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
       // Get the address to which to store the result.
       SILValue completeReturnAddress = F.getIndirectResults()[0];
       SILValue returnAddress;
-      switch (ctor->getFailability()) {
-      // For non-failable initializers, store to the return address directly.
-      case OTK_None:
+      if  (!ctor->isFailable()) {
+        // For non-failable initializers, store to the return address directly.
         returnAddress = completeReturnAddress;
-        break;
-      // If this is a failable initializer, project out the payload.
-      case OTK_Optional:
-      case OTK_ImplicitlyUnwrappedOptional:
+      } else {
+        // If this is a failable initializer, project out the payload.
         returnAddress = B.createInitEnumDataAddr(cleanupLoc,
                                                  completeReturnAddress,
-                                       getASTContext().getOptionalSomeDecl(),
+                                         getASTContext().getOptionalSomeDecl(),
                                                  selfLV->getType());
-        break;
       }
       
       // We have to do a non-take copy because someone else may be using the
@@ -400,7 +396,7 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
                        IsNotTake, IsInitialization);
       
       // Inject the enum tag if the result is optional because of failability.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         // Inject the 'Some' tag.
         B.createInjectEnumAddr(cleanupLoc, completeReturnAddress,
                                getASTContext().getOptionalSomeDecl());
@@ -447,7 +443,7 @@ void SILGenFunction::emitEnumConstructor(EnumElementDecl *element) {
   std::unique_ptr<Initialization> dest;
   if (enumTI.isAddressOnly() && silConv.useLoweredAddresses()) {
     auto &AC = getASTContext();
-    auto VD = new (AC) ParamDecl(VarDecl::Specifier::InOut,
+    auto VD = new (AC) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  AC.getIdentifier("$return_value"),
                                  SourceLoc(),
@@ -556,6 +552,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // For a designated initializer, we know that the static type being
     // allocated is the type of the class that defines the designated
     // initializer.
+    F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
@@ -686,7 +683,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
   SILArgument *failureExitArg = nullptr;
   auto &resultLowering = getTypeLowering(resultType);
 
-  if (ctor->getFailability() != OTK_None) {
+  if (ctor->isFailable()) {
     SILBasicBlock *failureBB = createBasicBlock(FunctionSection::Postmatter);
 
     RegularLocation loc(ctor);
@@ -785,7 +782,7 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
     }
 
     // Inject the self value into an optional if the constructor is failable.
-    if (ctor->getFailability() != OTK_None) {
+    if (ctor->isFailable()) {
       RegularLocation loc(ctor);
       loc.markAutoGenerated();
       selfArg = B.createEnum(loc, selfArg,
@@ -911,11 +908,11 @@ static Type getInitializationTypeInContext(
   auto interfaceType = pattern->getType()->mapTypeOutOfContext();
 
   // If this pattern is initializing the backing storage for a property
-  // with an attached delegate that is initialized with `=`, the
+  // with an attached wrapper that is initialized with `=`, the
   // initialization type is the original property type.
   if (auto singleVar = pattern->getSingleVar()) {
-    if (auto originalProperty = singleVar->getOriginalDelegatedProperty()) {
-      if (originalProperty->isPropertyDelegateInitializedWithInitialValue())
+    if (auto originalProperty = singleVar->getOriginalWrappedProperty()) {
+      if (originalProperty->isPropertyWrapperInitializedWithInitialValue())
         interfaceType = originalProperty->getValueInterfaceType();
     }
   }
@@ -978,14 +975,18 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
                                   SGFContext());
 
         // If we have the backing storage for a property with an attached
-        // property delegate initialized with `=`, inject the value into an
-        // instance of the delegate.
+        // property wrapper initialized with `=`, inject the value into an
+        // instance of the wrapper.
         if (auto singleVar = pbd->getSingleVar()) {
-          (void)maybeEmitPropertyDelegateInitFromValue(
-              *this, init, singleVar, std::move(result),
-              [&](Expr *expr) {
-                result = emitRValue(expr);
-              });
+          auto originalVar = singleVar->getOriginalWrappedProperty();
+          if (originalVar &&
+              originalVar->isPropertyWrapperInitializedWithInitialValue()) {
+            (void)maybeEmitPropertyWrapperInitFromValue(
+                *this, init, singleVar, std::move(result),
+                [&](Expr *expr) {
+                  result = emitRValue(expr);
+                });
+          }
         }
 
         emitMemberInit(*this, selfDecl, entry.getPattern(), std::move(result));

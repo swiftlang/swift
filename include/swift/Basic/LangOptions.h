@@ -37,18 +37,8 @@ namespace swift {
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
-    /// The active os target (OSX, iOS, Linux, etc.)
-    OS,
-    /// The active arch target (x86_64, i386, arm, arm64, etc.)
-    Arch,
-    /// The active endianness target (big or little)
-    Endianness,
-    /// Runtime support (_ObjC or _Native)
-    Runtime,
-    /// Conditional import of module
-    CanImport,
-    /// Target Environment (currently just 'simulator' or absent)
-    TargetEnvironment,
+#define PLATFORM_CONDITION(LABEL, IDENTIFIER) LABEL,
+#include "swift/AST/PlatformConditionKinds.def"
   };
 
   /// Describes which Swift 3 Objective-C inference warnings should be
@@ -88,13 +78,21 @@ namespace swift {
     bool DisableAvailabilityChecking = false;
 
     /// Maximum number of typo corrections we are allowed to perform.
-    unsigned TypoCorrectionLimit = 10;
+    /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
+    unsigned TypoCorrectionLimit = 0;
     
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
     /// Enable 'availability' restrictions for App Extensions.
     bool EnableAppExtensionRestrictions = false;
+
+    /// Require public declarations to declare an introduction OS version.
+    bool RequireExplicitAvailability = false;
+
+    /// Introduction platform and version to suggest as fix-it
+    /// when using RequireExplicitAvailability.
+    std::string RequireExplicitAvailabilityTarget;
 
     ///
     /// Support for alternate usage modes
@@ -107,9 +105,6 @@ namespace swift {
     /// Only used by lldb-moduleimport-test.
     bool EnableMemoryBufferImporter = false;
 
-    /// Enable the DWARFImporter. Only used by lldb-moduleimport-test.
-    bool EnableDWARFImporter = false;
-    
     /// Allows using identifiers with a leading dollar.
     bool EnableDollarIdentifiers = false;
 
@@ -138,6 +133,12 @@ namespace swift {
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
+
+    /// Enable C++ interop code generation and build configuration
+    /// options. Disabled by default because there is no way to control the
+    /// language mode of clang on a per-header or even per-module basis. Also
+    /// disabled because it is not complete.
+    bool EnableCXXInterop = false;
 
     /// On Darwin platforms, use the pre-stable ABI's mark bit for Swift
     /// classes instead of the stable ABI's bit. This is needed when
@@ -201,6 +202,9 @@ namespace swift {
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
+    /// Enable one-way constraints in function builders.
+    bool FunctionBuilderOneWayConstraints = true;
+
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 
@@ -239,7 +243,26 @@ namespace swift {
     bool EnableDeserializationRecovery = true;
 
     /// Should we use \c ASTScope-based resolution for unqualified name lookup?
+    /// Default is in \c ParseLangArgs
+    ///
+    /// This is a staging flag; eventually it will be removed.
     bool EnableASTScopeLookup = false;
+
+    /// Someday, ASTScopeLookup will supplant lookup in the parser
+    bool DisableParserLookup = false;
+
+    /// Should  we compare to ASTScope-based resolution for debugging?
+    bool CompareToASTScopeLookup = false;
+
+    /// Should  we stress ASTScope-based resolution for debugging?
+    bool StressASTScopeLookup = false;
+
+    /// Since some tests fail if the warning is output, use a flag to decide
+    /// whether it is. The warning is useful for testing.
+    bool WarnIfASTScopeLookup = false;
+
+    /// Build the ASTScope tree lazily
+    bool LazyASTScopes = true;
 
     /// Whether to use the import as member inference system
     ///
@@ -297,18 +320,10 @@ namespace swift {
     /// and faster rebuilds.
     bool EnableExperimentalDependencies = false;
     
-    /// Enable the experimental opaque result types feature.
-    bool EnableOpaqueResultTypes = true;
-    
     /// To mimic existing system, set to false.
     /// To experiment with including file-private and private dependency info,
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
-
-    /// Enable experimental support for emitting Objective-C resilient class
-    /// stubs. This is a language option since it also determines if we admit
-    /// @objc members in extensions of classes with resilient ancestry.
-    bool EnableObjCResilientClassStubs = false;
 
     /// Sets the target we are building for and updates platform conditions
     /// to match.
@@ -403,14 +418,25 @@ namespace swift {
     // - watchOS 5.2
     bool doesTargetSupportObjCGetClassHook() const;
 
+    // The following deployment targets ship an Objective-C runtime supporting
+    // the objc_loadClassref() entry point:
+    //
+    // - macOS 10.15
+    // - iOS 13
+    // - tvOS 13
+    // - watchOS 6
+    bool doesTargetSupportObjCClassStubs() const;
+
     /// Returns true if the given platform condition argument represents
     /// a supported target operating system.
     ///
-    /// \param suggestions Populated with suggested replacements
+    /// \param suggestedKind Populated with suggested replacement platform condition
+    /// \param suggestedValues Populated with suggested replacement values
     /// if a match is not found.
     static bool checkPlatformConditionSupported(
       PlatformConditionKind Kind, StringRef Value,
-      std::vector<StringRef> &suggestions);
+      PlatformConditionKind &suggestedKind,
+      std::vector<StringRef> &suggestedValues);
 
     /// Return a hash code of any components from these options that should
     /// contribute to a Swift Bridging PCH hash.

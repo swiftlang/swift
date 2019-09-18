@@ -39,6 +39,7 @@ protocol P {}
 
 // CHECK-LABEL: sil @$s22generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in T, Builtin.Int32) -> Builtin.Int32
 // CHECK:       bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $Builtin.Int32):
+// CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    return [[ARG1]] : $Builtin.Int32
 
 sil [ossa] @generic_promotable_box : $@convention(thin) <T> (@in T, @owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
@@ -46,6 +47,7 @@ entry(%0 : $*T, %b : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load [trivial] %a : $*Int
   destroy_value %b : $<τ_0_0> { var τ_0_0 } <Int>
+  destroy_addr %0 : $*T
   return %v : $Int
 }
 

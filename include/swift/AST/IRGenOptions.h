@@ -26,6 +26,8 @@
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
 #include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/VersionTuple.h"
 #include <string>
 #include <vector>
 
@@ -224,6 +226,10 @@ public:
   };
 
   TypeInfoDumpFilter TypeInfoFilter;
+  
+  /// Pull in runtime compatibility shim libraries by autolinking.
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityLibraryVersion;
+  Optional<llvm::VersionTuple> AutolinkRuntimeCompatibilityDynamicReplacementLibraryVersion;
 
   IRGenOptions()
       : DWARFVersion(2), OutputKind(IRGenOutputKind::LLVMAssembly),
@@ -248,13 +254,18 @@ public:
         SanitizeCoverage(llvm::SanitizerCoverageOptions()),
         TypeInfoFilter(TypeInfoDumpFilter::All) {}
 
-  // Get a hash of all options which influence the llvm compilation but are not
-  // reflected in the llvm module itself.
-  unsigned getLLVMCodeGenOptionsHash() {
-    unsigned Hash = (unsigned)OptMode;
-    Hash = (Hash << 1) | DisableLLVMOptzns;
-    Hash = (Hash << 1) | DisableSwiftSpecificLLVMOptzns;
-    return Hash;
+  /// Appends to \p os an arbitrary string representing all options which
+  /// influence the llvm compilation but are not reflected in the llvm module
+  /// itself.
+  void writeLLVMCodeGenOptionsTo(llvm::raw_ostream &os) {
+    // We put a letter between each value simply to keep them from running into
+    // one another. There might be a vague correspondence between meaning and
+    // letter, but don't sweat it.
+    os << 'O' << (unsigned)OptMode
+       << 'd' << DisableLLVMOptzns
+       << 'D' << DisableSwiftSpecificLLVMOptzns
+       << 'p' << GenerateProfile
+       << 's' << Sanitizers.toRaw();
   }
 
   /// Should LLVM IR value names be emitted and preserved?

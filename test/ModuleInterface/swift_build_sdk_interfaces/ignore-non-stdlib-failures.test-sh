@@ -1,0 +1,18 @@
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output | %FileCheck %s
+
+CHECK-DAG: # (FAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-DAG: # (PASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/xfails-sdk/ -v -o %t/output -ignore-non-stdlib-failures | %FileCheck -check-prefix=CHECK-IGNORING-FAILURES %s
+
+CHECK-IGNORING-FAILURES-DAG: # (XFAIL) {{.+}}{{\\|/}}Bad.swiftinterface
+CHECK-IGNORING-FAILURES-DAG: # (UPASS) {{.+}}{{\\|/}}Good.swiftinterface
+
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/broken-stdlib-sdk/ -v -o %t/output | %FileCheck -check-prefix CHECK-BROKEN-STDLIB %s
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/broken-stdlib-sdk/ -v -o %t/output -ignore-non-stdlib-failures | %FileCheck -check-prefix CHECK-BROKEN-STDLIB %s
+
+CHECK-BROKEN-STDLIB: # (FAIL) {{.+}}{{\\|/}}Swift.swiftinterface
+CHECK-BROKEN-STDLIB-NOT: {{^}}#
+
+RUN: not %swift_build_sdk_interfaces -sdk %S/Inputs/broken-stdlib-sdk/ -v -o %t/output -skip-stdlib | %FileCheck %s
+RUN: %swift_build_sdk_interfaces -sdk %S/Inputs/broken-stdlib-sdk/ -v -o %t/output -skip-stdlib -ignore-non-stdlib-failures | %FileCheck -check-prefix=CHECK-IGNORING-FAILURES %s

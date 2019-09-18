@@ -261,7 +261,7 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
     auto user = use->getUser();
     assert(!isa<BeginAccessInst>(user));
     assert(!isa<PartialApplyInst>(user) ||
-           onlyUsedByAssignByDelegate(cast<PartialApplyInst>(user)));
+           onlyUsedByAssignByWrapper(cast<PartialApplyInst>(user)));
   }
 #endif
 }

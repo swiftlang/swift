@@ -15,7 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/AST/Evaluator.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -48,8 +50,9 @@ Evaluator::getAbstractRequestFunction(uint8_t zoneID, uint8_t requestID) const {
 }
 
 void Evaluator::registerRequestFunctions(
-                               uint8_t zoneID,
+                               Zone zone,
                                ArrayRef<AbstractRequestFunction *> functions) {
+  uint8_t zoneID = static_cast<uint8_t>(zone);
 #ifndef NDEBUG
   for (const auto &zone : requestFunctionsByZone) {
     assert(zone.first != zoneID);
@@ -248,16 +251,46 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
   out << "digraph Dependencies {\n";
 
   // Emit the edges.
+  llvm::DenseMap<AnyRequest, unsigned> inDegree;
   for (const auto &source : allRequests) {
     auto known = dependencies.find(source);
     assert(known != dependencies.end());
     for (const auto &target : known->second) {
       out << "  " << getNodeName(source) << " -> " << getNodeName(target)
           << ";\n";
+      ++inDegree[target];
     }
   }
 
   out << "\n";
+
+  static const char *colorNames[] = {
+    "aquamarine",
+    "blueviolet",
+    "brown",
+    "burlywood",
+    "cadetblue",
+    "chartreuse",
+    "chocolate",
+    "coral",
+    "cornflowerblue",
+    "crimson"
+  };
+  const unsigned numColorNames = sizeof(colorNames) / sizeof(const char *);
+
+  llvm::DenseMap<unsigned, unsigned> knownBuffers;
+  auto getColor = [&](const AnyRequest &request) -> Optional<const char *> {
+    SourceLoc loc = request.getNearestLoc();
+    if (loc.isInvalid())
+      return None;
+
+    unsigned bufferID = diags.SourceMgr.findBufferContainingLoc(loc);
+    auto knownId = knownBuffers.find(bufferID);
+    if (knownId == knownBuffers.end()) {
+      knownId = knownBuffers.insert({bufferID, knownBuffers.size()}).first;
+    }
+    return colorNames[knownId->second % numColorNames];
+  };
 
   // Emit the nodes.
   for (unsigned i : indices(allRequests)) {
@@ -271,7 +304,48 @@ void Evaluator::printDependenciesGraphviz(llvm::raw_ostream &out) const {
       out << " -> ";
       printEscapedString(cachedValue->second.getAsString(), out);
     }
-    out << "\"];\n";
+    out << "\"";
+
+    if (auto color = getColor(request)) {
+      out << ", fillcolor=\"" << *color << "\"";
+    }
+
+    out << "];\n";
+  }
+
+  // Emit "fake" nodes for each of the source buffers we encountered, so
+  // we know which file we're working from.
+  // FIXME: This approximates a "top level" request for, e.g., type checking
+  // an entire source file.
+  std::vector<unsigned> sourceBufferIDs;
+  for (const auto &element : knownBuffers) {
+    sourceBufferIDs.push_back(element.first);
+  }
+  std::sort(sourceBufferIDs.begin(), sourceBufferIDs.end());
+  for (unsigned bufferID : sourceBufferIDs) {
+    out << "  buffer_" << bufferID << "[label=\"";
+    printEscapedString(diags.SourceMgr.getIdentifierForBuffer(bufferID), out);
+    out << "\"";
+
+    out << ", shape=\"box\"";
+    out << ", fillcolor=\""
+        << colorNames[knownBuffers[bufferID] % numColorNames] << "\"";
+    out << "];\n";
+  }
+
+  // Emit "false" dependencies from source buffer IDs to any requests that (1)
+  // have no other incomining edges and (2) can be associated with a source
+  // buffer.
+  for (const auto &request : allRequests) {
+    if (inDegree[request] > 0)
+      continue;
+
+    SourceLoc loc = request.getNearestLoc();
+    if (loc.isInvalid())
+      continue;
+
+    unsigned bufferID = diags.SourceMgr.findBufferContainingLoc(loc);
+    out << "  buffer_" << bufferID << " -> " << getNodeName(request) << ";\n";
   }
 
   // Done!

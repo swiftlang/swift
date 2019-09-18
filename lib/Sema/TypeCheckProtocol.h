@@ -658,11 +658,6 @@ class ConformanceChecker : public WitnessChecker {
          ValueDecl *requirement, bool isError,
          std::function<void(NormalProtocolConformance *)> fn);
 
-  void
-  addUsedConformances(ProtocolConformance *conformance,
-                      llvm::SmallPtrSetImpl<ProtocolConformance *> &visited);
-  void addUsedConformances(ProtocolConformance *conformance);
-
   ArrayRef<ValueDecl*> getLocalMissingWitness() {
     return GlobalMissingWitnesses.getArrayRef().
       slice(LocalMissingWitnessesStartIndex,
@@ -706,12 +701,7 @@ public:
 
   /// Check all of the protocols requirements are actually satisfied by a
   /// the chosen type witnesses.
-  ///
-  /// \param failUnsubstituted Whether to fail when the requirements of the
-  /// protocol could not be substituted (e.g., due to missing information).
-  /// When true, emits a diagnostic in such cases; when false, enqueues the
-  /// conformance for later checking.
-  void ensureRequirementsAreSatisfied(bool failUnsubstituted);
+  void ensureRequirementsAreSatisfied();
 
   /// Check the entire protocol conformance, ensuring that all
   /// witnesses are resolved and emitting any diagnostics.

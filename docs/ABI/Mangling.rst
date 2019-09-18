@@ -512,6 +512,7 @@ Types
   FUNCTION-KIND ::= 'U'                      // uncurried function type (currently not used)
   FUNCTION-KIND ::= 'K'                      // @auto_closure function type (noescape)
   FUNCTION-KIND ::= 'B'                      // objc block function type
+  FUNCTION-KIND ::= 'L'                      // objc block function type (escaping) (DWARF only; otherwise use 'B')
   FUNCTION-KIND ::= 'C'                      // C function pointer type
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
@@ -550,6 +551,11 @@ Types
   type ::= assoc-type-name 'Qz'                      // shortcut for 'Qyz'
   type ::= assoc-type-list 'QY' GENERIC-PARAM-INDEX  // associated type at depth
   type ::= assoc-type-list 'QZ'                      // shortcut for 'QYz'
+  
+  #if SWIFT_RUNTIME_VERSION >= 5.2
+    type ::= type assoc-type-name 'Qx' // associated type relative to base `type`
+    type ::= type assoc-type-list 'QX' // associated type relative to base `type`
+  #endif
 
   protocol-list ::= protocol '_' protocol*
   protocol-list ::= empty-list
@@ -716,8 +722,9 @@ conformance within the witness table, identified by the dependent type and
 protocol. In all cases, the DEPENDENT-CONFORMANCE-INDEX is an INDEX value
 indicating the position of the appropriate value within the generic environment
 (for "HD") or witness table (for "HI" and "HA") when it is known to be at a
-fixed position. A position of zero is used to indicate "unknown"; all other
-values are adjusted by 1.
+fixed position. An index of 1 ("0\_") is used to indicate "unknown"; all other
+values are adjusted by 2. That these indexes are not 0-based is a bug that's
+now codified into the ABI; the index 0 is therefore reserved.
 
 ::
 

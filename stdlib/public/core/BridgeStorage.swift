@@ -20,7 +20,7 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims
 
-@_fixed_layout
+@frozen
 @usableFromInline
 internal struct _BridgeStorage<NativeClass: AnyObject> {
   @usableFromInline

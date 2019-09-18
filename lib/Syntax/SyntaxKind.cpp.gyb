@@ -39,9 +39,15 @@ bool isTokenTextDetermined(tok kind) {
 }
 
 StringRef getTokenText(tok kind) {
-  auto text = getTokenTextInternal(kind);
-  assert(!text.empty() && "token kind cannot be determined");
-  return text;
+  return getTokenTextInternal(kind);
+}
+
+bool isTokenKeyword(tok kind) {
+  switch (kind) {
+#define KEYWORD(X) case tok::kw_##X: return true;
+#include "swift/Syntax/TokenKinds.def"
+  default: return false;
+  }
 }
 
 bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind) {

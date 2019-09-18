@@ -155,8 +155,8 @@ getFinalReleases(SILValue Box,
     // If we have a copy value or a mark_uninitialized, add its uses to the work
     // list and continue.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(cast<SingleValueInstruction>(User)->getUses(),
-           std::back_inserter(Worklist));
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
@@ -206,7 +206,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply);
 /// Could this operand to an apply escape that function by being
 /// stored or returned?
 static bool applyArgumentEscapes(FullApplySite Apply, Operand *O) {
-  SILFunction *F = Apply.getReferencedFunction();
+  SILFunction *F = Apply.getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
     return true;
@@ -233,7 +233,7 @@ static bool partialApplyEscapes(SILValue V, bool examineApply) {
     // uses might do so... so add the copy_value's uses to the worklist and
     // continue.
     if (auto CVI = dyn_cast<CopyValueInst>(User)) {
-      copy(CVI->getUses(), std::back_inserter(Worklist));
+      llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
       continue;
     }
 
@@ -283,7 +283,7 @@ static SILInstruction *findUnexpectedBoxUse(SILValue Box,
 /// disqualify it from being promoted to a stack location.  Return
 /// true if this partial apply will not block our promoting the box.
 static bool checkPartialApplyBody(Operand *O) {
-  SILFunction *F = ApplySite(O->getUser()).getReferencedFunction();
+  SILFunction *F = ApplySite(O->getUser()).getReferencedFunctionOrNull();
   // If we cannot examine the function body, assume the worst.
   if (!F || F->empty())
     return false;
@@ -331,8 +331,8 @@ findUnexpectedBoxUse(SILValue Box, bool examinePartialApply,
     // If our user instruction is a copy_value or a marked_uninitialized, visit
     // the users recursively.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
-      copy(cast<SingleValueInstruction>(User)->getUses(),
-           std::back_inserter(Worklist));
+      llvm::copy(cast<SingleValueInstruction>(User)->getUses(),
+                 std::back_inserter(Worklist));
       continue;
     }
 
@@ -407,7 +407,7 @@ static void replaceProjectBoxUsers(SILValue HeapBox, SILValue StackBox) {
     auto *CVI = dyn_cast<CopyValueInst>(Op->getUser());
     if (!CVI)
       continue;
-    copy(CVI->getUses(), std::back_inserter(Worklist));
+    llvm::copy(CVI->getUses(), std::back_inserter(Worklist));
   }
 }
 
@@ -436,8 +436,9 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
-      ABI->getLoc(), ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
-      ABI->getVarInfo());
+      ABI->getLoc(),
+      getSILBoxFieldType(ABI->getBoxType(), ABI->getModule().Types, 0),
+      ABI->getVarInfo(), ABI->hasDynamicLifetime());
 
   // Transfer a mark_uninitialized if we have one.
   SILValue StackBox = ASI;
@@ -453,7 +454,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
   auto &Lowering = ABI->getFunction()
-    ->getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
+    ->getTypeLowering(
+      getSILBoxFieldType(ABI->getBoxType(), ABI->getModule().Types, 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {
@@ -478,8 +480,10 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
     // Look through any mark_uninitialized, copy_values.
     if (isa<MarkUninitializedInst>(User) || isa<CopyValueInst>(User)) {
       auto Inst = cast<SingleValueInstruction>(User);
-      transform(Inst->getUses(), std::back_inserter(Worklist),
-                [](Operand *Op) -> SILInstruction * { return Op->getUser(); });
+      llvm::transform(Inst->getUses(), std::back_inserter(Worklist),
+                      [](Operand *Op) -> SILInstruction * {
+        return Op->getUser();
+      });
       Inst->replaceAllUsesWithUndef();
       Inst->eraseFromParent();
       continue;
@@ -579,9 +583,10 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
              && "promoting compound box not implemented");
       SILType paramTy;
       {
-        Lowering::GenericContextScope scope(Orig->getModule().Types,
+        auto &TC = Orig->getModule().Types;
+        Lowering::GenericContextScope scope(TC,
                                             OrigFTI->getGenericSignature());
-        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+        paramTy = getSILBoxFieldType(boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
@@ -645,7 +650,7 @@ PromotedParamCloner::populateCloned() {
       auto boxTy = (*I)->getType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting multi-field boxes not implemented yet");
-      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
+      auto promotedTy = getSILBoxFieldType(boxTy, Cloned->getModule().Types, 0);
       auto *promotedArg =
           ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       OrigPromotedParameters.insert(*I);
@@ -743,7 +748,7 @@ specializePartialApply(SILOptFunctionBuilder &FuncBuilder,
                        AllocBoxToStackState &pass) {
   auto *FRI = cast<FunctionRefInst>(PartialApply->getCallee());
   assert(FRI && "Expected a direct partial_apply!");
-  auto *F = FRI->getReferencedFunction();
+  auto *F = FRI->getReferencedFunctionOrNull();
   assert(F && "Expected a referenced function!");
 
   IsSerialized_t Serialized = IsNotSerialized;

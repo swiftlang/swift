@@ -75,6 +75,8 @@ BUILTIN_BINARY_OPERATION(ExactUDiv, "udiv_exact", "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION(URem,    "urem",     "n", Integer)
 BUILTIN_BINARY_OPERATION(FRem,    "frem",     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
+// This builtin is an optimizer hint and always returns the first argument.
+BUILTIN_BINARY_OPERATION(Expect, "int_expect", "n", Integer)
 #undef BUILTIN_BINARY_OPERATION
 
 /// These builtins are analogous the similarly named llvm intrinsics. The
@@ -316,7 +318,8 @@ BUILTIN_SIL_OPERATION(EndUnpairedAccess, "endUnpairedAccess", Special)
 
 /// condfail(Int1) -> ()
 /// Triggers a runtime failure if the condition is true.
-BUILTIN_SIL_OPERATION(CondFail, "condfail", Special)
+/// This builtin is deprecated. Use condfail_message instead.
+BUILTIN_SIL_OPERATION(LegacyCondFail, "condfail", Special)
 
 /// fixLifetime(T) -> ()
 /// Fixes the lifetime of any heap references in a value.
@@ -404,6 +407,10 @@ BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
           BUILTIN(Id, Name, Attrs)
 #endif
 
+/// condfail_message(Int1, RawPointer) -> ()
+/// Triggers a runtime failure if the condition is true.
+BUILTIN_MISC_OPERATION(CondFailMessage, "condfail_message", "", Special)
+
 /// Sizeof has type T.Type -> Int
 BUILTIN_MISC_OPERATION(Sizeof, "sizeof", "n", Special)
 
@@ -412,6 +419,14 @@ BUILTIN_MISC_OPERATION(Strideof, "strideof", "n", Special)
 
 /// IsPOD has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsPOD, "ispod", "n", Special)
+
+/// IsConcrete has type (T.Type) -> Bool
+///
+/// If the meta type T is concrete, we can always transform this to `true` at
+/// any time in SIL. If it's generic, then we lower it to `false` right before
+/// IRGen in IRGenPrepare. This allows for the optimizer to specialize this at
+/// -O and eliminate conditional code.
+BUILTIN_MISC_OPERATION(IsConcrete, "isConcrete", "n", Special)
 
 /// IsBitwiseTakable has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
@@ -550,6 +565,20 @@ BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
 /// poundAssert has type (Builtin.Int1, Builtin.RawPointer) -> ().
 BUILTIN_MISC_OPERATION(PoundAssert, "poundAssert", "", Special)
+
+// BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
+// specially emitted during SIL generation.
+#ifndef BUILTIN_MISC_OPERATION_WITH_SILGEN
+#define BUILTIN_MISC_OPERATION_WITH_SILGEN(Id, Name, Attrs, Overload) \
+  BUILTIN_MISC_OPERATION(Id, Name, Attrs, Overload)
+#endif
+
+/// globalStringTablePointer has type String -> Builtin.RawPointer.
+/// It returns an immortal, global string table pointer for strings constructed
+/// from string literals.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "", Special)
+
+#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
 
 #undef BUILTIN_MISC_OPERATION
 

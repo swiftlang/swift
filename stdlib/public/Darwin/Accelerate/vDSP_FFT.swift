@@ -16,11 +16,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// An enumeration that defines the size of the FFT decomposition.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public enum Radix {
         case radix2
         case radix3
@@ -39,7 +38,6 @@ extension vDSP {
     }
     
     /// A class that provides forward and inverse FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class FFT<T: vDSP_FourierTransformable> {
         
         let log2n: vDSP_Length
@@ -113,7 +111,6 @@ extension vDSP {
     // MARK: 2D FFT
     
     /// A class that provides forward and inverse 2D FFT on `DSPSplitComplex` or `DSPDoubleSplitComplex` structure.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class FFT2D<T: vDSP_FourierTransformable>: FFT<T> {
         
         let width: Int
@@ -123,7 +120,6 @@ extension vDSP {
         ///
         /// - Parameter width: The width of the matrix to be transformed.
         /// - Parameter height: The width of the matrix to be transformed.
-        @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
         required public init?(width: Int,
                               height: Int,
                               ofType: T.Type) {
@@ -156,7 +152,7 @@ extension vDSP {
     
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FourierTransformFunctions {
     associatedtype SplitComplex
     
@@ -185,7 +181,7 @@ public protocol vDSP_FourierTransformFunctions {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPSplitComplex
     
@@ -232,7 +228,7 @@ public struct vDSP_SplitComplexFloat: vDSP_FourierTransformFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     public typealias SplitComplex = DSPDoubleSplitComplex
     
@@ -279,22 +275,22 @@ public struct vDSP_SplitComplexDouble: vDSP_FourierTransformFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FourierTransformable {
     associatedtype FFTFunctions: vDSP_FourierTransformFunctions where FFTFunctions.SplitComplex == Self
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPSplitComplex: vDSP_FourierTransformable {
     public typealias FFTFunctions = vDSP_SplitComplexFloat
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPDoubleSplitComplex: vDSP_FourierTransformable {
     public typealias FFTFunctions = vDSP_SplitComplexDouble
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 struct vDSP_FFTFunctions {
     /// Performs a 1D fast Fourier transform.
     @inlinable
@@ -334,7 +330,7 @@ struct vDSP_FFTFunctions {
 }
 
 
-
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPSplitComplex {
     
     /// Creates a new `DSPSplitComplex` structure from a real array not in even-odd split configuration.
@@ -357,6 +353,7 @@ extension DSPSplitComplex {
     }
 }
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension DSPDoubleSplitComplex {
     
     /// Creates a new `DSPDoubleSplitComplex` structure from a real array not in even-odd split configuration.
@@ -384,6 +381,7 @@ extension Array where Element == Float {
     ///
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public init(fromSplitComplex splitComplex: DSPSplitComplex,
                 scale: Float,
                 count: Int) {
@@ -416,6 +414,7 @@ extension Array where Element == Double {
     ///
     /// - Parameter scale: A multiplier to apply during conversion.
     /// - Parameter count: The length of the required resulting array (typically half the count of either the real or imaginary parts of the `DSPSplitComplex`.
+    @available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
     public init(fromSplitComplex splitComplex: DSPDoubleSplitComplex,
                 scale: Double,
                 count: Int) {

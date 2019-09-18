@@ -1,16 +1,13 @@
 // RUN: %target-resilience-test
 // REQUIRES: executable_test
 
-// Use swift-version 4.
-// UNSUPPORTED: swift_test_mode_optimize_none_with_implicit_dynamic
-
 import opaque_archetypes_change_underlying_type
 import StdlibUnittest
 
 var OpaqueArchetypes = TestSuite("OpaqueArchetypes")
 
 OpaqueArchetypes.test("test1") {
-  if #available(iOS 9999, macOS 9999, tvOS 9999, watchOS 9999, *) {
+  if #available(macOS 15.0, iOS 13.0, watchOS 6.0, tvOS 13.0, *) {
     let o = resilientFunction()
     expectEqual(o.getValue(), expectedResult())
     expectEqual(MemoryLayout.size(ofValue: o), expectedSize())

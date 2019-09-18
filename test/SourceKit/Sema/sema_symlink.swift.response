@@ -12,28 +12,12 @@
     key.column: 16,
     key.filepath: real.swift,
     key.severity: source.diagnostic.severity.error,
-    key.description: "use of unresolved identifier 'goo'; did you mean 'Bool'?",
+    key.description: "use of unresolved identifier 'goo'",
     key.diagnostic_stage: source.diagnostic.stage.swift.sema,
     key.ranges: [
       {
         key.offset: 15,
         key.length: 3
-      }
-    ],
-    key.fixits: [
-      {
-        key.offset: 15,
-        key.length: 3,
-        key.sourcetext: "Bool"
-      }
-    ],
-    key.diagnostics: [
-      {
-        key.line: 1,
-        key.column: 16,
-        key.filepath: real.swift,
-        key.severity: source.diagnostic.severity.note,
-        key.description: "'Bool' declared here (Swift.Bool)"
       }
     ]
   }

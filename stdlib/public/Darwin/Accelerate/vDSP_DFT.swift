@@ -16,11 +16,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP {
     
     /// An enumeration that specifies whether to perform complex-to-complex or
     /// complex-to-real discrete Fourier transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     // TODO: Should probably be @_frozen; check with Accelerate.
     public enum DFTTransformType {
         /// Specifies complex-to-complex discrete Fourier transform, forward
@@ -33,7 +33,6 @@ extension vDSP {
     }
     
     /// A class that provides single- and double-precision discrete Fourier transform.
-    @available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
     public class DFT <T: vDSP_FloatingPointDiscreteFourierTransformable> {
         fileprivate let dftSetup: vDSP_DFT_Setup
         
@@ -140,22 +139,22 @@ extension vDSP {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_FloatingPointDiscreteFourierTransformable: BinaryFloatingPoint {
     associatedtype DFTFunctions: vDSP_DFTFunctions where DFTFunctions.Scalar == Self
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Float: vDSP_FloatingPointDiscreteFourierTransformable {
     public typealias DFTFunctions = vDSP.VectorizableFloat
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension Double: vDSP_FloatingPointDiscreteFourierTransformable {
     public typealias DFTFunctions = vDSP.VectorizableDouble
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 public protocol vDSP_DFTFunctions {
     associatedtype Scalar
     
@@ -197,7 +196,7 @@ public protocol vDSP_DFTFunctions {
 //
 //===----------------------------------------------------------------------===//
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     
     /// Returns a setup structure to perform a discrete Fourier transform
@@ -263,7 +262,7 @@ extension vDSP.VectorizableFloat: vDSP_DFTFunctions {
     }
 }
 
-@available(iOS 9999, OSX 9999, tvOS 9999, watchOS 9999, *)
+@available(macOS 10.15, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
 extension vDSP.VectorizableDouble: vDSP_DFTFunctions {
     
     /// Returns a data structure for use with to perform a discrete Fourier transform

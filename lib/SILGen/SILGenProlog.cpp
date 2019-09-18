@@ -245,23 +245,23 @@ struct ArgumentInitHelper {
 
   /// Create a SILArgument and store its value into the given Initialization,
   /// if not null.
-  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, VarDecl *vd) {
-    SILLocation loc(vd);
+  void makeArgumentIntoBinding(Type ty, SILBasicBlock *parent, ParamDecl *pd) {
+    SILLocation loc(pd);
     loc.markAsPrologue();
 
-    ManagedValue argrv = makeArgument(ty, vd->isInOut(), parent, loc);
+    ManagedValue argrv = makeArgument(ty, pd->isInOut(), parent, loc);
 
-    if (vd->isInOut()) {
+    if (pd->isInOut()) {
       assert(argrv.getType().isAddress() && "expected inout to be address");
     } else {
-      assert(vd->isImmutable() && "expected parameter to be immutable!");
+      assert(pd->isImmutable() && "expected parameter to be immutable!");
       // If the variable is immutable, we can bind the value as is.
       // Leave the cleanup on the argument, if any, in place to consume the
       // argument if we're responsible for it.
     }
-    SGF.VarLocs[vd] = SILGenFunction::VarLoc::get(argrv.getValue());
+    SGF.VarLocs[pd] = SILGenFunction::VarLoc::get(argrv.getValue());
     SILValue value = argrv.getValue();
-    SILDebugVariable varinfo(vd->isLet(), ArgNo);
+    SILDebugVariable varinfo(pd->isImmutable(), ArgNo);
     if (!argrv.getType().isAddress()) {
       SGF.B.createDebugValue(loc, value, varinfo);
     } else {
@@ -311,8 +311,8 @@ static void makeArgument(Type ty, ParamDecl *decl,
                          SmallVectorImpl<SILValue> &args, SILGenFunction &SGF) {
   assert(ty && "no type?!");
   
-  // Destructure tuple arguments.
-  if (TupleType *tupleTy = ty->getAs<TupleType>()) {
+  // Destructure tuple value arguments.
+  if (TupleType *tupleTy = decl->isInOut() ? nullptr : ty->getAs<TupleType>()) {
     for (auto fieldType : tupleTy->getElementTypes())
       makeArgument(fieldType, decl, args, SGF);
   } else {
@@ -342,7 +342,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
 
-  auto *VD = capture.getDecl();
+  auto *VD = cast<VarDecl>(capture.getDecl());
   SILLocation Loc(VD);
   Loc.markAsPrologue();
 
@@ -356,9 +356,6 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 
   auto expansion = SGF.F.getResilienceExpansion();
   switch (SGF.SGM.Types.getDeclCaptureKind(capture, expansion)) {
-  case CaptureKind::None:
-    break;
-
   case CaptureKind::Constant: {
     auto type = getVarTypeInCaptureContext();
     auto &lowering = SGF.getTypeLowering(type);
@@ -499,7 +496,7 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
     return;
   }
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(VarDecl::Specifier::InOut,
+  auto var = new (ctx) ParamDecl(ParamDecl::Specifier::InOut,
                                  SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),

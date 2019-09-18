@@ -23,7 +23,7 @@
 /// * `s.joined()` does not create new storage
 /// * `s.joined().map(f)` maps eagerly and returns a new array
 /// * `s.lazy.joined().map(f)` maps lazily and returns a `LazyMapSequence`
-@_fixed_layout // lazy-performance
+@frozen // lazy-performance
 public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 
   @usableFromInline // lazy-performance
@@ -39,7 +39,7 @@ public struct FlattenSequence<Base: Sequence> where Base.Element: Sequence {
 }
 
 extension FlattenSequence {
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Iterator {
     @usableFromInline // lazy-performance
     internal var _base: Base.Iterator
@@ -95,7 +95,7 @@ extension FlattenSequence: Sequence {
   }
 }
 
-extension Sequence where Element : Sequence {
+extension Sequence where Element: Sequence {
   /// Returns the elements of this sequence of sequences, concatenated.
   ///
   /// In this example, an array of three ranges is flattened so that the
@@ -125,7 +125,7 @@ extension Sequence where Element : Sequence {
   }
 }
 
-extension LazySequenceProtocol where Element : Sequence {
+extension LazySequenceProtocol where Element: Sequence {
   /// Returns a lazy sequence that concatenates the elements of this sequence of
   /// sequences.
   @inlinable // lazy-performance
@@ -138,7 +138,7 @@ public typealias FlattenCollection<T: Collection> = FlattenSequence<T> where T.E
 
 extension FlattenSequence where Base: Collection, Base.Element: Collection {
   /// A position in a FlattenCollection
-  @_fixed_layout // lazy-performance
+  @frozen // lazy-performance
   public struct Index {
     /// The position in the outer collection of collections.
     @usableFromInline // lazy-performance
@@ -161,7 +161,7 @@ extension FlattenSequence where Base: Collection, Base.Element: Collection {
   }
 }
 
-extension FlattenSequence.Index : Equatable where Base: Collection, Base.Element: Collection {
+extension FlattenSequence.Index: Equatable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
   public static func == (
     lhs: FlattenCollection<Base>.Index,
@@ -171,7 +171,7 @@ extension FlattenSequence.Index : Equatable where Base: Collection, Base.Element
   }
 }
 
-extension FlattenSequence.Index : Comparable where Base: Collection, Base.Element: Collection {
+extension FlattenSequence.Index: Comparable where Base: Collection, Base.Element: Collection {
   @inlinable // lazy-performance
   public static func < (
     lhs: FlattenCollection<Base>.Index,
@@ -195,8 +195,8 @@ extension FlattenSequence.Index : Comparable where Base: Collection, Base.Elemen
   }
 }
 
-extension FlattenSequence.Index : Hashable
-  where Base: Collection, Base.Element: Collection, Base.Index : Hashable, Base.Element.Index : Hashable {
+extension FlattenSequence.Index: Hashable
+  where Base: Collection, Base.Element: Collection, Base.Index: Hashable, Base.Element.Index: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
@@ -394,13 +394,13 @@ extension FlattenCollection: Collection {
   }
 
   @inlinable // lazy-performance
-  public subscript(bounds: Range<Index>) -> SubSequence {
+  public subscript(bounds: Range<Index>) -> Slice<FlattenCollection<Base>> {
     return Slice(base: self, bounds: bounds)
   }
 }
 
-extension FlattenCollection : BidirectionalCollection
-  where Base : BidirectionalCollection, Base.Element : BidirectionalCollection {
+extension FlattenCollection: BidirectionalCollection
+  where Base: BidirectionalCollection, Base.Element: BidirectionalCollection {
 
   // FIXME(performance): swift-3-indexing-model: add custom advance/distance
   // methods that skip over inner collections when random-access
