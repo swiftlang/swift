@@ -106,7 +106,7 @@ extension OSLogInterpolation {
   /// This function must be constant evaluable and all its arguments
   /// must be known at compile time.
   @inlinable
-  @_semantics("oslog.interpolation.getFormatSpecifier")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getIntegerFormatSpecifier<T>(
@@ -150,7 +150,7 @@ extension OSLogArguments {
 /// Return the number of bytes needed for serializing an integer argument as
 /// specified by os_log. This function must be constant evaluable.
 @inlinable
-@_semantics("oslog.integers.sizeForEncoding")
+@_semantics("constant_evaluable")
 @_effects(readonly)
 @_optimize(none)
 internal func sizeForEncoding<T>(

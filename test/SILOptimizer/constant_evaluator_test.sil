@@ -279,7 +279,7 @@ bb0:
   %0 = integer_literal $Builtin.Int64, -5
   %2 = function_ref @factorial : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   %3 = apply %2(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: 512 when evaluating the expression at compile time
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: {{.*}} when evaluating the expression at compile time
     // CHECK: {{.*}}: note: limit exceeded here
   return %3 : $Builtin.Int64
 }
