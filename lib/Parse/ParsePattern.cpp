@@ -18,6 +18,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"

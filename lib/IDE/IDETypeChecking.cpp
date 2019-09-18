@@ -18,6 +18,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"

@@ -26,6 +26,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"

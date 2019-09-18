@@ -21,6 +21,7 @@
 #include "IRGen.h"
 #include "SwiftTargetInfo.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/Basic/ClusteredBitVector.h"

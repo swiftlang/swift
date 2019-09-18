@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeDeclFinder.h"

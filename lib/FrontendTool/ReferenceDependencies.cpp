@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
