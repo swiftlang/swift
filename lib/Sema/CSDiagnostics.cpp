@@ -593,14 +593,16 @@ bool MissingConformanceFailure::diagnoseAsError() {
     }
   }
 
-  if (nonConformingType->isExistentialType()) {
-    auto diagnostic = diag::protocol_does_not_conform_objc;
-    if (nonConformingType->isObjCExistentialType())
-      diagnostic = diag::protocol_does_not_conform_static;
-
-    emitDiagnostic(anchor->getLoc(), diagnostic, nonConformingType,
-                   protocolType);
+  if (nonConformingType->isObjCExistentialType()) {
+    emitDiagnostic(anchor->getLoc(), diag::protocol_does_not_conform_static,
+                   nonConformingType, protocolType);
     return true;
+  }
+
+  if (diagnoseTypeCannotConform((atParameterPos ?
+                                getArgumentAt(Apply, *atParameterPos) : anchor),
+                                nonConformingType, protocolType)) {
+      return true;
   }
 
   if (atParameterPos) {
@@ -616,6 +618,58 @@ bool MissingConformanceFailure::diagnoseAsError() {
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
   return RequirementFailure::diagnoseAsError();
+}
+
+bool MissingConformanceFailure::diagnoseTypeCannotConform(Expr *anchor,
+    Type nonConformingType, Type protocolType) const {
+  if (!(nonConformingType->is<AnyFunctionType>() ||
+      nonConformingType->is<TupleType>() ||
+      nonConformingType->isExistentialType() ||
+      nonConformingType->is<AnyMetatypeType>())) {
+    return false;
+  }
+
+  emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
+                 nonConformingType->isExistentialType(), nonConformingType,
+                 protocolType);
+
+  if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
+    auto *namingDecl = OTD->getNamingDecl();
+    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+      emitDiagnostic(repr->getLoc(), diag::required_by_opaque_return,
+                     namingDecl->getDescriptiveKind(), namingDecl->getFullName())
+          .highlight(repr->getSourceRange());
+    }
+    return true;
+  }
+
+  auto &req = getRequirement();
+  auto *reqDC = getRequirementDC();
+  auto *genericCtx = getGenericContext();
+  auto noteLocation = reqDC->getAsDecl()->getLoc();
+
+  if (!noteLocation.isValid())
+    noteLocation = anchor->getLoc();
+
+  if (isConditional()) {
+    emitDiagnostic(noteLocation, diag::requirement_implied_by_conditional_conformance,
+                   resolveType(Conformance->getType()),
+                   Conformance->getProtocol()->getDeclaredInterfaceType());
+  } else if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
+                                     isStaticOrInstanceMember(AffectedDecl))) {
+    emitDiagnostic(noteLocation, diag::required_by_decl_ref,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(),
+                   reqDC->getSelfNominalTypeDecl()->getDeclaredType(),
+                   req.getFirstType(), nonConformingType);
+  } else {
+    emitDiagnostic(noteLocation, diag::required_by_decl,
+                   AffectedDecl->getDescriptiveKind(),
+                   AffectedDecl->getFullName(), req.getFirstType(),
+                   nonConformingType);
+  }
+
+  return true;
 }
 
 bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
