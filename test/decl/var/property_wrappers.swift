@@ -1143,5 +1143,5 @@ struct SR_11381_W<T> {
 }
 
 struct SR_11381_S {
-  @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+  @SR_11381_W var foo: Int = nil // expected-error {{'nil' requires a contextual type}}
 }
