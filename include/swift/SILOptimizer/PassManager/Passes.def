@@ -112,6 +112,8 @@ PASS(ConditionForwarding, "condition-forwarding",
      "Conditional Branch Forwarding to Fold SIL switch_enum")
 PASS(ConstantEvaluatorTester, "test-constant-evaluator",
       "Test constant evaluator")
+PASS(ConstantEvaluableSubsetChecker, "test-constant-evaluable-subset",
+     "Test Swift code snippets expected to be constant evaluable")
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",

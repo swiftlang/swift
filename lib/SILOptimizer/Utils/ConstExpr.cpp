@@ -898,6 +898,7 @@ ConstExprFunctionState::computeCallResult(ApplyInst *apply) {
                       UnknownReason::InvalidOperandValue);
 
   SILFunction *callee = calleeFn.getFunctionValue();
+  evaluator.recordCalledFunctionIfEnabled(callee);
 
   // If this is a well-known function, do not step into it.
   if (auto wellKnownFunction = classifyFunction(callee))
@@ -1644,8 +1645,9 @@ evaluateAndCacheCall(SILFunction &fn, SubstitutionMap substitutionMap,
 // ConstExprEvaluator implementation.
 //===----------------------------------------------------------------------===//
 
-ConstExprEvaluator::ConstExprEvaluator(SymbolicValueAllocator &alloc)
-    : allocator(alloc) {}
+ConstExprEvaluator::ConstExprEvaluator(SymbolicValueAllocator &alloc,
+                                       bool trackCallees)
+    : allocator(alloc), trackCallees(trackCallees) {}
 
 ConstExprEvaluator::~ConstExprEvaluator() {}
 
@@ -1661,14 +1663,10 @@ SymbolicValue ConstExprEvaluator::getUnknown(SILNode *node,
                                    getAllocator());
 }
 
-/// Analyze the specified values to determine if they are constant values.  This
-/// is done in code that is not necessarily itself a constexpr function.  The
+/// Analyze the specified values to determine if they are constant values. This
+/// is done in code that is not necessarily itself a constexpr function. The
 /// results are added to the results list which is a parallel structure to the
 /// input values.
-///
-/// TODO: Return information about which callees were found to be
-/// constexprs, which would allow the caller to delete dead calls to them
-/// that occur after folding them.
 void ConstExprEvaluator::computeConstantValues(
     ArrayRef<SILValue> values, SmallVectorImpl<SymbolicValue> &results) {
   unsigned numInstEvaluated = 0;
@@ -1688,9 +1686,10 @@ void ConstExprEvaluator::computeConstantValues(
 //===----------------------------------------------------------------------===//
 
 ConstExprStepEvaluator::ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
-                                               SILFunction *fun)
-    : evaluator(alloc), internalState(new ConstExprFunctionState(
-                            evaluator, fun, {}, stepsEvaluated)) {
+                                               SILFunction *fun,
+                                               bool trackCallees)
+    : evaluator(alloc, trackCallees), internalState(new ConstExprFunctionState(
+                                          evaluator, fun, {}, stepsEvaluated)) {
   assert(fun);
 }
 
