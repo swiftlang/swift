@@ -94,7 +94,7 @@ public func ldexp(_ x: ${T}, _ n : Int) -> ${T} {
 // SWIFT_ENABLE_TENSORFLOW
 %for T in ['Float', 'Double', 'Float80']:
 %   if T == 'Float80':
-#if (arch(i386) || arch(x86_64)) && !os(Windows)
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %   end
 @usableFromInline
 func _vjpExp(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
