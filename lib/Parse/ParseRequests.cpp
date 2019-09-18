@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 

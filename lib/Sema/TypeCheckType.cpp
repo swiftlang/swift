@@ -34,6 +34,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/SourceManager.h"

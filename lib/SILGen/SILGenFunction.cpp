@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
