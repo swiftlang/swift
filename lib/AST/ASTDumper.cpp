@@ -617,9 +617,9 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (TAD->getUnderlyingTypeLoc().getType()) {
+      if (auto underlying = TAD->getUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << TAD->getUnderlyingTypeLoc().getType().getString();
+          << underlying.getString();
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
@@ -3387,6 +3387,12 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
+      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      if (auto underlying = T->getSinglyDesugaredType()) {
+        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+      } else {
+        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+      }
       if (T->getParent())
         printRec("parent", T->getParent());
 

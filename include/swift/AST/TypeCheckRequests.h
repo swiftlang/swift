@@ -434,6 +434,9 @@ public:
   // Source location
   SourceLoc getNearestLoc() const;
 
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+                           
   // Separate caching.
   bool isCached() const;
   Optional<Requirement> getCachedResult() const;
@@ -1120,6 +1123,9 @@ public:
   SourceLoc getNearestLoc() const {
     return SourceLoc();
   }
+                           
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
 };
 
 void simple_display(llvm::raw_ostream &out, const TypeLoc source);
@@ -1174,11 +1180,33 @@ private:
   llvm::Expected<GenericSignature *>
   evaluate(Evaluator &evaluator, GenericContext *value) const;
   
-public:              
+public:
   // Separate caching.
   bool isCached() const { return true; }
   Optional<GenericSignature *> getCachedResult() const;
   void cacheResult(GenericSignature *value) const;
+};
+
+/// Compute the interface type of the underlying definition type of a typealias declaration.
+class UnderlyingTypeRequest :
+    public SimpleRequest<UnderlyingTypeRequest,
+                         Type(TypeAliasDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator,
+                                TypeAliasDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

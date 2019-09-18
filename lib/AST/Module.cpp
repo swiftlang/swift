@@ -103,6 +103,8 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
       TAD->setAccess(AccessLevel::Public);
+      TAD->setValidationToChecked();
+      TAD->computeType();
       Entry = TAD;
     }
   }
