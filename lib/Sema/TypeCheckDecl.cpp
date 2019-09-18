@@ -478,6 +478,52 @@ static void checkInheritanceClause(
   }
 }
 
+// Check for static properties that produce empty option sets
+static void checkForEmptyOptionSet(const VarDecl *VD, TypeChecker &tc) {
+  if (!VD->isStatic() || !VD->isLet())
+    return;
+  
+  auto DC = VD->getDeclContext();
+  
+  auto *optionSetProto = tc.Context.getProtocol(KnownProtocolKind::OptionSet);
+  auto protocolConformance = tc.containsProtocol(DC->getSelfTypeInContext(), optionSetProto, DC, /*Flags*/None);
+  if (!protocolConformance)
+    return;
+  
+  auto type = VD->getType();
+  if (!type->isEqual(DC->getSelfTypeInContext()))
+    return;
+  
+  auto PBD = VD->getParentPatternBinding();
+  if (!PBD)
+    return;
+  
+  for (auto entry : PBD->getPatternList()) {
+    if (entry.getPattern()->getSingleVar() != VD) continue;
+    
+    auto ctor = dyn_cast<CallExpr>(entry.getInit());
+    if (!ctor) continue;
+    if (!isa<ConstructorDecl>(ctor->getCalledValue())) continue;
+    
+    if (ctor->getNumArguments() != 1) continue;
+    auto argLabels = ctor->getArgumentLabels();
+    if (argLabels.front() != tc.Context.Id_rawValue) continue;
+    
+    auto *args = cast<TupleExpr>(ctor->getArg());
+    auto intArg = dyn_cast<IntegerLiteralExpr>(args->getElement(0));
+    if (!intArg) continue;
+    
+    auto val = intArg->getValue();
+    if (val != 0) continue;
+    
+    auto loc = VD->getLoc();
+    tc.diagnose(loc, diag::option_set_zero_constant, DescriptiveDeclKind::StaticProperty, VD->getName());
+    auto range = ctor->getArg()->getSourceRange();
+    tc.diagnose(loc, diag::option_set_empty_set_init).fixItReplace(range, "([])");
+  }
+}
+
+
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
@@ -2360,7 +2406,7 @@ public:
 
     TC.checkDeclAttributes(VD);
 
-    checkForEmptyOptionSet(VD);
+    checkForEmptyOptionSet(VD, TC);
     
     triggerAccessorSynthesis(TC, VD);
 
@@ -2385,43 +2431,7 @@ public:
     if (VD->getAttrs().hasAttribute<DynamicReplacementAttr>())
       TC.checkDynamicReplacementAttribute(VD);
   }
-    
-  void checkForEmptyOptionSet(VarDecl *VD) {
-    if (!VD->isStatic())
-      return;
-    auto DC = VD->getDeclContext();
-    auto protocols = DC->getLocalProtocols();
-    auto conformsToOptionSet = false;
-    for (auto protocol : protocols) {
-      if (protocol->isSpecificProtocol(KnownProtocolKind::OptionSet)) {
-        conformsToOptionSet = true;
-        break;
-      }
-    }
-    if (!conformsToOptionSet)
-      return;
-    auto type = VD->getType();
-    if (!type->isEqual(DC->getSelfTypeInContext()))
-      return;
-    auto PBD = VD->getParentPatternBinding();
-    if (!PBD)
-      return;
-    for (auto entry : PBD->getPatternList()) {
-      auto ctor = dyn_cast<CallExpr>(entry.getInit());
-      if (!ctor) continue;
-      auto argLabels = ctor->getArgumentLabels();
-      if (!argLabels.front().is(StringRef("rawValue"))) continue;
-      auto *args = cast<TupleExpr>(ctor->getArg());
-      auto intArg = dyn_cast<IntegerLiteralExpr>(args->getElement(0));
-      if (!intArg) continue;
-      auto val = intArg->getValue();
-      if (val == 0) {
-        auto loc = VD->getLoc();
-        TC.diagnose(loc, diag::option_set_zero_constant, type);
-      }
-    }
-  }
-
+  
   void visitBoundVars(Pattern *P) {
     P->forEachVariable([&] (VarDecl *VD) { this->visitBoundVariable(VD); });
   }

@@ -4424,8 +4424,10 @@ ERROR(property_delegate_type_not_usable_from_inline,none,
       (bool, bool))
 
 WARNING(option_set_zero_constant,none,
-      "'static let' constant inside %0 that conforms to OptionSet produces an empty option set",
-      (Type))
+      "%0 %1 produces an empty option set",
+      (DescriptiveDeclKind, Identifier))
+NOTE(option_set_empty_set_init,none,
+      "use [] to silence this warning", ())
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
