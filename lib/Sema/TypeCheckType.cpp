@@ -768,7 +768,7 @@ Type TypeChecker::applyGenericArguments(Type type,
   }
 
   // FIXME: More principled handling of circularity.
-  if (!genericDecl->hasValidSignature()) {
+  if (!genericDecl->getGenericSignature()) {
     diags.diagnose(loc, diag::recursive_decl_reference,
              genericDecl->getDescriptiveKind(), genericDecl->getName());
     genericDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
