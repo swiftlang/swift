@@ -249,7 +249,7 @@ static bool shouldAttemptEvaluation(SILInstruction *inst) {
     return false;
 
   return calleeFun->hasSemanticsAttrThatStartsWith("string.") ||
-         calleeFun->hasSemanticsAttrThatStartsWith("oslog.");
+         calleeFun->hasSemanticsAttr("constant_evaluable");
 }
 
 /// Skip or evaluate the given instruction based on the evaluation policy and

@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(512),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(1024),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
@@ -711,10 +711,10 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
     SILFunction *callee = unknownReason.getCalleeWithoutImplmentation();
     std::string demangledCalleeName =
         Demangle::demangleSymbolAsString(callee->getName());
-    diagnose(ctx, diagLoc, diag::constexpr_unknown_function_called,
+    diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
              StringRef(demangledCalleeName));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, triggerLoc, diag::constexpr_unknown_function_called_here,
+      diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
                triggerLocSkipsInternalLocs);
     return;
   }
