@@ -5177,6 +5177,8 @@ private:
            attr->getIndices().parameters->getNumIndices());
     auto origParamArgs = original->getArgumentsWithoutIndirectResults();
 
+    // TODO(TF-788): Re-enable non-varied result warning.
+    /*
     // Check if result is not varied.
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(*original, origFormalResults);
@@ -5193,6 +5195,7 @@ private:
             .fixItInsertAfter(endLoc, ")");
       }
     }
+    */
 
     // Create a mapping of the parameters.
     auto autoDiffIndex = getIndices().parameters->begin();
