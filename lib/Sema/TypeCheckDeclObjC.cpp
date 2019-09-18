@@ -23,6 +23,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
 using namespace swift;
