@@ -2244,7 +2244,6 @@ public:
     if (VD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(VD, VD->getValueInterfaceType());
 
-
       if (VD->getValueInterfaceType()->hasDynamicSelfType()) {
         if (VD->hasStorage())
           VD->diagnose(diag::dynamic_self_in_stored_property);
@@ -2278,7 +2277,7 @@ public:
       visit(accessor);
     });
   }
-  
+
   void visitBoundVars(Pattern *P) {
     P->forEachVariable([&] (VarDecl *VD) { this->visitBoundVariable(VD); });
   }
