@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"

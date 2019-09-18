@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Parse/LocalContext.h"
 #include "llvm/ADT/SmallString.h"
