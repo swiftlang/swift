@@ -591,9 +591,25 @@ SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
   return SourceRange(bsr.Start,
                      endEvenIfNoCloseBraceAndEndsWithInterpolatedStringLiteral);
 }
-SourceRange
-Portion::sourceRangeForDeferredExpansion(const IterableTypeScope *) const {
+
+SourceRange GenericTypeOrExtensionWholePortion::sourceRangeForDeferredExpansion(
+    const IterableTypeScope *s) const {
+  const auto range = getChildlessSourceRangeOf(s, false);
+  return SourceRange(range.Start, getLocEncompassingPotentialLookups(
+                                      s->getSourceManager(), range.End));
+}
+
+SourceRange GenericTypeOrExtensionWherePortion::sourceRangeForDeferredExpansion(
+    const IterableTypeScope *) const {
   return SourceRange();
+}
+
+SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
+    const IterableTypeScope *s) const {
+  const auto bracesRange = getChildlessSourceRangeOf(s, false);
+  return SourceRange(bracesRange.Start,
+                     getLocEncompassingPotentialLookups(s->getSourceManager(),
+                                                        bracesRange.End));
 }
 
 SourceRange ASTScopeImpl::getEffectiveSourceRange(const ASTNode n) const {
@@ -697,14 +713,4 @@ AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
        : fd->isDeferBody()     ? fd->getNameLoc()
        :                         fd->getParameters()->getLParenLoc();
   // clang-format on
-}
-
-#pragma mark deferred scope source ranges
-
-SourceRange IterableTypeBodyPortion::sourceRangeForDeferredExpansion(
-    const IterableTypeScope *s) const {
-  const auto bracesRange = getChildlessSourceRangeOf(s, false);
-  const auto &SM = s->getSourceManager();
-  return SourceRange(bracesRange.Start,
-                     getLocEncompassingPotentialLookups(SM, bracesRange.End));
 }

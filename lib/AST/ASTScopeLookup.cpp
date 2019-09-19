@@ -62,6 +62,14 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
   if (name.isOperator())
     return fileScope; // operators always at file scope
 
+  {
+    const SourceManager &SM = fileScope->getSourceManager();
+    if (SM.getLineAndColumn(loc) ==
+            std::make_pair<unsigned, unsigned>(271, 38) &&
+        SM.getIdentifierForBuffer(SM.findBufferContainingLoc(loc))
+            .endswith("CompilerProtocols.swift"))
+      llvm::errs() << "HERE\n";
+  }
   const auto innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
 
   // The legacy lookup code gets passed both a SourceLoc and a starting context.
@@ -94,8 +102,8 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     //    fileScope->dump();
     llvm::errs() << "\n\n";
 
-    ASTScopeAssert(fileScope->crossCheckWithAST(),
-                   "Tree creation missed some DeclContexts.");
+    if (fileScope->crossCheckWithAST())
+      llvm::errs() << "Tree creation missed some DeclContexts.\n";
   }
 
   ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");

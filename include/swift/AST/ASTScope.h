@@ -585,12 +585,12 @@ public:
   virtual const Decl *
   getReferrentOfScope(const GenericTypeOrExtensionScope *s) const;
 
-  virtual void beCurrent(IterableTypeScope *) const;
-  virtual bool isCurrent(const IterableTypeScope *) const;
+  virtual void beCurrent(IterableTypeScope *) const = 0;
+  virtual bool isCurrent(const IterableTypeScope *) const = 0;
   virtual NullablePtr<ASTScopeImpl>
-  insertionPointForDeferredExpansion(IterableTypeScope *) const;
+  insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
   virtual SourceRange
-  sourceRangeForDeferredExpansion(const IterableTypeScope *) const;
+  sourceRangeForDeferredExpansion(const IterableTypeScope *) const = 0;
   };
 
   // For the whole Decl scope of a GenericType or an Extension
@@ -611,6 +611,24 @@ public:
 
     const Decl *
     getReferrentOfScope(const GenericTypeOrExtensionScope *s) const override;
+
+    /// Make whole portion lazy to avoid circularity in lookup of generic
+    /// parameters of extensions. When \c bindExtension is called, it needs to
+    /// unqualifed-lookup the type being extended. That causes an \c
+    /// ExtensionScope
+    /// (\c GenericTypeOrExtensionWholePortion) to be built.
+    /// The building process needs the generic parameters, but that results in a
+    /// request for the extended nominal type of the \c ExtensionDecl, which is
+    /// an endless recursion. Although we only need to make \c ExtensionScope
+    /// lazy, might as well do it for all \c IterableTypeScopes.
+
+    void beCurrent(IterableTypeScope *) const override;
+    bool isCurrent(const IterableTypeScope *) const override;
+
+    NullablePtr<ASTScopeImpl>
+    insertionPointForDeferredExpansion(IterableTypeScope *) const override;
+    SourceRange
+    sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
   };
 
   /// GenericTypeOrExtension = GenericType or Extension
@@ -649,6 +667,14 @@ public:
 
   SourceRange getChildlessSourceRangeOf(const GenericTypeOrExtensionScope *,
                                         bool omitAssertions) const override;
+
+  void beCurrent(IterableTypeScope *) const override;
+  bool isCurrent(const IterableTypeScope *) const override;
+
+  NullablePtr<ASTScopeImpl>
+  insertionPointForDeferredExpansion(IterableTypeScope *) const override;
+  SourceRange
+  sourceRangeForDeferredExpansion(const IterableTypeScope *) const override;
 };
 
 /// Behavior specific to representing the Body of a NominalTypeDecl or
@@ -766,6 +792,8 @@ protected:
   bool isCurrent() const override;
 
 public:
+  void makeWholeCurrent();
+  bool isWholeCurrent() const;
   void makeBodyCurrent();
   bool isBodyCurrent() const;
   NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion() override;

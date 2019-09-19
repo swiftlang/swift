@@ -1811,8 +1811,15 @@ NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
 }
+
 NullablePtr<ASTScopeImpl>
-Portion::insertionPointForDeferredExpansion(IterableTypeScope *) const {
+GenericTypeOrExtensionWholePortion::insertionPointForDeferredExpansion(
+    IterableTypeScope *s) const {
+  return s->getParent().get();
+}
+NullablePtr<ASTScopeImpl>
+GenericTypeOrExtensionWherePortion::insertionPointForDeferredExpansion(
+    IterableTypeScope *) const {
   return nullptr;
 }
 NullablePtr<ASTScopeImpl>
@@ -1828,9 +1835,18 @@ bool ASTScopeImpl::isCurrent() const { return true; }
 void IterableTypeScope::beCurrent() { portion->beCurrent(this); }
 bool IterableTypeScope::isCurrent() const { return portion->isCurrent(this); }
 
-void Portion::beCurrent(IterableTypeScope *) const {}
-bool Portion::isCurrent(const IterableTypeScope *) const { return true; }
-
+void GenericTypeOrExtensionWholePortion::beCurrent(IterableTypeScope *s) const {
+  s->makeWholeCurrent();
+}
+bool GenericTypeOrExtensionWholePortion::isCurrent(
+    const IterableTypeScope *s) const {
+  return s->isWholeCurrent();
+}
+void GenericTypeOrExtensionWherePortion::beCurrent(IterableTypeScope *) const {}
+bool GenericTypeOrExtensionWherePortion::isCurrent(
+    const IterableTypeScope *) const {
+  return true;
+}
 void IterableTypeBodyPortion::beCurrent(IterableTypeScope *s) const {
   s->makeBodyCurrent();
 }
@@ -1838,6 +1854,15 @@ bool IterableTypeBodyPortion::isCurrent(const IterableTypeScope *s) const {
   return s->isBodyCurrent();
 }
 
+void IterableTypeScope::makeWholeCurrent() {
+  ASTScopeAssert(!shouldHaveABody() || !getChildren().empty(),
+                 "Should have been expanded");
+}
+bool IterableTypeScope::isWholeCurrent() const {
+  // Whole starts out unexpanded, and is lazily built but will have at least a
+  // body scope child
+  return !getChildren().empty();
+}
 void IterableTypeScope::makeBodyCurrent() {
   memberCount = getIterableDeclContext().get()->getMemberCount();
 }
