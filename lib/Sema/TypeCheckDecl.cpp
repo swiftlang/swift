@@ -4302,16 +4302,20 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
       // Nested Hack to break cycles if this is called before validation has
       // finished.
       if (aliasDecl->hasInterfaceType()) {
-        auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+        auto extendedNominal =
+            aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
         if (extendedNominal)
-          return TypeChecker::isPassThroughTypealias(aliasDecl, aliasDecl->getUnderlyingType(), extendedNominal)
-                      ? extendedType
-                      : extendedNominal->getDeclaredType();
+          return TypeChecker::isPassThroughTypealias(
+                     aliasDecl, aliasDecl->getUnderlyingType(), extendedNominal)
+                     ? extendedType
+                     : extendedNominal->getDeclaredType();
       } else {
-        if (auto ty = aliasDecl->getStructuralType()->getAs<NominalOrBoundGenericNominalType>())
-          return TypeChecker::isPassThroughTypealias(aliasDecl, ty, ty->getDecl())
-                 ? extendedType
-                 : ty->getDecl()->getDeclaredType();
+        if (auto ty = aliasDecl->getStructuralType()
+                          ->getAs<NominalOrBoundGenericNominalType>())
+          return TypeChecker::isPassThroughTypealias(aliasDecl, ty,
+                                                     ty->getDecl())
+                     ? extendedType
+                     : ty->getDecl()->getDeclaredType();
       }
     }
   }
