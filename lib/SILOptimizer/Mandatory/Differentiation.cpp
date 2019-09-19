@@ -1378,7 +1378,9 @@ using Activity = OptionSet<ActivityFlags>;
 /// indices.
 class DifferentiableActivityInfo {
 private:
-  // TODO: temporary hack while we investigate why reverse mode doesn't work
+  // TODO(TF-800): Temporarily store `AutoDiffAssociatedFunctionKind` because
+  // special logic for `apply` result does not work for reverse-mode.
+
   // with us handling `apply` instructions differently.
   AutoDiffAssociatedFunctionKind kind;
 
@@ -1549,8 +1551,8 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
         activityInfo.isActive(paramArgs[i], indices))
       return true;
 
-  // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling `apply` instructions differently.
+  // TODO(TF-800): Investigate why `apply` result special logic does not work
+  // for reverse-mode.
   if (kind == AutoDiffLinearMapKind::Differential) {
     for (auto use : ai->getUses()) {
       if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
@@ -1577,12 +1579,12 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   return hasActiveResults && hasActiveParamArguments;
 }
 
-// TODO: update comment once we figure out why reverse mode requires
-// different conditions.
-/// Returns a flag that indicates whether the instruction should be
-/// differentiated, given the differentiation indices of the instruction's
-/// parent function. Whether the instruction should be differentiated is
-/// determined sequentially from the following conditions:
+// TODO(TF-800): Investigate why reverse-mode requires special "should
+// differentiate logic" and update comment.
+/// Returns a flag indicating whether the instruction should be differentiated,
+/// given the differentiation indices of the instruction's parent function.
+/// Whether the instruction should be differentiated is determined sequentially
+/// from the following conditions:
 /// 1. The instruction is an `apply` and `shouldDifferentiateApplyInst` returns
 ///    true.
 /// 2. The instruction has an active operand and an active result.
@@ -1601,8 +1603,8 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   if (hasActiveOperands && hasActiveResults)
     return true;
 
-  // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling `apply` instructions differently.
+  // TODO(TF-800): Investigate why reverse-mode requires special "should
+  // differentiate logic" and update comment.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
 
@@ -1642,13 +1644,13 @@ if (auto *castInst = dyn_cast<TYPE>(inst)) { \
   return false;
 }
 
-/// Takes an `apply` instruction and adds its linear map function to the
+/// Given an `apply` instruction, conditionally adds its linear map function to the
 /// linear map struct if it's active.
 void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
-  // TODO: temporary hack while we investigate why reverse mode doesn't work
-  // with us handling `apply` instructions differently.
+  // TODO(TF-800): Investigate why `apply` result special logic does not work
+  // for reverse-mode.
   // If differential, handle `apply` result specially.
   // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
   // results of the `destructure_tuple` user to `allResults` instead of adding
@@ -1919,9 +1921,8 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (isVaried(arg, i)) {
               for (auto indRes : ai->getIndirectSILResults())
                 setVaried(indRes, i);
-              // TODO: temporary hack while we investigate why reverse mode
-              // doesn't work with us handling tuple destructure from `apply`
-              // instructions differently.
+              // TODO(TF-800): Investigate why `apply` result special logic
+              // does not work for reverse-mode.
               // If differential, handle `apply` result specially.
               // If JVP, handle `apply` result specially.
               // If `apply` result is tuple-typed with a `destructure_tuple`
