@@ -125,3 +125,12 @@ HiddenLibSyntaxAction::getExplicitNodeFor(OpaqueSyntaxNode node) {
   auto hiddenNode = (Node *)node;
   return hiddenNode->ExplicitActionNode;
 }
+
+void HiddenLibSyntaxAction::discardRecordedNode(OpaqueSyntaxNode opaqueN) {
+  if (!opaqueN)
+    return;
+  auto node = static_cast<Node *>(opaqueN);
+  if (!areBothLibSyntax())
+    LibSyntaxAction->discardRecordedNode(node->LibSyntaxNode);
+  ExplicitAction->discardRecordedNode(node->ExplicitActionNode);
+}
