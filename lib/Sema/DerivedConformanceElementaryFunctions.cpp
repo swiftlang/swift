@@ -300,8 +300,7 @@ ElementaryFunction op) {
 #include "DerivedConformanceElementaryFunctions.def"
 #undef ELEMENTARY_FUNCTION
   }
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    operatorDecl->setGenericEnvironment(env);
+  operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->computeType();
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   operatorDecl->setValidationToChecked();

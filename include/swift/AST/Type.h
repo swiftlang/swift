@@ -604,10 +604,6 @@ public:
   explicit CanGenericSignature(GenericSignature *Signature);
   ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
 
-  /// Retrieve the canonical generic environment associated with this
-  /// generic signature.
-  GenericEnvironment *getGenericEnvironment() const;
-
   GenericSignature *operator->() const {
     return Signature;
   }
@@ -620,7 +616,7 @@ public:
     return Signature;
   }
 
-  bool operator==(const swift::CanGenericSignature& other) {
+  bool operator==(const swift::CanGenericSignature &other) {
     return Signature == other.Signature;
   }
 };

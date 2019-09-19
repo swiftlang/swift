@@ -44,11 +44,10 @@ enum class DowngradeToWarning: bool {
 /// Calls \p callback for each type in each requirement provided by
 /// \p source.
 static void forAllRequirementTypes(
-    WhereClauseOwner source,
+    WhereClauseOwner &&source,
     llvm::function_ref<void(Type, TypeRepr *)> callback) {
-  RequirementRequest::visitRequirements(
-      source, TypeResolutionStage::Interface,
-      [&](const Requirement &req, RequirementRepr* reqRepr) {
+  std::move(source).visitRequirements(TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
     switch (req.getKind()) {
     case RequirementKind::Conformance:
     case RequirementKind::SameType:
@@ -95,11 +94,11 @@ protected:
   }
 
   void checkRequirementAccess(
-      WhereClauseOwner source,
+      WhereClauseOwner &&source,
       AccessScope accessScope,
       const DeclContext *useDC,
       llvm::function_ref<CheckTypeAccessCallback> diagnose) {
-    forAllRequirementTypes(source, [&](Type type, TypeRepr *typeRepr) {
+    forAllRequirementTypes(std::move(source), [&](Type type, TypeRepr *typeRepr) {
       checkTypeAccessImpl(type, typeRepr, accessScope, useDC,
                           /*mayBeInferred*/false, diagnose);
     });
@@ -1926,9 +1925,6 @@ public:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto extendedType = ED->getExtendedNominal();
-    // TODO: Sometimes we have an extension that is marked valid but has no
-    //       extended type. Assert, just in case we see it while testing, but
-    //       don't crash. rdar://50401284
     assert(extendedType && "valid extension with no extended type?");
     if (!extendedType || shouldSkipChecking(extendedType))
       return;

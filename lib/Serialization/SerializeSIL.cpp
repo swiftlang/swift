@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-serialize"
 #include "SILFormat.h"
 #include "Serialization.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -390,9 +391,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
 
   // If we have a body, we might have a generic environment.
-  GenericSignatureID genericEnvID = 0;
+  GenericSignatureID genericSigID = 0;
   if (!NoBody)
-    genericEnvID = S.addGenericEnvironmentRef(F.getGenericEnvironment());
+    if (auto *genericEnv = F.getGenericEnvironment())
+      genericSigID = S.addGenericSignatureRef(genericEnv->getGenericSignature());
 
   DeclID clangNodeOwnerID;
   if (F.hasClangNode())
@@ -409,6 +411,14 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   }
   unsigned numSpecAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   unsigned numDiffAttrs = NoBody ? 0 : F.getDifferentiableAttrs().size();
+
+  Optional<llvm::VersionTuple> available;
+  auto availability = F.getAvailabilityForLinkage();
+  if (!availability.isAlwaysAvailable()) {
+    available = availability.getOSVersion().getLowerEndpoint();
+  }
+  ENCODE_VER_TUPLE(available, available)
+
   SILFunctionLayout::emitRecord(
       Out, ScratchRecord, abbrCode, toStableSILLinkage(Linkage),
       (unsigned)F.isTransparent(), (unsigned)F.isSerialized(),
@@ -418,9 +428,10 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
       // SWIFT_ENABLE_TENSORFLOW
       (unsigned)numSpecAttrs, (unsigned)numDiffAttrs,
       (unsigned)F.hasOwnership(),
-      F.isWeakLinked(), (unsigned)F.isDynamicallyReplaceable(),
+      F.isAlwaysWeakImported(), LIST_VER_TUPLE_PIECES(available),
+      (unsigned)F.isDynamicallyReplaceable(),
       (unsigned)F.isExactSelfClass(),
-      FnID, replacedFunctionID, genericEnvID, clangNodeOwnerID, SemanticsIDs);
+      FnID, replacedFunctionID, genericSigID, clangNodeOwnerID, SemanticsIDs);
 
   if (NoBody)
     return;

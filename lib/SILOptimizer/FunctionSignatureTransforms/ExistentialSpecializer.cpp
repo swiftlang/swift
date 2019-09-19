@@ -152,8 +152,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
       continue;
 
     auto ExistentialRepr =
-        CalleeArg->getType().getPreferredExistentialRepresentation(
-            F->getModule());
+        CalleeArg->getType().getPreferredExistentialRepresentation();
     if (ExistentialRepr != ExistentialRepresentation::Opaque &&
           ExistentialRepr != ExistentialRepresentation::Class)
       continue;

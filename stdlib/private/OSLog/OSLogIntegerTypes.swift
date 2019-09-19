@@ -99,7 +99,7 @@ extension OSLogInterpolation {
     // two bytes needed for the headers.
     totalBytesForSerializingArguments += byteCount + 2
 
-    preamble = getUpdatedPreamble(isPrivate: isPrivate)
+    preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: true)
   }
 
   /// Construct an os_log format specifier from the given parameters.

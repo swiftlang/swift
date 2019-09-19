@@ -338,8 +338,7 @@ static ValueDecl *deriveTensorGroup_constructor(
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   initDecl->setValidationToChecked();

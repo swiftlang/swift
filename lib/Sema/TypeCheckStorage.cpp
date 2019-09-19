@@ -1818,6 +1818,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("not an opaque accessor");
   }
+  llvm_unreachable("Unhandled AccessorKind in switch");
 }
 
 llvm::Expected<bool>
@@ -2214,27 +2215,43 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
 llvm::Expected<Optional<PropertyWrapperMutability>>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
-  unsigned numWrappers = var->getAttachedPropertyWrappers().size();
-  if (numWrappers < 1)
-    return None;
+  VarDecl *originalVar = var;
+  unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
+  bool isProjectedValue = false;
+  if (numWrappers < 1) {
+    originalVar = var->getOriginalWrappedProperty(
+        PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
+    if (!originalVar)
+      return None;
+
+    numWrappers = originalVar->getAttachedPropertyWrappers().size();
+    isProjectedValue = true;
+  }
+
   if (var->getParsedAccessor(AccessorKind::Get))
     return None;
   if (var->getParsedAccessor(AccessorKind::Set))
     return None;
 
+  // Figure out which member we're looking through.
+  auto varMember = isProjectedValue
+    ? &PropertyWrapperTypeInfo::projectedValueVar
+    : &PropertyWrapperTypeInfo::valueVar;
+
   // Start with the traits from the outermost wrapper.
-  auto firstWrapper = var->getAttachedPropertyWrapperTypeInfo(0);
-  if (!firstWrapper.valueVar)
+  auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
+  if (firstWrapper.*varMember == nullptr)
     return None;
   
   PropertyWrapperMutability result;
   
-  result.Getter = getGetterMutatingness(firstWrapper.valueVar);
-  result.Setter = getSetterMutatingness(firstWrapper.valueVar,
+  result.Getter = getGetterMutatingness(firstWrapper.*varMember);
+  result.Setter = getSetterMutatingness(firstWrapper.*varMember,
                                         var->getInnermostDeclContext());
   
   // Compose the traits of the following wrappers.
-  for (unsigned i = 1; i < numWrappers; ++i) {
+  for (unsigned i = 1; i < numWrappers && !isProjectedValue; ++i) {
+    assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
       return None;

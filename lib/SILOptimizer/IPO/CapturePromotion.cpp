@@ -367,7 +367,7 @@ computeNewArgInterfaceTypes(SILFunction *F, IndicesSet &PromotableIndices,
     auto paramBoxTy = paramTy.castTo<SILBoxType>();
     assert(paramBoxTy->getLayout()->getFields().size() == 1
            && "promoting compound box not implemented yet");
-    auto paramBoxedTy = paramBoxTy->getFieldType(F->getModule(), 0);
+    auto paramBoxedTy = getSILBoxFieldType(paramBoxTy, Types, 0);
     auto &paramTL = Types.getTypeLowering(paramBoxedTy, expansion);
     ParameterConvention convention;
     if (paramTL.isAddressOnly()) {
@@ -479,7 +479,8 @@ ClosureCloner::populateCloned() {
     auto BoxTy = (*I)->getType().castTo<SILBoxType>();
     assert(BoxTy->getLayout()->getFields().size() == 1 &&
            "promoting compound box not implemented");
-    auto BoxedTy = BoxTy->getFieldType(Cloned->getModule(), 0).getObjectType();
+    auto BoxedTy = getSILBoxFieldType(BoxTy, Cloned->getModule().Types, 0)
+      .getObjectType();
     SILValue MappedValue =
         ClonedEntryBB->createFunctionArgument(BoxedTy, (*I)->getDecl());
 
@@ -997,7 +998,7 @@ bool isPartialApplyNonEscapingUser(Operand *CurrentOp, PartialApplyInst *PAI,
   auto BoxTy = BoxArg->getType().castTo<SILBoxType>();
   assert(BoxTy->getLayout()->getFields().size() == 1 &&
          "promoting compound box not implemented yet");
-  if (BoxTy->getFieldType(M, 0).isAddressOnly(*F)) {
+  if (getSILBoxFieldType(BoxTy, M.Types, 0).isAddressOnly(*F)) {
     LLVM_DEBUG(llvm::dbgs() << "        FAIL! Box is an address only "
                                "argument!\n");
     return false;

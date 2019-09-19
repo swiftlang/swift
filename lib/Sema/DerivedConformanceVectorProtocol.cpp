@@ -228,8 +228,7 @@ static ValueDecl *deriveVectorProtocol_method(
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    funcDecl->setGenericEnvironment(env);
+  funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   funcDecl->setValidationToChecked();

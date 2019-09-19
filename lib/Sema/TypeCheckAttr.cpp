@@ -1115,10 +1115,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
                                                   ConformanceCheckOptions());
   if (!dictConf) return false;
-  auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
-  auto keyAssocType =
-    cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
-  auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
+  auto keyType = dictConf.getValue().getTypeWitnessByName(
+      argType, TC.Context.Id_Key);
   return TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
                                          ConformanceCheckOptions()).hasValue();
 }
@@ -1630,7 +1628,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
-  auto &C = D->getASTContext();
+  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
+  auto &C = SF->getASTContext();
 
   auto KitModule = C.getLoadedModule(Id_Kit);
   ProtocolDecl *ApplicationDelegateProto = nullptr;
@@ -1639,7 +1638,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
-                               KitModule);
+                               SF);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -1659,30 +1658,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
 
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
-  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
   if (SF->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
-
-  // Check that we have the needed symbols in the frameworks.
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookupMain = TC.lookupUnqualified(KitModule, Id_ApplicationMain,
-                                         SourceLoc(), lookupOptions);
-
-  for (const auto &result : lookupMain) {
-    TC.validateDecl(result.getValueDecl());
-  }
-  auto Foundation = TC.Context.getLoadedModule(C.Id_Foundation);
-  if (Foundation) {
-    auto lookupString = TC.lookupUnqualified(
-                          Foundation,
-                          C.getIdentifier("NSStringFromClass"),
-                          SourceLoc(),
-                          lookupOptions);
-    for (const auto &result : lookupString) {
-      TC.validateDecl(result.getValueDecl());
-    }
-  }
 }
 
 void AttributeChecker::visitNSApplicationMainAttr(NSApplicationMainAttr *attr) {
@@ -1897,8 +1874,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
 
   // Go over the set of requirements, adding them to the builder.
-  RequirementRequest::visitRequirements(
-      WhereClauseOwner(FD, attr), TypeResolutionStage::Interface,
+  WhereClauseOwner(FD, attr).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         // Collect all of the generic parameters used by these types.
         switch (req.getKind()) {
@@ -3383,8 +3359,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
         GenericSignatureBuilder::FloatingRequirementSource;
 
     bool errorOccurred = false;
-    RequirementRequest::visitRequirements(
-      WhereClauseOwner(original, attr), TypeResolutionStage::Structural,
+    WhereClauseOwner(original, attr).visitRequirements(
+      TypeResolutionStage::Structural,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::SameType:
@@ -3417,7 +3393,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     // functions.
     whereClauseGenSig = std::move(builder).computeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
-    whereClauseGenEnv = whereClauseGenSig->createGenericEnvironment();
+    whereClauseGenEnv = whereClauseGenSig->getGenericEnvironment();
     // Store the resolved requirements in the attribute.
     attr->setRequirements(ctx, whereClauseGenSig->getRequirements());
   }

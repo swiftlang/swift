@@ -244,9 +244,10 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: It would be nice if we had a more detailed diagnostic here.
+  // FIXME: For some reason this is type-checked twice, second time around solver complains about <<error type>> argument
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{'Bool' is not convertible to 'Int'}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -719,6 +720,7 @@ func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
   _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+  // expected-error@-1 {{cannot convert value of type 'Wrapper<Bool>' to expected argument type 'Int'}}
 }
 
 
@@ -1580,4 +1582,67 @@ protocol SR_11288_P5 {
 
 struct SR_11288_S5<T>: SR_11288_P5 {
   @SR_11288_Wrapper5 var answer = 42 // Okay
+}
+
+// SR-11393
+protocol Copyable: AnyObject {
+    func copy() -> Self
+}
+
+@propertyWrapper
+struct CopyOnWrite<Value: Copyable> {
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+
+  var wrappedValue: Value
+
+  var projectedValue: Value {
+    mutating get {
+      if !isKnownUniquelyReferenced(&wrappedValue) {
+        wrappedValue = wrappedValue.copy()
+      }
+      return wrappedValue
+    }
+    set {
+      wrappedValue = newValue
+    }
+  }
+}
+
+final class CopyOnWriteTest: Copyable {
+    let a: Int
+    init(a: Int) {
+        self.a = a
+    }
+
+    func copy() -> Self {
+        Self.init(a: a)
+    }
+}
+
+struct CopyOnWriteDemo1 {
+  @CopyOnWrite var a = CopyOnWriteTest(a: 3)
+
+  func foo() { // expected-note{{mark method 'mutating' to make 'self' mutable}}
+    _ = $a // expected-error{{cannot use mutating getter on immutable value: 'self' is immutable}}
+  }
+}
+
+@propertyWrapper
+struct NonMutatingProjectedValueSetWrapper<Value> {
+  var wrappedValue: Value
+  var projectedValue: Value {
+    get { wrappedValue }
+    nonmutating set { } 
+  }
+}
+
+struct UseNonMutatingProjectedValueSet {
+  @NonMutatingProjectedValueSetWrapper var x = 17
+
+  func test() { // expected-note{{mark method 'mutating' to make 'self' mutable}}
+    $x = 42 // okay
+    x = 42  // expected-error{{cannot assign to property: 'self' is immutable}}
+  }
 }

@@ -2932,7 +2932,7 @@ buildThunkSignature(SILGenFunction &SGF,
       AbstractGenericSignatureRequest{
         baseGenericSig, { newGenericParam }, { newRequirement }},
       nullptr);
-  genericEnv = genericSig->createGenericEnvironment();
+  genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();
@@ -3727,13 +3727,13 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   Lowering::GenericContextScope genericContextScope(
       Types, assocFnType->getGenericSignature());
   auto *thunkGenericEnv = assocFnType->getGenericSignature()
-      ? assocFnType->getGenericSignature()->createGenericEnvironment()
+      ? assocFnType->getGenericSignature()->getGenericEnvironment()
       : nullptr;
 
   auto origFnType = original->getLoweredFunctionType();
   auto origAssocFnType = origFnType->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      assocFnKind, M, LookUpConformanceInModule(M.getSwiftModule()),
+      assocFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
       assocFnType->getGenericSignature());
   assert(!origAssocFnType->getExtInfo().hasContext());
 

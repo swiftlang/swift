@@ -17,10 +17,12 @@ idLover.takesId(ArbitraryThing())
 var x: AnyObject = NSObject()
 idLover.takesArray(ofId: &x)
 var xAsAny = x as Any
-idLover.takesArray(ofId: &xAsAny)  // expected-error{{argument type 'Any' does not conform to expected type 'AnyObject'}}
+idLover.takesArray(ofId: &xAsAny)  // expected-error{{cannot convert value of type 'UnsafePointer<Any>' to expected argument type 'UnsafePointer<AnyObject>'}}
+// expected-note@-1 {{arguments to generic parameter 'Pointee' ('Any' and 'AnyObject') are expected to be equal}}
 
 var y: Any = NSObject()
-idLover.takesArray(ofId: &y) // expected-error{{argument type 'Any' does not conform to expected type 'AnyObject'}}
+idLover.takesArray(ofId: &y) // expected-error{{cannot convert value of type 'UnsafePointer<Any>' to expected argument type 'UnsafePointer<AnyObject>'}}
+// expected-note@-1 {{arguments to generic parameter 'Pointee' ('Any' and 'AnyObject') are expected to be equal}}
 
 idLover.takesId(x)
 idLover.takesId(y)

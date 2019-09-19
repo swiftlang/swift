@@ -294,5 +294,45 @@ if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
     // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
     // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 1
   }
+
+  // CHECK-LABEL: @$s25OSLogPrototypeCompileTest26testDynamicStringArgumentsL_1hy0aB06LoggerV_tF
+  func testDynamicStringArguments(h: Logger) {
+    let concatString = "hello" + " - " + "world"
+    let interpolatedString = "\(31) trillion digits of pi are known so far"
+
+    h.log("""
+      concat: \(concatString, privacy: .public) \
+      interpolated: \(interpolatedString, privacy: .private)
+      """)
+
+    // Check if there is a call to _os_log_impl with a literal format string.
+    // CHECK-DAG is used here as it is easier to perform the checks backwards
+    // from uses to the definitions.
+
+    // CHECK-DAG: [[OS_LOG_IMPL:%[0-9]+]] = function_ref @_os_log_impl : $@convention(c)
+    // CHECK-DAG: apply [[OS_LOG_IMPL]]({{%.*}}, {{%.*}}, {{%.*}}, [[CHARPTR:%[0-9]+]], {{%.*}}, {{%.*}})
+    // CHECK-DAG: [[CHARPTR]] = struct $UnsafePointer<Int8> ([[LIT:%[0-9]+]] : $Builtin.RawPointer)
+    // CHECK-DAG: [[LIT]] = string_literal utf8 "concat: %{public}s interpolated: %{private}s"
+
+    // Check if the size of the argument buffer is a constant.
+
+    // CHECK-DAG: [[ALLOCATE:%[0-9]+]] = function_ref @$sSp8allocate8capacitySpyxGSi_tFZ
+    // CHECK-DAG: apply [[ALLOCATE]]<UInt8>([[BUFFERSIZE:%[0-9]+]], {{%.*}})
+    // CHECK-DAG: [[BUFFERSIZE]] = struct $Int ([[BUFFERSIZELIT:%[0-9]+]]
+    // CHECK-64-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int64, 22
+    // CHECK-32-DAG: [[BUFFERSIZELIT]] = integer_literal $Builtin.Int32, 14
+
+    // Check whether the header bytes: premable and argument count are constants.
+
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: apply [[SERIALIZE]]([[PREAMBLE:%[0-9]+]], {{%.*}})
+    // CHECK-DAG: [[PREAMBLE]] =  struct $UInt8 ([[PREAMBLELIT:%[0-9]+]] : $Builtin.Int8)
+    // CHECK-DAG: [[PREAMBLELIT]] = integer_literal $Builtin.Int8, 3
+
+    // CHECK-DAG: [[SERIALIZE:%[0-9]+]] = function_ref @$s14OSLogPrototype0A17ByteBufferBuilderV9serializeyys5UInt8VF
+    // CHECK-DAG: apply [[SERIALIZE]]([[ARGCOUNT:%[0-9]+]], {{%.*}})
+    // CHECK-DAG: [[ARGCOUNT]] =  struct $UInt8 ([[ARGCOUNTLIT:%[0-9]+]] : $Builtin.Int8)
+    // CHECK-DAG: [[ARGCOUNTLIT]] = integer_literal $Builtin.Int8, 2
+  }
 }
 

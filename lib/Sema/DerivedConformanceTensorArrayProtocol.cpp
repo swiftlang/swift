@@ -242,8 +242,7 @@ static ValueDecl *deriveTensorArrayProtocol_method(
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    funcDecl->setGenericEnvironment(env);
+  funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   funcDecl->setValidationToChecked();
@@ -646,8 +645,7 @@ static ValueDecl
   initDecl->setSynthesized();
   initDecl->setBodySynthesizer(deriveBodyTensorArrayProtocol_init, nullptr);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows(false));
   initDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   initDecl->setValidationToChecked();

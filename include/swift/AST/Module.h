@@ -361,7 +361,7 @@ public:
   /// within the current module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  void lookupValue(AccessPathTy AccessPath, DeclName Name, NLKind LookupKind,
+  void lookupValue(DeclName Name, NLKind LookupKind,
                    SmallVectorImpl<ValueDecl*> &Result) const;
 
   /// Look up a local type declaration by its mangled name.
@@ -629,8 +629,7 @@ public:
   /// within this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const = 0;
 
   /// Look up a local type declaration by its mangled name.
@@ -1059,8 +1058,7 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void addVisibleDecl(ValueDecl *decl);
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ModuleDecl::AccessPathTy accessPath,
@@ -1246,6 +1244,8 @@ public:
 
   bool canBeParsedInFull() const;
 
+  bool isSuitableForASTScopes() const { return canBeParsedInFull(); }
+
   syntax::SourceFileSyntax getSyntaxRoot() const;
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
@@ -1284,8 +1284,7 @@ private:
 public:
   explicit BuiltinUnit(ModuleDecl &M);
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                           NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   /// Find all Objective-C methods with the given selector.

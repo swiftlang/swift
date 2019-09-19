@@ -25,7 +25,6 @@
 #include "swift/Basic/Timer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParsedSyntaxNodes.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
@@ -112,7 +111,6 @@ void tokenize(const LangOptions &LangOpts, const SourceManager &SM,
 using namespace swift;
 using namespace swift::syntax;
 
-void DelayedParsingCallbacks::anchor() { }
 void SILParserTUStateBase::anchor() { }
 
 namespace {
@@ -173,8 +171,7 @@ static void parseDelayedDecl(
   SourceManager &SourceMgr = SF.getASTContext().SourceMgr;
   unsigned BufferID =
     SourceMgr.findBufferContainingLoc(ParserState.getDelayedDeclLoc());
-  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr,
-                   /*DelayBodyParsing=*/false);
+  Parser TheParser(BufferID, SF, nullptr, &ParserState, nullptr);
   TheParser.SyntaxContext->setDiscard();
   std::unique_ptr<CodeCompletionCallbacks> CodeCompletion;
   if (CodeCompletionFactory) {
@@ -322,7 +319,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
       /*SplitTokens=*/ArrayRef<Token>(),
       [&](const Token &Tok, const ParsedTrivia &LeadingTrivia,
           const ParsedTrivia &TrailingTrivia) {
-        CharSourceRange TokRange = Tok.getRangeWithoutBackticks();
+        CharSourceRange TokRange = Tok.getRange();
         SourceLoc LeadingTriviaLoc =
           TokRange.getStart().getAdvancedLoc(-LeadingTrivia.getLength());
         SourceLoc TrailingTriviaLoc =
@@ -331,7 +328,7 @@ swift::tokenizeWithTrivia(const LangOptions &LangOpts, const SourceManager &SM,
           LeadingTrivia.convertToSyntaxTrivia(LeadingTriviaLoc, SM, BufferID);
         Trivia syntaxTrailingTrivia =
           TrailingTrivia.convertToSyntaxTrivia(TrailingTriviaLoc, SM, BufferID);
-        auto Text = OwnedString::makeRefCounted(Tok.getText());
+        auto Text = OwnedString::makeRefCounted(Tok.getRawText());
         auto ThisToken =
             RawSyntax::make(Tok.getKind(), Text, syntaxLeadingTrivia.Pieces,
                             syntaxTrailingTrivia.Pieces,
@@ -687,19 +684,19 @@ void Parser::skipSingleSyntax(SmallVectorImpl<ParsedSyntax> &Skipped) {
     Skipped.push_back(consumeTokenSyntax());
     skipUntilSyntax(Skipped, tok::r_paren);
     if (auto RParen = consumeTokenSyntaxIf(tok::r_paren))
-      Skipped.push_back(*RParen);
+      Skipped.push_back(std::move(*RParen));
     break;
   case tok::l_brace:
     Skipped.push_back(consumeTokenSyntax());
     skipUntilSyntax(Skipped, tok::r_brace);
     if (auto RBrace = consumeTokenSyntaxIf(tok::r_brace))
-      Skipped.push_back(*RBrace);
+      Skipped.push_back(std::move(*RBrace));
     break;
   case tok::l_square:
     Skipped.push_back(consumeTokenSyntax());
     skipUntilSyntax(Skipped, tok::r_square);
     if (auto RSquare = consumeTokenSyntaxIf(tok::r_square))
-      Skipped.push_back(*RSquare);
+      Skipped.push_back(std::move(*RSquare));
     break;
   case tok::pound_if:
   case tok::pound_else:
@@ -711,7 +708,7 @@ void Parser::skipSingleSyntax(SmallVectorImpl<ParsedSyntax> &Skipped) {
     if (Tok.isAny(tok::pound_else, tok::pound_elseif))
       skipSingleSyntax(Skipped);
     else if (auto Endif = consumeTokenSyntaxIf(tok::pound_endif))
-      Skipped.push_back(*Endif);
+      Skipped.push_back(std::move(*Endif));
     break;
 
   default:
@@ -756,6 +753,58 @@ void Parser::skipSingle() {
   }
 }
 
+void Parser::ignoreToken() {
+  ParsedTriviaList Skipped;
+  Skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
+  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+            std::back_inserter(Skipped));
+  Skipped.emplace_back(TriviaKind::GarbageText, Tok.getText().size());
+  std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
+            std::back_inserter(Skipped));
+
+  TokReceiver->receive(Tok);
+  consumeTokenWithoutFeedingReceiver();
+
+  std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
+            std::back_inserter(Skipped));
+  LeadingTrivia = {std::move(Skipped)};
+}
+
+void Parser::ignoreSingle() {
+  switch (Tok.getKind()) {
+  case tok::l_paren:
+      ignoreToken();
+    ignoreUntil(tok::r_paren);
+    ignoreIf(tok::r_paren);
+    break;
+  case tok::l_brace:
+    ignoreToken();
+    ignoreUntil(tok::r_brace);
+    ignoreIf(tok::r_brace);
+    break;
+  case tok::l_square:
+    ignoreToken();
+    ignoreUntil(tok::r_square);
+    ignoreIf(tok::r_square);
+    break;
+  case tok::pound_if:
+  case tok::pound_else:
+  case tok::pound_elseif:
+    ignoreToken();
+    ignoreUntil(tok::pound_endif);
+    ignoreIf(tok::pound_endif);
+    break;
+  default:
+    ignoreToken();
+    break;
+  }
+}
+
+void Parser::ignoreUntil(tok Kind) {
+  while (Tok.isNot(Kind, tok::eof, tok::pound_endif, tok::code_complete))
+    ignoreSingle();
+}
+
 void Parser::skipUntilSyntax(llvm::SmallVectorImpl<ParsedSyntax> &Skipped,
                              tok T1, tok T2) {
   // tok::NUM_TOKENS is a sentinel that means "don't skip".
@@ -777,6 +826,30 @@ void Parser::skipUntilAnyOperator() {
   while (Tok.isNot(tok::eof, tok::pound_endif, tok::code_complete) &&
          Tok.isNotAnyOperator())
     skipSingle();
+}
+
+bool Parser::ignoreUntilGreaterInTypeList() {
+  while (true) {
+    switch (Tok.getKind()) {
+    case tok::eof:
+    case tok::l_brace:
+    case tok::r_brace:
+    case tok::code_complete:
+      return false;
+
+#define KEYWORD(X) case tok::kw_##X:
+#define POUND_KEYWORD(X) case tok::pound_##X:
+#include "swift/Syntax/TokenKinds.def"
+      if (isStartOfStmt() || isStartOfDecl() || Tok.is(tok::pound_endif))
+        return false;
+      break;
+    default:
+      if (startsWithGreater(Tok))
+        return true;
+      break;
+    }
+    ignoreSingle();
+  }
 }
 
 void Parser::skipUntilGreaterInTypeListSyntax(
@@ -930,11 +1003,12 @@ void Parser::skipListUntilDeclRBraceSyntax(
   while (Tok.isNot(T1, T2, tok::eof, tok::r_brace, tok::pound_endif,
                    tok::pound_else, tok::pound_elseif)) {
     auto Comma = consumeTokenSyntaxIf(tok::comma);
-    if (Comma)
-      Skipped.push_back(*Comma);
-    
+
     bool hasDelimiter = Tok.getLoc() == startLoc || Comma;
     bool possibleDeclStartsLine = Tok.isAtStartOfLine();
+
+    if (Comma)
+      Skipped.push_back(std::move(*Comma));
 
     if (isStartOfDecl()) {
       // Could have encountered something like `_ var:` 
@@ -947,7 +1021,7 @@ void Parser::skipListUntilDeclRBraceSyntax(
         Parser::BacktrackingScope backtrack(*this);
         // Consume the let or var
         auto LetOrVar = consumeTokenSyntax();
-        Skipped.push_back(LetOrVar);
+        Skipped.push_back(std::move(LetOrVar));
         
         // If the following token is either <identifier> or :, it means that
         // this `var` or `let` should be interpreted as a label
@@ -1278,7 +1352,7 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
       diagnose(Tok, diag::unexpected_separator, ",")
           .fixItRemove(SourceRange(Tok.getLoc()));
       auto Comma = consumeTokenSyntax();
-      Junk.push_back(Comma);
+      Junk.push_back(std::move(Comma));
     }
     SourceLoc StartLoc = Tok.getLoc();
 

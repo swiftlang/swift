@@ -239,6 +239,11 @@ static llvm::cl::opt<std::string>
 BaselineFilePath("baseline-path",
                  llvm::cl::desc("The path to the Json file that we should use as the baseline"),
                  llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+UseEmptyBaseline("empty-baseline",
+                llvm::cl::desc("Use empty baseline for diagnostics"),
+                llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -819,6 +824,26 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
   }
 }
 
+static StringRef getAttrName(DeclAttrKind Kind) {
+  switch (Kind) {
+#define DECL_ATTR(NAME, CLASS, ...)                                           \
+  case DAK_##CLASS:                                                           \
+      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
+#include "swift/AST/Attr.def"
+  case DAK_Count:
+    llvm_unreachable("unrecognized attribute kind.");
+  }
+  llvm_unreachable("covered switch");
+}
+
+static bool shouldDiagnoseAddingAttribute(SDKNodeDecl *D, DeclAttrKind Kind) {
+  return true;
+}
+
+static bool shouldDiagnoseRemovingAttribute(SDKNodeDecl *D, DeclAttrKind Kind) {
+  return true;
+}
+
 void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   SDKNode::diagnose(Right);
   auto *RD = dyn_cast<SDKNodeDecl>(Right);
@@ -877,13 +902,27 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
     }
   }
 
-  // Check if some attributes with ABI/API-impact have been added/removed.
-  for (auto &Info: Ctx.getBreakingAttributeInfo()) {
-    if (hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
-      auto Desc = hasDeclAttribute(Info.Kind) ?
-      Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
-      Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
-      emitDiag(diag::decl_new_attr, Desc);
+  // Diagnose removing attributes.
+  for (auto Kind: getDeclAttributes()) {
+    if (!RD->hasDeclAttribute(Kind)) {
+      if ((Ctx.checkingABI() ? DeclAttribute::isRemovingBreakingABI(Kind) :
+                               DeclAttribute::isRemovingBreakingAPI(Kind)) &&
+          shouldDiagnoseRemovingAttribute(this, Kind)) {
+        emitDiag(diag::decl_new_attr,
+                Ctx.buffer((llvm::Twine("without ") + getAttrName(Kind)).str()));
+      }
+    }
+  }
+
+  // Diagnose adding attributes.
+  for (auto Kind: RD->getDeclAttributes()) {
+    if (!hasDeclAttribute(Kind)) {
+      if ((Ctx.checkingABI() ? DeclAttribute::isAddingBreakingABI(Kind) :
+                               DeclAttribute::isAddingBreakingAPI(Kind)) &&
+          shouldDiagnoseAddingAttribute(this, Kind)) {
+        emitDiag(diag::decl_new_attr,
+                Ctx.buffer((llvm::Twine("with ") + getAttrName(Kind)).str()));
+      }
     }
   }
 
@@ -1105,6 +1144,18 @@ public:
           }
         }
       }
+      if (auto *CD = dyn_cast<SDKNodeDeclConstructor>(Right)) {
+        if (auto *TD = dyn_cast<SDKNodeDeclType>(Right->getParent())) {
+          if (TD->isOpen() && CD->getInitKind() == CtorInitializerKind::Designated) {
+            // If client's subclass provides an implementation of all of its superclass designated
+            // initializers, it automatically inherits all of the superclass convenience initializers.
+            // This means if a new designated init is added to the base class, the inherited
+            // convenience init may be missing and cause breakage.
+            CD->emitDiag(diag::desig_init_added);
+          }
+        }
+      }
+
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
@@ -2517,7 +2568,15 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.SwiftOnly = options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
   for (int i = 1; i < argc; ++i)
-    Opts.ToolArgs.push_back(StringRef(argv[i]));
+    Opts.ToolArgs.push_back(argv[i]);
+
+  if (!options::SDK.empty()) {
+    auto Ver = getSDKVersion(options::SDK);
+    if (!Ver.empty()) {
+      Opts.ToolArgs.push_back("-sdk-version");
+      Opts.ToolArgs.push_back(Ver);
+    }
+  }
   return Opts;
 }
 
@@ -2570,28 +2629,33 @@ static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
   llvm::SmallString<128> BaselinePath(ExePath);
   llvm::sys::path::remove_filename(BaselinePath); // Remove /swift-api-digester
   llvm::sys::path::remove_filename(BaselinePath); // Remove /bin
-  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline",
-                          Modules.begin()->getKey());
-  // Look for ABI or API baseline
-  if (Ctx.checkingABI())
-    llvm::sys::path::append(BaselinePath, "ABI");
-  else
-    llvm::sys::path::append(BaselinePath, "API");
-  // Look for deployment target specific baseline files.
-  auto Triple = Invok.getLangOptions().Target;
-  if (Triple.isMacCatalystEnvironment())
-    llvm::sys::path::append(BaselinePath, "iosmac.json");
-  else if (Triple.isMacOSX())
-    llvm::sys::path::append(BaselinePath, "macos.json");
-  else if (Triple.isiOS())
-    llvm::sys::path::append(BaselinePath, "iphoneos.json");
-  else if (Triple.isTvOS())
-    llvm::sys::path::append(BaselinePath, "appletvos.json");
-  else if (Triple.isWatchOS())
-    llvm::sys::path::append(BaselinePath, "watchos.json");
-  else {
-    llvm::errs() << "Unsupported triple target\n";
-    exit(1);
+  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline");
+  if (options::UseEmptyBaseline) {
+    // Use the empty baseline for comparison.
+    llvm::sys::path::append(BaselinePath, "nil.json");
+  } else {
+    llvm::sys::path::append(BaselinePath, Modules.begin()->getKey());
+    // Look for ABI or API baseline
+    if (Ctx.checkingABI())
+      llvm::sys::path::append(BaselinePath, "ABI");
+    else
+      llvm::sys::path::append(BaselinePath, "API");
+    // Look for deployment target specific baseline files.
+    auto Triple = Invok.getLangOptions().Target;
+    if (Triple.isMacCatalystEnvironment())
+      llvm::sys::path::append(BaselinePath, "iosmac.json");
+    else if (Triple.isMacOSX())
+      llvm::sys::path::append(BaselinePath, "macos.json");
+    else if (Triple.isiOS())
+      llvm::sys::path::append(BaselinePath, "iphoneos.json");
+    else if (Triple.isTvOS())
+      llvm::sys::path::append(BaselinePath, "appletvos.json");
+    else if (Triple.isWatchOS())
+      llvm::sys::path::append(BaselinePath, "watchos.json");
+    else {
+      llvm::errs() << "Unsupported triple target\n";
+      exit(1);
+    }
   }
   StringRef Path = BaselinePath.str();
   if (!fs::exists(Path)) {

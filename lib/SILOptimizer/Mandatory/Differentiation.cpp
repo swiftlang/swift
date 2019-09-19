@@ -475,8 +475,8 @@ private:
                                      SILAutoDiffIndices indices,
                                      CanGenericSignature genericSig) {
     assert(originalBB->getParent() == original);
-    auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
+    auto *moduleDecl = original->getModule().getSwiftModule();
     auto &file = getDeclarationFileUnit();
     // Create a branching trace enum.
     std::string enumName;
@@ -497,16 +497,30 @@ private:
 
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
+    // SWIFT_ENABLE_TENSORFLOW_MERGE
+    // Test failures (AutoDiff) related to code here:
+    //   Concrete type metadata cannot have generic parameters
+    //   UNREACHABLE executed at swift/lib/IRGen/GenMeta.cpp:3493!
+    // https://github.com/apple/swift/commit/d4bb9a5cfe3ee995bf6015a75ecea6ba0c5a2a0b
+    GenericParamList *genericParams = nullptr;
+    if (genericSig)
+      genericParams =
+          cloneGenericParameters(astCtx, moduleDecl, genericSig);
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
         /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
-        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+        /*GenericParams*/ genericParams, /*DC*/ &file);
     if (genericSig) {
+/*
       auto *genericParams =
           cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
       branchingTraceDecl->setGenericParams(genericParams);
-      branchingTraceDecl->setGenericEnvironment(
-          genericSig->createGenericEnvironment());
+*/
+      for (auto *genericParam : *genericParams) {
+        genericParam->setDeclContext(branchingTraceDecl);
+      }
+      branchingTraceDecl->setGenericSignature(genericSig);
     }
+    // SWIFT_ENABLE_TENSORFLOW_MERGE END
     branchingTraceDecl->setBraces(loc);
     computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
     branchingTraceDecl->computeType();
@@ -567,8 +581,10 @@ private:
   StructDecl *
   createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
                         CanGenericSignature genericSig) {
+    assert(originalBB->getParent() == original);
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
+    auto *moduleDecl = original->getModule().getSwiftModule();
     auto &file = getDeclarationFileUnit();
 
     std::string structName;
@@ -589,16 +605,26 @@ private:
 
     auto structId = astCtx.getIdentifier(structName);
     SourceLoc loc = original->getLocation().getSourceLoc();
+    // SWIFT_ENABLE_TENSORFLOW_MERGE
+    // Test failures (AutoDiff) related to code here:
+    //   Concrete type metadata cannot have generic parameters
+    //   UNREACHABLE executed at swift/lib/IRGen/GenMeta.cpp:3493!
+    GenericParamList *genericParams = nullptr;
+    if (genericSig)
+      genericParams =
+          cloneGenericParameters(astCtx, moduleDecl, genericSig);
     auto *linearMapStruct = new (astCtx) StructDecl(
         /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
     if (genericSig) {
+/*
       auto *genericParams =
           cloneGenericParameters(astCtx, linearMapStruct, genericSig);
       linearMapStruct->setGenericParams(genericParams);
-      linearMapStruct->setGenericEnvironment(
-          genericSig->createGenericEnvironment());
+*/
+      linearMapStruct->setGenericSignature(genericSig);
     }
+    // SWIFT_ENABLE_TENSORFLOW_MERGE END
     linearMapStruct->setBraces(loc);
     computeAccessLevel(
         linearMapStruct, original->getEffectiveSymbolLinkage());
@@ -657,7 +683,8 @@ private:
     return linearMapDecl;
   }
 
-  void addLinearMapToStruct(ApplyInst *ai, const SILAutoDiffIndices &indices);
+  void addLinearMapToStruct(ADContext &context, ApplyInst *ai,
+                            const SILAutoDiffIndices &indices);
 
   /// This takes the declared linear map structs and populates
   /// them with the necessary fields, specifically the linear function (pullback
@@ -1553,7 +1580,7 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
 
 /// Takes an `apply` instruction and adds its linear map function to the
 /// linear map struct if it's active.
-void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
+void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
   allResults.push_back(ai);
@@ -1622,7 +1649,8 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
     return;
 
   auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
-      parameters, source, /*differentiationOrder*/ 1, kind, builder.getModule(),
+      parameters, source, /*differentiationOrder*/ 1, kind,
+      context.getTypeConverter(),
       LookUpConformanceInModule(builder.getModule().getSwiftModule()));
 
   auto assocFnResultTypes =
@@ -1703,7 +1731,7 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
         // Do not add it for array functions since those are already linear
         // and we don't need to add it to the struct.
         if (shouldDifferentiateApplyInst(ai) && !isArrayLiteralIntrinsic(ai))
-          addLinearMapToStruct(ai, indices);
+          addLinearMapToStruct(context, ai, indices);
       }
     }
   }
@@ -2599,7 +2627,7 @@ emitAssociatedFunctionReference(
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         minimalIndices.parameters, minimalIndices.source,
-        /*differentiationOrder*/ 1, kind, builder.getModule(),
+        /*differentiationOrder*/ 1, kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
         kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
@@ -2647,7 +2675,7 @@ emitAssociatedFunctionReference(
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         minimalIndices.parameters, minimalIndices.source,
-        /*differentiationOrder*/ 1, kind, builder.getModule(),
+        /*differentiationOrder*/ 1, kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
         kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
@@ -2754,7 +2782,7 @@ buildThunkSignature(SILFunction *fn,
 
   auto *genericSig = std::move(builder).computeGenericSignature(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->createGenericEnvironment();
+  genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
       ->castTo<ArchetypeType>();
@@ -3321,9 +3349,8 @@ public:
             original->getName(), AutoDiffLinearMapKind::Pullback,
             indices)).str();
     auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-    auto *pbGenericEnv = pbGenericSig
-        ? pbGenericSig->createGenericEnvironment()
-        : nullptr;
+    auto *pbGenericEnv =
+        pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
     auto pbType = SILFunctionType::get(
         pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
@@ -4250,7 +4277,7 @@ private:
   SILValue emitZeroDirect(CanType type, SILLocation loc) {
     auto diffBuilder = getDifferentialBuilder();
     auto silType = getModule().Types.getLoweredLoadableType(
-        type, ResilienceExpansion::Minimal);
+        type, ResilienceExpansion::Minimal, getModule());
     auto *buffer = diffBuilder.createAllocStack(loc, silType);
     emitZeroIndirect(type, buffer, loc);
     auto loaded = diffBuilder.emitLoadValueOperation(
@@ -4540,7 +4567,7 @@ public:
             indices)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv =
-        diffGenericSig ? diffGenericSig->createGenericEnvironment() : nullptr;
+        diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
     auto diffType = SILFunctionType::get(
         diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
@@ -6827,7 +6854,7 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
 
 SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
   auto silType = getModule().Types.getLoweredLoadableType(
-      type, ResilienceExpansion::Minimal);
+      type, ResilienceExpansion::Minimal, getModule());
   auto *buffer = builder.createAllocStack(loc, silType);
   emitZeroIndirect(type, buffer, loc);
   auto loaded = builder.emitLoadValueOperation(
@@ -7145,7 +7172,8 @@ ADContext::declareExternalAssociatedFunction(
   auto assocGenSig = getAssociatedFunctionGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
-      module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
+      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
   auto *assocFn = fb.createFunction(
@@ -7185,11 +7213,11 @@ static SILFunction *createEmptyVJP(
       module.Types, vjpGenericSig);
 
   auto *vjpGenericEnv = vjpGenericSig
-      ? vjpGenericSig->createGenericEnvironment()
+      ? vjpGenericSig->getGenericEnvironment()
       : nullptr;
   auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      AutoDiffAssociatedFunctionKind::VJP, module,
+      AutoDiffAssociatedFunctionKind::VJP, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -7235,11 +7263,11 @@ static SILFunction *createEmptyJVP(
       module.Types, jvpGenericSig);
 
   auto *jvpGenericEnv = jvpGenericSig
-      ? jvpGenericSig->createGenericEnvironment()
+      ? jvpGenericSig->getGenericEnvironment()
       : nullptr;
   auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      AutoDiffAssociatedFunctionKind::JVP, module,
+      AutoDiffAssociatedFunctionKind::JVP, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -7657,7 +7685,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffAssociatedFunctionType(
       desiredIndices.parameters, desiredIndices.source,
-      /*differentiationOrder*/ 1, kind, module, lookupConformance);
+      /*differentiationOrder*/ 1, kind, module.Types, lookupConformance);
   auto *caller = assocFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType = caller->mapTypeIntoContext(
@@ -7845,7 +7873,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
         if (newThunk->empty()) {
           if (auto newThunkGenSig = thunkType->getGenericSignature())
             newThunk->setGenericEnvironment(
-                newThunkGenSig->createGenericEnvironment());
+                newThunkGenSig->getGenericEnvironment());
           newThunk->setOwnershipEliminated();
           BasicTypeSubstCloner cloner(thunk, newThunk);
           cloner.run();
@@ -7961,7 +7989,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     }
     auto expectedAssocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
         parameterIndices, resultIndex, differentiationOrder,
-        assocFnKind, getModule(),
+        assocFnKind, getTypeConverter(),
         LookUpConformanceInModule(getModule().getSwiftModule()));
     // If `assocFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.

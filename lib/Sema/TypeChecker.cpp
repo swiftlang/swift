@@ -209,17 +209,11 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (StdlibModule)
-    return StdlibModule;
-
-  StdlibModule = Context.getStdlibModule();
-
-  if (!StdlibModule) {
-    return dc->getParentModule();
+  if (auto *stdlib = Context.getStdlibModule()) {
+    return stdlib;
   }
 
-  assert(StdlibModule && "no main module found");
-  return StdlibModule;
+  return dc->getParentModule();
 }
 
 /// Bind the given extension to the given nominal type.
@@ -228,7 +222,6 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 
@@ -365,6 +358,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 unsigned SwitchCheckingInvocationThreshold) {
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
+
+  // Eagerly build a scope tree before type checking
+  // because type-checking mutates the AST and that throws off the scope-based
+  // lookups.
+  if (SF.getASTContext().LangOpts.EnableASTScopeLookup &&
+      SF.isSuitableForASTScopes())
+    SF.getScope().buildScopeTreeEagerly();
 
   auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
@@ -605,7 +605,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
   TypeChecker &TC = createTypeChecker(Ctx);
-  return TC.validateType(T, resolution, options);
+  return TypeChecker::validateType(TC.Context, T, resolution, options);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.

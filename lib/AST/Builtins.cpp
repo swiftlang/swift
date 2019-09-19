@@ -193,7 +193,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericEnvironment *Env,
+                          GenericSignature *Sig,
                           // SWIFT_ENABLE_TENSORFLOW
                           bool Rethrows = false) {
   assert(GenericParams && "Missing generic parameters");
@@ -231,7 +231,7 @@ getBuiltinGenericFunction(Identifier Id,
                                paramList,
                                TypeLoc::withoutLoc(ResType), DC);
 
-  func->setGenericEnvironment(Env);
+  func->setGenericSignature(Sig);
   func->computeType();
   func->setValidationToChecked();
   func->setImplicit();
@@ -468,6 +468,7 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     // Deleted `GenericSig` because we make that later, when `build()` is
     // called.
+    // SWIFT_ENABLE_TENSORFLOW END
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -475,8 +476,9 @@ namespace {
     // Accumulate params and requirements here, so that we can make the
     // appropriate `AbstractGenericSignatureRequest` when `build()` is called.
     bool Rethrows = false;
-    SmallVector<GenericTypeParamType *, 2> addedParameters;
+    SmallVector<GenericTypeParamType *, 2> genericParamTypes;
     SmallVector<Requirement, 2> addedRequirements;
+    // SWIFT_ENABLE_TENSORFLOW END
 
   public:
     BuiltinGenericSignatureBuilder(ASTContext &ctx, unsigned numGenericParams = 1)
@@ -486,10 +488,9 @@ namespace {
 
       // SWIFT_ENABLE_TENSORFLOW
       for (auto gp : GenericTypeParams) {
-        addedParameters.push_back(
+        genericParamTypes.push_back(
             gp->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
       }
-
     }
 
     template <class G>
@@ -517,17 +518,19 @@ namespace {
     void setRethrows(bool rethrows = true) {
       Rethrows = rethrows;
     }
+    // SWIFT_ENABLE_TENSORFLOW END
 
     ValueDecl *build(Identifier name) {
       auto GenericSig = evaluateOrDefault(
           Context.evaluator,
           AbstractGenericSignatureRequest{
-            nullptr, std::move(addedParameters), std::move(addedRequirements)},
+            nullptr, std::move(genericParamTypes), std::move(addedRequirements)},
           nullptr);
       return getBuiltinGenericFunction(name, InterfaceParams,
                                        InterfaceResult,
                                        TheGenericParamList,
-                                       GenericSig->createGenericEnvironment(),
+                                       // SWIFT_ENABLE_TENSORFLOW
+                                       GenericSig,
                                        /*Rethrows*/ Rethrows);
     }
 

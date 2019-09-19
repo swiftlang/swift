@@ -33,7 +33,7 @@
 #endif
 
 // Define a TypeID where the type name and internal name are the same.
-#define SWIFT_REQUEST(Zone, Type) SWIFT_TYPEID_NAMED(Type, Type)
+#define SWIFT_REQUEST(Zone, Type, Sig, Caching, LocOptions) SWIFT_TYPEID_NAMED(Type, Type)
 #define SWIFT_TYPEID(Type) SWIFT_TYPEID_NAMED(Type, Type)
 
 // Out-of-line definitions.

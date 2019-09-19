@@ -55,35 +55,6 @@ GenericEnvironment::GenericEnvironment(GenericSignature *signature,
                           Type());
 }
 
-void GenericEnvironment::setOwningDeclContext(DeclContext *newOwningDC) {
-  if (!OwningDC) {
-    OwningDC = newOwningDC;
-    return;
-  }
-
-  if (!newOwningDC || OwningDC == newOwningDC)
-    return;
-
-  // Find the least common ancestor context to be the owner.
-  unsigned oldDepth = OwningDC->getSyntacticDepth();
-  unsigned newDepth = newOwningDC->getSyntacticDepth();
-
-  while (oldDepth > newDepth) {
-    OwningDC = OwningDC->getParent();
-    --oldDepth;
-  }
-
-  while (newDepth > oldDepth) {
-    newOwningDC = newOwningDC->getParent();
-    --newDepth;
-  }
-
-  while (OwningDC != newOwningDC) {
-    OwningDC = OwningDC->getParent();
-    newOwningDC = newOwningDC->getParent();
-  }
-}
-
 void GenericEnvironment::addMapping(GenericParamKey key,
                                     Type contextType) {
   // Find the index into the parallel arrays of generic parameters and

@@ -142,8 +142,7 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   synthesizer(initDecl);
 
   // Compute the interface type of the initializer.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType();
 
   initDecl->setAccess(derived.Nominal->getFormalAccess());

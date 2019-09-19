@@ -15,6 +15,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(AccessControl, AccessLevelRequest)
-SWIFT_REQUEST(AccessControl, DefaultAndMaxAccessLevelRequest)
-SWIFT_REQUEST(AccessControl, SetterAccessLevelRequest)
+SWIFT_REQUEST(AccessControl, AccessLevelRequest, AccessLevel(ValueDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(AccessControl, DefaultAndMaxAccessLevelRequest,
+              DefaultAndMax(ExtensionDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(AccessControl, SetterAccessLevelRequest,
+              AccessLevel(AbstractStorageDecl *), SeparatelyCached,
+              NoLocationInfo)

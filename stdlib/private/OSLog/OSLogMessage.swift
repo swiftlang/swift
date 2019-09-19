@@ -113,18 +113,27 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
 
   /// The possible values for the argument type, as defined by the os_log ABI,
   /// which occupies four most significant bits of the first byte of the
-  /// argument header.
+  /// argument header. The rawValue of this enum must be constant evaluable.
+  /// (Note that an auto-generated rawValue is not constant evaluable because
+  /// it cannot be annotated so.)
   @usableFromInline
   @_frozen
   internal enum ArgumentType {
-    case scalar
-    // TODO: more types will be added here.
+    case scalar, count, string, pointer, object
 
     @inlinable
     internal var rawValue: UInt8 {
       switch self {
       case .scalar:
         return 0
+      case .count:
+        return 1
+      case .string:
+        return 2
+      case .pointer:
+        return 3
+      case .object:
+        return 4
       }
     }
   }
@@ -242,9 +251,16 @@ public struct OSLogInterpolation : StringInterpolationProtocol {
   @_semantics("oslog.interpolation.getUpdatedPreamble")
   @_effects(readonly)
   @_optimize(none)
-  internal func getUpdatedPreamble(isPrivate: Bool) -> UInt8 {
+  internal func getUpdatedPreamble(
+    isPrivate: Bool,
+    isScalar: Bool
+  ) -> UInt8 {
+    var preamble = self.preamble
     if isPrivate {
-      return preamble | PreambleBitMask.privateBitMask.rawValue
+      preamble |= PreambleBitMask.privateBitMask.rawValue
+    }
+    if !isScalar {
+      preamble |= PreambleBitMask.nonScalarBitMask.rawValue
     }
     return preamble
   }
@@ -350,12 +366,19 @@ internal struct OSLogArguments {
 internal struct OSLogByteBufferBuilder {
   internal var position: UnsafeMutablePointer<UInt8>
 
+  /// Objects denoting storage created by the serialize methods. Such storage
+  /// is created while serializing strings as os_log requires stable pointers to
+  /// Swift strings, which may require copying them to a in-memory buffer.
+  /// The lifetime of this auxiliary storage is same as the lifetime of `self`.
+  internal var auxiliaryStorage: [AnyObject]
+
   /// Initializer that accepts a pointer to a preexisting buffer.
   /// - Parameter bufferStart: the starting pointer to a byte buffer
   ///   that must contain the serialized bytes.
   @usableFromInline
   internal init(_ bufferStart: UnsafeMutablePointer<UInt8>) {
     position = bufferStart
+    auxiliaryStorage = []
   }
 
   /// Serialize a UInt8 value at the buffer location pointed to by `position`.
@@ -366,4 +389,11 @@ internal struct OSLogByteBufferBuilder {
   }
 
   /// `serialize` for other other types must be implemented by extensions.
+
+  /// This function exists so that clients can control the lifetime of a stack-
+  /// allocated instance of OSLogByteBufferBuilder.
+  @usableFromInline
+  internal mutating func destroy() {
+    auxiliaryStorage = []
+  }
 }

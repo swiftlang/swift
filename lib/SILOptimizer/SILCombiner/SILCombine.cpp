@@ -101,47 +101,18 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
   addInitialGroup(InstrsForSILCombineWorklist);
 }
 
-static void eraseSingleInstFromFunction(SILInstruction &I,
-                                        SILCombineWorklist &Worklist,
-                                        bool AddOperandsToWorklist) {
-  LLVM_DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
-
-  assert(!I.hasUsesOfAnyResult() && "Cannot erase instruction that is used!");
-
-  // Make sure that we reprocess all operands now that we reduced their
-  // use counts.
-  if (I.getNumOperands() < 8 && AddOperandsToWorklist) {
-    for (auto &OpI : I.getAllOperands()) {
-      if (auto *Op = OpI.get()->getDefiningInstruction()) {
-        LLVM_DEBUG(llvm::dbgs() << "SC: add op " << *Op
-                                << " from erased inst to worklist\n");
-        Worklist.add(Op);
-      }
-    }
-  }
-  Worklist.remove(&I);
-  I.eraseFromParent();
-}
-
 //===----------------------------------------------------------------------===//
 //                               Implementation
 //===----------------------------------------------------------------------===//
 
-void SILCombineWorklist::add(SILInstruction *I) {
-  if (!WorklistMap.insert(std::make_pair(I, Worklist.size())).second)
-    return;
-
-  LLVM_DEBUG(llvm::dbgs() << "SC: ADD: " << *I << '\n');
-  Worklist.push_back(I);
-}
-
 // Define a CanonicalizeInstruction subclass for use in SILCombine.
 class SILCombineCanonicalize final : CanonicalizeInstruction {
-  SILCombineWorklist &Worklist;
+  SmallSILInstructionWorklist<256> &Worklist;
   bool changed = false;
 
 public:
-  SILCombineCanonicalize(SILCombineWorklist &Worklist)
+  SILCombineCanonicalize(
+      SmallSILInstructionWorklist<256> &Worklist)
       : CanonicalizeInstruction(DEBUG_TYPE), Worklist(Worklist) {}
 
   void notifyNewInstruction(SILInstruction *inst) override {
@@ -153,8 +124,8 @@ public:
   // Just delete the given 'inst' and record its operands. The callback isn't
   // allowed to mutate any other instructions.
   void killInstruction(SILInstruction *inst) override {
-    eraseSingleInstFromFunction(*inst, Worklist,
-                                /*AddOperandsToWorklist*/ true);
+    Worklist.eraseSingleInstFromFunction(*inst,
+                                         /*AddOperandsToWorklist*/ true);
     changed = true;
   }
 
@@ -183,7 +154,7 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
-    SILInstruction *I = Worklist.removeOne();
+    SILInstruction *I = Worklist.pop_back_val();
 
     // When we erase an instruction, we use the map in the worklist to check if
     // the instruction is in the worklist. If it is, we replace it with null
@@ -222,34 +193,12 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     if (SILInstruction *Result = visit(I)) {
       ++NumCombined;
       // Should we replace the old instruction with a new one?
-      if (Result != I) {
-        assert(&*std::prev(SILBasicBlock::iterator(I)) == Result &&
-              "Expected new instruction inserted before existing instruction!");
-
-        LLVM_DEBUG(llvm::dbgs() << "SC: Old = " << *I << '\n'
-                                << "    New = " << *Result << '\n');
-
-        // Everything uses the new instruction now.
-        replaceInstUsesPairwiseWith(I, Result);
-
-        // Push the new instruction and any users onto the worklist.
-        Worklist.add(Result);
-        Worklist.addUsersOfAllResultsToWorklist(Result);
-
-        eraseInstFromFunction(*I);
-      } else {
-        LLVM_DEBUG(llvm::dbgs() << "SC: Mod = " << OrigI << '\n'
-                                << "    New = " << *I << '\n');
-
-        // If the instruction was modified, it's possible that it is now dead.
-        // if so, remove it.
-        if (isInstructionTriviallyDead(I)) {
-          eraseInstFromFunction(*I);
-        } else {
-          Worklist.add(I);
-          Worklist.addUsersOfAllResultsToWorklist(I);
-        }
-      }
+      Worklist.replaceInstructionWithInstruction(I, Result
+#ifndef NDEBUG
+          ,
+          OrigI
+#endif
+      );
       MadeChange = true;
     }
 
@@ -266,22 +215,8 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     TrackingList.clear();
   }
 
-  Worklist.zap();
+  Worklist.resetChecked();
   return MadeChange;
-}
-
-void SILCombineWorklist::addInitialGroup(ArrayRef<SILInstruction *> List) {
-  assert(Worklist.empty() && "Worklist must be empty to add initial group");
-  Worklist.reserve(List.size()+16);
-  WorklistMap.reserve(List.size());
-  LLVM_DEBUG(llvm::dbgs() << "SC: ADDING: " << List.size()
-                          << " instrs to worklist\n");
-  while (!List.empty()) {
-    SILInstruction *I = List.back();
-    List = List.slice(0, List.size()-1);    
-    WorklistMap.insert(std::make_pair(I, Worklist.size()));
-    Worklist.push_back(I);
-    }
 }
 
 bool SILCombiner::runOnFunction(SILFunction &F) {
@@ -296,88 +231,6 @@ bool SILCombiner::runOnFunction(SILFunction &F) {
 
   // Cleanup the builder and return whether or not we made any changes.
   return Changed;
-}
-
-// Insert the instruction New before instruction Old in Old's parent BB. Add
-// New to the worklist.
-SILInstruction *SILCombiner::insertNewInstBefore(SILInstruction *New,
-                                                 SILInstruction &Old) {
-  assert(New && New->getParent() == nullptr &&
-         "New instruction already inserted into a basic block!");
-  SILBasicBlock *BB = Old.getParent();
-  BB->insert(&Old, New);  // Insert inst
-  Worklist.add(New);
-  return New;
-}
-
-// This method is to be used when an instruction is found to be dead,
-// replaceable with another preexisting expression. Here we add all uses of I
-// to the worklist, replace all uses of I with the new value, then return I,
-// so that the combiner will know that I was modified.
-void SILCombiner::replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
-  Worklist.addUsersToWorklist(&I);   // Add all modified instrs to worklist.
-
-  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << I << "\n"
-                          << "    with " << *V << '\n');
-
-  I.replaceAllUsesWith(V);
-}
-
-void SILCombiner::replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
-  Worklist.addUsersToWorklist(oldValue); // Add all modified instrs to worklist.
-
-  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << oldValue << "\n"
-                          << "    with " << newValue << '\n');
-
-  oldValue->replaceAllUsesWith(newValue);
-}
-
-/// Replace all of the results of the old instruction with the
-/// corresponding results of the new instruction.
-void SILCombiner::replaceInstUsesPairwiseWith(SILInstruction *oldI,
-                                              SILInstruction *newI) {
-  LLVM_DEBUG(llvm::dbgs() << "SC: Replacing " << *oldI << "\n"
-                          << "    with " << *newI << '\n');
-
-  auto oldResults = oldI->getResults();
-  auto newResults = newI->getResults();
-  assert(oldResults.size() == newResults.size());
-  for (auto i : indices(oldResults)) {
-    // Add all modified instrs to worklist.
-    Worklist.addUsersToWorklist(oldResults[i]);
-
-    oldResults[i]->replaceAllUsesWith(newResults[i]);
-  }
-}
-
-// Some instructions can never be "trivially dead" due to side effects or
-// producing a void value. In those cases, since we cannot rely on
-// SILCombines trivially dead instruction DCE in order to delete the
-// instruction, visit methods should use this method to delete the given
-// instruction and upon completion of their peephole return the value returned
-// by this method.
-SILInstruction *
-SILCombiner::eraseInstFromFunction(SILInstruction &I,
-                                   SILBasicBlock::iterator &InstIter,
-                                   bool AddOperandsToWorklist) {
-  // Delete any debug users first.
-  for (auto result : I.getResults()) {
-    while (!result->use_empty()) {
-      auto *user = result->use_begin()->getUser();
-      assert(user->isDebugInstruction());
-      if (InstIter == user->getIterator())
-        ++InstIter;
-      Worklist.remove(user);
-      user->eraseFromParent();
-    }
-  }
-  if (InstIter == I.getIterator())
-    ++InstIter;
-
-  eraseSingleInstFromFunction(I, Worklist, AddOperandsToWorklist);
-  MadeChange = true;
-  // Dummy return, so the caller doesn't need to explicitly return nullptr.
-  return nullptr;
 }
 
 //===----------------------------------------------------------------------===//

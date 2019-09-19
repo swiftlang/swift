@@ -91,7 +91,7 @@ SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef assocFnDeclRef,
     return thunk;
 
   if (auto genSig = assocFnTy->getGenericSignature())
-    thunk->setGenericEnvironment(genSig->createGenericEnvironment());
+    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
   auto loc = assocFnDeclRef.getAsRegularLocation();
@@ -129,7 +129,7 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
     return thunk;
 
   if (auto genSig = constantTy->getGenericSignature())
-    thunk->setGenericEnvironment(genSig->createGenericEnvironment());
+    thunk->setGenericEnvironment(genSig->getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
   auto loc = assocFnDeclRef.getAsRegularLocation();

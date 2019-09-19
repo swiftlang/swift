@@ -140,51 +140,12 @@ public:
     return !getAllVisibleAccessPaths(mod, dc).empty();
   }
 
-  /// Determines if 'mod' is visible from 'dc' as a result of a scoped import.
-  /// Note that if 'mod' was not imported from 'dc' at all, this also returns
-  /// false.
-  bool isScopedImport(const ModuleDecl *mod, DeclBaseName name,
-                      const DeclContext *dc) {
-    auto accessPaths = getAllVisibleAccessPaths(mod, dc);
-    for (auto accessPath : accessPaths) {
-      if (accessPath.empty())
-        continue;
-      if (ModuleDecl::matchesAccessPath(accessPath, name))
-        return true;
-    }
-
-    return false;
-  }
-
   /// Returns all access paths in 'mod' that are visible from 'dc' if we
   /// subtract imports of 'other'.
   ArrayRef<ModuleDecl::AccessPathTy>
   getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                  const ModuleDecl *other,
                                  const DeclContext *dc);
-
-  /// Returns 'true' if a declaration named 'name' defined in 'other' shadows
-  /// defined in 'mod', because no access paths can find 'name' in 'mod' from
-  /// 'dc' if we ignore imports of 'other'.
-  bool isShadowedBy(const ModuleDecl *mod,
-                    const ModuleDecl *other,
-                    DeclBaseName name,
-                    const DeclContext *dc) {
-     auto accessPaths = getAllAccessPathsNotShadowedBy(mod, other, dc);
-     return llvm::none_of(accessPaths,
-                          [&](ModuleDecl::AccessPathTy accessPath) {
-                            return ModuleDecl::matchesAccessPath(accessPath, name);
-                          });
-  }
-
-  /// Qualified lookup into types uses a slightly different check that does not
-  /// take access paths into account.
-  bool isShadowedBy(const ModuleDecl *mod,
-                    const ModuleDecl *other,
-                    const DeclContext *dc) {
-    auto accessPaths = getAllAccessPathsNotShadowedBy(mod, other, dc);
-    return accessPaths.empty();
-  }
 
   /// This is a hack to cope with main file parsing and REPL parsing, where
   /// we can add ImportDecls after name binding.

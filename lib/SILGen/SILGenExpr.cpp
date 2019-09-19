@@ -3045,7 +3045,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     // Compare each pair of index values using the == witness from the
     // conformance.
     auto equatableProtocol = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equalsMethod = equatableProtocol->lookupDirect(C.Id_EqualsOperator)[0];
+    auto equalsMethod = equatableProtocol->getSingleRequirement(
+      C.Id_EqualsOperator);
     auto equalsRef = SILDeclRef(equalsMethod);
     auto equalsTy = subSGF.SGM.Types.getConstantType(equalsRef);
     
@@ -3224,7 +3225,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       }
 
       VarDecl *hashValueVar =
-        cast<VarDecl>(hashableProto->lookupDirect(C.Id_hashValue)[0]);
+        cast<VarDecl>(hashableProto->getSingleRequirement(C.Id_hashValue));
 
       auto formalTy = index.FormalType;
       auto hashable = index.Hashable;

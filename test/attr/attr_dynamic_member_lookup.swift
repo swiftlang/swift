@@ -600,8 +600,10 @@ func keypath_with_subscripts(_ arr: SubscriptLens<[Int]>,
 
 func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
   for idx in 0..<arr.count {
-    // expected-error@-1 {{binary operator '..<' cannot be applied to operands of type 'Int' and 'Lens<Int>'}}
-    // expected-note@-2  {{expected an argument list of type '(Self, Self)'}}
+    // expected-error@-1 {{operator function '..<' requires that 'Lens<Int>' conform to 'Strideable'}}
+    // expected-error@-2 {{operator function '..<' requires that 'Lens<Int>.Stride' conform to 'SignedInteger'}}
+    // expected-error@-3 {{cannot convert value of type 'Int' to expected argument type 'Lens<Int>'}}
+    // expected-error@-4 {{argument type 'Lens<Int>' does not conform to expected type 'Comparable'}}
     let _ = arr[idx]
   }
 }

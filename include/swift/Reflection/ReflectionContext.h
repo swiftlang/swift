@@ -108,7 +108,7 @@ public:
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader)) {
-    getBuilder().setSymbolicReferenceResolverReader(*this);
+    getBuilder().setMetadataReader(*this);
   }
 
   ReflectionContext(const ReflectionContext &other) = delete;

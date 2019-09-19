@@ -17,7 +17,7 @@
 #ifndef SWIFT_SERIALIZATION_SERIALIZATION_H
 #define SWIFT_SERIALIZATION_SERIALIZATION_H
 
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
@@ -428,11 +428,6 @@ public:
   ///
   /// The GenericSignature will be scheduled for serialization if necessary.
   GenericSignatureID addGenericSignatureRef(const GenericSignature *sig);
-
-  /// Records the use of the given generic environment.
-  ///
-  /// The GenericEnvironment will be scheduled for serialization if necessary.
-  GenericSignatureID addGenericEnvironmentRef(const GenericEnvironment *env);
 
   /// Records the use of the given substitution map.
   ///

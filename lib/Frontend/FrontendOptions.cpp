@@ -126,7 +126,7 @@ void FrontendOptions::forAllOutputPaths(
       input.getPrimarySpecificPaths().SupplementaryOutputs;
   const std::string *outputs[] = {&outs.ModuleOutputPath,
                                   &outs.ModuleDocOutputPath,
-                                  &outs.ParseableInterfaceOutputPath,
+                                  &outs.ModuleInterfaceOutputPath,
                                   &outs.ObjCHeaderOutputPath};
   for (const std::string *next : outputs) {
     if (!next->empty())

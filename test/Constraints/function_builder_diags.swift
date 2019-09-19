@@ -172,3 +172,45 @@ func test_51167632() -> some P {
     // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}} {{10-10=<<#L: P#>>}}
   })
 }
+
+struct SR11440 {
+  typealias ReturnsTuple<T> = () -> (T, T)
+  subscript<T, U>(@TupleBuilder x: ReturnsTuple<T>) -> (ReturnsTuple<U>) -> Void { //expected-note {{in call to 'subscript(_:)'}}
+    return { _ in }
+  }
+
+  func foo() {
+    // This is okay, we apply the function builder for the subscript arg.
+    self[{
+      5
+      5
+    }]({
+      (5, 5)
+    })
+
+    // But we shouldn't perform the transform for the argument to the call
+    // made on the function returned from the subscript.
+    self[{ // expected-error {{generic parameter 'U' could not be inferred}}
+      5
+      5
+    }]({
+      5
+      5
+    })
+  }
+}
+
+func acceptInt(_: Int, _: () -> Void) { }
+
+// SR-11350 crash due to improper recontextualization.
+func erroneousSR11350(x: Int) {
+  tuplify(true) { b in
+    17
+    x + 25
+    Optional(tuplify(false) { b in
+      if b {
+        acceptInt(0) { }
+      }
+    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
+  }
+}

@@ -87,8 +87,6 @@ public:
 // Type relation checking
 //----------------------------------------------------------------------------//
 enum class TypeRelation: uint8_t {
-  EqualTo,
-  PossiblyEqualTo,
   ConvertTo,
 };
 
@@ -158,8 +156,6 @@ struct TypeRelationCheckInput {
     out << " is ";
     switch(owner.Relation) {
 #define CASE(NAME) case TypeRelation::NAME: out << #NAME << " "; break;
-    CASE(EqualTo)
-    CASE(PossiblyEqualTo)
     CASE(ConvertTo)
 #undef CASE
     }
@@ -265,11 +261,11 @@ public:
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_REQUEST(Zone, RequestType)                         \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+template<>                                                                     \
+inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,                \
+                            const RequestType &request) {                      \
+  ++stats.getFrontendCounters().RequestType;                                   \
 }
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #undef SWIFT_REQUEST
