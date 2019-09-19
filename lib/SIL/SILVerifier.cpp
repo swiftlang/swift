@@ -1630,8 +1630,16 @@ public:
 
   void checkBuiltinInst(BuiltinInst *BI) {
     // Check for special constraints on llvm intrinsics.
-    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)
+    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic) {
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
+      return;
+    }
+
+    // At this point, we know that we have a Builtin that is a Swift Builtin
+    // rather than an llvm intrinsic. Make sure our name corresponds to an
+    // actual ValueDecl. Otherwise, we have an invalid builtin.
+    require(getBuiltinValueDecl(BI->getModule().getASTContext(), BI->getName()),
+            "Invalid builtin name?!");
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
