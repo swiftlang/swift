@@ -118,9 +118,13 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->hasInlinableBodyText()) return;
+    if (!AFD)
+      return;
     if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
       return;
+    if (!AFD->hasInlinableBodyText())
+      return;
+
     SmallString<128> scratch;
     printer << " " << AFD->getInlinableBodyText(scratch);
   };
@@ -191,8 +195,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
   // the default to 'public' and mark the 'internal' things.
   result.PrintAccess = true;
 
-  result.ExcludeAttrList = {DAK_ImplicitlyUnwrappedOptional, DAK_AccessControl,
-                            DAK_SetterAccess, DAK_Lazy};
+  result.ExcludeAttrList = {DAK_AccessControl, DAK_SetterAccess, DAK_Lazy};
 
   return result;
 }
@@ -673,8 +676,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap,
-                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
+      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printTypeWithOptions(T, options);
@@ -703,9 +705,9 @@ class PrintAST : public ASTVisitor<PrintAST> {
 
   void printTypeLoc(const TypeLoc &TL) { printTypeLocWithOptions(TL, Options); }
 
-  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL) {
+  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL, bool IUO) {
     PrintOptions options = Options;
-    options.PrintOptionalAsImplicitlyUnwrapped = true;
+    options.PrintOptionalAsImplicitlyUnwrapped = IUO;
     printTypeLocWithOptions(TL, options);
   }
 
@@ -993,12 +995,9 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   bool isIUO = false;
   if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
     if (auto decl = named->getDecl())
-      isIUO = decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      isIUO = decl->isImplicitlyUnwrappedOptional();
 
-  if (isIUO)
-    printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc());
-  else
-    printTypeLoc(TP->getTypeLoc());
+  printTypeLocForImplicitlyUnwrappedOptional(TP->getTypeLoc(), isIUO);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -1344,22 +1343,21 @@ void PrintAST::printGenericSignature(const GenericSignature *genericSig,
                         // print everything
                         [&](const Requirement &) { return true; });
 }
+
 void PrintAST::printGenericSignature(
     const GenericSignature *genericSig, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
+  auto requirements = genericSig->getRequirements();
+
   if (flags & InnermostOnly) {
     auto genericParams = genericSig->getInnermostGenericParams();
-    unsigned depth = genericParams[0]->getDepth();
-    SmallVector<Requirement, 2> requirementsAtDepth;
-    getRequirementsAtDepth(genericSig, depth, requirementsAtDepth);
 
-    printSingleDepthOfGenericSignature(genericParams, requirementsAtDepth,
-                                       flags, filter);
+    printSingleDepthOfGenericSignature(genericParams, requirements, flags,
+                                       filter);
     return;
   }
 
   auto genericParams = genericSig->getGenericParams();
-  auto requirements = genericSig->getRequirements();
 
   if (!Options.PrintInSILBody) {
     printSingleDepthOfGenericSignature(genericParams, requirements, flags,
@@ -1452,10 +1450,12 @@ void PrintAST::printSingleDepthOfGenericSignature(
         second = req.getSecondType();
 
       if (!subMap.empty()) {
-        if (Type subFirst = substParam(first))
+        Type subFirst = substParam(first);
+        if (!subFirst->hasError())
           first = subFirst;
         if (second) {
-          if (Type subSecond = substParam(second))
+          Type subSecond = substParam(second);
+          if (!subSecond->hasError())
             second = subSecond;
           if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
               !(second->is<ArchetypeType>() || second->isTypeParameter()))
@@ -1966,15 +1966,24 @@ void PrintAST::printMembers(ArrayRef<Decl *> members, bool needComma,
 }
 
 void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
-  if (decl->getGenericParams())
+  if (decl->isGeneric())
     if (auto GenericSig = decl->getGenericSignature())
       printGenericSignature(GenericSig, PrintParams | InnermostOnly);
 }
 
 void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
-  if (decl->getGenericParams())
-    if (auto GenericSig = decl->getGenericSignature())
-      printGenericSignature(GenericSig, PrintRequirements | InnermostOnly);
+  if (decl->isGeneric()) {
+    if (auto genericSig = decl->getGenericSignature()) {
+      auto *baseGenericSig = decl->getParent()
+          ->getGenericSignatureOfContext();
+      printGenericSignature(genericSig, PrintRequirements,
+                            [baseGenericSig](const Requirement &req) {
+                              if (baseGenericSig)
+                                return !baseGenericSig->isRequirementSatisfied(req);
+                              return true;
+                            });
+    }
+  }
 }
 
 void PrintAST::printInherited(const Decl *decl) {
@@ -2102,9 +2111,15 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      if (!extendedType || !extendedType->getAnyNominal()) {
+      if (!extendedType) {
         // Fallback to TypeRepr.
-        printTypeLoc(decl->getExtendedTypeLoc());
+        printTypeLoc(decl->getExtendedTypeRepr());
+        return;
+      }
+      if (!extendedType->getAnyNominal()) {
+        // Fallback to the type.  This usually means we're trying to print an
+        // UnboundGenericType.
+        printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
       printExtendedTypeName(extendedType, Printer, Options);
@@ -2115,7 +2130,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
-      printGenericSignature(genericSig, PrintRequirements | InnermostOnly,
+      printGenericSignature(genericSig, PrintRequirements,
                             [baseGenericSig](const Requirement &req) -> bool {
         // Only include constraints that are not satisfied by the base type.
         return !baseGenericSig->isRequirementSatisfied(req);
@@ -2523,10 +2538,8 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     x(Options.OpaqueReturnTypePrinting,
       PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
 
-    if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-      printTypeLocForImplicitlyUnwrappedOptional(tyLoc);
-    else
-      printTypeLoc(tyLoc);
+    printTypeLocForImplicitlyUnwrappedOptional(
+      tyLoc, decl->isImplicitlyUnwrappedOptional());
   }
 
   printAccessors(decl);
@@ -2603,10 +2616,8 @@ void PrintAST::printOneParameter(const ParamDecl *param,
                         isEscaping(type));
   }
 
-  if (param->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    printTypeLocForImplicitlyUnwrappedOptional(TheTypeLoc);
-  else
-    printTypeLoc(TheTypeLoc);
+  printTypeLocForImplicitlyUnwrappedOptional(
+    TheTypeLoc, param->isImplicitlyUnwrappedOptional());
 
   if (param->isVariadic())
     Printer << "...";
@@ -2827,10 +2838,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       x(Options.OpaqueReturnTypePrinting,
         PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
 
-      if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-        printTypeLocForImplicitlyUnwrappedOptional(ResultTyLoc);
-      else
-        printTypeLoc(ResultTyLoc);
+      printTypeLocForImplicitlyUnwrappedOptional(
+          ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
     printGenericDeclGenericRequirements(decl);
@@ -2977,10 +2986,8 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
   x(Options.OpaqueReturnTypePrinting,
     PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword);
 
-  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
-    printTypeLocForImplicitlyUnwrappedOptional(elementTy);
-  else
-    printTypeLoc(elementTy);
+  printTypeLocForImplicitlyUnwrappedOptional(
+    elementTy, decl->isImplicitlyUnwrappedOptional());
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   printGenericDeclGenericRequirements(decl);
   printAccessors(decl);
@@ -3019,17 +3026,11 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
     [&]{
       Printer << "init";
     }, [&] { // Signature
-      switch (decl->getFailability()) {
-      case OTK_None:
-        break;
-
-      case OTK_Optional:
-        Printer << "?";
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        Printer << "!";
-        break;
+      if (decl->isFailable()) {
+        if (decl->isImplicitlyUnwrappedOptional())
+          Printer << "!";
+        else
+          Printer << "?";
       }
 
       printGenericDeclGenericParams(decl);

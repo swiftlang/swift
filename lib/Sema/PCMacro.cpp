@@ -435,7 +435,7 @@ public:
 
               SourceRange SR = PBD->getSourceRange();
               if (!SR.isValid()) {
-                SR = PBD->getOrigInitRange(0);
+                SR = PBD->getOriginalInitRange(0);
               }
 
               Added<Stmt *> LogBefore = buildLoggerCall(SR, true);

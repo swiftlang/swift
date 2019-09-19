@@ -292,6 +292,17 @@ public:
   /// \returns the derived member, which will also be added to the type.
   ValueDecl *deriveDifferentiable(ValueDecl *requirement);
 
+  /// Determine if a Differentiable requirement can be derived for a type.
+  ///
+  /// \returns True if the requirement can be derived.
+  static bool canDeriveEuclideanDifferentiable(NominalTypeDecl *type,
+                                               DeclContext *DC);
+
+  /// Derive a EuclideanDifferentiable requirement for a nominal type.
+  ///
+  /// \returns the derived member, which will also be added to the type.
+  ValueDecl *deriveEuclideanDifferentiable(ValueDecl *requirement);
+
   /// Derive a Differentiable type witness for a nominal type.
   ///
   /// \returns the derived member, which will also be added to the type.

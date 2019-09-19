@@ -225,7 +225,6 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
     Type bridgedTy =
       ProtocolConformanceRef(conformance).getTypeWitnessByName(
         t, M.getASTContext().Id_ObjectiveCType);
-    assert(bridgedTy && "Missing _ObjectiveCType witness?");
     if (purpose == BridgedTypePurpose::ForResult && clangTy)
       bridgedTy = OptionalType::get(bridgedTy);
     return bridgedTy;

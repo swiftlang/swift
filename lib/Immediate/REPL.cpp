@@ -964,7 +964,7 @@ public:
       IRGenOpts(),
       SILOpts(),
       Input(*this),
-      PersistentState(CI.getASTContext())
+      PersistentState()
   {
     ASTContext &Ctx = CI.getASTContext();
     Ctx.LangOpts.EnableAccessControl = false;
@@ -1091,8 +1091,7 @@ public:
           ASTContext &ctx = CI.getASTContext();
           SourceFile &SF =
               MostRecentModule->getMainSourceFile(SourceFileKind::REPL);
-          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF,
-                                   nullptr);
+          UnqualifiedLookup lookup(ctx.getIdentifier(Tok.getText()), &SF);
           for (auto result : lookup.Results) {
             printOrDumpDecl(result.getValueDecl(), doPrint);
               
@@ -1100,7 +1099,6 @@ public:
               if (auto typeAliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
                 TypeDecl *origTypeDecl = typeAliasDecl
                   ->getDeclaredInterfaceType()
-                  ->getDesugaredType()
                   ->getNominalOrBoundGenericNominal();
                 if (origTypeDecl) {
                   printOrDumpDecl(origTypeDecl, doPrint);

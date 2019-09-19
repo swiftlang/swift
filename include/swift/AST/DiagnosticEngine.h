@@ -583,6 +583,9 @@ namespace swift {
     /// input being compiled.
     /// May be invalid.
     SourceLoc bufferIndirectlyCausingDiagnostic;
+    
+    /// Print diagnostic names after their messages
+    bool printDiagnosticNames = false;
 
     friend class InFlightDiagnostic;
     friend class DiagnosticTransaction;
@@ -618,6 +621,14 @@ namespace swift {
       return state.getWarningsAsErrors();
     }
 
+    /// Whether to print diagnostic names after their messages
+    void setPrintDiagnosticNames(bool val) {
+      printDiagnosticNames = val;
+    }
+    bool getPrintDiagnosticNames() const {
+      return printDiagnosticNames;
+    }
+
     void ignoreDiagnostic(DiagID id) {
       state.setDiagnosticBehavior(id, DiagnosticState::Behavior::Ignore);
     }
@@ -646,7 +657,7 @@ namespace swift {
     }
 
     /// Return all \c DiagnosticConsumers.
-    ArrayRef<DiagnosticConsumer *> getConsumers() {
+    ArrayRef<DiagnosticConsumer *> getConsumers() const {
       return Consumers;
     }
 
@@ -826,7 +837,8 @@ namespace swift {
     void emitTentativeDiagnostics();
 
   public:
-    static const char *diagnosticStringFor(const DiagID id);
+    static const char *diagnosticStringFor(const DiagID id,
+                                           bool printDiagnosticName);
 
     /// If there is no clear .dia file for a diagnostic, put it in the one
     /// corresponding to the SourceLoc given here.

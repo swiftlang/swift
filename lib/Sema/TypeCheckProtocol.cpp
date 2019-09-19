@@ -20,11 +20,11 @@
 #include "MiscDiagnostics.h"
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
+#include "TypeCheckObjC.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/AST/AccessScope.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
@@ -445,10 +445,8 @@ swift::matchWitness(
     // Result types must match.
     // FIXME: Could allow (trivial?) subtyping here.
     if (!ignoreReturnType) {
-      auto reqTypeIsIUO =
-          req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-      auto witnessTypeIsIUO =
-          witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
+      auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
       auto types =
           getTypesToCompare(req, reqResultType, reqTypeIsIUO, witnessResultType,
                             witnessTypeIsIUO, VarianceKind::Covariant);
@@ -497,12 +495,9 @@ swift::matchWitness(
       auto reqParamDecl = reqParamList->get(i);
       auto witnessParamDecl = witnessParamList->get(i);
 
-      auto reqParamTypeIsIUO =
-          reqParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+      auto reqParamTypeIsIUO = reqParamDecl->isImplicitlyUnwrappedOptional();
       auto witnessParamTypeIsIUO =
-          witnessParamDecl->getAttrs()
-              .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+          witnessParamDecl->isImplicitlyUnwrappedOptional();
 
       // Gross hack: strip a level of unchecked-optionality off both
       // sides when matching against a protocol imported from Objective-C.
@@ -532,10 +527,8 @@ swift::matchWitness(
     }
 
   } else {
-    auto reqTypeIsIUO =
-        req->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
-    auto witnessTypeIsIUO =
-        witness->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+    auto reqTypeIsIUO = req->isImplicitlyUnwrappedOptional();
+    auto witnessTypeIsIUO = witness->isImplicitlyUnwrappedOptional();
     auto types = getTypesToCompare(req, reqType, reqTypeIsIUO, witnessType,
                                    witnessTypeIsIUO, VarianceKind::None);
 
@@ -798,9 +791,8 @@ swift::matchWitness(TypeChecker &tc,
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
     // Open up the type of the requirement.
-    reqLocator = cs->getConstraintLocator(
-                     static_cast<Expr *>(nullptr),
-                     LocatorPathElt(ConstraintLocator::Requirement, req));
+    reqLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+                                          LocatorPathElt::Requirement(req));
     OpenedTypeMap reqReplacements;
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
@@ -818,7 +810,7 @@ swift::matchWitness(TypeChecker &tc,
 
       // If substitution failed, skip the requirement. This only occurs in
       // invalid code.
-      if (!replacedInReq || replacedInReq->hasError())
+      if (replacedInReq->hasError())
         continue;
 
       if (reqGenericEnv) {
@@ -833,9 +825,8 @@ swift::matchWitness(TypeChecker &tc,
     witnessType = witness->getInterfaceType();
     // FIXME: witness as a base locator?
     locator = cs->getConstraintLocator(nullptr);
-    witnessLocator = cs->getConstraintLocator(
-                       static_cast<Expr *>(nullptr),
-                       LocatorPathElt(ConstraintLocator::Witness, witness));
+    witnessLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
+                                              LocatorPathElt::Witness(witness));
     if (witness->getDeclContext()->isTypeContext()) {
       std::tie(openedFullWitnessType, openWitnessType) 
         = cs->getTypeOfMemberReference(selfTy, witness, dc,
@@ -1311,23 +1302,17 @@ RequirementCheck WitnessChecker::checkWitness(ValueDecl *requirement,
   // A non-failable initializer requirement cannot be satisfied
   // by a failable initializer.
   if (auto ctor = dyn_cast<ConstructorDecl>(requirement)) {
-    if (ctor->getFailability() == OTK_None) {
+    if (!ctor->isFailable()) {
       auto witnessCtor = cast<ConstructorDecl>(match.Witness);
 
-      switch (witnessCtor->getFailability()) {
-      case OTK_None:
-        // Okay
-        break;
-
-      case OTK_ImplicitlyUnwrappedOptional:
-        // Only allowed for non-@objc protocols.
-        if (!Proto->isObjC())
-          break;
-
-        LLVM_FALLTHROUGH;
-
-      case OTK_Optional:
-        return CheckKind::ConstructorFailability;
+      if (witnessCtor->isFailable()) {
+        if (witnessCtor->isImplicitlyUnwrappedOptional()) {
+          // Only allowed for non-@objc protocols.
+          if (Proto->isObjC())
+            return CheckKind::ConstructorFailability;
+        } else {
+          return CheckKind::ConstructorFailability;
+        }
       }
     }
   }
@@ -1887,8 +1872,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
                         return Type(dependentType);
                       },
-                      LookUpConformanceInModule(module),
-                      SubstFlags::UseErrorType);
+                      LookUpConformanceInModule(module));
   };
 
   if (auto fnTy = type->getAs<AnyFunctionType>()) {
@@ -2205,7 +2189,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // FIXME: Could emit a Fix-It here.
     diags.diagnose(match.Witness,
                    diag::protocol_witness_mutation_modifier_conflict,
-                   SelfAccessKind::__Consuming);
+                   SelfAccessKind::Consuming);
     break;
   case MatchKind::RethrowsConflict:
     // FIXME: Could emit a Fix-It here.
@@ -3267,8 +3251,7 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
           diags.diagnose(diagLoc,
                          diag::witness_initializer_failability,
                          ctor->getFullName(),
-                         witnessCtor->getFailability()
-                           == OTK_ImplicitlyUnwrappedOptional)
+                         witnessCtor->isImplicitlyUnwrappedOptional())
             .highlight(witnessCtor->getFailabilityLoc());
           emitDeclaredHereIfNeeded(diags, diagLoc, witness);
         });
@@ -5362,6 +5345,10 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::Differentiable:
     return derived.deriveDifferentiable(Requirement);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  case KnownProtocolKind::EuclideanDifferentiable:
+    return derived.deriveEuclideanDifferentiable(Requirement);
 
   default:
     return nullptr;

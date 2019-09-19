@@ -335,14 +335,14 @@ func testFixIts() {
   _ = AnyClassAndProtoBound() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{28-28=<<#Foo: SubProto & AnyObject#>>}}
   _ = AnyClassAndProtoBound2() // expected-error {{generic parameter 'Foo' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{29-29=<<#Foo: SubProto & AnyObject#>>}}
 
-  _ = ClassAndProtoBound() // expected-error {{referencing initializer 'init()' on 'ClassAndProtoBound' requires that 'X' conform to 'SubProto'}}
+  _ = ClassAndProtoBound() // expected-error {{generic struct 'ClassAndProtoBound' requires that 'X' conform to 'SubProto'}}
 
-  _ = ClassAndProtosBound() 
-  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'NSCopyish'}}
-  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound' requires that 'X' conform to 'SubProto'}}
+  _ = ClassAndProtosBound()
+  // expected-error@-1 {{generic struct 'ClassAndProtosBound' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-2 {{generic struct 'ClassAndProtosBound' requires that 'X' conform to 'NSCopyish'}}
   _ = ClassAndProtosBound2()
-  // expected-error@-1 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
-  // expected-error@-2 {{referencing initializer 'init()' on 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-1 {{generic struct 'ClassAndProtosBound2' requires that 'X' conform to 'SubProto'}}
+  // expected-error@-2 {{generic struct 'ClassAndProtosBound2' requires that 'X' conform to 'NSCopyish'}}
 
   _ = Pair()
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
@@ -631,7 +631,7 @@ func rdar40537858() {
   }
 
   var arr: [S] = []
-  _ = List(arr, id: \.id) // expected-error {{referencing initializer 'init(_:id:)' on 'List' requires that 'S.Id' conform to 'Hashable'}}
+  _ = List(arr, id: \.id) // expected-error {{generic struct 'List' requires that 'S.Id' conform to 'Hashable'}}
 
   enum E<T: P> { // expected-note 2 {{where 'T' = 'S'}}
     case foo(T)
@@ -639,8 +639,8 @@ func rdar40537858() {
   }
 
   var s = S(id: S.Id())
-  let _: E = .foo(s)   // expected-error {{enum case 'foo' requires that 'S' conform to 'P'}}
-  let _: E = .bar([s]) // expected-error {{enum case 'bar' requires that 'S' conform to 'P'}}
+  let _: E = .foo(s)   // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
+  let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
 }
 
 // https://bugs.swift.org/browse/SR-8934
@@ -714,7 +714,7 @@ protocol Q {
 }
 
 struct SR10694 {
-  init<T : P>(_ x: T) {} // expected-note 2{{where 'T' = 'T'}}
+  init<T : P>(_ x: T) {} // expected-note 3{{where 'T' = 'T'}}
   func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
     SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
 
@@ -725,6 +725,10 @@ struct SR10694 {
     // expected-error@-1 {{protocol type 'Q' cannot be instantiated}}
 
     type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+
+    var srTy = SR10694.self
+    srTy(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
   }
 }
@@ -797,4 +801,21 @@ struct R_51413254 {
   mutating func test(_ anyDict: Any) throws {
     self.str = try anyDict ==> Key("a") // Ok
   }
+}
+
+func test_correct_identification_of_requirement_source() {
+  struct X<T: P> { // expected-note {{where 'T' = 'Int'}}
+    init<U: P>(_: T, _: U) {} // expected-note {{where 'U' = 'Int'}}
+  }
+
+  struct A : P {
+    static func foo(_ arg: A) -> A {
+      return A()
+    }
+  }
+
+  _ = X(17, A())
+  // expected-error@-1 {{generic struct 'X' requires that 'Int' conform to 'P'}}
+  _ = X(A(), 17)
+  // expected-error@-1 {{initializer 'init(_:_:)' requires that 'Int' conform to 'P'}}
 }

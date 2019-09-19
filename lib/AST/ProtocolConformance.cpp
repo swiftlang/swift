@@ -85,10 +85,12 @@ ProtocolDecl *ProtocolConformanceRef::getRequirement() const {
 
 ProtocolConformanceRef
 ProtocolConformanceRef::subst(Type origType,
-                              SubstitutionMap subMap) const {
+                              SubstitutionMap subMap,
+                              SubstOptions options) const {
   return subst(origType,
                QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap));
+               LookUpConformanceInSubstitutionMap(subMap),
+               options);
 }
 
 ProtocolConformanceRef
@@ -114,8 +116,7 @@ ProtocolConformanceRef::subst(Type origType,
   }
 
   // Otherwise, compute the substituted type.
-  auto substType = origType.subst(subs, conformances,
-                                  options | SubstFlags::UseErrorType);
+  auto substType = origType.subst(subs, conformances, options);
 
   // Opened existentials trivially conform and do not need to go through
   // substitution map lookup.
@@ -172,7 +173,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
 
   // FIXME: Shouldn't this be a hard error?
   if (!assocType)
-    return nullptr;
+    return ErrorType::get(proto->getASTContext());
 
   return assocType->getDeclaredInterfaceType().subst(
     SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
@@ -847,10 +848,7 @@ recursivelySubstituteBaseType(ModuleDecl *module,
   if (auto *depBase = origBase->getAs<DependentMemberType>()) {
     Type substBase = recursivelySubstituteBaseType(
         module, conformance, depBase);
-    auto result = depMemTy->substBaseType(module, substBase);
-    if (!result)
-      return ErrorType::get(substBase);
-    return result;
+    return depMemTy->substBaseType(module, substBase);
   }
 
   // Base case. The associated type's protocol should be either the
@@ -1082,7 +1080,7 @@ SpecializedProtocolConformance::getTypeWitnessAndDecl(
 
   // Apply the substitution we computed above
   auto specializedType = genericWitness.subst(substitutionMap, options);
-  if (!specializedType) {
+  if (specializedType->hasError()) {
     if (isTentativeWitness())
       return { Type(), nullptr };
 
@@ -1188,9 +1186,11 @@ bool ProtocolConformance::isVisibleFrom(const DeclContext *dc) const {
 }
 
 ProtocolConformance *
-ProtocolConformance::subst(SubstitutionMap subMap) const {
+ProtocolConformance::subst(SubstitutionMap subMap,
+                           SubstOptions options) const {
   return subst(QuerySubstitutionMap{subMap},
-               LookUpConformanceInSubstitutionMap(subMap));
+               LookUpConformanceInSubstitutionMap(subMap),
+               options);
 }
 
 ProtocolConformance *
@@ -1204,12 +1204,12 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
         !origType->hasArchetype())
       return const_cast<ProtocolConformance *>(this);
 
-    auto subMap = SubstitutionMap::get(getGenericSignature(),
-                                       subs, conformances);
-    auto substType = origType.subst(subMap, options | SubstFlags::UseErrorType);
+    auto substType = origType.subst(subs, conformances, options);
     if (substType->isEqual(origType))
       return const_cast<ProtocolConformance *>(this);
 
+    auto subMap = SubstitutionMap::get(getGenericSignature(),
+                                       subs, conformances);
     return substType->getASTContext()
         .getSpecializedConformance(substType,
                                    const_cast<ProtocolConformance *>(this),
@@ -1236,8 +1236,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
                                                          options);
     }
 
-    auto substType = origType.subst(subs, conformances,
-                                    options | SubstFlags::UseErrorType);
+    auto substType = origType.subst(subs, conformances, options);
     return substType->getASTContext()
       .getInheritedConformance(substType, inheritedConformance);
   }
@@ -1248,8 +1247,7 @@ ProtocolConformance::subst(TypeSubstitutionFn subs,
     auto subMap = spec->getSubstitutionMap();
 
     auto origType = getType();
-    auto substType = origType.subst(subs, conformances,
-                                    options | SubstFlags::UseErrorType);
+    auto substType = origType.subst(subs, conformances, options);
     return substType->getASTContext()
       .getSpecializedConformance(substType, genericConformance,
                                  subMap.subst(subs, conformances, options));

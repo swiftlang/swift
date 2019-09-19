@@ -788,11 +788,9 @@ void ClosureSpecCloner::populateCloned() {
   entryArgs.reserve(ClosureUserEntryBB->getArguments().size());
 
   // Remove the closure argument.
-  SILArgument *ClosureArg = nullptr;
   for (size_t i = 0, e = ClosureUserEntryBB->args_size(); i != e; ++i) {
     SILArgument *Arg = ClosureUserEntryBB->getArgument(i);
     if (i == CallSiteDesc.getClosureIndex()) {
-      ClosureArg = Arg;
       entryArgs.push_back(SILValue());
       continue;
     }

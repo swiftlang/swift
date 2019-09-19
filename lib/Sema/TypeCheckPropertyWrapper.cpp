@@ -161,7 +161,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
   }
 
   // The initializer must not be failable.
-  if (init->getFailability() != OTK_None) {
+  if (init->isFailable()) {
     init->diagnose(diag::property_wrapper_failable_init, initName);
     return nullptr;
   }
@@ -215,7 +215,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
   }
 
   // The initializer must not be failable.
-  if (init->getFailability() != OTK_None) {
+  if (init->isFailable()) {
     init->diagnose(diag::property_wrapper_failable_init, initName);
     return nullptr;
   }

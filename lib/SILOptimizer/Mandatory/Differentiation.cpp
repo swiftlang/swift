@@ -1956,6 +1956,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
           if (isVaried(cai->getSrc(), i))
             recursivelySetVaried(cai->getDest(), i);
         }
+        // Handle `unconditional_checked_cast_addr`.
+        else if (auto *uccai =
+                     dyn_cast<UnconditionalCheckedCastAddrInst>(&inst)) {
+          if (isVaried(uccai->getSrc(), i))
+            recursivelySetVaried(uccai->getDest(), i);
+        }
         // Handle `tuple_element_addr`.
         else if (auto *teai = dyn_cast<TupleElementAddrInst>(&inst)) {
           if (isVaried(teai->getOperand(), i)) {
@@ -2076,6 +2082,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
           if (isUseful(cai->getDest(), i))
             propagateUsefulThroughBuffer(cai->getSrc(), i);
+        }
+        // Handle `unconditional_checked_cast_addr`.
+        else if (auto *uccai =
+                     dyn_cast<UnconditionalCheckedCastAddrInst>(&inst)) {
+          if (isUseful(uccai->getDest(), i))
+            propagateUsefulThroughBuffer(uccai->getSrc(), i);
         }
         // Handle everything else.
         else if (llvm::any_of(inst.getResults(),
@@ -3889,9 +3901,14 @@ public:
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
-      vjpValue = getBuilder().createAutoDiffFunctionExtract(
+      auto borrowedADFunc =
+          builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
+      auto extractedVJP = getBuilder().createAutoDiffFunctionExtract(
           loc, AutoDiffFunctionExtractInst::Extractee::VJP,
-          /*differentiationOrder*/ 1, autoDiffFuncInst);
+          /*differentiationOrder*/ 1, borrowedADFunc);
+      vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
+      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
     }
 
     // Record desired/actual VJP indices.
@@ -5101,6 +5118,12 @@ public:
 #undef CLONE_AND_EMIT_TANGENT
 
 private:
+
+  /// Set up the differential function. This includes:
+  /// - Creating all differential blocks.
+  /// - Creating differential entry block arguments based on the function type.
+  /// - Creating tangent value mapping for original/differential parameters.
+  /// - Checking for unvaried result and emitting related warnings.
   void prepareForDifferentialGeneration() {
     // Create differential blocks and arguments.
     auto *diffGenEnv = getDifferential().getGenericEnvironment();
@@ -5481,7 +5504,6 @@ public:
     // on the remapped original function operand and `autodiff_function_extract`
     // the JVP. The actual JVP functions will be populated in the
     // `autodiff_function` during the transform main loop.
-    SILValue differentiableFunc;
     if (!jvpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
       // redesign: currently, each original function + attribute pair is mapped
@@ -5542,16 +5564,20 @@ public:
       auto *autoDiffFuncInst =
           context.createAutoDiffFunction(builder, loc, indices.parameters,
                                          /*differentiationOrder*/ 1, original);
-      differentiableFunc = autoDiffFuncInst;
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
       context.getResultIndices()[autoDiffFuncInst] =
           activeResultIndices.front();
 
-      jvpValue = builder.createAutoDiffFunctionExtract(
+      auto borrowedADFunc =
+          builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
+      auto extractedJVP = builder.createAutoDiffFunctionExtract(
           loc, AutoDiffFunctionExtractInst::Extractee::JVP,
-          /*differentiationOrder*/ 1, autoDiffFuncInst);
+          /*differentiationOrder*/ 1, borrowedADFunc);
+      jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
+      builder.emitEndBorrowOperation(loc, borrowedADFunc);
+      builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
     }
 
     // Call the JVP using the original parameters.
@@ -6341,8 +6367,10 @@ public:
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
     auto origResult = origFormalResults[getIndices().source];
-    // Emit warning if original result is not varied, because it will always
-    // have a zero derivative.
+    // TODO(TF-788): Re-enable non-varied result warning.
+    /*
+    // Emit a warning and fixit if original result is not varied, because it
+    // will always have a zero derivative.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
       // Emit fixit if original result has a valid source location.
       auto startLoc = origResult.getLoc().getStartSourceLoc();
@@ -6353,6 +6381,7 @@ public:
             .fixItInsertAfter(endLoc, ")");
       }
     }
+    */
     builder.setInsertionPoint(
         pullbackEntry, getNextFunctionLocalAllocationInsertionPoint());
     if (seed->getType().isAddress()) {
@@ -7316,6 +7345,27 @@ public:
         return;
       }
     }
+  }
+
+  /// Handle `unconditional_checked_cast_addr` instruction.
+  ///   Original: y = unconditional_checked_cast_addr x
+  ///    Adjoint: adj[x] += unconditional_checked_cast_addr adj[y]
+  void visitUnconditionalCheckedCastAddrInst(
+      UnconditionalCheckedCastAddrInst *uccai) {
+    auto *bb = uccai->getParent();
+    auto &adjDest = getAdjointBuffer(bb, uccai->getDest());
+    auto &adjSrc = getAdjointBuffer(bb, uccai->getSrc());
+    if (errorOccurred)
+      return;
+    auto destType = remapType(adjDest->getType());
+    auto castBuf = builder.createAllocStack(uccai->getLoc(), adjSrc->getType());
+    builder.createUnconditionalCheckedCastAddr(
+        uccai->getLoc(), adjDest, adjDest->getType().getASTType(), castBuf,
+        adjSrc->getType().getASTType());
+    addToAdjointBuffer(bb, uccai->getSrc(), castBuf, uccai->getLoc());
+    builder.emitDestroyAddrAndFold(uccai->getLoc(), castBuf);
+    builder.createDeallocStack(uccai->getLoc(), castBuf);
+    emitZeroIndirect(destType.getASTType(), adjDest, uccai->getLoc());
   }
 
 #define NOT_DIFFERENTIABLE(INST, DIAG) \

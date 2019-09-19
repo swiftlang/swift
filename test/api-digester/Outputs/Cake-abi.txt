@@ -1,12 +1,11 @@
 
 /* Generic Signature Changes */
-cake: Func P1.P1Constraint() has generic signature change from <τ_0_0 where τ_0_0 : P1, τ_0_0 : P2> to <τ_0_0 where τ_0_0 : P1>
-cake: Protocol P3 has generic signature change from <τ_0_0 : cake.P1, τ_0_0 : cake.P2> to <τ_0_0 : cake.P1, τ_0_0 : cake.P4>
+cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
+cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Swift: Extension Int has been removed
 cake: Accessor GlobalVarChangedToLet.Modify() has been removed
 cake: Accessor GlobalVarChangedToLet.Set() has been removed
 cake: Accessor RemoveSetters.Value.Modify() has been removed
@@ -18,6 +17,7 @@ cake: AssociatedType RequiementChanges.removedType has been removed
 cake: Class C3 has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
+cake: Func Int.IntEnhancer() has been removed
 cake: Func RequiementChanges.removedFunc() has been removed
 cake: Var RequiementChanges.removedVar has been removed
 
@@ -27,24 +27,27 @@ cake: InfixOperator ..*.. has been changed to a PrefixOperator
 cake: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
+cake: Class SwiftObjcClass has ObjC name change from OldObjCClass to NewObjCClass
 cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
+cake: Func SwiftObjcClass.foo(a:b:c:) has ObjC name change from OldObjCFool:OldObjCA:OldObjCB: to NewObjCFool:NewObjCA:NewObjCB:
 cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
-cake: Accessor Zoo.current.Get() has return type change from Cat to Dog
-cake: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
-cake: Class TChangesFromIntToString has type witness type for AssociatedTypesProtocol.T changing from Int to String
-cake: Constructor S1.init(_:) has parameter 0 type change from Int to Double
-cake: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
+cake: Accessor Zoo.current.Get() has return type change from cake.Cat to cake.Dog
+cake: AssociatedType AssociatedTypePro.T3 has default type change from cake.C1 to cake.C6
+cake: Class TChangesFromIntToString has type witness type for AssociatedTypesProtocol.T changing from Swift.Int to Swift.String
+cake: Constructor S1.init(_:) has parameter 0 type change from Swift.Int to Swift.Double
+cake: Func C1.foo2(_:) has parameter 0 type change from Swift.Int to () -> ()
 cake: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
 cake: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
-cake: Func Somestruct2.foo1(_:) has parameter 0 type change from C3 to C1
-cake: Func Zoo.getCurrentAnimalInlinable() has return type change from Cat to Dog
+cake: Func Somestruct2.foo1(_:) has parameter 0 type change from cake.C3 to cake.C1
+cake: Func Zoo.getCurrentAnimalInlinable() has return type change from cake.Cat to cake.Dog
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
-cake: Var Zoo.current has declared type change from Cat to Dog
+cake: Func returnFunctionTypeOwnershipChange() has return type change from (cake.C1) -> () to (__owned cake.C1) -> ()
+cake: Var Zoo.current has declared type change from cake.Cat to cake.Dog
 
 /* Decl Attribute changes */
 cake: Accessor GlobalLetChangedToVar.Modify() is a new API without @available attribute
@@ -102,13 +105,13 @@ cake: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
 cake: Accessor HasMutatingMethodClone.bar.Get() now requires  new witness table entry
-cake: AssociatedType AssociatedTypePro.T1 has removed default type Int
+cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int
 cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake: Func HasMutatingMethodClone.foo() now requires  new witness table entry
 cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake: Var RequiementChanges.addedVar has been added as a protocol requirement
 
 /* Class Inheritance Change */
-cake: Class C4 has changed its super class from OldType to NewType
-cake: Class SubGenericClass has changed its super class from GenericClass<P1> to GenericClass<P2>
-cake: Class SuperClassRemoval has removed its super class C3
+cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
+cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
+cake: Class SuperClassRemoval has removed its super class cake.C3

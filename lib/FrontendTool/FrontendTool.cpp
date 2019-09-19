@@ -268,6 +268,8 @@ static bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   for (auto &module : ctxt.LoadedModules) {
     ModuleDecl *loadedDecl = module.second;
     assert(loadedDecl && "Expected loaded module to be non-null.");
+    if (loadedDecl == mainModule)
+      continue;
     assert(!loadedDecl->getModuleFilename().empty()
            && "Don't know how to handle modules with empty names.");
     pathToModuleDecl.insert(
@@ -745,7 +747,8 @@ static void verifyGenericSignaturesIfNeeded(CompilerInvocation &Invocation,
 
 static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
                                  CompilerInstance &Instance, SourceFile *SF) {
-  const ASTScope &scope = SF->getScope();
+  // Not const because may require reexpansion
+  ASTScope &scope = SF->getScope();
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";

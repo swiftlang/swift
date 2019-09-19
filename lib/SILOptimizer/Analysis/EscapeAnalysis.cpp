@@ -1205,7 +1205,7 @@ bool EscapeAnalysis::buildConnectionGraphForDestructor(
   while (auto payloadTy = Ty.getOptionalObjectType())
     Ty = payloadTy;
   auto Class = Ty.getClassOrBoundGenericClass();
-  if (!Class || !Class->hasDestructor())
+  if (!Class || Class->hasClangNode())
     return false;
   auto Destructor = Class->getDestructor();
   SILDeclRef DeallocRef(Destructor, SILDeclRef::Kind::Deallocator);
@@ -1376,6 +1376,8 @@ void EscapeAnalysis::analyzeInstruction(SILInstruction *I,
       ConGraph->getNode(cast<SingleValueInstruction>(I), this);
       return;
 
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
     case SILInstructionKind::Name##RetainInst: \
     case SILInstructionKind::StrongRetain##Name##Inst: \

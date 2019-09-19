@@ -9,7 +9,7 @@
 // RUN: %swift-syntax-test -deserialize-raw-tree -input-source-filename %t.dump -output-filename %t
 // RUN: diff -u %s %t
 
-let <PatternBinding><IdentifierPattern>strings</IdentifierPattern><TypeAnnotation>: [<SimpleTypeIdentifier>Strin</SimpleTypeIdentifier>[<UnresolvedPatternExpr><IdentifierPattern>g</IdentifierPattern></UnresolvedPatternExpr>]?</TypeAnnotation></PatternBinding></VariableDecl><FunctionDecl>
+let <PatternBinding><IdentifierPattern>strings</IdentifierPattern><TypeAnnotation>: [<OptionalType><SimpleTypeIdentifier>Strin</SimpleTypeIdentifier>[<UnresolvedPatternExpr><IdentifierPattern>g</IdentifierPattern></UnresolvedPatternExpr>]?</OptionalType></TypeAnnotation></PatternBinding></VariableDecl><FunctionDecl>
 
 // Function body without closing brace token.
 func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{<VariableDecl>

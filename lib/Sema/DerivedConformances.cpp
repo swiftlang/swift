@@ -94,6 +94,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*knownProtocol == KnownProtocolKind::Differentiable)
     return canDeriveDifferentiable(Nominal, DC);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  if (*knownProtocol == KnownProtocolKind::EuclideanDifferentiable)
+    return canDeriveEuclideanDifferentiable(Nominal, DC);
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(Nominal)) {
     switch (*knownProtocol) {
         // The presence of a raw type is an explicit declaration that
@@ -256,6 +260,11 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       return getRequirement(KnownProtocolKind::AdditiveArithmetic);
 
     // SWIFT_ENABLE_TENSORFLOW
+    // EuclideanDifferentiable.differentiableVectorView
+    if (name.isSimpleName(ctx.Id_differentiableVectorView))
+      return getRequirement(KnownProtocolKind::EuclideanDifferentiable);
+
+    // SWIFT_ENABLE_TENSORFLOW
     // PointwiseMultiplicative.one
     if (name.isSimpleName(ctx.Id_one))
       return getRequirement(KnownProtocolKind::PointwiseMultiplicative);
@@ -406,7 +415,8 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
         return getRequirement(KnownProtocolKind::RawRepresentable);
 
       // CodingKey.init?(stringValue:), CodingKey.init?(intValue:)
-      if (ctor->getFailability() == OTK_Optional &&
+      if (ctor->isFailable() &&
+          !ctor->isImplicitlyUnwrappedOptional() &&
           (argumentNames[0] == ctx.Id_stringValue ||
            argumentNames[0] == ctx.Id_intValue))
         return getRequirement(KnownProtocolKind::CodingKey);

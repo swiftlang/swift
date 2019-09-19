@@ -785,10 +785,6 @@ extension Array: ExpressibleByArrayLiteral {
   ///
   /// - Parameter elements: A variadic list of elements of the new array.
   @inlinable
-  // SWIFT_ENABLE_TENSORFLOW
-  // FIXME: We can probably remove @_transparent once constexpr folding is
-  // more fleshed out.
-  @_transparent
   public init(arrayLiteral elements: Element...) {
     self = elements
   }
@@ -1429,7 +1425,7 @@ extension Array {
   ///     of the new array.
   ///     - Parameters:
   ///       - buffer: A buffer covering uninitialized memory with room for the
-  ///         specified number of of elements.
+  ///         specified number of elements.
   ///       - initializedCount: The count of initialized elements in the array,
   ///         which begins as zero. Set `initializedCount` to the number of
   ///         elements you initialize.
@@ -1965,6 +1961,14 @@ extension Array where Element : Differentiable {
   }
 }
 
+extension Array.DifferentiableView : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: Array.DifferentiableView.TangentVector {
+    Array.DifferentiableView.TangentVector(
+      base.map { $0.differentiableVectorView })
+  }
+}
+
 extension Array.DifferentiableView : Equatable where Element : Equatable {
   public static func == (
     lhs: Array.DifferentiableView,
@@ -2058,6 +2062,13 @@ extension Array : Differentiable where Element : Differentiable {
     var view = DifferentiableView(self)
     view.move(along: direction)
     self = view.base
+  }
+}
+
+extension Array : EuclideanDifferentiable
+  where Element : EuclideanDifferentiable {
+  public var differentiableVectorView: TangentVector {
+    TangentVector(map { $0.differentiableVectorView })
   }
 }
 

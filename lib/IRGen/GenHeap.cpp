@@ -1457,7 +1457,9 @@ public:
     }
 
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
-        boxedInterfaceType.getASTType());
+        boxedInterfaceType,
+        env ? env->getGenericSignature()->getCanonicalSignature()
+            : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
     Address rawAddr = project(IGF, allocation, boxedType);
@@ -1717,8 +1719,10 @@ llvm::Value *IRGenFunction::getLocalSelfMetadata() {
     SelfKind = SwiftMetatype;
     break;
   case ObjectReference:
-    LocalSelf = emitDynamicTypeOfOpaqueHeapObject(*this, LocalSelf,
-                                             MetatypeRepresentation::Thick);
+    LocalSelf = emitDynamicTypeOfHeapObject(*this, LocalSelf,
+                                MetatypeRepresentation::Thick,
+                                SILType::getPrimitiveObjectType(LocalSelfType),
+                                /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
   }
@@ -1839,9 +1843,25 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 
 /// Given an opaque class instance pointer, produce the type metadata reference
 /// as a %type*.
-llvm::Value *irgen::emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
+///
+/// You should only use this if you have an untyped object pointer with absolutely no type information.
+/// Generally, it's better to use \c emitDynamicTypeOfHeapObject, which will
+/// use the most efficient possible access pattern to get the dynamic type based on
+/// the static type information.
+static llvm::Value *emitDynamicTypeOfOpaqueHeapObject(IRGenFunction &IGF,
                                                   llvm::Value *object,
                                                   MetatypeRepresentation repr) {
+  if (!IGF.IGM.ObjCInterop) {
+    // Without objc interop, getting the dynamic type of an object is always
+    // just a load of the isa pointer.
+
+    assert(repr == MetatypeRepresentation::Thick
+           && "objc metatypes should not occur without objc interop, "
+              "and thin metadata should not be requested here");
+    return emitLoadOfHeapMetadataRef(IGF, object, IsaEncoding::Pointer,
+                                     /*suppressCast*/ false);
+  }
+  
   object = IGF.Builder.CreateBitCast(object, IGF.IGM.ObjCPtrTy);
   llvm::CallInst *metadata;
   

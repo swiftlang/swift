@@ -52,7 +52,13 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 506; // transparent accessor bit
+const uint16_t SWIFTMODULE_VERSION_MINOR = 517; // better string hash seed
+
+/// A standard hash seed used for all string hashes in a serialized module.
+///
+/// This is the same as the default used by llvm::djbHash, just provided
+/// explicitly here to note that it's part of the format.
+const uint32_t SWIFTMODULE_HASH_SEED = 5381;
 
 using DeclIDField = BCFixed<31>;
 
@@ -66,9 +72,58 @@ using TypeIDWithBitField = BCFixed<32>;
 using IdentifierID = DeclID;
 using IdentifierIDField = DeclIDField;
 
-// DeclContextID must be the same as DeclID because it is stored in the same way.
-using DeclContextID = DeclID;
-using DeclContextIDField = DeclIDField;
+// LocalDeclContextID must be the same as DeclID because it is stored in the
+// same way.
+using LocalDeclContextID = DeclID;
+using LocalDeclContextIDField = DeclIDField;
+
+/// Stores either a DeclID or a LocalDeclContextID, using 32 bits.
+class DeclContextID {
+  int32_t rawValue;
+  explicit DeclContextID(int32_t rawValue) : rawValue(rawValue) {}
+public:
+  DeclContextID() : DeclContextID(0) {}
+
+  static DeclContextID forDecl(DeclID value) {
+    assert(value && "should encode null using DeclContextID()");
+    assert(llvm::isUInt<31>(value) && "too many DeclIDs");
+    return DeclContextID(static_cast<int32_t>(value));
+  }
+  static DeclContextID forLocalDeclContext(LocalDeclContextID value) {
+    assert(value && "should encode null using DeclContextID()");
+    assert(llvm::isUInt<31>(value) && "too many LocalDeclContextIDs");
+    return DeclContextID(-static_cast<int32_t>(value));
+  }
+
+  explicit operator bool() const {
+    return rawValue != 0;
+  }
+
+  Optional<DeclID> getAsDeclID() const {
+    if (rawValue > 0)
+      return DeclID(rawValue);
+    return None;
+  }
+
+  Optional<LocalDeclContextID> getAsLocalDeclContextID() const {
+    if (rawValue < 0)
+      return LocalDeclContextID(-rawValue);
+    return None;
+  }
+
+  static DeclContextID getFromOpaqueValue(uint32_t opaqueValue) {
+    return DeclContextID(opaqueValue);
+  }
+  uint32_t getOpaqueValue() const { return rawValue; }
+};
+
+class DeclContextIDField : public BCFixed<32> {
+public:
+  static DeclContextID convert(uint64_t rawValue) {
+    assert(llvm::isUInt<32>(rawValue));
+    return DeclContextID::getFromOpaqueValue(rawValue);
+  }
+};
 
 // NormalConformanceID must be the same as DeclID because it is stored
 // in the same way.
@@ -79,11 +134,6 @@ using NormalConformanceIDField = DeclIDField;
 // same way.
 using GenericSignatureID = DeclID;
 using GenericSignatureIDField = DeclIDField;
-
-// GenericEnvironmentID must be the same as DeclID because it is stored in the
-// same way.
-using GenericEnvironmentID = DeclID;
-using GenericEnvironmentIDField = DeclIDField;
 
 // SubstitutionMapID must be the same as DeclID because it is stored in the
 // same way.
@@ -307,7 +357,7 @@ using MetatypeRepresentationField = BCFixed<2>;
 enum class SelfAccessKind : uint8_t {
   NonMutating = 0,
   Mutating,
-  __Consuming,
+  Consuming,
 };
 using SelfAccessKindField = BCFixed<2>;
   
@@ -415,15 +465,6 @@ enum class AccessLevel : uint8_t {
   Open,
 };
 using AccessLevelField = BCFixed<3>;
-
-// These IDs must \em not be renumbered or reordered without incrementing
-// the module version.
-enum class OptionalTypeKind : uint8_t {
-  None,
-  Optional,
-  ImplicitlyUnwrappedOptional
-};
-using OptionalTypeKindField = BCFixed<2>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // the module version.
@@ -812,7 +853,7 @@ namespace decls_block {
 
   using PrimaryArchetypeTypeLayout = BCRecordLayout<
     PRIMARY_ARCHETYPE_TYPE,
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     BCVBR<4>, // generic type parameter depth
     BCVBR<4>  // index + 1, or zero if we have a generic type parameter decl
   >;
@@ -874,9 +915,9 @@ namespace decls_block {
     // SWIFT_ENABLE_TENSORFLOW
     BCFixed<1>,            // differentiable?
     BCFixed<1>,            // error result?
-    BCFixed<30>,           // number of parameters
-    BCFixed<30>,           // number of yields
-    BCFixed<30>,           // number of results
+    BCVBR<6>,              // number of parameters
+    BCVBR<5>,              // number of yields
+    BCVBR<5>,              // number of results
     GenericSignatureIDField, // generic signature
     // SWIFT_ENABLE_TENSORFLOW
     BCArray<TypeIDField>   // for each parameter: type, convention, and (if
@@ -894,7 +935,7 @@ namespace decls_block {
   using SILLayoutLayout = BCRecordLayout<
     SIL_LAYOUT,
     GenericSignatureIDField,    // generic signature
-    BCFixed<31>,                // number of fields
+    BCVBR<8>,                   // number of fields
     BCArray<TypeIDWithBitField> // field types with mutability
   >;
 
@@ -938,7 +979,7 @@ namespace decls_block {
     TypeIDField, // underlying type
     TypeIDField, // interface type (no longer used)
     BCFixed<1>,  // implicit flag
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     AccessLevelField, // access level
     BCArray<TypeIDField> // dependency types
     // Trailed by generic parameters (if any).
@@ -967,7 +1008,7 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // isObjC
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
     BCVBR<4>,               // number of inherited types
@@ -982,7 +1023,7 @@ namespace decls_block {
     DeclContextIDField,     // context decl
     BCFixed<1>,             // implicit flag
     BCFixed<1>,             // isObjC
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     TypeIDField,            // raw type
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
@@ -999,7 +1040,7 @@ namespace decls_block {
     BCFixed<1>,             // implicit?
     BCFixed<1>,             // explicitly objc?
     BCFixed<1>,             // inherits convenience initializers from its superclass?
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     TypeIDField,            // superclass
     AccessLevelField,       // access level
     BCVBR<4>,               // number of conformances
@@ -1034,13 +1075,14 @@ namespace decls_block {
   using ConstructorLayout = BCRecordLayout<
     CONSTRUCTOR_DECL,
     DeclContextIDField, // context decl
-    OptionalTypeKindField,  // failability
+    BCFixed<1>,  // failable?
+    BCFixed<1>,  // IUO result?
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
     BCFixed<1>,  // stub implementation?
     BCFixed<1>,  // throws?
     CtorInitializerKindField,  // initializer kind
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     BCFixed<1>,   // requires a new vtable slot
@@ -1074,12 +1116,13 @@ namespace decls_block {
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
     TypeIDField,  // interface type
+    BCFixed<1>,   // IUO value?
     DeclIDField,  // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     DeclIDField, // opaque return type decl
     BCFixed<2>,  // # of property wrapper backing properties
-    BCVBR<4>, // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable entries introduced by all accessors
     BCArray<TypeIDField> // accessors, backing properties, and dependencies
   >;
 
@@ -1090,6 +1133,7 @@ namespace decls_block {
     DeclContextIDField,      // context decl
     ParamDeclSpecifierField, // specifier
     TypeIDField,             // interface type
+    BCFixed<1>,              // isIUO?
     BCFixed<1>,              // isVariadic?
     BCFixed<1>,              // isAutoClosure?
     DefaultArgumentField,    // default argument kind
@@ -1106,8 +1150,9 @@ namespace decls_block {
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
+    BCFixed<1>,   // IUO result?
     DeclIDField,  // operator decl
     DeclIDField,  // overridden function
     BCVBR<5>,     // 0 for a simple name, otherwise the number of parameter name
@@ -1131,7 +1176,7 @@ namespace decls_block {
     DeclIDField, // naming decl
     GenericSignatureIDField, // interface generic signature
     TypeIDField, // interface type for opaque type
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     SubstitutionMapIDField // optional substitution map for underlying type
     // trailed by generic parameters
   >;
@@ -1147,8 +1192,9 @@ namespace decls_block {
     SelfAccessKindField,   // self access kind
     BCFixed<1>,   // has forced static dispatch?
     BCFixed<1>,   // throws?
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     TypeIDField,  // result interface type
+    BCFixed<1>,   // IUO result?
     DeclIDField,  // overridden function
     DeclIDField,  // AccessorStorageDecl
     AccessorKindField, // accessor kind
@@ -1173,7 +1219,7 @@ namespace decls_block {
     StaticSpellingKindField, // spelling of 'static' or 'class'
     BCVBR<3>,    // numpatterns
     BCArray<DeclContextIDField> // init contexts
-    // The patterns and decl-contexts trail the record.
+    // The patterns trail the record.
   >;
 
   template <unsigned Code>
@@ -1233,15 +1279,16 @@ namespace decls_block {
     WriteImplKindField,   // write implementation
     ReadWriteImplKindField,   // read-write implementation
     AccessorCountField, // number of accessors
-    GenericEnvironmentIDField, // generic environment
+    GenericSignatureIDField, // generic environment
     TypeIDField, // element interface type
+    BCFixed<1>,  // IUO element?
     DeclIDField, // overridden decl
     AccessLevelField, // access level
     AccessLevelField, // setter access, if applicable
     StaticSpellingKindField,    // is subscript static?
     BCVBR<5>,    // number of parameter name components
     DeclIDField, // opaque return type decl
-    BCFixed<8>, // total number of vtable entries introduced by all accessors
+    BCVBR<4>,    // total number of vtable entries introduced by all accessors
     BCArray<IdentifierIDField> // name components,
                                // followed by DeclID accessors,
                                // followed by TypeID dependencies
@@ -1255,7 +1302,7 @@ namespace decls_block {
     TypeIDField, // base type
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
-    GenericEnvironmentIDField,  // generic environment
+    GenericSignatureIDField,  // generic environment
     BCVBR<4>,    // # of protocol conformances
     BCVBR<4>,    // number of inherited types
     BCArray<TypeIDField> // inherited types, followed by TypeID dependencies
@@ -1268,7 +1315,7 @@ namespace decls_block {
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit?
     BCFixed<1>,  // objc?
-    GenericEnvironmentIDField // generic environment
+    GenericSignatureIDField // generic environment
     // This record is trailed by its inlinable body text
   >;
 
@@ -1348,8 +1395,8 @@ namespace decls_block {
     // Conformances trail the record.
   >;
 
-  using SILGenericEnvironmentLayout = BCRecordLayout<
-    SIL_GENERIC_ENVIRONMENT,
+  using SILGenericSignatureLayout = BCRecordLayout<
+    SIL_GENERIC_SIGNATURE,
     BCArray<TypeIDField>         // (generic parameter name, sugared interface
                                  //  type) pairs
   >;
@@ -1365,8 +1412,8 @@ namespace decls_block {
     LAYOUT_REQUIREMENT,
     LayoutRequirementKindField,  // requirement kind
     TypeIDField,                 // type being constrained
-    BCFixed<24>,                 // size
-    BCFixed<32>                  // alignment
+    BCVBR<16>,                   // size
+    BCVBR<8>                     // alignment
   >;
 
   /// Specifies the private discriminator string for a private declaration. This
@@ -1518,7 +1565,7 @@ namespace decls_block {
   using AlignmentDeclAttrLayout = BCRecordLayout<
     Alignment_DECL_ATTR,
     BCFixed<1>, // implicit flag
-    BCFixed<31> // alignment
+    BCVBR<8>    // alignment
   >;
   
   using SwiftNativeObjCRuntimeBaseDeclAttrLayout = BCRecordLayout<
@@ -1536,16 +1583,6 @@ namespace decls_block {
   using EffectsDeclAttrLayout = BCRecordLayout<
     Effects_DECL_ATTR,
     BCFixed<2>  // modref value
-  >;
-
-  using DeclContextLayout = BCRecordLayout<
-    DECL_CONTEXT,
-    // If this DeclContext is a local context, this is an
-    // index into the local decl context table.
-    // If this DeclContext is a Decl (and not a DeclContext
-    // *at all*, this is an index into the decl table.
-    DeclContextIDField,
-    BCFixed<1> // is a decl
   >;
 
   using ForeignErrorConventionLayout = BCRecordLayout<
@@ -1660,7 +1697,8 @@ namespace decls_block {
   using SpecializeDeclAttrLayout = BCRecordLayout<
     Specialize_DECL_ATTR,
     BCFixed<1>, // exported flag
-    BCFixed<1> // specialization kind
+    BCFixed<1>, // specialization kind
+    GenericSignatureIDField // specialized signature
   >;
 
   // SWIFT_ENABLE_TENSORFLOW
@@ -1790,10 +1828,9 @@ namespace index_block {
 
     ENTRY_POINT,
     LOCAL_DECL_CONTEXT_OFFSETS,
-    DECL_CONTEXT_OFFSETS,
     LOCAL_TYPE_DECLS,
     OPAQUE_RETURN_TYPE_DECLS,
-    GENERIC_ENVIRONMENT_OFFSETS,
+    GENERIC_SIGNATURE_OFFSETS,
     NORMAL_CONFORMANCE_OFFSETS,
     SIL_LAYOUT_OFFSETS,
 
@@ -1803,7 +1840,6 @@ namespace index_block {
 
     ORDERED_TOP_LEVEL_DECLS,
 
-    GENERIC_SIGNATURE_OFFSETS,
     SUBSTITUTION_MAP_OFFSETS,
     LastRecordKind = SUBSTITUTION_MAP_OFFSETS,
   };

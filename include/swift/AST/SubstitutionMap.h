@@ -167,13 +167,14 @@ public:
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
-  SubstitutionMap subst(SubstitutionMap subMap) const;
+  SubstitutionMap subst(SubstitutionMap subMap,
+                        SubstOptions options=None) const;
 
   /// Apply a substitution to all replacement types in the map. Does not
   /// change keys.
   SubstitutionMap subst(TypeSubstitutionFn subs,
                         LookupConformanceFn conformances,
-                        SubstOptions options = None) const;
+                        SubstOptions options=None) const;
   
   /// Create a substitution map for a protocol conformance.
   static SubstitutionMap

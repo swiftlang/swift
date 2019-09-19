@@ -321,7 +321,8 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, const ClangImporterOptions &opts);
+  Implementation(ASTContext &ctx, const ClangImporterOptions &opts,
+                 DWARFImporterDelegate *dwarfImporterDelegate);
   ~Implementation();
 
   /// Swift AST context.
@@ -389,12 +390,6 @@ private:
 
   /// Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::MangleContext> Mangler;
-
-  /// The active type checker, or null if there is no active type checker.
-  ///
-  /// The flag is \c true if there has ever been a type resolver assigned, i.e.
-  /// if type checking has begun.
-  llvm::PointerIntPair<LazyResolver *, 1, bool> typeResolver;
 
 public:
   /// Mapping of already-imported declarations.
@@ -602,29 +597,44 @@ public:
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
   bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
+private:
+  /// The DWARF importer delegate, if installed.
+  DWARFImporterDelegate *DWARFImporter = nullptr;
 public:
-  void recordImplicitUnwrapForDecl(Decl *decl, bool isIUO) {
+  /// Only used for testing.
+  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
+
+private:
+  /// The list of Clang modules found in the debug info.
+  llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
+public:
+  /// Load a module using the clang::CompilerInstance.
+  ModuleDecl *loadModuleClang(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+  
+  /// "Load" a module from debug info. Because debug info types are read on
+  /// demand, this doesn't really do any work.
+  ModuleDecl *loadModuleDWARF(SourceLoc importLoc,
+                              ArrayRef<std::pair<Identifier, SourceLoc>> path);
+
+  
+  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+    if (!isIUO)
+      return;
+
 #if !defined(NDEBUG)
     Type ty;
     if (auto *FD = dyn_cast<FuncDecl>(decl)) {
-      assert(FD->getInterfaceType());
       ty = FD->getResultInterfaceType();
     } else if (auto *CD = dyn_cast<ConstructorDecl>(decl)) {
-      assert(CD->getInterfaceType());
       ty = CD->getResultInterfaceType();
     } else {
       ty = cast<AbstractStorageDecl>(decl)->getValueInterfaceType();
     }
+    assert(ty->getOptionalObjectType());
 #endif
 
-    if (!isIUO)
-      return;
-
-    assert(ty->getOptionalObjectType());
-
-    auto *IUOAttr = new (SwiftContext)
-        ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true);
-    decl->getAttrs().add(IUOAttr);
+    decl->setImplicitlyUnwrappedOptional(true);
   }
 
   /// Retrieve the Clang AST context.
@@ -1160,15 +1170,6 @@ public:
   /// 'let' declaration as opposed to 'var'.
   bool shouldImportGlobalAsLet(clang::QualType type);
 
-  LazyResolver *getTypeResolver() const {
-    return typeResolver.getPointer();
-  }
-  void setTypeResolver(LazyResolver *newResolver) {
-    assert((!typeResolver.getPointer() || !newResolver) &&
-           "already have a type resolver");
-    typeResolver.setPointerAndInt(newResolver, true);
-  }
-
   /// Allocate a new delayed conformance ID with the given set of
   /// conformances.
   unsigned allocateDelayedConformance(
@@ -1276,7 +1277,6 @@ public:
                                                   true);
     auto D = ::new (DeclPtr) DeclTy(std::forward<Targs>(Args)...);
     D->setClangNode(ClangN);
-    D->setEarlyAttrValidation(true);
     D->setAccess(access);
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D))
       ASD->setSetterAccess(access);
@@ -1306,6 +1306,18 @@ public:
   /// Swift lookup table.
   void lookupValue(SwiftLookupTable &table, DeclName name,
                    VisibleDeclConsumer &consumer);
+
+  /// Look for namespace-scope values with the given name using the
+  /// DWARFImporterDelegate.
+  /// \param inModule only return results from this module.
+  void lookupValueDWARF(ModuleDecl::AccessPathTy accessPath, DeclName name,
+                        NLKind lookupKind, Identifier inModule,
+                        SmallVectorImpl<ValueDecl *> &results);
+
+  /// Look for top-level scope types with a name and kind using the
+  /// DWARFImporterDelegate.
+  void lookupTypeDeclDWARF(StringRef rawName, ClangTypeKind kind,
+                           llvm::function_ref<void(TypeDecl *)> receiver);
 
   /// Look for namespace-scope values in the given Swift lookup table.
   void lookupVisibleDecls(SwiftLookupTable &table,

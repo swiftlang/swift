@@ -70,42 +70,6 @@ class Serializer : public SerializerBase {
   friend class DeclSerializer;
   class TypeSerializer;
   friend class TypeSerializer;
-public:
-  /// Stores a declaration or a type to be written to the AST file.
-  ///
-  /// Convenience wrapper around a PointerUnion.
-  class DeclTypeUnion {
-    using DataTy = llvm::PointerUnion<const Decl *, Type>;
-    DataTy Data;
-
-    explicit DeclTypeUnion(const void *val)
-      : Data(DataTy::getFromOpaqueValue(const_cast<void *>(val))) {}
-
-  public:
-    /*implicit*/ DeclTypeUnion(const Decl *d)
-      : Data(d) { }
-    /*implicit*/ DeclTypeUnion(Type ty)
-      : Data(ty) { }
-
-    bool isDecl() const { return Data.is<const Decl *>(); }
-    bool isType() const { return Data.is<Type>(); }
-
-    Type getType() const { return Data.get<Type>(); }
-    const Decl *getDecl() const { return Data.get<const Decl *>(); }
-
-    const void *getOpaqueValue() const { return Data.getOpaqueValue(); }
-    static DeclTypeUnion getFromOpaqueValue(void *opaqueVal) {
-      return DeclTypeUnion(opaqueVal);
-    }
-
-    bool operator==(const DeclTypeUnion &other) const {
-      return Data == other.Data;
-    }
-  };
-
-private:
-  /// A map from Types and Decls to their serialized IDs.
-  llvm::DenseMap<DeclTypeUnion, DeclID> DeclAndTypeIDs;
 
   /// A map from non-identifier uniqued strings to their serialized IDs.
   ///
@@ -120,29 +84,134 @@ private:
   /// identifier and non-identifier strings.
   llvm::DenseMap<Identifier, IdentifierID> IdentifierIDs;
 
-  /// A map from DeclContexts to their serialized IDs.
-  llvm::DenseMap<const DeclContext*, DeclContextID> DeclContextIDs;
+  /// All uniqued strings that need to be serialized (identifiers and
+  /// non-identifiers).
+  std::vector<StringRef> StringsToWrite;
 
-  /// A map from local DeclContexts to their serialized IDs.
-  llvm::DenseMap<const DeclContext*, DeclContextID> LocalDeclContextIDs;
+  /// The last assigned IdentifierID for uniqued strings from this module.
+  ///
+  /// Note that special module IDs and IDs of special names must not be valid
+  /// IdentifierIDs, except that 0 will always represent the empty identifier.
+  uint32_t /*IdentifierID*/ LastUniquedStringID =
+      serialization::NUM_SPECIAL_IDS - 1;
 
-  /// A map from generic signatures to their serialized IDs.
-  llvm::DenseMap<const GenericSignature *, GenericSignatureID>
-    GenericSignatureIDs;
+  /// Helper for serializing entities in the AST block object graph.
+  ///
+  /// Keeps track of assigning IDs to newly-seen entities, and collecting
+  /// offsets when those entities are ready to be serialized.
+  ///
+  /// \tparam T The AST type that's being serialized
+  /// \tparam ID The ID type for encoding into the bitstream
+  /// \tparam RecordCode_ The code for the offsets record in the Index block for
+  /// referring to these entities.
+  template <typename T, typename ID, unsigned RecordCode_>
+  class ASTBlockRecordKeeper {
+    /// Map of entities to assigned ID numbers.
+    llvm::DenseMap<T, ID> IDs;
 
-  /// A map from generic environments to their serialized IDs.
-  llvm::DenseMap<const GenericEnvironment *, GenericEnvironmentID>
-    GenericEnvironmentIDs;
+    /// All entities that still need to be written.
+    ///
+    /// This is a queue and not simply a vector because serializing one
+    /// entity might result in another one getting queued up.
+    std::queue<T> EntitiesToWrite;
 
-  /// A map from substitution maps to their serialized IDs.
-  llvm::DenseMap<SubstitutionMap, SubstitutionMapID> SubstitutionMapIDs;
+    /// The offsets of entities that have already been written.
+    ///
+    /// `Offsets[entityID - 1]` gives the offset for a particular entity. (0 is
+    /// reserved for "empty" entities.)
+    std::vector<BitOffset> Offsets;
+  public:
+    /// The code for the offsets record in the Index block for referring to
+    /// these entities.
+    static const unsigned RecordCode = RecordCode_;
 
-  // A map from NormalProtocolConformances to their serialized IDs.
-  llvm::DenseMap<const NormalProtocolConformance *, NormalConformanceID>
-    NormalConformances;
+    /// Assigns \p entity an ID and schedules it for writing.
+    ///
+    /// If \p entity has been seen before, returns the existing ID.
+    ///
+    /// 0 is used for "empty" entities (those that coerce to \c false ).
+    ID addRef(T entity) {
+      assert(ID() == 0 && "bad default constructor for ID");
+      if (!entity)
+        return 0;
 
-  // A map from SILLayouts to their serialized IDs.
-  llvm::DenseMap<SILLayout *, SILLayoutID> SILLayouts;
+      auto &entityID = IDs[entity];
+      if (entityID == ID()) {
+        EntitiesToWrite.push(entity);
+        entityID = IDs.size();
+      }
+      return entityID;
+    }
+
+    /// Returns true if \p entity has been seen before (i.e. ever passed to
+    /// #addRef).
+    bool hasRef(T entity) const {
+      return IDs.find(entity) != IDs.end();
+    }
+
+    bool hasMoreToSerialize() const {
+      return !EntitiesToWrite.empty();
+    }
+
+    /// Returns the next entity to be written.
+    ///
+    /// If there is nothing left to serialize, returns None.
+    Optional<T> peekNext() const {
+      if (!hasMoreToSerialize())
+        return None;
+      return EntitiesToWrite.front();
+    }
+
+    /// Records that the next entity will be written at \p offset, and returns
+    /// it so it can be written.
+    ///
+    /// If there is nothing left to serialize, returns None.
+    Optional<T> popNext(BitOffset offset) {
+      if (!hasMoreToSerialize())
+        return None;
+      T result = EntitiesToWrite.front();
+      EntitiesToWrite.pop();
+      Offsets.push_back(offset);
+      assert(IDs.lookup(result) == Offsets.size());
+      return result;
+    }
+
+    /// Returns the offsets for all entities that have been written.
+    ///
+    /// Should only be called after all entities \e have been written.
+    ArrayRef<BitOffset> getOffsets() const {
+      assert(!hasMoreToSerialize() && "not all entities were serialized");
+      return Offsets;
+    }
+  };
+
+  ASTBlockRecordKeeper<const Decl *, DeclID,
+                       index_block::DECL_OFFSETS>
+  DeclsToSerialize;
+
+  ASTBlockRecordKeeper<Type, TypeID,
+                       index_block::TYPE_OFFSETS>
+  TypesToSerialize;
+
+  ASTBlockRecordKeeper<const DeclContext *, LocalDeclContextID,
+                       index_block::LOCAL_DECL_CONTEXT_OFFSETS>
+  LocalDeclContextsToSerialize;
+
+  ASTBlockRecordKeeper<const GenericSignature *, GenericSignatureID,
+                       index_block::GENERIC_SIGNATURE_OFFSETS>
+  GenericSignaturesToSerialize;
+
+  ASTBlockRecordKeeper<SubstitutionMap, SubstitutionMapID,
+                       index_block::SUBSTITUTION_MAP_OFFSETS>
+  SubstitutionMapsToSerialize;
+
+  ASTBlockRecordKeeper<const NormalProtocolConformance *, NormalConformanceID,
+                       index_block::NORMAL_CONFORMANCE_OFFSETS>
+  NormalConformancesToSerialize;
+
+  ASTBlockRecordKeeper<const SILLayout *, SILLayoutID,
+                       index_block::SIL_LAYOUT_OFFSETS>
+  SILLayoutsToSerialize;
 
 public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
@@ -188,147 +257,14 @@ private:
   /// This is for Named Lazy Member Loading.
   DeclMemberNamesTable DeclMemberNames;
 
-  /// The queue of types and decls that need to be serialized.
-  ///
-  /// This is a queue and not simply a vector because serializing one
-  /// decl-or-type might trigger the serialization of another one.
-  std::queue<DeclTypeUnion> DeclsAndTypesToWrite;
-
-  /// DeclContexts that need to be serialized.
-  std::queue<const DeclContext*> DeclContextsToWrite;
-
-  /// Local DeclContexts that need to be serialized.
-  std::queue<const DeclContext*> LocalDeclContextsToWrite;
-
-  /// Generic signatures that need to be serialized.
-  std::queue<const GenericSignature *> GenericSignaturesToWrite;
-
-  /// Generic environments that need to be serialized.
-  std::queue<const GenericEnvironment*> GenericEnvironmentsToWrite;
-
-  /// Substitution maps that need to be serialized.
-  std::queue<SubstitutionMap> SubstitutionMapsToWrite;
-
-  /// NormalProtocolConformances that need to be serialized.
-  std::queue<const NormalProtocolConformance *> NormalConformancesToWrite;
-
-  /// SILLayouts that need to be serialized.
-  std::queue<SILLayout *> SILLayoutsToWrite;
-
-  /// All uniqued strings that need to be serialized (identifiers and
-  /// non-identifiers).
-  std::vector<StringRef> StringsToWrite;
-
   /// The abbreviation code for each record in the "decls-and-types" block.
   ///
   /// These are registered up front when entering the block, so they can be
   /// reused.
   std::array<unsigned, 256> DeclTypeAbbrCodes;
 
-  /// The offset of each Decl in the bitstream, indexed by DeclID.
-  std::vector<BitOffset> DeclOffsets;
-
-  /// The offset of each Type in the bitstream, indexed by TypeID.
-  std::vector<BitOffset> TypeOffsets;
-
-  /// The offset of each DeclContext in the bitstream, indexed by DeclContextID
-  std::vector<BitOffset> DeclContextOffsets;
-
-  /// The offset of each localDeclContext in the bitstream,
-  /// indexed by DeclContextID
-  std::vector<BitOffset> LocalDeclContextOffsets;
-
-  /// The offset of each Identifier in the identifier data block, indexed by
-  /// IdentifierID.
-  std::vector<CharOffset> IdentifierOffsets;
-
-  /// The offset of each GenericSignature in the bitstream, indexed by
-  /// GenericSignatureID.
-  std::vector<BitOffset> GenericSignatureOffsets;
-
-  /// The offset of each GenericEnvironment in the bitstream, indexed by
-  /// GenericEnvironmentID.
-  std::vector<BitOffset> GenericEnvironmentOffsets;
-
-  /// The offset of each SubstitutionMap in the bitstream, indexed by
-  /// SubstitutionMapID.
-  std::vector<BitOffset> SubstitutionMapOffsets;
-
-  /// The offset of each NormalProtocolConformance in the bitstream, indexed by
-  /// NormalConformanceID.
-  std::vector<BitOffset> NormalConformanceOffsets;
-
-  /// The offset of each SILLayout in the bitstream, indexed by
-  /// SILLayoutID.
-  std::vector<BitOffset> SILLayoutOffsets;
-
   /// The decls that adopt compiler-known protocols.
   SmallVector<DeclID, 2> KnownProtocolAdopters[NumKnownProtocols];
-
-  /// The last assigned DeclID for decls from this module.
-  uint32_t /*DeclID*/ LastDeclID = 0;
-
-  /// The last assigned DeclContextID for decl contexts from this module.
-  uint32_t /*DeclContextID*/ LastDeclContextID = 0;
-
-  /// The last assigned DeclContextID for local decl contexts from this module.
-  uint32_t /*DeclContextID*/ LastLocalDeclContextID = 0;
-
-  /// The last assigned NormalConformanceID for decl contexts from this module.
-  uint32_t /*NormalConformanceID*/ LastNormalConformanceID = 0;
-
-  /// The last assigned SILLayoutID for SIL layouts from this module.
-  uint32_t /*SILLayoutID*/ LastSILLayoutID = 0;
-
-  /// The last assigned DeclID for types from this module.
-  uint32_t /*TypeID*/ LastTypeID = 0;
-
-  /// The last assigned IdentifierID for uniqued strings from this module.
-  ///
-  /// Note that special module IDs and IDs of special names must not be valid
-  /// IdentifierIDs, except that 0 will always represent the empty identifier.
-  uint32_t /*IdentifierID*/ LastUniquedStringID =
-      serialization::NUM_SPECIAL_IDS - 1;
-
-  /// The last assigned GenericSignatureID for generic signature from this
-  /// module.
-  uint32_t /*GenericSignatureID*/ LastGenericSignatureID = 0;
-
-  /// The last assigned GenericEnvironmentID for generic environments from this
-  /// module.
-  uint32_t /*GenericEnvironmentID*/ LastGenericEnvironmentID = 0;
-
-  /// The last assigned SubstitutionMapID for substitution maps from this
-  /// module.
-  uint32_t /*SubstitutionMapID*/ LastSubstitutionMapID = 0;
-
-  /// Returns the record code for serializing the given vector of offsets.
-  ///
-  /// This allows the offset-serialization code to be generic over all kinds
-  /// of offsets.
-  unsigned getOffsetRecordCode(const std::vector<BitOffset> &values) {
-    if (&values == &DeclOffsets)
-      return index_block::DECL_OFFSETS;
-    if (&values == &TypeOffsets)
-      return index_block::TYPE_OFFSETS;
-    if (&values == &IdentifierOffsets)
-      return index_block::IDENTIFIER_OFFSETS;
-    if (&values == &DeclContextOffsets)
-      return index_block::DECL_CONTEXT_OFFSETS;
-    if (&values == &LocalDeclContextOffsets)
-      return index_block::LOCAL_DECL_CONTEXT_OFFSETS;
-    if (&values == &GenericSignatureOffsets)
-      return index_block::GENERIC_SIGNATURE_OFFSETS;
-    if (&values == &GenericEnvironmentOffsets)
-      return index_block::GENERIC_ENVIRONMENT_OFFSETS;
-    if (&values == &SubstitutionMapOffsets)
-      return index_block::SUBSTITUTION_MAP_OFFSETS;
-    if (&values == &NormalConformanceOffsets)
-      return index_block::NORMAL_CONFORMANCE_OFFSETS;
-    if (&values == &SILLayoutOffsets)
-      return index_block::SIL_LAYOUT_OFFSETS;
-    llvm_unreachable("unknown offset kind");
-  }
 
   /// Writes the BLOCKINFO block for the serialized module file.
   void writeBlockInfoBlock();
@@ -359,13 +295,10 @@ private:
   void writeCrossReference(const Decl *D);
 
   /// Writes the given decl.
-  void writeDecl(const Decl *D);
-
-  /// Writes the given decl context.
-  void writeDeclContext(const DeclContext *DC);
+  void writeASTBlockEntity(const Decl *D);
 
   /// Write a DeclContext as a local DeclContext at the current offset.
-  void writeLocalDeclContext(const DeclContext *DC);
+  void writeASTBlockEntity(const DeclContext *DC);
 
   /// Write the components of a PatternBindingInitializer as a local context.
   void writePatternBindingInitializer(PatternBindingDecl *binding,
@@ -378,16 +311,13 @@ private:
   void writeAbstractClosureExpr(const DeclContext *parentContext, Type Ty, bool isImplicit, unsigned discriminator);
 
   /// Writes the given type.
-  void writeType(Type ty);
+  void writeASTBlockEntity(Type ty);
 
   /// Writes a generic signature.
-  void writeGenericSignature(const GenericSignature *sig);
-
-  /// Writes a generic environment.
-  void writeGenericEnvironment(const GenericEnvironment *env);
+  void writeASTBlockEntity(const GenericSignature *sig);
 
   /// Writes a substitution map.
-  void writeSubstitutionMap(const SubstitutionMap substitutions);
+  void writeASTBlockEntity(const SubstitutionMap substitutions);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -397,6 +327,12 @@ private:
                   "layout has invalid record code");
     DeclTypeAbbrCodes[Layout::Code] = Layout::emitAbbrev(Out);
   }
+
+  /// Writes all queued \p entities until there are no more.
+  ///
+  /// \returns true if any entities were written
+  template <typename SpecificASTBlockRecordKeeper>
+  bool writeASTBlockEntitiesIfNeeded(SpecificASTBlockRecordKeeper &entities);
 
   /// Writes all decls and types in the DeclsToWrite queue.
   ///
@@ -408,11 +344,14 @@ private:
   ///
   /// This must be called after writeAllDeclsAndTypes(), since that may add
   /// additional identifiers to the pool.
-  void writeAllIdentifiers();
+  std::vector<CharOffset> writeAllIdentifiers();
 
-  /// Writes the offsets for decls or types.
+  /// Writes the offsets for a serialized entity kind.
+  ///
+  /// \see ASTBlockRecordKeeper
+  template <typename SpecificASTBlockRecordKeeper>
   void writeOffsets(const index_block::OffsetsLayout &Offsets,
-                    const std::vector<BitOffset> &values);
+                    const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
   void writeSIL(const SILModule *M, bool serializeAllSIL);
@@ -483,7 +422,7 @@ public:
   /// Records the use of the given local DeclContext.
   ///
   /// The DeclContext will be scheduled for serialization if necessary.
-  DeclContextID addLocalDeclContextRef(const DeclContext *DC);
+  LocalDeclContextID addLocalDeclContextRef(const DeclContext *DC);
 
   /// Records the use of the given generic signature.
   ///
@@ -493,7 +432,7 @@ public:
   /// Records the use of the given generic environment.
   ///
   /// The GenericEnvironment will be scheduled for serialization if necessary.
-  GenericEnvironmentID addGenericEnvironmentRef(const GenericEnvironment *env);
+  GenericSignatureID addGenericEnvironmentRef(const GenericEnvironment *env);
 
   /// Records the use of the given substitution map.
   ///
@@ -510,7 +449,7 @@ public:
                         const NormalProtocolConformance *conformance);
 
   /// Records the use of the given SILLayout.
-  SILLayoutID addSILLayoutRef(SILLayout *layout);
+  SILLayoutID addSILLayoutRef(const SILLayout *layout);
 
   /// Records the module containing \p DC.
   ///
@@ -524,10 +463,10 @@ public:
   IdentifierID addContainingModuleRef(const DeclContext *DC);
 
   /// Write a normal protocol conformance.
-  void writeNormalConformance(const NormalProtocolConformance *conformance);
+  void writeASTBlockEntity(const NormalProtocolConformance *conformance);
 
   /// Write a SILLayout.
-  void writeSILLayout(SILLayout *conformance);
+  void writeASTBlockEntity(const SILLayout *layout);
 
   /// Writes a protocol conformance.
   ///

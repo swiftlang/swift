@@ -1504,3 +1504,80 @@ struct AllCompositionsStruct {
   }
 }
 
+// rdar://problem/54184846 - crash while trying to retrieve wrapper info on l-value base type
+func test_missing_method_with_lvalue_base() {
+  @propertyWrapper
+  struct Ref<T> {
+    var wrappedValue: T
+  }
+
+  struct S<T> where T: RandomAccessCollection, T.Element: Equatable {
+    @Ref var v: T.Element
+
+    init(items: T, v: Ref<T.Element>) {
+      self.v.binding = v // expected-error {{value of type 'T.Element' has no member 'binding'}}
+    }
+  }
+}
+
+// SR-11288
+// Look into the protocols that the type conforms to
+
+// typealias as propertyWrapper //
+
+@propertyWrapper
+struct SR_11288_S0 {
+  var wrappedValue: Int
+}
+
+protocol SR_11288_P1 {
+  typealias SR_11288_Wrapper1 = SR_11288_S0
+}
+
+struct SR_11288_S1: SR_11288_P1 {
+  @SR_11288_Wrapper1 var answer = 42 // Okay
+}
+
+// associatedtype as propertyWrapper //
+
+protocol SR_11288_P2 {
+  associatedtype SR_11288_Wrapper2 = SR_11288_S0
+}
+
+struct SR_11288_S2: SR_11288_P2 {
+  @SR_11288_Wrapper2 var answer = 42 // expected-error {{unknown attribute 'SR_11288_Wrapper2'}}
+}
+
+protocol SR_11288_P3 {
+  associatedtype SR_11288_Wrapper3
+}
+
+struct SR_11288_S3: SR_11288_P3 {
+  typealias SR_11288_Wrapper3 = SR_11288_S0
+  @SR_11288_Wrapper3 var answer = 42 // Okay
+}
+
+// typealias as propertyWrapper in a constrained protocol extension //
+
+protocol SR_11288_P4 {}
+extension SR_11288_P4 where Self: AnyObject {
+  typealias SR_11288_Wrapper4 = SR_11288_S0
+}
+
+struct SR_11288_S4: SR_11288_P4 {
+  @SR_11288_Wrapper4 var answer = 42 // expected-error 2 {{'SR_11288_S4.SR_11288_Wrapper4.Type' (aka 'SR_11288_S0.Type') requires that 'SR_11288_S4' conform to 'AnyObject'}}
+}
+
+class SR_11288_C0: SR_11288_P4 {
+  @SR_11288_Wrapper4 var answer = 42 // Okay
+}
+
+// typealias as propertyWrapper in a generic type //
+
+protocol SR_11288_P5 {
+  typealias SR_11288_Wrapper5 = SR_11288_S0
+}
+
+struct SR_11288_S5<T>: SR_11288_P5 {
+  @SR_11288_Wrapper5 var answer = 42 // Okay
+}

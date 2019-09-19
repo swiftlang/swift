@@ -2,3 +2,6 @@
 // REQUIRES: OS=macosx
 // REQUIRES: asserts
 // REQUIRES: CMAKE_GENERATOR=Ninja
+//
+// TODO: Re-enable this.
+// REQUIRES: disabled

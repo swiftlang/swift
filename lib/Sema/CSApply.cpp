@@ -668,7 +668,8 @@ namespace {
         opaqueType = LValueType::get(opaqueType);
 
       ASTContext &ctx = tc.Context;
-      auto archetypeVal = new (ctx) OpaqueValueExpr(base->getLoc(), opaqueType);
+      auto archetypeVal =
+          new (ctx) OpaqueValueExpr(base->getSourceRange(), opaqueType);
       cs.cacheType(archetypeVal);
 
       // Record the opened existential.
@@ -755,8 +756,6 @@ namespace {
             member->getInnermostDeclContext()->getGenericSignatureOfContext(),
             memberLocator);
       auto memberRef = ConcreteDeclRef(member, substitutions);
-
-      cs.TC.requestMemberLayout(member);
 
       auto refTy = solution.simplifyType(openedFullType);
 
@@ -1069,9 +1068,12 @@ namespace {
     Expr *finishApply(ApplyExpr *apply, Type openedType,
                       ConstraintLocatorBuilder locator);
 
-    // Resolve @dynamicCallable applications.
-    Expr *finishApplyDynamicCallable(const Solution &solution, ApplyExpr *apply,
-                                     ConstraintLocatorBuilder locator);
+    // Resolve `@dynamicCallable` applications.
+    Expr *finishApplyDynamicCallable(ApplyExpr *apply,
+                                     SelectedOverload selected,
+                                     FuncDecl *method,
+                                     AnyFunctionType *methodType,
+                                     ConstraintLocatorBuilder applyFunctionLoc);
 
   private:
     /// Simplify the given type by substituting all occurrences of
@@ -1286,7 +1288,10 @@ namespace {
         } else {
           auto keyPathBGT = keyPathTy->castTo<BoundGenericType>();
           baseTy = keyPathBGT->getGenericArgs()[0];
-          
+
+          // Coerce the index to the key path's type
+          indexKP = coerceToType(indexKP, keyPathTy, locator);
+
           // Coerce the base to the key path's expected base type.
           if (!baseTy->isEqual(cs.getType(base)->getRValueType()))
             base = coerceToType(base, baseTy, locator);
@@ -1331,7 +1336,6 @@ namespace {
       }
       
       auto subscript = cast<SubscriptDecl>(choice.getDecl());
-      cs.TC.requestMemberLayout(subscript);
 
       auto &tc = cs.getTypeChecker();
       auto baseTy = cs.getType(base)->getRValueType();
@@ -1481,8 +1485,6 @@ namespace {
 
       auto ref = ConcreteDeclRef(ctor, substitutions);
 
-      tc.requestMemberLayout(ctor);
-
       // The constructor was opened with the allocating type, not the
       // initializer type. Map the former into the latter.
       auto resultTy = solution.simplifyType(openedFullType);
@@ -1546,17 +1548,8 @@ namespace {
 
       auto *componentLoc = cs.getConstraintLocator(
           memberLoc,
-          LocatorPathElt::getKeyPathDynamicMember(keyPathTy->getAnyNominal()));
+          LocatorPathElt::KeyPathDynamicMember(keyPathTy->getAnyNominal()));
       auto overload = solution.getOverloadChoice(componentLoc);
-
-      auto getKeyPathComponentIndex =
-          [](ConstraintLocator *locator) -> unsigned {
-        for (const auto &elt : locator->getPath()) {
-          if (elt.getKind() == ConstraintLocator::KeyPathComponent)
-            return elt.getValue();
-        }
-        llvm_unreachable("no keypath component node");
-      };
 
       // Looks like there is a chain of implicit `subscript(dynamicMember:)`
       // calls necessary to resolve a member reference.
@@ -1582,8 +1575,9 @@ namespace {
       // of a keypath expression e.g. `\Lens<[Int]>.count` where
       // `count` is referenced using dynamic lookup.
       if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
-        auto componentIdx = getKeyPathComponentIndex(memberLoc);
-        auto &origComponent = KPE->getComponents()[componentIdx];
+        auto kpElt = memberLoc->findFirst<LocatorPathElt::KeyPathComponent>();
+        assert(kpElt && "no keypath component node");
+        auto &origComponent = KPE->getComponents()[kpElt->getIndex()];
 
         using ComponentKind = KeyPathExpr::Component::Kind;
         if (origComponent.getKind() == ComponentKind::UnresolvedProperty) {
@@ -2174,8 +2168,8 @@ namespace {
 
       // This OpaqueValueExpr represents the result of builderInit above in
       // silgen.
-      OpaqueValueExpr *interpolationExpr =
-          new (tc.Context) OpaqueValueExpr(expr->getLoc(), interpolationType);
+      OpaqueValueExpr *interpolationExpr = new (tc.Context)
+          OpaqueValueExpr(expr->getSourceRange(), interpolationType);
       cs.setType(interpolationExpr, interpolationType);
       expr->setInterpolationExpr(interpolationExpr);
 
@@ -2315,6 +2309,17 @@ namespace {
 
       auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
           ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
+
+      // We won't have a disjunction choice if we have an IUO function call
+      // wrapped in parens (i.e. '(s.foo)()'), because we only create a
+      // single constraint to bind to an optional type. So, we can just return
+      // false here as there's no need to force unwrap.
+      if (!solution.DisjunctionChoices.count(choiceLocator)) {
+        auto type = choice.getDecl()->getInterfaceType();
+        assert((type && type->is<AnyFunctionType>()) &&
+               "expected a function type");
+        return false;
+      }
 
       return solution.getDisjunctionChoice(choiceLocator);
     }
@@ -3072,7 +3077,7 @@ namespace {
       Expr *unwrappedSubExpr = expr->getSubExpr()->getSemanticsProvidingExpr();
       Type valueTy = cs.getType(unwrappedSubExpr)->getOptionalObjectType();
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
-      if (valueTy && inCtor->getFailability() == OTK_None) {
+      if (valueTy && !inCtor->isFailable()) {
         bool isChaining;
         auto *otherCtorRef = expr->getCalledConstructor(isChaining);
         ConstructorDecl *ctor = otherCtorRef->getDecl();
@@ -3080,8 +3085,7 @@ namespace {
 
         // If the initializer we're calling is not declared as
         // checked, it's an error.
-        bool isError =
-            !ctor->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+        bool isError = !ctor->isImplicitlyUnwrappedOptional();
 
         // If we're suppressing diagnostics, just fail.
         if (isError && SuppressDiagnostics)
@@ -4077,7 +4081,6 @@ namespace {
         method = func;
       } else if (auto var = dyn_cast<VarDecl>(foundDecl)) {
         // Properties.
-        addExpectedOpaqueAccessorsToStorage(var);
 
         // If this isn't a property on a type, complain.
         if (!var->getDeclContext()->isTypeContext()) {
@@ -4237,9 +4240,18 @@ namespace {
 
       // Resolve each of the components.
       bool didOptionalChain = false;
-      auto keyPathTy = cs.getType(E)->castTo<BoundGenericType>();
-      Type baseTy = keyPathTy->getGenericArgs()[0];
-      Type leafTy = keyPathTy->getGenericArgs()[1];
+      bool isFunctionType = false;
+      Type baseTy, leafTy;
+      Type exprType = cs.getType(E);
+      if (auto fnTy = exprType->getAs<FunctionType>()) {
+        baseTy = fnTy->getParams()[0].getPlainType();
+        leafTy = fnTy->getResult();
+        isFunctionType = true;
+      } else {
+        auto keyPathTy = exprType->castTo<BoundGenericType>();
+        baseTy = keyPathTy->getGenericArgs()[0];
+        leafTy = keyPathTy->getGenericArgs()[1];
+      }
 
       // Updates the constraint system with the type of the last resolved
       // component. We do it this way because we sometimes insert new
@@ -4280,7 +4292,7 @@ namespace {
         Optional<SelectedOverload> foundDecl;
 
         auto locator = cs.getConstraintLocator(
-            E, ConstraintLocator::PathElement::getKeyPathComponent(i));
+            E, LocatorPathElt::KeyPathComponent(i));
         if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
           locator =
             cs.getConstraintLocator(locator,
@@ -4444,7 +4456,101 @@ namespace {
       // key path.
       assert(!baseTy || baseTy->hasUnresolvedType()
              || baseTy->getWithoutSpecifierType()->isEqual(leafTy));
-      return E;
+
+      if (!isFunctionType)
+        return E;
+
+      // If we've gotten here, the user has used key path literal syntax to form
+      // a closure. The type checker has given E a function type to indicate
+      // this; we're going to change E's type to KeyPath<baseTy, leafTy> and
+      // then wrap it in a larger closure expression with the appropriate type.
+
+      // baseTy has been overwritten by the loop above; restore it.
+      baseTy = exprType->getAs<FunctionType>()->getParams()[0].getPlainType();
+
+      // Compute KeyPath<baseTy, leafTy> and set E's type back to it.
+      auto kpDecl = cs.getASTContext().getKeyPathDecl();
+      auto keyPathTy =
+          BoundGenericType::get(kpDecl, nullptr, { baseTy, leafTy });
+      E->setType(keyPathTy);
+      cs.cacheType(E);
+
+      // To ensure side effects of the key path expression (mainly indices in
+      // subscripts) are only evaluated once, we construct an outer closure,
+      // which is immediately evaluated, and an inner closure, which it returns.
+      // The result looks like this:
+      //
+      //     return "{ $kp$ in { $0[keyPath: $kp$] } }( \(E) )"
+
+      auto &ctx = cs.getASTContext();
+      auto discriminator = AutoClosureExpr::InvalidDiscriminator;
+
+      // The inner closure.
+      //
+      //     let closure = "{ $0[keyPath: $kp$] }"
+      auto closureTy =
+          FunctionType::get({ FunctionType::Param(baseTy) }, leafTy);
+      auto closure = new (ctx)
+          AutoClosureExpr(E, leafTy, discriminator, cs.DC);
+      auto param = new (ctx) ParamDecl(
+          ParamDecl::Specifier::Default, SourceLoc(),
+          /*argument label*/ SourceLoc(), Identifier(),
+          /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
+      param->setType(baseTy);
+      param->setInterfaceType(baseTy->mapTypeOutOfContext());
+
+      // The outer closure.
+      //
+      //    let outerClosure = "{ $kp$ in \(closure) }"
+      auto outerClosureTy =
+          FunctionType::get({ FunctionType::Param(keyPathTy) }, closureTy);
+      auto outerClosure = new (ctx)
+          AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
+      auto outerParam =
+          new (ctx) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+                              /*argument label*/ SourceLoc(), Identifier(),
+                              /*parameter name*/ SourceLoc(),
+                              ctx.getIdentifier("$kp$"), outerClosure);
+      outerParam->setType(keyPathTy);
+      outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
+
+      // let paramRef = "$0"
+      auto *paramRef = new (ctx)
+          DeclRefExpr(param, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
+      paramRef->setType(baseTy);
+      cs.cacheType(paramRef);
+
+      // let outerParamRef = "$kp$"
+      auto outerParamRef = new (ctx)
+          DeclRefExpr(outerParam, DeclNameLoc(E->getLoc()), /*Implicit=*/true);
+      outerParamRef->setType(keyPathTy);
+      cs.cacheType(outerParamRef);
+
+      // let application = "\(paramRef)[keyPath: \(outerParamRef)]"
+      auto *application = new (ctx)
+          KeyPathApplicationExpr(paramRef,
+                                 E->getStartLoc(), outerParamRef, E->getEndLoc(),
+                                 leafTy, /*implicit=*/true);
+      cs.cacheType(application);
+
+      // Finish up the inner closure.
+      closure->setParameterList(ParameterList::create(ctx, {param}));
+      closure->setBody(application);
+      closure->setType(closureTy);
+      cs.cacheType(closure);
+
+      // Finish up the outer closure.
+      outerClosure->setParameterList(ParameterList::create(ctx, {outerParam}));
+      outerClosure->setBody(closure);
+      outerClosure->setType(outerClosureTy);
+      cs.cacheType(outerClosure);
+
+      // let outerApply = "\( outerClosure )( \(E) )"
+      auto outerApply = CallExpr::createImplicit(ctx, outerClosure, {E}, {});
+      outerApply->setType(closureTy);
+      cs.cacheExprTypes(outerApply);
+
+      return coerceToType(outerApply, exprType, cs.getConstraintLocator(E));
     }
 
     KeyPathExpr::Component
@@ -4459,8 +4565,6 @@ namespace {
         // Key paths don't currently support static members.
         // There is a fix which diagnoses such situation already.
         assert(!varDecl->isStatic());
-
-        cs.TC.requestMemberLayout(property);
 
         auto dc = property->getInnermostDeclContext();
 
@@ -4490,8 +4594,6 @@ namespace {
         ArrayRef<Identifier> labels, ConstraintLocator *locator) {
       auto subscript = cast<SubscriptDecl>(overload.choice.getDecl());
       assert(!subscript->isGetterMutating());
-
-      cs.TC.requestMemberLayout(subscript);
 
       auto dc = subscript->getInnermostDeclContext();
 
@@ -4577,6 +4679,11 @@ namespace {
 
     Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) {
       llvm_unreachable("found KeyPathDotExpr in CSApply");
+    }
+
+    Expr *visitOneWayExpr(OneWayExpr *E) {
+      auto type = simplifyType(cs.getType(E));
+      return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
     }
 
     Expr *visitTapExpr(TapExpr *E) {
@@ -4967,7 +5074,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
       auto *toElt
         = coerceToType(fromElt, toEltType,
                       locator.withPathElement(
-                        LocatorPathElt::getTupleElement(i)));
+                        LocatorPathElt::TupleElement(i)));
       if (!toElt)
         return nullptr;
 
@@ -4988,8 +5095,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
   SmallVector<OpaqueValueExpr *, 4> destructured;
   for (unsigned i = 0, e = sources.size(); i != e; ++i) {
     auto fromEltType = fromTuple->getElementType(i);
-    auto *opaqueElt = new (tc.Context) OpaqueValueExpr(expr->getLoc(),
-                                                       fromEltType);
+    auto *opaqueElt =
+        new (tc.Context) OpaqueValueExpr(expr->getSourceRange(), fromEltType);
     cs.cacheType(opaqueElt);
     destructured.push_back(opaqueElt);
   }
@@ -5010,7 +5117,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr,
     auto *toElt
       = coerceToType(fromElt, toEltType,
                      locator.withPathElement(
-                       LocatorPathElt::getTupleElement(source)));
+                       LocatorPathElt::TupleElement(source)));
     if (!toElt)
       return nullptr;
 
@@ -5083,10 +5190,8 @@ Expr *ExprRewriter::coerceSuperclass(Expr *expr, Type toType,
     // concrete superclass.
     auto fromArchetype = OpenedArchetypeType::getAny(fromType);
 
-    auto *archetypeVal =
-      cs.cacheType(
-        new (tc.Context) OpaqueValueExpr(expr->getLoc(),
-                                         fromArchetype));
+    auto *archetypeVal = cs.cacheType(new (tc.Context) OpaqueValueExpr(
+        expr->getSourceRange(), fromArchetype));
 
     auto *result = coerceSuperclass(archetypeVal, toType, locator);
 
@@ -5149,12 +5254,10 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // For existential-to-existential coercions, open the source existential.
   if (fromType->isAnyExistentialType()) {
     fromType = OpenedArchetypeType::getAny(fromType);
-    
-    auto *archetypeVal =
-      cs.cacheType(
-          new (ctx) OpaqueValueExpr(expr->getLoc(),
-                                    fromType));
-    
+
+    auto *archetypeVal = cs.cacheType(
+        new (ctx) OpaqueValueExpr(expr->getSourceRange(), fromType));
+
     auto *result = cs.cacheType(ErasureExpr::create(ctx, archetypeVal, toType,
                                                     conformances));
     return cs.cacheType(
@@ -5334,7 +5437,7 @@ Expr *ExprRewriter::coerceCallArguments(
   auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
                          -> ConstraintLocatorBuilder {
     return locator.withPathElement(
-             LocatorPathElt::getApplyArgToParam(argIdx, paramIdx));
+             LocatorPathElt::ApplyArgToParam(argIdx, paramIdx));
   };
 
   bool matchCanFail =
@@ -5899,10 +6002,8 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
 
 /// Build the conversion of an element in a collection upcast.
 static Expr *buildElementConversion(ExprRewriter &rewriter,
-                                    SourceLoc srcLoc,
-                                    Type srcType,
-                                    Type destType,
-                                    bool bridged,
+                                    SourceRange srcRange, Type srcType,
+                                    Type destType, bool bridged,
                                     ConstraintLocatorBuilder locator,
                                     Expr *element) {
   auto &cs = rewriter.getConstraintSystem();
@@ -5922,12 +6023,9 @@ static Expr *buildElementConversion(ExprRewriter &rewriter,
 }
 
 static CollectionUpcastConversionExpr::ConversionPair
-buildOpaqueElementConversion(ExprRewriter &rewriter,
-                             SourceLoc srcLoc,
-                             Type srcCollectionType,
-                             Type destCollectionType,
-                             bool bridged,
-                             ConstraintLocatorBuilder locator,
+buildOpaqueElementConversion(ExprRewriter &rewriter, SourceRange srcRange,
+                             Type srcCollectionType, Type destCollectionType,
+                             bool bridged, ConstraintLocatorBuilder locator,
                              unsigned typeArgIndex) {
   // We don't need this stuff unless we've got generalized casts.
   Type srcType = srcCollectionType->castTo<BoundGenericType>()
@@ -5939,14 +6037,12 @@ buildOpaqueElementConversion(ExprRewriter &rewriter,
   auto &cs = rewriter.getConstraintSystem();
   ASTContext &ctx = cs.getASTContext();
   auto opaque =
-    rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcLoc, srcType));
+      rewriter.cs.cacheType(new (ctx) OpaqueValueExpr(srcRange, srcType));
 
-  Expr *conversion =
-    buildElementConversion(rewriter, srcLoc, srcType, destType, bridged,
-                           locator.withPathElement(
-                             ConstraintLocator::PathElement::getGenericArgument(
-                                typeArgIndex)),
-                           opaque);
+  Expr *conversion = buildElementConversion(
+      rewriter, srcRange, srcType, destType, bridged,
+      locator.withPathElement(LocatorPathElt::GenericArgument(typeArgIndex)),
+      opaque);
 
   return { opaque, conversion };
 }
@@ -5964,8 +6060,7 @@ void ExprRewriter::peepholeArrayUpcast(ArrayExpr *expr, Type toType,
 
   // Convert the elements.
   ConstraintLocatorBuilder innerLocator =
-    locator.withPathElement(
-                        ConstraintLocator::PathElement::getGenericArgument(0));
+    locator.withPathElement(LocatorPathElt::GenericArgument(0));
   for (auto &element : expr->getElements()) {
     if (auto newElement = buildElementConversion(*this, expr->getLoc(),
                                                  cs.getType(element),
@@ -5992,8 +6087,7 @@ void ExprRewriter::peepholeDictionaryUpcast(DictionaryExpr *expr,
   expr->setType(toType);
 
   ConstraintLocatorBuilder valueLocator =
-    locator.withPathElement(
-      ConstraintLocator::PathElement::getGenericArgument(1));
+    locator.withPathElement(LocatorPathElt::GenericArgument(1));
 
   // Convert the elements.
   TupleTypeElt tupleTypeElts[2] = { keyType, valueType };
@@ -6833,7 +6927,7 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
     // Extract the literal type.
     Type builtinLiteralType =
         conformance->getTypeWitnessByName(type, literalType);
-    if (!builtinLiteralType)
+    if (builtinLiteralType->hasError())
       return nullptr;
 
     // Perform the builtin conversion.
@@ -6868,11 +6962,62 @@ Expr *ExprRewriter::convertLiteralInPlace(Expr *literal,
   return literal;
 }
 
-// Resolve @dynamicCallable applications.
+// Returns true if the given method and method type are a valid
+// `@dynamicCallable` required `func dynamicallyCall` method.
+static bool isValidDynamicCallableMethod(FuncDecl *method,
+                                         AnyFunctionType *methodType) {
+  auto &ctx = method->getASTContext();
+  if (method->getName() != ctx.Id_dynamicallyCall)
+    return false;
+  if (methodType->getParams().size() != 1)
+    return false;
+  auto argumentLabel = methodType->getParams()[0].getLabel();
+  if (argumentLabel != ctx.Id_withArguments &&
+      argumentLabel != ctx.Id_withKeywordArguments)
+    return false;
+  return true;
+}
+
+// Resolve `callAsFunction` method applications.
+static Expr *finishApplyCallAsFunctionMethod(
+    ExprRewriter &rewriter, ApplyExpr *apply, SelectedOverload selected,
+    AnyFunctionType *openedMethodType,
+    ConstraintLocatorBuilder applyFunctionLoc) {
+  auto &cs = rewriter.cs;
+  auto *fn = apply->getFn();
+  auto choice = selected.choice;
+  // Create direct reference to `callAsFunction` method.
+  bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  auto *declRef = rewriter.buildMemberRef(
+      fn, selected.openedFullType, /*dotLoc*/ SourceLoc(), choice,
+      DeclNameLoc(fn->getEndLoc()), selected.openedType, applyFunctionLoc,
+      applyFunctionLoc, /*implicit*/ true, choice.getFunctionRefKind(),
+      AccessSemantics::Ordinary, isDynamic);
+  if (!declRef)
+    return nullptr;
+  declRef->setImplicit(apply->isImplicit());
+  apply->setFn(declRef);
+  // Coerce argument to input type of the `callAsFunction` method.
+  SmallVector<Identifier, 2> argLabelsScratch;
+  auto *arg = rewriter.coerceCallArguments(
+      apply->getArg(), openedMethodType, apply,
+      apply->getArgumentLabels(argLabelsScratch), apply->hasTrailingClosure(),
+      applyFunctionLoc);
+  if (!arg)
+    return nullptr;
+  apply->setArg(arg);
+  cs.setType(apply, openedMethodType->getResult());
+  cs.cacheExprTypes(apply);
+  return apply;
+}
+
+// Resolve `@dynamicCallable` applications.
 Expr *
-ExprRewriter::finishApplyDynamicCallable(const Solution &solution,
-                                         ApplyExpr *apply,
-                                         ConstraintLocatorBuilder locator) {
+ExprRewriter::finishApplyDynamicCallable(ApplyExpr *apply,
+                                         SelectedOverload selected,
+                                         FuncDecl *method,
+                                         AnyFunctionType *methodType,
+                                         ConstraintLocatorBuilder loc) {
   auto &ctx = cs.getASTContext();
   auto *fn = apply->getFn();
 
@@ -6881,27 +7026,16 @@ ExprRewriter::finishApplyDynamicCallable(const Solution &solution,
     arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
 
   // Get resolved `dynamicallyCall` method and verify it.
-  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
-  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
-  auto *method = dyn_cast<FuncDecl>(selected.choice.getDecl());
-  auto methodType = simplifyType(selected.openedType)->castTo<AnyFunctionType>();
-  assert(method->getName() == ctx.Id_dynamicallyCall &&
-         "Expected 'dynamicallyCall' method");
+  assert(isValidDynamicCallableMethod(method, methodType));
   auto params = methodType->getParams();
-  assert(params.size() == 1 &&
-         "Expected 'dynamicallyCall' method with one parameter");
   auto argumentType = params[0].getParameterType();
-  auto argumentLabel = params[0].getLabel();
-  assert((argumentLabel == ctx.Id_withArguments ||
-          argumentLabel == ctx.Id_withKeywordArguments) &&
-         "Expected 'dynamicallyCall' method argument label 'withArguments' or "
-         "'withKeywordArguments'");
 
   // Determine which method was resolved: a `withArguments` method or a
   // `withKeywordArguments` method.
+  auto argumentLabel = methodType->getParams()[0].getLabel();
   bool useKwargsMethod = argumentLabel == ctx.Id_withKeywordArguments;
 
-  // Construct expression referencing the `dynamicallyCall` method.	
+  // Construct expression referencing the `dynamicallyCall` method.
   bool isDynamic =
       selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
   auto member = buildMemberRef(fn, selected.openedFullType,
@@ -7023,9 +7157,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
           bodyFnTy->withExtInfo(bodyFnTy->getExtInfo().withNoEscape()));
         body = coerceToType(body, bodyFnTy, locator);
         assert(body && "can't make nonescaping?!");
-        
+
         auto escapable = new (tc.Context)
-          OpaqueValueExpr(apply->getFn()->getLoc(), Type());
+            OpaqueValueExpr(apply->getFn()->getSourceRange(), Type());
         cs.setType(escapable, escapableParams[0].getOldType());
 
         auto getType = [&](const Expr *E) -> Type {
@@ -7082,8 +7216,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                    ->getOpenedExistentialType()
                    ->isEqual(existentialInstanceTy));
 
-        auto opaqueValue = new (tc.Context)
-          OpaqueValueExpr(apply->getLoc(), openedTy);
+        auto opaqueValue =
+            new (tc.Context) OpaqueValueExpr(apply->getSourceRange(), openedTy);
         cs.setType(opaqueValue, openedTy);
         
         auto getType = [&](const Expr *E) -> Type {
@@ -7108,11 +7242,24 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       llvm_unreachable("Unhandled DeclTypeCheckingSemantics in switch.");
     };
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Save the original potentially lvalue function for rewriting
-  // 'callAsFunction' method applications.
-  auto *originalFn = fn;
-  // SWIFT_ENABLE_TENSORFLOW END
+  // Resolve `callAsFunction` and `@dynamicCallable` applications.
+  auto applyFunctionLoc =
+      locator.withPathElement(ConstraintLocator::ApplyFunction);
+  if (auto selected = solution.getOverloadChoiceIfAvailable(
+          cs.getConstraintLocator(applyFunctionLoc))) {
+    auto *method = dyn_cast<FuncDecl>(selected->choice.getDecl());
+    auto methodType =
+        simplifyType(selected->openedType)->getAs<AnyFunctionType>();
+    if (method && methodType) {
+      if (method->isCallAsFunctionMethod())
+        return finishApplyCallAsFunctionMethod(
+            *this, apply, *selected, methodType, applyFunctionLoc);
+      if (methodType && isValidDynamicCallableMethod(method, methodType))
+        return finishApplyDynamicCallable(
+            apply, *selected, method, methodType, applyFunctionLoc);
+    }
+  }
+
   // The function is always an rvalue.
   fn = cs.coerceToRValue(fn);
 
@@ -7213,109 +7360,51 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   }
 
   // We have a type constructor.
-  if (auto metaTy = cs.getType(fn)->getAs<AnyMetatypeType>()) {
-    auto ty = metaTy->getInstanceType();
+  auto metaTy = cs.getType(fn)->castTo<AnyMetatypeType>();
+  auto ty = metaTy->getInstanceType();
 
-    // If we're "constructing" a tuple type, it's simply a conversion.
-    if (auto tupleTy = ty->getAs<TupleType>()) {
-      // FIXME: Need an AST to represent this properly.
-      return coerceToType(apply->getArg(), tupleTy, locator);
-    }
-
-    // We're constructing a value of nominal type. Look for the constructor or
-    // enum element to use.
-    auto ctorLocator = cs.getConstraintLocator(
-        locator.withPathElement(ConstraintLocator::ApplyFunction)
-               .withPathElement(ConstraintLocator::ConstructorMember));
-    auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
-    if (!selected) {
-      assert(ty->hasError() || ty->hasUnresolvedType());
-      cs.setType(apply, ty);
-      return apply;
-    }
-
-    assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
-           ty->isExistentialType() || ty->is<ArchetypeType>());
-
-    // We have the constructor.
-    auto choice = selected->choice;
-
-    // Consider the constructor decl reference expr 'implicit', but the
-    // constructor call expr itself has the apply's 'implicitness'.
-    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-    Expr *declRef = buildMemberRef(fn, selected->openedFullType,
-                                   /*dotLoc=*/SourceLoc(), choice,
-                                   DeclNameLoc(fn->getEndLoc()),
-                                   selected->openedType, locator, ctorLocator,
-                                   /*Implicit=*/true,
-                                   choice.getFunctionRefKind(),
-                                   AccessSemantics::Ordinary, isDynamic);
-    if (!declRef)
-      return nullptr;
-    declRef->setImplicit(apply->isImplicit());
-    apply->setFn(declRef);
-
-    // Tail-recur to actually call the constructor.
-    return finishApply(apply, openedType, locator);
+  // If we're "constructing" a tuple type, it's simply a conversion.
+  if (auto tupleTy = ty->getAs<TupleType>()) {
+    // FIXME: Need an AST to represent this properly.
+    return coerceToType(apply->getArg(), tupleTy, locator);
   }
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Handle 'callAsFunction' method applications.
-  auto &ctx = cs.getASTContext();
-
-  TupleExpr *arg = dyn_cast<TupleExpr>(apply->getArg());
-  if (auto parenExpr = dyn_cast<ParenExpr>(apply->getArg()))
-    arg = TupleExpr::createImplicit(ctx, parenExpr->getSubExpr(), {});
-
-  // Get resolved call method and verify it.
-  auto loc = locator.withPathElement(ConstraintLocator::ApplyFunction);
-  auto selected = solution.getOverloadChoice(cs.getConstraintLocator(loc));
-  auto choice = selected.choice;
-  auto *callMethod = dyn_cast<FuncDecl>(selected.choice.getDecl());
-  if (callMethod && callMethod->isCallable()) {
-    auto methodType =
-        simplifyType(selected.openedType)->castTo<AnyFunctionType>();
-    auto selfParam = callMethod->getImplicitSelfDecl();
-    // Diagnose `mutating` method call on immutable value.
-    if (!cs.getType(originalFn)->hasLValueType() && selfParam->isInOut()) {
-      AssignmentFailure failure(originalFn, cs, originalFn->getLoc(),
-                                diag::cannot_pass_rvalue_mutating_subelement,
-                                diag::cannot_pass_rvalue_mutating);
-      failure.diagnose();
-      return nullptr;
-    }
-    // Create direct reference to call method.
-    bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-    Expr *declRef = buildMemberRef(originalFn, selected.openedFullType,
-                                   /*dotLoc=*/SourceLoc(), choice,
-                                   DeclNameLoc(fn->getEndLoc()),
-                                   selected.openedType, loc, loc,
-                                   /*Implicit=*/true,
-                                   choice.getFunctionRefKind(),
-                                   AccessSemantics::Ordinary, isDynamic);
-    if (!declRef)
-      return nullptr;
-    declRef->setImplicit(apply->isImplicit());
-    apply->setFn(declRef);
-    // Coerce argument to input type of call method.
-    SmallVector<Identifier, 2> argLabelsScratch;
-    auto *arg = coerceCallArguments(apply->getArg(), methodType, apply,
-                                    apply->getArgumentLabels(argLabelsScratch),
-                                    apply->hasTrailingClosure(), loc);
-    if (!arg)
-      return nullptr;
-    apply->setArg(arg);
-    cs.setType(apply, methodType->getResult());
-    cs.cacheExprTypes(apply);
+  // We're constructing a value of nominal type. Look for the constructor or
+  // enum element to use.
+  auto ctorLocator = cs.getConstraintLocator(
+      locator.withPathElement(ConstraintLocator::ApplyFunction)
+             .withPathElement(ConstraintLocator::ConstructorMember));
+  auto selected = solution.getOverloadChoiceIfAvailable(ctorLocator);
+  if (!selected) {
+    assert(ty->hasError() || ty->hasUnresolvedType());
+    cs.setType(apply, ty);
     return apply;
   }
-  // SWIFT_ENABLE_TENSORFLOW END
 
-  // Handle @dynamicCallable applications.
-  // At this point, all other ApplyExpr cases have been handled.
-  return finishApplyDynamicCallable(solution, apply, locator);
+  assert(ty->getNominalOrBoundGenericNominal() || ty->is<DynamicSelfType>() ||
+         ty->isExistentialType() || ty->is<ArchetypeType>());
+
+  // We have the constructor.
+  auto choice = selected->choice;
+
+  // Consider the constructor decl reference expr 'implicit', but the
+  // constructor call expr itself has the apply's 'implicitness'.
+  bool isDynamic = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
+  Expr *declRef = buildMemberRef(fn, selected->openedFullType,
+                                 /*dotLoc=*/SourceLoc(), choice,
+                                 DeclNameLoc(fn->getEndLoc()),
+                                 selected->openedType, locator, ctorLocator,
+                                 /*Implicit=*/true,
+                                 choice.getFunctionRefKind(),
+                                 AccessSemantics::Ordinary, isDynamic);
+  if (!declRef)
+    return nullptr;
+  declRef->setImplicit(apply->isImplicit());
+  apply->setFn(declRef);
+
+  // Tail-recur to actually call the constructor.
+  return finishApply(apply, openedType, locator);
 }
-
 
 // Return the precedence-yielding parent of 'expr', along with the index of
 // 'expr' as the child of that parent. The precedence-yielding parent is the
@@ -7492,10 +7581,6 @@ namespace {
         auto fnType = cs.getType(closure)->castTo<FunctionType>();
         auto *params = closure->getParameters();
         tc.coerceParameterListToType(params, closure, fnType);
-
-        // Require layout of dependent types that could be used to materialize
-        // metadata types/conformances during IRGen.
-        tc.requestRequiredNominalTypeLayoutForParameters(params);
 
         // If this closure had a function builder applied, rewrite it to a
         // closure with a single expression body containing the builder

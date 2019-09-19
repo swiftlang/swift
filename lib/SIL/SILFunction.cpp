@@ -28,25 +28,16 @@
 using namespace swift;
 using namespace Lowering;
 
-ArrayRef<Requirement> SILSpecializeAttr::getRequirements() const {
-  return {const_cast<SILSpecializeAttr *>(this)->getRequirementsData(),
-          numRequirements};
-}
-
-SILSpecializeAttr::SILSpecializeAttr(ArrayRef<Requirement> requirements,
-                                     bool exported, SpecializationKind kind)
-    : numRequirements(requirements.size()), kind(kind), exported(exported) {
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
+SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
+                                     GenericSignature *specializedSig)
+    : kind(kind), exported(exported), specializedSignature(specializedSig) { }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             ArrayRef<Requirement> requirements,
+                                             GenericSignature *specializedSig,
                                              bool exported,
                                              SpecializationKind kind) {
-  unsigned size =
-      sizeof(SILSpecializeAttr) + sizeof(Requirement) * requirements.size();
-  void *buf = M.allocate(size, alignof(SILSpecializeAttr));
-  return ::new (buf) SILSpecializeAttr(requirements, exported, kind);
+  void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
+  return ::new (buf) SILSpecializeAttr(exported, kind, specializedSig);
 }
 
 void SILFunction::addSpecializeAttr(SILSpecializeAttr *Attr) {
@@ -125,7 +116,9 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
                     GenericEnvironment *genericEnv, Optional<SILLocation> loc,
                     IsBare_t isBareSILFunction, IsTransparent_t isTrans,
                     IsSerialized_t isSerialized, ProfileCounter entryCount,
-                    IsDynamicallyReplaceable_t isDynamic, IsThunk_t isThunk,
+                    IsDynamicallyReplaceable_t isDynamic,
+                    IsExactSelfClass_t isExactSelfClass,
+                    IsThunk_t isThunk,
                     SubclassScope classSubclassScope, Inline_t inlineStrategy,
                     EffectsKind E, SILFunction *insertBefore,
                     const SILDebugScope *debugScope) {
@@ -145,7 +138,8 @@ SILFunction::create(SILModule &M, SILLinkage linkage, StringRef name,
   auto fn = new (M) SILFunction(M, linkage, name, loweredType, genericEnv, loc,
                                 isBareSILFunction, isTrans, isSerialized,
                                 entryCount, isThunk, classSubclassScope,
-                                inlineStrategy, E, insertBefore, debugScope, isDynamic);
+                                inlineStrategy, E, insertBefore, debugScope,
+                                isDynamic, isExactSelfClass);
 
   if (entry) entry->setValue(fn);
   return fn;
@@ -161,7 +155,8 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
                          Inline_t inlineStrategy, EffectsKind E,
                          SILFunction *InsertBefore,
                          const SILDebugScope *DebugScope,
-                         IsDynamicallyReplaceable_t isDynamic)
+                         IsDynamicallyReplaceable_t isDynamic,
+                         IsExactSelfClass_t isExactSelfClass)
     : Module(Module), Name(Name), LoweredType(LoweredType),
       GenericEnv(genericEnv), SpecializationInfo(nullptr),
       DebugScope(DebugScope), Bare(isBareSILFunction), Transparent(isTrans),
@@ -169,7 +164,9 @@ SILFunction::SILFunction(SILModule &Module, SILLinkage Linkage, StringRef Name,
       ClassSubclassScope(unsigned(classSubclassScope)), GlobalInitFlag(false),
       InlineStrategy(inlineStrategy), Linkage(unsigned(Linkage)),
       HasCReferences(false), IsWeakLinked(false),
-      IsDynamicReplaceable(isDynamic), OptMode(OptimizationMode::NotSet),
+      IsDynamicReplaceable(isDynamic),
+      ExactSelfClass(isExactSelfClass),
+      OptMode(OptimizationMode::NotSet),
       EffectsKindAttr(E), EntryCount(entryCount) {
   assert(!Transparent || !IsDynamicReplaceable);
   validateSubclassScope(classSubclassScope, isThunk, nullptr);

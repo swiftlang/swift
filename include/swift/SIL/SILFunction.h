@@ -28,7 +28,6 @@
 #include "llvm/ADT/StringMap.h"
 
 /// The symbol name used for the program entry point function.
-/// FIXME: Hardcoding this is lame.
 #define SWIFT_ENTRY_POINT_FUNCTION "main"
 
 namespace swift {
@@ -57,6 +56,10 @@ enum IsDynamicallyReplaceable_t {
   IsNotDynamic,
   IsDynamic
 };
+enum IsExactSelfClass_t {
+  IsNotExactSelfClass,
+  IsExactSelfClass,
+};
 
 class SILSpecializeAttr final {
   friend SILFunction;
@@ -67,10 +70,8 @@ public:
   };
 
   static SILSpecializeAttr *create(SILModule &M,
-                                   ArrayRef<Requirement> requirements,
+                                   GenericSignature *specializedSignature,
                                    bool exported, SpecializationKind kind);
-
-  ArrayRef<Requirement> getRequirements() const;
 
   bool isExported() const {
     return exported;
@@ -88,6 +89,10 @@ public:
     return kind;
   }
 
+  GenericSignature *getSpecializedSignature() const {
+    return specializedSignature;
+  }
+
   SILFunction *getFunction() const {
     return F;
   }
@@ -95,17 +100,13 @@ public:
   void print(llvm::raw_ostream &OS) const;
 
 private:
-  unsigned numRequirements;
   SpecializationKind kind;
   bool exported;
-  SILFunction *F;
+  GenericSignature *specializedSignature;
+  SILFunction *F = nullptr;
 
-  SILSpecializeAttr(ArrayRef<Requirement> requirements, bool exported,
-                    SpecializationKind kind);
-
-  Requirement *getRequirementsData() {
-    return reinterpret_cast<Requirement *>(this+1);
-  }
+  SILSpecializeAttr(bool exported, SpecializationKind kind,
+                    GenericSignature *specializedSignature);
 };
 
 /// SWIFT_ENABLE_TENSORFLOW
@@ -280,8 +281,12 @@ private:
   /// Whether cross-module references to this function should use weak linking.
   unsigned IsWeakLinked : 1;
 
-  // Whether the implementation can be dynamically replaced.
+  /// Whether the implementation can be dynamically replaced.
   unsigned IsDynamicReplaceable : 1;
+    
+  /// If true, this indicates that a class method implementation will always be
+  /// invoked with a `self` argument of the exact base class type.
+  unsigned ExactSelfClass : 1;
 
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
@@ -381,7 +386,8 @@ private:
               SubclassScope classSubclassScope, Inline_t inlineStrategy,
               EffectsKind E, SILFunction *insertBefore,
               const SILDebugScope *debugScope,
-              IsDynamicallyReplaceable_t isDynamic);
+              IsDynamicallyReplaceable_t isDynamic,
+              IsExactSelfClass_t isExactSelfClass);
 
   static SILFunction *
   create(SILModule &M, SILLinkage linkage, StringRef name,
@@ -389,12 +395,19 @@ private:
          Optional<SILLocation> loc, IsBare_t isBareSILFunction,
          IsTransparent_t isTrans, IsSerialized_t isSerialized,
          ProfileCounter entryCount, IsDynamicallyReplaceable_t isDynamic,
+         IsExactSelfClass_t isExactSelfClass,
          IsThunk_t isThunk = IsNotThunk,
          SubclassScope classSubclassScope = SubclassScope::NotApplicable,
          Inline_t inlineStrategy = InlineDefault,
          EffectsKind EffectsKindAttr = EffectsKind::Unspecified,
          SILFunction *InsertBefore = nullptr,
          const SILDebugScope *DebugScope = nullptr);
+
+  /// Set has ownership to the given value. True means that the function has
+  /// ownership, false means it does not.
+  ///
+  /// Only for use by FunctionBuilders!
+  void setHasOwnership(bool newValue) { HasOwnership = newValue; }
 
 public:
   ~SILFunction();
@@ -522,9 +535,7 @@ public:
 
   /// Sets the HasOwnership flag to false. This signals to SIL that no
   /// ownership instructions should be in this function any more.
-  void setOwnershipEliminated() {
-    HasOwnership = false;
-  }
+  void setOwnershipEliminated() { setHasOwnership(false); }
 
   /// Returns true if this function was deserialized from canonical
   /// SIL. (.swiftmodule files contain canonical SIL; .sib files may be 'raw'
@@ -674,13 +685,20 @@ public:
     IsWeakLinked = value;
   }
 
-  /// Returs whether this function implementation can be dynamically replaced.
+  /// Returns whether this function implementation can be dynamically replaced.
   IsDynamicallyReplaceable_t isDynamicallyReplaceable() const {
     return IsDynamicallyReplaceable_t(IsDynamicReplaceable);
   }
   void setIsDynamic(IsDynamicallyReplaceable_t value = IsDynamic) {
     IsDynamicReplaceable = value;
     assert(!Transparent || !IsDynamicReplaceable);
+  }
+    
+  IsExactSelfClass_t isExactSelfClass() const {
+    return IsExactSelfClass_t(ExactSelfClass);
+  }
+  void setIsExactSelfClass(IsExactSelfClass_t t) {
+    ExactSelfClass = t;
   }
 
   /// Get the DeclContext of this function. (Debug info only).

@@ -634,9 +634,6 @@ public:
   /// The list of fixes that need to be applied to the initial expression
   /// to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
-  /// The list of member references which couldn't be resolved,
-  /// and had to be assumed based on their use.
-  llvm::SmallVector<ConstraintLocator *, 4> MissingMembers;
 
   /// The set of disjunction choices used to arrive at this solution,
   /// which informs constraint application.
@@ -1055,7 +1052,7 @@ private:
   /// solution it represents.
   Score CurrentScore;
 
-  std::vector<TypeVariableType *> TypeVariables;
+  llvm::SetVector<TypeVariableType *> TypeVariables;
 
   /// Maps expressions to types for choosing a favored overload
   /// type in a disjunction constraint.
@@ -1095,8 +1092,13 @@ private:
 
   /// The set of fixes applied to make the solution work.
   llvm::SmallVector<ConstraintFix *, 4> Fixes;
-  /// The set of type variables representing types of missing members.
-  llvm::SmallSetVector<ConstraintLocator *, 4> MissingMembers;
+
+  /// The set of "holes" in the constraint system encountered
+  /// along the current path identified by locator. A "hole" is
+  /// a type variable which type couldn't be determined due to
+  /// an inference failure e.g. missing member, ambiguous generic
+  /// parameter which hasn't been explicitly specified.
+  llvm::SmallSetVector<ConstraintLocator *, 4> Holes;
 
   /// The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -1118,6 +1120,23 @@ private:
   /// with that locator.
   SmallVector<std::pair<ConstraintLocator *, ArrayRef<OpenedType>>, 4>
     OpenedTypes;
+
+  /// The list of all generic requirements fixed along the current
+  /// solver path.
+  using FixedRequirement = std::tuple<TypeBase *, RequirementKind, TypeBase *>;
+  SmallVector<FixedRequirement, 4> FixedRequirements;
+
+  bool hasFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
+    auto reqInfo = std::make_tuple(lhs.getPointer(), kind, rhs.getPointer());
+    return llvm::any_of(
+        FixedRequirements,
+        [&reqInfo](const FixedRequirement &entry) { return entry == reqInfo; });
+  }
+
+  void recordFixedRequirement(Type lhs, RequirementKind kind, Type rhs) {
+    FixedRequirements.push_back(
+        std::make_tuple(lhs.getPointer(), kind, rhs.getPointer()));
+  }
 
   /// A mapping from constraint locators to the opened existential archetype
   /// used for the 'self' of an existential type.
@@ -1290,6 +1309,7 @@ private:
     ///
     /// \param constraint The newly generated constraint.
     void addGeneratedConstraint(Constraint *constraint) {
+      assert(constraint && "Null generated constraint?");
       generatedConstraints.push_back(constraint);
     }
 
@@ -1613,6 +1633,12 @@ public:
     /// The length of \c Fixes.
     unsigned numFixes;
 
+    /// The length of \c Holes.
+    unsigned numHoles;
+
+    /// The length of \c FixedRequirements.
+    unsigned numFixedRequirements;
+
     /// The length of \c DisjunctionChoices.
     unsigned numDisjunctionChoices;
 
@@ -1628,8 +1654,6 @@ public:
     unsigned numAddedNodeTypes;
 
     unsigned numCheckedConformances;
-
-    unsigned numMissingMembers;
 
     unsigned numDisabledConstraints;
 
@@ -1765,9 +1789,15 @@ public:
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return TypeVariables;
+    return TypeVariables.getArrayRef();
   }
-  
+
+  /// Whether the given type variable is active in the constraint system at
+  /// the moment.
+  bool isActiveTypeVariable(TypeVariableType *typeVar) const {
+    return TypeVariables.count(typeVar) > 0;
+  }
+
   TypeBase* getFavoredType(Expr *E) {
     assert(E != nullptr);
     return this->FavoredTypes[E];
@@ -2007,6 +2037,16 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix);
 
+  void recordHole(TypeVariableType *typeVar);
+
+  bool isHole(TypeVariableType *typeVar) const {
+    return isHoleAt(typeVar->getImpl().getLocator());
+  }
+
+  bool isHoleAt(ConstraintLocator *locator) const {
+    return bool(Holes.count(locator));
+  }
+
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
   bool hasFixFor(ConstraintLocator *locator) const {
@@ -2069,6 +2109,7 @@ public:
 
   /// Add a key path constraint to the constraint system.
   void addKeyPathConstraint(Type keypath, Type root, Type value,
+                            ArrayRef<TypeVariableType *> componentTypeVars,
                             ConstraintLocatorBuilder locator,
                             bool isFavored = false);
 
@@ -2737,7 +2778,7 @@ public:
   /// Attempt to repair typing failures and record fixes if needed.
   /// \return true if at least some of the failures has been repaired
   /// successfully, which allows type matcher to continue.
-  bool repairFailures(Type lhs, Type rhs,
+  bool repairFailures(Type lhs, Type rhs, ConstraintKind matchKind,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator);
 
@@ -3082,16 +3123,24 @@ private:
                                          ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given KeyPath constraint.
-  SolutionKind simplifyKeyPathConstraint(Type keyPath,
-                                         Type root,
-                                         Type value,
-                                         TypeMatchOptions flags,
-                                         ConstraintLocatorBuilder locator);
+  SolutionKind simplifyKeyPathConstraint(
+      Type keyPath,
+      Type root,
+      Type value,
+      ArrayRef<TypeVariableType *> componentTypeVars,
+      TypeMatchOptions flags,
+      ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given defaultable constraint.
   SolutionKind simplifyDefaultableConstraint(Type first, Type second,
                                              TypeMatchOptions flags,
                                              ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify a one-way constraint.
+  SolutionKind simplifyOneWayConstraint(ConstraintKind kind,
+                                        Type first, Type second,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
@@ -3920,6 +3969,18 @@ Expr *getArgumentExpr(Expr *expr, unsigned index);
 //   foo(y)
 // }
 bool isAutoClosureArgument(Expr *argExpr);
+
+/// Check whether type conforms to a given known protocol.
+bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+                             KnownProtocolKind protocol);
+
+/// Check whether given type conforms to `RawPepresentable` protocol
+/// and return witness type.
+Type isRawRepresentable(ConstraintSystem &cs, Type type);
+/// Check whether given type conforms to a specific known kind
+/// `RawPepresentable` protocol and return witness type.
+Type isRawRepresentable(ConstraintSystem &cs, Type type,
+                        KnownProtocolKind rawRepresentableProtocol);
 
 class DisjunctionChoice {
   unsigned Index;

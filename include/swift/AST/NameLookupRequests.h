@@ -24,6 +24,7 @@
 namespace swift {
 
 class ClassDecl;
+class DestructorDecl;
 class TypeAliasDecl;
 class TypeDecl;
 
@@ -231,10 +232,29 @@ public:
   bool isCached() const { return true; }
 };
 
-/// The zone number for name-lookup requests.
-#define SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE 9
+/// Finds or synthesizes a destructor for the given class.
+class GetDestructorRequest :
+    public SimpleRequest<GetDestructorRequest,
+                         DestructorDecl *(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
 
-#define SWIFT_TYPEID_ZONE SWIFT_NAME_LOOKUP_REQUESTS_TYPEID_ZONE
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<DestructorDecl *>
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+  Optional<DestructorDecl *> getCachedResult() const;
+  void cacheResult(DestructorDecl *value) const;
+};
+
+#define SWIFT_TYPEID_ZONE NameLookup
 #define SWIFT_TYPEID_HEADER "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -245,14 +265,14 @@ template<typename Request>
 void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
-#define SWIFT_TYPEID(RequestType)                                \
+#define SWIFT_REQUEST(Zone, RequestType)                         \
 template<>                                                       \
 inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
                             const RequestType &request) {        \
   ++stats.getFrontendCounters().RequestType;                     \
 }
 #include "swift/AST/NameLookupTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

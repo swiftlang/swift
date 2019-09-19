@@ -467,7 +467,7 @@ if(MSVC OR "${CMAKE_SIMULATE_ID}" STREQUAL MSVC)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL Darwin OR
-    EXISTS ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+    EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
   set(SWIFT_BUILD_SYNTAXPARSERLIB_default TRUE)
   set(SWIFT_BUILD_SOURCEKIT_default TRUE)
 else()
@@ -516,6 +516,18 @@ include(CMakePushCheckState)
 
 print_versions()
 
+include(SwiftSharedCMakeConfig)
+
+# NOTE: We include this before SwiftComponents as it relies on some LLVM CMake
+# functionality.
+# Support building Swift as a standalone project, using LLVM as an
+# external library.
+if(SWIFT_BUILT_STANDALONE)
+  swift_common_standalone_build_config(SWIFT)
+else()
+  swift_common_unified_build_config(SWIFT)
+endif()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
@@ -542,16 +554,6 @@ if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
       COMMAND "uname" "-m"
       OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif()
-
-include(SwiftSharedCMakeConfig)
-
-# Support building Swift as a standalone project, using LLVM as an
-# external library.
-if(SWIFT_BUILT_STANDALONE)
-  swift_common_standalone_build_config(SWIFT)
-else()
-  swift_common_unified_build_config(SWIFT)
 endif()
 
 get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
@@ -1068,6 +1070,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   else()
     set(SOURCEKIT_RUNTIME_DIR lib)
   endif()
+  add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
   swift_install_in_component(FILES
                                $<TARGET_FILE:dispatch>
                                $<TARGET_FILE:BlocksRuntime>

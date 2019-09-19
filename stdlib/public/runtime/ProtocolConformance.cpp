@@ -145,14 +145,15 @@ ProtocolConformanceDescriptor::getCanonicalTypeMetadata() const {
 
   case TypeReferenceKind::DirectTypeDescriptor:
   case TypeReferenceKind::IndirectTypeDescriptor: {
-    auto anyType = getTypeDescriptor();
-    if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
-      if (!type->isGeneric()) {
-        if (auto accessFn = type->getAccessFunction())
-          return accessFn(MetadataState::Abstract).Value;
+    if (auto anyType = getTypeDescriptor()) {
+      if (auto type = dyn_cast<TypeContextDescriptor>(anyType)) {
+        if (!type->isGeneric()) {
+          if (auto accessFn = type->getAccessFunction())
+            return accessFn(MetadataState::Abstract).Value;
+        }
+      } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
+        return _getSimpleProtocolTypeMetadata(protocol);
       }
-    } else if (auto protocol = dyn_cast<ProtocolDescriptor>(anyType)) {
-      return _getSimpleProtocolTypeMetadata(protocol);
     }
 
     return nullptr;
@@ -639,6 +640,22 @@ swift::_searchConformancesByMangledTypeName(Demangle::NodePointer node) {
     }
   }
   return nullptr;
+}
+
+void
+swift::_forEachProtocolConformanceSectionAfter(
+  size_t *start, 
+  const std::function<void(const ProtocolConformanceRecord *,
+                           const ProtocolConformanceRecord *)> &f) {
+  auto snapshot = Conformances.get().SectionsToScan.snapshot();
+  if (snapshot.Count > *start) {
+    auto *begin = snapshot.begin() + *start;
+    auto *end = snapshot.end();
+    for (auto *section = begin; section != end; section++) {
+      f(section->Begin, section->End);
+    }
+    *start = snapshot.Count;
+  }
 }
 
 bool swift::_checkGenericRequirements(

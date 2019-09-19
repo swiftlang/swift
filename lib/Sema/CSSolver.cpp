@@ -77,7 +77,7 @@ Solution ConstraintSystem::finalize() {
     }
   }
 
-  for (auto tv : TypeVariables) {
+  for (auto tv : getTypeVariables()) {
     if (getFixedType(tv))
       continue;
 
@@ -95,7 +95,7 @@ Solution ConstraintSystem::finalize() {
   }
 
   // For each of the type variables, get its fixed type.
-  for (auto tv : TypeVariables) {
+  for (auto tv : getTypeVariables()) {
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
@@ -125,12 +125,6 @@ Solution ConstraintSystem::finalize() {
   }
   solution.Fixes.append(Fixes.begin() + firstFixIndex, Fixes.end());
 
-  // Remember all of the missing member references encountered,
-  // that helps diagnostics to avoid emitting error for each
-  // member in the chain.
-  for (auto *member : MissingMembers)
-    solution.MissingMembers.push_back(member);
-
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     // We shouldn't ever register disjunction choices multiple times,
@@ -150,9 +144,11 @@ Solution ConstraintSystem::finalize() {
     // multiple entries.  We should use an optimized PartialSolution
     // structure for that use case, which would optimize a lot of
     // stuff here.
+#if false
     assert((solution.OpenedTypes.count(opened.first) == 0 ||
             solution.OpenedTypes[opened.first] == opened.second)
             && "Already recorded");
+#endif
     solution.OpenedTypes.insert(opened);
   }
 
@@ -196,12 +192,9 @@ void ConstraintSystem::applySolution(const Solution &solution) {
   CurrentScore += solution.getFixedScore();
 
   // Assign fixed types to the type variables solved by this solution.
-  llvm::SmallPtrSet<TypeVariableType *, 4> 
-    knownTypeVariables(TypeVariables.begin(), TypeVariables.end());
   for (auto binding : solution.typeBindings) {
     // If we haven't seen this type variable before, record it now.
-    if (knownTypeVariables.insert(binding.first).second)
-      TypeVariables.push_back(binding.first);
+    addTypeVariable(binding.first);
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
@@ -268,10 +261,6 @@ void ConstraintSystem::applySolution(const Solution &solution) {
     
   // Register any fixes produced along this path.
   Fixes.append(solution.Fixes.begin(), solution.Fixes.end());
-
-  // Register any missing members encountered along this path.
-  MissingMembers.insert(solution.MissingMembers.begin(),
-                        solution.MissingMembers.end());
 }
 
 /// Restore the type variable bindings to what they were before
@@ -453,13 +442,14 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
   numSavedBindings = cs.solverState->savedBindings.size();
   numConstraintRestrictions = cs.ConstraintRestrictions.size();
   numFixes = cs.Fixes.size();
+  numHoles = cs.Holes.size();
+  numFixedRequirements = cs.FixedRequirements.size();
   numDisjunctionChoices = cs.DisjunctionChoices.size();
   numOpenedTypes = cs.OpenedTypes.size();
   numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
   numDefaultedConstraints = cs.DefaultedConstraints.size();
   numAddedNodeTypes = cs.addedNodeTypes.size();
   numCheckedConformances = cs.CheckedConformances.size();
-  numMissingMembers = cs.MissingMembers.size();
   numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
   numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
   numBuilderTransformedClosures = cs.builderTransformedClosures.size();
@@ -473,7 +463,8 @@ ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
 ConstraintSystem::SolverScope::~SolverScope() {
   // Erase the end of various lists.
   cs.resolvedOverloadSets = resolvedOverloadSets;
-  truncate(cs.TypeVariables, numTypeVariables);
+  while (cs.TypeVariables.size() > numTypeVariables)
+    cs.TypeVariables.pop_back();
 
   // Restore bindings.
   cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
@@ -499,11 +490,18 @@ ConstraintSystem::SolverScope::~SolverScope() {
   // Remove any fixes.
   truncate(cs.Fixes, numFixes);
 
+  // Remove any holes encountered along the current path.
+  truncate(cs.Holes, numHoles);
+
   // Remove any disjunction choices.
   truncate(cs.DisjunctionChoices, numDisjunctionChoices);
 
   // Remove any opened types.
   truncate(cs.OpenedTypes, numOpenedTypes);
+
+  // Remove any conformances solver had to fix along
+  // the current path.
+  truncate(cs.FixedRequirements, numFixedRequirements);
 
   // Remove any opened existential types.
   truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
@@ -519,9 +517,6 @@ ConstraintSystem::SolverScope::~SolverScope() {
 
   // Remove any conformances checked along the current path.
   truncate(cs.CheckedConformances, numCheckedConformances);
-
-  // Remove any missing members found along the current path.
-  truncate(cs.MissingMembers, numMissingMembers);
 
   /// Remove any builder transformed closures.
   truncate(cs.builderTransformedClosures, numBuilderTransformedClosures);
@@ -1224,7 +1219,7 @@ ConstraintSystem::solveImpl(Expr *&expr,
     bool isForSingleExprFunction =
         getContextualTypePurpose() == CTP_ReturnSingleExpr;
     auto *convertTypeLocator = getConstraintLocator(
-        expr, LocatorPathElt::getContextualType(isForSingleExprFunction));
+        expr, LocatorPathElt::ContextualType(isForSingleExprFunction));
 
     if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
       convertType = convertType.transform([&](Type type) -> Type {
@@ -1681,6 +1676,7 @@ void ConstraintSystem::ArgumentInfoCollector::walk(Type argType) {
       case ConstraintKind::SelfObjectOfProtocol:
       case ConstraintKind::ConformsTo:
       case ConstraintKind::Defaultable:
+      case ConstraintKind::OneWayEqual:
         break;
       }
     }

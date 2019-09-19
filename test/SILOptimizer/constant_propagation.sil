@@ -954,3 +954,95 @@ bb0:
 // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
 // The semantics attribute is used by the constant folder.
 sil [serialized] [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// CHECK-LABEL: sil @string_ptr_to_int_round_trip : $@convention(thin) () -> Builtin.RawPointer {
+// CHECK-NOT: builtin
+// CHECK: } // end sil function 'string_ptr_to_int_round_trip'
+sil @string_ptr_to_int_round_trip : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = string_literal utf8 "constant"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "inttoptr_Word"(%1 : $Builtin.Word) : $Builtin.RawPointer
+  return %2 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @string_ptr_to_int_round_trip_2 : $@convention(thin) () -> Builtin.Word {
+// CHECK-NOT: builtin
+// CHECK: } // end sil function 'string_ptr_to_int_round_trip_2'
+sil @string_ptr_to_int_round_trip_2 : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = builtin "inttoptr_Word"(%0 : $Builtin.Word) : $Builtin.RawPointer
+  %2 = builtin "ptrtoint_Word"(%1 : $Builtin.RawPointer) : $Builtin.Word
+  return %2 : $Builtin.Word
+}
+
+// CHECK-LABEL: sil @string_ptr_to_int_round_trip_no_match : $@convention(thin) () -> Builtin.Int32 {
+// CHECK: builtin
+// CHECK: builtin
+// CHECK: } // end sil function 'string_ptr_to_int_round_trip_no_match'
+sil @string_ptr_to_int_round_trip_no_match : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = builtin "inttoptr_Word"(%0 : $Builtin.Word) : $Builtin.RawPointer
+  %2 = builtin "ptrtoint_Int32"(%1 : $Builtin.RawPointer) : $Builtin.Int32
+  return %2 : $Builtin.Int32
+}
+
+// Make sure that we perform the transformation, but do not eliminate the int1,
+// since we do not know what it is.
+//
+// CHECK-LABEL: sil @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
+// CHECK-NOT: builtin
+// CHECK: cond_fail
+// CHECK-NOT: builtin
+// CHECK: } // end sil function 'cond_fail_test'
+sil @cond_fail_test : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %1 = string_literal utf8 "constant"
+  %2 = builtin "condfail_message"(%0 : $Builtin.Int1, %1 : $Builtin.RawPointer) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @simplify_struct_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK-NOT: struct
+// CHECK: } // end sil function 'simplify_struct_test'
+sil @simplify_struct_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = struct_extract %1 : $Int64, #Int64.value
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @simplify_tuple_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+// CHECK-NOT: tuple
+// CHECK: } // end sil function 'simplify_tuple_test'
+sil @simplify_tuple_test : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = tuple(%0 : $Builtin.Int64, %0 : $Builtin.Int64)
+  %2 = tuple_extract %1 : $(Builtin.Int64, Builtin.Int64), 0
+  return %2 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [canonical] @isConcrete_true : $@convention(thin) (@thin UInt.Type) -> Builtin.Int1 {
+// CHECK: bb0(
+// CHECK-NEXT: [[RESULT:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-NEXT: } // end sil function 'isConcrete_true'
+sil [canonical] @isConcrete_true : $@convention(thin) (@thin UInt.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin UInt.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin UInt.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil [canonical] @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+// CHECK: bb0(
+// CHECK-NEXT: [[RESULT:%.*]] = builtin "isConcrete"(
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-NEXT: } // end sil function 'isConcrete_false'
+sil [canonical] @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}

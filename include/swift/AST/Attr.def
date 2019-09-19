@@ -353,10 +353,7 @@ DECL_ATTR(_restatedObjCConformance, RestatedObjCConformance,
   LongAttribute | RejectByParser |
   NotSerialized, 70)
 // NOTE: 71 is unused
-SIMPLE_DECL_ATTR(_implicitly_unwrapped_optional, ImplicitlyUnwrappedOptional,
-  OnFunc | OnAccessor | OnVar | OnParam | OnSubscript | OnConstructor |
-  RejectByParser,
-  72)
+// NOTE: 72 is unused
 DECL_ATTR(_optimize, Optimize,
   OnAbstractFunction | OnSubscript | OnVar |
   UserInaccessible,
@@ -370,8 +367,7 @@ SIMPLE_DECL_ATTR(_weakLinked, WeakLinked,
   OnSubscript | OnConstructor | OnEnumElement | OnExtension | UserInaccessible,
   75)
 SIMPLE_DECL_ATTR(frozen, Frozen,
-  OnEnum | OnStruct |
-  UserInaccessible,
+  OnEnum | OnStruct,
   76)
 DECL_ATTR_ALIAS(_frozen, Frozen)
 SIMPLE_DECL_ATTR(_forbidSerializingReference, ForbidSerializingReference,

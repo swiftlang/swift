@@ -107,8 +107,7 @@ static ConstructorDecl *getOrCreateEffectiveMemberwiseInitializer(
   auto &C = nominal->getASTContext();
   if (auto *initDecl = nominal->getEffectiveMemberwiseInitializer())
     return initDecl;
-  auto *initDecl = createImplicitConstructor(
-      TC, nominal, ImplicitConstructorKind::Memberwise);
+  auto *initDecl = createMemberwiseImplicitConstructor(TC, nominal);
   nominal->addMember(initDecl);
   C.addSynthesizedDecl(initDecl);
   return initDecl;

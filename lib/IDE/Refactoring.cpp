@@ -1004,7 +1004,7 @@ static StringRef correctNewDeclName(DeclContext *DC, StringRef Name) {
   llvm::SmallVector<ValueDecl*, 16> AllVisibles;
   VectorDeclConsumer Consumer(AllVisibles);
   ASTContext &Ctx = DC->getASTContext();
-  lookupVisibleDecls(Consumer, DC, Ctx.getLazyResolver(), true);
+  lookupVisibleDecls(Consumer, DC, true);
   return correctNameInternal(Ctx, Name, AllVisibles);
 }
 
@@ -1618,8 +1618,9 @@ class FindAllSubDecls : public SourceEntityWalker {
       return false;
 
     if (auto ASD = dyn_cast<AbstractStorageDecl>(D)) {
-      auto accessors = ASD->getAllAccessors();
-      Found.insert(accessors.begin(), accessors.end());
+      ASD->visitParsedAccessors([&](AccessorDecl *accessor) {
+        Found.insert(accessor);
+      });
     }
     return true;
   }

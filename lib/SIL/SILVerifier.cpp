@@ -28,6 +28,7 @@
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/SIL/MemoryLifetime.h"
 #include "swift/SIL/PostOrder.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -2022,6 +2023,34 @@ public:
             "Store operand type and dest type mismatch");
   }
 
+  // Usually the assign_by_wrapper initializer or setter has a single argument
+  // (the value). But in case of a tuple, the initializer/setter expect the
+  // tuple elements as separate arguments.
+  void checkAssignByWrapperArgsRecursively(SILType ty,
+                               SILFunctionConventions &conv, unsigned &argIdx) {
+    if (auto tupleTy = ty.getAs<TupleType>()) {
+      for (Type et : tupleTy->getElementTypes()) {
+        SILType elTy = SILType::getPrimitiveType(CanType(et), ty.getCategory());
+        checkAssignByWrapperArgsRecursively(elTy, conv, argIdx);
+      }
+      return;
+    }
+    require(argIdx < conv.getNumSILArguments(),
+            "initializer or setter has too few arguments");
+    SILType argTy = conv.getSILArgumentType(argIdx++);
+    if (ty.isAddress() && argTy.isObject())
+      ty = ty.getObjectType();
+    require(ty == argTy,
+            "wrong argument type of initializer or setter");
+  }
+
+  void checkAssignByWrapperArgs(SILType ty, SILFunctionConventions &conv) {
+    unsigned argIdx = conv.getSILArgIndexOfFirstParam();
+    checkAssignByWrapperArgsRecursively(ty, conv, argIdx);
+    require(argIdx == conv.getNumSILArguments(),
+            "initializer or setter has too many arguments");
+  }
+
   void checkAssignByWrapperInst(AssignByWrapperInst *AI) {
     SILValue Src = AI->getSrc(), Dest = AI->getDest();
     require(AI->getModule().getStage() == SILStage::Raw,
@@ -2031,11 +2060,7 @@ public:
     SILValue initFn = AI->getInitializer();
     CanSILFunctionType initTy = initFn->getType().castTo<SILFunctionType>();
     SILFunctionConventions initConv(initTy, AI->getModule());
-    unsigned firstArgIdx = initConv.getSILArgIndexOfFirstParam();
-    require(initConv.getNumSILArguments() == firstArgIdx + 1,
-            "init function has wrong number of arguments");
-    require(Src->getType() == initConv.getSILArgumentType(firstArgIdx),
-            "wrong argument type of init function");
+    checkAssignByWrapperArgs(Src->getType(), initConv);
     switch (initConv.getNumIndirectSILResults()) {
       case 0:
         require(initConv.getNumDirectSILResults() == 1,
@@ -2059,10 +2084,7 @@ public:
     SILFunctionConventions setterConv(setterTy, AI->getModule());
     require(setterConv.getNumIndirectSILResults() == 0,
             "set function has indirect results");
-    require(setterConv.getNumSILArguments() == 1,
-            "init function has wrong number of arguments");
-    require(Src->getType() == setterConv.getSILArgumentType(0),
-            "wrong argument type of init function");
+    checkAssignByWrapperArgs(Src->getType(), setterConv);
   }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
@@ -2122,40 +2144,41 @@ public:
             "Operand of " #name "_to_ref does not have the " \
             "operand's type as its referent type"); \
   }
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure) \
-  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
-    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
-                                "Operand of strong_retain_" #name); \
-    closure(); \
-    (void)ty; \
-    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
-                                        "functions with unqualified " \
-                                        "ownership"); \
-  } \
-  void check##Name##RetainInst(Name##RetainInst *RI) { \
-    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
-                                "Operand of " #name "_retain"); \
-    closure(); \
-    (void)ty; \
-    require(!F.hasOwnership(), \
-            #name "_retain is only in functions with unqualified ownership"); \
-  } \
-  void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
-    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
-                                "Operand of " #name "_release"); \
-    closure(); \
-    (void)ty; \
-    require(!F.hasOwnership(), \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure)        \
+  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) {           \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(),           \
+                                "Operand of strong_retain_" #name);            \
+    closure();                                                                 \
+    (void)ty;                                                                  \
+    require(!F.hasOwnership(), "strong_retain_" #name " is only in "           \
+                               "functions with unqualified "                   \
+                               "ownership");                                   \
+  }                                                                            \
+  void check##Name##RetainInst(Name##RetainInst *RI) {                         \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(),           \
+                                "Operand of " #name "_retain");                \
+    closure();                                                                 \
+    (void)ty;                                                                  \
+    require(!F.hasOwnership(),                                                 \
+            #name "_retain is only in functions with unqualified ownership");  \
+  }                                                                            \
+  void check##Name##ReleaseInst(Name##ReleaseInst *RI) {                       \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(),           \
+                                "Operand of " #name "_release");               \
+    closure();                                                                 \
+    (void)ty;                                                                  \
+    require(!F.hasOwnership(),                                                 \
             #name "_release is only in functions with unqualified ownership"); \
-  } \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    auto ty = requireObjectType(Name##StorageType, I->getOperand(), \
-                                "Operand of " #name "_retain"); \
-    closure(); \
-    (void)ty; \
+  }                                                                            \
+  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+    auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
+                                "Operand of " #name "_retain");                \
+    closure();                                                                 \
+    (void)ty;                                                                  \
     /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
-    /* pipeline even though it is a higher level instruction. */ \
+    /* pipeline even though it is a higher level instruction. */               \
   }
+
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name, name) \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, []{})
@@ -2166,8 +2189,16 @@ public:
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
             "'" #name "' type must be loadable"); \
   })
-#define UNCHECKED_REF_STORAGE(Name, name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name, name)
+#define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
+  LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
+  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+    auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
+                                "Operand of " #name "_retain");                \
+    (void)ty;                                                                  \
+    /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
+    /* pipeline even though it is a higher level instruction. */               \
+  }
+
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
 #undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
@@ -5078,6 +5109,11 @@ public:
     // because we build the map of archetypes as we visit the
     // instructions.
     verifyOpenedArchetypes(F);
+
+    if (F->hasOwnership() && F->shouldVerifyOwnership() &&
+        !F->getModule().getASTContext().hadError()) {
+      verifyMemoryLifetime(F);
+    }
   }
 
   void verify() {

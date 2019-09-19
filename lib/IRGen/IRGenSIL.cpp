@@ -859,7 +859,7 @@ public:
   /// TODO: just make sure that we have a path to them that the debug info
   ///       can follow.
   void bindArchetypes(swift::Type Ty) {
-    auto runtimeTy = getRuntimeReifiedType(IGM, Ty->getCanonicalType());
+    auto runtimeTy = IGM.getRuntimeReifiedType(Ty->getCanonicalType());
     if (!IGM.IRGen.Opts.shouldOptimize() && runtimeTy->hasArchetype())
       runtimeTy.visit([&](CanType t) {
         if (auto archetype = dyn_cast<ArchetypeType>(t))
@@ -1129,19 +1129,18 @@ public:
   
   void visitKeyPathInst(KeyPathInst *I);
 
-
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitRefTo##Name##Inst(RefTo##Name##Inst *i); \
-  void visit##Name##ToRefInst(Name##ToRefInst *i);
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
+  void visit##Name##ToRefInst(Name##ToRefInst *i);                             \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *i); \
   void visitStore##Name##Inst(Store##Name##Inst *i);
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i); \
-  void visit##Name##RetainInst(Name##RetainInst *i); \
-  void visit##Name##ReleaseInst(Name##ReleaseInst *i); \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i);             \
+  void visit##Name##RetainInst(Name##RetainInst *i);                           \
+  void visit##Name##ReleaseInst(Name##ReleaseInst *i);
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
@@ -1590,23 +1589,36 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
     return;
   
   const SILArgument *selfArg = IGF.CurSILFn->getSelfMetadataArgument();
+  auto selfTy = selfArg->getType().getASTType();
   CanMetatypeType metaTy =
-    dyn_cast<MetatypeType>(selfArg->getType().getASTType());
+    dyn_cast<MetatypeType>(selfTy);
   IRGenFunction::LocalSelfKind selfKind;
   if (!metaTy)
     selfKind = IRGenFunction::ObjectReference;
-  else switch (metaTy->getRepresentation()) {
-  case MetatypeRepresentation::Thin:
-    llvm_unreachable("class metatypes are never thin");
-  case MetatypeRepresentation::Thick:
-    selfKind = IRGenFunction::SwiftMetatype;
-    break;
-  case MetatypeRepresentation::ObjC:
-    selfKind = IRGenFunction::ObjCMetatype;
-    break;
+  else {
+    selfTy = metaTy.getInstanceType();
+    switch (metaTy->getRepresentation()) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("class metatypes are never thin");
+    case MetatypeRepresentation::Thick:
+      selfKind = IRGenFunction::SwiftMetatype;
+      break;
+    case MetatypeRepresentation::ObjC:
+      selfKind = IRGenFunction::ObjCMetatype;
+      break;
+    }
   }
   llvm::Value *value = IGF.getLoweredExplosion(selfArg).claimNext();
-  IGF.setLocalSelfMetadata(value, selfKind);
+  if (auto dynSelfTy = dyn_cast<DynamicSelfType>(selfTy))
+    selfTy = dynSelfTy.getSelfType();
+
+  // Specify the exact Self type if we know it, either because the class
+  // is final, or because the function we're emitting is a method with the
+  // [exact_self_class] attribute set on it during the SIL pipeline.
+  bool isExact = selfTy->getClassOrBoundGenericClass()->isFinal()
+    || IGF.CurSILFn->isExactSelfClass();
+
+  IGF.setLocalSelfMetadata(selfTy, isExact, value, selfKind);
 }
 
 /// Emit the definition for the given SIL constant.
@@ -1636,6 +1648,9 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
+  if (CurSILFn->isThunk())
+    IGM.setHasFramePointer(CurFn, false);
+  
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
@@ -3916,6 +3931,31 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
+  void IRGenSILFunction::visitCopy##Name##ValueInst(                           \
+      swift::Copy##Name##ValueInst *i) {                                       \
+    Explosion in = getLoweredExplosion(i->getOperand());                       \
+    auto silTy = i->getOperand()->getType();                                   \
+    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
+    auto &ti = getReferentTypeInfo(*this, silTy);                              \
+    /* Since we are unchecked, we just use strong retain here. We do not       \
+     * perform any checks */                                                   \
+    ti.strongRetain(*this, in, irgen::Atomicity::Atomic);                      \
+    /* Semantically we are just passing through the input parameter but as a   \
+     */                                                                        \
+    /* strong reference... at LLVM IR level these type differences don't */    \
+    /* matter. So just set the lowered explosion appropriately. */             \
+    Explosion output = getLoweredExplosion(i->getOperand());                   \
+    if (isOptional) {                                                          \
+      auto values = output.claimAll();                                         \
+      output.reset();                                                          \
+      for (auto value : values) {                                              \
+        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
+      }                                                                        \
+    }                                                                          \
+    setLoweredExplosion(i, output);                                            \
+  }
 #include "swift/AST/ReferenceStorage.def"
 #undef COMMON_CHECKED_REF_STORAGE
 

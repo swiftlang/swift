@@ -24,6 +24,7 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -484,7 +485,7 @@ public:
       }
 
       // "return nil" is only permitted in a failable initializer.
-      if (ctor->getFailability() == OTK_None) {
+      if (!ctor->isFailable()) {
         TC.diagnose(RS->getReturnLoc(), diag::return_non_failable_init)
           .highlight(E->getSourceRange());
         TC.diagnose(ctor->getLoc(), diag::make_init_failable,
@@ -518,19 +519,17 @@ public:
       }
     }
 
+    if (EndTypeCheckLoc.isValid()) {
+      assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+             "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+      options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+    }
+
     ContextualTypePurpose ctp = CTP_ReturnStmt;
     if (auto func =
             dyn_cast_or_null<FuncDecl>(TheFunc->getAbstractFunctionDecl())) {
       if (func->hasSingleExpressionBody()) {
         ctp = CTP_ReturnSingleExpr;
-      }
-
-      // If we are performing code-completion inside a function builder body,
-      // suppress diagnostics to workaround typechecking performance problems.
-      if (func->getFunctionBuilderType() &&
-          TC.Context.SourceMgr.rangeContainsCodeCompletionLoc(
-              func->getBody()->getSourceRange())) {
-        options |= TypeCheckExprFlags::SuppressDiagnostics;
       }
     }
 
@@ -773,7 +772,7 @@ public:
 
       iteratorTy = conformance->getTypeWitnessByName(sequenceType,
                                                      TC.Context.Id_Iterator);
-      if (!iteratorTy)
+      if (iteratorTy->hasError())
         return nullptr;
 
       auto witness = conformance->getWitnessByName(
@@ -781,8 +780,6 @@ public:
       if (!witness)
         return nullptr;
       S->setMakeIterator(witness);
-
-      TC.requestMemberLayout(witness.getDecl());
 
       // Create a local variable to capture the iterator.
       std::string name;
@@ -807,7 +804,7 @@ public:
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
                                 sequenceType, TC.Context.Id_Element));
-      auto *genBinding = PatternBindingDecl::createImplicit(
+      PatternBindingDecl::createImplicit(
           TC.Context, StaticSpellingKind::None, genPat,
           new (TC.Context) OpaqueValueExpr(S->getInLoc(), nextResultType), DC,
           /*VarLoc*/ S->getForLoc());
@@ -840,7 +837,7 @@ public:
 
     Type elementTy = genConformance->getTypeWitnessByName(iteratorTy,
                                                         TC.Context.Id_Element);
-    if (!elementTy)
+    if (elementTy->hasError())
       return nullptr;
 
     auto *varRef =
@@ -854,8 +851,6 @@ public:
     auto witness =
         genConformance->getWitnessByName(iteratorTy, TC.Context.Id_next);
     S->setIteratorNext(witness);
-
-    TC.requestMemberLayout(witness.getDecl());
 
     auto nextResultType = cast<FuncDecl>(S->getIteratorNext().getDecl())
                               ->getResultInterfaceType()
@@ -1791,6 +1786,12 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
       if (isDiscarded)
         options |= TypeCheckExprFlags::IsDiscarded;
 
+      if (EndTypeCheckLoc.isValid()) {
+        assert(DiagnosticSuppression::isEnabled(TC.Diags) &&
+               "Diagnosing and AllowUnresolvedTypeVariables don't seem to mix");
+        options |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+      }
+
       auto resultTy =
           TC.typeCheckExpression(SubExpr, DC, TypeLoc(), CTP_Unused, options);
 
@@ -1928,7 +1929,9 @@ static Type getFunctionBuilderType(FuncDecl *FD) {
 }
 
 bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
-  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  auto result = typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  checkFunctionErrorHandling(AFD);
+  return result;
 }
 
 static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
@@ -1946,10 +1949,10 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
     r = new (Context) TryExpr(SourceLoc(), r, Type(), /*implicit=*/true);
 
   TypeChecker &tc = *static_cast<TypeChecker *>(Context.getLazyResolver());
+  DiagnosticSuppression suppression(tc.Diags);
   auto resultTy =
       tc.typeCheckExpression(r, ctor, TypeLoc(), CTP_Unused,
-                             TypeCheckExprFlags::IsDiscarded |
-                               TypeCheckExprFlags::SuppressDiagnostics);
+                             TypeCheckExprFlags::IsDiscarded);
   if (!resultTy)
     return nullptr;
   
@@ -2144,7 +2147,6 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
   tc.validateDecl(AFD);
-  tc.requestRequiredNominalTypeLayoutForParameters(AFD->getParameters());
   tc.checkDefaultArguments(AFD->getParameters(), AFD);
 
   BraceStmt *body = AFD->getBody();

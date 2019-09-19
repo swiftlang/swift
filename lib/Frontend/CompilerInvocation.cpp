@@ -338,6 +338,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
       Opts.DisableParserLookup;
   Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
+  Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
+  Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
 
   Opts.DebugConstraintSolver |= Args.hasArg(OPT_debug_constraints);
   Opts.NamedLazyMemberLoading &= !Args.hasArg(OPT_disable_named_lazy_member_loading);
@@ -442,6 +444,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.getLastArg(OPT_solver_disable_shrink))
     Opts.SolverDisableShrink = true;
+  Opts.FunctionBuilderOneWayConstraints =
+    Args.hasFlag(OPT_enable_function_builder_one_way_constraints,
+                 OPT_disable_function_builder_one_way_constraints,
+                 /*Default=*/true);
 
   if (const Arg *A = Args.getLastArg(OPT_value_recursion_threshold)) {
     unsigned threshold;
@@ -672,6 +678,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.FixitCodeForAllDiagnostics |= Args.hasArg(OPT_fixit_all);
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.WarningsAsErrors |= Args.hasArg(OPT_warnings_as_errors);
+  Opts.PrintDiagnosticNames |= Args.hasArg(OPT_debug_diagnostic_names);
 
   assert(!(Opts.WarningsAsErrors && Opts.SuppressWarnings) &&
          "conflicting arguments; should have been caught by driver");
@@ -774,10 +781,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.AssertConfig = SILOptions::Unchecked;
     } else if (A->getOption().matches(OPT_Oplayground)) {
       // For now -Oplayground is equivalent to -Onone.
-      // SWIFT_ENABLE_TENSORFLOW
-      // FIXME(rxwei): Change back to NoOptimization when deabstraction runs
-      // optimizations before partitioning.
-      Opts.OptMode = OptimizationMode::ForSpeed;
+      Opts.OptMode = OptimizationMode::NoOptimization;
     } else if (A->getOption().matches(OPT_Osize)) {
       Opts.OptMode = OptimizationMode::ForSize;
     } else {

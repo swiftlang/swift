@@ -268,6 +268,14 @@ public func _isStdlibDebugConfiguration() -> Bool {
 #endif
 }
 
+// Return true if the Swift runtime available is at least 5.1
+public func _hasSwift_5_1() -> Bool {
+  if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
+    return true
+  }
+  return false
+}
+
 @frozen
 public struct LinearCongruentialGenerator: RandomNumberGenerator {
 

@@ -296,7 +296,7 @@ func archetype_with_generic_class_constraint<T, U>(t: T) where T : A<U> {
   takes_metatype(U.self)
 }
 
-// CHECK-LABEL: define hidden swiftcc void @"$s22class_bounded_generics029calls_archetype_with_generic_A11_constraint1ayAA1ACyxG_tlF"(%T22class_bounded_generics1AC*) #0 {
+// CHECK-LABEL: define hidden swiftcc void @"$s22class_bounded_generics029calls_archetype_with_generic_A11_constraint1ayAA1ACyxG_tlF"(%T22class_bounded_generics1AC*) {{.*}} {
 // CHECK:      alloca
 // CHECK:      memset
 // CHECK:      [[ISA_ADDR:%.*]] = getelementptr inbounds %T22class_bounded_generics1AC, %T22class_bounded_generics1AC* %0, i32 0, i32 0, i32 0

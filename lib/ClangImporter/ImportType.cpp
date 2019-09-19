@@ -2372,8 +2372,8 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
 
   assert(!decl->hasClangNode() && "picked up the original type?");
 
-  if (auto *typeResolver = getTypeResolver())
-    typeResolver->resolveDeclSignature(decl);
+  if (auto *lazyResolver = SwiftContext.getLazyResolver())
+    lazyResolver->resolveDeclSignature(decl);
 
   if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(decl))
     return nominalDecl->getDeclaredType();

@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
@@ -627,7 +628,7 @@ bool swift::isRepresentableInObjC(
       kind = ForeignErrorConvention::NilResult;
 
       // Only non-failing initializers can throw.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         if (Diagnose) {
           AFD->diagnose(diag::objc_invalid_on_failing_init,
                         getObjCDiagnosticAttrKind(Reason))
@@ -1795,10 +1796,12 @@ void swift::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
       return;
   }
 
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-    if (import.second->getName() == Ctx.Id_Foundation)
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == Ctx.Id_Foundation) {
       ImportsFoundationModule = true;
-  });
+      break;
+    }
+  }
 
   if (ImportsFoundationModule)
     return;
@@ -1851,7 +1854,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   return { 4, func->getFullName() };
 }
 
-bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                DeclName targetName) {
   if (decl->isImplicit()) return false;
   if (decl->getFullName() == targetName) return false;
@@ -1919,7 +1922,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
   return false;
 }
 
-bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                    Optional<ObjCSelector> nameOpt,
                                    Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {

@@ -1,0 +1,316 @@
+// RUN: %target-sil-opt -o /dev/null %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// A non-trivial type
+class T {
+  init()
+}
+
+struct Inner {
+  var a: T
+  var b: T
+}
+
+struct Outer {
+  var x: T
+  var y: Inner
+  var z: T
+}
+
+sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0 : $*Outer, #Outer.y
+  %2 = struct_element_addr %0 : $*Outer, #Outer.x
+  %10 = struct_element_addr %0 : $*Outer, #Outer.z
+  %3 = load [copy] %2 : $*T
+  br bb1
+bb1:
+  cond_br undef, bb2, bb6
+bb2:
+  cond_br undef, bb3, bb4
+bb3:
+  %4 = struct_element_addr %1 : $*Inner, #Inner.a
+  %5 = copy_value %3 : $T
+  store %5 to [assign] %4 : $*T
+  br bb5
+bb4:
+  %6 = struct_element_addr %0 : $*Outer, #Outer.y
+  %7 = struct_element_addr %6 : $*Inner, #Inner.b
+  destroy_addr %7 : $*T
+  %8 = copy_value %3 : $T
+  store %8 to [init] %7 : $*T
+  br bb5
+bb5:
+  br bb1
+bb6:
+  destroy_addr %1 : $*Inner
+  destroy_addr %2 : $*T
+  destroy_addr %10 : $*T
+  return %3 : $T
+}
+
+sil [ossa] @test_struct2 : $@convention(thin) (@in Outer, @owned T) -> () {
+bb0(%0 : $*Outer, %1 : @owned $T):
+  %2 = struct_element_addr %0 : $*Outer, #Outer.x
+  store %1 to [assign] %2 : $*T
+  destroy_addr %0 : $*Outer
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+
+sil [ossa] @test_try_apply : $@convention(thin) () -> (@out T, @error Error) {
+bb0(%0 : $*T):
+  %1 = function_ref @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+  try_apply %1(%0) : $@convention(thin) () -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%2 : $()):
+  %3 = tuple ()
+  return %3 : $()
+
+bb2(%4 : @owned $Error):
+  throw %4 : $Error
+
+}
+
+sil [ossa] @test_alloc_stack_simple : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = alloc_stack $T
+  copy_addr %0 to [initialization] %2 : $*T
+  br bb1
+
+bb1:
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_alloc_stack_nested : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  copy_addr %0 to [initialization] %1 : $*T
+  %2 = alloc_stack $T
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = alloc_stack $T
+  %4 = alloc_stack $T
+  copy_addr %0 to [initialization] %3 : $*T
+  copy_addr %0 to [initialization] %4 : $*T
+  destroy_addr %3 : $*T
+  destroy_addr %4 : $*T
+  dealloc_stack %4 : $*T
+  dealloc_stack %3 : $*T
+  br bb3
+bb2:
+  br bb3
+bb3:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_unreachable_block : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %2 = alloc_stack $T
+  store %0 to [init] %2 : $*T
+  br bb2
+
+bb1:
+  br bb2
+
+bb2:
+  destroy_addr %2 : $*T
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @test_many_locations_in_block : $@convention(thin) <A, B, C, D, E, G, H, I> (@in_guaranteed A, @in_guaranteed B, @in_guaranteed C, @in_guaranteed D, @in_guaranteed E, @in_guaranteed G, @in_guaranteed H, @in_guaranteed I) -> (@out A, @out B, @out C, @out D, @out E, @out G, @out H, @out I) {
+bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $*I, %9 : $*A, %10 : $*B, %11 : $*C, %12 : $*D, %13 : $*E, %14 : $*G, %15 : $*H, %16 : $*I):
+  %18 = alloc_stack $(A, B, C, D, E, G, H, I), let, name "a", argno 1
+  %19 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 0
+  copy_addr %9 to [initialization] %19 : $*A
+  %21 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 1
+  copy_addr %10 to [initialization] %21 : $*B
+  %23 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 2
+  copy_addr %11 to [initialization] %23 : $*C
+  %25 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 3
+  copy_addr %12 to [initialization] %25 : $*D
+  %27 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 4
+  copy_addr %13 to [initialization] %27 : $*E
+  %29 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 5
+  copy_addr %14 to [initialization] %29 : $*G
+  %31 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 6
+  copy_addr %15 to [initialization] %31 : $*H
+  %33 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr %16 to [initialization] %33 : $*I
+  %41 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %41 : $*(A, B, C, D, E, G, H, I)
+  %43 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 0
+  %44 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 1
+  %45 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 2
+  %46 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 3
+  %47 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 4
+  %48 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 5
+  %49 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 6
+  %50 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %43 to [initialization] %0 : $*A
+  %52 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %52 : $*(A, B, C, D, E, G, H, I)
+  %54 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 0
+  %55 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 1
+  %56 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 2
+  %57 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 3
+  %58 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 4
+  %59 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 5
+  %60 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 6
+  %61 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %55 to [initialization] %1 : $*B
+  %63 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %63 : $*(A, B, C, D, E, G, H, I)
+  %65 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 0
+  %66 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 1
+  %67 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 2
+  %68 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 3
+  %69 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 4
+  %70 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 5
+  %71 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 6
+  %72 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %67 to [initialization] %2 : $*C
+  %74 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %74 : $*(A, B, C, D, E, G, H, I)
+  %76 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 0
+  %77 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 1
+  %78 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 2
+  %79 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 3
+  %80 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 4
+  %81 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 5
+  %82 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 6
+  %83 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %79 to [initialization] %3 : $*D
+  %85 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %85 : $*(A, B, C, D, E, G, H, I)
+  %87 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 0
+  %88 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 1
+  %89 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 2
+  %90 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 3
+  %91 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 4
+  %92 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 5
+  %93 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 6
+  %94 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %91 to [initialization] %4 : $*E
+  %96 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %96 : $*(A, B, C, D, E, G, H, I)
+  %98 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 0
+  %99 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 1
+  %100 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 2
+  %101 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 3
+  %102 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 4
+  %103 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 5
+  %104 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 6
+  %105 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %103 to [initialization] %5 : $*G
+  %107 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %107 : $*(A, B, C, D, E, G, H, I)
+  %109 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 0
+  %110 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 1
+  %111 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 2
+  %112 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 3
+  %113 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 4
+  %114 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 5
+  %115 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 6
+  %116 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %115 to [initialization] %6 : $*H
+  %118 = alloc_stack $(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [initialization] %118 : $*(A, B, C, D, E, G, H, I)
+  %120 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 0
+  %121 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 1
+  %122 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 2
+  %123 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 3
+  %124 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 4
+  %125 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 5
+  %126 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 6
+  %127 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 7
+  copy_addr [take] %127 to [initialization] %7 : $*I
+  destroy_addr %126 : $*H
+  destroy_addr %125 : $*G
+  destroy_addr %124 : $*E
+  destroy_addr %123 : $*D
+  destroy_addr %122 : $*C
+  destroy_addr %121 : $*B
+  destroy_addr %120 : $*A
+  dealloc_stack %118 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %116 : $*I
+  destroy_addr %114 : $*G
+  destroy_addr %113 : $*E
+  destroy_addr %112 : $*D
+  destroy_addr %111 : $*C
+  destroy_addr %110 : $*B
+  destroy_addr %109 : $*A
+  dealloc_stack %107 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %105 : $*I
+  destroy_addr %104 : $*H
+  destroy_addr %102 : $*E
+  destroy_addr %101 : $*D
+  destroy_addr %100 : $*C
+  destroy_addr %99 : $*B
+  destroy_addr %98 : $*A
+  dealloc_stack %96 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %94 : $*I
+  destroy_addr %93 : $*H
+  destroy_addr %92 : $*G
+  destroy_addr %90 : $*D
+  destroy_addr %89 : $*C
+  destroy_addr %88 : $*B
+  destroy_addr %87 : $*A
+  dealloc_stack %85 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %83 : $*I
+  destroy_addr %82 : $*H
+  destroy_addr %81 : $*G
+  destroy_addr %80 : $*E
+  destroy_addr %78 : $*C
+  destroy_addr %77 : $*B
+  destroy_addr %76 : $*A
+  dealloc_stack %74 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %72 : $*I
+  destroy_addr %71 : $*H
+  destroy_addr %70 : $*G
+  destroy_addr %69 : $*E
+  destroy_addr %68 : $*D
+  destroy_addr %66 : $*B
+  destroy_addr %65 : $*A
+  dealloc_stack %63 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %61 : $*I
+  destroy_addr %60 : $*H
+  destroy_addr %59 : $*G
+  destroy_addr %58 : $*E
+  destroy_addr %57 : $*D
+  destroy_addr %56 : $*C
+  destroy_addr %54 : $*A
+  dealloc_stack %52 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %50 : $*I
+  destroy_addr %49 : $*H
+  destroy_addr %48 : $*G
+  destroy_addr %47 : $*E
+  destroy_addr %46 : $*D
+  destroy_addr %45 : $*C
+  destroy_addr %44 : $*B
+  dealloc_stack %41 : $*(A, B, C, D, E, G, H, I)
+  destroy_addr %18 : $*(A, B, C, D, E, G, H, I)
+  dealloc_stack %18 : $*(A, B, C, D, E, G, H, I)
+  %196 = tuple ()
+  return %196 : $()
+}
+

@@ -504,6 +504,7 @@ func test(_ a : B) {
   B.f1(nil)              // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
   a.function(42, a: nil) // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
   a.function(42, nil)    // expected-error {{missing argument label 'a:' in call}}
+  // expected-error@-1 {{'nil' is not compatible with expected argument type 'AOpts'}}
   a.f2(nil)              // expected-error {{'nil' is not compatible with expected argument type 'AOpts'}}
 
   func foo1(_ arg: Bool) -> Int {return nil}
@@ -570,8 +571,8 @@ func r22255907_2<T>(_ x : Int, a : T, b: Int) {}
 
 func reachabilityForInternetConnection() {
   var variable: Int = 42
-  r22255907_1(&variable, b: 2.1) // expected-error {{'&' used with non-inout argument of type 'Int'}} {{15-16=}}
-  r22255907_2(1, a: &variable, b: 2.1)// expected-error {{'&' used with non-inout argument of type 'Int'}} {{21-22=}}
+  r22255907_1(&variable, b: 2) // expected-error {{'&' used with non-inout argument of type 'Int'}} {{15-16=}}
+  r22255907_2(1, a: &variable, b: 2)// expected-error {{'&' used with non-inout argument of type 'Int'}} {{21-22=}}
 }
 
 // <rdar://problem/21601687> QoI: Using "=" instead of "==" in if statement leads to incorrect error message
@@ -772,8 +773,8 @@ secondArgumentNotLabeled(10, 20)
 func testImplConversion(a : Float?) -> Bool {}
 func testImplConversion(a : Int?) -> Bool {
   let someInt = 42
-  let a : Int = testImplConversion(someInt) // expected-error {{argument labels '(_:)' do not match any available overloads}}
-  // expected-note @-1 {{overloads for 'testImplConversion' exist with these partially matching parameter lists: (a: Float?), (a: Int?)}}
+  let a : Int = testImplConversion(someInt) // expected-error {{missing argument label 'a:' in call}} {{36-36=a: }}
+  // expected-error@-1 {{cannot convert value of type 'Bool' to specified type 'Int'}}
 }
 
 // <rdar://problem/23752537> QoI: Bogus error message: Binary operator '&&' cannot be applied to two 'Bool' operands
@@ -801,7 +802,7 @@ func read2(_ p: UnsafeMutableRawPointer, maxLength: Int) {}
 func read<T : BinaryInteger>() -> T? {
   var buffer : T 
   let n = withUnsafeMutablePointer(to: &buffer) { (p) in
-    read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<_>' to expected argument type 'UnsafeMutableRawPointer'}}
+    read2(UnsafePointer(p), maxLength: MemoryLayout<T>.size) // expected-error {{cannot convert value of type 'UnsafePointer<Pointee>' to expected argument type 'UnsafeMutableRawPointer'}}
   }
 }
 
@@ -833,8 +834,9 @@ struct rdar27891805 {
 }
 
 try rdar27891805(contentsOfURL: nil, usedEncoding: nil)
-// expected-error@-1 {{argument labels '(contentsOfURL:, usedEncoding:)' do not match any available overloads}}
-// expected-note@-2 {{overloads for 'rdar27891805' exist with these partially matching parameter lists: (contentsOf: String, encoding: String), (contentsOf: String, usedEncoding: inout String)}}
+// expected-error@-1 {{incorrect argument labels in call (have 'contentsOfURL:usedEncoding:', expected 'contentsOf:encoding:')}}
+// expected-error@-2 {{'nil' is not compatible with expected argument type 'String'}}
+// expected-error@-3 {{'nil' is not compatible with expected argument type 'String'}}
 
 // Make sure RawRepresentable fix-its don't crash in the presence of type variables
 class NSCache<K, V> {
@@ -1002,7 +1004,7 @@ func SR_6272_c() {
 struct SR_6272_D: ExpressibleByIntegerLiteral {
   typealias IntegerLiteralType = Int
   init(integerLiteral: Int) {}
-  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 } // expected-note {{found this candidate}}
+  static func +(lhs: SR_6272_D, rhs: Int) -> Float { return 42.0 }
 }
 
 func SR_6272_d() {
@@ -1196,7 +1198,7 @@ func rdar17170728() {
 
   let _ = [i, j, k].reduce(0 as Int?) {
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
-    // expected-error@-1 {{ambiguous use of operator '+'}}
+    // expected-error@-1 {{'nil' cannot be used in context expecting type 'Bool'}}
   }
 }
 
@@ -1225,7 +1227,7 @@ func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
 
 struct Array {}
-let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'diagnostics.Array' to specified type 'Swift.Array'}}
+let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Any>'}}
 
 struct Error {}
 let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
@@ -1235,21 +1237,23 @@ let baz3: (Swift.Error) = (Error()) //expected-error {{value of type 'diagnostic
 let baz4: ((Swift.Error)) = (Error()) //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
 
 // SyntaxSugarTypes with unresolved types
+// TODO(diagnostics): It should be easy to improve messages here e.g. infer type of `Element` with a fix which would
+// add as many brackets as required by parameter type. It's a bit harder for dictionaries but should be doable.
 func takesGenericArray<T>(_ x: [T]) {}
-takesGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<_>'}}
+takesGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Element>'}}
 func takesNestedGenericArray<T>(_ x: [[T]]) {}
-takesNestedGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Array<_>>'}}
+takesNestedGenericArray(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Element>'}}
 func takesSetOfGenericArrays<T>(_ x: Set<[T]>) {}
-takesSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Array<_>>'}}
+takesSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Set<Element>'}}
 func takesArrayOfSetOfGenericArrays<T>(_ x: [Set<[T]>]) {}
-takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Set<Array<_>>>'}}
+takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Element>'}}
 func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
-takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Optional<_>>'}}
+takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type 'Array<Element>'}}
 func takesGenericDictionary<T, U>(_ x: [T : U]) {}
-takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<_, _>'}}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<Key, Value>'}}
 typealias Z = Int
 func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {}
-takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<_, Z>'}}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type 'Dictionary<Key, Value>'}}
 func takesGenericFunction<T>(_ x: ([T]) -> Void) {}
 takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '(Array<_>) -> Void'}}
 func takesTuple<T>(_ x: ([T], [T])) {}

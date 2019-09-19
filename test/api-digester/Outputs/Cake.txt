@@ -1,18 +1,18 @@
 
 /* Generic Signature Changes */
-cake: Func P1.P1Constraint() has generic signature change from <Self where Self : P1, Self : P2> to <Self where Self : P1>
+cake: Func P1.P1Constraint() has generic signature change from <Self where Self : cake.P1, Self : cake.P2> to <Self where Self : cake.P1>
 cake: Protocol P3 has generic signature change from <Self : cake.P1, Self : cake.P2> to <Self : cake.P1, Self : cake.P4>
 
 /* RawRepresentable Changes */
 
 /* Removed Decls */
-Swift: Extension Int has been removed
 cake: Accessor GlobalVarChangedToLet.Set() has been removed
 cake: Accessor RemoveSetters.Value.Set() has been removed
 cake: Accessor RemoveSetters.subscript(_:).Set() has been removed
 cake: AssociatedType RequiementChanges.removedType has been removed
 cake: Constructor Somestruct2.init(_:) has been removed
 cake: Func C4.foo() has been removed
+cake: Func Int.IntEnhancer() has been removed
 cake: Func RequiementChanges.removedFunc() has been removed
 cake: Var RequiementChanges.removedVar has been removed
 
@@ -22,18 +22,20 @@ cake: InfixOperator ..*.. has been changed to a PrefixOperator
 cake: Protocol ProtocolToEnum has been changed to a Enum
 
 /* Renamed Decls */
+cake: Class SwiftObjcClass has ObjC name change from OldObjCClass to NewObjCClass
 cake: Func S1.foo5(x:y:) has been renamed to Func foo5(x:y:z:)
+cake: Func SwiftObjcClass.foo(a:b:c:) has ObjC name change from OldObjCFool:OldObjCA:OldObjCB: to NewObjCFool:NewObjCA:NewObjCB:
 cake: Struct Somestruct2 has been renamed to Struct NSSomestruct2
 
 /* Type Changes */
-cake: AssociatedType AssociatedTypePro.T3 has default type change from C1 to C6
-cake: Constructor S1.init(_:) has parameter 0 type change from Int to Double
-cake: Func C1.foo2(_:) has parameter 0 type change from Int to () -> ()
+cake: AssociatedType AssociatedTypePro.T3 has default type change from cake.C1 to cake.C6
+cake: Constructor S1.init(_:) has parameter 0 type change from Swift.Int to Swift.Double
+cake: Func C1.foo2(_:) has parameter 0 type change from Swift.Int to () -> ()
 cake: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake: Func C7.foo(_:_:) has removed default argument from parameter 1
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
 cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
-cake: TypeAlias TChangesFromIntToString.T has underlying type change from Int to String
+cake: TypeAlias TChangesFromIntToString.T has underlying type change from Swift.Int to Swift.String
 
 /* Decl Attribute changes */
 cake: Func C1.foo1() is now not static
@@ -52,16 +54,16 @@ cake: Protocol P3 has removed inherited protocol P2
 cake: Struct fixedLayoutStruct has removed conformance to P1
 
 /* Protocol Requirement Change */
-cake: AssociatedType AssociatedTypePro.T1 has removed default type Int
+cake: AssociatedType AssociatedTypePro.T1 has removed default type Swift.Int
 cake: AssociatedType RequiementChanges.addedTypeWithoutDefault has been added as a protocol requirement
 cake: Func RequiementChanges.addedFunc() has been added as a protocol requirement
 cake: Var RequiementChanges.addedVar has been added as a protocol requirement
 cake: Accessor ClassWithOpenMember.property.Get() is no longer open for subclassing
 
 /* Class Inheritance Change */
-cake: Class C4 has changed its super class from OldType to NewType
-cake: Class SubGenericClass has changed its super class from GenericClass<P1> to GenericClass<P2>
-cake: Class SuperClassRemoval has removed its super class C3
+cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
+cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
+cake: Class SuperClassRemoval has removed its super class cake.C3
 cake: Func ClassWithOpenMember.bar() is no longer open for subclassing
 cake: Func ClassWithOpenMember.foo() is no longer open for subclassing
 cake: Var ClassWithOpenMember.property is no longer open for subclassing

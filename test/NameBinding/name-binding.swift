@@ -1,4 +1,3 @@
-// XFAIL: enable-astscope-lookup
 // RUN: %target-swift-frontend -typecheck %s -module-name themodule -enable-source-import -I %S/../decl/enum -sdk "" -verify -show-diagnostics-after-fatal -verify-ignore-unknown
 
 // -verify-ignore-unknown is for
@@ -142,6 +141,7 @@ func overloadtest(x: Int) {
 func localtest() {
   func shadowbug() { 
     var Foo = 10
+    // expected-warning@-1 {{initialization of variable 'Foo' was never used; consider replacing with assignment to '_' or removing it}}
     func g() {
       struct S {
         // FIXME: Swap these two lines to crash our broken lookup.
