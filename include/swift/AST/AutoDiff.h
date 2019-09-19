@@ -556,6 +556,8 @@ struct AutoDiffAssociatedFunctionKind {
 
   AutoDiffAssociatedFunctionKind() = default;
   AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffAssociatedFunctionKind(AutoDiffLinearMapKind linMapKind)
+      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
   explicit AutoDiffAssociatedFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
   AutoDiffLinearMapKind getLinearMapKind() {
