@@ -649,7 +649,7 @@ using BuiltinApplyTy = typename Apply_match<BuiltinValueKind, Tys...>::Ty;
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(Id, Name, Attrs) \
   BUILTIN_UNARY_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
 
-#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload) \
+#define BUILTIN_BINARY_OPERATION_ALL(Id, Name, Attrs, Overload)                \
   BUILTIN_BINARY_OP_MATCH_WITH_ARG_MATCHER(Id, Id)
 
 #define BUILTIN_BINARY_PREDICATE(Id, Name, Attrs, Overload) \
