@@ -37,6 +37,7 @@ using namespace ast_scope;
 static SourceLoc getStartOfFirstParam(ClosureExpr *closure);
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &,
                                                     SourceLoc endLoc);
+static SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *);
 
 SourceRange ASTScopeImpl::widenSourceRangeForIgnoredASTNodes(
     const SourceRange range) const {
@@ -264,10 +265,15 @@ SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
   // is visible from the start of the body.
   if (auto *protoDecl = dyn_cast<ProtocolDecl>(nOrE))
     return SourceRange(protoDecl->getBraces().Start, protoDecl->getEndLoc());
-  auto startLoc = paramList->getSourceRange().Start;
-  if (startLoc.isInvalid())
-    startLoc = holder->getStartLoc();
-  return SourceRange(startLoc, holder->getEndLoc());
+  const auto startLoc = paramList->getSourceRange().Start;
+  const auto validStartLoc =
+      startLoc.isValid() ? startLoc : holder->getStartLoc();
+  // Since ExtensionScope (whole portion) range doesn't start till after the
+  // extended nominal, the range here must be pushed back, too.
+  if (auto const *const ext = dyn_cast<ExtensionDecl>(holder)) {
+    return SourceRange(getLocAfterExtendedNominal(ext), ext->getEndLoc());
+  }
+  return SourceRange(validStartLoc, holder->getEndLoc());
 }
 
 SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
@@ -296,9 +302,20 @@ SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
   auto r = d->getSourceRangeIncludingAttrs();
   if (r.Start.isValid()) {
     ASTScopeAssert(r.End.isValid(), "Start valid imples end valid.");
-    return r;
+    return scope->moveStartPastExtendedNominal(r);
   }
   return d->getSourceRange();
+}
+
+SourceRange
+ExtensionScope::moveStartPastExtendedNominal(const SourceRange sr) const {
+  return SourceRange(getLocAfterExtendedNominal(decl), sr.End);
+}
+
+SourceRange
+GenericTypeScope::moveStartPastExtendedNominal(const SourceRange sr) const {
+  // There is no extended nominal
+  return sr;
 }
 
 SourceRange GenericTypeOrExtensionWherePortion::getChildlessSourceRangeOf(
@@ -557,8 +574,12 @@ static bool isInterpolatedStringLiteral(const Token& tok) {
     Segments.front().Kind != Lexer::StringSegment::Literal;
 }
 
-// If right brace is missing, the source range of the body will end
-// at the last token, which may be a one of the special cases below.
+/// If right brace is missing, the source range of the body will end
+/// at the last token, which may be a one of the special cases below.
+/// This work is only needed for *unexpanded* scopes because unioning the range
+/// with the children will do the same thing for an expanded scope.
+/// It is also needed for ignored \c ASTNodes, which may be, e.g. \c
+/// InterpolatedStringLiterals
 static SourceLoc getLocEncompassingPotentialLookups(const SourceManager &SM,
                                                     const SourceLoc endLoc) {
   const auto tok = Lexer::getTokenAtLocation(SM, endLoc);
@@ -594,9 +615,15 @@ SourceRange AbstractFunctionBodyScope::sourceRangeForDeferredExpansion() const {
 
 SourceRange GenericTypeOrExtensionWholePortion::sourceRangeForDeferredExpansion(
     const IterableTypeScope *s) const {
-  const auto range = getChildlessSourceRangeOf(s, false);
-  return SourceRange(range.Start, getLocEncompassingPotentialLookups(
-                                      s->getSourceManager(), range.End));
+  const auto rangeOfThisNodeWithoutChildren =
+      getChildlessSourceRangeOf(s, false);
+  const auto rangeExtendedForFinalToken = SourceRange(
+      rangeOfThisNodeWithoutChildren.Start,
+      getLocEncompassingPotentialLookups(s->getSourceManager(),
+                                         rangeOfThisNodeWithoutChildren.End));
+  const auto rangePastExtendedNominal =
+      s->moveStartPastExtendedNominal(rangeExtendedForFinalToken);
+  return rangePastExtendedNominal;
 }
 
 SourceRange GenericTypeOrExtensionWherePortion::sourceRangeForDeferredExpansion(
@@ -713,4 +740,13 @@ AbstractFunctionDeclScope::getParmsSourceLocOfAFD(AbstractFunctionDecl *decl) {
        : fd->isDeferBody()     ? fd->getNameLoc()
        :                         fd->getParameters()->getLParenLoc();
   // clang-format on
+}
+
+SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {
+  const auto *const etr = ext->getExtendedTypeRepr();
+  if (!etr)
+    return ext->getStartLoc();
+  const auto &SM = ext->getASTContext().SourceMgr;
+  return Lexer::getCharSourceRangeFromSourceRange(SM, etr->getSourceRange())
+      .getEnd();
 }

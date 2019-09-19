@@ -263,6 +263,8 @@ public:
   void ensureSourceRangesAreCorrectWhenAddingDescendants(function_ref<void()>);
 
 public: // public for debugging
+  /// Returns source range of this node alone, without factoring in any
+  /// children.
   virtual SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const = 0;
 
@@ -338,6 +340,8 @@ public:
   /// Some scopes can be expanded lazily.
   /// Such scopes must: not change their source ranges after expansion, and
   /// their expansion must return an insertion point outside themselves.
+  /// After a node is expanded, its source range (getSourceRangeofThisASTNode
+  /// union children's ranges) must be same as this.
   virtual NullablePtr<ASTScopeImpl> insertionPointForDeferredExpansion();
   virtual SourceRange sourceRangeForDeferredExpansion() const;
 
@@ -730,6 +734,17 @@ public:
   SourceRange
   getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
 
+  /// \c tryBindExtension needs to get the extended nominal, and the DeclContext
+  /// is the parent of the \c ExtensionDecl. If the \c SourceRange of an \c
+  /// ExtensionScope were to start where the \c ExtensionDecl says, the lookup
+  /// source locaiton would fall within the \c ExtensionScope. This inclusion
+  /// would cause the lazy \c ExtensionScope to be expanded which would ask for
+  /// its generic parameters in order to create those sub-scopes. That request
+  /// would cause a cycle because it would ask for the extended nominal. So,
+  /// move the source range of an \c ExtensionScope *past* the extended nominal
+  /// type, which is not in-scope there anyway.
+  virtual SourceRange moveStartPastExtendedNominal(SourceRange) const = 0;
+
   virtual GenericContext *getGenericContext() const = 0;
   std::string getClassName() const override;
   virtual std::string declKindName() const = 0;
@@ -768,6 +783,8 @@ class GenericTypeScope : public GenericTypeOrExtensionScope {
 public:
   GenericTypeScope(const Portion *p) : GenericTypeOrExtensionScope(p) {}
   virtual ~GenericTypeScope() {}
+  SourceRange moveStartPastExtendedNominal(SourceRange) const override;
+
 protected:
   NullablePtr<const GenericParamList> genericParams() const override;
 };
@@ -842,6 +859,7 @@ public:
   NullablePtr<NominalTypeDecl> getCorrespondingNominalTypeDecl() const override;
   std::string declKindName() const override { return "Extension"; }
   SourceRange getBraces() const override;
+  SourceRange moveStartPastExtendedNominal(SourceRange) const override;
   ASTScopeImpl *createTrailingWhereClauseScope(ASTScopeImpl *parent,
                                                ScopeCreator &) override;
   void createBodyScope(ASTScopeImpl *leaf, ScopeCreator &) override;
