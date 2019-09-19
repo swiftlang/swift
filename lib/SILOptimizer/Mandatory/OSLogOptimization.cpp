@@ -186,9 +186,10 @@ private:
   SmallVector<SILValue, 4> constantSILValues;
 
 public:
-  FoldState(SILFunction *fun, SILInstruction *beginInst,
+  FoldState(SILFunction *fun, unsigned assertConfig, SILInstruction *beginInst,
             ArrayRef<SILInstruction *> endInsts)
-      : constantEvaluator(allocator, fun), beginInstruction(beginInst),
+      : constantEvaluator(allocator, fun, assertConfig),
+        beginInstruction(beginInst),
         endInstructions(endInsts.begin(), endInsts.end()) {}
 
   void addConstantSILValue(SILValue value) {
@@ -627,13 +628,14 @@ static bool detectAndDiagnoseErrors(Optional<SymbolicValue> errorInfo,
 /// Constant evaluate instructions starting from 'start' and fold the uses
 /// of the value 'oslogMessage'. Stop when oslogMessageValue is released.
 static void constantFold(SILInstruction *start,
-                         SingleValueInstruction *oslogMessage) {
+                         SingleValueInstruction *oslogMessage,
+                         unsigned assertConfig) {
 
   // Initialize fold state.
   SmallVector<SILInstruction *, 2> lifetimeEndInsts;
   getLifetimeEndInstructionsOfSILValue(oslogMessage, lifetimeEndInsts);
 
-  FoldState state(start->getFunction(), start, lifetimeEndInsts);
+  FoldState state(start->getFunction(), assertConfig, start, lifetimeEndInsts);
 
   auto errorInfo = collectConstants(state);
 
@@ -738,6 +740,7 @@ class OSLogOptimization : public SILFunctionTransform {
   /// The entry point to the transformation.
   void run() override {
     auto &fun = *getFunction();
+    unsigned assertConfig = getOptions().AssertConfig;
 
     // Don't rerun optimization on deserialized functions or stdlib functions.
     if (fun.wasDeserializedCanonical()) {
@@ -778,7 +781,7 @@ class OSLogOptimization : public SILFunctionTransform {
         continue;
       }
 
-      constantFold(interpolationStart, oslogInit);
+      constantFold(interpolationStart, oslogInit, assertConfig);
     }
   }
 };

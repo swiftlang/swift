@@ -377,14 +377,9 @@ NOTE(constexpr_overflow,none, "integer overflow detected", ())
 NOTE(constexpr_overflow_operation,none, "operation"
      "%select{| performed during this call}0 overflows", (bool))
 
-NOTE(constexpr_trap,none, "trap detected", ())
-NOTE(constexpr_trap_operation,none, "operation"
+NOTE(constexpr_trap, none, "%0", (StringRef))
+NOTE(constexpr_trap_operation, none, "operation"
      "%select{| performed during this call}0 traps", (bool))
-
-NOTE(constexpr_assertion_failed, none, "assertion failed with message: %0",
-    (StringRef))
-NOTE(constexpr_assertion_failed_here, none, "assertion failed"
-     "%select{ here| during this call}0 ", (bool))
 
 NOTE(constexpr_invalid_operand_seen, none,
     "operation with invalid operands encountered during evaluation",())
