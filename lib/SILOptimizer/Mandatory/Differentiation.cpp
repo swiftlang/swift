@@ -1578,15 +1578,6 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   return hasActiveResults && hasActiveParamArguments;
 }
 
-#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
-if (isa<TYPE>(inst) && hasActiveOperands) \
-  return true;
-
-#define CHECK_INST_TYPE_ACTIVE_DEST(TYPE) \
-if (auto *castInst = dyn_cast<TYPE>(inst)) { \
-  return activityInfo.isActive(castInst->getDest(), indices); \
-}
-
 // TODO: update comment once we figure out why reverse mode requires
 // different conditions.
 /// Returns a flag that indicates whether the instruction should be
@@ -1615,6 +1606,16 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // with us handling `apply` instructions differently.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
+
+#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
+if (isa<TYPE>(inst) && hasActiveOperands) \
+  return true;
+
+#define CHECK_INST_TYPE_ACTIVE_DEST(TYPE) \
+if (auto *castInst = dyn_cast<TYPE>(inst)) { \
+  return activityInfo.isActive(castInst->getDest(), indices); \
+}
+
     CHECK_INST_TYPE_ACTIVE_DEST(StoreInst)
     CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrowInst)
     CHECK_INST_TYPE_ACTIVE_DEST(CopyAddrInst)
@@ -1624,8 +1625,13 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
     CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccessInst)
     CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrowInst)
     CHECK_INST_TYPE_ACTIVE_OPERANDS(DeallocationInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(CopyValueInst)
     CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValueInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddrInst)
     break;
+
+#undef CHECK_INST_TYPE_ACTIVE_OPERANDS
+#undef CHECK_INST_TYPE_ACTIVE_DEST
   }
   case AutoDiffLinearMapKind::Pullback: {
     if (inst->mayHaveSideEffects() && hasActiveOperands)
@@ -1636,9 +1642,6 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
 
   return false;
 }
-
-#undef CHECK_INST_TYPE_ACTIVE_OPERANDS
-#undef CHECK_INST_TYPE_ACTIVE_DEST
 
 /// Takes an `apply` instruction and adds its linear map function to the
 /// linear map struct if it's active.
@@ -4558,14 +4561,6 @@ public:
   } \
   void emitTangentFor##INST##Inst(INST##Inst *(ID))
 
-
-  CLONE_AND_EMIT_TANGENT(DestroyValue, dvi) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto loc = dvi->getLoc();
-    auto tanVal = materializeTangent(getTangentValue(dvi->getOperand()), loc);
-    diffBuilder.emitDestroyValue(loc, tanVal);
-  }
-
   CLONE_AND_EMIT_TANGENT(BeginBorrow, bbi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = bbi->getLoc();
@@ -4580,6 +4575,13 @@ public:
     auto loc = ebi->getLoc();
     auto tanVal = materializeTangent(getTangentValue(ebi->getOperand()), loc);
     diffBuilder.emitEndBorrowOperation(loc, tanVal);
+  }
+
+  CLONE_AND_EMIT_TANGENT(DestroyValue, dvi) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto loc = dvi->getLoc();
+    auto tanVal = materializeTangent(getTangentValue(dvi->getOperand()), loc);
+    diffBuilder.emitDestroyValue(loc, tanVal);
   }
 
   CLONE_AND_EMIT_TANGENT(CopyValue, cvi) {
@@ -4996,6 +4998,15 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto tanBuffer = getTangentBuffer(dsi->getParent(), dsi->getOperand());
     diffBuilder.createDeallocStack(dsi->getLoc(), tanBuffer);
+  }
+
+  /// Handle `destroy_addr` instruction.
+  ///   Original: destroy_addr x
+  ///   Tangent: destroy_addr tan[x]
+  CLONE_AND_EMIT_TANGENT(DestroyAddr, dai) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto tanBuffer = getTangentBuffer(dai->getParent(), dai->getOperand());
+    diffBuilder.createDestroyAddr(dai->getLoc(), tanBuffer);
   }
 
   /// Handle `struct` instruction.
