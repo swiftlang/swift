@@ -3522,6 +3522,9 @@ bool AllowTypeOrInstanceMemberFailure::diagnoseAsError() {
     return true;
   }
 
+  if (diagnoseInvalidTupleDestructuring())
+    return true;
+
   return false;
 }
 
@@ -3585,7 +3588,8 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // TODO: Currently this is only intended to diagnose contextual failures.
   if (path.empty() ||
       !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
-        path.back().getKind() == ConstraintLocator::ContextualType))
+        path.back().getKind() == ConstraintLocator::ContextualType ||
+        path.back().getKind() == ConstraintLocator::ApplyArgument))
     return false;
 
   auto *anchor = getAnchor();
@@ -3691,6 +3695,55 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
 
+  return true;
+}
+
+bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
+  auto *locator = getLocator();
+  if (!locator->isLastElement(ConstraintLocator::ApplyArgument))
+    return false;
+
+  if (SynthesizedArgs.size() < 2)
+    return false;
+
+  auto *anchor = getAnchor();
+
+  Expr *argExpr = nullptr;
+  // Something like `foo(x: (1, 2))`
+  if (auto *TE = dyn_cast<TupleExpr>(anchor)) {
+    if (TE->getNumElements() == 1)
+      argExpr = TE->getElement(0);
+  } else { // or `foo((1, 2))`
+    argExpr = cast<ParenExpr>(anchor)->getSubExpr();
+  }
+
+  if (!(argExpr && getType(argExpr)->getRValueType()->is<TupleType>()))
+    return false;
+
+  auto selectedOverload = getChoiceFor(locator);
+  if (!selectedOverload)
+    return false;
+
+  auto *decl = selectedOverload->choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto name = decl->getBaseName();
+  auto diagnostic =
+      emitDiagnostic(anchor->getLoc(),
+                     diag::cannot_convert_single_tuple_into_multiple_arguments,
+                     decl->getDescriptiveKind(), name, name.isSpecial(),
+                     SynthesizedArgs.size(), isa<TupleExpr>(argExpr));
+
+  // If argument is a literal tuple, let's suggest removal of parentheses.
+  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    diagnostic.fixItRemove(TE->getLParenLoc()).fixItRemove(TE->getRParenLoc());
+  }
+
+  diagnostic.flush();
+
+  // Add a note which points to the overload choice location.
+  emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
   return true;
 }
 

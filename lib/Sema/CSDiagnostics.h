@@ -1201,6 +1201,10 @@ private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(ClosureExpr *closure);
+
+  /// Diagnose cases when instead of multiple distinct arguments
+  /// call got a single tuple argument with expected arity/types.
+  bool diagnoseInvalidTupleDestructuring() const;
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {

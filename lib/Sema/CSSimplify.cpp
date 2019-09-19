@@ -930,6 +930,40 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   argsWithLabels.append(args.begin(), args.end());
   AnyFunctionType::relabelParams(argsWithLabels, argLabels);
 
+  // Special case when a single tuple argument if used
+  // instead of N distinct arguments e.g.:
+  //
+  // func foo(_ x: Int, _ y: Int) {}
+  // foo((1, 2)) // expected 2 arguments, got a single tuple with 2 elements.
+  if (cs.shouldAttemptFixes() && argsWithLabels.size() == 1 &&
+      llvm::count_if(indices(params), [&](unsigned paramIdx) {
+        return !paramInfo.hasDefaultArgument(paramIdx);
+      }) > 1) {
+    const auto &arg = argsWithLabels.front();
+    auto argTuple = arg.getPlainType()->getRValueType()->getAs<TupleType>();
+    // Don't explode a tuple in cases where first parameter is a tuple as
+    // well. That is a regular "missing argument case" even if their arity
+    // is different e.g.
+    //
+    // func foo(_: (Int, Int), _: Int) {}
+    // foo((1, 2)) // call is missing an argument for parameter #1
+    if (argTuple && argTuple->getNumElements() == params.size() &&
+        !params.front().getPlainType()->is<TupleType>()) {
+      argsWithLabels.pop_back();
+      // Let's make sure that labels associated with tuple elements
+      // line up with what is expected by argument list.
+      for (const auto &arg : argTuple->getElements()) {
+        argsWithLabels.push_back(
+            AnyFunctionType::Param(arg.getType(), arg.getName()));
+      }
+
+      (void)cs.recordFix(
+          AddMissingArguments::create(cs, argsWithLabels,
+                                      cs.getConstraintLocator(locator)),
+          /*impact=*/argsWithLabels.size() * 2);
+    }
+  }
+
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
   {
