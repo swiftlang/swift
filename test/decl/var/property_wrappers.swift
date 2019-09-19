@@ -1150,3 +1150,17 @@ final class SR_11478_C2 {
   @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
   @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
 }
+
+// SR-11381
+
+@propertyWrapper
+struct SR_11381_W<T> {
+  init(wrappedValue: T) {}
+  var wrappedValue: T {
+    fatalError()
+  }
+}
+
+struct SR_11381_S {
+  @SR_11381_W var foo: Int = nil // expected-error {{'nil' requires a contextual type}}
+}

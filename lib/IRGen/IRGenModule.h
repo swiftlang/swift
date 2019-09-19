@@ -1061,7 +1061,9 @@ public:
 
   llvm::Constant *getTypeRef(Type type, GenericSignature *genericSig,
                              MangledTypeRefRole role);
-  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  llvm::Constant *getTypeRef(CanType type, CanGenericSignature genericSig,
+                             MangledTypeRefRole role);
+
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
                                             GenericSignature *genericSig,

@@ -649,9 +649,10 @@ getInitializerForComputedComponent(IRGenModule &IGM,
 }
 
 static llvm::Constant *
-emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type) {
+emitMetadataTypeRefForKeyPath(IRGenModule &IGM, CanType type,
+                              CanGenericSignature sig) {
   // Produce a mangled name for the type.
-  auto constant = IGM.getTypeRef(type, MangledTypeRefRole::Metadata);
+  auto constant = IGM.getTypeRef(type, sig, MangledTypeRefRole::Metadata);
   
   // Mask the bottom bit to tell the key path runtime this is a mangled name
   // rather than a direct reference.
@@ -837,6 +838,10 @@ emitKeyPathComponent(IRGenModule &IGM,
       SmallVector<llvm::Constant *, 4> externalSubArgs;
       auto componentSig = externalDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
+      
+      auto componentCanSig = componentSig
+        ? componentSig->getCanonicalSignature()
+        : CanGenericSignature();
       auto subs = component.getExternalSubstitutions();
       if (!subs.empty()) {
         enumerateGenericSignatureRequirements(
@@ -847,7 +852,7 @@ emitKeyPathComponent(IRGenModule &IGM,
             if (!reqt.Protocol) {
               // Type requirement.
               externalSubArgs.push_back(
-                emitMetadataTypeRefForKeyPath(IGM, substType));
+                emitMetadataTypeRefForKeyPath(IGM, substType, componentCanSig));
             } else {
               // Protocol requirement.
               auto conformance = subs.lookupConformance(
@@ -1182,9 +1187,11 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     getAddrOfGenericEnvironment(pattern->getGenericSignature()));
   // Store type references for the root and leaf.
   fields.addRelativeAddress(
-    emitMetadataTypeRefForKeyPath(*this, rootTy));
+    emitMetadataTypeRefForKeyPath(*this, rootTy,
+                                  pattern->getGenericSignature()));
   fields.addRelativeAddress(
-    emitMetadataTypeRefForKeyPath(*this, valueTy));
+    emitMetadataTypeRefForKeyPath(*this, valueTy,
+                                  pattern->getGenericSignature()));
   
   // Add a pointer to the ObjC KVC compatibility string, if there is one, or
   // null otherwise.
@@ -1238,7 +1245,9 @@ IRGenModule::getAddrOfKeyPathPattern(KeyPathPattern *pattern,
     // For all but the last component, we pack in the type of the component.
     if (i + 1 != pattern->getComponents().size()) {
       fields.addRelativeAddress(
-        emitMetadataTypeRefForKeyPath(*this, component.getComponentType()));
+        emitMetadataTypeRefForKeyPath(*this,
+                                      component.getComponentType(),
+                                      pattern->getGenericSignature()));
     }
     baseTy = component.getComponentType();
   }
