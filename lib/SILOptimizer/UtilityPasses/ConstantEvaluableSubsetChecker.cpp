@@ -64,6 +64,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
     // Create a step evaluator and run it on the function.
     SymbolicValueBumpAllocator allocator;
     ConstExprStepEvaluator stepEvaluator(allocator, fun,
+                                         getOptions().AssertConfig,
                                          /*trackCallees*/ true);
     bool previousEvaluationHadFatalError = false;
 

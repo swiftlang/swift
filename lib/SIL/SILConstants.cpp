@@ -656,18 +656,11 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
       diagnose(ctx, triggerLoc, diag::constexpr_overflow_operation,
                triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::Trap:
-    diagnose(ctx, diagLoc, diag::constexpr_trap);
+  case UnknownReason::Trap: {
+    const char *message = unknownReason.getTrapMessage();
+    diagnose(ctx, diagLoc, diag::constexpr_trap, StringRef(message));
     if (emitTriggerLocInDiag)
       diagnose(ctx, triggerLoc, diag::constexpr_trap_operation,
-               triggerLocSkipsInternalLocs);
-    return;
-  case UnknownReason::AssertionFailure: {
-    const char *message = unknownReason.getAssertionFailureMessage();
-    diagnose(ctx, diagLoc, diag::constexpr_assertion_failed,
-             StringRef(message));
-    if (emitTriggerLocInDiag)
-      diagnose(ctx, triggerLoc, diag::constexpr_assertion_failed_here,
                triggerLocSkipsInternalLocs);
     return;
   }

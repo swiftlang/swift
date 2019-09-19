@@ -192,8 +192,8 @@ internal func interpretIntTruncations() -> Int8 {
 @_semantics("constant_evaluable")
 internal func testInvalidIntTruncations(a: Int32) -> Int8 {
   return Int8(a)
-    // CHECK: note: assertion failed with message: Fatal error: Not enough bits to represent the passed value: {{.*}}/Integers.swift:
-    // CHECK: note: assertion failed during this call
+    // CHECK: note: {{.*}}: Not enough bits to represent the passed value
+    // CHECK: note: operation performed during this call traps
     // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
 }
 
@@ -238,8 +238,8 @@ internal func interpretSingedUnsignedConversions() -> UInt32 {
 @_semantics("constant_evaluable")
 internal func testInvalidSingedUnsignedConversions(a: Int64) -> UInt64 {
   return UInt64(a)
-    // CHECK: note: assertion failed with message: Fatal error: Negative value is not representable: {{.*}}/Integers.swift:
-    // CHECK: note: assertion failed during this call
+    // CHECK: note: {{.*}}: Negative value is not representable
+    // CHECK: note: operation performed during this call traps
     // CHECK: function_ref @$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
 }
 
@@ -341,8 +341,8 @@ func interpretIntAddOverflow() -> Int8 {
 @_semantics("constant_evaluable")
 func testDivideByZero(_ x: Int, _ y: Int) -> Int {
   return x / y
-    // CHECK: note: assertion failed with message: Fatal error: Division by zero: {{.*}}/IntegerTypes.swift:
-    // CHECK: note: assertion failed here
+    // CHECK: note: {{.*}}: Division by zero
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
@@ -355,8 +355,8 @@ func interpretDivideByZero() -> Int {
 @_semantics("constant_evaluable")
 func testDivideOverflow(_ x: Int8, _ y: Int8) -> Int8 {
   return x / y
-    // CHECK: note: assertion failed with message: Fatal error: Division results in an overflow: {{.*}}/IntegerTypes.swift:
-    // CHECK: note: assertion failed here
+    // CHECK: note: {{.*}}: Division results in an overflow
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")

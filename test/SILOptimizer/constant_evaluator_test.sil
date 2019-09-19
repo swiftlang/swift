@@ -1191,8 +1191,8 @@ sil [noinline] [_semantics "programtermination_point"] [canonical] @$assertionFa
 // CHECK-LABEL: @interpretAssertionFailure
 sil @interpretAssertionFailure : $@convention(thin) () -> Never {
   // Construct error prefix.
-  %0 = string_literal utf8 "prefix"
-  %1 = integer_literal $Builtin.Word, 6
+  %0 = string_literal utf8 "error-prefix"
+  %1 = integer_literal $Builtin.Word, 12
   %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
   %3 = integer_literal $Builtin.Int8, 2
   %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
@@ -1210,6 +1210,6 @@ sil @interpretAssertionFailure : $@convention(thin) () -> Never {
 
   %22 = function_ref @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
   %23 = apply %22(%4, %14, %21) : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: assertion failed with message: prefix: message:
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: error-prefix: message
   unreachable
 }

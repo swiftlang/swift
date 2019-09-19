@@ -37,6 +37,45 @@ struct UnknownSymbolicValue;
 
 extern llvm::cl::opt<unsigned> ConstExprLimit;
 
+/// An abstract class that exposes functions for allocating symbolic values.
+/// The implementors of this class have to determine where to allocate them and
+/// and manage the lifetime of the allocated symbolic values.
+class SymbolicValueAllocator {
+public:
+  virtual ~SymbolicValueAllocator() {}
+
+  /// Allocate raw bytes.
+  /// \param byteSize number of bytes to allocate.
+  /// \param alignment alignment for the allocated bytes.
+  virtual void *allocate(unsigned long byteSize, unsigned alignment) = 0;
+
+  /// Allocate storage for a given number of elements of a specific type
+  /// provided as a template parameter. Precondition: \c T must have an
+  /// accesible zero argument constructor.
+  /// \param numElts number of elements of the type to allocate.
+  template <typename T> T *allocate(unsigned numElts) {
+    T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
+    for (unsigned i = 0; i != numElts; ++i)
+      new (res + i) T();
+    return res;
+  }
+};
+
+/// A class that allocates symbolic values in a local bump allocator. The
+/// lifetime of the bump allocator is same as the lifetime of \c this object.
+class SymbolicValueBumpAllocator : public SymbolicValueAllocator {
+private:
+  llvm::BumpPtrAllocator bumpAllocator;
+
+public:
+  SymbolicValueBumpAllocator() {}
+  ~SymbolicValueBumpAllocator() {}
+
+  void *allocate(unsigned long byteSize, unsigned alignment) {
+    return bumpAllocator.Allocate(byteSize, alignment);
+  }
+};
+
 /// When we fail to constant fold a value, this captures a reason why,
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
 /// SymbolicValue representation also includes a pointer to the SILNode in
@@ -58,12 +97,8 @@ public:
     /// Integer overflow detected.
     Overflow,
 
-    /// Unspecified trap detected.
+    /// Trap detected. Traps will a message as a payload.
     Trap,
-
-    /// Assertion failure detected. These have an associated message unlike
-    /// traps.
-    AssertionFailure,
 
     /// An operation was applied over operands whose symbolic values were
     /// constants but were not valid for the operation.
@@ -111,14 +146,20 @@ private:
   // Auxiliary information for different unknown kinds.
   union {
     SILFunction *function;
-    const char *failedAssertMessage;
+    const char *trapMessage;
   } payload;
 
 public:
   UnknownKind getKind() { return kind; }
 
   static bool isUnknownKindWithPayload(UnknownKind kind) {
-    return kind == UnknownKind::CalleeImplementationUnknown;
+    switch (kind) {
+    case UnknownKind::CalleeImplementationUnknown:
+    case UnknownKind::Trap:
+      return true;
+    default:
+      return false;
+    }
   }
 
   static UnknownReason create(UnknownKind kind) {
@@ -141,57 +182,23 @@ public:
     return payload.function;
   }
 
-  static UnknownReason createAssertionFailure(const char *message,
-                                              size_t size) {
-    assert(message[size] == '\0' && "message must be null-terminated");
+  static UnknownReason createTrap(StringRef message,
+                                  SymbolicValueAllocator &allocator) {
+    // Copy and null terminate the string.
+    size_t size = message.size();
+    char *messagePtr = allocator.allocate<char>(size + 1);
+    std::uninitialized_copy(message.begin(), message.end(), messagePtr);
+    messagePtr[size] = '\0';
+
     UnknownReason reason;
-    reason.kind = UnknownKind::AssertionFailure;
-    reason.payload.failedAssertMessage = message;
+    reason.kind = UnknownKind::Trap;
+    reason.payload.trapMessage = messagePtr;
     return reason;
   }
 
-  const char *getAssertionFailureMessage() {
-    assert(kind == UnknownKind::AssertionFailure);
-    return payload.failedAssertMessage;
-  }
-};
-
-/// An abstract class that exposes functions for allocating symbolic values.
-/// The implementors of this class have to determine where to allocate them and
-/// and manage the lifetime of the allocated symbolic values.
-class SymbolicValueAllocator {
-public:
-  virtual ~SymbolicValueAllocator() {}
-
-  /// Allocate raw bytes.
-  /// \param byteSize number of bytes to allocate.
-  /// \param alignment alignment for the allocated bytes.
-  virtual void *allocate(unsigned long byteSize, unsigned alignment) = 0;
-
-  /// Allocate storage for a given number of elements of a specific type
-  /// provided as a template parameter. Precondition: \c T must have an
-  /// accesible zero argument constructor.
-  /// \param numElts number of elements of the type to allocate.
-  template <typename T> T *allocate(unsigned numElts) {
-    T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
-    for (unsigned i = 0; i != numElts; ++i)
-      new (res + i) T();
-    return res;
-  }
-};
-
-/// A class that allocates symbolic values in a local bump allocator. The
-/// lifetime of the bump allocator is same as the lifetime of \c this object.
-class SymbolicValueBumpAllocator : public SymbolicValueAllocator {
-private:
-  llvm::BumpPtrAllocator bumpAllocator;
-
-public:
-  SymbolicValueBumpAllocator() {}
-  ~SymbolicValueBumpAllocator() {}
-
-  void *allocate(unsigned long byteSize, unsigned alignment) {
-    return bumpAllocator.Allocate(byteSize, alignment);
+  const char *getTrapMessage() {
+    assert(kind == UnknownKind::Trap);
+    return payload.trapMessage;
   }
 };
 
