@@ -1640,6 +1640,10 @@ public:
     // actual ValueDecl. Otherwise, we have an invalid builtin.
     require(getBuiltinValueDecl(BI->getModule().getASTContext(), BI->getName()),
             "Invalid builtin name?!");
+
+    require(BI->getModule().getStage() != SILStage::Lowered ||
+                !isPolymorphicBuiltin(*BI->getBuiltinKind()),
+            "Polymorphic builtins are illegal in lowered SIL?!");
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
