@@ -3786,12 +3786,13 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
 
 static Type getStructuralType(TypeDecl *typeDecl) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-	// When we're computing requirement signatures, the structural type
-	// suffices.  Otherwise we'll potentially try to validate incomplete 
-	// requirements.
-	auto *proto = dyn_cast_or_null<ProtocolDecl>(typealias->getDeclContext()->getAsDecl());
-	if (proto && proto->isComputingRequirementSignature())
-		return typealias->getStructuralType();
+    // When we're computing requirement signatures, the structural type
+    // suffices.  Otherwise we'll potentially try to validate incomplete
+    // requirements.
+    auto *proto = dyn_cast_or_null<ProtocolDecl>(
+        typealias->getDeclContext()->getAsDecl());
+    if (proto && proto->isComputingRequirementSignature())
+      return typealias->getStructuralType();
     return typealias->getUnderlyingType();
   }
 

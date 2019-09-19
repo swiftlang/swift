@@ -2321,15 +2321,7 @@ public:
 
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
-    SubstitutionMap subs;
-    if (genericSig) {
-      subs = genericSig->getIdentitySubstitutionMap();
-    }
-    Type parent;
-    if (DC->isTypeContext())
-      parent = DC->getDeclaredInterfaceType();
-    auto sugaredType = TypeAliasType::get(alias, parent, subs, underlying);
-    alias->setInterfaceType(MetatypeType::get(sugaredType, ctx));
+    alias->computeType();
     alias->setValidationToChecked();
     
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
