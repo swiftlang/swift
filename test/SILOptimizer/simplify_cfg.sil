@@ -1425,24 +1425,24 @@ bb6(%r : $Int32):
 // CHECK:      bb0:
 // CHECK-NEXT:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK-NEXT:   cond_br undef, bb3, bb4
+// CHECK:        enum $Optional<Int32>, #Optional.none!enumelt
+// CHECK:        br bb3
 // CHECK:      bb2:
+// CHECK:        integer_literal $Builtin.Int32, 0
+// CHECK:        enum $Optional<Int32>, #Optional.some!enumelt.1
+// CHECK:        br bb3
+// CHECK:      bb3
 // CHECK:        integer_literal {{.*}}, 27
-// CHECK:        br bb5
-// CHECK:      bb3:
-// CHECK:        br bb4
-// CHECK:      bb4:
 // CHECK:        integer_literal {{.*}}, 28
-// CHECK:        br bb5
-// CHECK:      bb5({{.*}}):
-// CHECK-NEXT:   return
+// CHECK:        return
 sil @jumpthread_switch_enum4 : $@convention(thin) () -> Builtin.Int32 {
 bb0:
+  %c0 = builtin "assert_configuration"() : $Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:
   %4 = enum $Optional<Int32>, #Optional.none!enumelt
-  cond_br undef, bb3(%4 : $Optional<Int32>), bb4(%4 : $Optional<Int32>)
+  cond_br undef, bb3(%4 : $Optional<Int32>), bb4(%4 : $Optional<Int32>, %c0 : $Builtin.Int32)
 
 bb2:
   %6 = integer_literal $Builtin.Int32, 0
@@ -1454,23 +1454,22 @@ bb2:
 bb3(%10 : $Optional<Int32>):
   // Some instruction which is not "trivial"
   %c1 = builtin "assert_configuration"() : $Builtin.Int32
-  br bb4(%10 : $Optional<Int32>)
+  br bb4(%10 : $Optional<Int32>, %c1 : $Builtin.Int32)
 
-
-bb4(%13 : $Optional<Int32>):
+bb4(%13 : $Optional<Int32>, %carg1 : $Builtin.Int32):
   switch_enum %13 : $Optional<Int32>, case #Optional.some!enumelt.1: bb5, case #Optional.none!enumelt: bb6
 
 bb5:
   %r1 = integer_literal $Builtin.Int32, 27
   %c2 = builtin "assert_configuration"() : $Builtin.Int32
-  br bb7(%r1 : $Builtin.Int32)
+  br bb7(%r1 : $Builtin.Int32, %c2 : $Builtin.Int32)
 
 bb6:
   %r2 = integer_literal $Builtin.Int32, 28
   %c3 = builtin "assert_configuration"() : $Builtin.Int32
-  br bb7(%r2 : $Builtin.Int32)
+  br bb7(%r2 : $Builtin.Int32, %c3 : $Builtin.Int32)
 
-bb7(%r : $Builtin.Int32):
+bb7(%r : $Builtin.Int32, %carg2 : $Builtin.Int32):
   return %r : $Builtin.Int32
 }
 

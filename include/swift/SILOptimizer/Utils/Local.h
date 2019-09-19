@@ -372,6 +372,46 @@ protected:
   }
 };
 
+/// Sink address projections to their out-of-block uses. This is
+/// required after cloning a block and before calling
+/// updateSSAAfterCloning to avoid address-type phis.
+///
+/// This clones address projections at their use points, but does not
+/// mutate the block containing the projections.
+class SinkAddressProjections {
+  // Projections ordered from last to first in the chain.
+  SmallVector<SingleValueInstruction *, 4> projections;
+  SmallSetVector<SILValue, 4> inBlockDefs;
+
+public:
+  /// Check for an address projection chain ending at \p inst. Return true if
+  /// the given instruction is successfully analyzed.
+  ///
+  /// If \p inst does not produce an address, then return
+  /// true. getInBlockDefs() will contain \p inst if any of its
+  /// (non-address) values are used outside its block.
+  ///
+  /// If \p inst does produce an address, return true only of the
+  /// chain of address projections within this block is clonable at
+  /// their use sites. getInBlockDefs will return all non-address
+  /// operands in the chain that are also defined in this block. These
+  /// may require phis after cloning the projections.
+  bool analyzeAddressProjections(SILInstruction *inst);
+
+  /// After analyzing projections, returns the list of (non-address) values
+  /// defined in the same block as the projections which will have uses outside
+  /// the block after cloning.
+  ArrayRef<SILValue> getInBlockDefs() const {
+    return inBlockDefs.getArrayRef();
+  }
+  /// Clone the chain of projections at their use sites.
+  ///
+  /// Return true if anything was done.
+  ///
+  /// getInBlockProjectionOperandValues() can be called before or after cloning.
+  bool cloneProjections();
+};
+
 /// Helper function to perform SSA updates in case of jump threading.
 void updateSSAAfterCloning(BasicBlockCloner &Cloner, SILBasicBlock *SrcBB,
                            SILBasicBlock *DestBB);
