@@ -5,6 +5,9 @@
 // RUN:    | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -module-name Foo %s -I %t -g -o - \
 // RUN:    -sdk %t | %FileCheck %s --check-prefix=SDK
+// RUN: %target-swift-frontend -c -module-name Foo %s -I %t -g -o - \
+// RUN:    | %llvm-dwarfdump - \
+// RUN:    | %FileCheck %s --check-prefix=DWARF
 
 import basic
 
@@ -16,6 +19,7 @@ import basic
 // SDK:   !DIModule(scope: null, name: "basic", includePath: "
 // SDK-SAME:        basic{{.*}}.swiftmodule"
 
+// DWARF: DW_AT_LLVM_include_path{{.*}}basic.swiftinterface
 
 func markUsed<T>(_ t: T) {}
 markUsed(basic.foo(1, 2))
