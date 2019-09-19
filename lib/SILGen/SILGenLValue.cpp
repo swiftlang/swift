@@ -1382,7 +1382,9 @@ namespace {
         VarDecl *field = dyn_cast<VarDecl>(Storage);
         VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
         assert(backingVar);
-        CanType ValType = backingVar->getType()->getCanonicalType();
+        CanType ValType =
+            SGF.F.mapTypeIntoContext(backingVar->getInterfaceType())
+              ->getCanonicalType();
         SILType varStorageType =
           SGF.SGM.Types.getSubstitutedStorageType(backingVar, ValType);
         auto typeData =
@@ -1405,7 +1407,7 @@ namespace {
         assert(field->getAttachedPropertyWrappers().size() == 1);
         auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
         auto ctor = wrapperInfo.wrappedValueInit;
-        SubstitutionMap subs = backingVar->getType()->getMemberSubstitutionMap(
+        SubstitutionMap subs = ValType->getMemberSubstitutionMap(
                         SGF.getModule().getSwiftModule(), ctor);
 
         Type ity = ctor->getInterfaceType();
@@ -1416,8 +1418,8 @@ namespace {
           .asForeign(requiresForeignEntryPoint(ctor));
         RValue initFuncRV =
           SGF.emitApplyPropertyWrapperAllocator(loc, subs,initRef,
-                                                 backingVar->getType(),
-                                                 CanAnyFunctionType(substIty));
+                                                ValType,
+                                                CanAnyFunctionType(substIty));
         ManagedValue initFn = std::move(initFuncRV).getAsSingleValue(SGF, loc);
 
         // Create the allocating setter function. It captures the base address.
