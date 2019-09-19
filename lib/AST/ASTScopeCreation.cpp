@@ -388,6 +388,7 @@ private:
 
   // A safe way to discover this, without creating a circular request.
   // Cannot call getAttachedPropertyWrappers.
+  // rdar://55263708
   static bool hasAttachedPropertyWrapper(VarDecl *vd) {
     return AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(vd).isValid();
   }

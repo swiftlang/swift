@@ -1114,6 +1114,8 @@ public:
   /// false positives, that that doesn't hurt anything. However, the result of
   /// the conservative source range computation doesn't seem to be stable. So
   /// keep the original here, and use it for source range queries.
+  /// rdar://55263708
+
   const SourceRange sourceRangeWhenCreated;
 
   AttachedPropertyWrapperScope(VarDecl *e)
