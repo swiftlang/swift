@@ -299,6 +299,7 @@ SimpleMathTests.test("StructGeneric") {
     generic.y = generic.x * input
     return generic.x * generic.y
   }
+  // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
   expectEqual(405, gradient(at: 3, in: fifthPower))
 }
 
