@@ -3581,6 +3581,25 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (auto *closure = dyn_cast<ClosureExpr>(anchor))
     return diagnoseClosure(closure);
 
+  // This is a situation where function type is passed as an argument
+  // to a function type parameter and their argument arity is different.
+  //
+  // ```
+  // func foo(_: (Int) -> Void) {}
+  // func bar() {}
+  //
+  // foo(bar) // `() -> Void` vs. `(Int) -> Void`
+  // ```
+  if (locator->isLastElement(ConstraintLocator::ApplyArgToParam)) {
+    auto info = *getFunctionArgApplyInfo(locator);
+
+    auto *argExpr = info.getArgExpr();
+    emitDiagnostic(argExpr->getLoc(), diag::cannot_convert_argument_value,
+                   info.getArgType(), info.getParamType());
+    // TODO: It would be great so somehow point out which arguments are missing.
+    return true;
+  }
+
   return false;
 }
 
