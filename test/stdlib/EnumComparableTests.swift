@@ -28,4 +28,17 @@ SynthesizedComparableTests.test("Simple Enum sorting with duplicates") {
   expectEqual(unsorted.sorted(), [.debut, .be, .fearless, .sn, .sn, .red, .roses, .reputation, .lover, .lover])
 }
 
+SynthesizedComparableTests.test("Associated Values Enum sorting") {
+  enum Bar:Comparable 
+  {
+    case a(Int, Int)
+    case b(Int)
+    case c 
+  }
+  
+  let unsorted:[Bar] = [.b(89), .a(12, 4), .c, .a(5, 4), .b(9), .a(5, 1)]
+
+  expectEqual(unsorted.sorted(), [.a(5, 1), .a(5, 4), .a(12, 4), .b(9), .b(89), .c])
+}
+
 runAllTests()
