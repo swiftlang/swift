@@ -228,12 +228,46 @@ public:
   bool checkAndDiagnoseDisallowedContext(ValueDecl *synthesizing) const;
 };
 
+/// Create AST statements which convert from an enum to an Int with a switch.
+/// \p stmts The generated statements are appended to this vector.
+/// \p parentDC Either an extension or the enum itself.
+/// \p enumDecl The enum declaration.
+/// \p enumVarDecl The enum input variable.
+/// \p funcDecl The parent function.
+/// \p indexName The name of the output variable.
+/// \return A DeclRefExpr of the output variable (of type Int).
 DeclRefExpr *convertEnumToIndex( SmallVectorImpl<ASTNode> &stmts,
   DeclContext *parentDC,
   EnumDecl *enumDecl,
   VarDecl *enumVarDecl,
   AbstractFunctionDecl *funcDecl,
   const char *indexName);
+  
+/// Returns the ParamDecl for each associated value of the given enum whose type
+/// does not conform to a protocol
+/// \p theEnum The enum whose elements and associated values should be checked.
+/// \p protocol The protocol being requested.
+/// \return The ParamDecl of each associated value whose type does not conform.
+SmallVector<ParamDecl *, 3>
+associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
+                                      ProtocolDecl *protocol);
+
+/// Returns true if, for every element of the given enum, it either has no
+/// associated values or all of them conform to a protocol.
+/// \p theEnum The enum whose elements and associated values should be checked.
+/// \p protocol The protocol being requested.
+/// \return True if all associated values of all elements of the enum conform.
+bool allAssociatedValuesConformToProtocol(DeclContext *DC,
+                                       EnumDecl *theEnum,
+                                       ProtocolDecl *protocol);
+
+Pattern*
+enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
+                            char varPrefix, DeclContext *varContext,
+                            SmallVectorImpl<VarDecl*> &boundVars);
+
+VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
+                               DeclContext *varContext);
 }
 
 #endif

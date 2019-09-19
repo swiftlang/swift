@@ -36,46 +36,6 @@ enum NonconformingMemberKind {
   StoredProperty
 };
 
-/// Returns the ParamDecl for each associated value of the given enum whose type
-/// does not conform to a protocol
-/// \p theEnum The enum whose elements and associated values should be checked.
-/// \p protocol The protocol being requested.
-/// \return The ParamDecl of each associated value whose type does not conform.
-static SmallVector<ParamDecl *, 3>
-associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
-                                        ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
-  SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
-  for (auto elt : theEnum->getAllElements()) {
-    if (!elt->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(elt);
-
-    auto PL = elt->getParameterList();
-    if (!PL)
-      continue;
-
-    for (auto param : *PL) {
-      auto type = param->getInterfaceType();
-      if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type),
-                                           protocol, DC, None)) {
-        nonconformingAssociatedValues.push_back(param);
-      }
-    }
-  }
-  return nonconformingAssociatedValues;
-}
-
-/// Returns true if, for every element of the given enum, it either has no
-/// associated values or all of them conform to a protocol.
-/// \p theEnum The enum whose elements and associated values should be checked.
-/// \p protocol The protocol being requested.
-/// \return True if all associated values of all elements of the enum conform.
-static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
-                                                 EnumDecl *theEnum,
-                                                 ProtocolDecl *protocol) {
-  return associatedValuesNotConformingToProtocol(DC, theEnum, protocol).empty();
-}
-
 /// Returns the VarDecl of each stored property in the given struct whose type
 /// does not conform to a protocol.
 /// \p theStruct The struct whose stored properties should be checked.
@@ -168,92 +128,6 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
           nominal->getDeclaredInterfaceType());
     }
   }
-}
-
-/// Creates a named variable based on a prefix character and a numeric index.
-/// \p prefixChar The prefix character for the variable's name.
-/// \p index The numeric index to append to the variable's name.
-/// \p type The type of the variable.
-/// \p varContext The context of the variable.
-/// \return A VarDecl named with the prefix and number.
-static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
-                               DeclContext *varContext) {
-  ASTContext &C = varContext->getASTContext();
-
-  llvm::SmallString<8> indexVal;
-  indexVal.append(1, prefixChar);
-  APInt(32, index).toString(indexVal, 10, /*signed*/ false);
-  auto indexStr = C.AllocateCopy(indexVal);
-  auto indexStrRef = StringRef(indexStr.data(), indexStr.size());
-
-  auto varDecl = new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
-                                 /*IsCaptureList*/true, SourceLoc(),
-                                 C.getIdentifier(indexStrRef),
-                                 varContext);
-  varDecl->setType(type);
-  varDecl->setHasNonPatternBindingInit(true);
-  return varDecl;
-}
-
-/// Returns the pattern used to match and bind the associated values (if any) of
-/// an enum case.
-/// \p enumElementDecl The enum element to match.
-/// \p varPrefix The prefix character for variable names (e.g., a0, a1, ...).
-/// \p varContext The context into which payload variables should be declared.
-/// \p boundVars The array to which the pattern's variables will be appended.
-static Pattern*
-enumElementPayloadSubpattern(EnumElementDecl *enumElementDecl,
-                             char varPrefix, DeclContext *varContext,
-                             SmallVectorImpl<VarDecl*> &boundVars) {
-  auto parentDC = enumElementDecl->getDeclContext();
-  ASTContext &C = parentDC->getASTContext();
-
-  // No arguments, so no subpattern to match.
-  if (!enumElementDecl->hasAssociatedValues())
-    return nullptr;
-
-  auto argumentType = enumElementDecl->getArgumentInterfaceType();
-  if (auto tupleType = argumentType->getAs<TupleType>()) {
-    // Either multiple (labeled or unlabeled) arguments, or one labeled
-    // argument. Return a tuple pattern that matches the enum element in arity,
-    // types, and labels. For example:
-    // case a(x: Int) => (x: let a0)
-    // case b(Int, String) => (let a0, let a1)
-    SmallVector<TuplePatternElt, 3> elementPatterns;
-    int index = 0;
-    for (auto tupleElement : tupleType->getElements()) {
-      auto payloadVar = indexedVarDecl(varPrefix, index++,
-                                       tupleElement.getType(), varContext);
-      boundVars.push_back(payloadVar);
-
-      auto namedPattern = new (C) NamedPattern(payloadVar);
-      namedPattern->setImplicit();
-      auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                           namedPattern);
-      elementPatterns.push_back(TuplePatternElt(tupleElement.getName(),
-                                                SourceLoc(), letPattern));
-    }
-
-    auto pat = TuplePattern::create(C, SourceLoc(), elementPatterns,
-                                    SourceLoc());
-    pat->setImplicit();
-    return pat;
-  }
-
-  // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
-  // underlying type is the same as the payload. For example:
-  // case a(Int) => (let a0)
-  auto underlyingType = argumentType->getWithoutParens();
-  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
-  boundVars.push_back(payloadVar);
-
-  auto namedPattern = new (C) NamedPattern(payloadVar);
-  namedPattern->setImplicit();
-  auto letPattern = new (C) VarPattern(SourceLoc(), /*isLet*/ true,
-                                       namedPattern);
-  auto pat = new (C) ParenPattern(SourceLoc(), letPattern, SourceLoc());
-  pat->setImplicit();
-  return pat;
 }
 
 /// Returns a generated guard statement that checks whether the given lhs and
