@@ -388,12 +388,15 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     if (conformance->isAbstract()) {
       // FIXME: Rip this out once we can get a concrete conformance from
       // an archetype.
-      auto *M = proto->getParentModule();
       auto substType = type.subst(*this);
+      if (substType->hasError())
+        return ProtocolConformanceRef(proto);
+
       if ((!substType->is<ArchetypeType>() ||
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
+        auto *M = proto->getParentModule();
         return M->lookupConformance(substType, proto);
       }
 
