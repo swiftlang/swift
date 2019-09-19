@@ -12,5 +12,10 @@ config.swift_test_results_dir = \
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 
+if "@SWIFT_LSAN_BUILD@" == "TRUE":
+  config.available_features.add('lsan')
+else:
+  config.available_features.add('no_lsan')
+
 # Let the main config do the real work.
 lit_config.load_config(config, "@SWIFT_SOURCE_DIR@/test/Unit/lit.cfg")

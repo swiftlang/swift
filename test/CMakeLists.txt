@@ -123,8 +123,12 @@ if(NOT CMAKE_CFG_INTDIR STREQUAL ".")
        "--param" "build_mode=${CMAKE_CFG_INTDIR}")
 endif()
 
-if (LLVM_USE_SANITIZER STREQUAL "Address")
+if (LLVM_USE_SANITIZER MATCHES ".*Address.*")
   set(SWIFT_ASAN_BUILD TRUE)
+endif()
+
+if (LLVM_USE_SANITIZER MATCHES ".*Leaks.*")
+  set(SWIFT_LSAN_BUILD TRUE)
 endif()
 
 # Normalize spelling of boolean values.

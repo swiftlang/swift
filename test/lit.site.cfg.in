@@ -58,6 +58,11 @@ if "@SWIFT_ASAN_BUILD@" == "TRUE":
 else:
     config.available_features.add('no_asan')
 
+if "@SWIFT_LSAN_BUILD@" == "TRUE":
+    config.available_features.add('lsan')
+else:
+    config.available_features.add('no_lsan')
+
 if "@SWIFT_RUNTIME_ENABLE_LEAK_CHECKER@" == "TRUE":
     config.available_features.add('leak-checker')
 
