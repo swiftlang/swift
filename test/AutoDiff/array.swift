@@ -90,6 +90,19 @@ ArrayAutoDiffTests.test("ArrayConcat") {
       in: sumFirstThreeConcatted))
 }
 
+ArrayAutoDiffTests.test("Array.init(repeating:count:)") {
+  @differentiable
+  func repeating(_ x: Tracked<Float>) -> [Tracked<Float>] {
+    Array(repeating: x, count: 10)
+  }
+  expectEqual(Tracked<Float>(10), gradient(at: .zero) { x in
+    repeating(x).differentiableReduce(0, {$0 + $1}).value
+  })
+  expectEqual(Tracked<Float>(20), pullback(at: .zero, in: { x in
+    repeating(x).differentiableReduce(0, {$0 + $1}).value
+  })(2))
+}
+
 ArrayAutoDiffTests.test("Array.DifferentiableView.init") {
   @differentiable
   func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {

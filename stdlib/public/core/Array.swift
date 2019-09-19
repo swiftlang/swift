@@ -867,6 +867,8 @@ extension Array: RangeReplaceableCollection {
   ///     `repeating` parameter. `count` must be zero or greater.
   @inlinable
   @_semantics("array.init")
+  @differentiable(wrt: repeatedValue, vjp: _vjpInit(repeating:count:)
+                  where Element: Differentiable)
   public init(repeating repeatedValue: Element, count: Int) {
     var p: UnsafeMutablePointer<Element>
     (self, p) = Array._allocateUninitialized(count)
@@ -2102,5 +2104,16 @@ extension Array where Element : Differentiable {
             gradientIn.base[lhs.count...])))
       }
       return (lhs + rhs, pullback)
+  }
+}
+
+extension Array where Element: Differentiable {
+  @usableFromInline
+  static func _vjpInit(repeating repeatedValue: Element, count: Int) -> (
+    value: Self, pullback: (TangentVector) -> Element.TangentVector
+  ) {
+    (value: Self(repeating: repeatedValue, count: count), pullback: { v in
+      v.base.reduce(.zero, +)
+    })
   }
 }
