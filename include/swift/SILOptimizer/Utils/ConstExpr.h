@@ -45,6 +45,10 @@ class UnknownReason;
 class ConstExprEvaluator {
   SymbolicValueAllocator &allocator;
 
+  // Assert configuration that must be used by the evaluator. This determines
+  // the result of the builtin "assert_configuration".
+  unsigned assertConfig;
+
   /// The current call stack, used for providing accurate diagnostics.
   llvm::SmallVector<SourceLoc, 4> callStack;
 
@@ -58,12 +62,14 @@ class ConstExprEvaluator {
 
 public:
   explicit ConstExprEvaluator(SymbolicValueAllocator &alloc,
-                              bool trackCallees = false);
+                              unsigned assertConf, bool trackCallees = false);
   ~ConstExprEvaluator();
 
   explicit ConstExprEvaluator(const ConstExprEvaluator &other);
 
   SymbolicValueAllocator &getAllocator() { return allocator; }
+
+  unsigned getAssertConfig() { return assertConfig; }
 
   void pushCallStack(SourceLoc loc) { callStack.push_back(loc); }
 
@@ -124,7 +130,8 @@ public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a
   /// SILFunction.
   explicit ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
-                                  SILFunction *fun, bool trackCallees = false);
+                                  SILFunction *fun, unsigned assertConf,
+                                  bool trackCallees = false);
   ~ConstExprStepEvaluator();
 
   /// Evaluate an instruction in the current interpreter state.

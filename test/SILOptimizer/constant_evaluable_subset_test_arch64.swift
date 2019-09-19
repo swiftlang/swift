@@ -70,8 +70,8 @@ internal func interpretIntTruncations() -> Int16 {
 @_semantics("constant_evaluable")
 internal func testInvalidIntTruncations(a: Int64) -> Int8 {
   return Int8(a)
-    // CHECK: note: assertion failed with message: Fatal error: Not enough bits to represent the passed value: {{.*}}/Integers.swift:
-    // CHECK: note: assertion failed during this call
+    // CHECK: note: {{.*}} Not enough bits to represent the passed value
+    // CHECK: note: operation performed during this call traps
     // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
 }
 
