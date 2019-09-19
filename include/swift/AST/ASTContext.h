@@ -69,7 +69,6 @@ namespace swift {
   class LazyGenericContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
-  class LazyMemberParser;
   class LazyResolver;
   class PatternBindingDecl;
   class PatternBindingInitializer;
@@ -115,6 +114,10 @@ namespace swift {
   class DifferentiableAttr;
 
   enum class KnownProtocolKind : uint8_t;
+
+namespace namelookup {
+  class ImportCache;
+}
 
 namespace syntax {
   class SyntaxArena;
@@ -426,13 +429,6 @@ public:
     return true;
   }
 
-  /// Remove the lazy resolver, if there is one.
-  ///
-  /// FIXME: We probably don't ever want to do this.
-  void removeLazyResolver() {
-    setLazyResolver(nullptr);
-  }
-
   /// Retrieve the lazy resolver for this context.
   LazyResolver *getLazyResolver() const;
 
@@ -441,12 +437,6 @@ private:
   void setLazyResolver(LazyResolver *resolver);
 
 public:
-  /// Add a lazy parser for resolving members later.
-  void addLazyParser(LazyMemberParser *parser);
-
-  /// Remove a lazy parser.
-  void removeLazyParser(LazyMemberParser *parser);
-
   /// getIdentifier - Return the uniqued and AST-Context-owned version of the
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
@@ -732,7 +722,9 @@ public:
   /// If there is no Clang module loader, returns a null pointer.
   /// The loader is owned by the AST context.
   ClangModuleLoader *getDWARFModuleLoader() const;
-  
+
+  namelookup::ImportCache &getImportCache() const;
+
   /// Asks every module loader to verify the ASTs it has loaded.
   ///
   /// Does nothing in non-asserts (NDEBUG) builds.
@@ -864,16 +856,6 @@ public:
   /// across all calls for the same \p func.
   LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
                                               LazyMemberLoader *lazyLoader);
-
-  /// Use the lazy parsers associated with the context to populate the members
-  /// of the given decl context.
-  ///
-  /// \param IDC The context whose member decls should be lazily parsed.
-  void parseMembers(IterableDeclContext *IDC);
-
-  /// Use the lazy parsers associated with the context to check whether the decl
-  /// context has been parsed.
-  bool hasUnparsedMembers(const IterableDeclContext *IDC) const;
 
   /// Get the lazy function data for the given generic context.
   ///

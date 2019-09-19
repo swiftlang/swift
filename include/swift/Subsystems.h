@@ -284,6 +284,23 @@ namespace swift {
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                           const SILModule *M = nullptr);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Serializes a module or single source file to a memory buffer, and returns
+  /// the memory buffer in an output parameter. Does not write to the
+  /// filesystem.
+  ///
+  /// \param moduleBuffer will be set to a pointer to the serialized module
+  ///                     buffer. nullptr is allowed, in which case the module
+  ///                     will not be serialized.
+  /// \param moduleDocBuffer will be set to a pointer to the serialized module
+  ///                        doc buffer. nullptr is allowed, in which case the
+  ///                        module doc will not be serialized.
+  void serializeToMemory(ModuleOrSourceFile DC,
+                         const SerializationOptions &options,
+                         std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
+                         std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                         const SILModule *M = nullptr);
+
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.
   std::tuple<llvm::TargetOptions, std::string, std::vector<std::string>,
              std::string>
@@ -388,6 +405,13 @@ namespace swift {
   ///
   /// The ASTContext will automatically call these upon construction.
   void registerNameLookupRequestFunctions(Evaluator &evaluator);
+
+  /// Register Parse-level request functions with the evaluator.
+  ///
+  /// Clients that form an ASTContext and will perform any parsing queries
+  /// using Parse-level logic should call these functions after forming the
+  /// ASTContext.
+  void registerParseRequestFunctions(Evaluator &evaluator);
 
   /// Register Sema-level request functions with the evaluator.
   ///

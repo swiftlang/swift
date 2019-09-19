@@ -256,6 +256,21 @@ protected:
                                           Inst->isInitializationOfDest()));
   }
 
+  SILValue remapResultType(SILLocation loc, SILValue val) {
+    auto specializedTy = remapType(val->getType());
+    if (val->getType() == specializedTy)
+      return val;
+    return createCast(loc, val, specializedTy);
+  }
+
+  void visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto loc = getOpLocation(Inst->getLoc());
+    auto opd = remapResultType(loc, getOpValue(Inst->getOperand()));
+    recordClonedInstruction(Inst, getBuilder().createThinToThickFunction(
+                                      loc, opd, getOpType(Inst->getType())));
+  }
+
   void visitStoreInst(StoreInst *Inst) {
     auto src = getOpValue(Inst->getSrc());
     auto dst = getOpValue(Inst->getDest());

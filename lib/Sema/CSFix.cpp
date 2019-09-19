@@ -247,14 +247,14 @@ AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
-  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
-                                                 getActual(), getRequired(),
-                                                 getMismatches(), getLocator());
+  auto &cs = getConstraintSystem();
+  GenericArgumentsMismatchFailure failure(root, cs, getFromType(), getToType(),
+                                          getMismatches(), getLocator());
   return failure.diagnose(asNote);
 }
 
 GenericArgumentsMismatch *GenericArgumentsMismatch::create(
-    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    ConstraintSystem &cs, Type actual, Type required,
     llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
   void *mem =
@@ -482,21 +482,6 @@ bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   return failure.diagnose(asNote);
 }
 
-IgnoreDefaultArgumentTypeMismatch *
-IgnoreDefaultArgumentTypeMismatch::create(ConstraintSystem &cs, Type fromType,
-                                          Type toType,
-                                          ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      IgnoreDefaultArgumentTypeMismatch(cs, fromType, toType, locator);
-}
-
-bool IgnoreDefaultArgumentTypeMismatch::diagnose(Expr *root,
-                                                 bool asNote) const {
-  DefaultArgumentTypeMismatch failure(root, getConstraintSystem(), FromType,
-                                      ToType, getLocator());
-  return failure.diagnose(asNote);
-}
-
 AddMissingArguments *
 AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
                             llvm::ArrayRef<Param> synthesizedArgs,
@@ -623,13 +608,14 @@ KeyPathContextualMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool RemoveAddressOf::diagnose(Expr *root, bool asNote) const {
-  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getLocator());
+  InvalidUseOfAddressOf failure(root, getConstraintSystem(), getFromType(),
+                                getToType(), getLocator());
   return failure.diagnose(asNote);
 }
 
-RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs,
+RemoveAddressOf *RemoveAddressOf::create(ConstraintSystem &cs, Type lhs, Type rhs,
                                          ConstraintLocator *locator) {
-  return new (cs.getAllocator()) RemoveAddressOf(cs, locator);
+  return new (cs.getAllocator()) RemoveAddressOf(cs, lhs, rhs, locator);
 }
 
 bool RemoveReturn::diagnose(Expr *root, bool asNote) const {
@@ -742,4 +728,47 @@ bool AllowTupleSplatForSingleParameter::attempt(
       cs, paramTy, cs.getConstraintLocator(locator));
 
   return cs.recordFix(fix);
+}
+
+bool DropThrowsAttribute::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ThrowingFunctionConversionFailure failure(root, cs, getFromType(),
+                                            getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+DropThrowsAttribute *DropThrowsAttribute::create(ConstraintSystem &cs,
+                                                 FunctionType *fromType,
+                                                 FunctionType *toType,
+                                                 ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      DropThrowsAttribute(cs, fromType, toType, locator);
+}
+
+bool IgnoreContextualType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ContextualFailure failure(root, cs, getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
+                                                   Type resultTy,
+                                                   Type specifiedTy,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreContextualType(cs, resultTy, specifiedTy, locator);
+}
+
+bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InOutConversionFailure failure(root, cs, getFromType(), getToType(),
+                                 getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
+                                                   Type argType, Type paramType,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInOutConversion(cs, argType, paramType, locator);
 }

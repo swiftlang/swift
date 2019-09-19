@@ -21,8 +21,10 @@
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/LazyResolver.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/LazyResolver.h"
+#include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
@@ -176,22 +178,54 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
 /// figure out which of these declarations have been shadowed by others.
 static void recordShadowedDeclsAfterSignatureMatch(
                               ArrayRef<ValueDecl *> decls,
-                              const ModuleDecl *curModule,
+                              const DeclContext *dc,
                               llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
   assert(decls.size() > 1 && "Nothing collided");
 
   // Compare each declaration to every other declaration. This is
   // unavoidably O(n^2) in the number of declarations, but because they
   // all have the same signature, we expect n to remain small.
+  auto *curModule = dc->getParentModule();
   ASTContext &ctx = curModule->getASTContext();
+  auto &imports = ctx.getImportCache();
+
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
-    auto firstSig = firstDecl->getOverloadSignature();
+    auto name = firstDecl->getBaseName();
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
+
+      // Top-level type declarations in a module shadow other declarations
+      // visible through the module's imports.
+      //
+      // [Backward compatibility] Note that members of types have the same
+      // shadowing check, but we do it after dropping unavailable members.
+      if (firstModule != secondModule &&
+          firstDecl->getDeclContext()->isModuleScopeContext() &&
+          secondDecl->getDeclContext()->isModuleScopeContext()) {
+        // First, scoped imports shadow unscoped imports.
+        bool firstScoped = imports.isScopedImport(firstModule, name, dc);
+        bool secondScoped = imports.isScopedImport(secondModule, name, dc);
+        if (!firstScoped && secondScoped) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (firstScoped && !secondScoped) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+
+        // Now check if one module shadows the other.
+        if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (imports.isShadowedBy(secondModule, firstModule, name, dc)) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+      }
 
       // Swift 4 compatibility hack: Don't shadow properties defined in
       // extensions of generic types with properties defined elsewhere.
@@ -200,6 +234,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // used the null type.
       if (!ctx.isSwiftVersionAtLeast(5)) {
         auto secondSig = secondDecl->getOverloadSignature();
+        auto firstSig = firstDecl->getOverloadSignature();
         if (firstSig.IsVariable && secondSig.IsVariable)
           if (firstSig.InExtensionOfGenericType !=
               secondSig.InExtensionOfGenericType)
@@ -237,22 +272,19 @@ static void recordShadowedDeclsAfterSignatureMatch(
           isa<ProtocolDecl>(secondDecl->getDeclContext()))
         continue;
 
-      // Prefer declarations in the current module over those in another
-      // module.
-      // FIXME: This is a hack. We should query a (lazily-built, cached)
-      // module graph to determine shadowing.
-      if ((firstModule == curModule) != (secondModule == curModule)) {
-        // If the first module is the current module, the second declaration
-        // is shadowed by the first.
-        if (firstModule == curModule) {
+      // [Backward compatibility] For members of types, the general module
+      // shadowing check is performed after unavailable candidates have
+      // already been dropped.
+      if (firstModule != secondModule &&
+          !firstDecl->getDeclContext()->isModuleScopeContext() &&
+          !secondDecl->getDeclContext()->isModuleScopeContext()) {
+        if (imports.isShadowedBy(firstModule, secondModule, dc)) {
+          shadowed.insert(firstDecl);
+          break;
+        } else if (imports.isShadowedBy(secondModule, firstModule, dc)) {
           shadowed.insert(secondDecl);
           continue;
         }
-
-        // Otherwise, the first declaration is shadowed by the second. There is
-        // no point in continuing to compare the first declaration to others.
-        shadowed.insert(firstDecl);
-        break;
       }
 
       // Prefer declarations in the any module over those in the standard
@@ -363,7 +395,7 @@ static void recordShadowedDeclsForImportedInits(
 /// recording those that are shadowed by another declaration in the
 /// \c shadowed set.
 static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
-                                const ModuleDecl *curModule,
+                                const DeclContext *dc,
                                 llvm::SmallPtrSetImpl<ValueDecl *> &shadowed) {
   if (decls.size() < 2)
     return;
@@ -432,7 +464,7 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
 
   // Check whether we have shadowing for signature collisions.
   for (auto signature : collisionTypes) {
-    recordShadowedDeclsAfterSignatureMatch(collisions[signature], curModule,
+    recordShadowedDeclsAfterSignatureMatch(collisions[signature], dc,
                                            shadowed);
   }
 
@@ -444,7 +476,7 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
 }
 
 bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
-                                const ModuleDecl *curModule) {
+                                const DeclContext *dc) {
   // Collect declarations with the same (full) name.
   llvm::SmallDenseMap<DeclName, llvm::TinyPtrVector<ValueDecl *>>
     collidingDeclGroups;
@@ -471,7 +503,7 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
       continue;
     }
 
-    recordShadowedDecls(known->second, curModule, shadowed);
+    recordShadowedDecls(known->second, dc, shadowed);
     collidingDeclGroups.erase(known);
   }
 
@@ -1025,6 +1057,7 @@ populateLookupTableEntryFromExtensions(ASTContext &ctx,
   if (!ignoreNewExtensions) {
     for (auto e : nominal->getExtensions()) {
       if (e->wasDeserialized() || e->hasClangNode()) {
+        assert(!e->hasUnparsedMembers());
         if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
                                                       name, e)) {
           return true;
@@ -1054,6 +1087,8 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
   }
 
   if (hasLazyMembers()) {
+    assert(!hasUnparsedMembers());
+
     // Lazy members: if the table needs population, populate the table _only
     // from those members already in the IDC member list_ such as implicits or
     // globals-as-members, then update table entries from the extensions that
@@ -1185,6 +1220,14 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
       if (!ignoreNewExtensions) {
         for (auto E : getExtensions())
           (void)E->getMembers();
+      }
+    } else {
+      // We still have to parse any unparsed extensions.
+      if (!ignoreNewExtensions) {
+        for (auto *e : getExtensions()) {
+          if (e->getParentSourceFile() != nullptr)
+            e->loadAllMembers();
+        }
       }
     }
 
@@ -1367,10 +1410,10 @@ void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
     removeOverriddenDecls(decls);
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
-  ModuleDecl *M = dc->getParentModule();
   if (options & NL_RemoveNonVisible)
-    removeShadowedDecls(decls, M);
+    removeShadowedDecls(decls, dc);
 
+  ModuleDecl *M = dc->getParentModule();
   filterForDiscriminator(decls, M->getDebugClient());
 }
 
@@ -1426,7 +1469,6 @@ static void extractDirectlyReferencedNominalTypes(
 bool DeclContext::lookupQualified(Type type,
                                   DeclName member,
                                   NLOptions options,
-                                  LazyResolver *typeResolver,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
@@ -1452,6 +1494,10 @@ bool DeclContext::lookupQualified(ArrayRef<NominalTypeDecl *> typeDecls,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
   assert(decls.empty() && "additive lookup not supported");
+
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInNominal++;
 
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
@@ -1589,20 +1635,26 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
                                   SmallVectorImpl<ValueDecl *> &decls) const {
   using namespace namelookup;
 
+  auto &ctx = getASTContext();
+  auto *stats = ctx.Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInModule++;
+
   // Configure lookup and dig out the tracker.
   ReferencedNameTracker *tracker = nullptr;
   bool isLookupCascading;
   configureLookup(this, options, tracker, isLookupCascading);
 
-  ASTContext &ctx = getASTContext();
+  auto kind = (options & NL_OnlyTypes
+               ? ResolutionKind::TypesOnly
+               : ResolutionKind::Overloadable);
   auto topLevelScope = getModuleScopeContext();
   if (module == topLevelScope->getParentModule()) {
     if (tracker) {
       recordLookupOfTopLevelName(topLevelScope, member, isLookupCascading);
     }
-    lookupInModule(module, /*accessPath=*/{}, member, decls,
-                   NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                   ctx.getLazyResolver(), topLevelScope);
+    lookupInModule(module, member, decls,
+                   NLKind::QualifiedLookup, kind, topLevelScope);
   } else {
     // Note: This is a lookup into another module. Unless we're compiling
     // multiple modules at once, or if the other module re-exports this one,
@@ -1610,28 +1662,16 @@ bool DeclContext::lookupQualified(ModuleDecl *module, DeclName member,
     // anything in this one.
 
     // Perform the lookup in all imports of this module.
-    forAllVisibleModules(this,
-                         [&](const ModuleDecl::ImportedModule &import) -> bool {
-      if (import.second != module)
-        return true;
-      lookupInModule(import.second, import.first, member, decls,
-                     NLKind::QualifiedLookup, ResolutionKind::Overloadable,
-                     ctx.getLazyResolver(), topLevelScope);
-      // If we're able to do an unscoped lookup, we see everything. No need
-      // to keep going.
-      return !import.first.empty();
-    });
+    auto accessPaths = ctx.getImportCache().getAllVisibleAccessPaths(
+        module, topLevelScope);
+    if (llvm::any_of(accessPaths,
+                     [&](ModuleDecl::AccessPathTy accessPath) {
+                       return ModuleDecl::matchesAccessPath(accessPath, member);
+                     })) {
+      lookupInModule(module, member, decls,
+                     NLKind::QualifiedLookup, kind, topLevelScope);
+    }
   }
-
-  llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
-  decls.erase(std::remove_if(decls.begin(), decls.end(),
-                             [&](ValueDecl *vd) -> bool {
-    // If we're performing a type lookup, skip non-types.
-    if ((options & NL_OnlyTypes) && !isa<TypeDecl>(vd))
-      return true;
-
-    return !knownDecls.insert(vd).second;
-  }), decls.end());
 
   pruneLookupResultSet(this, options, decls);
 
@@ -1660,11 +1700,15 @@ bool DeclContext::lookupAnyObject(DeclName member, NLOptions options,
   if (options & NL_OnlyTypes)
     return false;
 
+  auto *stats = getASTContext().Stats;
+  if (stats)
+    stats->getFrontendCounters().NumLookupQualifiedInAnyObject++;
+
   // Collect all of the visible declarations.
   SmallVector<ValueDecl *, 4> allDecls;
-  forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(this)) {
     import.second->lookupClassMember(import.first, member, allDecls);
-  });
+  }
 
   // For each declaration whose context is not something we've
   // already visited above, add it to the list of declarations.
@@ -1706,9 +1750,9 @@ void DeclContext::lookupAllObjCMethods(
        ObjCSelector selector,
        SmallVectorImpl<AbstractFunctionDecl *> &results) const {
   // Collect all of the methods with this selector.
-  forAllVisibleModules(this, [&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(this)) {
     import.second->lookupObjCMethods(selector, results);
-  });
+  }
 
   // Filter out duplicates.
   llvm::SmallPtrSet<AbstractFunctionDecl *, 8> visited;
@@ -1810,11 +1854,13 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
 
 /// Perform unqualified name lookup for types at the given location.
 static DirectlyReferencedTypeDecls
-directReferencesForUnqualifiedTypeLookup(ASTContext &ctx, DeclName name,
+directReferencesForUnqualifiedTypeLookup(DeclName name,
                                          SourceLoc loc, DeclContext *dc) {
   DirectlyReferencedTypeDecls results;
-  UnqualifiedLookup::Options options = UnqualifiedLookup::Flags::TypeLookup;
-  UnqualifiedLookup lookup(name, dc, ctx.getLazyResolver(), loc, options);
+  UnqualifiedLookup::Options options =
+      UnqualifiedLookup::Flags::TypeLookup |
+      UnqualifiedLookup::Flags::AllowProtocolMembers;
+  UnqualifiedLookup lookup(name, dc, loc, options);
   for (const auto &result : lookup.Results) {
     if (auto typeDecl = dyn_cast<TypeDecl>(result.getValueDecl()))
       results.push_back(typeDecl);
@@ -1886,8 +1932,7 @@ directReferencesForIdentTypeRepr(Evaluator &evaluator,
     // For the first component, perform unqualified name lookup.
     if (current.empty()) {
       current =
-        directReferencesForUnqualifiedTypeLookup(ctx,
-                                                 component->getIdentifier(),
+        directReferencesForUnqualifiedTypeLookup(component->getIdentifier(),
                                                  component->getIdLoc(),
                                                  dc);
 
@@ -2110,10 +2155,9 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   ASTContext &ctx = ext->getASTContext();
 
   // Prefer syntactic information when we have it.
-  TypeLoc &typeLoc = ext->getExtendedTypeLoc();
-  if (auto typeRepr = typeLoc.getTypeRepr()) {
+  if (auto typeRepr = ext->getExtendedTypeRepr()) {
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-  } else if (auto type = typeLoc.getType()) {
+  } else if (auto type = ext->getExtendedType()) {
     // Fall back to semantic types.
     // FIXME: In the long run, we shouldn't need this. Non-syntactic results
     // should be cached.

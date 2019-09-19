@@ -1,0 +1,132 @@
+// RUN: %target-sil-opt -dont-abort-on-memory-lifetime-errors -o /dev/null %s 2>&1 | %FileCheck %s
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// A non-trivial type
+class T {
+  init()
+}
+
+struct Inner {
+  var a: T
+  var b: T
+}
+
+struct Outer {
+  var x: T
+  var y: Inner
+  var z: T
+}
+
+// CHECK: SIL memory lifetime failure in @test_simple: indirect argument is not alive at function return
+sil [ossa] @test_simple : $@convention(thin) (@inout T) -> @owned T {
+bb0(%0 : $*T):
+  %2 = begin_access [read] [static] %0 : $*T
+  %3 = load [copy] %2 : $*T
+  end_access %2 : $*T
+  br bb1
+bb1:
+  destroy_addr %0 : $*T
+  return %3 : $T
+}
+
+// CHECK: SIL memory lifetime failure in @test_loop: memory is initialized at function return but shouldn't
+sil [ossa] @test_loop : $@convention(thin) (@in T) -> @owned T {
+bb0(%0 : $*T):
+  %2 = begin_access [read] [static] %0 : $*T
+  %3 = load [copy] %2 : $*T
+  end_access %2 : $*T
+  br bb1
+bb1:
+  cond_br undef, bb1, bb2
+bb2:
+  return %3 : $T
+}
+
+// CHECK: SIL memory lifetime failure in @test_merge: lifetime mismatch in predecessors
+sil [ossa] @test_merge : $@convention(thin) (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = alloc_stack $T
+  cond_br undef, bb1, bb2
+
+bb1:
+  copy_addr %0 to [initialization] %2 : $*T
+  br bb3
+bb2:
+  copy_addr %0 to [initialization] %2 : $*T
+  destroy_addr %2 : $*T
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// CHECK: SIL memory lifetime failure in @test_nesting: memory is initialized at function return but shouldn't
+sil [ossa] @test_nesting : $@convention(thin) (@in Outer) -> () {
+bb0(%0 : $*Outer):
+  %1 = struct_element_addr %0 : $*Outer, #Outer.x
+  %2 = struct_element_addr %0 : $*Outer, #Outer.y
+  destroy_addr %1 : $*T
+  destroy_addr %2 : $*Inner
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+
+// CHECK: SIL memory lifetime failure in @test_try_apply_return: memory is initialized, but shouldn't
+sil [ossa] @test_try_apply_return : $@convention(thin) () -> ((), @error Error) {
+bb0:
+  %0 = alloc_stack $T
+  %1 = function_ref @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+  try_apply %1(%0) : $@convention(thin) () -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%2 : $()):
+  dealloc_stack %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+
+bb2(%4 : @owned $Error):
+  dealloc_stack %0 : $*T
+  throw %4 : $Error
+
+}
+
+// CHECK: SIL memory lifetime failure in @test_try_apply_throw: memory is not initialized, but should
+sil [ossa] @test_try_apply_throw : $@convention(thin) () -> ((), @error Error) {
+bb0:
+  %0 = alloc_stack $T
+  %1 = function_ref @throwing_func : $@convention(thin) () -> (@out T, @error Error)
+  try_apply %1(%0) : $@convention(thin) () -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%2 : $()):
+  destroy_addr %0 : $*T
+  dealloc_stack %0 : $*T
+  %3 = tuple ()
+  return %3 : $()
+
+bb2(%4 : @owned $Error):
+  destroy_addr %0 : $*T
+  dealloc_stack %0 : $*T
+  throw %4 : $Error
+
+}
+
+// CHECK: SIL memory lifetime failure in @test_single_block: memory is initialized, but shouldn't
+sil [ossa] @test_single_block : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %2 = alloc_stack $T
+  store %0 to [init] %2 : $*T
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+

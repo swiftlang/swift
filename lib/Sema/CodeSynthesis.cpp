@@ -25,7 +25,6 @@
 #include "swift/AST/Availability.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
@@ -254,7 +253,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
   auto *ctor =
     new (ctx) ConstructorDecl(name, Loc,
-                              OTK_None, /*FailabilityLoc=*/SourceLoc(),
+                              /*Failable=*/false, /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               paramList, /*GenericParams=*/nullptr, decl);
 
@@ -407,15 +406,14 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
                                              SourceLoc());
 
     // Build a generic signature for the derived class initializer.
-    GenericSignatureBuilder builder(ctx);
-    builder.addGenericSignature(classDecl->getGenericSignature());
 
     // Add the generic parameters.
-    for (auto *newParam : newParams)
-      builder.addGenericParameter(newParam);
+    SmallVector<GenericTypeParamType *, 1> newParamTypes;
+    for (auto *newParam : newParams) {
+      newParamTypes.push_back(
+          newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
+    }
 
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
     auto *superclassSig = superclassCtor->getGenericSignature();
 
     unsigned superclassDepth = 0;
@@ -443,16 +441,24 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
       return ProtocolConformanceRef(proto);
     };
 
+    SmallVector<Requirement, 2> requirements;
     for (auto reqt : superclassSig->getRequirements())
       if (auto substReqt = reqt.subst(substFn, lookupConformanceFn))
-        builder.addRequirement(*substReqt, source, nullptr);
+        requirements.push_back(*substReqt);
 
     // Now form the substitution map that will be used to remap parameter
     // types.
     subMap = SubstitutionMap::get(superclassSig,
                                   substFn, lookupConformanceFn);
 
-    auto *genericSig = std::move(builder).computeGenericSignature(SourceLoc());
+    auto *genericSig = evaluateOrDefault(
+        ctx.evaluator,
+        AbstractGenericSignatureRequest{
+          classDecl->getGenericSignature(),
+          std::move(newParamTypes),
+          std::move(requirements)
+        },
+        nullptr);
     genericEnv = genericSig->createGenericEnvironment();
   } else {
     genericEnv = classDecl->getGenericEnvironment();
@@ -554,8 +560,7 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   subs = SubstitutionMap::getOverrideSubstitutions(superclassCtor, fn, subs);
   ConcreteDeclRef ctorRef(superclassCtor, subs);
 
-  auto type = superclassCtor->getInitializerInterfaceType()
-      .subst(subs, SubstFlags::UseErrorType);
+  auto type = superclassCtor->getInitializerInterfaceType().subst(subs);
   auto *ctorRefExpr =
       new (ctx) OtherConstructorDeclRefExpr(ctorRef, DeclNameLoc(),
                                             IsImplicit, type);
@@ -654,20 +659,27 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Determine the initializer parameters.
 
   // Create the initializer parameter patterns.
-  OptionSet<ParameterList::CloneFlags> options = ParameterList::Implicit;
-  options |= ParameterList::Inherited;
-  auto *bodyParams = superclassCtor->getParameters()->clone(ctx, options);
+  OptionSet<ParameterList::CloneFlags> options
+    = (ParameterList::Implicit |
+       ParameterList::Inherited |
+       ParameterList::WithoutTypes);
+  auto *superclassParams = superclassCtor->getParameters();
+  auto *bodyParams = superclassParams->clone(ctx, options);
 
   // If the superclass is generic, we need to map the superclass constructor's
   // parameter types into the generic context of our class.
   //
   // We might have to apply substitutions, if for example we have a declaration
   // like 'class A : B<Int>'.
-  for (auto *decl : *bodyParams) {
-    auto paramTy = decl->getInterfaceType();
-    auto substTy = paramTy.subst(subMap, SubstFlags::UseErrorType);
-    decl->setInterfaceType(substTy);
-    decl->getTypeLoc() = TypeLoc::withoutLoc(substTy);
+  for (unsigned idx : range(superclassParams->size())) {
+    auto *superclassParam = superclassParams->get(idx);
+    auto *bodyParam = bodyParams->get(idx);
+
+    auto paramTy = superclassParam->getInterfaceType();
+    auto substTy = paramTy.subst(subMap);
+
+    bodyParam->setInterfaceType(substTy);
+    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,
@@ -675,7 +687,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   auto ctor =
     new (ctx) ConstructorDecl(superclassCtor->getFullName(),
                               classDecl->getBraces().Start,
-                              superclassCtor->getFailability(),
+                              superclassCtor->isFailable(),
                               /*FailabilityLoc=*/SourceLoc(),
                               /*Throws=*/superclassCtor->hasThrows(),
                               /*ThrowsLoc=*/SourceLoc(),
@@ -687,10 +699,8 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setGenericEnvironment(genericEnv);
   ctor->computeType();
 
-  if (ctor->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-    ctor->getAttrs().add(
-      new (ctx) ImplicitlyUnwrappedOptionalAttr(/*implicit=*/true));
-  }
+  ctor->setImplicitlyUnwrappedOptional(
+    superclassCtor->isImplicitlyUnwrappedOptional());
 
   ctor->setValidationToChecked();
 

@@ -23,7 +23,7 @@ using namespace swift;
 
 namespace swift {
 // Implement the type checker type zone (zone 10).
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
@@ -817,4 +817,21 @@ EmittedMembersRequest::getCachedResult() const {
 void EmittedMembersRequest::cacheResult(DeclRange result) const {
   auto *classDecl = std::get<0>(getStorage());
   classDecl->setHasForcedEmittedMembers();
+}
+
+//----------------------------------------------------------------------------//
+// IsImplicitlyUnwrappedOptionalRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool>
+IsImplicitlyUnwrappedOptionalRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.isIUOComputed)
+    return decl->LazySemanticInfo.isIUO;
+  return None;
+}
+
+void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setImplicitlyUnwrappedOptional(value);
 }

@@ -187,6 +187,8 @@ public:
 
   const std::vector<Token> &getSplitTokens() const { return SplitTokens; }
 
+  ParsedTokenSyntax markSplitTokenSyntax(tok Kind, StringRef Txt);
+
   void markSplitToken(tok Kind, StringRef Txt);
 
   /// Returns true if the parser reached EOF with incomplete source input, due
@@ -367,6 +369,22 @@ public:
   };
   friend class StructureMarkerRAII;
 
+  /// A RAII object that tells the SyntaxParsingContext to defer Syntax nodes.
+  class DeferringContextRAII {
+    SyntaxParsingContext &Ctx;
+    bool WasDeferring;
+
+  public:
+    explicit DeferringContextRAII(SyntaxParsingContext &SPCtx)
+        : Ctx(SPCtx), WasDeferring(Ctx.shouldDefer()) {
+      Ctx.setShouldDefer();
+    }
+
+    ~DeferringContextRAII() {
+      Ctx.setShouldDefer(WasDeferring);
+    }
+  };
+
   /// The stack of structure markers indicating the locations of
   /// structural elements actively being parsed, including the start
   /// of declarations, statements, and opening operators of various
@@ -529,6 +547,20 @@ public:
     assert(Tok.is(K) && "Consuming wrong token kind");
     return consumeTokenSyntax();
   }
+  SourceLoc leadingTriviaLoc() {
+    return Tok.getLoc().getAdvancedLoc(-LeadingTrivia.getLength());
+  }
+
+  ParsedTokenSyntax consumeIdentifierSyntax(bool allowDollarIdentifier = false) {
+    assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
+
+    Context.getIdentifier(Tok.getText());
+
+    if (Tok.getText()[0] == '$' && !allowDollarIdentifier)
+      diagnoseDollarIdentifier(Tok);
+
+    return consumeTokenSyntax();
+  }
 
   SourceLoc consumeIdentifier(Identifier *Result = nullptr,
                               bool allowDollarIdentifier = false) {
@@ -555,6 +587,17 @@ public:
     return consumeToken();
   }
 
+  ParsedTokenSyntax consumeArgumentLabelSyntax() {
+    assert(Tok.canBeArgumentLabel());
+    if (!Tok.is(tok::kw__)) {
+      Tok.setKind(tok::identifier);
+
+      if (Tok.getText()[0] == '$')
+        diagnoseDollarIdentifier(Tok);
+    }
+    return consumeTokenSyntax();
+  }
+
   /// When we have a token that is an identifier starting with '$',
   /// diagnose it if not permitted in this mode.
   void diagnoseDollarIdentifier(const Token &tok) {
@@ -571,7 +614,15 @@ public:
 
   /// Retrieve the location just past the end of the previous
   /// source location.
-  SourceLoc getEndOfPreviousLoc();
+  SourceLoc getEndOfPreviousLoc() const;
+
+  /// If the current token is the specified kind, consume it and
+  /// return it. Otherwise, return None without consuming it.
+  llvm::Optional<ParsedTokenSyntax> consumeTokenSyntaxIf(tok K) {
+    if (Tok.isNot(K))
+      return llvm::None;
+    return consumeTokenSyntax();
+  }
 
   /// If the current token is the specified kind, consume it and
   /// return true.  Otherwise, return false without consuming it.
@@ -603,6 +654,8 @@ public:
   /// Read tokens until we get to one of the specified tokens, then
   /// return without consuming it.  Because we cannot guarantee that the token
   /// will ever occur, this skips to some likely good stopping point.
+  void skipUntilSyntax(llvm::SmallVectorImpl<ParsedSyntax> &Skipped, tok T1,
+                       tok T2 = tok::NUM_TOKENS);
   void skipUntil(tok T1, tok T2 = tok::NUM_TOKENS);
   void skipUntilAnyOperator();
 
@@ -610,6 +663,9 @@ public:
   /// Applies heuristics that are suitable when trying to find the end of a list
   /// of generic parameters, generic arguments, or list of types in a protocol
   /// composition.
+  void
+  skipUntilGreaterInTypeListSyntax(llvm::SmallVectorImpl<ParsedSyntax> &Skipped,
+                                   bool protocolComposition = false);
   SourceLoc skipUntilGreaterInTypeList(bool protocolComposition = false);
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
@@ -619,14 +675,17 @@ public:
   void skipUntilDeclStmtRBrace(tok T1, tok T2);
 
   void skipUntilDeclRBrace(tok T1, tok T2);
-  
+
   void skipListUntilDeclRBrace(SourceLoc startLoc, tok T1, tok T2);
-  
+  void skipListUntilDeclRBraceSyntax(SmallVectorImpl<ParsedSyntax> &Skipped,
+                                     SourceLoc startLoc, tok T1, tok T2);
+
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
   /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
+  void skipSingleSyntax(llvm::SmallVectorImpl<ParsedSyntax> &Skipped);
   void skipSingle();
 
   /// Skip until the next '#else', '#endif' or until eof.
@@ -708,18 +767,20 @@ public:
   /// Consume the starting '<' of the current token, which may either
   /// be a complete '<' token or some kind of operator token starting with '<',
   /// e.g., '<>'.
+  ParsedTokenSyntax consumeStartingLessSyntax();
   SourceLoc consumeStartingLess();
 
   /// Consume the starting '>' of the current token, which may either
   /// be a complete '>' token or some kind of operator token starting with '>',
   /// e.g., '>>'.
+  ParsedTokenSyntax consumeStartingGreaterSyntax();
   SourceLoc consumeStartingGreater();
 
   /// Consume the starting character of the current token, and split the
   /// remainder of the token into a new token (or tokens).
-  SourceLoc
-  consumeStartingCharacterOfCurrentToken(tok Kind = tok::oper_binary_unspaced,
-                                         size_t Len = 1);
+  ParsedTokenSyntax
+  consumeStartingCharacterOfCurrentTokenSyntax(tok Kind, size_t Len = 1);
+  SourceLoc consumeStartingCharacterOfCurrentToken(tok Kind, size_t Len = 1);
 
   swift::ScopeInfo &getScopeInfo() { return State->getScopeInfo(); }
 
@@ -746,6 +807,7 @@ public:
   ///
   /// \returns false on success, true on error.
   bool parseIdentifier(Identifier &Result, SourceLoc &Loc, const Diagnostic &D);
+  llvm::Optional<ParsedTokenSyntax> parseIdentifierSyntax(const Diagnostic &D);
   
   /// Consume an identifier with a specific expected name.  This is useful for
   /// contextually sensitive keywords that must always be present.
@@ -795,7 +857,9 @@ public:
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
   bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
-  
+  llvm::Optional<ParsedTokenSyntax> parseTokenSyntax(tok K,
+                                                     const Diagnostic &D);
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   bool parseToken(tok K, Diag<DiagArgTypes...> ID, ArgTypes... Args) {
     SourceLoc L;
@@ -807,9 +871,8 @@ public:
     return parseToken(K, L, Diagnostic(ID, Args...));
   }
   
-  /// Parse the specified expected token and return its location
-  /// on success.  On failure, emit the specified error diagnostic, and
-  /// a note at the specified note location.
+  /// Parse the specified expected token and return its location on success.  On failure, emit the specified
+  /// error diagnostic,  a note at the specified note location, and return the location of the previous token.
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
@@ -820,11 +883,34 @@ public:
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
                             const Diagnostic &D);
 
+  llvm::Optional<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc);
+
+  /// Returns the proper location for a missing right brace, parenthesis, etc.
+  SourceLoc getLocForMissingMatchingToken() const;
+
+  /// When encountering an error or a missing matching token (e.g. '}'), return
+  /// the location to use for it. This value should be at the last token in
+  /// the ASTNode being parsed so that it nests within any enclosing nodes, and,
+  /// for ASTScope lookups, it does not preceed any identifiers to be looked up.
+  /// However, the latter case does not hold when  parsing an interpolated
+  /// string literal because there may be identifiers to be looked up in the
+  /// literal and their locations will not precede the location of a missing
+  /// close brace.
+  SourceLoc getErrorOrMissingLoc() const;
+
   /// Parse a comma separated list of some elements.
   ParserStatus parseList(tok RightK, SourceLoc LeftLoc, SourceLoc &RightLoc,
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
                          llvm::function_ref<ParserStatus()> callback);
+  ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
+                               llvm::Optional<ParsedTokenSyntax> &LastComma,
+                               SourceLoc &RightLoc,
+                               llvm::Optional<ParsedTokenSyntax> &Right,
+                               llvm::SmallVectorImpl<ParsedSyntax>& Junk,
+                               bool AllowSepAfterLast, Diag<> ErrorDiag,
+                               llvm::function_ref<ParserStatus()> callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);
@@ -892,13 +978,17 @@ public:
 
   void parseDeclDelayed();
 
-  void parseDeclListDelayed(IterableDeclContext *IDC);
+  std::vector<Decl *> parseDeclListDelayed(IterableDeclContext *IDC);
 
-  bool canDelayMemberDeclParsing();
+  bool parseMemberDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                           SourceLoc PosBeforeLB,
+                           Diag<> ErrorDiag,
+                           IterableDeclContext *IDC);
+
+  bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
+                                 bool &HasNestedClassDeclarations);
 
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                            SourceLoc PosBeforeLB,
-                            ParseDeclOptions Options,
                             IterableDeclContext *IDC);
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
@@ -1023,9 +1113,10 @@ public:
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
                              Parser::ParseDeclOptions Options,
                              llvm::function_ref<void(Decl*)> handler);
-  bool parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
-                     Diag<> ErrorDiag, ParseDeclOptions Options,
-                     IterableDeclContext *IDC);
+  std::vector<Decl *> parseDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
+                                    Diag<> ErrorDiag, ParseDeclOptions Options,
+                                    IterableDeclContext *IDC,
+                                    bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
   ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
@@ -1049,7 +1140,6 @@ public:
   ParserStatus parseGetSet(ParseDeclOptions Flags,
                            GenericParamList *GenericParams,
                            ParameterList *Indices,
-                           TypeLoc ElementTy,
                            ParsedAccessors &accessors,
                            AbstractStorageDecl *storage,
                            SourceLoc StaticLoc);
@@ -1070,7 +1160,7 @@ public:
                                        DeclAttributes &Attributes,
                                        bool HasFuncKeyword = true);
   void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
-  bool parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
+  BraceStmt *parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
   ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
@@ -1099,59 +1189,64 @@ public:
 
   ParserResult<TypeRepr> parseDeclResultType(Diag<> MessageID);
 
+  /// Get the location for a type error.
+  SourceLoc getTypeErrorLoc() const;
+
   //===--------------------------------------------------------------------===//
   // Type Parsing
-  
-  ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool HandleCodeCompletion = true,
-                                   bool IsSILFuncDecl = false);
 
-  ParserResult<TypeRepr>
-    parseTypeSimpleOrComposition(Diag<> MessageID,
-                                 bool HandleCodeCompletion = true);
+  using TypeASTResult = ParserResult<TypeRepr>;
+  using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
+  using TypeErrorResult = ParsedSyntaxResult<ParsedUnknownTypeSyntax>;
 
-  ParserResult<TypeRepr> parseTypeSimple(Diag<> MessageID,
-                                         bool HandleCodeCompletion = true);
-
-  /// Parse layout constraint.
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
 
-  ParserStatus parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
-                                     SourceLoc &LAngleLoc,
-                                     SourceLoc &RAngleLoc);
+  TypeASTResult parseType();
+  TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
+                          bool IsSILFuncDecl = false);
+  ParserStatus
+  parseGenericArgumentsAST(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
+                           SourceLoc &LAngleLoc, SourceLoc &RAngleLoc);
+  TypeASTResult parseSILBoxType(GenericParamList *generics,
+                                const TypeAttributes &attrs,
+                                Optional<Scope> &GenericsScope);
+  TypeASTResult parseTypeSimpleOrCompositionAST(Diag<> MessageID,
+                                                bool HandleCodeCompletion);
+  TypeASTResult parseAnyTypeAST();
 
+  ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
+  parseGenericArgumentClauseSyntax();
+
+  TypeResult parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
+  TypeResult parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
   // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
-  /// The `isParsingQualifiedDeclName` flag controls whether parsing is done as
-  /// if this type identifier is the prefix to a qualified declaration name. If
-  /// true, backtrack parsing the last identifier.
-  ParserResult<TypeRepr>
-    parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
-  ParserResult<TypeRepr> parseOldStyleProtocolComposition();
-  ParserResult<CompositionTypeRepr> parseAnyType();
-  ParserResult<TypeRepr> parseSILBoxType(GenericParamList *generics,
-                                         const TypeAttributes &attrs,
-                                         Optional<Scope> &GenericsScope);
-  
-  ParserResult<TupleTypeRepr> parseTypeTupleBody();
-  ParserResult<TypeRepr> parseTypeArray(TypeRepr *Base);
+  /// Parses a type identifier (e.g. 'Foo' or 'Foo.Bar.Baz').
+  ///
+  /// When `isParsingQualifiedDeclName` is true:
+  /// - Parses the type qualifier from a qualified decl name, and returns a
+  ///   parser result for the type of the qualifier.
+  /// - Positions the parser at the final declaration name.
+  /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser gets
+  ///   positioned at 'f'.
+  /// - If there is no type qualification (e.g. when parsing just 'f'), returns
+  ///   an empty parser error.
+  TypeResult parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
+  TypeResult parseAnyType();
+  TypeResult parseTypeTupleBody();
+  TypeResult parseTypeCollection();
+  TypeResult parseMetatypeType(ParsedTypeSyntax Base);
+  TypeResult parseOptionalType(ParsedTypeSyntax Base);
+  TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
 
-  /// Parse a collection type.
-  ///   type-simple:
-  ///     '[' type ']'
-  ///     '[' type ':' type ']'
-  SyntaxParserResult<ParsedTypeSyntax, TypeRepr> parseTypeCollection();
-
-  SyntaxParserResult<ParsedTypeSyntax, OptionalTypeRepr>
-  parseTypeOptional(TypeRepr *Base);
-
-  SyntaxParserResult<ParsedTypeSyntax, ImplicitlyUnwrappedOptionalTypeRepr>
-  parseTypeImplicitlyUnwrappedOptional(TypeRepr *Base);
+  TypeErrorResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
+  TypeErrorResult parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
+  ParsedTokenSyntax consumeOptionalTokenSyntax();
   SourceLoc consumeOptionalToken();
-  
+
   bool isImplicitlyUnwrappedOptionalToken(const Token &T) const;
+  ParsedTokenSyntax consumeImplicitlyUnwrappedOptionalTokenSyntax();
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,

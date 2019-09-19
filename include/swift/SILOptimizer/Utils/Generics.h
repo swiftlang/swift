@@ -147,9 +147,8 @@ public:
                     OptRemark::Emitter *ORE = nullptr);
 
   /// Constructs the ReabstractionInfo for generic function \p Callee with
-  /// additional requirements. Requirements may contain new layout,
-  /// conformances or same concrete type requirements.
-  ReabstractionInfo(SILFunction *Callee, ArrayRef<Requirement> Requirements);
+  /// a specialization signature.
+  ReabstractionInfo(SILFunction *Callee, GenericSignature *SpecializedSig);
 
   IsSerialized_t isSerialized() const {
     return Serialized;

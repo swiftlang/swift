@@ -163,13 +163,14 @@ std::error_code swift::atomicallyWritingToFile(
   return swift::moveFileIfDifferent(temporaryPath.getValue(), outputPath);
 }
 
-std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
-                                           const llvm::Twine &destination) {
+llvm::ErrorOr<FileDifference>
+swift::areFilesDifferent(const llvm::Twine &source,
+                         const llvm::Twine &destination,
+                         bool allowDestinationErrors) {
   namespace fs = llvm::sys::fs;
 
-  // First check for a self-move.
   if (fs::equivalent(source, destination))
-    return std::error_code();
+    return FileDifference::IdenticalFile;
 
   OpenFileRAII sourceFile;
   fs::file_status sourceStatus;
@@ -182,45 +183,80 @@ std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
     return error;
   }
 
+  /// Converts an error from the destination file into either an error or
+  /// DifferentContents return, depending on `allowDestinationErrors`.
+  auto convertDestinationError = [=](std::error_code error) ->
+      llvm::ErrorOr<FileDifference> {
+    if (allowDestinationErrors)
+      return FileDifference::DifferentContents;
+    return error;
+  };
+
   OpenFileRAII destFile;
   fs::file_status destStatus;
-  bool couldReadDest = !fs::openFileForRead(destination, destFile.fd);
-  if (couldReadDest)
-    couldReadDest = !fs::status(destFile.fd, destStatus);
-
-  // If we could read the destination file, and it matches the source file in
-  // size, they may be the same. Do an actual comparison of the contents.
-  if (couldReadDest && sourceStatus.getSize() == destStatus.getSize()) {
-    uint64_t size = sourceStatus.getSize();
-    bool same = false;
-    if (size == 0) {
-      same = true;
-    } else {
-      std::error_code sourceRegionErr;
-      fs::mapped_file_region sourceRegion(sourceFile.fd,
-                                          fs::mapped_file_region::readonly,
-                                          size, 0, sourceRegionErr);
-      if (sourceRegionErr)
-        return sourceRegionErr;
-
-      std::error_code destRegionErr;
-      fs::mapped_file_region destRegion(destFile.fd,
-                                        fs::mapped_file_region::readonly,
-                                        size, 0, destRegionErr);
-
-      if (!destRegionErr) {
-        same = (0 == memcmp(sourceRegion.const_data(), destRegion.const_data(),
-                            size));
-      }
-    }
-
-    // If the file contents are the same, we are done. Just delete the source.
-    if (same)
-      return fs::remove(source);
+  if (std::error_code error = fs::openFileForRead(destination, destFile.fd)) {
+    // If we can't open the destination file, fail in the specified fashion.
+    return convertDestinationError(error);
+  }
+  if (std::error_code error = fs::status(destFile.fd, destStatus)) {
+    // If we can't open the destination file, fail in the specified fashion.
+    return convertDestinationError(error);
   }
 
-  // If we get here, we weren't able to prove that the files are the same.
-  return fs::rename(source, destination);
+  uint64_t size = sourceStatus.getSize();
+  if (size != destStatus.getSize())
+    // If the files are different sizes, they must be different.
+    return FileDifference::DifferentContents;
+  if (size == 0)
+    // If both files are zero size, they must be the same.
+    return FileDifference::SameContents;
+
+  // The two files match in size, so we have to compare the bytes to determine
+  // if they're the same.
+  std::error_code sourceRegionErr;
+  fs::mapped_file_region sourceRegion(sourceFile.fd,
+                                      fs::mapped_file_region::readonly,
+                                      size, 0, sourceRegionErr);
+  if (sourceRegionErr)
+    return sourceRegionErr;
+
+  std::error_code destRegionErr;
+  fs::mapped_file_region destRegion(destFile.fd,
+                                    fs::mapped_file_region::readonly,
+                                    size, 0, destRegionErr);
+
+  if (destRegionErr)
+    return convertDestinationError(destRegionErr);
+
+  if (0 == memcmp(sourceRegion.const_data(), destRegion.const_data(), size))
+    return FileDifference::SameContents;
+
+  return FileDifference::DifferentContents;
+}
+
+std::error_code swift::moveFileIfDifferent(const llvm::Twine &source,
+                                           const llvm::Twine &destination) {
+  namespace fs = llvm::sys::fs;
+
+  auto result = areFilesDifferent(source, destination,
+                                  /*allowDestinationErrors=*/true);
+
+  if (!result)
+    return result.getError();
+
+  switch (*result) {
+  case FileDifference::IdenticalFile:
+    // Do nothing for a self-move.
+    return std::error_code();
+
+  case FileDifference::SameContents:
+    // Files are identical; remove the source file.
+    return fs::remove(source);
+
+  case FileDifference::DifferentContents:
+    // Files are different; overwrite the destination file.
+    return fs::rename(source, destination);
+  }
 }
 
 llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>>

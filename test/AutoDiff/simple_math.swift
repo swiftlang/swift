@@ -307,7 +307,6 @@ SimpleMathTests.test("StructGeneric") {
     generic.y = generic.x * input
     return generic.x * generic.y
   }
-  // FIXME(TF-274): The true expected result is `405`, like other variants of `fifthPower` above.
   expectEqual(405, gradient(at: 3, in: fifthPower))
 }
 
@@ -321,6 +320,15 @@ SimpleMathTests.test("SubsetIndices") {
     return gradient(at: 2) { x in lossFunction(x * x, 10) }
   }
   expectEqual(4, gradWRTNonDiff { x, y in x + Float(y) })
+}
+
+SimpleMathTests.test("ForceUnwrapping") {
+  func bla<T: Differentiable & FloatingPoint>(_ t: T) -> (T, Float) where T == T.TangentVector {
+    gradient(at: t, Float(1)) { (x, y) in
+      (x as! Float) * y
+    }
+  }
+  expectEqual((1, 2), bla(Float(2)))
 }
 
 runAllTests()

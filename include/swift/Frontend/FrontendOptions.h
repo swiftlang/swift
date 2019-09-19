@@ -76,6 +76,9 @@ public:
   /// binary module has already been built for use by the compiler.
   std::string PrebuiltModuleCachePath;
 
+  /// For these modules, we should prefer using Swift interface when importing them.
+  std::vector<std::string> PreferInterfaceForModules;
+
   /// Emit index data for imported serialized swift system modules.
   bool IndexSystemModules = false;
 

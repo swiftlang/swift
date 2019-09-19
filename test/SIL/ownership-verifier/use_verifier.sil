@@ -1183,3 +1183,8 @@ bb1:
   unreachable
 }
 
+sil [ossa] @copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
+  %1 = copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject
+  return %1 : $Builtin.NativeObject
+}

@@ -175,6 +175,35 @@ IRGenModule::getTypeRef(Type type, GenericSignature *genericSig,
 }
 
 std::pair<llvm::Constant *, unsigned>
+IRGenModule::getLoweredTypeRef(SILType loweredType,
+                               CanGenericSignature genericSig,
+                               MangledTypeRefRole role) {
+  auto type =
+      substOpaqueTypesWithUnderlyingTypes(loweredType, genericSig).getASTType();
+
+  switch (role) {
+  case MangledTypeRefRole::DefaultAssociatedTypeWitness:
+  case MangledTypeRefRole::Metadata:
+    // Note that we're using all of the nominal types referenced by this type,
+    // ensuring that we can always reconstruct type metadata from a mangled name
+    // in-process.
+    IRGen.noteUseOfTypeMetadata(type);
+    break;
+
+  case MangledTypeRefRole::Reflection:
+    // For reflection records only used for out-of-process reflection, we do not
+    // need to force emission of runtime type metadata.
+    IRGen.noteUseOfFieldDescriptors(type);
+    break;
+  }
+
+  IRGenMangler Mangler;
+  auto SymbolicName = Mangler.mangleTypeForReflection(*this, type);
+  return {getAddrOfStringForTypeRef(SymbolicName, role),
+          SymbolicName.runtimeSizeInBytes()};
+}
+
+std::pair<llvm::Constant *, unsigned>
 IRGenModule::getTypeRef(CanType type, MangledTypeRefRole role) {
   type = substOpaqueTypesWithUnderlyingTypes(type);
   
@@ -397,6 +426,15 @@ protected:
                       MangledTypeRefRole::Reflection) {
     B.addRelativeAddress(IGM.getTypeRef(type, role).first);
     addBuiltinTypeRefs(type);
+  }
+
+  void
+  addLoweredTypeRef(SILType loweredType,
+                    CanGenericSignature genericSig,
+                    MangledTypeRefRole role = MangledTypeRefRole::Reflection) {
+    B.addRelativeAddress(
+        IGM.getLoweredTypeRef(loweredType, genericSig, role).first);
+    addBuiltinTypeRefs(loweredType.getASTType());
   }
 
   /// Add a 32-bit relative offset to a mangled nominal type string
@@ -725,17 +763,20 @@ void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
 /// SIL @box. These look like closure contexts, but without any necessary
 /// bindings or metadata sources, and only a single captured value.
 class BoxDescriptorBuilder : public ReflectionMetadataBuilder {
-  CanType BoxedType;
+  SILType BoxedType;
+  CanGenericSignature genericSig;
 public:
-  BoxDescriptorBuilder(IRGenModule &IGM, CanType BoxedType)
-    : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType) {}
-  
+  BoxDescriptorBuilder(IRGenModule &IGM, SILType BoxedType,
+                       CanGenericSignature genericSig)
+      : ReflectionMetadataBuilder(IGM), BoxedType(BoxedType),
+        genericSig(genericSig) {}
+
   void layout() override {
     B.addInt32(1);
     B.addInt32(0); // Number of sources
     B.addInt32(0); // Number of generic bindings
 
-    addTypeRef(BoxedType);
+    addLoweredTypeRef(BoxedType, genericSig);
   }
 
   llvm::GlobalVariable *emit() {
@@ -896,8 +937,8 @@ public:
 
   /// Get the interface types of all of the captured values, mapped out of the
   /// context of the callee we're partially applying.
-  std::vector<CanType> getCaptureTypes() {
-    std::vector<CanType> CaptureTypes;
+  std::vector<SILType> getCaptureTypes() {
+    std::vector<SILType> CaptureTypes;
 
     for (auto ElementType : getElementTypes()) {
       auto SwiftType = ElementType.getASTType();
@@ -914,7 +955,8 @@ public:
       }
 
       auto InterfaceType = SwiftType->mapTypeOutOfContext();
-      CaptureTypes.push_back(InterfaceType->getCanonicalType());
+      CaptureTypes.push_back(
+          SILType::getPrimitiveObjectType(InterfaceType->getCanonicalType()));
     }
 
     return CaptureTypes;
@@ -930,8 +972,11 @@ public:
 
     // Now add typerefs of all of the captures.
     for (auto CaptureType : CaptureTypes) {
-      addTypeRef(CaptureType);
-      addBuiltinTypeRefs(CaptureType);
+      addLoweredTypeRef(
+          CaptureType,
+          OrigCalleeType->getGenericSignature()
+              ? OrigCalleeType->getGenericSignature()->getCanonicalSignature()
+              : CanGenericSignature());
     }
 
     // Add the pairs that make up the generic param -> metadata source map
@@ -1025,11 +1070,12 @@ llvm::Constant *IRGenModule::getAddrOfFieldName(StringRef Name) {
 }
 
 llvm::Constant *
-IRGenModule::getAddrOfBoxDescriptor(CanType BoxedType) {
+IRGenModule::getAddrOfBoxDescriptor(SILType BoxedType,
+                                    CanGenericSignature genericSig) {
   if (!IRGen.Opts.EnableReflectionMetadata)
     return llvm::Constant::getNullValue(CaptureDescriptorPtrTy);
 
-  BoxDescriptorBuilder builder(*this, BoxedType);
+  BoxDescriptorBuilder builder(*this, BoxedType, genericSig);
   auto var = builder.emit();
 
   return llvm::ConstantExpr::getBitCast(var, CaptureDescriptorPtrTy);

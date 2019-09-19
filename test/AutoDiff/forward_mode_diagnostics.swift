@@ -80,7 +80,8 @@ func one() -> Float {
 }
 @differentiable
 func nonVariedResult(_ x: Float) -> Float {
-  // expected-warning @+1 2 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}}
+  // TODO(TF-788): Re-enable non-varied result warning.
+  // xpected-warning @+1 2 {{result does not depend on differentiation arguments and will always have a zero derivative; do you want to use 'withoutDerivative(at:)'?}} {{10-10=withoutDerivative(at:}}
   return one()
 }
 

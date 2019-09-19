@@ -278,8 +278,8 @@ let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'MyType<Double, Int>' to specified type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'MyType<Int, Float>'}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'MyType<Int, Float>'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
 
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)

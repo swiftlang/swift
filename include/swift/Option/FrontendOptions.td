@@ -127,6 +127,9 @@ def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
   
 def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
   HelpText<"Print a warning if ASTScope lookup is used">;
+  
+def lazy_astscopes : Flag<["-"], "lazy-astscopes">,
+  HelpText<"Build ASTScopes lazily">;
 
 def print_clang_stats : Flag<["-"], "print-clang-stats">,
   HelpText<"Print Clang importer statistics">;
@@ -400,6 +403,14 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+
+def enable_function_builder_one_way_constraints : Flag<["-"],
+  "enable-function-builder-one-way-constraints">,
+  HelpText<"Enable one-way constraints in the function builder transformation">;
+
+def disable_function_builder_one_way_constraints : Flag<["-"],
+  "disable-function-builder-one-way-constraints">,
+  HelpText<"Disable one-way constraints in the function builder transformation">;
 
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,

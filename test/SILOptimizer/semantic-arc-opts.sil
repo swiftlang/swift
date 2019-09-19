@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 
@@ -8,13 +8,19 @@ import Builtin
 // Declarations //
 //////////////////
 
+enum MyNever {}
+
 sil @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+sil @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
+sil @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
 
 struct NativeObjectPair {
   var obj1 : Builtin.NativeObject
   var obj2 : Builtin.NativeObject
 }
+
+sil @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
 
 class Klass {}
 
@@ -37,6 +43,19 @@ enum FakeOptional<T> {
 case none
 case some(T)
 }
+
+class ClassLet {
+  @_hasStorage let aLet: Klass
+  @_hasStorage var aVar: Klass
+  @_hasStorage let aLetTuple: (Klass, Klass)
+
+  @_hasStorage let anotherLet: ClassLet
+}
+
+class SubclassLet: ClassLet {}
+
+sil_global [let] @a_let_global : $Klass
+sil_global @a_var_global : $Klass
 
 ///////////
 // Tests //
@@ -394,4 +413,428 @@ bb0(%0 : @guaranteed $(Klass, MyInt)):
   %4 = struct_extract %3 : $MyInt, #MyInt.value
   destroy_value %2 : $Klass
   return %4 : $Builtin.Int32
+}
+
+sil [ossa] @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_base
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+sil [ossa] @dont_copy_let_properties_with_guaranteed_base : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%x : @guaranteed $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_upcast_base
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+sil [ossa] @dont_copy_let_properties_with_guaranteed_upcast_base : $@convention(thin) (@guaranteed SubclassLet) -> () {
+bb0(%x : @guaranteed $SubclassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %u = upcast %x : $SubclassLet to $ClassLet
+  %p = ref_element_addr %u : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_global
+// CHECK:         global_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+sil [ossa] @dont_copy_let_global : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = global_addr @a_let_global : $*Klass
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_base_structural
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    tuple_element_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+sil [ossa] @dont_copy_let_properties_with_guaranteed_base_structural : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%x : @guaranteed $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLetTuple
+  %q = tuple_element_addr %p : $*(Klass, Klass), 1
+  %v = load [copy] %q : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_copy_var_properties_with_guaranteed_base
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    load [copy]
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy
+// CHECK-NEXT:    return
+sil [ossa] @do_copy_var_properties_with_guaranteed_base : $@convention(thin) (@guaranteed ClassLet) -> () {
+bb0(%x : @guaranteed $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = ref_element_addr %x : $ClassLet, #ClassLet.aVar
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_copy_var_global
+// CHECK:         global_addr
+// CHECK-NEXT:    load [copy]
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy
+// CHECK-NEXT:    return
+sil [ossa] @do_copy_var_global : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = global_addr @a_var_global : $*Klass
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates
+// CHECK:         [[OUTER:%.*]] = begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    destroy_value
+sil [ossa] @dont_copy_let_properties_with_borrowed_base_that_dominates : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%x : @owned $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %a = begin_borrow %x : $ClassLet
+  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  end_borrow %a : $ClassLet
+  destroy_value %x : $ClassLet
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_multi_borrowed_base_that_dominates
+// CHECK:         [[OUTER:%.*]] = begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    [[OUTER:%.*]] = begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    destroy_value
+sil [ossa] @dont_copy_let_properties_with_multi_borrowed_base_that_dominates : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%x : @owned $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %a = begin_borrow %x : $ClassLet
+  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %c = begin_borrow %v : $Klass
+  apply %f(%c) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %c : $Klass
+  destroy_value %v : $Klass
+  end_borrow %a : $ClassLet
+
+  %b = begin_borrow %x : $ClassLet
+  %q = ref_element_addr %b : $ClassLet, #ClassLet.aLet
+  %w = load [copy] %q : $*Klass
+  %d = begin_borrow %w : $Klass
+  apply %f(%d) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %d : $Klass
+  destroy_value %w : $Klass
+  end_borrow %b : $ClassLet
+
+  destroy_value %x : $ClassLet
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_copy_let_properties_with_borrowed_base_that_does_not_dominate
+// CHECK:         begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    load [copy]
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy_value
+sil [ossa] @do_copy_let_properties_with_borrowed_base_that_does_not_dominate : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%x : @owned $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %a = begin_borrow %x : $ClassLet
+  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  // End the lifetime of the base object first...
+  end_borrow %a : $ClassLet
+  destroy_value %x : $ClassLet
+
+  // ...then end the lifetime of the copy.
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
+// CHECK-LABEL: sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates
+// CHECK:         [[OUTER:%.*]] = begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[INNER:%.*]] = load_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-NEXT:    begin_borrow
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    load [copy]
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    destroy_value
+sil [ossa] @do_or_dont_copy_let_properties_with_multi_borrowed_base_when_it_dominates : $@convention(thin) (@owned ClassLet) -> () {
+bb0(%x : @owned $ClassLet):
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %a = begin_borrow %x : $ClassLet
+  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %v = load [copy] %p : $*Klass
+  %c = begin_borrow %v : $Klass
+  apply %f(%c) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %c : $Klass
+  destroy_value %v : $Klass
+  end_borrow %a : $ClassLet
+
+  %b = begin_borrow %x : $ClassLet
+  %q = ref_element_addr %b : $ClassLet, #ClassLet.aLet
+  %w = load [copy] %q : $*Klass
+  %d = begin_borrow %w : $Klass
+  apply %f(%d) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  // End the lifetime of the base object first...
+  end_borrow %b : $ClassLet
+  destroy_value %x : $ClassLet
+
+  // ...then end the lifetime of the copy.
+  apply %f(%d) : $@convention(thin) (@guaranteed Klass) -> ()
+
+  end_borrow %d : $Klass
+  destroy_value %w : $Klass
+
+  return undef : $()
+}
+
+// Make sure that we properly eliminate all ref count ops except for the destroy
+// for the @owned argument. The recursion happens since we can not eliminate the
+// begin_borrow without eliminating the struct_extract (which we do after we
+// eliminate the destroy_value).
+// CHECK-LABEL: sil [ossa] @worklist_test : $@convention(thin) (@owned NativeObjectPair) -> () {
+// CHECK-NOT: struct_extract
+// CHECK: } // end sil function 'worklist_test'
+sil [ossa] @worklist_test : $@convention(thin) (@owned NativeObjectPair) -> () {
+bb0(%0 : @owned $NativeObjectPair):
+  %1 = begin_borrow %0 : $NativeObjectPair
+  %2 = struct_extract %1 : $NativeObjectPair, #NativeObjectPair.obj1
+  %3 = copy_value %2 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  destroy_value %3 : $Builtin.NativeObject
+  end_borrow %1 : $NativeObjectPair
+  destroy_value %0 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_borrow_simple : $@convention(thin) () -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'begin_borrow_simple'
+sil [ossa] @begin_borrow_simple : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @begin_borrow_fail : $@convention(thin) () -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'begin_borrow_fail'
+sil [ossa] @begin_borrow_fail : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_value %1 : $NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_simple : $@convention(thin) (@in NativeObjectPair) -> () {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'load_borrow_simple'
+sil [ossa] @load_borrow_simple : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %2 = load_borrow %0 : $*NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  destroy_addr %0 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_fail : $@convention(thin) (@in NativeObjectPair) -> () {
+// CHECK: copy_value
+// CHECK: } // end sil function 'load_borrow_fail'
+sil [ossa] @load_borrow_fail : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %2 = load_borrow %0 : $*NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_borrow %2 : $NativeObjectPair
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_addr %0 : $*NativeObjectPair
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure we do not eliminate the copy_value below to ensure that all uses of
+// %2 are before %2's end_borrow.
+//
+// We used to eliminate the copy_value and change %func to use %2.
+//
+// CHECK-LABEL: sil [ossa] @begin_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+// CHECK: copy_value
+// CHECK: } // end sil function 'begin_borrow_used_by_postdominating_no_return_function'
+sil [ossa] @begin_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %2 = begin_borrow %1 : $NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
+}
+
+// Make sure we do not eliminate the copy_value below to ensure that all uses of
+// %2 are before %2's end_borrow.
+//
+// We used to eliminate the copy_value and change %func to use %2.
+//
+// CHECK-LABEL: sil [ossa] @load_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+// CHECK: copy_value
+// CHECK: } // end sil function 'load_borrow_used_by_postdominating_no_return_function'
+sil [ossa] @load_borrow_used_by_postdominating_no_return_function : $@convention(thin) () -> MyNever {
+bb0:
+  %0 = function_ref @get_nativeobject_pair : $@convention(thin) () -> @owned NativeObjectPair
+  %1 = apply %0() : $@convention(thin) () -> @owned NativeObjectPair
+  %stackSlot = alloc_stack $NativeObjectPair
+  store %1 to [init] %stackSlot : $*NativeObjectPair
+  %2 = load_borrow %stackSlot : $*NativeObjectPair
+  %3 = struct_extract %2 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  end_borrow %2 : $NativeObjectPair
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
+}
+
+// Make sure we do perform the optimization if our borrowed value is an
+// argument.
+//
+// CHECK-LABEL: sil [ossa] @guaranteed_arg_used_by_postdominating_no_return_function : $@convention(thin) (@guaranteed NativeObjectPair) -> MyNever {
+// CHECK-NOT: copy_value
+// CHECK: } // end sil function 'guaranteed_arg_used_by_postdominating_no_return_function'
+sil [ossa] @guaranteed_arg_used_by_postdominating_no_return_function : $@convention(thin) (@guaranteed NativeObjectPair) -> MyNever {
+bb0(%0 : @guaranteed $NativeObjectPair):
+  %3 = struct_extract %0 : $NativeObjectPair, #NativeObjectPair.obj1
+  %4 = copy_value %3 : $Builtin.NativeObject
+  %func = function_ref @unreachable_guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  apply %func(%4) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> MyNever
+  unreachable
 }

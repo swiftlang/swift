@@ -180,6 +180,13 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::IsConcrete) {
+    (void)args.claimAll();
+    auto isConcrete = !substitutions.getReplacementTypes()[0]->hasArchetype();
+    out.add(llvm::ConstantInt::get(IGF.IGM.Int1Ty, isConcrete));
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::IsBitwiseTakable) {
     (void)args.claimAll();
     auto valueTy = getLoweredTypeAndTypeInfo(IGF.IGM,
@@ -257,15 +264,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     replacement.add(NameGEP);
     replacement.add(args.claimAll());
     args = std::move(replacement);
-
-    if (Opts.EmitProfileCoverageMapping) {
-      // Update the associated coverage mapping: it's now safe to emit, because
-      // a symtab entry for this function is guaranteed (r://39146527).
-      auto &coverageMaps = SILMod.getCoverageMaps();
-      auto CovMapIt = coverageMaps.find(PGOFuncName);
-      if (CovMapIt != coverageMaps.end())
-        CovMapIt->second->setSymtabEntryGuaranteed();
-    }
   }
 
   if (IID != llvm::Intrinsic::not_intrinsic) {

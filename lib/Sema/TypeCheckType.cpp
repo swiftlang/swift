@@ -536,11 +536,20 @@ Type TypeChecker::resolveTypeInContext(
             parentDC = parentDC->getParent()) {
         if (auto *ext = dyn_cast<ExtensionDecl>(parentDC)) {
           auto extendedType = ext->getExtendedType();
+          if (auto *unboundGeneric = dyn_cast<UnboundGenericType>(extendedType.getPointer())) {
+            if (auto *ugAliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
+              if (ugAliasDecl == aliasDecl)
+                return resolution.mapTypeIntoContext(
+                  aliasDecl->getDeclaredInterfaceType());
+
+              extendedType = unboundGeneric->getParent();
+              continue;
+            }
+          }
           if (auto *aliasType = dyn_cast<TypeAliasType>(extendedType.getPointer())) {
-            if (aliasType->getDecl() == aliasDecl) {
+            if (aliasType->getDecl() == aliasDecl)
               return resolution.mapTypeIntoContext(
                   aliasDecl->getDeclaredInterfaceType());
-            }
 
             extendedType = aliasType->getParent();
             continue;
@@ -828,10 +837,10 @@ Type TypeChecker::applyUnboundGenericArguments(
     skipRequirementsCheck |= parentType->hasTypeVariable();
   } else if (auto genericEnv =
                  decl->getDeclContext()->getGenericEnvironmentOfContext()) {
-    auto subMap = genericEnv->getForwardingSubstitutionMap();
-    for (auto gp : subMap.getGenericSignature()->getGenericParams()) {
+    auto genericSig = genericEnv->getGenericSignature();
+    for (auto gp : genericSig->getGenericParams()) {
       subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
-        Type(gp).subst(subMap);
+        genericEnv->mapTypeIntoContext(gp);
     }
   }
 
@@ -883,8 +892,7 @@ Type TypeChecker::applyUnboundGenericArguments(
 
   // Apply the substitution map to the interface type of the declaration.
   resultType = resultType.subst(QueryTypeSubstitutionMap{subs},
-                                LookUpConformance(dc),
-                                SubstFlags::UseErrorType);
+                                LookUpConformance(dc));
 
   // Form a sugared typealias reference.
   Type parentType = unboundType->getParent();
@@ -928,19 +936,18 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
                                            SourceLoc loc,
                                            TypeDecl *typeDecl) {
   auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
-  if (!protocol)
-    return;
 
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
-  if (auto conformanceRef = TypeChecker::conformsToProtocol(
-          parentTy, protocol, dc,
-          (ConformanceCheckFlags::InExpression |
-           ConformanceCheckFlags::SuppressDependencyTracking |
-           ConformanceCheckFlags::SkipConditionalRequirements))) {
-    if (conformanceRef->isConcrete())
-      conformance = conformanceRef->getConcrete();
-  }
+  if (protocol)
+    if (auto conformanceRef = TypeChecker::conformsToProtocol(
+            parentTy, protocol, dc,
+            (ConformanceCheckFlags::InExpression |
+             ConformanceCheckFlags::SuppressDependencyTracking |
+             ConformanceCheckFlags::SkipConditionalRequirements))) {
+      if (conformanceRef->isConcrete())
+        conformance = conformanceRef->getConcrete();
+    }
 
   // If any errors have occurred, don't bother diagnosing this cross-file
   // issue.
@@ -949,7 +956,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
     return;
 
   auto diagCode =
-      (conformance && !conformance->getConditionalRequirementsIfAvailable())
+    (!protocol || (conformance && !conformance->getConditionalRequirementsIfAvailable()))
           ? diag::unsupported_recursion_in_associated_type_reference
           : diag::broken_associated_type_witness;
 
@@ -3536,7 +3543,7 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
       return ErrorType::get(memberType);
 
     subs = baseTy->getContextSubstitutionMap(module, member->getDeclContext());
-    resultType = memberType.subst(subs, SubstFlags::UseErrorType);
+    resultType = memberType.subst(subs);
   } else {
     resultType = memberType;
   }

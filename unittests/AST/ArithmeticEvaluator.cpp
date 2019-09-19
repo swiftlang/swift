@@ -174,12 +174,11 @@ struct ExternallyCachedEvaluationRule
 
 // Define the arithmetic evaluator's zone.
 namespace swift {
-#define SWIFT_ARITHMETIC_EVALUATOR_ZONE 255
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 
-#define SWIFT_TYPEID_ZONE SWIFT_ARITHMETIC_EVALUATOR_ZONE
+#define SWIFT_TYPEID_ZONE ArithmeticEvaluator
 #define SWIFT_TYPEID_HEADER "ArithmeticEvaluatorTypeIDZone.def"
 #include "swift/Basic/ImplementTypeIDZone.h"
 
@@ -187,10 +186,10 @@ namespace swift {
 
 /// All of the arithmetic request functions.
 static AbstractRequestFunction *arithmeticRequestFunctions[] = {
-#define SWIFT_TYPEID(Name)                                    \
+#define SWIFT_REQUEST(Zone, Name)                      \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "ArithmeticEvaluatorTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 };
 
 /// Helper to short-circuit errors to NaN.
@@ -212,7 +211,7 @@ TEST(ArithmeticEvaluator, Simple) {
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   const double expectedResult = (3.14159 + 2.71828) * 42.0;
@@ -335,7 +334,7 @@ TEST(ArithmeticEvaluator, Cycle) {
   SourceManager sourceMgr;
   DiagnosticEngine diags(sourceMgr);
   Evaluator evaluator(diags);
-  evaluator.registerRequestFunctions(SWIFT_ARITHMETIC_EVALUATOR_ZONE,
+  evaluator.registerRequestFunctions(Zone::ArithmeticEvaluator,
                                      arithmeticRequestFunctions);
 
   // Evaluate when there is a cycle.

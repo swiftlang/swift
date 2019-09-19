@@ -43,3 +43,4 @@ void validatePatternBindingEntries(TypeChecker &tc,
 }
 
 #endif
+

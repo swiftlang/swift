@@ -76,7 +76,7 @@ static void checkGenericParamList(TypeChecker &tc,
         
         if (auto decl = owner.dc->getAsDecl()) {
           if (auto extDecl = dyn_cast<ExtensionDecl>(decl)) {
-            auto extType = extDecl->getExtendedType();
+            auto extType = extDecl->getDeclaredInterfaceType();
             auto extSelfType = extDecl->getSelfInterfaceType();
             auto reqLHSType = req.getFirstType();
             auto reqRHSType = req.getSecondType();
@@ -143,19 +143,6 @@ TypeChecker::gatherGenericParamBindingsText(
 
   result += "]";
   return result.str().str();
-}
-
-static void revertDependentTypeLoc(TypeLoc &tl) {
-  // If there's no type representation, there's nothing to revert.
-  if (!tl.getTypeRepr())
-    return;
-
-  // Don't revert an error type; we've already complained.
-  if (tl.wasValidated() && tl.isError())
-    return;
-
-  // Make sure we validate the type again.
-  tl.setType(Type());
 }
 
 //
@@ -229,14 +216,11 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   // Create a generic signature for the opaque environment. This is the outer
   // generic signature with an added generic parameter representing the opaque
   // type and its interface constraints.
-  GenericSignatureBuilder builder(Context);
-
   auto originatingDC = originatingDecl->getInnermostDeclContext();
   unsigned returnTypeDepth = 0;
   auto outerGenericSignature = originatingDC->getGenericSignatureOfContext();
   
   if (outerGenericSignature) {
-    builder.addGenericSignature(outerGenericSignature);
     returnTypeDepth =
                outerGenericSignature->getGenericParams().back()->getDepth() + 1;
   }
@@ -244,38 +228,37 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   auto returnTypeParam = GenericTypeParamType::get(returnTypeDepth, 0,
                                                    Context);
 
-  builder.addGenericParameter(returnTypeParam);
+  SmallVector<GenericTypeParamType *, 2> genericParamTypes;
+  genericParamTypes.push_back(returnTypeParam);
 
+  SmallVector<Requirement, 2> requirements;
   if (constraintType->getClassOrBoundGenericClass()) {
-    builder.addRequirement(Requirement(RequirementKind::Superclass,
-                                       returnTypeParam, constraintType),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+    requirements.push_back(Requirement(RequirementKind::Superclass,
+                                       returnTypeParam, constraintType));
   } else {
     auto constraints = constraintType->getExistentialLayout();
     if (auto superclass = constraints.getSuperclass()) {
-      builder.addRequirement(Requirement(RequirementKind::Superclass,
-                                         returnTypeParam, superclass),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+      requirements.push_back(Requirement(RequirementKind::Superclass,
+                                         returnTypeParam, superclass));
     }
     for (auto protocol : constraints.getProtocols()) {
-      builder.addRequirement(Requirement(RequirementKind::Conformance,
-                                         returnTypeParam, protocol),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+      requirements.push_back(Requirement(RequirementKind::Conformance,
+                                         returnTypeParam, protocol));
     }
     if (auto layout = constraints.getLayoutConstraint()) {
-      builder.addRequirement(Requirement(RequirementKind::Layout,
-                                         returnTypeParam, layout),
-             GenericSignatureBuilder::FloatingRequirementSource::forAbstract(),
-             originatingDC->getParentModule());
+      requirements.push_back(Requirement(RequirementKind::Layout,
+                                         returnTypeParam, layout));
     }
   }
   
-  auto interfaceSignature = std::move(builder)
-                                          .computeGenericSignature(SourceLoc());
-  
+  auto interfaceSignature = evaluateOrDefault(
+      Context.evaluator,
+      AbstractGenericSignatureRequest{
+        outerGenericSignature,
+        std::move(genericParamTypes),
+        std::move(requirements)},
+      nullptr);
+
   // Create the OpaqueTypeDecl for the result type.
   // It has the same parent context and generic environment as the originating
   // decl.
@@ -592,41 +575,49 @@ void TypeChecker::validateGenericFuncOrSubscriptSignature(
                               ->getGenericSignatureOfContext(),
                           resolution);
 
-    // Check parameter patterns.
-    typeCheckParameterList(params, resolution, func
-                             ? TypeResolverContext::AbstractFunctionDecl
-                             : TypeResolverContext::SubscriptDecl);
+    // Infer requirements from the parameter list.
+    auto *module = genCtx->getParentModule();
+    TypeResolutionOptions options =
+      (func
+       ? TypeResolverContext::AbstractFunctionDecl
+       : TypeResolverContext::SubscriptDecl);
 
-    // Infer requirements from the pattern.
-    builder.inferRequirements(*genCtx->getParentModule(), params);
+    for (auto param : *params) {
+      auto *typeRepr = param->getTypeLoc().getTypeRepr();
+      if (typeRepr == nullptr)
+        continue;
 
-    // Check the result type, but leave opaque return types alone
-    // for structural checking.
-    if (!resultTyLoc.isNull() &&
-        !(resultTyLoc.getTypeRepr() &&
-          isa<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())))
-      validateType(resultTyLoc, resolution,
-                   TypeResolverContext::FunctionResult);
+      auto paramOptions = options;
+      paramOptions.setContext(param->isVariadic() ?
+                              TypeResolverContext::VariadicFunctionInput :
+                              TypeResolverContext::FunctionInput);
+      paramOptions |= TypeResolutionFlags::Direct;
 
-    // Infer requirements from it.
-    if (resultTyLoc.getTypeRepr()) {
+      auto type = resolution.resolveType(typeRepr, paramOptions);
+
+      if (auto *specifier = dyn_cast_or_null<SpecifierTypeRepr>(typeRepr))
+        typeRepr = specifier->getBase();
+
       auto source = GenericSignatureBuilder::FloatingRequirementSource::
-          forInferred(resultTyLoc.getTypeRepr());
-      builder.inferRequirements(*genCtx->getParentModule(),
-                                resultTyLoc.getType(),
-                                resultTyLoc.getTypeRepr(), source);
+          forInferred(typeRepr);
+      builder.inferRequirements(*module, type, typeRepr, source);
+    }
+
+    // Infer requirements from the result type.
+    auto *resultTypeRepr = resultTyLoc.getTypeRepr();
+    if (resultTypeRepr && !isa<OpaqueReturnTypeRepr>(resultTypeRepr)) {
+      TypeResolutionOptions resultOptions = TypeResolverContext::FunctionResult;
+
+      auto resultType = resolution.resolveType(resultTypeRepr, resultOptions);
+
+      auto source = GenericSignatureBuilder::FloatingRequirementSource::
+          forInferred(resultTypeRepr);
+      builder.inferRequirements(*module, resultType, resultTypeRepr, source);
     }
 
     // The signature is complete and well-formed. Determine
     // the type of the generic function or subscript.
     sig = std::move(builder).computeGenericSignature(decl->getLoc());
-
-    // The generic signature builder now has all of the requirements, although
-    // there might still be errors that have not yet been diagnosed. Revert the
-    // signature and type-check it again, completely.
-    revertDependentTypeLoc(resultTyLoc);
-    for (auto &param : *params)
-      revertDependentTypeLoc(param->getTypeLoc());
 
     // Debugging of the generic signature.
     if (Context.LangOpts.DebugGenericSignatures) {

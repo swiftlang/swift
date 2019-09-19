@@ -132,7 +132,7 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil [ossa] @copy_addr2
-sil [ossa] @copy_addr2 : $@convention(thin) <T> (@in T) -> @out T {
+sil [ossa] @copy_addr2 : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <T>
   %3a = project_box %3 : $<τ_0_0> { var τ_0_0 } <T>, 0
@@ -492,7 +492,7 @@ bb2:
 sil [ossa] @conditionalInitOrAssign : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   // CHECK: [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
-  // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack $SomeClass
+  // CHECK: [[CLASSVAL:%[0-9]+]] = alloc_stack [dynamic_lifetime] $SomeClass
   // CHECK: integer_literal $Builtin.Int1, 0
   // CHECK: store
   %5 = alloc_stack $SomeClass

@@ -727,9 +727,11 @@ static bool validateTypedPattern(TypeChecker &TC,
       subPattern = parenPattern->getSubPattern();
 
     if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      auto &C = resolution.getDeclContext()->getASTContext();
-      namedPattern->getDecl()->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      // FIXME: This needs to be done as part of
+      // IsImplicitlyUnwrappedOptionalRequest::evaluate(); we just
+      // need to find the right TypedPattern there for the VarDecl
+      // in order to recover it's TypeRepr.
+      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
     } else {
       assert(isa<AnyPattern>(subPattern) &&
              "Unexpected pattern nested in typed pattern!");
@@ -766,20 +768,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
     hadError |= TC.validateType(TL, resolution, options);
   }
 
-  auto *TR = TL.getTypeRepr();
-  if (auto *STR = dyn_cast_or_null<SpecifierTypeRepr>(TR))
-    TR = STR->getBase();
-
-  // If this is declared with '!' indicating that it is an Optional
-  // that we should implicitly unwrap if doing so is required to type
-  // check, then add an attribute to the decl.
-  if (!decl->isVariadic() && TR &&
-      TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto &C = resolution.getDeclContext()->getASTContext();
-    decl->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
-  }
-
   Type Ty = TL.getType();
   if (decl->isVariadic() && !Ty.isNull() && !hadError) {
     Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
@@ -808,8 +796,6 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
   bool hadError = false;
   
   for (auto param : *PL) {
-    checkDeclAttributesEarly(param);
-
     auto typeRepr = param->getTypeLoc().getTypeRepr();
     if (!typeRepr &&
         param->hasInterfaceType()) {
@@ -838,8 +824,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
     } else {
       param->setInterfaceType(type);
     }
-    
-    checkTypeModifyingDeclAttributes(param);
+
     if (!hadError) {
       auto *nestedRepr = typeRepr;
 
@@ -1125,19 +1110,25 @@ recur:
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    var->setType(type);
-    // FIXME: wtf
-    if (type->hasTypeParameter())
-      var->setInterfaceType(type);
-    else
-      var->setInterfaceType(type->mapTypeOutOfContext());
 
-    checkTypeModifyingDeclAttributes(var);
-    if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
-      type = var->getType()->getReferenceStorageReferent();
-    else if (!var->isInvalid())
-      type = var->getType();
+    Type interfaceType = type;
+    if (interfaceType->hasArchetype())
+      interfaceType = interfaceType->mapTypeOutOfContext();
+
+    // In SIL mode, VarDecls are written as having reference storage types.
+    if (type->is<ReferenceStorageType>()) {
+      assert(interfaceType->is<ReferenceStorageType>());
+      type = type->getReferenceStorageReferent();
+    } else {
+      if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+        interfaceType = checkReferenceOwnershipAttr(var, interfaceType, attr);
+    }
+
+    // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
+    var->setInterfaceType(interfaceType);
+    var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
+
     var->getTypeLoc() = tyLoc;
     var->getTypeLoc().setType(var->getType());
 
@@ -1414,11 +1405,11 @@ recur:
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
-              diagnose(EEP->getLoc(),
-                       diag::availability_decl_unavailable_rename,
-                       /*"getter" prefix*/2, EEP->getName(), /*replaced*/false,
-                       /*special kind*/0, Rename.str())
-                .fixItReplace(EEP->getLoc(), Rename.str());
+              diagnose(
+                  EEP->getLoc(), diag::availability_decl_unavailable_rename,
+                  /*"getter" prefix*/ 2, EEP->getName(), /*replaced*/ false,
+                  /*special kind*/ 0, Rename.str(), /*message*/ StringRef())
+                  .fixItReplace(EEP->getLoc(), Rename.str());
 
               return true;
             }
@@ -1663,8 +1654,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       param->setType(ty);
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
-    
-    checkTypeModifyingDeclAttributes(param);
   };
 
   // Coerce each parameter to the respective type.

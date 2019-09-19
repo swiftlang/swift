@@ -210,10 +210,8 @@ func conditionalDowncastToOptional(b: B?) -> D? {
 }
 
 func conditionalDowncastToObject(b: B?) -> D {
-  return b as? D! // expected-error {{value of optional type 'D?' must be unwrapped}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
-  // expected-warning@-3 {{using '!' here is deprecated and will be removed in a future release}}
+  return b as? D! // expected-error {{cannot convert return expression of type 'D??' to return type 'D'}}
+  // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
 }
 
 // Ensure that we select the overload that does *not* involve forcing an IUO.
@@ -225,3 +223,26 @@ var y: Int = 2
 
 let r = sr6988(x: x, y: y)
 let _: Int = r
+
+// SR-10492
+
+struct SR_10492_S {
+  func foo() -> Int! { return 0 }
+}
+
+let sr_10492_s = SR_10492_S()
+let sr_10492_int1: Int = (sr_10492_s.foo)() // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+// expected-note@-1 {{coalesce}}{{44-44= ?? <#default value#>}}
+// expected-note@-2 {{force-unwrap}}{{44-44=!}}
+let sr_10492_int2: Int? = (sr_10492_s.foo)() // Okay
+
+
+class SR_10492_C1 {
+  init!() {}
+}
+
+class SR_10492_C2 {
+  init(_ foo: SR_10492_C1) {}
+}
+
+let bar = SR_10492_C2(SR_10492_C1()) // Okay

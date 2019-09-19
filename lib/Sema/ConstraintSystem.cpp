@@ -107,7 +107,7 @@ bool ConstraintSystem::hasFreeTypeVariables() {
 }
 
 void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
-  TypeVariables.push_back(typeVar);
+  TypeVariables.insert(typeVar);
   
   // Notify the constraint graph.
   (void)CG[typeVar];
@@ -425,7 +425,8 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(Expr *expr) {
     // For an apply of a metatype, we have a short-form constructor. Unlike
     // other locators to callees, these are anchored on the apply expression
     // rather than the function expr.
-    if (simplifyType(getType(fnExpr))->is<AnyMetatypeType>()) {
+    auto fnTy = getFixedTypeRecursive(getType(fnExpr), /*wantRValue*/ true);
+    if (fnTy->is<AnyMetatypeType>()) {
       auto *fnLocator =
           getConstraintLocator(applyExpr, ConstraintLocator::ApplyFunction);
       return getConstraintLocator(fnLocator,
@@ -576,8 +577,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
             // because the requirements might look like `T: P, T.U: Q`, where
             // U is an associated type of protocol P.
             return type.subst(QuerySubstitutionMap{contextSubMap},
-                              LookUpConformanceInSubstitutionMap(subMap),
-                              SubstFlags::UseErrorType);
+                              LookUpConformanceInSubstitutionMap(subMap));
           });
     }
   }
@@ -849,13 +849,15 @@ void ConstraintSystem::recordOpenedTypes(
 
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
+#if false
   assert(std::find_if(OpenedTypes.begin(), OpenedTypes.end(),
                       [&](const std::pair<ConstraintLocator *,
                           ArrayRef<OpenedType>> &entry) {
                         return entry.first == locatorPtr;
                       }) == OpenedTypes.end() &&
          "already registered opened types for this locator");
-
+#endif
+  
   OpenedType* openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
@@ -1087,8 +1089,8 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
 
   // Create the type variables for the generic parameters.
   for (auto gp : sig->getGenericParams()) {
-    auto *paramLocator =
-        getConstraintLocator(locator.withPathElement(LocatorPathElt(gp)));
+    auto *paramLocator = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::GenericParameter(gp)));
 
     auto typeVar = createTypeVariable(paramLocator, TVO_PrefersSubtypeBinding);
     auto result = replacements.insert(std::make_pair(
@@ -1099,7 +1101,7 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
   }
 
   auto *baseLocator = getConstraintLocator(
-      locator.withPathElement(LocatorPathElt::getOpenedGeneric(sig)));
+      locator.withPathElement(LocatorPathElt::OpenedGeneric(sig)));
 
   bindArchetypesFromContext(*this, outerDC, baseLocator, replacements);
 }
@@ -1139,9 +1141,9 @@ void ConstraintSystem::openGenericRequirements(
 
     addConstraint(
         *openedReq,
-        locator.withPathElement(LocatorPathElt::getOpenedGeneric(signature))
+        locator.withPathElement(LocatorPathElt::OpenedGeneric(signature))
             .withPathElement(
-                LocatorPathElt::getTypeRequirementComponent(pos, kind)));
+                LocatorPathElt::TypeParameterRequirement(pos, kind)));
   }
 }
 
@@ -1428,7 +1430,7 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
 
   // Declarations returning unwrapped optionals don't have a single effective
   // type.
-  if (decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+  if (decl->isImplicitlyUnwrappedOptional())
     return Type();
 
   // Retrieve the interface type.
@@ -1755,7 +1757,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       addConstraint(ConstraintKind::ConformsTo, argType,
                     hashable->getDeclaredType(),
                     getConstraintLocator(
-                        locator, LocatorPathElt::getTupleElement(index)));
+                        locator, LocatorPathElt::TupleElement(index)));
     }
   };
 
@@ -1968,7 +1970,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
              "parameter is supposed to be a keypath");
 
       auto *keyPathLoc = getConstraintLocator(
-          locator, LocatorPathElt::getKeyPathDynamicMember(keyPathDecl));
+          locator, LocatorPathElt::KeyPathDynamicMember(keyPathDecl));
 
       auto rootTy = keyPathTy->getGenericArgs()[0];
       auto leafTy = keyPathTy->getGenericArgs()[1];
@@ -2199,9 +2201,34 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
                                               openedFullType,
                                               refType};
 
+  // If we have something like '(s.foo)()', where 's.foo()' returns an IUO,
+  // then we need to only create a single constraint that binds the
+  // type to an optional.
+  auto isIUOCallWrappedInParens = [&]() {
+    auto decl = choice.getDecl();
+    auto type = decl ? decl->getInterfaceType() : nullptr;
+    if (!type || !type->is<AnyFunctionType>())
+      return false;
+
+    auto expr = locator->getAnchor();
+    if (!expr)
+      return false;
+
+    if (isa<CallExpr>(expr)) {
+      return false;
+    }
+
+    auto parentExpr = getParentExpr(expr);
+    if (parentExpr && isa<ParenExpr>(parentExpr))
+      return true;
+
+    return false;
+  };
+
   // In some cases we already created the appropriate bind constraints.
   if (!bindConstraintCreated) {
-    if (choice.isImplicitlyUnwrappedValueOrReturnValue()) {
+    if (choice.isImplicitlyUnwrappedValueOrReturnValue() &&
+        !isIUOCallWrappedInParens()) {
       // Build the disjunction to attempt binding both T? and T (or
       // function returning T? and function returning T).
       buildDisjunctionForImplicitlyUnwrappedOptional(boundType, refType,
@@ -2263,8 +2290,7 @@ Type simplifyTypeImpl(ConstraintSystem &cs, Type type, Fn getFixedTypeFn) {
         auto subs = SubstitutionMap::getProtocolSubstitutions(
           proto, lookupBaseType, *conformance);
         auto result = assocType->getDeclaredInterfaceType().subst(subs);
-
-        if (result && !result->hasError())
+        if (!result->hasError())
           return result;
       }
 
@@ -2346,7 +2372,7 @@ bool OverloadChoice::isImplicitlyUnwrappedValueOrReturnValue() const {
     return false;
 
   auto *decl = getDecl();
-  if (!decl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>())
+  if (!decl->isImplicitlyUnwrappedOptional())
     return false;
 
   auto itfType = decl->getInterfaceType();
@@ -2761,6 +2787,43 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
   }
 
   return false;
+}
+
+bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
+                                          KnownProtocolKind protocol) {
+  if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
+    return bool(TypeChecker::conformsToProtocol(
+        type, proto, cs.DC, ConformanceCheckFlags::InExpression));
+  return false;
+}
+
+/// Check whether given type conforms to `RawPepresentable` protocol
+/// and return the witness type.
+Type constraints::isRawRepresentable(ConstraintSystem &cs, Type type) {
+  auto &TC = cs.TC;
+  auto *DC = cs.DC;
+
+  auto rawReprType =
+      TC.getProtocol(SourceLoc(), KnownProtocolKind::RawRepresentable);
+  if (!rawReprType)
+    return Type();
+
+  auto conformance = TypeChecker::conformsToProtocol(
+      type, rawReprType, DC, ConformanceCheckFlags::InExpression);
+  if (!conformance)
+    return Type();
+
+  return conformance->getTypeWitnessByName(type, TC.Context.Id_RawValue);
+}
+
+Type constraints::isRawRepresentable(
+    ConstraintSystem &cs, Type type,
+    KnownProtocolKind rawRepresentableProtocol) {
+  Type rawTy = isRawRepresentable(cs, type);
+  if (!rawTy || !conformsToKnownProtocol(cs, rawTy, rawRepresentableProtocol))
+    return Type();
+
+  return rawTy;
 }
 
 void ConstraintSystem::generateConstraints(

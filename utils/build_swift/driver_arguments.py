@@ -579,6 +579,8 @@ def create_argument_parser():
            help='build IndexStoreDB')
     option(['--sourcekit-lsp'], toggle_true('build_sourcekitlsp'),
            help='build SourceKitLSP')
+    option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
+           help='install SourceKitLSP')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -1045,8 +1047,7 @@ def create_argument_parser():
     option('--tensorflow-host-lib-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow libraries '
-                '(libtensorflow.so and libtensorflow_framework.so). '
-                'Used for linking swiftc.')
+                '(libtensorflow.so). Used for linking swiftc.')
     option('--tensorflow-host-include-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow headers. '
@@ -1054,8 +1055,7 @@ def create_argument_parser():
     option('--tensorflow-target-lib-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow libraries '
-                '(libtensorflow.so and libtensorflow_framework.so). '
-                'Used for linking Swift programs.')
+                '(libtensorflow.so). Used for linking Swift programs.')
     option('--tensorflow-target-include-dir', store_path,
            default=None,
            help='Path to a directory containing TensorFlow headers. '

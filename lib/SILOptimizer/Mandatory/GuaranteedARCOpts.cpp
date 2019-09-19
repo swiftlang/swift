@@ -73,11 +73,13 @@ bool GuaranteedARCOptsVisitor::visitDestroyAddrInst(DestroyAddrInst *DAI) {
 static bool couldReduceStrongRefcount(SILInstruction *Inst) {
   // Simple memory accesses cannot reduce refcounts.
   switch (Inst->getKind()) {
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Name##RetainValueInst:                              \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Name##RetainInst: \
-  case SILInstructionKind::Name##ReleaseInst: \
   case SILInstructionKind::StrongRetain##Name##Inst: \
   case SILInstructionKind::Copy##Name##ValueInst:
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \

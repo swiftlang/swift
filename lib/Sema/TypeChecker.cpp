@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
@@ -35,7 +36,6 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -56,18 +56,9 @@ TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
 }
 
 TypeChecker::TypeChecker(ASTContext &Ctx)
-  : Context(Ctx), Diags(Ctx.Diags)
-{
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->setTypeResolver(*this);
-}
+  : Context(Ctx), Diags(Ctx.Diags) {}
 
-TypeChecker::~TypeChecker() {
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->clearTypeResolver();
-}
+TypeChecker::~TypeChecker() {}
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
@@ -241,7 +232,7 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   nominal->addExtension(ext);
 }
 
-static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
+static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
@@ -259,7 +250,7 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
 
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
@@ -272,7 +263,7 @@ static void bindExtensions(SourceFile &SF, TypeChecker &TC) {
             worklist.push_back(ED);
       }
     }
-  });
+  }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
   // extension there, removing it from the worklist if we succeed.
@@ -421,7 +412,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // Resolve extensions. This has to occur first during type checking,
     // because the extensions need to be wired into the AST for name lookup
     // to work.
-    bindExtensions(SF, TC);
+    bindExtensions(SF);
 
     // Look for bridging functions. This only matters when
     // -enable-source-import is provided.
@@ -722,8 +713,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   TypeChecker &TC = createTypeChecker(ctx);
 
   auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                    ContextualTypePurpose::CTP_Unused,
-                                    TypeCheckExprFlags::SuppressDiagnostics);
+                                         ContextualTypePurpose::CTP_Unused);
   return !resultTy;
 }
 

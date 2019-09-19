@@ -251,12 +251,6 @@ static void validatePatternBindingEntry(TypeChecker &tc,
                                                    ? Property : GlobalVariable);
     }
   }
-
-  // If we have any type-adjusting attributes, apply them here.
-  assert(binding->getPattern(entryNumber)->hasType() && "Type missing?");
-  if (auto var = binding->getSingleVar()) {
-    tc.checkTypeModifyingDeclAttributes(var);
-  }
 }
 
 /// Validate the entries in the given pattern binding declaration.
@@ -416,29 +410,6 @@ static void addMemberToContextIfNeeded(Decl *D, DeclContext *DC,
     assert((DC->isLocalContext() || isa<FileUnit>(DC)) &&
            "Unknown declcontext");
   }
-}
-
-static ParamDecl *getParamDeclAtIndex(FuncDecl *fn, unsigned index) {
-  return fn->getParameters()->get(index);
-}
-
-static VarDecl *getFirstParamDecl(FuncDecl *fn) {
-  return getParamDeclAtIndex(fn, 0);
-};
-
-
-static ParamDecl *buildArgument(SourceLoc loc, DeclContext *DC,
-                                StringRef name,
-                                Type interfaceType,
-                                ParamDecl::Specifier specifier,
-                                ASTContext &context) {
-  auto *param = new (context) ParamDecl(specifier, SourceLoc(), SourceLoc(),
-                                        Identifier(), loc,
-                                        context.getIdentifier(name),
-                                        DC);
-  param->setImplicit();
-  param->setInterfaceType(interfaceType);
-  return param;
 }
 
 /// Build a parameter list which can forward the formal index parameters of a
@@ -631,8 +602,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       ConcreteDeclRef memberRef(underlyingVar, subs);
       auto *memberRefExpr = new (ctx) MemberRefExpr(
           result, SourceLoc(), memberRef, DeclNameLoc(), /*Implicit=*/true);
-      auto type = underlyingVar->getValueInterfaceType()
-          .subst(subs, SubstFlags::UseErrorType);
+      auto type = underlyingVar->getValueInterfaceType().subst(subs);
       if (isLValue)
         type = LValueType::get(type);
       memberRefExpr->setType(type);
@@ -737,8 +707,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
     assert(target != TargetImpl::Super);
     auto *storageDRE = new (ctx) DeclRefExpr(storage, DeclNameLoc(),
                                              /*IsImplicit=*/true, semantics);
-    auto type = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
+    auto type = storage->getValueInterfaceType().subst(subs);
     if (isLValue)
       type = LValueType::get(type);
     storageDRE->setType(type);
@@ -773,8 +742,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
 
   Expr *lookupExpr;
   ConcreteDeclRef memberRef(storage, subs);
-  auto type = storage->getValueInterfaceType()
-      .subst(subs, SubstFlags::UseErrorType);
+  auto type = storage->getValueInterfaceType().subst(subs);
   if (isMemberLValue)
     type = LValueType::get(type);
 
@@ -782,8 +750,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
   // that accepts the enclosing self along with key paths, form that subscript
   // operation now.
   if (enclosingSelfAccess) {
-    Type storageType = storage->getValueInterfaceType()
-        .subst(subs, SubstFlags::UseErrorType);
+    Type storageType = storage->getValueInterfaceType().subst(subs);
     // Metatype instance for the wrapper type itself.
     TypeExpr *wrapperMetatype = TypeExpr::createImplicit(storageType, ctx);
 
@@ -1332,7 +1299,7 @@ synthesizeTrivialSetterBodyWithStorage(AccessorDecl *setter,
                                        ASTContext &ctx) {
   SourceLoc loc = setter->getStorage()->getLoc();
 
-  VarDecl *valueParamDecl = getFirstParamDecl(setter);
+  VarDecl *valueParamDecl = setter->getParameters()->get(0);
 
   auto *valueDRE =
     new (ctx) DeclRefExpr(valueParamDecl, DeclNameLoc(), /*IsImplicit=*/true);
@@ -1417,8 +1384,7 @@ synthesizeObservedSetterBody(AccessorDecl *Set, TargetImpl target,
 
   auto callObserver = [&](AccessorDecl *observer, VarDecl *arg) {
     ConcreteDeclRef ref(observer, subs);
-    auto type = observer->getInterfaceType()
-                  .subst(subs, SubstFlags::UseErrorType);
+    auto type = observer->getInterfaceType().subst(subs);
     Expr *Callee = new (Ctx) DeclRefExpr(ref, DeclNameLoc(), /*imp*/true);
     Callee->setType(type);
     auto *ValueDRE = new (Ctx) DeclRefExpr(arg, DeclNameLoc(), /*imp*/true);
@@ -1648,8 +1614,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
                                            ASTContext &ctx) {
   SourceLoc loc = storage->getLoc();
 
-  GenericEnvironment *genericEnvironmentOfLazyAccessor = nullptr;
-
   ParamDecl *selfDecl = nullptr;
   if (storage->getDeclContext()->isTypeContext()) {
     if (storage->getAttrs().hasAttribute<LazyAttr>()) {
@@ -1660,8 +1624,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
         bindingDecl->getPatternEntryForVarDecl(varDecl).getInitContext());
 
       selfDecl = bindingInit->getImplicitSelfDecl();
-      genericEnvironmentOfLazyAccessor =
-        bindingInit->getGenericEnvironmentOfContext();
     }
   }
 
@@ -1674,8 +1636,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   if (storage->isStatic())
     staticLoc = storage->getLoc();
 
-  auto storageInterfaceType = storage->getValueInterfaceType();
-
   auto getter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ loc,
       AccessorKind::Get, storage,
@@ -1683,7 +1643,7 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams,
       getterParams,
-      TypeLoc::withoutLoc(storageInterfaceType),
+      TypeLoc(),
       storage->getDeclContext());
 
   // If we're stealing the 'self' from a lazy initializer, set it now.
@@ -1691,18 +1651,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   // the getter until we synthesize the body of the getter later.
   if (selfDecl)
     *getter->getImplicitSelfDeclStorage() = selfDecl;
-
-  // We need to install the generic environment here because:
-  // 1) validating the getter will change the implicit self decl's DC to it,
-  // 2) it's likely that the initializer will be type-checked before the
-  //    accessor (and therefore before the normal installation happens), and
-  // 3) type-checking a reference to the self decl will map its type into
-  //    its context, which requires an environment to be installed on that
-  //    context.
-  // We can safely use the enclosing environment because properties are never
-  // differently generic.
-  if (genericEnvironmentOfLazyAccessor)
-    getter->setGenericEnvironment(genericEnvironmentOfLazyAccessor);
 
   if (storage->isGetterMutating())
     getter->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -1733,20 +1681,22 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   // Add a "(value : T, indices...)" argument list.
-  auto storageInterfaceType = storage->getValueInterfaceType();
-  auto valueDecl = buildArgument(storage->getLoc(), storage->getDeclContext(),
-                                 "value", storageInterfaceType,
-                                 ParamDecl::Specifier::Default, ctx);
-  auto *params = buildIndexForwardingParamList(storage, valueDecl, ctx);
+  auto *param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
+                                    SourceLoc(), SourceLoc(),
+                                    Identifier(), loc,
+                                    ctx.getIdentifier("value"),
+                                    storage->getDeclContext());
+  param->setImplicit();
 
-  Type setterRetTy = TupleType::getEmpty(ctx);
+  auto *params = buildIndexForwardingParamList(storage, param, ctx);
+
   auto setter = AccessorDecl::create(
       ctx, loc, /*AccessorKeywordLoc*/ SourceLoc(),
       AccessorKind::Set, storage,
       /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None,
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
       genericParams, params,
-      TypeLoc::withoutLoc(setterRetTy),
+      TypeLoc(),
       storage->getDeclContext());
 
   if (isMutating)
@@ -1848,9 +1798,6 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
                                     AbstractStorageDecl *storage,
                                     AccessorKind kind) const {
   auto &ctx = storage->getASTContext();
-
-  if (!storage->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(storage);
 
   switch (kind) {
   case AccessorKind::Get:
@@ -2446,7 +2393,7 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   // Form the initialization of the backing property from a value of the
   // original property's type.
   OpaqueValueExpr *origValue =
-      new (ctx) OpaqueValueExpr(var->getLoc(), var->getType(),
+      new (ctx) OpaqueValueExpr(var->getSourceRange(), var->getType(),
                                 /*isPlaceholder=*/true);
   Expr *initializer = buildPropertyWrapperInitialValueCall(
       var, storageType, origValue,
@@ -2607,6 +2554,8 @@ static void finishNSManagedImplInfo(VarDecl *var,
 
 static void finishStorageImplInfo(AbstractStorageDecl *storage,
                                   StorageImplInfo &info) {
+  auto dc = storage->getDeclContext();
+
   if (auto var = dyn_cast<VarDecl>(storage)) {
     if (!info.hasStorage()) {
       if (auto *init = var->getParentInitializer()) {
@@ -2625,8 +2574,28 @@ static void finishStorageImplInfo(AbstractStorageDecl *storage,
     }
   }
 
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(dc))
     finishProtocolStorageImplInfo(storage, info);
+
+  // If we have a stored property in an unsupported context, diagnose
+  // and change it to computed to avoid confusing SILGen.
+
+  // Note: Stored properties in protocols are diagnosed in
+  // finishProtocolStorageImplInfo().
+
+  if (info.hasStorage() && !storage->isStatic()) {
+    if (isa<EnumDecl>(dc)) {
+      storage->diagnose(diag::enum_stored_property);
+      info = StorageImplInfo::getMutableComputed();
+    } else if (isa<ExtensionDecl>(dc) &&
+              !storage->getAttrs().getAttribute<DynamicReplacementAttr>()) {
+      storage->diagnose(diag::extension_stored_property);
+
+      info = (info.supportsMutation()
+              ? StorageImplInfo::getMutableComputed()
+              : StorageImplInfo::getImmutableComputed());
+    }
+  }
 }
 
 /// Gets the storage info of the provided storage decl if it has the
@@ -2674,6 +2643,13 @@ static StorageImplInfo classifyWithHasStorageAttr(VarDecl *var) {
 llvm::Expected<StorageImplInfo>
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  if (auto *param = dyn_cast<ParamDecl>(storage)) {
+    return StorageImplInfo::getSimpleStored(
+      param->isInOut()
+      ? StorageIsMutable
+      : StorageIsNotMutable);
+  }
+
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     // Allow the @_hasStorage attribute to override all the accessors we parsed
     // when making the final classification.

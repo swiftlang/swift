@@ -30,7 +30,7 @@ Please make sure you use Python 2.x. Python 3.x is not supported currently.
 
 #### macOS
 
-To build for macOS, you need [Xcode 11 beta 5](https://developer.apple.com/xcode/downloads/).
+To build for macOS, you need [Xcode 11 beta 6](https://developer.apple.com/xcode/downloads/).
 The required version of Xcode changes frequently, and is often a beta release.
 Check this document for the current required version.
 
@@ -149,7 +149,7 @@ Below is more information about TensorFlow-related build arguments.
     * Default: None.
 * `tensorflow-host-include-dir`: A directory containing custom TensorFlow headers.
     * Default value: None.
-* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so` and `libtensorflow_framework.so`).
+* `tensorflow-host-lib-dir`: A directory containing custom TensorFlow shared libraries (`libtensorflow.so`).
     * Default value: None.
 * `tensorflow-swift-apis`: A path to the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) deep learning library repository.
     * Default value: `tensorflow-swift-apis` if the [tensorflow/swift-apis](https://github.com/tensorflow/swift-apis) repository is cloned. Otherwise, none.
@@ -266,7 +266,7 @@ compiler crashes.
 Make sure you are using the [correct release](#macos) of Xcode.
 
 If you have changed Xcode versions but still encounter errors that appear to
-be related to the Xcode version, try passing `--rebuild` to `build-script`.
+be related to the Xcode version, try passing `--clean` to `build-script`.
 
 When a new version of Xcode is released, you can update your build without
 recompiling the entire project by passing the `--reconfigure` option.

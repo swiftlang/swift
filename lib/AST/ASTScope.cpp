@@ -41,6 +41,8 @@ llvm::SmallVector<const ASTScopeImpl *, 0> ASTScope::unqualifiedLookup(
     SourceFile *SF, DeclName name, SourceLoc loc,
     const DeclContext *startingContext,
     namelookup::AbstractASTScopeDeclConsumer &consumer) {
+  if (auto *s = SF->getASTContext().Stats)
+    ++s->getFrontendCounters().NumASTScopeLookups;
   return ASTScopeImpl::unqualifiedLookup(SF, name, loc, startingContext,
                                          consumer);
 }
@@ -82,7 +84,7 @@ AbstractClosureScope::getClosureIfClosureScope() const {
 
 // Conservative, because using precise info would be circular
 SourceRange
-AttachedPropertyWrapperScope::getSourceRangeFor(const VarDecl *const vd) {
+AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(const VarDecl *const vd) {
   SourceRange sr;
   for (auto *attr : vd->getAttrs().getAttributes<CustomAttr>()) {
     if (sr.isInvalid())

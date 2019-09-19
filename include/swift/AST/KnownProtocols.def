@@ -87,6 +87,7 @@ PROTOCOL_(TensorFlowDataTypeCompatible)
 PROTOCOL(TensorProtocol)
 PROTOCOL(VectorProtocol)
 PROTOCOL(Differentiable)
+PROTOCOL(EuclideanDifferentiable)
 
 PROTOCOL_(ObjectiveCBridgeable)
 PROTOCOL_(DestructorSafeContainer)

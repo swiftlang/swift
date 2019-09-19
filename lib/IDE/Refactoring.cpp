@@ -1004,7 +1004,7 @@ static StringRef correctNewDeclName(DeclContext *DC, StringRef Name) {
   llvm::SmallVector<ValueDecl*, 16> AllVisibles;
   VectorDeclConsumer Consumer(AllVisibles);
   ASTContext &Ctx = DC->getASTContext();
-  lookupVisibleDecls(Consumer, DC, Ctx.getLazyResolver(), true);
+  lookupVisibleDecls(Consumer, DC, true);
   return correctNameInternal(Ctx, Name, AllVisibles);
 }
 

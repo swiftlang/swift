@@ -25,13 +25,14 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 
@@ -197,9 +198,6 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
 
   // FIXME: subst() should build the sugar for us
   declaredType = declaredType.subst(subs);
-  if (!declaredType)
-    return Type();
-
   return TypeAliasType::get(aliasDecl, parent, subs, declaredType);
 }
 
@@ -250,8 +248,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   // FIXME: We're not checking that the type satisfies the generic
   // requirements of the signature here.
-  auto substType = origType.subst(subs);
-  return substType;
+  return origType.subst(subs);
 }
 
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
@@ -334,9 +331,6 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   // FIXME: subst() should build the sugar for us
   auto declaredType = aliasDecl->getDeclaredInterfaceType().subst(subMap);
-  if (!declaredType)
-    return Type();
-
   return TypeAliasType::get(aliasDecl, parent, subMap, declaredType);
 }
 
@@ -809,8 +803,7 @@ ASTBuilder::getForeignModuleKind(NodePointer node) {
 CanGenericSignature ASTBuilder::demangleGenericSignature(
     NominalTypeDecl *nominalDecl,
     NodePointer node) {
-  GenericSignatureBuilder builder(Ctx);
-  builder.addGenericSignature(nominalDecl->getGenericSignature());
+  SmallVector<Requirement, 2> requirements;
 
   for (auto &child : *node) {
     if (child->getKind() ==
@@ -835,51 +828,71 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
         return CanGenericSignature();
     }
 
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
-
     switch (child->getKind()) {
     case Demangle::Node::Kind::DependentGenericConformanceRequirement: {
-      builder.addRequirement(
+      requirements.push_back(
           Requirement(constraintType->isExistentialType()
                         ? RequirementKind::Conformance
                         : RequirementKind::Superclass,
-                      subjectType, constraintType),
-          source, nullptr);
+                      subjectType, constraintType));
       break;
     }
     case Demangle::Node::Kind::DependentGenericSameTypeRequirement: {
-      builder.addRequirement(
+      requirements.push_back(
           Requirement(RequirementKind::SameType,
-                      subjectType, constraintType),
-          source, nullptr);
+                      subjectType, constraintType));
       break;
     }
     case Demangle::Node::Kind::DependentGenericLayoutRequirement: {
-      // FIXME: Other layout constraints
-      LayoutConstraint constraint;
       auto kindChild = child->getChild(1);
       if (kindChild->getKind() != Demangle::Node::Kind::Identifier)
         return CanGenericSignature();
 
-      if (kindChild->getText() == "C") {
-        auto kind = LayoutConstraintKind::Class;
-        auto layout = LayoutConstraint::getLayoutConstraint(kind, Ctx);
-        builder.addRequirement(
-            Requirement(RequirementKind::Layout, subjectType, layout),
-            source, nullptr);
-        break;
+      auto kind = llvm::StringSwitch<Optional<
+          LayoutConstraintKind>>(kindChild->getText())
+        .Case("U", LayoutConstraintKind::UnknownLayout)
+        .Case("R", LayoutConstraintKind::RefCountedObject)
+        .Case("N", LayoutConstraintKind::NativeRefCountedObject)
+        .Case("C", LayoutConstraintKind::Class)
+        .Case("D", LayoutConstraintKind::NativeClass)
+        .Case("T", LayoutConstraintKind::Trivial)
+        .Cases("E", "e", LayoutConstraintKind::TrivialOfExactSize)
+        .Cases("M", "m", LayoutConstraintKind::TrivialOfAtMostSize)
+        .Default(None);
+
+      if (!kind)
+        return CanGenericSignature();
+
+      LayoutConstraint layout;
+
+      if (kind != LayoutConstraintKind::TrivialOfExactSize &&
+          kind != LayoutConstraintKind::TrivialOfAtMostSize) {
+        layout = LayoutConstraint::getLayoutConstraint(*kind, Ctx);
+      } else {
+        auto size = child->getChild(2)->getIndex();
+        auto alignment = 0;
+
+        if (child->getNumChildren() == 4)
+          alignment = child->getChild(3)->getIndex();
+
+        layout = LayoutConstraint::getLayoutConstraint(*kind, size, alignment,
+                                                       Ctx);
       }
 
-      return CanGenericSignature();
+      requirements.push_back(
+          Requirement(RequirementKind::Layout, subjectType, layout));
+      break;
     }
     default:
       return CanGenericSignature();
     }
   }
 
-  return std::move(builder).computeGenericSignature(SourceLoc())
-      ->getCanonicalSignature();
+  return evaluateOrDefault(
+      Ctx.evaluator,
+      AbstractGenericSignatureRequest{
+        nominalDecl->getGenericSignature(), { }, std::move(requirements)},
+      nullptr)->getCanonicalSignature();
 }
 
 DeclContext *
@@ -1041,6 +1054,23 @@ ASTBuilder::findTypeDecl(DeclContext *dc,
   return result;
 }
 
+static Optional<ClangTypeKind>
+getClangTypeKindForNodeKind(Demangle::Node::Kind kind) {
+  switch (kind) {
+  case Demangle::Node::Kind::Protocol:
+    return ClangTypeKind::ObjCProtocol;
+  case Demangle::Node::Kind::Class:
+    return ClangTypeKind::ObjCClass;
+  case Demangle::Node::Kind::TypeAlias:
+    return ClangTypeKind::Typedef;
+  case Demangle::Node::Kind::Structure:
+  case Demangle::Node::Kind::Enum:
+    return ClangTypeKind::Tag;
+  default:
+    return None;
+  }
+}
+
 GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
                                                  StringRef relatedEntityKind,
                                                  ForeignModuleKind foreignKind,
@@ -1078,10 +1108,15 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
     consumer.foundDecl(found, DeclVisibilityKind::VisibleAtTopLevel);
   };
 
+  Optional<ClangTypeKind> lookupKind = getClangTypeKindForNodeKind(kind);
+  if (!lookupKind)
+    return nullptr;
+
   switch (foreignKind) {
   case ForeignModuleKind::SynthesizedByImporter:
     if (!relatedEntityKind.empty()) {
-      importer->lookupRelatedEntity(name, relatedEntityKind, found);
+      importer->lookupRelatedEntity(name, *lookupKind, relatedEntityKind,
+                                    found);
       break;
     }
     importer->lookupValue(Ctx.getIdentifier(name), consumer);
@@ -1089,12 +1124,7 @@ GenericTypeDecl *ASTBuilder::findForeignTypeDecl(StringRef name,
       consumer.Result = getAcceptableTypeDeclCandidate(consumer.Result, kind);
     break;
   case ForeignModuleKind::Imported:
-    importer->lookupTypeDecl(name, kind, found);
-
-    // Try the DWARFImporter if it exists.
-    if (!consumer.Result)
-      if (auto *dwarf_importer = Ctx.getDWARFModuleLoader())
-        dwarf_importer->lookupTypeDecl(name, kind, found);
+    importer->lookupTypeDecl(name, *lookupKind, found);
   }
 
   return consumer.Result;

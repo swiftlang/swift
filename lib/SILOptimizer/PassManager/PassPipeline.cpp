@@ -107,6 +107,7 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   P.addClosureLifetimeFixup();
   if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
+    P.addDestroyHoisting();
   }
   if (!Options.StripOwnershipAfterSerialization)
     P.addOwnershipModelEliminator();

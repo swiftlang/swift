@@ -19,6 +19,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ParseRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceManager.h"
@@ -106,10 +107,8 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
 }
 
 Type DeclContext::getDeclaredTypeInContext() const {
-  if (auto *ED = dyn_cast<ExtensionDecl>(this))
-    return ED->mapTypeIntoContext(getDeclaredInterfaceType());
-  if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
-    return NTD->getDeclaredTypeInContext();
+  if (auto declaredType = getDeclaredInterfaceType())
+    return mapTypeIntoContext(declaredType);
   return Type();
 }
 
@@ -475,6 +474,20 @@ unsigned DeclContext::getSemanticDepth() const {
   return 1 + getParent()->getSemanticDepth();
 }
 
+bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
+  // Members of non-generic classes and class extensions can be found by
+  /// dynamic lookup.
+  if (auto *CD = getSelfClassDecl())
+    return !CD->isGenericContext();
+
+  // Members of @objc protocols (but not protocol extensions) can be
+  // found by dynamic lookup.
+  if (auto *PD = dyn_cast<ProtocolDecl>(this))
+      return PD->getAttrs().hasAttribute<ObjCAttr>();
+
+  return false;
+}
+
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:
@@ -726,7 +739,7 @@ DeclRange IterableDeclContext::getMembers() const {
 void IterableDeclContext::addMember(Decl *member, Decl *Hint) {
   // Add the member to the list of declarations without notification.
   addMemberSilently(member, Hint);
-  ++memberCount;
+  ++MemberCount;
 
   // Notify our parent declaration that we have added the member, which can
   // be used to update the lookup tables.
@@ -792,15 +805,53 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
     ++s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
   }
 }
+bool IterableDeclContext::hasUnparsedMembers() const {
+  if (AddedParsedMembers)
+    return false;
+
+  if (!getDecl()->getDeclContext()->getParentSourceFile()) {
+    // There will never be any parsed members to add, so set the flag to say
+    // we are done so we can short-circuit next time.
+    const_cast<IterableDeclContext *>(this)->AddedParsedMembers = 1;
+    return false;
+  }
+
+  return true;
+}
 
 void IterableDeclContext::loadAllMembers() const {
-  // Lazily parse members.
-  getASTContext().parseMembers(const_cast<IterableDeclContext*>(this));
+  // SWIFT_ENABLE_TENSORFLOW
+  // If it's an AD-synthesized decl, then the members are already "loaded"
+  // because we create the members eagerly when the synthesize it. Trying to
+  // load the members confuses the parser.
+  if (auto *typeDecl = dyn_cast<TypeDecl>(getDecl()))
+    if (typeDecl->getNameStr().startswith("_AD__"))
+      return;
+
+  ASTContext &ctx = getASTContext();
+
+  // For contexts within a source file, get the list of parsed members.
+  if (getDecl()->getDeclContext()->getParentSourceFile()) {
+    // Retrieve the parsed members. Even if we've already added the parsed
+    // members to this context, this call is important for recording the
+    // dependency edge.
+    auto mutableThis = const_cast<IterableDeclContext *>(this);
+    auto members = evaluateOrDefault(
+        ctx.evaluator, ParseMembersRequest{mutableThis}, ArrayRef<Decl*>());
+
+    // If we haven't already done so, add these members to this context.
+    if (!AddedParsedMembers) {
+      mutableThis->AddedParsedMembers = 1;
+      for (auto member : members) {
+        mutableThis->addMember(member);
+      }
+    }
+  }
+
   if (!hasLazyMembers())
     return;
 
   // Don't try to load all members re-entrant-ly.
-  ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
     /*lazyLoader=*/nullptr);
   auto lazyMembers = FirstDeclAndLazyMembers.getInt() & ~LazyMembers::Present;
@@ -1054,3 +1105,12 @@ static void verify_DeclContext_is_start_of_node() {
 #include "swift/AST/ExprNodes.def"
 }
 #endif
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const IterableDeclContext *idc) {
+  simple_display(out, idc->getDecl());
+}
+
+SourceLoc swift::extractNearestSourceLoc(const IterableDeclContext *idc) {
+  return extractNearestSourceLoc(idc->getDecl());
+}

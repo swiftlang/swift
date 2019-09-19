@@ -21,44 +21,9 @@
 
 using namespace swift;
 
-PersistentParserState::PersistentParserState(ASTContext &Ctx):
-  Ctx(Ctx) { Ctx.addLazyParser(this); }
+PersistentParserState::PersistentParserState() { }
 
-PersistentParserState::~PersistentParserState() { Ctx.removeLazyParser(this); }
-
-void PersistentParserState::delayFunctionBodyParsing(AbstractFunctionDecl *AFD,
-                                                     SourceRange BodyRange,
-                                                     SourceLoc PreviousLoc) {
-  std::unique_ptr<FunctionBodyState> State;
-  State.reset(new FunctionBodyState(BodyRange, PreviousLoc,
-                                    ScopeInfo.saveCurrentScope()));
-  assert(DelayedFunctionBodies.find(AFD) == DelayedFunctionBodies.end() &&
-         "Already recorded state for this body");
-  DelayedFunctionBodies[AFD] = std::move(State);
-}
-
-std::unique_ptr<PersistentParserState::FunctionBodyState>
-PersistentParserState::takeFunctionBodyState(AbstractFunctionDecl *AFD) {
-  assert(AFD->getBodyKind() == AbstractFunctionDecl::BodyKind::Unparsed);
-  DelayedFunctionBodiesTy::iterator I = DelayedFunctionBodies.find(AFD);
-  assert(I != DelayedFunctionBodies.end() && "State should be saved");
-  std::unique_ptr<FunctionBodyState> State = std::move(I->second);
-  DelayedFunctionBodies.erase(I);
-  return State;
-}
-
-bool PersistentParserState::hasFunctionBodyState(AbstractFunctionDecl *AFD) {
-  return DelayedFunctionBodies.find(AFD) != DelayedFunctionBodies.end();
-}
-
-std::unique_ptr<PersistentParserState::DelayedDeclListState>
-PersistentParserState::takeDelayedDeclListState(IterableDeclContext *IDC) {
-  auto I = DelayedDeclListStates.find(IDC);
-  assert(I != DelayedDeclListStates.end() && "State should be saved");
-  auto State = std::move(I->second);
-  DelayedDeclListStates.erase(I);
-  return State;
-}
+PersistentParserState::~PersistentParserState() { }
 
 void PersistentParserState::delayDecl(DelayedDeclKind Kind,
                                       unsigned Flags,
@@ -72,24 +37,13 @@ void PersistentParserState::delayDecl(DelayedDeclKind Kind,
       ScopeInfo.saveCurrentScope()));
 }
 
-void PersistentParserState::delayDeclList(IterableDeclContext* D,
-                                          unsigned Flags,
-                                          DeclContext *ParentContext,
-                                          SourceRange BodyRange,
-                                          SourceLoc PreviousLoc) {
-  DelayedDeclListStates[D] = llvm::make_unique<DelayedDeclListState>(Flags,
-    ParentContext, BodyRange, PreviousLoc, ScopeInfo.saveCurrentScope());
+void PersistentParserState::delayDeclList(IterableDeclContext *D) {
+  DelayedDeclLists.push_back(D);
 }
 
 void PersistentParserState::parseAllDelayedDeclLists() {
-  std::vector<IterableDeclContext*> AllDelayed;
-  AllDelayed.reserve(DelayedDeclListStates.size());
-  for (auto &P: DelayedDeclListStates) {
-    AllDelayed.push_back(P.first);
-  }
-  for (auto *D: AllDelayed) {
-    parseMembers(D);
-  }
+  for (auto IDC : DelayedDeclLists)
+    IDC->loadAllMembers();
 }
 
 void PersistentParserState::delayTopLevel(TopLevelCodeDecl *TLCD,

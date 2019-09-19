@@ -246,8 +246,8 @@ extension MutableCollection where Self: RandomAccessCollection {
   public mutating func sort(
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
-    let didSortUnsafeBuffer = try _withUnsafeMutableBufferPointerIfSupported {
-      buffer -> Void? in
+    let didSortUnsafeBuffer: Void? = try _withUnsafeMutableBufferPointerIfSupported {
+      buffer -> Void in
         try buffer._stableSortImpl(by: areInIncreasingOrder)
     }
     if didSortUnsafeBuffer == nil {

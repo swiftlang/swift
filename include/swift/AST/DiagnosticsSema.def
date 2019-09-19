@@ -81,6 +81,13 @@ ERROR(could_not_find_value_member,none,
 ERROR(could_not_find_value_member_corrected,none,
       "value of type %0 has no member %1; did you mean %2?",
       (Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member_corrected,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1; did you mean %3?",
+      (Type, Type, DeclName, DeclName))
+ERROR(could_not_find_value_dynamic_member,none,
+      "value of type %0 has no dynamic member %2 using key path from root type %1",
+      (Type, Type, DeclName))
+
 ERROR(could_not_find_type_member,none,
       "type %0 has no member %1", (Type, DeclName))
 ERROR(could_not_find_type_member_corrected,none,
@@ -354,9 +361,6 @@ ERROR(cannot_convert_default_arg_value,none,
       (Type,Type))
 ERROR(cannot_convert_default_arg_value_protocol,none,
       "default argument value of type %0 does not conform to %1", (Type,Type))
-ERROR(default_argument_literal_cannot_convert, none,
-      "cannot call %0 %1 because default argument of type %2 cannot be "
-      "converted to type %3", (DescriptiveDeclKind, DeclName, Type, Type))
 ERROR(cannot_convert_default_arg_value_nil,none,
       "nil default argument value cannot be converted to type %0", (Type))
 
@@ -1114,7 +1118,10 @@ ERROR(missing_dynamic_callable_kwargs_method,none,
 ERROR(invalid_dynamic_member_lookup_type,none,
       "@dynamicMemberLookup attribute requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
-      "'ExpressibleByStringLiteral' or a keypath", (Type))
+      "'ExpressibleByStringLiteral' or a key path", (Type))
+NOTE(invalid_dynamic_member_subscript, none,
+     "add an explicit argument label to this subscript to satisfy "
+     "the @dynamicMemberLookup requirement", ())
 
 ERROR(string_index_not_integer,none,
       "String must not be indexed with %0, it has variable size elements",
@@ -1833,16 +1840,16 @@ ERROR(protocol_access,none,
       "|private or fileprivate}4 because %select{it refines|its 'where' clause uses}2"
       "|%select{in this context|fileprivate|internal|public|%error}1 "
       "%select{protocol cannot refine|protocol's 'where' clause cannot use}2}0 "
-      "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
-      (bool, AccessLevel, bool, AccessLevel, bool))
+      "%select{a private|a fileprivate|an internal|%error|%error}3 %5",
+      (bool, AccessLevel, bool, AccessLevel, bool, DescriptiveDeclKind))
 WARNING(protocol_access_warn,none,
         "%select{protocol should be declared "
         "%select{private|fileprivate|internal|%error|%error}1 because "
         "%select{it refines|its 'where' clause uses}2"
         "|%select{in this context|fileprivate|internal|public|%error}1 "
         "%select{protocol should not refine|protocol's 'where' clause should not use}2}0 "
-        "%select{a private|a fileprivate|an internal|%error|%error}3 protocol",
-        (bool, AccessLevel, bool, AccessLevel, bool))
+        "%select{a private|a fileprivate|an internal|%error|%error}3 %5",
+        (bool, AccessLevel, bool, AccessLevel, bool, DescriptiveDeclKind))
 ERROR(protocol_usable_from_inline,none,
       "protocol %select{refined|used}0 by '@usableFromInline' protocol "
       "must be '@usableForInline' or public", (bool))
@@ -2223,10 +2230,8 @@ ERROR(multiple_override,none,
 NOTE(multiple_override_prev,none,
      "%0 previously overridden here", (DeclName))
 
-ERROR(override_unavailable,none,
-      "cannot override %0 which has been marked unavailable", (DeclBaseName))
-ERROR(override_unavailable_msg, none,
-      "cannot override %0 which has been marked unavailable: %1",
+ERROR(override_unavailable, none,
+      "cannot override %0 which has been marked unavailable%select{|: %1}1",
       (DeclBaseName, StringRef))
 
 ERROR(override_less_available,none,
@@ -2576,6 +2581,8 @@ ERROR(broken_vector_protocol_requirement,none,
       "VectorProtocol protocol is broken: unexpected requirement", ())
 ERROR(broken_differentiable_requirement,none,
       "Differentiable protocol is broken: unexpected requirement", ())
+ERROR(broken_euclidean_differentiable_requirement,none,
+      "EuclideanDifferentiable protocol is broken: unexpected requirement", ())
 ERROR(broken_key_path_iterable_requirement,none,
       "KeyPathIterable protocol is broken: unexpected requirement", ())
 ERROR(broken_tensor_array_protocol_requirement,none,
@@ -4326,26 +4333,15 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
 
 ERROR(availability_decl_unavailable, none,
       "%select{getter for |setter for |}0%1 is unavailable"
-      "%select{ in %3|}2",
-      (unsigned, DeclName, bool, StringRef))
+      "%select{ in %3|}2%select{|: %4}4",
+      (unsigned, DeclName, bool, StringRef, StringRef))
 
 #define REPLACEMENT_DECL_KIND_SELECT "select{| instance method| property}"
 ERROR(availability_decl_unavailable_rename, none,
       "%select{getter for |setter for |}0%1 has been "
       "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
-      "'%4'",
-      (unsigned, DeclName, bool, unsigned, StringRef))
-
-ERROR(availability_decl_unavailable_rename_msg, none,
-      "%select{getter for |setter for |}0%1 has been "
-      "%select{renamed to|replaced by}2%" REPLACEMENT_DECL_KIND_SELECT "3 "
-      "'%4': %5",
+      "'%4'%select{|: %5}5",
       (unsigned, DeclName, bool, unsigned, StringRef, StringRef))
-
-ERROR(availability_decl_unavailable_msg, none,
-      "%select{getter for |setter for |}0%1 is unavailable"
-      "%select{ in %3|}2: %4",
-      (unsigned, DeclName, bool, StringRef, StringRef))
 
 NOTE(availability_marked_unavailable, none,
      "%select{getter for |setter for |}0%1 has been explicitly marked "
@@ -4361,12 +4357,7 @@ NOTE(availability_obsoleted, none,
 
 WARNING(availability_deprecated, none,
         "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2",
-        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple))
-
-WARNING(availability_deprecated_msg, none,
-        "%select{getter for |setter for |}0%1 %select{is|%select{is|was}4}2 "
-        "deprecated%select{| in %3%select{| %5}4}2: %6",
+        "deprecated%select{| in %3%select{| %5}4}2%select{|: %6}6",
         (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
          StringRef))
 

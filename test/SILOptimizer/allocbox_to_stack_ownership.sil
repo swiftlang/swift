@@ -164,7 +164,7 @@ bb0(%0 : @owned $SomeClass):
   %1 = alloc_box ${ var SomeClass }
   %1a = project_box %1 : ${ var SomeClass }, 0
   store %0 to [init] %1a : $*SomeClass
-  %3 = load [take] %1a : $*SomeClass
+  %3 = load [copy] %1a : $*SomeClass
   destroy_value %1 : ${ var SomeClass }
   return %3 : $SomeClass
 
@@ -1037,7 +1037,7 @@ bb3:
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'deinit_access'
 sil [ossa] @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
-bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
+bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %2 to [initialization] %5 : $*T
@@ -1076,7 +1076,7 @@ bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
 // CHECK: return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function 'nodeinit_access'
 sil [ossa] @nodeinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
-bb0(%0 : @owned $*T, %1 : @owned $*T, %2 : @owned $*T):
+bb0(%0 : $*T, %1 : $*T, %2 : $*T):
   %4 = alloc_box $<τ_0_0> { var τ_0_0 } <T>, var, name "x"
   %5 = project_box %4 : $<τ_0_0> { var τ_0_0 } <T>, 0
   copy_addr %2 to [initialization] %5 : $*T

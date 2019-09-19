@@ -104,8 +104,10 @@ Optional<bool> forEachModuleSearchPath(
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoaderBase::SerializedModuleLoaderBase(
-    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode)
-    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
+    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    ArrayRef<std::string> PreferInterfaceForModules)
+    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode),
+      PreferInterfaceForModules(PreferInterfaceForModules) {}
 
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 SerializedModuleLoader::~SerializedModuleLoader() = default;
@@ -548,7 +550,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
                                                 extendedInfo.isSIB());
-    fileUnit->setParseableInterface(extendedInfo.getParseableInterface());
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
@@ -954,6 +955,11 @@ void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
     return;
   
   File.lookupValue(name, results);
+}
+
+StringRef
+SerializedASTFile::getFilenameForPrivateDecl(const ValueDecl *decl) const {
+  return File.FilenamesForPrivateValues.lookup(decl);
 }
 
 TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{

@@ -1769,8 +1769,8 @@ getObjCClassByMangledName(const char * _Nonnull typeName,
         return nullptr;
       }).getMetadata();
   } else {
-    metadata = swift_getTypeByMangledNameInEnvironment(
-      typeStr.data(), typeStr.size(), /* no substitutions */ nullptr, nullptr);
+    metadata = swift_stdlib_getTypeByMangledNameUntrusted(typeStr.data(),
+                                                          typeStr.size());
   }
   if (metadata) {
     auto objcClass =

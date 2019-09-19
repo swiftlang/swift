@@ -24,6 +24,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -1389,7 +1390,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
-  assert(DC == closure->getParent() && "Decl context isn't correct");
+  assert((closure->getParent() == DC ||
+          closure->getParent()->isChildContextOf(DC)) &&
+      "Decl context isn't correct");
   DC = closure;
   return true;
 }
@@ -2139,7 +2142,7 @@ private:
 
   void maybeProduceFallbackDiagnostic(Expr *expr) const {
     if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        Options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+        DiagnosticSuppression::isEnabled(TC.Diags))
       return;
 
     // Before producing fatal error here, let's check if there are any "error"
@@ -2181,7 +2184,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
 
-  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+  if (DiagnosticSuppression::isEnabled(Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
@@ -2232,7 +2235,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
-        cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+        cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
@@ -2636,8 +2639,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator =
-          cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+      Locator = cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // Collect constraints from the pattern.
       Type patternType = cs.generateConstraints(pattern, Locator);
@@ -3664,7 +3666,7 @@ void ConstraintSystem::print(raw_ostream &out) {
   }
 
   out << "Type Variables:\n";
-  for (auto tv : TypeVariables) {
+  for (auto tv : getTypeVariables()) {
     out.indent(2);
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())

@@ -928,10 +928,12 @@ public:
   void setBody(BraceStmt * b) { Body = b; }
 
   SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
-
-  SourceRange getSourceRange() const {
-    return SubExpr ? SubExpr->getSourceRange() : SourceRange();
+  
+  SourceLoc getStartLoc() const {
+    return SubExpr ? SubExpr->getStartLoc() : SourceLoc();
   }
+
+  SourceLoc getEndLoc() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
@@ -1029,6 +1031,8 @@ public:
     // token, so the range should be (Start == End).
     return Loc;
   }
+  
+  /// Could also be computed by relexing.
   SourceLoc getTrailingQuoteLoc() const {
     return TrailingQuoteLoc;
   }
@@ -3965,11 +3969,12 @@ public:
 /// node (say, an \c OpenExistentialExpr) and can only be used within the
 /// subexpressions of that AST node.
 class OpaqueValueExpr : public Expr {
-  SourceLoc Loc;
+  SourceRange Range;
 
 public:
-  explicit OpaqueValueExpr(SourceLoc Loc, Type Ty, bool isPlaceholder = false)
-    : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Loc(Loc) {
+  explicit OpaqueValueExpr(SourceRange Range, Type Ty,
+                           bool isPlaceholder = false)
+      : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
     Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
   }
 
@@ -3978,8 +3983,8 @@ public:
   /// value to be specified later.
   bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
 
-  SourceRange getSourceRange() const { return Loc; }
-  
+  SourceRange getSourceRange() const { return Range; }
+
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::OpaqueValue; 
   }
@@ -4777,7 +4782,8 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
+    auto SrcEnd = Src->getEndLoc();
+    return (SrcEnd.isValid() ? SrcEnd : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.
@@ -5440,6 +5446,33 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::KeyPathDot;
+  }
+};
+
+/// Expression node that effects a "one-way" constraint in
+/// the constraint system, allowing type information to flow from the
+/// subexpression outward but not the other way.
+///
+/// One-way expressions are generally implicit and synthetic, introduced by
+/// the type checker. However, there is a built-in expression of the
+/// form \c Builtin.one_way(x) that forms a one-way constraint coming out
+/// of expression `x` that can be used for testing purposes.
+class OneWayExpr : public Expr {
+  Expr *SubExpr;
+
+public:
+  /// Construct an implicit one-way expression from the given subexpression.
+  OneWayExpr(Expr *subExpr)
+     : Expr(ExprKind::OneWay, /*isImplicit=*/true), SubExpr(subExpr) { }
+
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::OneWay;
   }
 };
 
