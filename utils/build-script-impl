@@ -2520,7 +2520,6 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                   cmake_options+=(
-                    -DLLDB_CODESIGN_IDENTITY=""
                     -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
                   )
                 fi
