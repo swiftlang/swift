@@ -575,6 +575,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
   // If we have any unfulfilled parameters, check them now.
   if (haveUnfulfilledParams) {
+    bool hasSynthesizedArgs = false;
     for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
       // If we have a binding for this parameter, we're done.
       if (!parameterBindings[paramIdx].empty())
@@ -590,16 +591,19 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
-      if (potentiallyOutOfOrder)
-        return true;
-
       if (auto newArgIdx = listener.missingArgument(paramIdx)) {
         parameterBindings[paramIdx].push_back(*newArgIdx);
+        hasSynthesizedArgs = true;
         continue;
       }
 
       return true;
     }
+
+    // If all of the missing arguments have been synthesized,
+    // let's stop since we have found the problem.
+    if (hasSynthesizedArgs)
+      return false;
   }
 
   // If any arguments were provided out-of-order, check whether we have
