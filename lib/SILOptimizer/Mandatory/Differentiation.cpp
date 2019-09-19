@@ -102,23 +102,22 @@ static ApplyInst *getAllocateUninitializedArrayIntrinsic(SILValue v) {
   return nullptr;
 }
 
-/// Given a tuple result, find the single use of it in a `destructure_tuple`
-/// instruction.
-static DestructureTupleInst *
-getSingleDestructureTupleUser(SILValue tuple) {
-  unsigned numDestructureTupleInsts = 0;
-  assert(tuple->getType().is<TupleType>());
-  DestructureTupleInst *retVal = nullptr;
-  for (auto *use : tuple->getUses()) {
-    if (auto *destructure =
-            dyn_cast<DestructureTupleInst>(use->getUser())) {
-      numDestructureTupleInsts++;
-      assert(numDestructureTupleInsts == 1 && "There should only be one use of "
-             "the tuple that is a 'destructure_tuple' inst.");
-      retVal = destructure;
+/// Given a value, find its single `destructure_tuple` user if the value is
+/// tuple-typed and such a user exists.
+static DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
+  bool foundDestructureTupleUser = false;
+  if (!value->getType().is<TupleType>())
+    return nullptr;
+  DestructureTupleInst *result = nullptr;
+  for (auto *use : value->getUses()) {
+    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
+      assert(!foundDestructureTupleUser &&
+             "There should only be one `destructure_tuple` user of a tuple");
+      foundDestructureTupleUser = true;
+      result = dti;
     }
   }
-  return retVal;
+  return result;
 }
 
 /// Given a function, gather all of its formal results (both direct and
@@ -1650,22 +1649,21 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   SmallVector<SILValue, 4> allResults;
   // TODO: temporary hack while we investigate why reverse mode doesn't work
   // with us handling `apply` instructions differently.
-  if (kind == AutoDiffLinearMapKind::Differential &&
-      ai->getResult(0)->getType().is<TupleType>()) {
-    // Only append the results from the `destruct_tuple` instruction which are
-    // active, we don't consider the result of the original apply if it's a
-    // tuple.
-    auto *destructure =
-        getSingleDestructureTupleUser(ai->getResult(0));
-    if (destructure) {
-      for (auto result : destructure->getResults())
+  // If differential, handle `apply` result specially.
+  // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
+  // results of the `destructure_tuple` user to `allResults` instead of adding
+  // the `apply` result itself.
+  bool isDifferentialAndFoundDestructureTupleUser = false;
+  if (kind == AutoDiffLinearMapKind::Differential) {
+    if (auto *dti = getSingleDestructureTupleUser(ai)) {
+      isDifferentialAndFoundDestructureTupleUser = true;
+      for (auto result : dti->getResults())
         allResults.push_back(result);
-    } else {
-      allResults.push_back(ai);
     }
-  } else {
-    allResults.push_back(ai);
   }
+  // Otherwise, add `apply` result to `allResults`.
+  if (!isDifferentialAndFoundDestructureTupleUser)
+    allResults.push_back(ai);
   allResults.append(ai->getIndirectSILResults().begin(),
                     ai->getIndirectSILResults().end());
 
@@ -1924,23 +1922,22 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
               // TODO: temporary hack while we investigate why reverse mode
               // doesn't work with us handling tuple destructure from `apply`
               // instructions differently.
-              if (kind == swift::AutoDiffAssociatedFunctionKind::JVP &&
-                  ai->getResult(0)->getType().is<TupleType>()) {
-                // Handle tuple results, in this case only mark the destructured
-                // results from the `destruct_tuple` instruction use as varied.
-                auto *destInst = getSingleDestructureTupleUser(
-                    ai->getResult(0));
-                if (destInst) {
-                  for (auto result : destInst->getResults())
+              // If differential, handle `apply` result specially.
+              // If JVP, handle `apply` result specially.
+              // If `apply` result is tuple-typed with a `destructure_tuple`
+              // user, mark the results of the `destructure_tuple` user as
+              // varied instead of marking the `apply` result itself.
+              bool isJVPAndFoundDestructureTupleUser = false;
+              if (kind == swift::AutoDiffAssociatedFunctionKind::JVP) {
+                if (auto *dti = getSingleDestructureTupleUser(ai)) {
+                  for (auto result : dti->getResults())
                     setVaried(result, i);
-                } else {
-                  for (auto dirRes : ai->getResults())
-                    setVaried(dirRes, i);
+                  isJVPAndFoundDestructureTupleUser = true;
                 }
-              } else {
-                for (auto dirRes : ai->getResults())
-                  setVaried(dirRes, i);
               }
+              // Otherwise, mark the `apply` result as varied.
+              if (!isJVPAndFoundDestructureTupleUser)
+                setVaried(ai, i);
             }
           }
         }
@@ -3761,15 +3758,9 @@ public:
     // Only append the results from the `destruct_tuple` instruction which are
     // active, we don't consider the result of the original apply if it's a
     // tuple.
-    if (ai->getResult(0)->getType().is<TupleType>()) {
-      auto *destructure =
-          getSingleDestructureTupleUser(ai->getResult(0));
-      if (destructure) {
-        for (auto result : destructure->getResults())
-          allResults.push_back(result);
-      } else {
-        allResults.push_back(ai);
-      }
+    if (auto *dti = getSingleDestructureTupleUser(ai)) {
+      for (auto result : dti->getResults())
+        allResults.push_back(result);
     } else {
       allResults.push_back(ai);
     }
@@ -5444,18 +5435,13 @@ public:
 
     // Get the parameter indices required for differentiating this function.
     SmallVector<SILValue, 4> allResults;
-    // Only append the results from the `destruct_tuple` instruction which are
-    // active, we don't consider the result of the original apply if it's a
-    // tuple.
-    if (ai->getResult(0)->getType().is<TupleType>()) {
-      auto *destructure =
-          getSingleDestructureTupleUser(ai->getResult(0));
-      if (destructure) {
-        for (auto result : destructure->getResults())
-          allResults.push_back(result);
-      } else {
-        allResults.push_back(ai);
-      }
+    // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
+    // results of the `destructure_tuple` user to `allResults` instead of adding
+    // the `apply` result itself.
+    // Otherwise, add `apply` result to `allResults`.
+    if (auto *dti = getSingleDestructureTupleUser(ai)) {
+      for (auto result : dti->getResults())
+        allResults.push_back(result);
     } else {
       allResults.push_back(ai);
     }
@@ -7032,8 +7018,7 @@ public:
           tangentVectorTy->getStructOrBoundGenericStruct();
       assert(tangentVectorDecl);
 
-      auto *destructure =
-          builder.createDestructureStruct(si->getLoc(), adjStruct);
+      auto *dti = builder.createDestructureStruct(si->getLoc(), adjStruct);
       // Accumulate adjoints for the fields of the `struct` operand.
       unsigned fieldIndex = 0;
       for (auto it = structDecl->getStoredProperties().begin();
@@ -7060,7 +7045,7 @@ public:
           tanField = cast<VarDecl>(tanFieldLookup.front());
         }
         assert(tanField);
-        auto tanElt = destructure->getResult(fieldIndex);
+        auto tanElt = dti->getResult(fieldIndex);
         addAdjointValue(
             bb, si->getFieldValue(field),
             makeConcreteAdjointValue(tanElt), si->getLoc());
