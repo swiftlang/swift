@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt -module-name Swift -diagnostic-constant-propagation %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+struct MyInt {
+  var i : Builtin.Int32
+}
+
+// CHECK-LABEL: sil @concrete_type_object_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+// CHECK: builtin "add_Vec4xInt32"(
+// CHECK: return
+// CHECK: } // end sil function 'concrete_type_object_test'
+sil @concrete_type_object_test : $@convention(thin) (Builtin.Vec4xInt32, Builtin.Vec4xInt32) -> Builtin.Vec4xInt32 {
+bb0(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32):
+  %2 = builtin "generic_add"(%0 : $Builtin.Vec4xInt32, %1 : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+  return %2 : $Builtin.Vec4xInt32
+}
+
+// CHECK-LABEL: sil @concrete_type_address_test : $@convention(thin) (@in_guaranteed Builtin.Vec4xInt32, @in_guaranteed Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+// CHECK: bb0([[RESULT:%.*]] : $*Builtin.Vec4xInt32, [[ARG0:%.*]] : $*Builtin.Vec4xInt32, [[ARG1:%.*]] : $*Builtin.Vec4xInt32):
+// CHECK:   [[LOADED_ARG0:%.*]] = load [[ARG0]]
+// CHECK:   [[LOADED_ARG1:%.*]] = load [[ARG1]]
+// CHECK:   [[LOADED_RESULT:%.*]] = builtin "add_Vec4xInt32"([[LOADED_ARG0]] : $Builtin.Vec4xInt32, [[LOADED_ARG1]] : $Builtin.Vec4xInt32) : $Builtin.Vec4xInt32
+// CHECK:   store [[LOADED_RESULT]] to [[RESULT]]
+// CHECK: } // end sil function 'concrete_type_address_test'
+sil @concrete_type_address_test : $@convention(thin) (@in_guaranteed Builtin.Vec4xInt32, @in_guaranteed Builtin.Vec4xInt32) -> @out Builtin.Vec4xInt32 {
+bb0(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32):
+  builtin "generic_add"<Builtin.Vec4xInt32>(%0 : $*Builtin.Vec4xInt32, %1 : $*Builtin.Vec4xInt32, %2 : $*Builtin.Vec4xInt32) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @concrete_type_object_fail : $@convention(thin) (MyInt, MyInt) -> MyInt {
+// CHECK: builtin "generic_add"<MyInt>(
+// CHECK: return
+// CHECK: } // end sil function 'concrete_type_object_fail'
+sil @concrete_type_object_fail : $@convention(thin) (MyInt, MyInt) -> MyInt {
+bb0(%0 : $MyInt, %1 : $MyInt):
+  %2 = builtin "generic_add"<MyInt>(%0 : $MyInt, %1 : $MyInt) : $MyInt
+  return %2 : $MyInt
+}
+
+// CHECK-LABEL: sil @concrete_type_address_fail : $@convention(thin) (@in_guaranteed MyInt, @in_guaranteed MyInt) -> @out MyInt {
+// CHECK: builtin "generic_add"<MyInt>(
+// CHECK: return
+// CHECK: } // end sil function 'concrete_type_address_fail'
+sil @concrete_type_address_fail : $@convention(thin) (@in_guaranteed MyInt, @in_guaranteed MyInt) -> @out MyInt {
+bb0(%0 : $*MyInt, %1 : $*MyInt, %2 : $*MyInt):
+  %3 = builtin "generic_add"<MyInt>(%0 : $*MyInt, %1 : $*MyInt, %2 : $*MyInt) : $()
+  %9999 = tuple()
+  return %9999 : $()
+}

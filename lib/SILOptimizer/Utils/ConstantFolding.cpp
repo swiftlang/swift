@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
@@ -23,7 +24,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "constant-folding"
+#define DEBUG_TYPE "sil-constant-folding"
 
 using namespace swift;
 
@@ -580,6 +581,21 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   // Add the literal instruction to represent the result of the division.
   SILBuilderWithScope B(BI);
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
+}
+
+static SILValue specializePolymorphicBuiltin(BuiltinInst *bi,
+                                             BuiltinValueKind id,
+                                             Optional<bool> &resultsInError) {
+  // If we are not a polymorphic builtin, return an empty SILValue()
+  // so we keep on scanning.
+  if (!isPolymorphicBuiltin(id))
+    return SILValue();
+
+  // Otherwise, try to perform the mapping.
+  if (auto newBuiltin = getStaticOverloadForSpecializedPolymorphicBuiltin(bi))
+    return newBuiltin;
+
+  return SILValue();
 }
 
 /// Fold binary operations.
@@ -1593,6 +1609,15 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
+      if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
+        if (auto kind = bi->getBuiltinKind()) {
+          if (isPolymorphicBuiltin(kind.getValue())) {
+            WorkList.insert(bi);
+            continue;
+          }
+        }
+      }
+
       // If we have nominal type literals like struct, tuple, enum visit them
       // like we do in the worklist to see if we can fold any projection
       // manipulation operations.
@@ -1802,6 +1827,29 @@ ConstantFolder::processWorkList() {
         InvalidateInstructions = true;
       }
       continue;
+    }
+
+    if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+      if (auto kind = bi->getBuiltinKind()) {
+        Optional<bool> ResultsInError;
+        if (EnableDiagnostics)
+          ResultsInError = false;
+        if (SILValue v = specializePolymorphicBuiltin(bi, kind.getValue(),
+                                                      ResultsInError)) {
+          // If bi had a result, RAUW.
+          if (bi->getResult(0)->getType() !=
+              bi->getModule().Types.getEmptyTupleType())
+            bi->replaceAllUsesWith(v);
+          // Then delete no matter what.
+          bi->eraseFromParent();
+          InvalidateInstructions = true;
+        }
+
+        // If we did not pass in a None and the optional is set to true, add the
+        // user to our error set.
+        if (ResultsInError.hasValue() && ResultsInError.getValue())
+          ErrorSet.insert(bi);
+      }
     }
 
     // Go through all users of the constant and try to fold them.
