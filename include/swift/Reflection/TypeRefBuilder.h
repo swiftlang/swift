@@ -531,8 +531,8 @@ public:
         // underlying type if available.
         if (context->getKind() == ContextDescriptorKind::OpaqueType) {
           return Dem.createNode(
-                              Node::Kind::OpaqueTypeDescriptorSymbolicReference,
-                              (uintptr_t)context.getAddress());
+                            Node::Kind::OpaqueTypeDescriptorSymbolicReference,
+                            (uintptr_t)context.template getAddress<Runtime>());
         }
           
         return reader.buildContextMangling(context, Dem);
