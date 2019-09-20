@@ -3405,6 +3405,10 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
+                  cmake_options=(
+                    ${cmake_options[@]}
+                    -DCMAKE_Swift_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                  )
                   results_targets=( "test" )
                   executable_target=""
                 ;;
