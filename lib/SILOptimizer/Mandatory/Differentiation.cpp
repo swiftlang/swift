@@ -533,8 +533,12 @@ private:
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
-        /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
-        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+        /*EnumLoc*/ SourceLoc(), /*Name*/ enumId, /*NameLoc*/ SourceLoc(),
+        /*Inherited*/ {}, /*GenericParams*/ /*set later*/ nullptr,
+        /*DC*/ &file);
+    // Note: must mark enum as implicit to satisfy assertion in
+    // `Parser::parseDeclListDelayed`.
+    branchingTraceDecl->setImplicit();
     if (genericSig) {
       auto *genericParams =
           cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
@@ -542,8 +546,8 @@ private:
       branchingTraceDecl->setGenericEnvironment(
           genericSig->createGenericEnvironment());
     }
-    branchingTraceDecl->setBraces(loc);
-    computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
+    computeAccessLevel(branchingTraceDecl,
+                       original->getEffectiveSymbolLinkage());
     branchingTraceDecl->computeType();
     assert(branchingTraceDecl->hasInterfaceType());
     file.addVisibleDecl(branchingTraceDecl);
@@ -577,22 +581,6 @@ private:
       // Record enum element declaration.
       branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
     }
-    LLVM_DEBUG({
-      auto &s = getADDebugStream();
-      std::string enumName;
-      switch (kind) {
-      case AutoDiffLinearMapKind::Differential:
-        enumName = "Predecessor";
-        break;
-      case AutoDiffLinearMapKind::Pullback:
-        enumName = "Successor";
-        break;
-      }
-      s << enumName << " branching trace enum created for function @"
-        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
-      branchingTraceDecl->print(s);
-      s << '\n';
-    });
     return branchingTraceDecl;
   }
 
@@ -623,10 +611,13 @@ private:
     }
 
     auto structId = astCtx.getIdentifier(structName);
-    SourceLoc loc = original->getLocation().getSourceLoc();
     auto *linearMapStruct = new (astCtx) StructDecl(
-        /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
-        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+        /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
+        /*Inherited*/ {}, /*GenericParams*/ /*set later*/ nullptr,
+        /*DC*/ &file);
+    // Note: must mark struct as implicit to satisfy assertion in
+    // `Parser::parseDeclListDelayed`.
+    linearMapStruct->setImplicit();
     if (genericSig) {
       auto *genericParams =
           cloneGenericParameters(astCtx, linearMapStruct, genericSig);
@@ -634,28 +625,10 @@ private:
       linearMapStruct->setGenericEnvironment(
           genericSig->createGenericEnvironment());
     }
-    linearMapStruct->setBraces(loc);
-    computeAccessLevel(
-        linearMapStruct, original->getEffectiveSymbolLinkage());
+    computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
     linearMapStruct->computeType();
     assert(linearMapStruct->hasInterfaceType());
     file.addVisibleDecl(linearMapStruct);
-    LLVM_DEBUG({
-      auto &s = getADDebugStream();
-      std::string structName;
-      switch (kind) {
-      case AutoDiffLinearMapKind::Differential:
-        structName = "Differential";
-        break;
-      case AutoDiffLinearMapKind::Pullback:
-        structName = "Pullback";
-        break;
-      }
-      s << structName << " struct declaration created for function @"
-        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
-      linearMapStruct->print(s);
-      s << '\n';
-    });
     return linearMapStruct;
   }
 
@@ -694,11 +667,10 @@ private:
 
   void addLinearMapToStruct(ApplyInst *ai, const SILAutoDiffIndices &indices);
 
-  /// This takes the declared linear map structs and populates
-  /// them with the necessary fields, specifically the linear function (pullback
-  /// or differential) of the corresponding original function call in the
-  /// original function, and the branching enum.
-  void populateLinearMapStructDeclarationFields(
+  /// Generate linear map struct and branching enum declarations for the given
+  /// function. Linear map structs are populated with linear map fields and a
+  /// branching enum field.
+  void generateDifferentiationDataStructures(
       ADContext &context, const SILAutoDiffIndices &indices,
       SILFunction *assocFn);
 
@@ -1529,7 +1501,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
     : kind(kind), original(original), activityInfo(activityInfo),
       indices(indices), typeConverter(context.getTypeConverter()),
       builder(builder) {
-  populateLinearMapStructDeclarationFields(context, indices, assocFn);
+  generateDifferentiationDataStructures(context, indices, assocFn);
 }
 
 /// Returns a flag that indicates whether the `apply` instruction should be
@@ -1746,11 +1718,9 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   addLinearMapDecl(ai, linearMapSILType);
 }
 
-void LinearMapInfo::populateLinearMapStructDeclarationFields(
+void LinearMapInfo::generateDifferentiationDataStructures(
     ADContext &context, const SILAutoDiffIndices &indices,
     SILFunction *assocFn) {
-  LLVM_DEBUG(getADDebugStream() << "Populating linear map structs for " <<
-             original->getName() << '\n');
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
@@ -1817,6 +1787,28 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
       }
     }
   }
+
+  // Print generated linear map structs and branching trace enums.
+  // These declarations do not show up with `-emit-sil` because they are
+  // implicit. Instead, using `-Xllvm -debug-only=differentiation` to test
+  // declarations with FileCheck.
+  LLVM_DEBUG({
+    auto &s = getADDebugStream();
+    PrintOptions printOptions;
+    printOptions.TypeDefinitions = true;
+    printOptions.ExplodePatternBindingDecls = true;
+    printOptions.SkipImplicit = false;
+    s << "Generated linear map structs and branching trace enums for @"
+      << original->getName() << ":\n";
+    for (auto &origBB : *original) {
+      auto *linearMapStruct = getLinearMapStruct(&origBB);
+      linearMapStruct->print(s, printOptions); s << '\n';
+    }
+    for (auto &origBB : *original) {
+      auto *traceEnum = getBranchingTraceDecl(&origBB);
+      traceEnum->print(s, printOptions); s << '\n';
+    }
+  });
 }
 
 class DifferentiableActivityCollection {

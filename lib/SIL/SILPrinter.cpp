@@ -2787,7 +2787,6 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
     for (const Decl *D : topLevelDecls) {
       if (!WholeModuleMode && !(D->getDeclContext() == AssociatedDeclContext))
           continue;
-      // SWIFT_ENABLE_TENSORFLOW
       if ((isa<ValueDecl>(D) || isa<OperatorDecl>(D) ||
            isa<ExtensionDecl>(D) || isa<ImportDecl>(D)) &&
           !D->isImplicit()) {
