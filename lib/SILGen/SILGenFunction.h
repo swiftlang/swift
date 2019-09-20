@@ -1492,12 +1492,6 @@ public:
                          ArgumentSource &&self, PreparedArguments &&args,
                          SGFContext C);
 
-  RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
-                                            SubstitutionMap subs,
-                                            SILDeclRef ctorRef,
-                                            Type wrapperTy,
-                                            CanAnyFunctionType funcTy);
-
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,
                                CanSILFunctionType substFnType,
