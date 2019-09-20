@@ -493,11 +493,7 @@ namespace {
       if (size > 4096)
         return Type();
       
-      TupleTypeElt elt(elementType);
-      SmallVector<TupleTypeElt, 8> elts;
-      for (size_t i = 0; i < size; ++i)
-        elts.push_back(elt);
-      
+      SmallVector<TupleTypeElt, 8> elts{size, elementType};
       return TupleType::get(elts, elementType->getASTContext());
     }
 
