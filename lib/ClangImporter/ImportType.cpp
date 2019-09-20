@@ -444,9 +444,7 @@ namespace {
 
     ImportResult VisitBlockPointerType(const clang::BlockPointerType *type) {
       // Block pointer types are mapped to function types.
-      Type pointeeType = Impl.importTypeIgnoreIUO(
-          type->getPointeeType(), ImportTypeKind::Abstract,
-          AllowNSUIntegerAsInt, Bridging);
+      Type pointeeType = Visit(type->getPointeeType()).AbstractType;
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
