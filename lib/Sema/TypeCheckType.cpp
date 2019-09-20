@@ -534,9 +534,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                     dyn_cast<TypeAliasDecl>(unboundGeneric->getAnyGeneric())) {
               if (ugAliasDecl == aliasDecl) {
                 if (resolution.getStage() == TypeResolutionStage::Structural &&
-                    !aliasDecl->hasInterfaceType()) {
-                  return resolution.mapTypeIntoContext(
-                      aliasDecl->getStructuralType());
+                    aliasDecl->getUnderlyingTypeRepr() != nullptr) {
+                  return aliasDecl->getStructuralType();
                 }
                 return resolution.mapTypeIntoContext(
                     aliasDecl->getDeclaredInterfaceType());
@@ -550,9 +549,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
                   dyn_cast<TypeAliasType>(extendedType.getPointer())) {
             if (aliasType->getDecl() == aliasDecl) {
               if (resolution.getStage() == TypeResolutionStage::Structural &&
-                  !aliasDecl->hasInterfaceType()) {
-                return resolution.mapTypeIntoContext(
-                    aliasDecl->getStructuralType());
+                  aliasDecl->getUnderlyingTypeRepr() != nullptr) {
+                return aliasDecl->getStructuralType();
               }
               return resolution.mapTypeIntoContext(
                   aliasDecl->getDeclaredInterfaceType());
@@ -577,8 +575,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
 
       // Otherwise, return the appropriate type.
       if (resolution.getStage() == TypeResolutionStage::Structural &&
-          !aliasDecl->hasInterfaceType()) {
-        return resolution.mapTypeIntoContext(aliasDecl->getStructuralType());
+          aliasDecl->getUnderlyingTypeRepr() != nullptr) {
+        return aliasDecl->getStructuralType();
       }
       return resolution.mapTypeIntoContext(
           aliasDecl->getDeclaredInterfaceType());
