@@ -663,7 +663,7 @@ namespace {
       // If that fails, fall back on importing the underlying type.
       if (!decl) return Visit(type->desugar());
 
-      Type mappedType = getAdjustedTypeDeclReferenceType(decl);
+      Type mappedType = decl->getDeclaredInterfaceType();
 
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
         if (isCFTypeDecl(type->getDecl())) {
@@ -816,19 +816,6 @@ namespace {
       if (!decl)
         return nullptr;
 
-      return getAdjustedTypeDeclReferenceType(decl);
-    }
-
-    /// Retrieve the adjusted type of a reference to the given type declaration.
-    Type getAdjustedTypeDeclReferenceType(TypeDecl *decl) {
-      // If the imported declaration is a bridged NSError, dig out
-      // the Code nested type. References to the enum type from C
-      // code need to map to the code type (which is ABI compatible with C),
-      // and the bridged error type is used elsewhere.
-      if (auto *structDecl = dyn_cast<StructDecl>(decl))
-        if (auto *codeEnum = Impl.lookupErrorCodeEnum(structDecl))
-          return codeEnum->getDeclaredInterfaceType();
-
       return decl->getDeclaredInterfaceType();
     }
 
@@ -861,7 +848,7 @@ namespace {
         if (!decl)
           return nullptr;
 
-        return getAdjustedTypeDeclReferenceType(decl);
+        return decl->getDeclaredInterfaceType();
       }
       }
 
