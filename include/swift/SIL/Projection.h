@@ -761,6 +761,8 @@ public:
     return NonProjUsers;
   };
 
+  bool isLeaf() const { return ChildProjections.empty(); }
+
   SILType getType() const { return NodeType; }
 
   bool isRoot() const {
@@ -912,6 +914,24 @@ public:
 
     // Otherwise this Node has multiple children, return false.
     return false;
+  }
+
+  void getAllLeafTypes(llvm::SmallVectorImpl<SILType> &outArray) const {
+    llvm::SmallVector<const ProjectionTreeNode *, 32> worklist;
+    worklist.push_back(getRoot());
+
+    while (!worklist.empty()) {
+      auto *node = worklist.pop_back_val();
+      // If we have a leaf node, add its type.
+      if (node->isLeaf()) {
+        outArray.push_back(node->getType());
+        continue;
+      }
+
+      // Otherwise, add the nodes children to the worklist.
+      transform(node->getChildProjections(), std::back_inserter(worklist),
+                [&](unsigned idx) { return getNode(idx); });
+    }
   }
 
   void getLiveLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
