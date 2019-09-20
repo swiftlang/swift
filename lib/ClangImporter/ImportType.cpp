@@ -2101,10 +2101,9 @@ ImportedType ClangImporter::Implementation::importMethodType(
       auto optKind =
           getOptionalKind(ImportTypeKind::Parameter, optionalityOfParam);
 
-      if (optKind == OTK_None)
-        swiftParamTy = getNSCopyingType();
-      else
-        swiftParamTy = OptionalType::get(getNSCopyingType());
+      swiftParamTy = SwiftContext.getNSCopyingDecl()->getDeclaredType();
+      if (optKind != OTK_None)
+        swiftParamTy = OptionalType::get(swiftParamTy);
 
       paramIsIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
     } else {
@@ -2515,10 +2514,6 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   }
 
   return Type();
-}
-
-Type ClangImporter::Implementation::getNSCopyingType() {
-  return getNamedProtocolType(*this, "NSCopying");
 }
 
 Type ClangImporter::Implementation::getNSObjectProtocolType() {

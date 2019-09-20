@@ -943,9 +943,6 @@ public:
   /// Retrieve the NSObject protocol type.
   Type getNSObjectProtocolType();
 
-  /// Retrieve the NSCopying protocol type.
-  Type getNSCopyingType();
-
   /// Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
   bool matchesHashableBound(Type type);
