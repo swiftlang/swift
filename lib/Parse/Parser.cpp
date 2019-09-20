@@ -527,7 +527,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                             L->getBufferID(),
                             SF.SyntaxParsingCache,
                             SF.getASTContext().getSyntaxArena())))),
-    Generator(SF.getASTContext(), *this) {
+    Generator(SF.getASTContext(), &State) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
