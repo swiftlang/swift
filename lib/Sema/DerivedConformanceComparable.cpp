@@ -371,8 +371,7 @@ deriveComparable_lt(
   comparableDecl->setBodySynthesizer(bodySynthesizer);
 
   // Compute the interface type.
-  if (auto genericEnv = parentDC->getGenericEnvironmentOfContext())
-    comparableDecl->setGenericEnvironment(genericEnv);
+  comparableDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   comparableDecl->computeType();
 
   comparableDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
