@@ -4,6 +4,7 @@
 
 // XFAIL: CPU=armv7k
 // XFAIL: CPU=powerpc64le
+// XFAIL: CPU=s390x
 
 import Foundation
 import resilient_struct
