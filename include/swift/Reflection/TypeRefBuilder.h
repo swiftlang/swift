@@ -532,7 +532,7 @@ public:
         if (context->getKind() == ContextDescriptorKind::OpaqueType) {
           return Dem.createNode(
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference,
-                            (uintptr_t)context.template getAddress<Runtime>());
+                            context.getAddressData());
         }
           
         return reader.buildContextMangling(context, Dem);
