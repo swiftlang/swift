@@ -626,6 +626,25 @@ Parser::parseGenericArgumentsAST(SmallVectorImpl<TypeRepr *> &ArgsAST,
   return makeParserSuccess();
 }
 
+/// SWIFT_ENABLE_TENSORFLOW
+bool Parser::canParseTypeQualifierForDeclName() {
+  BacktrackingScope backtrack(*this);
+
+  // First, parse a single type identifier component.
+  if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
+    return false;
+  consumeToken();
+
+  if (startsWithLess(Tok)) {
+    if (!canParseGenericArguments())
+      return false;
+  }
+
+  // If the next token is a period or starts with a period, then this can be
+  // parsed as a type qualifier.
+  return startsWithSymbol(Tok, '.');
+}
+
 /// parseTypeIdentifier
 ///
 ///   type-identifier:
@@ -634,6 +653,9 @@ Parser::parseGenericArgumentsAST(SmallVectorImpl<TypeRepr *> &ArgsAST,
 // SWIFT_ENABLE_TENSORFLOW: Added `isParsingQualifiedDeclName` flag.
 Parser::TypeResult
 Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
+  if (isParsingQualifiedDeclName && !canParseTypeQualifierForDeclName())
+    return makeParsedError<ParsedTypeSyntax>();
+
   if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {
     if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
       // is this the 'Any' type
@@ -673,40 +695,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   Optional<ParsedTypeSyntax> Base;
   Optional<ParsedTokenSyntax> Period;
   while (true) {
-    // SWIFT_ENABLE_TENSORFLOW
-    // Returns true if the last type identifier component has been parsed.
-    // This function is used only when `isParsingQualifiedDeclName` is true.
-    auto parsedLastComponent = [&] {
-      // First, parse a single type identifier component.
-      if (!Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_Any))
-        return false;
-      consumeToken();
-
-      if (startsWithLess(Tok)) {
-        if (!canParseGenericArguments())
-          return false;
-      }
-
-      // A period followed by an operator is often parsed as a single token
-      // (e.g. `.+` in `Float.+`).
-      // If this is encountered, return false so that the type identifier
-      // component can be parsed.
-      if (startsWithSymbol(Tok, '.') && Tok.getLength() != 1)
-        return false;
-
-      // If the next token is not a period, then this must be the last component
-      // in the type identifier.
-      return Tok.isNot(tok::period) && Tok.isNot(tok::period_prefix);
-    };
-    if (isParsingQualifiedDeclName) {
-      BacktrackingScope backtrack(*this);
-      // If last type identifier component has been parsed, then the next
-      // token is (the start of) the final decl name. Break to stop parsing type
-      // components.
-      if (parsedLastComponent())
-        break;
-    }
-
     Optional<ParsedTokenSyntax> Identifier;
     if (Tok.is(tok::kw_Self)) {
       Identifier = consumeIdentifierSyntax();
@@ -757,6 +745,21 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
         Junk.push_back(std::move(*Period));
     }
 
+    if (isParsingQualifiedDeclName) {
+      // If we're parsing a qualified decl name, break out before parsing the
+      // last period.
+
+      BacktrackingScope backtrack(*this);
+
+      if (Tok.is(tok::period) || Tok.is(tok::period_prefix))
+        consumeToken();
+      else if (startsWithSymbol(Tok, '.'))
+        consumeStartingCharacterOfCurrentToken(tok::period);
+
+      if (!canParseTypeQualifierForDeclName())
+        break;
+    }
+
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
     // unless <anything> is 'Type'.
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
@@ -773,13 +776,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
       if (!Tok.isAtStartOfLine())
         Status.setHasCodeCompletion();
       break;
-    // If parsing qualified decl name and encountered a token like `.+` in
-    // `Float.+`, consume the period so that `+` is treated correctly as a
-    // standalone token.
-    } else if (isParsingQualifiedDeclName && startsWithSymbol(Tok, '.') &&
-               Tok.getLength() != 1) {
-      Period = consumeStartingCharacterOfCurrentTokenSyntax(tok::period);
-      continue;
     }
     break;
   }
@@ -812,15 +808,6 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   if (Status.isError()) {
     auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
     return makeParsedError(std::move(ty));
-  }
-
-  // SWIFT_ENABLE_TENSORFLOW
-  // When parsing a qualified decl name (`isParsingQualifiedDeclName`), it is
-  // possible that there are no type qualifications and therefore we have an
-  // empty result. In this case, return an empty parser error.
-  if (!Base) {
-    assert(isParsingQualifiedDeclName);
-    return makeParsedError<ParsedTypeSyntax>();
   }
 
   return makeParsedResult(std::move(*Base));
