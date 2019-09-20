@@ -52,7 +52,7 @@ using namespace swift;
 // runtime.
 % for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
 SWIFT_RUNTIME_STDLIB_API
-@interface __SwiftNativeNS${Class}Base : NS${Class}
+@interface __SwiftNativeNS${Class}Base : NSObject
 {
  @private
   SWIFT_HEAPOBJECT_NON_OBJC_MEMBERS;
@@ -112,37 +112,27 @@ SWIFT_RUNTIME_STDLIB_API
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 bool
-swift_stdlib_NSObject_isEqual(NSObject *lhs,
-                              NSObject *rhs) {
+swift_stdlib_NSObject_isEqual(id lhs,
+                              id rhs) {
   return (lhs == rhs) || [lhs isEqual:rhs];
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-int32_t swift_stdlib_compareNSStringDeterministicUnicodeCollation(
-    NSString *lhs, NSString *rhs) {
-  // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  return CFStringCompare((__bridge CFStringRef)lhs,
-                         (__bridge CFStringRef)rhs, kCFCompareNonliteral);
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
+bool
+swift_stdlib_connectNSBaseClasses() {
+% for Class in ('Array', 'Dictionary', 'Set', 'String', 'Enumerator'):
+  Class NS${Class}Super = objc_lookUpClass("NS${Class}");
+  if (!NS${Class}Super) return false;
+  Class NS${Class}OurClass = objc_lookUpClass("__SwiftNativeNS${Class}Base");
+  if (!NS${Class}OurClass) return false;
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+  class_setSuperclass(NS${Class}OurClass, NS${Class}Super);
+#pragma clang diagnostic pop
+% end
+  return true;
 }
 
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
-int32_t
-swift_stdlib_compareNSStringDeterministicUnicodeCollationPtr(void *Lhs,
-                                                             void *Rhs) {
-  NSString *lhs = (NSString *)Lhs;
-  NSString *rhs = (NSString *)Rhs;
-
-  // 'kCFCompareNonliteral' actually means "normalize to NFD".
-  int Result = CFStringCompare((__bridge CFStringRef)lhs,
-                               (__bridge CFStringRef)rhs, kCFCompareNonliteral);
-  return Result;
-}
-
-SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-void swift_stdlib_CFSetGetValues(NSSet *set,
-                                 const void **values) {
-  CFSetGetValues((__bridge CFSetRef)set, values);
-}
 #endif
 
 // ${'Local Variables'}:

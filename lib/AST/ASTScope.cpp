@@ -25,6 +25,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/NullablePtr.h"
@@ -53,7 +54,17 @@ Optional<bool> ASTScope::computeIsCascadingUse(
   return ASTScopeImpl::computeIsCascadingUse(history, initialIsCascadingUse);
 }
 
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void ASTScope::dump() const { impl->dump(); }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif
+
 void ASTScope::print(llvm::raw_ostream &out) const { impl->print(out); }
 void ASTScope::dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineCol) {
   impl->dumpOneScopeMapLocation(lineCol);

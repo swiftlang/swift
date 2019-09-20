@@ -18,9 +18,9 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/Parser.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Subsystems.h"
@@ -208,12 +208,9 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   const unsigned OriginalDeclCount = SF.Decls.size();
 
   PersistentParserState PersistentState;
-  std::unique_ptr<DelayedParsingCallbacks> DelayedCB(
-      new CodeCompleteDelayedCallbacks(Ctx.SourceMgr.getCodeCompletionLoc()));
   bool Done;
   do {
-    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState,
-                        DelayedCB.get());
+    parseIntoSourceFile(SF, *BufferID, &Done, nullptr, &PersistentState);
   } while (!Done);
   performTypeChecking(SF, PersistentState.getTopLevelContext(), None,
                       OriginalDeclCount);

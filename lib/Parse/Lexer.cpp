@@ -289,10 +289,6 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
       return isCommentTriviaKind(Piece.getKind());
     });
     for (auto End = LeadingTrivia.end(); Iter != End; Iter++) {
-      if (Iter->getKind() == TriviaKind::Backtick)
-        // Since Token::getCommentRange() doesn't take backtick into account,
-        // we cannot include length of backtick.
-        break;
       CommentLength += Iter->getLength();
     }
   }
@@ -300,6 +296,7 @@ void Lexer::formToken(tok Kind, const char *TokStart) {
   StringRef TokenText { TokStart, static_cast<size_t>(CurPtr - TokStart) };
 
   if (TriviaRetention == TriviaRetentionMode::WithTrivia && Kind != tok::eof) {
+    assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
     lexTrivia(TrailingTrivia, /* IsForTrailingTrivia */ true);
   }
 
@@ -310,10 +307,6 @@ void Lexer::formEscapedIdentifierToken(const char *TokStart) {
   assert(CurPtr - TokStart >= 3 && "escaped identifier must be longer than or equal 3 bytes");
   assert(TokStart[0] == '`' && "escaped identifier starts with backtick");
   assert(CurPtr[-1] == '`' && "escaped identifier ends with backtick");
-
-  LeadingTrivia.push_back(TriviaKind::Backtick, 1);
-  assert(TrailingTrivia.empty() && "TrailingTrivia is empty here");
-  TrailingTrivia.push_back(TriviaKind::Backtick, 1);
 
   formToken(tok::identifier, TokStart);
   // If this token is at ArtificialEOF, it's forced to be tok::eof. Don't mark

@@ -1,5 +1,4 @@
 // RUN: %scale-test -O --begin 5 --end 21 --step 5 --select StoredPropertiesRequest %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 //
 // Single file with many stored properties.

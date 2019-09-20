@@ -1690,9 +1690,8 @@ private:
       break;
     }
 
-    // Install our own symbolic reference resolver
-    auto oldSymbolicReferenceResolver = dem.takeSymbolicReferenceResolver();
-    dem.setSymbolicReferenceResolver([&](SymbolicReferenceKind kind,
+    // Symbolic reference resolver for the demangle operation below.
+    auto symbolicReferenceResolver = [&](SymbolicReferenceKind kind,
                                          Directness directness,
                                          int32_t offset,
                                          const void *base) ->
@@ -1726,20 +1725,19 @@ private:
       }
 
       return nullptr;
-    });
+    };
 
     swift::Demangle::NodePointer result;
     switch (kind) {
     case MangledNameKind::Type:
-      result = dem.demangleType(mangledName);
+      result = dem.demangleType(mangledName, symbolicReferenceResolver);
       break;
 
     case MangledNameKind::Symbol:
-      result = dem.demangleSymbol(mangledName);
+      result = dem.demangleSymbol(mangledName, symbolicReferenceResolver);
       break;
     }
 
-    dem.setSymbolicReferenceResolver(std::move(oldSymbolicReferenceResolver));
     return result;
   }
 

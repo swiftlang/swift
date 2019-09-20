@@ -254,6 +254,9 @@ namespace swift {
     /// Should  we compare to ASTScope-based resolution for debugging?
     bool CompareToASTScopeLookup = false;
 
+    /// Should  we stress ASTScope-based resolution for debugging?
+    bool StressASTScopeLookup = false;
+
     /// Since some tests fail if the warning is output, use a flag to decide
     /// whether it is. The warning is useful for testing.
     bool WarnIfASTScopeLookup = false;

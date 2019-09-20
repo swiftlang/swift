@@ -16,7 +16,7 @@
 #ifndef SWIFT_CLANGIMPORTER_CLANGMODULE_H
 #define SWIFT_CLANGIMPORTER_CLANGMODULE_H
 
-#include "swift/AST/Module.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ExternalASTSource.h"
 
@@ -64,8 +64,7 @@ public:
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
-                           DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual TypeDecl *

@@ -23,6 +23,11 @@ struct Outer {
   var ox: X
 }
 
+struct Mixed {
+  var x: X
+  var i: Int
+}
+
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
 
@@ -190,3 +195,17 @@ bb5:
   return %r : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_mixed
+// CHECK: load
+// CHECK: destroy_addr %0
+// CHECK: br bb1
+// CHECK: return
+sil [ossa] @test_mixed : $@convention(thin) (@in Mixed) -> Int {
+bb0(%0 : $*Mixed):
+  %2 = struct_element_addr %0 : $*Mixed, #Mixed.i
+  %v = load [trivial] %2 : $*Int
+  br bb1
+bb1:
+  destroy_addr %0 : $*Mixed
+  return %v : $Int
+}

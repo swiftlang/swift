@@ -43,7 +43,7 @@ public protocol P {
   associatedtype T
 }
 
-public struct S<A: P> where A.T == S<A> {
+public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference}}
 // expected-note@-1 {{type declared here}}
 // expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
@@ -54,8 +54,7 @@ public struct S<A: P> where A.T == S<A> {
 
   func g(a: S<A>) {
     f(a: id(t: a))
-    // expected-note@-1 {{expected an argument list of type '(a: A.T)'}}
-    // expected-error@-2 {{cannot invoke 'f' with an argument list of type '(a: S<A>)'}}
+    // expected-error@-1 {{cannot convert value of type 'S<A>' to expected argument type 'A.T'}}
     _ = S<A>.self
   }
 
@@ -72,7 +71,7 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI> : I where A : I, A.T == SI<A> {
+struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error {{circular reference}}
 // expected-note@-1 {{type declared here}}
 // expected-error@-2 {{generic struct 'SI' references itself}}
   func ggg<T : I>(t: T.Type) -> T {

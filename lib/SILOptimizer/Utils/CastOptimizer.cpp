@@ -487,26 +487,6 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   (void)conf;
 
   // Generate code to invoke _bridgeToObjectiveC
-
-  auto *ntd = sourceType.getNominalOrBoundGenericNominal();
-  assert(ntd);
-  auto members = ntd->lookupDirect(mod.getASTContext().Id_bridgeToObjectiveC);
-  if (members.empty()) {
-    SmallVector<ValueDecl *, 4> foundMembers;
-    if (ntd->getDeclContext()->lookupQualified(
-            ntd, mod.getASTContext().Id_bridgeToObjectiveC,
-            NLOptions::NL_ProtocolMembers, foundMembers)) {
-      // Returned members are starting with the most specialized ones.
-      // Thus, the first element is what we are looking for.
-      members.push_back(foundMembers.front());
-    }
-  }
-
-  // There should be exactly one implementation of _bridgeToObjectiveC.
-  if (members.size() != 1)
-    return None;
-
-  auto bridgeFuncDecl = members.front();
   ModuleDecl *modDecl =
       mod.getASTContext().getLoadedModule(mod.getASTContext().Id_Foundation);
   if (!modDecl)
@@ -532,7 +512,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
 
   // Get substitutions, if source is a bound generic type.
   auto subMap = sourceType->getContextSubstitutionMap(
-      mod.getSwiftModule(), bridgeFuncDecl->getDeclContext());
+      mod.getSwiftModule(), resultDecl->getDeclContext());
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
@@ -1552,7 +1532,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
         Ctx.AllocateCopy(NewConformances);
 
     auto ExistentialRepr =
-        Dest->getType().getPreferredExistentialRepresentation(Mod, SourceType);
+        Dest->getType().getPreferredExistentialRepresentation(SourceType);
 
     switch (ExistentialRepr) {
     default:

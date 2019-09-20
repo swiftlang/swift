@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -typecheck -verify
-// RUN: %target-typecheck-verify-swift -typecheck -debug-generic-signatures %s > %t.dump 2>&1
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures > %t.dump 2>&1
 // RUN: %FileCheck %s < %t.dump
 
 protocol P1 {}
@@ -11,14 +11,11 @@ protocol P6: P2 {}
 
 protocol Assoc { associatedtype AT }
 
-func takes_P2<X: P2>(_: X) {}
-// expected-note@-1 {{candidate requires that the types 'U' and 'V' be equivalent (requirement specified as 'U' == 'V')}}
-// expected-note@-2 {{requirement from conditional conformance of 'SameTypeGeneric<U, V>' to 'P2'}}
-// expected-note@-3 {{requirement from conditional conformance of 'SubclassBad' to 'P2'}}
-// expected-note@-4 {{candidate requires that 'C1' inherit from 'U' (requirement specified as 'U' : 'C1')}}
-// expected-note@-5 {{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
-// expected-note@-6 {{candidate requires that 'C1' inherit from 'Int' (requirement specified as 'Int' : 'C1')}}
+func takes_P2<X: P2>(_: X) {} // expected-note {{in call to function 'takes_P2'}}
 func takes_P5<X: P5>(_: X) {}
+
+// Skip the first generic signature declcontext dump
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=Free
 
 struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free
@@ -99,7 +96,7 @@ func same_type_generic_good<U, V>(_: U, _: V)
 }
 func same_type_bad<U, V>(_: U, _: V) {
   takes_P2(SameTypeGeneric<U, V>())
-  // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SameTypeGeneric<U, V>)'}}
+  // expected-error@-1{{generic parameter 'X' could not be inferred}}
   takes_P2(SameTypeGeneric<U, Int>())
   // expected-error@-1{{global function 'takes_P2' requires the types 'U' and 'Int' be equivalent}}
   takes_P2(SameTypeGeneric<Int, Float>())
@@ -149,13 +146,13 @@ struct ClassFree<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=ClassFree
 // CHECK-NEXT: (normal_conformance type=ClassFree<T> protocol=P2
 // CHECK-NEXT:   superclass: T C1)
-extension ClassFree: P2 where T: C1 {}
+extension ClassFree: P2 where T: C1 {} // expected-note {{requirement from conditional conformance of 'ClassFree<U>' to 'P2'}}
 func class_free_good<U: C1>(_: U) {
     takes_P2(ClassFree<U>())
 }
 func class_free_bad<U>(_: U) {
     takes_P2(ClassFree<U>())
-    // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(ClassFree<U>)'}}
+    // expected-error@-1{{global function 'takes_P2' requires that 'U' inherit from 'C1'}}
 }
 
 struct ClassMoreSpecific<T: C1> {}
@@ -186,10 +183,10 @@ class SubclassGood: Base<C1> {}
 func subclass_good() {
   takes_P2(SubclassGood())
 }
-class SubclassBad: Base<Int> {}
+class SubclassBad: Base<Int> {} // expected-note {{requirement from conditional conformance of 'SubclassBad' to 'P2'}}
 func subclass_bad() {
   takes_P2(SubclassBad())
-  // expected-error@-1{{cannot invoke 'takes_P2(_:)' with an argument list of type '(SubclassBad)'}}
+  // expected-error@-1{{global function 'takes_P2' requires that 'Int' inherit from 'C1'}}
 }
 
 // Inheriting conformances:

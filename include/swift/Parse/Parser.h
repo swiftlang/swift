@@ -46,7 +46,6 @@ namespace llvm {
 namespace swift {
   class CodeCompletionCallbacks;
   class DefaultArgumentInitializer;
-  class DelayedParsingCallbacks;
   class DiagnosticEngine;
   class Expr;
   class Lexer;
@@ -165,14 +164,8 @@ public:
 
   LocalContext *CurLocalContext = nullptr;
 
-  DelayedParsingCallbacks *DelayedParseCB = nullptr;
-
   bool isDelayedParsingEnabled() const {
-    return DelayBodyParsing || DelayedParseCB != nullptr;
-  }
-
-  void setDelayedParsingCallbacks(DelayedParsingCallbacks *DelayedParseCB) {
-    this->DelayedParseCB = DelayedParseCB;
+    return DelayBodyParsing || SourceMgr.getCodeCompletionLoc().isValid();
   }
 
   void setCodeCompletionCallbacks(CodeCompletionCallbacks *Callbacks) {
@@ -554,11 +547,10 @@ public:
   ParsedTokenSyntax consumeIdentifierSyntax(bool allowDollarIdentifier = false) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
 
-    Context.getIdentifier(Tok.getText());
-
     if (Tok.getText()[0] == '$' && !allowDollarIdentifier)
       diagnoseDollarIdentifier(Tok);
 
+    Tok.setKind(tok::identifier);
     return consumeTokenSyntax();
   }
 
@@ -702,6 +694,25 @@ public:
   /// avoids the foot-gun of not considering T1 starting the next line for a
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1);
+
+  void ignoreToken();
+  void ignoreToken(tok Kind) {
+    assert(Tok.is(Kind));
+    ignoreToken();
+  }
+  bool ignoreIf(tok Kind) {
+    if (!Tok.is(Kind))
+      return false;
+    ignoreToken();
+    return true;
+  }
+  void ignoreSingle();
+  void ignoreUntil(tok Kind);
+
+  /// Ignore tokens until a token that starts with '>', and return true it if
+  /// found. Applies heuristics that are suitable when trying to find the end
+  /// of a list of generic parameters, generic arguments.
+  bool ignoreUntilGreaterInTypeList();
 
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
@@ -1161,9 +1172,12 @@ public:
 
   using TypeASTResult = ParserResult<TypeRepr>;
   using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
-  using TypeErrorResult = ParsedSyntaxResult<ParsedUnknownTypeSyntax>;
 
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
+
+  TypeResult parseTypeSyntax();
+  TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
+                             bool IsSILFuncDecl = false);
 
   TypeASTResult parseType();
   TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
@@ -1191,8 +1205,8 @@ public:
   TypeResult parseOptionalType(ParsedTypeSyntax Base);
   TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
 
-  TypeErrorResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
-  TypeErrorResult parseOldStyleProtocolComposition();
+  TypeResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
+  TypeResult parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
   ParsedTokenSyntax consumeOptionalTokenSyntax();
@@ -1597,7 +1611,7 @@ public:
     AssociatedType
   };
   ParserStatus
-  parseFreestandingGenericWhereClause(GenericParamList *&GPList,
+  parseFreestandingGenericWhereClause(GenericParamList *GPList,
                              WhereClauseKind kind=WhereClauseKind::Declaration);
 
   ParserStatus parseGenericWhereClause(

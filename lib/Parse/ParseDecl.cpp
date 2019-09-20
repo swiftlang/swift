@@ -16,7 +16,6 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
-#include "swift/Parse/DelayedParsingCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -30,6 +29,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
@@ -4136,8 +4136,10 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   Status |= parseIdentifierDeclName(*this, Id, IdLoc, "typealias",
                                     tok::colon, tok::equal);
-  if (Status.isError())
+  if (Status.isError()) {
+    TmpCtxt->setTransparent();
     return nullptr;
+  }
     
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
@@ -4173,8 +4175,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   TmpCtxt.reset();
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
-                                          /*genericParams*/nullptr,
-                                          CurDeclContext);
+                                          genericParams, CurDeclContext);
   setLocalDiscriminator(TAD);
   ParserResult<TypeRepr> UnderlyingTy;
 
@@ -4198,7 +4199,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Status |= UnderlyingTy;
   }
 
-  TAD->getUnderlyingTypeLoc() = UnderlyingTy.getPtrOrNull();
+  TAD->setUnderlyingTypeRepr(UnderlyingTy.getPtrOrNull());
   TAD->getAttrs() = Attributes;
 
   // Parse a 'where' clause if present, adding it to our GenericParamList.
@@ -4206,9 +4207,6 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
     ContextChange CC(*this, TAD);
     Status |= parseFreestandingGenericWhereClause(genericParams);
   }
-
-  // Set after parsing the where clause, which might create genericParams.
-  TAD->setGenericParams(genericParams);
 
   if (UnderlyingTy.isNull()) {
     // If there is an attempt to do code completion
@@ -4643,7 +4641,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
   assert(Tok.is(tok::l_brace));
 
   // Properties in protocols use a very limited syntax.
-  // SIL mode and parseable interfaces use the same syntax.
+  // SIL mode and module interfaces use the same syntax.
   // Otherwise, we have a normal var or subscript declaration and we need
   // parse the full complement of specifiers, along with their bodies.
   bool parsingLimitedSyntax = Flags.contains(PD_InProtocol) ||
@@ -4797,7 +4795,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags,
 
     // It's okay not to have a body if there's an external asm name.
     if (!Tok.is(tok::l_brace)) {
-      // Accessors don't need bodies in parseable interfaces
+      // Accessors don't need bodies in module interfaces
       if (SF.Kind == SourceFileKind::Interface)
         continue;
       // _silgen_name'd accessors don't need bodies.
@@ -5387,9 +5385,8 @@ void Parser::consumeAbstractFunctionBody(AbstractFunctionDecl *AFD,
 
   BodyRange.End = PreviousLoc;
 
-  if (DelayedParseCB &&
-      DelayedParseCB->shouldDelayFunctionBodyParsing(*this, AFD, Attrs,
-                                                     BodyRange)) {
+  if (SourceMgr.getCodeCompletionLoc().isInvalid() ||
+      SourceMgr.rangeContainsCodeCompletionLoc(BodyRange)) {
     AFD->setBodyDelayed(BodyRange);
   } else {
     AFD->setBodySkipped(BodyRange);
@@ -5516,7 +5513,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   auto *FD = FuncDecl::create(Context, StaticLoc, StaticSpelling,
                               FuncLoc, FullName, NameLoc,
                               /*Throws=*/throwsLoc.isValid(), throwsLoc,
-                              /*GenericParams=*/nullptr,
+                              GenericParams,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
 
@@ -5538,8 +5535,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
       return whereStatus;
     }
   }
-
-  FD->setGenericParams(GenericParams);
   
   // Protocol method arguments may not have default values.
   if (Flags.contains(PD_InProtocol) && DefaultArgs.HasDefaultArgument) {
@@ -5740,7 +5735,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   }
 
   EnumDecl *ED = new (Context) EnumDecl(EnumLoc, EnumName, EnumNameLoc,
-                                        { }, nullptr, CurDeclContext);
+                                        { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(ED);
   ED->getAttrs() = Attributes;
 
@@ -5766,8 +5761,6 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
       return whereStatus;
     }
   }
-
-  ED->setGenericParams(GenericParams);
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6024,7 +6017,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   StructDecl *SD = new (Context) StructDecl(StructLoc, StructName,
                                             StructNameLoc,
                                             { },
-                                            nullptr,
+                                            GenericParams,
                                             CurDeclContext);
   setLocalDiscriminator(SD);
   SD->getAttrs() = Attributes;
@@ -6052,7 +6045,6 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
     }
   }
 
-  SD->setGenericParams(GenericParams);
   // Make the entities of the struct as a code block.
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6115,9 +6107,12 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   // Create the class.
   ClassDecl *CD = new (Context) ClassDecl(ClassLoc, ClassName, ClassNameLoc,
-                                          { }, nullptr, CurDeclContext);
+                                          { }, GenericParams, CurDeclContext);
   setLocalDiscriminator(CD);
   CD->getAttrs() = Attributes;
+
+  // Parsed classes never have missing vtable entries.
+  CD->setHasMissingVTableEntries(false);
 
   ContextChange CC(*this, CD);
 
@@ -6164,8 +6159,6 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
       return whereStatus;
     }
   }
-
-  CD->setGenericParams(GenericParams);
 
   SyntaxParsingContext BlockContext(SyntaxContext, SyntaxKind::MemberDeclBlock);
   SourceLoc LBLoc, RBLoc;
@@ -6390,7 +6383,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
                                                 SubscriptLoc, Indices.get(),
                                                 ArrowLoc, ElementTy.get(),
                                                 CurDeclContext,
-                                                nullptr);
+                                                GenericParams);
   Subscript->getAttrs() = Attributes;
   
   // Let the source file track the opaque return type mapping, if any.
@@ -6413,8 +6406,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       return whereStatus;
     }
   }
-
-  Subscript->setGenericParams(GenericParams);
 
   // Pass the function signature to code completion.
   if (SignatureHasCodeCompletion && CodeCompletion) {
@@ -6534,7 +6525,7 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
                                            Failable, FailabilityLoc,
                                            throwsLoc.isValid(), throwsLoc,
-                                           Params.get(), nullptr,
+                                           Params.get(), GenericParams,
                                            CurDeclContext);
   CD->setImplicitlyUnwrappedOptional(IUO);
   CD->getAttrs() = Attributes;
@@ -6550,8 +6541,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
       return whereStatus;
     }
   }
-
-  CD->setGenericParams(GenericParams);
 
   // No need to setLocalDiscriminator.
 
@@ -6605,7 +6594,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     switch (SF.Kind) {
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
-      // It's okay to have no body for SIL code or parseable interfaces.
+      // It's okay to have no body for SIL code or module interfaces.
       break;
     case SourceFileKind::Library:
     case SourceFileKind::Main:

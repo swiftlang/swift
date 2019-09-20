@@ -1,4 +1,6 @@
 // RUN: %target-sil-opt %s | %FileCheck %s
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// UNSUPPORTED: OS=windows-msvc
 
 @available(*,unavailable,message: "it has been renamed")
 public struct mmConstUnsafePointer<T> {
@@ -11,3 +13,15 @@ bb0(%0 : $@thin mmConstUnsafePointer<T>.Type):
   %1 = struct $mmConstUnsafePointer<T> ()
   return %1 : $mmConstUnsafePointer<T>
 }
+
+// CHECK-LABEL: sil [available 123] @version_major : $@convention(thin) () -> ()
+sil [available 123] @version_major : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [available 123.321] @version_minor : $@convention(thin) () -> ()
+sil [available 123.321] @version_minor : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [available 123.321.444] @version_subminor : $@convention(thin) () -> ()
+sil [available 123.321.444] @version_subminor : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [weak_imported] @weak_func : $@convention(thin) () -> ()
+sil [weak_imported] @weak_func : $@convention(thin) () -> ()

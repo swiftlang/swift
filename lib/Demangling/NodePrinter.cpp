@@ -2142,7 +2142,11 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
     return nullptr;
   }
   case Node::Kind::DependentAssociatedTypeRef: {
-    Printer << Node->getFirstChild()->getText();
+    if (Node->getNumChildren() > 1) {
+      print(Node->getChild(1));
+      Printer << '.';
+    }
+    print(Node->getChild(0));
     return nullptr;
   }
   case Node::Kind::ReflectionMetadataBuiltinDescriptor:

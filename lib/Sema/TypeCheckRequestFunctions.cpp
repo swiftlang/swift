@@ -68,7 +68,7 @@ InheritedTypeRequest::evaluate(
   }
   }
 
-  TypeLoc &typeLoc = getTypeLoc(decl, index);
+  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
 
   Type inheritedType;
   if (typeLoc.getTypeRepr())
@@ -234,7 +234,7 @@ FunctionBuilderTypeRequest::evaluate(Evaluator &evaluator,
 
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *typeCheckerRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/TypeCheckerTypeIDZone.def"
 #undef SWIFT_REQUEST

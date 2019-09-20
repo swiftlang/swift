@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
@@ -1070,7 +1071,7 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  TC.validateDeclForNameLookup(decl);
+  TC.validateDecl(decl);
   auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
@@ -1093,10 +1094,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   auto dictConf = TypeChecker::conformsToProtocol(argType, dictLitProto, DC,
                                                   ConformanceCheckOptions());
   if (!dictConf) return false;
-  auto lookup = dictLitProto->lookupDirect(TC.Context.Id_Key);
-  auto keyAssocType =
-    cast<AssociatedTypeDecl>(lookup[0])->getDeclaredInterfaceType();
-  auto keyType = dictConf.getValue().getAssociatedType(argType, keyAssocType);
+  auto keyType = dictConf.getValue().getTypeWitnessByName(
+      argType, TC.Context.Id_Key);
   return TypeChecker::conformsToProtocol(keyType, stringLitProtocol, DC,
                                          ConformanceCheckOptions()).hasValue();
 }
@@ -1243,7 +1242,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto oneCandidate = candidates.front().getValueDecl();
     candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      TC.validateDeclForNameLookup(cand);
+      TC.validateDecl(cand);
       return isValidDynamicMemberLookupSubscript(cand, decl, TC);
     });
 
@@ -1266,7 +1265,7 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    TC.validateDeclForNameLookup(cand);
+    TC.validateDecl(cand);
     return isValidDynamicMemberLookupSubscript(cand, decl, TC,
                                                /*ignoreLabel*/ true);
   });
@@ -1608,7 +1607,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   
   // @XXApplicationMain classes must conform to the XXApplicationDelegate
   // protocol.
-  auto &C = D->getASTContext();
+  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
+  auto &C = SF->getASTContext();
 
   auto KitModule = C.getLoadedModule(Id_Kit);
   ProtocolDecl *ApplicationDelegateProto = nullptr;
@@ -1617,7 +1617,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
     namelookup::lookupInModule(KitModule, Id_ApplicationDelegate,
                                decls, NLKind::QualifiedLookup,
                                namelookup::ResolutionKind::TypesOnly,
-                               KitModule);
+                               SF);
     if (decls.size() == 1)
       ApplicationDelegateProto = dyn_cast<ProtocolDecl>(decls[0]);
   }
@@ -1637,30 +1637,8 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   
   // Register the class as the main class in the module. If there are multiples
   // they will be diagnosed.
-  auto *SF = cast<SourceFile>(CD->getModuleScopeContext());
   if (SF->registerMainClass(CD, attr->getLocation()))
     attr->setInvalid();
-  
-  // Check that we have the needed symbols in the frameworks.
-  auto lookupOptions = defaultUnqualifiedLookupOptions;
-  lookupOptions |= NameLookupFlags::KnownPrivate;
-  auto lookupMain = TC.lookupUnqualified(KitModule, Id_ApplicationMain,
-                                         SourceLoc(), lookupOptions);
-
-  for (const auto &result : lookupMain) {
-    TC.validateDecl(result.getValueDecl());
-  }
-  auto Foundation = TC.Context.getLoadedModule(C.Id_Foundation);
-  if (Foundation) {
-    auto lookupString = TC.lookupUnqualified(
-                          Foundation,
-                          C.getIdentifier("NSStringFromClass"),
-                          SourceLoc(),
-                          lookupOptions);
-    for (const auto &result : lookupString) {
-      TC.validateDecl(result.getValueDecl());
-    }
-  }
 }
 
 void AttributeChecker::visitNSApplicationMainAttr(NSApplicationMainAttr *attr) {
@@ -1875,8 +1853,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   SmallPtrSet<TypeBase *, 4> constrainedGenericParams;
 
   // Go over the set of requirements, adding them to the builder.
-  RequirementRequest::visitRequirements(
-      WhereClauseOwner(FD, attr), TypeResolutionStage::Interface,
+  WhereClauseOwner(FD, attr).visitRequirements(TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         // Collect all of the generic parameters used by these types.
         switch (req.getKind()) {

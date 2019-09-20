@@ -417,13 +417,27 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   }
 
 #if _runtime(_ObjC)
+  
   /// Convert to an NSArray.
   ///
   /// - Precondition: `Element` is bridged to Objective-C.
   ///
   /// - Complexity: O(1).
-  @inlinable
+  @usableFromInline
   internal __consuming func _asCocoaArray() -> AnyObject {
+    // _asCocoaArray was @inlinable in Swift 5.0 and 5.1, which means that there
+    // are existing apps out there that effectively have the old implementation
+    // Be careful with future changes to this function. Here be dragons!
+    // The old implementation was
+    // if count == 0 {
+    //   return _emptyArrayStorage
+    // }
+    // if _isBridgedVerbatimToObjectiveC(Element.self) {
+    //   return _storage
+    // }
+    // return __SwiftDeferredNSArray(_nativeStorage: _storage)
+    
+    _connectOrphanedFoundationSubclassesIfNeeded()
     if count == 0 {
       return _emptyArrayStorage
     }

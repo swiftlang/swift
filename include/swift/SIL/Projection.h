@@ -292,30 +292,7 @@ public:
   ///
   /// WARNING: This is not a constant time operation because it is implemented
   /// in terms of getVarDecl, which requests all BaseType's stored properties.
-  SILType getType(SILType BaseType, SILModule &M) const {
-    assert(isValid());
-    switch (getKind()) {
-    case ProjectionKind::Struct:
-    case ProjectionKind::Class:
-      return BaseType.getFieldType(getVarDecl(BaseType), M);
-    case ProjectionKind::Enum:
-      return BaseType.getEnumElementType(getEnumElementDecl(BaseType), M);
-    case ProjectionKind::Box:
-      return BaseType.castTo<SILBoxType>()->getFieldType(M, getIndex());
-    case ProjectionKind::Tuple:
-      return BaseType.getTupleElementType(getIndex());
-    case ProjectionKind::Upcast:
-    case ProjectionKind::RefCast:
-    case ProjectionKind::BitwiseCast:
-    case ProjectionKind::TailElems:
-      return getCastType(BaseType);
-    case ProjectionKind::Index:
-      // Index types do not change the underlying type.
-      return BaseType;
-    }
-
-    llvm_unreachable("Unhandled ProjectionKind in switch.");
-  }
+  SILType getType(SILType BaseType, SILModule &M) const;
 
   VarDecl *getVarDecl(SILType BaseType) const {
     assert(isValid());

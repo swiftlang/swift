@@ -39,8 +39,8 @@ func testMixedSignArithmetic() {
     _ = ${T}(1) - Stride(0) // expected-error {{}} expected-note {{}}
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1) // expected-error {{}} expected-note {{}}
-    x -= Stride(1) // expected-error {{}} expected-note {{}}
+    x += Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected argument type '${T}'}} {{10-10=${T}(}} {{19-19=)}}
+    x -= Stride(1) // expected-error {{cannot convert value of type 'Stride' (aka 'Int') to expected argument type '${T}'}} {{10-10=${T}(}} {{19-19=)}}
 
     _ = (x - x) as Stride // expected-error {{}}
 
@@ -52,10 +52,9 @@ func testMixedSignArithmetic() {
     (x + x) as Stride   // expected-error {{}}
     Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
-    // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{}} expected-note {{}}
-    y -= ${T}(1)        // expected-error {{}} expected-note {{}}
+    y += ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Int'}} {{10-10=Int(}}
+    y -= ${T}(1)        // expected-error {{cannot convert value of type '${T}' to expected argument type 'Int'}} {{10-10=Int(}}
   }
 % end
 }

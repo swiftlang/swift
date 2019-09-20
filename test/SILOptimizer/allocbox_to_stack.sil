@@ -1086,8 +1086,38 @@ bb2:
 bb3:
   strong_release %1 : ${ var Int }
   unreachable
-
 }
+
+
+// Verify that we don't crash on this one:
+//
+// CHECK-LABEL: sil @unreachable_with_two_predecessors
+sil @unreachable_with_two_predecessors : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  cond_br undef, bb1, bb4
+
+bb1:
+  %4 = alloc_stack $Bool
+  %1 = alloc_box ${ var Int }
+  %1a = project_box %1 : ${ var Int }, 0
+  store %0 to %1a : $*Int
+  cond_br undef, bb3, bb2
+
+bb2:
+  dealloc_stack %4 : $*Bool
+  br bb4
+
+bb3:
+  %9 = load %1a : $*Int
+  strong_release %1 : ${ var Int }
+  dealloc_stack %4 : $*Bool
+  %13 = tuple ()
+  return %13 : $()
+
+bb4:
+  unreachable
+}
+
 
 // Verify the case in which a box used by a partial apply which is then used by a try_apply.
 //

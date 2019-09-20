@@ -261,7 +261,10 @@ public:
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
-  
+
+  /// Returns whether this context has value semantics.
+  bool hasValueSemantics() const;
+
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
@@ -359,10 +362,6 @@ public:
   /// Retrieve the innermost archetypes of this context or any
   /// of its parents.
   GenericEnvironment *getGenericEnvironmentOfContext() const;
-
-  /// Whether the context has a generic environment that will be constructed
-  /// on first access (but has not yet been constructed).
-  bool contextHasLazyGenericEnvironment() const;
 
   /// Map an interface type to a contextual type within this context.
   Type mapTypeIntoContext(Type type) const;
@@ -764,7 +763,7 @@ public:
   void addMember(Decl *member, Decl *hint = nullptr);
 
   /// See \c MemberCount
-  unsigned getMemberCount() const { return MemberCount; }
+  unsigned getMemberCount() const;
 
   /// Check whether there are lazily-loaded members.
   bool hasLazyMembers() const {

@@ -222,6 +222,7 @@ public:
   bool insert(const Key1 &k1, const Key2 &k2, Value &v) {
     const bool r1 = map1.insert(k1, k2, v);
     const bool r2 = map2.insert(k2, k1, v);
+    (void)r2;
     assertConsistent(r1, r2);
     return r1;
   }

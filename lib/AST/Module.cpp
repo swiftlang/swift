@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
@@ -33,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -101,6 +103,8 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
       TAD->setAccess(AccessLevel::Public);
+      TAD->setValidationToChecked();
+      TAD->computeType();
       Entry = TAD;
     }
   }
@@ -168,8 +172,8 @@ public:
   /// Throw away as much memory as possible.
   void invalidate();
   
-  void lookupValue(AccessPathTy AccessPath, DeclName Name,
-                   NLKind LookupKind, SmallVectorImpl<ValueDecl*> &Result);
+  void lookupValue(DeclName Name, NLKind LookupKind,
+                   SmallVectorImpl<ValueDecl*> &Result);
   
   void lookupVisibleDecls(AccessPathTy AccessPath,
                           VisibleDeclConsumer &Consumer,
@@ -284,14 +288,8 @@ SourceLookupCache::SourceLookupCache(const ModuleDecl &M) {
   }
 }
 
-void SourceLookupCache::lookupValue(AccessPathTy AccessPath, DeclName Name,
-                                    NLKind LookupKind,
+void SourceLookupCache::lookupValue(DeclName Name, NLKind LookupKind,
                                     SmallVectorImpl<ValueDecl*> &Result) {
-  // If this import is specific to some named type or decl ("import Swift.int")
-  // then filter out any lookups that don't match.
-  if (!ModuleDecl::matchesAccessPath(AccessPath, Name))
-    return;
-  
   auto I = TopLevelValues.find(Name);
   if (I == TopLevelValues.end()) return;
   
@@ -457,19 +455,18 @@ static bool isParsedModule(const ModuleDecl *mod) {
           cast<SourceFile>(files[0])->Kind != SourceFileKind::SIL);
 }
 
-void ModuleDecl::lookupValue(AccessPathTy AccessPath, DeclName Name,
-                             NLKind LookupKind, 
+void ModuleDecl::lookupValue(DeclName Name, NLKind LookupKind,
                              SmallVectorImpl<ValueDecl*> &Result) const {
   auto *stats = getASTContext().Stats;
   if (stats)
     stats->getFrontendCounters().NumModuleLookupValue++;
 
   if (isParsedModule(this)) {
-    getSourceLookupCache().lookupValue(AccessPath, Name, LookupKind, Result);
+    getSourceLookupCache().lookupValue(Name, LookupKind, Result);
     return;
   }
 
-  FORWARD(lookupValue, (AccessPath, Name, LookupKind, Result));
+  FORWARD(lookupValue, (Name, LookupKind, Result));
 }
 
 TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
@@ -517,7 +514,7 @@ void ModuleDecl::lookupMember(SmallVectorImpl<ValueDecl*> &results,
       alreadyInPrivateContext = true;
   } else if (isa<ModuleDecl>(containerDecl)) {
     assert(container == this);
-    this->lookupValue({}, name, NLKind::QualifiedLookup, results);
+    this->lookupValue(name, NLKind::QualifiedLookup, results);
   } else if (!isa<GenericTypeDecl>(containerDecl)) {
     // If ExtensionDecl, then use ExtensionDecl::lookupDirect instead.
     llvm_unreachable("This context does not support lookup.");
@@ -557,8 +554,7 @@ void ModuleDecl::lookupObjCMethods(
   FORWARD(lookupObjCMethods, (selector, results));
 }
 
-void BuiltinUnit::lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                              NLKind lookupKind,
+void BuiltinUnit::lookupValue(DeclName name, NLKind lookupKind,
                               SmallVectorImpl<ValueDecl*> &result) const {
   getCache().lookupValue(name.getBaseIdentifier(), lookupKind, *this, result);
 }
@@ -569,10 +565,9 @@ void BuiltinUnit::lookupObjCMethods(
   // No @objc methods in the Builtin module.
 }
 
-void SourceFile::lookupValue(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                             NLKind lookupKind,
+void SourceFile::lookupValue(DeclName name, NLKind lookupKind,
                              SmallVectorImpl<ValueDecl*> &result) const {
-  getCache().lookupValue(accessPath, name, lookupKind, result);
+  getCache().lookupValue(name, lookupKind, result);
 }
 
 void ModuleDecl::lookupVisibleDecls(AccessPathTy AccessPath,
@@ -1754,6 +1749,7 @@ StringRef SourceFile::getFilename() const {
 }
 
 ASTScope &SourceFile::getScope() {
+  assert(isSuitableForASTScopes() && "Should not be creating scope tree");
   if (!Scope)
     Scope = std::unique_ptr<ASTScope>(new (getASTContext()) ASTScope(this));
   return *Scope.get();

@@ -17,7 +17,6 @@
 #ifndef SWIFT_AST_ASTCONTEXT_H
 #define SWIFT_AST_ASTCONTEXT_H
 
-#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
@@ -32,6 +31,7 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Allocator.h"
@@ -49,10 +49,12 @@ namespace clang {
 }
 
 namespace swift {
+  class AbstractFunctionDecl;
   class ASTContext;
   enum class Associativity : unsigned char;
   class AvailabilityContext;
   class BoundGenericType;
+  class ClangModuleLoader;
   class ClangNode;
   class ConcreteDeclRef;
   class ConstructorDecl;
@@ -66,7 +68,6 @@ namespace swift {
   class InFlightDiagnostic;
   class IterableDeclContext;
   class LazyContextData;
-  class LazyGenericContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
   class LazyResolver;
@@ -821,15 +822,6 @@ public:
   LazyContextData *getOrCreateLazyContextData(const DeclContext *decl,
                                               LazyMemberLoader *lazyLoader);
 
-  /// Get the lazy function data for the given generic context.
-  ///
-  /// \param lazyLoader If non-null, the lazy loader to use when creating the
-  /// function data. The pointer must either be null or be consistent
-  /// across all calls for the same \p func.
-  LazyGenericContextData *getOrCreateLazyGenericContextData(
-                                              const GenericContext *dc,
-                                              LazyMemberLoader *lazyLoader);
-
   /// Get the lazy iterable context for the given iterable declaration context.
   ///
   /// \param lazyLoader If non-null, the lazy loader to use when creating the
@@ -879,12 +871,6 @@ public:
   /// canonical generic signature and module.
   GenericSignatureBuilder *getOrCreateGenericSignatureBuilder(
                                                      CanGenericSignature sig);
-
-  /// Retrieve or create the canonical generic environment of a canonical
-  /// generic signature builder.
-  GenericEnvironment *getOrCreateCanonicalGenericEnvironment(
-                                       GenericSignatureBuilder *builder,
-                                       GenericSignature *sig);
 
   /// Retrieve a generic signature with a single unconstrained type parameter,
   /// like `<T>`.

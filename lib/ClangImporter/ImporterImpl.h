@@ -493,6 +493,15 @@ public:
       std::tuple<const clang::ObjCMethodDecl *, DeclContext *, Version>,
       ConstructorDecl *> Constructors;
 
+  /// Keep track of all initializers that have been imported into a
+  /// nominal type.
+  llvm::DenseMap<const NominalTypeDecl *, TinyPtrVector<ConstructorDecl *>>
+      ConstructorsForNominal;
+
+  /// Keep track of the nested 'Code' enum for imported error wrapper
+  /// structs.
+  llvm::DenseMap<const StructDecl *, EnumDecl *> ErrorCodeEnums;
+
   /// Retrieve the alternative declaration for the given imported
   /// Swift declaration.
   ArrayRef<ValueDecl *> getAlternateDecls(Decl *decl) {
@@ -550,18 +559,14 @@ private:
   /// Records those modules that we have looked up.
   llvm::DenseMap<Identifier, ModuleDecl *> checkedModules;
 
-  /// Mapping from delayed conformance IDs to the set of delayed
-  /// protocol conformances.
-  llvm::DenseMap<unsigned, SmallVector<ProtocolConformance *, 4>>
-    DelayedConformances;
-
-  /// The next delayed conformance ID to use with \c DelayedConformances.
-  unsigned NextDelayedConformanceID = 0;
-
   /// The set of imported protocols for a declaration, used only to
   /// load all members of the declaration.
-  llvm::DenseMap<const Decl *, SmallVector<ProtocolDecl *, 4>>
+  llvm::DenseMap<const Decl *, ArrayRef<ProtocolDecl *>>
     ImportedProtocols;
+
+  /// The set of declaration context for which we've already ruled out the
+  /// presence of globals-as-members.
+  llvm::DenseSet<const IterableDeclContext *> checkedGlobalsAsMembers;
 
   void startedImportingEntity();
 
@@ -797,10 +802,6 @@ public:
   GenericSignature *buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
 
-  /// Utility function for building simple generic environments.
-  GenericEnvironment *buildGenericEnvironment(GenericParamList *genericParams,
-                                              DeclContext *dc);
-
   /// Import the given Clang declaration context into Swift.
   ///
   /// Usually one will use \c importDeclContextOf instead.
@@ -944,9 +945,6 @@ public:
 
   /// Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
-
-  /// Retrieve a sugared referenece to the given (imported) type.
-  Type getSugaredTypeReference(TypeDecl *type);
 
   /// Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
@@ -1170,24 +1168,6 @@ public:
   /// 'let' declaration as opposed to 'var'.
   bool shouldImportGlobalAsLet(clang::QualType type);
 
-  /// Allocate a new delayed conformance ID with the given set of
-  /// conformances.
-  unsigned allocateDelayedConformance(
-             SmallVector<ProtocolConformance *, 4> &&conformances) {
-    unsigned id = NextDelayedConformanceID++;
-    DelayedConformances[id] = std::move(conformances);
-    return id;
-  }
-
-  /// Take the delayed conformances associated with the given id.
-  SmallVector<ProtocolConformance *, 4> takeDelayedConformance(unsigned id) {
-    auto conformances = DelayedConformances.find(id);
-    SmallVector<ProtocolConformance *, 4> result
-      = std::move(conformances->second);
-    DelayedConformances.erase(conformances);
-    return result;
-  }
-
   /// Record the set of imported protocols for the given declaration,
   /// to be used by member loading.
   ///
@@ -1198,21 +1178,22 @@ public:
     if (protocols.empty())
       return;
 
-    auto &recorded = ImportedProtocols[decl];
-    recorded.insert(recorded.end(), protocols.begin(), protocols.end());
+    ImportedProtocols[decl] = SwiftContext.AllocateCopy(protocols);
   }
 
   /// Retrieve the imported protocols for the given declaration.
-  SmallVector<ProtocolDecl *, 4> takeImportedProtocols(const Decl *decl) {
-    SmallVector<ProtocolDecl *, 4> result;
-
+  ArrayRef<ProtocolDecl *> getImportedProtocols(const Decl *decl) {
     auto known = ImportedProtocols.find(decl);
-    if (known != ImportedProtocols.end()) {
-      result = std::move(known->second);
-      ImportedProtocols.erase(known);
-    }
+    if (known != ImportedProtocols.end())
+      return known->second;
+    return ArrayRef<ProtocolDecl *>();
+  }
 
-    return result;
+  EnumDecl *lookupErrorCodeEnum(const StructDecl *errorWrapper) {
+    auto found = ErrorCodeEnums.find(errorWrapper);
+    if (found == ErrorCodeEnums.end())
+      return nullptr;
+    return found->second;
   }
 
   virtual void
@@ -1255,12 +1236,6 @@ public:
   /// Returns the default definition type for \p ATD.
   Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                  uint64_t contextData) override {
-    llvm_unreachable("unimplemented for ClangImporter");
-  }
-  
-  /// Returns the generic environment.
-  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
@@ -1310,8 +1285,7 @@ public:
   /// Look for namespace-scope values with the given name using the
   /// DWARFImporterDelegate.
   /// \param inModule only return results from this module.
-  void lookupValueDWARF(ModuleDecl::AccessPathTy accessPath, DeclName name,
-                        NLKind lookupKind, Identifier inModule,
+  void lookupValueDWARF(DeclName name, NLKind lookupKind, Identifier inModule,
                         SmallVectorImpl<ValueDecl *> &results);
 
   /// Look for top-level scope types with a name and kind using the

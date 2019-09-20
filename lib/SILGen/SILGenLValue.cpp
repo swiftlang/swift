@@ -850,13 +850,13 @@ namespace {
       assert(base.getType().isExistentialType() &&
              "base for open existential component must be an existential");
       assert((base.getType().isAddress() ||
-              base.getType().getPreferredExistentialRepresentation(SGF.SGM.M) ==
+              base.getType().getPreferredExistentialRepresentation() ==
                   ExistentialRepresentation::Boxed) &&
              "base value of open-existential component was not an address or a "
              "boxed existential?");
       SILValue addr;
 
-      auto rep = base.getType().getPreferredExistentialRepresentation(SGF.SGM.M);
+      auto rep = base.getType().getPreferredExistentialRepresentation();
       switch (rep) {
       case ExistentialRepresentation::Opaque:
         addr = SGF.B.createOpenExistentialAddr(
@@ -922,14 +922,14 @@ namespace {
              "base for open existential component must be an existential");
       ManagedValue ref;
       if (refType.is<ExistentialMetatypeType>()) {
-        assert(refType.getPreferredExistentialRepresentation(SGF.SGM.M)
+        assert(refType.getPreferredExistentialRepresentation()
                  == ExistentialRepresentation::Metatype);
         ref = ManagedValue::forUnmanaged(
                 SGF.B.createOpenExistentialMetatype(loc,
                                                     result.getUnmanagedValue(),
                                                     getTypeOfRValue()));
       } else {
-        assert(refType.getPreferredExistentialRepresentation(SGF.SGM.M)
+        assert(refType.getPreferredExistentialRepresentation()
                  == ExistentialRepresentation::Class);
         ref = SGF.B.createOpenExistentialRef(loc, result, getTypeOfRValue());
       }
@@ -1384,7 +1384,9 @@ namespace {
         VarDecl *field = dyn_cast<VarDecl>(Storage);
         VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
         assert(backingVar);
-        CanType ValType = backingVar->getType()->getCanonicalType();
+        CanType ValType =
+            SGF.F.mapTypeIntoContext(backingVar->getInterfaceType())
+              ->getCanonicalType();
         SILType varStorageType =
           SGF.SGM.Types.getSubstitutedStorageType(backingVar, ValType);
         auto typeData =
@@ -1407,7 +1409,7 @@ namespace {
         assert(field->getAttachedPropertyWrappers().size() == 1);
         auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
         auto ctor = wrapperInfo.wrappedValueInit;
-        SubstitutionMap subs = backingVar->getType()->getMemberSubstitutionMap(
+        SubstitutionMap subs = ValType->getMemberSubstitutionMap(
                         SGF.getModule().getSwiftModule(), ctor);
 
         Type ity = ctor->getInterfaceType();
@@ -1418,8 +1420,8 @@ namespace {
           .asForeign(requiresForeignEntryPoint(ctor));
         RValue initFuncRV =
           SGF.emitApplyPropertyWrapperAllocator(loc, subs,initRef,
-                                                 backingVar->getType(),
-                                                 CanAnyFunctionType(substIty));
+                                                ValType,
+                                                CanAnyFunctionType(substIty));
         ManagedValue initFn = std::move(initFuncRV).getAsSingleValue(SGF, loc);
 
         // Create the allocating setter function. It captures the base address.
@@ -4188,7 +4190,7 @@ SILGenFunction::emitOpenExistentialLValue(SILLocation loc,
 
   // Open up the existential.
   auto rep = lv.getTypeOfRValue()
-    .getPreferredExistentialRepresentation(SGM.M);
+    .getPreferredExistentialRepresentation();
   switch (rep) {
   case ExistentialRepresentation::Opaque:
   case ExistentialRepresentation::Boxed: {

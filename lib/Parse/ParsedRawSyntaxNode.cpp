@@ -19,15 +19,20 @@ using namespace llvm;
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
-                                  ArrayRef<ParsedRawSyntaxNode> deferredNodes,
+                                  MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
                                   SyntaxParsingContext &ctx) {
   if (deferredNodes.empty()) {
     return ParsedRawSyntaxNode(k, {});
   }
   ParsedRawSyntaxNode *newPtr =
     ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
-  std::uninitialized_copy(deferredNodes.begin(), deferredNodes.end(), newPtr);
-  return ParsedRawSyntaxNode(k, makeArrayRef(newPtr, deferredNodes.size()));
+
+  // uninitialized move;
+  auto ptr = newPtr;
+  for (auto &node : deferredNodes)
+    :: new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
+
+  return ParsedRawSyntaxNode(k, makeMutableArrayRef(newPtr, deferredNodes.size()));
 }
 
 ParsedRawSyntaxNode
@@ -35,7 +40,7 @@ ParsedRawSyntaxNode::makeDeferred(Token tok,
                                   const ParsedTrivia &leadingTrivia,
                                   const ParsedTrivia &trailingTrivia,
                                   SyntaxParsingContext &ctx) {
-  CharSourceRange tokRange = tok.getRangeWithoutBackticks();
+  CharSourceRange tokRange = tok.getRange();
   size_t piecesCount = leadingTrivia.size() + trailingTrivia.size();
   ParsedTriviaPiece *piecesPtr = nullptr;
   if (piecesCount > 0) {
@@ -59,13 +64,13 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
   for (decltype(Indent) i = 0; i < Indent; ++i)
     OS << ' ';
   OS << '(';
-  dumpSyntaxKind(OS, getKind());
 
   switch (DK) {
     case DataKind::Null:
       OS << "<NULL>";
       break;
     case DataKind::Recorded:
+      dumpSyntaxKind(OS, getKind());
       OS << " [recorded] ";
       if (isToken()) {
         dumpTokenKind(OS, getTokenKind());
@@ -74,6 +79,7 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
       }
       break;
     case DataKind::DeferredLayout:
+      dumpSyntaxKind(OS, getKind());
       OS << " [deferred]";
       for (const auto &child : getDeferredChildren()) {
         OS << "\n";
@@ -81,6 +87,7 @@ void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
       }
       break;
     case DataKind::DeferredToken:
+      dumpSyntaxKind(OS, getKind());
       OS << " [deferred] ";
       dumpTokenKind(OS, getTokenKind());
       break;

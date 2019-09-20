@@ -23,6 +23,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
 using namespace swift;
@@ -1015,15 +1016,14 @@ static void checkObjCBridgingFunctions(ModuleDecl *mod,
                                        StringRef forwardConversion,
                                        StringRef reverseConversion) {
   assert(mod);
-  ModuleDecl::AccessPathTy unscopedAccess = {};
   SmallVector<ValueDecl *, 4> results;
 
   auto &ctx = mod->getASTContext();
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(bridgedTypeName),
+  mod->lookupValue(ctx.getIdentifier(bridgedTypeName),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(forwardConversion),
+  mod->lookupValue(ctx.getIdentifier(forwardConversion),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(reverseConversion),
+  mod->lookupValue(ctx.getIdentifier(reverseConversion),
                    NLKind::QualifiedLookup, results);
 
   for (auto D : results) {
@@ -1340,7 +1340,7 @@ static bool isCIntegerType(Type type) {
   auto matchesStdlibTypeNamed = [&](StringRef name) {
     auto identifier = ctx.getIdentifier(name);
     SmallVector<ValueDecl *, 2> foundDecls;
-    stdlibModule->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+    stdlibModule->lookupValue(identifier, NLKind::UnqualifiedLookup,
                               foundDecls);
     for (auto found : foundDecls) {
       auto foundType = dyn_cast<TypeDecl>(found);

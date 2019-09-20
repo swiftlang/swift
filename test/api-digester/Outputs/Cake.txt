@@ -38,9 +38,9 @@ cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 cake: TypeAlias TChangesFromIntToString.T has underlying type change from Swift.Int to Swift.String
 
 /* Decl Attribute changes */
+cake: Enum IceKind is now without @frozen
 cake: Func C1.foo1() is now not static
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
-cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
@@ -64,6 +64,7 @@ cake: Accessor ClassWithOpenMember.property.Get() is no longer open for subclass
 cake: Class C4 has changed its super class from APINotesTest.OldType to APINotesTest.NewType
 cake: Class SubGenericClass has changed its super class from cake.GenericClass<cake.P1> to cake.GenericClass<cake.P2>
 cake: Class SuperClassRemoval has removed its super class cake.C3
+cake: Constructor AddingNewDesignatedInit.init(_:) has been added as a designated initializer to an open class
 cake: Func ClassWithOpenMember.bar() is no longer open for subclassing
 cake: Func ClassWithOpenMember.foo() is no longer open for subclassing
 cake: Var ClassWithOpenMember.property is no longer open for subclassing

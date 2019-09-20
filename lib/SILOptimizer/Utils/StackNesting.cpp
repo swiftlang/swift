@@ -24,6 +24,7 @@ void StackNesting::setup(SILFunction *F) {
 
   // We use pointers to BlockInfo structs. Therefore it's important that the
   // BlockInfos vector is never re-allocated.
+  BlockInfos.clear();
   BlockInfos.reserve(F->size());
 
   // Start with the function entry block and add blocks while walking down along
@@ -231,36 +232,26 @@ bool StackNesting::insertDeallocs(const BitVector &AliveBefore,
   return changesMade;
 }
 
-StackNesting::Changes StackNesting::adaptDeallocs() {
-
-  bool InstChanged = false;
-  bool CFGChanged = false;
-  BitVector Bits(StackLocs.size());
-
-  // Visit all blocks. Actually the order doesn't matter, but let's to it in
-  // the same order as in solve().
+// Insert deallocations at block boundaries.
+// This can be necessary for unreachable blocks. Example:
+//
+//   %1 = alloc_stack
+//   %2 = alloc_stack
+//   cond_br %c, bb2, bb3
+// bb2: <--- need to insert a dealloc_stack %2 at the begin of bb2
+//   dealloc_stack %1
+//   unreachable
+// bb3:
+//   dealloc_stack %2
+//   dealloc_stack %1
+StackNesting::Changes StackNesting::insertDeallocsAtBlockBoundaries() {
+  Changes changes = Changes::None;
   for (const BlockInfo &BI : reversed(BlockInfos)) {
-    // Collect the alive-bits (at the block exit) from the successor blocks.
-    Bits = BI.AliveStackLocsAtExit;
-
-    // Insert deallocations at block boundaries.
-    // This can be necessary for unreachable blocks. Example:
-    //
-    //   %1 = alloc_stack
-    //   %2 = alloc_stack
-    //   cond_br %c, bb2, bb3
-    // bb2:   <--- need to insert a dealloc_stack %2 at the begin of bb2
-    //   dealloc_stack %1
-    //   unreachable
-    // bb3:
-    //   dealloc_stack %2
-    //   dealloc_stack %1
-    //
     for (unsigned SuccIdx = 0, NumSuccs = BI.Successors.size();
-         SuccIdx < NumSuccs; ++ SuccIdx) {
-      BlockInfo *SuccBI = BI.Successors[SuccIdx];
+         SuccIdx < NumSuccs; ++SuccIdx) {
 
-      if (SuccBI->AliveStackLocsAtEntry == Bits)
+      BlockInfo *SuccBI = BI.Successors[SuccIdx];
+      if (SuccBI->AliveStackLocsAtEntry == BI.AliveStackLocsAtExit)
         continue;
 
       // Insert deallocations for all locations which are alive at the end of
@@ -271,11 +262,26 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
         // block, we have to insert a new block where we can add the
         // deallocations.
         InsertionBlock = splitEdge(BI.Block->getTerminator(), SuccIdx);
-        CFGChanged = true;
+        changes = Changes::CFG;
       }
-      InstChanged |= insertDeallocs(Bits, SuccBI->AliveStackLocsAtEntry,
-                                    &InsertionBlock->front(), None);
+      if (insertDeallocs(BI.AliveStackLocsAtExit, SuccBI->AliveStackLocsAtEntry,
+                         &InsertionBlock->front(), None)) {
+        if (changes == Changes::None)
+          changes = Changes::Instructions;
+      }
     }
+  }
+  return changes;
+}
+
+bool StackNesting::adaptDeallocs() {
+  bool InstChanged = false;
+  BitVector Bits(StackLocs.size());
+
+  // Visit all blocks. Actually the order doesn't matter, but let's to it in
+  // the same order as in solve().
+  for (const BlockInfo &BI : reversed(BlockInfos)) {
+    Bits = BI.AliveStackLocsAtExit;
 
     // Insert/remove deallocations inside blocks.
     for (SILInstruction *StackInst : reversed(BI.StackInsts)) {
@@ -310,19 +316,29 @@ StackNesting::Changes StackNesting::adaptDeallocs() {
     }
     assert(Bits == BI.AliveStackLocsAtEntry && "dataflow didn't converge");
   }
-  if (CFGChanged)
-    return Changes::CFG;
-  if (InstChanged)
-    return Changes::Instructions;
-  return Changes::None;
+  return InstChanged;
 }
 
 StackNesting::Changes StackNesting::correctStackNesting(SILFunction *F) {
   setup(F);
-  if (solve()) {
-    return adaptDeallocs();
+  if (!solve())
+    return Changes::None;
+
+  // Insert deallocs at block boundaries. This might be necessary in CFG sub
+  // graphs which don't  reach a function exit, but only an unreachable.
+  Changes changes = insertDeallocsAtBlockBoundaries();
+  if (changes != Changes::None) {
+    // Those inserted deallocs make it necessary to re-compute the analysis.
+    setup(F);
+    solve();
   }
-  return Changes::None;
+  // Do the real work: extend lifetimes by moving deallocs.
+  if (adaptDeallocs()) {
+    if (changes == Changes::None)
+      changes = Changes::Instructions;
+  }
+
+  return changes;
 }
 
 void StackNesting::dump() const {

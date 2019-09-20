@@ -780,9 +780,8 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // Then perform the linear lifetime check. If we succeed, continue. We have
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
-    auto error =
-        valueHasLinearLifetime(cvi, {svi}, {}, visitedBlocks, deadEndBlocks,
-                               errorKind, &leakingBlocks);
+    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+    auto error = checker.checkValue(cvi, {svi}, {}, errorKind, &leakingBlocks);
     if (!error.getFoundError())
       continue;
 
@@ -1434,7 +1433,7 @@ static SILType getMemoryType(AllocationInst *memory) {
   if (auto *abi = dyn_cast<AllocBoxInst>(memory)) {
     assert(abi->getBoxType()->getLayout()->getFields().size() == 1 &&
            "optimizing multi-field boxes not implemented");
-    return abi->getBoxType()->getFieldType(abi->getModule(), 0);
+    return getSILBoxFieldType(abi->getBoxType(), abi->getModule().Types, 0);
   }
 
   assert(isa<AllocStackInst>(memory));

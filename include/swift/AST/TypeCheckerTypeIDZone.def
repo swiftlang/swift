@@ -15,49 +15,124 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest)
-SWIFT_REQUEST(TypeChecker, AttachedFunctionBuilderRequest)
-SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest)
-SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest)
-SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest)
-SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest)
-SWIFT_REQUEST(TypeChecker, DefaultTypeRequest)
-SWIFT_REQUEST(TypeChecker, EmittedMembersRequest)
-SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest)
-SWIFT_REQUEST(TypeChecker, ExistentialConformsToSelfRequest)
-SWIFT_REQUEST(TypeChecker, ExistentialTypeSupportedRequest)
-SWIFT_REQUEST(TypeChecker, ExtendedTypeRequest)
-SWIFT_REQUEST(TypeChecker, FunctionBuilderTypeRequest)
-SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest)
-SWIFT_REQUEST(TypeChecker, InheritedTypeRequest)
-SWIFT_REQUEST(TypeChecker, InitKindRequest)
-SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest)
-SWIFT_REQUEST(TypeChecker, IsDynamicRequest)
-SWIFT_REQUEST(TypeChecker, IsFinalRequest)
-SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest)
-SWIFT_REQUEST(TypeChecker, IsImplicitlyUnwrappedOptionalRequest)
-SWIFT_REQUEST(TypeChecker, IsObjCRequest)
-SWIFT_REQUEST(TypeChecker, IsSetterMutatingRequest)
-SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest)
-SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest)
-SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest)
-SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyTypeRequest)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperMutabilityRequest)
-SWIFT_REQUEST(TypeChecker, PropertyWrapperTypeInfoRequest)
-SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest)
-SWIFT_REQUEST(TypeChecker, RequirementRequest)
-SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest)
-SWIFT_REQUEST(TypeChecker, RequiresOpaqueAccessorsRequest)
-SWIFT_REQUEST(TypeChecker, RequiresOpaqueModifyCoroutineRequest)
-SWIFT_REQUEST(TypeChecker, ResilienceExpansionRequest)
-SWIFT_REQUEST(TypeChecker, SelfAccessKindRequest)
-SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest)
-SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest)
-SWIFT_REQUEST(TypeChecker, StoredPropertiesRequest)
-SWIFT_REQUEST(TypeChecker, StructuralTypeRequest)
-SWIFT_REQUEST(TypeChecker, SuperclassTypeRequest)
-SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest)
-SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest)
-SWIFT_REQUEST(TypeChecker, USRGenerationRequest)
+SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
+              GenericSignature *(GenericSignature *,
+                                 SmallVector<GenericTypeParamType *, 2>,
+                                 SmallVector<Requirement, 2>),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AttachedFunctionBuilderRequest,
+              CustomAttr *(ValueDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AttachedPropertyWrapperTypeRequest,
+              Type(VarDecl *, unsigned), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, AttachedPropertyWrappersRequest,
+              llvm::TinyPtrVector<CustomAttr *>(VarDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ClassAncestryFlagsRequest,
+              AncestryFlags(ClassDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultDefinitionTypeRequest,
+              Type(AssociatedTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
+              Type(KnownProtocolKind, const DeclContext *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
+              Type(EnumDecl *, TypeResolutionStage), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExistentialConformsToSelfRequest,
+              bool(ProtocolDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExistentialTypeSupportedRequest,
+              bool(ProtocolDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ExtendedTypeRequest, Type(ExtensionDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, FunctionBuilderTypeRequest, Type(ValueDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
+              GenericSignature *(GenericContext *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
+              GenericSignature *(ModuleDecl *, GenericSignature *,
+                                 SmallVector<GenericParamList *, 2>,
+                                 SmallVector<Requirement, 2>,
+                                 SmallVector<TypeLoc, 2>, bool),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, InheritedTypeRequest,
+              Type(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned,
+                   TypeResolutionStage),
+              SeparatelyCached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, InitKindRequest,
+              CtorInitializerKind(ConstructorDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsAccessorTransparentRequest, bool(AccessorDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsDynamicRequest, bool(ValueDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsFinalRequest, bool(ValueDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsGetterMutatingRequest, bool(AbstractStorageDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsImplicitlyUnwrappedOptionalRequest,
+              bool(ValueDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsObjCRequest, bool(ValueDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsSetterMutatingRequest, bool(AbstractStorageDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, LazyStoragePropertyRequest, VarDecl *(VarDecl *),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
+              std::string(const TypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
+              OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
+              llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyInfoRequest,
+              PropertyWrapperBackingPropertyInfo(VarDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperBackingPropertyTypeRequest,
+              Type(VarDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperMutabilityRequest,
+              Optional<PropertyWrapperMutability>(VarDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, PropertyWrapperTypeInfoRequest,
+              PropertyWrapperTypeInfo(NominalTypeDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ProtocolRequiresClassRequest, bool(ProtocolDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RequirementRequest,
+              Requirement(WhereClauseOwner, unsigned, TypeResolutionStage),
+              SeparatelyCached, HasNearestLocation)
+SWIFT_REQUEST(TypeChecker, RequirementSignatureRequest,
+              ArrayRef<Requirement>(ProtocolDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RequiresOpaqueAccessorsRequest, bool(VarDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RequiresOpaqueModifyCoroutineRequest,
+              bool(AbstractStorageDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResilienceExpansionRequest,
+              ResilienceExpansion(DeclContext *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SelfAccessKindRequest, SelfAccessKind(FuncDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, StorageImplInfoRequest,
+              StorageImplInfo(AbstractStorageDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, StoredPropertiesAndMissingMembersRequest,
+              ArrayRef<Decl *>(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, StoredPropertiesRequest,
+              ArrayRef<VarDecl *>(NominalTypeDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, StructuralTypeRequest, Type(TypeAliasDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SuperclassTypeRequest,
+              Type(NominalTypeDecl *, TypeResolutionStage), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
+              AccessorDecl *(AbstractStorageDecl *, AccessorKind),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
+              bool(AbstractFunctionDecl *, SourceLoc), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
+              Cached, NoLocationInfo)

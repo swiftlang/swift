@@ -158,12 +158,12 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
     // Type specifier should already be parsed before here. This only happens
     // for construct like 'P1 & inout P2'.
     diagnose(Tok.getLoc(), diag::attr_only_on_parameters, Tok.getRawText());
-    consumeToken();
+    ignoreToken();
   }
 
   auto TypeLoc = leadingTriviaLoc();
 
-  Optional<TypeResult> Result;
+  TypeResult Result;
   switch (Tok.getKind()) {
   case tok::kw_Self:
   case tok::kw_Any:
@@ -179,8 +179,10 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
     // Eat the code completion token because we handled it.
-    auto Token = consumeTokenSyntax(tok::code_complete);
-    return makeParsedCodeCompletion<ParsedTypeSyntax>({Token});
+    auto CCTok = consumeTokenSyntax(tok::code_complete);
+    ParsedTypeSyntax ty =
+        ParsedSyntaxRecorder::makeUnknownType({&CCTok, 1}, *SyntaxContext);
+    return makeParsedCodeCompletion(std::move(ty));
   }
   case tok::l_square:
     Result = parseTypeCollection();
@@ -199,45 +201,65 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
                     tok::equal, tok::comma, tok::semi))
         diag.fixItInsert(getEndOfPreviousLoc(), " <#type#>");
     }
+
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      auto Token = consumeTokenSyntax();
-      return makeParsedError<ParsedTypeSyntax>({Token});
+      auto token = consumeTokenSyntax();
+      ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeUnknownType(
+          {&token, 1}, *SyntaxContext);
+      return makeParsedError(std::move(ty));
     }
 
     checkForInputIncomplete();
-    return makeParsedErrorEmpty<ParsedTypeSyntax>();
+    return makeParsedError<ParsedTypeSyntax>();
   }
 
   // '.Type', '.Protocol', '?', '!', and '[]' still leave us with type-simple.
-  while (Result->isSuccess()) {
-    auto PrevType = Result->getResult();
-
+  while (Result.isSuccess()) {
     if ((Tok.is(tok::period) || Tok.is(tok::period_prefix)) &&
         (peekToken().isContextualKeyword("Type") ||
          peekToken().isContextualKeyword("Protocol"))) {
-      Result = parseMetatypeType(PrevType);
+      Result = parseMetatypeType(Result.get());
       continue;
     }
 
     if (!Tok.isAtStartOfLine()) {
       if (isOptionalToken(Tok)) {
-        Result = parseOptionalType(PrevType);
+        Result = parseOptionalType(Result.get());
         continue;
       }
       if (isImplicitlyUnwrappedOptionalToken(Tok)) {
-        Result = parseImplicitlyUnwrappedOptionalType(PrevType);
+        Result = parseImplicitlyUnwrappedOptionalType(Result.get());
         continue;
       }
       // Parse legacy array types for migration.
       if (Tok.is(tok::l_square)) {
-        Result = parseTypeArray(PrevType, TypeLoc);
+        Result = parseTypeArray(Result.get(), TypeLoc);
         continue;
       }
     }
     break;
   }
 
-  return *Result;
+  return Result;
+}
+
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSyntax() {
+  return parseTypeSyntax(diag::expected_type);
+}
+
+ParsedSyntaxResult<ParsedTypeSyntax>
+Parser::parseTypeSyntax(Diag<> messageID, bool HandleCodeCompletion,
+                        bool IsSILFuncDecl) {
+  SyntaxParsingContext ctxt(SyntaxContext);
+  ctxt.setTransparent();
+
+  auto loc = Tok.getLoc();
+  auto tyR = parseType(messageID, HandleCodeCompletion, IsSILFuncDecl);
+  if (auto ty = SyntaxContext->popIf<ParsedTypeSyntax>()) {
+    Generator.addType(tyR.getPtrOrNull(), loc);
+    return makeParsedResult(std::move(*ty), tyR.getStatus());
+  }
+  return tyR.getStatus();
 }
 
 Parser::TypeASTResult Parser::parseType() {
@@ -248,7 +270,7 @@ Parser::TypeASTResult Parser::parseSILBoxType(GenericParamList *generics,
                                               const TypeAttributes &attrs,
                                               Optional<Scope> &GenericsScope) {
   auto LBraceLoc = consumeToken(tok::l_brace);
-  
+
   SmallVector<SILBoxTypeRepr::Field, 4> Fields;
   if (!Tok.is(tok::r_brace)) {
     for (;;) {
@@ -262,30 +284,30 @@ Parser::TypeASTResult Parser::parseSILBoxType(GenericParamList *generics,
         return makeParserError();
       }
       SourceLoc VarOrLetLoc = consumeToken();
-      
+
       auto fieldTy = parseType();
       if (!fieldTy.getPtrOrNull())
         return makeParserError();
       Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
-      
+
       if (consumeIf(tok::comma))
         continue;
-      
+
       break;
     }
   }
-  
+
   if (!Tok.is(tok::r_brace)) {
     diagnose(Tok, diag::sil_box_expected_r_brace);
     return makeParserError();
   }
-  
+
   auto RBraceLoc = consumeToken(tok::r_brace);
-  
+
   // The generic arguments are taken from the enclosing scope. Pop the
   // box layout's scope now.
   GenericsScope.reset();
-  
+
   SourceLoc LAngleLoc, RAngleLoc;
   SmallVector<TypeRepr*, 4> Args;
   if (Tok.isContextualPunctuator("<")) {
@@ -303,7 +325,7 @@ Parser::TypeASTResult Parser::parseSILBoxType(GenericParamList *generics,
       diagnose(Tok, diag::sil_box_expected_r_angle);
       return makeParserError();
     }
-    
+
     RAngleLoc = consumeToken();
   }
 
@@ -349,7 +371,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       GenericsScope.emplace(this, ScopeKind::Generics);
     generics = maybeParseGenericParams().getPtrOrNull();
   }
-  
+
   // In SIL mode, parse box types { ... }.
   if (isInSILMode() && Tok.is(tok::l_brace)) {
     auto SILBoxType = parseSILBoxType(generics, attrs, GenericsScope);
@@ -386,7 +408,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   }
 
   if (Tok.is(tok::arrow)) {
-    auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
+    auto InputNode(std::move(SyntaxContext->popIf<ParsedTypeSyntax>().getValue()));
     // Handle type-function if we have an arrow.
     auto ArrowLoc = Tok.getLoc();
     auto Arrow = consumeTokenSyntax();
@@ -401,16 +423,15 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
         parseType(diag::expected_type_function_result);
     auto SecondTy = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (SecondHalf.isParseError()) {
-      SyntaxContext->addSyntax(InputNode);
+      SyntaxContext->addSyntax(std::move(InputNode));
       if (Throws)
-        SyntaxContext->addSyntax(*Throws);
-      SyntaxContext->addSyntax(Arrow);
+        SyntaxContext->addSyntax(std::move(*Throws));
+      SyntaxContext->addSyntax(std::move(Arrow));
       if (SecondTy)
-        SyntaxContext->addSyntax(*SecondTy);
+        SyntaxContext->addSyntax(std::move(*SecondTy));
       if (SecondHalf.hasCodeCompletion())
         return makeParserCodeCompletionResult<TypeRepr>();
-      if (SecondHalf.isNull())
-        return nullptr;
+      return makeParserErrorResult<TypeRepr>();
     }
 
     ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
@@ -421,9 +442,9 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       auto Arguments = TupleTypeNode->getDeferredElements();
       auto RightParen = TupleTypeNode->getDeferredRightParen();
       Builder
-        .useLeftParen(LeftParen)
-        .useArguments(Arguments)
-        .useRightParen(RightParen);
+        .useLeftParen(std::move(LeftParen))
+        .useArguments(std::move(Arguments))
+        .useRightParen(std::move(RightParen));
     } else {
       // FIXME(syntaxparse): Extract 'Void' text from recoreded node.
       if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR))
@@ -439,14 +460,13 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
           .fixItInsertAfter(tyR->getEndLoc(), ")");
       }
       Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
-          InputNode, /*TrailingComma=*/None, *SyntaxContext));
+          std::move(InputNode), /*TrailingComma=*/None, *SyntaxContext));
     }
 
-    Builder.useReturnType(*SecondTy);
     if (Throws)
-      Builder.useThrowsOrRethrowsKeyword(*Throws);
-    Builder.useArrow(Arrow);
-    Builder.useReturnType(*SecondTy);
+      Builder.useThrowsOrRethrowsKeyword(std::move(*Throws));
+    Builder.useArrow(std::move(Arrow));
+    Builder.useReturnType(std::move(*SecondTy));
 
     SyntaxContext->addSyntax(Builder.build());
 
@@ -544,45 +564,46 @@ ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
 Parser::parseGenericArgumentClauseSyntax() {
   assert(startsWithLess(Tok) && "Generic parameter list must start with '<'");
   auto LAngleLoc = Tok.getLoc();
-  auto LAngle = consumeStartingLessSyntax();
+  ParsedGenericArgumentClauseSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
 
-  SmallVector<ParsedGenericArgumentSyntax, 4> Args;
-  SmallVector<ParsedSyntax, 0> Junk;
-  Junk.push_back(LAngle);
+  // Parse '<'.
+  builder.useLeftAngleBracket(consumeStartingLessSyntax());
 
-  while (true) {
-    ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
-    auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
-    if (Ty.isParseError() || Ty.hasCodeCompletion()) {
-      Junk.append(Args.begin(), Args.end());
-      if (Type)
-        Junk.push_back(*Type);
-      skipUntilGreaterInTypeListSyntax(Junk);
-      return makeParsedResult<ParsedGenericArgumentClauseSyntax>(Junk, Ty.getStatus());
-    }
-    auto Comma = consumeTokenSyntaxIf(tok::comma);
-    auto Arg = ParsedSyntaxRecorder::makeGenericArgument(*Type, Comma, *SyntaxContext);
-    Args.push_back(Arg);
-    if (!Comma)
+  bool hasNext = true;
+  do {
+    // Parse argument type.
+    auto ty = parseTypeSyntax(diag::expected_type);
+    status |= ty.getStatus();
+    if (ty.isNull())
       break;
-  }
+    ParsedGenericArgumentSyntaxBuilder argBuilder(*SyntaxContext);
+    argBuilder.useArgumentType(ty.get());
 
-  if (!startsWithGreater(Tok)) {
+    // Parse trailing comma: ','.
+    if (Tok.is(tok::comma)) {
+      argBuilder.useTrailingComma(consumeTokenSyntax());
+    } else {
+      hasNext = false;
+    }
+    builder.addArgumentsMember(argBuilder.build());
+  } while (hasNext);
+
+  // Parse '>'.
+  if (startsWithGreater(Tok)) {
+    builder.useRightAngleBracket(consumeStartingGreaterSyntax());
+  } else {
+    if (status.isSuccess()) {
+      diagnose(Tok, diag::expected_rangle_generic_arg_list);
+      diagnose(LAngleLoc, diag::opening_angle);
+    }
     checkForInputIncomplete();
-    diagnose(Tok, diag::expected_rangle_generic_arg_list);
-    diagnose(LAngleLoc, diag::opening_angle);
-
-    Junk.append(Args.begin(), Args.end());
-    skipUntilGreaterInTypeListSyntax(Junk);
-    return makeParsedError<ParsedGenericArgumentClauseSyntax>(Junk);
+    status.setIsParseError();
+    if (ignoreUntilGreaterInTypeList())
+      builder.useRightAngleBracket(consumeStartingGreaterSyntax());
   }
 
-  auto ArgList =
-      ParsedSyntaxRecorder::makeGenericArgumentList(Args, *SyntaxContext);
-  auto RAngle = consumeStartingGreaterSyntax();
-  auto Clause = ParsedSyntaxRecorder::makeGenericArgumentClause(
-      LAngle, ArgList, RAngle, *SyntaxContext);
-  return makeParsedSuccess(Clause);
+  return makeParsedResult(builder.build(), status);
 }
 
 ParserStatus
@@ -590,18 +611,14 @@ Parser::parseGenericArgumentsAST(SmallVectorImpl<TypeRepr *> &ArgsAST,
                                  SourceLoc &LAngleLoc, SourceLoc &RAngleLoc) {
   auto StartLoc = leadingTriviaLoc();
   auto ParsedClauseResult = parseGenericArgumentClauseSyntax();
+  if (ParsedClauseResult.isNull())
+    return ParsedClauseResult.getStatus();
 
-  if (!ParsedClauseResult.isSuccess()) {
-    for (auto &&Node : ParsedClauseResult.getUnknownNodes())
-      SyntaxContext->addSyntax(Node);
-    if (ParsedClauseResult.isCodeCompletion())
-      return makeParserCodeCompletionStatus();
-    return makeParserError();
-  }
+  SyntaxContext->addSyntax(ParsedClauseResult.get());
+  if (ParsedClauseResult.isError())
+    return ParsedClauseResult.getStatus();
 
-  SyntaxContext->addSyntax(ParsedClauseResult.getResult());
   auto Clause = SyntaxContext->topNode<GenericArgumentClauseSyntax>();
-
   LAngleLoc = Generator.generate(Clause.getLeftAngleBracket(), StartLoc);
   for (auto &&ArgAST : Generator.generate(Clause.getArguments(), StartLoc))
     ArgsAST.push_back(ArgAST);
@@ -610,7 +627,7 @@ Parser::parseGenericArgumentsAST(SmallVectorImpl<TypeRepr *> &ArgsAST,
 }
 
 /// parseTypeIdentifier
-///   
+///
 ///   type-identifier:
 ///     identifier generic-args? ('.' identifier generic-args?)*
 ///
@@ -623,9 +640,11 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletion)
         CodeCompletion->completeTypeSimpleBeginning();
-      // Eat the code completion token because we handled it.
-      SmallVector<ParsedSyntax, 0> CodeComplete{consumeTokenSyntax(tok::code_complete)};
-      return makeParsedCodeCompletion<ParsedTypeSyntax>(CodeComplete);
+
+      auto CCTok = consumeTokenSyntax(tok::code_complete);
+      auto ty = ParsedSyntaxRecorder::makeUnknownType(
+          {&CCTok, 1}, *SyntaxContext);
+      return makeParsedCodeCompletion(std::move(ty));
     }
 
     diagnose(Tok, diag::expected_identifier_for_type);
@@ -633,10 +652,13 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     // If there is a keyword at the start of a new line, we won't want to
     // skip it as a recovery but rather keep it.
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-      return makeParsedError<ParsedTypeSyntax>({consumeTokenSyntax()});
+      auto kwTok = consumeTokenSyntax();
+      ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeUnknownType(
+          {&kwTok, 1}, *SyntaxContext);
+      return makeParsedError(std::move(ty));
     }
 
-    return makeParsedErrorEmpty<ParsedTypeSyntax>();
+    return makeParsedError<ParsedTypeSyntax>();
   }
 
   SmallVector<ParsedSyntax, 0> Junk;
@@ -655,42 +677,42 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
       // FIXME: offer a fixit: 'self' -> 'Self'
       Identifier =
           parseIdentifierSyntax(diag::expected_identifier_in_dotted_type);
-      if (!Identifier) {
-        Status.setIsParseError();
-        if (Base)
-          Junk.push_back(*Base);
-        if (Period)
-          Junk.push_back(*Period);
-      }
     }
 
     if (Identifier) {
       Optional<ParsedGenericArgumentClauseSyntax> GenericArgs;
-      
+
       if (startsWithLess(Tok)) {
         SmallVector<TypeRepr *, 4> GenericArgsAST;
         SourceLoc LAngleLoc, RAngleLoc;
         auto GenericArgsResult = parseGenericArgumentClauseSyntax();
-        if (!GenericArgsResult.isSuccess()) {
+        if (GenericArgsResult.isError()) {
           if (Base)
-            Junk.push_back(*Base);
+            Junk.push_back(std::move(*Base));
           if (Period)
-            Junk.push_back(*Period);
-          Junk.push_back(*Identifier);
-          auto genericJunks = GenericArgsResult.getUnknownNodes();
-          Junk.append(genericJunks.begin(), genericJunks.end());
-          return makeParsedResult<ParsedTypeSyntax>(
-              Junk, GenericArgsResult.getStatus());
+            Junk.push_back(std::move(*Period));
+          Junk.push_back(std::move(*Identifier));
+          if (!GenericArgsResult.isNull())
+            Junk.push_back(GenericArgsResult.get());
+          auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
+          return makeParsedResult(std::move(ty), GenericArgsResult.getStatus());
         }
-        GenericArgs = GenericArgsResult.getResult();
+        GenericArgs = GenericArgsResult.get();
       }
 
       if (!Base)
         Base = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
-            *Identifier, GenericArgs, *SyntaxContext);
+            std::move(*Identifier), std::move(GenericArgs), *SyntaxContext);
       else
         Base = ParsedSyntaxRecorder::makeMemberTypeIdentifier(
-            *Base, *Period, *Identifier, GenericArgs, *SyntaxContext);
+            std::move(*Base), std::move(*Period), std::move(*Identifier),
+            std::move(GenericArgs), *SyntaxContext);
+    } else {
+      Status.setIsParseError();
+      if (Base)
+        Junk.push_back(std::move(*Base));
+      if (Period)
+        Junk.push_back(std::move(*Period));
     }
 
     // Treat 'Foo.<anything>' as an attempt to write a dotted type
@@ -717,17 +739,16 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     IdentTypeRepr *ITR = nullptr;
 
     if (Base) {
-      SyntaxContext->addSyntax(*Base);
+      SyntaxContext->addSyntax(std::move(*Base));
       auto T = SyntaxContext->topNode<TypeSyntax>();
-      SyntaxContext->popIf<ParsedTypeSyntax>();
+      Junk.push_back(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
       ITR = dyn_cast<IdentTypeRepr>(Generator.generate(T, BaseLoc));
-      Junk.push_back(*Base);
     }
 
     if (Tok.isNot(tok::code_complete)) {
       // We have a dot.
       auto Dot = consumeTokenSyntax();
-      Junk.push_back(Dot);
+      Junk.push_back(std::move(Dot));
       if (CodeCompletion)
         CodeCompletion->completeTypeIdentifierWithDot(ITR);
     } else {
@@ -736,13 +757,16 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     }
     // Eat the code completion token because we handled it.
     Junk.push_back(consumeTokenSyntax(tok::code_complete));
-    return makeParsedCodeCompletion<ParsedTypeSyntax>(Junk);
+    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
+    return makeParsedCodeCompletion(std::move(ty));
   }
-  
-  if (Status.isError())
-    return makeParsedError<ParsedTypeSyntax>(Junk);
 
-  return makeParsedSuccess(*Base);
+  if (Status.isError()) {
+    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
+    return makeParsedError(std::move(ty));
+  }
+
+  return makeParsedResult(std::move(*Base));
 }
 
 Parser::TypeASTResult
@@ -750,33 +774,15 @@ Parser::parseTypeSimpleOrCompositionAST(Diag<> MessageID,
                                         bool HandleCodeCompletion) {
   auto Loc = leadingTriviaLoc();
 
-  auto CompositionResult =
+  auto Result =
       parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
-
-  if (!CompositionResult.isSuccess()) {
-    auto nodes = CompositionResult.getUnknownNodes();
-    if (nodes.size() > 0) {
-      if (nodes.size() != 1 || !nodes.front().is<ParsedTypeSyntax>()) {
-        auto ParsedUnknown = ParsedSyntaxRecorder::makeUnknownType(
-            nodes, *SyntaxContext);
-        SyntaxContext->addSyntax(ParsedUnknown);
-      } else {
-        SyntaxContext->addSyntax(nodes.front());
-      }
-    }
-    TypeRepr *CorrectedAST = nullptr;
-    if (SyntaxContext->isTopNode<TypeSyntax>()) {
-      auto Unknown = SyntaxContext->topNode<TypeSyntax>();
-      CorrectedAST = Generator.generate(Unknown, Loc);
-    }
-    return makeParserResult(CompositionResult.getStatus(), CorrectedAST);
+  if (!Result.isNull()) {
+    SyntaxContext->addSyntax(Result.get());
+    auto ty = SyntaxContext->topNode<TypeSyntax>();
+    return makeParserResult(Result.getStatus(), Generator.generate(ty, Loc));
+  } else {
+    return Result.getStatus();
   }
-
-  SyntaxContext->addSyntax(CompositionResult.getResult());
-  auto Composition = SyntaxContext->topNode<TypeSyntax>();
-  auto CompositionAST = Generator.generate(Composition, Loc);
-
-  return makeParserResult(CompositionAST);
 }
 
 /// parseTypeSimpleOrComposition
@@ -797,29 +803,31 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
     FirstSome = consumeTokenSyntax();
   }
 
-  auto ApplySome = [this](ParsedTypeSyntax Type, Optional<ParsedTokenSyntax> Some) {
-    return Some ? ParsedSyntaxRecorder::makeSomeType(*Some, Type, *SyntaxContext)
-                : Type;
+  auto ApplySome = [this](ParsedTypeSyntax Type,
+                          Optional<ParsedTokenSyntax> Some) {
+    return Some ? ParsedSyntaxRecorder::makeSomeType(
+                      std::move(*Some), std::move(Type), *SyntaxContext)
+                : std::move(Type);
   };
 
   // Parse the first type
   auto FirstTypeResult = parseTypeSimple(MessageID, HandleCodeCompletion);
 
-  // todo [gsoc]: handle Junk properly here
-  if (!FirstTypeResult.isSuccess())
+  if (FirstTypeResult.isError())
     return FirstTypeResult;
 
-  auto FirstType = FirstTypeResult.getResult();
+  auto FirstType = FirstTypeResult.get();
 
   if (!Tok.isContextualPunctuator("&"))
-    return makeParsedSuccess(ApplySome(FirstType, FirstSome));
+    return makeParsedResult(
+        ApplySome(std::move(FirstType), std::move(FirstSome)));
 
   SmallVector<ParsedCompositionTypeElementSyntax, 4> Elements;
-  
+
   Optional<ParsedTokenSyntax> Ampersand = consumeTokenSyntax();
   auto FirstElement = ParsedSyntaxRecorder::makeCompositionTypeElement(
-      FirstType, *Ampersand, *SyntaxContext);
-  Elements.push_back(FirstElement);
+      std::move(FirstType), std::move(*Ampersand), *SyntaxContext);
+  Elements.push_back(std::move(FirstElement));
 
   ParserStatus Status;
 
@@ -837,53 +845,52 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
                                           HandleCodeCompletion);
 
     if (!NextTypeResult.isSuccess()) {
-      auto following = NextTypeResult.getUnknownNodes();
-      if (following.empty()) {
-        Status |= NextTypeResult.getStatus();
+      Status |= NextTypeResult.getStatus();
+      if (NextTypeResult.isNull())
         break;
-      }
-      SmallVector<ParsedSyntax, 0> nodes = {FirstElement};
-      nodes.append(following.begin(), following.end());
-      return makeParsedResult<ParsedTypeSyntax>(nodes, NextTypeResult.getStatus());
+
+      SmallVector<ParsedSyntax, 0> nodes;
+      if (FirstSome)
+        nodes.push_back(std::move(*FirstSome));
+      std::move(Elements.begin(), Elements.end(), std::back_inserter(nodes));
+      if (NextSome)
+        nodes.push_back(std::move(*NextSome));
+      nodes.push_back(NextTypeResult.get());
+
+      auto ty = ParsedSyntaxRecorder::makeUnknownType(nodes, *SyntaxContext);
+      return makeParsedResult(std::move(ty), Status);
     }
 
-    auto NextType = ApplySome(NextTypeResult.getResult(), NextSome);
-    Ampersand = Tok.isContextualPunctuator("&") 
-        ? consumeTokenSyntax() 
+    auto NextType = ApplySome(NextTypeResult.get(), std::move(NextSome));
+    Ampersand = Tok.isContextualPunctuator("&")
+        ? consumeTokenSyntax()
         : llvm::Optional<ParsedTokenSyntax>();
     auto NextElement = ParsedSyntaxRecorder::makeCompositionTypeElement(
-        NextType, Ampersand, *SyntaxContext);
-    Elements.push_back(NextElement);
+        std::move(NextType), std::move(Ampersand), *SyntaxContext);
+    Elements.push_back(std::move(NextElement));
   } while (Ampersand);
 
-  // todo [gsoc]: handle failure here
-
-  auto ElementList =
-      ParsedSyntaxRecorder::makeCompositionTypeElementList(Elements, *SyntaxContext);
-  auto Composition =
-      ParsedSyntaxRecorder::makeCompositionType(ElementList, *SyntaxContext);
-  if (Status.isSuccess()) {
-    return makeParsedSuccess(ApplySome(Composition, FirstSome));
-  } else {
-    return makeParsedResult<ParsedTypeSyntax>({ApplySome(Composition, FirstSome)}, Status);
-  }
-
-  return makeParsedSuccess(ApplySome(Composition, FirstSome));
+  auto ElementList = ParsedSyntaxRecorder::makeCompositionTypeElementList(
+      Elements, *SyntaxContext);
+  auto Composition = ParsedSyntaxRecorder::makeCompositionType(
+      std::move(ElementList), *SyntaxContext);
+  return makeParsedResult(
+      ApplySome(std::move(Composition), std::move(FirstSome)), Status);
 }
 
 Parser::TypeASTResult Parser::parseAnyTypeAST() {
   auto AnyLoc = leadingTriviaLoc();
-  auto ParsedAny = parseAnyType().getResult();
-  SyntaxContext->addSyntax(ParsedAny);
+  auto ParsedAny = parseAnyType().get();
+  SyntaxContext->addSyntax(std::move(ParsedAny));
   auto Any = SyntaxContext->topNode<SimpleTypeIdentifierSyntax>();
   return makeParserResult(Generator.generate(Any, AnyLoc));
 }
 
 Parser::TypeResult Parser::parseAnyType() {
   auto Any = consumeTokenSyntax(tok::kw_Any);
-  auto Type = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(Any, llvm::None,
-                                                             *SyntaxContext);
-  return makeParsedSuccess(Type);
+  auto Type = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
+      std::move(Any), llvm::None, *SyntaxContext);
+  return makeParsedResult(std::move(Type));
 }
 
 /// parseOldStyleProtocolComposition
@@ -894,7 +901,7 @@ Parser::TypeResult Parser::parseAnyType() {
 ///   type-composition-list-deprecated:
 ///     type-identifier
 ///     type-composition-list-deprecated ',' type-identifier
-Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
+Parser::TypeResult Parser::parseOldStyleProtocolComposition() {
   // Defer all nodes so that we can de-structure the composed types in case we
   // need to emit a diagnostic (below).
   DeferringContextRAII Deferring(*SyntaxContext);
@@ -906,8 +913,8 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
   auto LAngleLoc = Tok.getLoc();
   auto LAngle = consumeStartingLessSyntax();
 
-  Junk.push_back(Protocol);
-  Junk.push_back(LAngle);
+  Junk.push_back(Protocol.copyDeferred());
+  Junk.push_back(LAngle.copyDeferred());
 
   // Parse the type-composition-list.
   ParserStatus Status;
@@ -920,14 +927,14 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
       auto TypeResult = parseTypeIdentifier();
       Status |= TypeResult.getStatus();
       if (TypeResult.isSuccess()) {
-        auto Type = TypeResult.getResult();
-        Junk.push_back(Type);
+        auto Type = TypeResult.get();
+        Junk.push_back(Type.copyDeferred());
         if (!IsAny)
-          Protocols.push_back(Type);
+          Protocols.push_back(std::move(Type));
       }
       Comma = consumeTokenSyntaxIf(tok::comma);
       if (Comma)
-        Junk.push_back(*Comma);
+        Junk.push_back(Comma->copyDeferred());
     } while (Comma);
   }
 
@@ -936,7 +943,7 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
   if (startsWithGreater(Tok)) {
     RAngleLoc = Tok.getLoc();
     auto RAngle = consumeStartingGreaterSyntax();
-    Junk.push_back(RAngle);
+    Junk.push_back(RAngle.copyDeferred());
   } else {
     if (Status.isSuccess()) {
       diagnose(Tok, diag::expected_rangle_protocol);
@@ -948,7 +955,7 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
     // Skip until we hit the '>'.
     skipUntilGreaterInTypeListSyntax(RAngleJunk, /*protocolComposition=*/true);
     for (auto &&Piece : RAngleJunk)
-      Junk.push_back(Piece);
+      Junk.push_back(Piece.copyDeferred());
   }
 
   if (Status.isSuccess()) {
@@ -956,7 +963,7 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
     if (Protocols.empty()) {
       replacement = "Any";
     } else {
-      auto extractText = [&](ParsedTypeSyntax Type) -> StringRef {
+      auto extractText = [&](ParsedTypeSyntax &Type) -> StringRef {
         auto SourceRange = Type.getRaw().getDeferredRange();
         return SourceMgr.extractText(SourceRange);
       };
@@ -972,7 +979,7 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
       // Need parenthesis if the next token looks like postfix TypeRepr.
       // i.e. '?', '!', '.Type', '.Protocol'
       bool needParen = false;
-      needParen |= !Tok.isAtStartOfLine() && 
+      needParen |= !Tok.isAtStartOfLine() &&
           (isOptionalToken(Tok) || isImplicitlyUnwrappedOptionalToken(Tok));
       needParen |= Tok.isAny(tok::period, tok::period_prefix);
       if (needParen) {
@@ -998,7 +1005,7 @@ Parser::TypeErrorResult Parser::parseOldStyleProtocolComposition() {
   }
 
   auto Unknown = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
-  return makeParsedSuccess(Unknown);
+  return makeParsedResult(std::move(Unknown));
 }
 
 /// parseTypeTupleBody
@@ -1016,18 +1023,17 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
 
   if (ParsingTypeTuple.isFailed())
-    return makeParsedError<ParsedTypeSyntax>({});
+    return makeParsedError<ParsedTypeSyntax>();
 
   SmallVector<ParsedSyntax, 0> Junk;
-  
+
   auto LParenLoc = Tok.getLoc();
   auto LParen = consumeTokenSyntax(tok::l_paren);
 
-  Junk.push_back(LParen);
+  Junk.push_back(LParen.copyDeferred());
 
   SmallVector<ParsedTupleTypeElementSyntax, 4> Elements;
   SmallVector<std::tuple<SourceLoc, SourceLoc, SourceLoc>, 4> ElementsLoc;
-  Optional<ParsedTokenSyntax> FirstEllipsis;
   SourceLoc FirstEllipsisLoc;
 
   Optional<ParsedTokenSyntax> Comma;
@@ -1052,7 +1058,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       InOut = consumeTokenSyntax(tok::kw_inout);
       IsInOutObsoleted = true;
 
-      LocalJunk.push_back(*InOut);
+      LocalJunk.push_back(InOut->copyDeferred());
     }
 
     // If the label is "some", this could end up being an opaque type
@@ -1075,18 +1081,18 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       // Consume a name.
       NameLoc = Tok.getLoc();
       Name = consumeArgumentLabelSyntax();
-      LocalJunk.push_back(*Name);
+      LocalJunk.push_back(Name->copyDeferred());
 
       // If there is a second name, consume it as well.
       if (Tok.canBeArgumentLabel()) {
         SecondNameLoc = Tok.getLoc();
         SecondName = consumeArgumentLabelSyntax();
-        LocalJunk.push_back(*SecondName);
+        LocalJunk.push_back(SecondName->copyDeferred());
       }
 
       // Consume the ':'.
       if ((Colon = consumeTokenSyntaxIf(tok::colon))) {
-        LocalJunk.push_back(*Colon);
+        LocalJunk.push_back(Colon->copyDeferred());
         // If we succeed, then we successfully parsed a label.
         if (Backtracking)
           Backtracking->cancelBacktrack();
@@ -1107,22 +1113,22 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
 
     // Parse the type annotation.
     auto TypeLoc = Tok.getLoc();
-    auto TypeASTResult = parseType(diag::expected_type);
-    auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
-    if (TypeASTResult.hasCodeCompletion() || TypeASTResult.isNull()) {
-      Junk.append(LocalJunk.begin(), LocalJunk.end());
-      if (Type)
-        Junk.push_back(*Type);
+    auto ty = parseTypeSyntax(diag::expected_type);
+    if (ty.hasCodeCompletion() || ty.isNull()) {
+      std::move(LocalJunk.begin(), LocalJunk.end(), std::back_inserter(Junk));
+      if (!ty.isNull())
+        Junk.push_back(ty.get());
       skipListUntilDeclRBraceSyntax(Junk, LParenLoc, tok::r_paren, tok::comma);
-      return TypeASTResult.hasCodeCompletion()
-                 ? makeParserCodeCompletionStatus()
-                 : makeParserError();
+      return ty.getStatus();
     }
 
     if (IsInOutObsoleted) {
       bool IsTypeAlreadyAttributed = false;
-      if (auto AttributedType = Type->getAs<ParsedAttributedTypeSyntax>())
-        IsTypeAlreadyAttributed = AttributedType->getDeferredSpecifier().hasValue();
+      if (auto AttributedType = ty.getAs<ParsedAttributedTypeSyntax>()) {
+        IsTypeAlreadyAttributed =
+            AttributedType->getDeferredSpecifier().hasValue();
+        ty = makeParsedResult(std::move(*AttributedType), ty.getStatus());
+      }
 
       if (IsTypeAlreadyAttributed) {
         // If the parsed type is already attributed, suggest removing `inout`.
@@ -1140,8 +1146,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       Tok.setKind(tok::ellipsis);
       auto ElementEllipsisLoc = Tok.getLoc();
       ElementEllipsis = consumeTokenSyntax();
-      if (!FirstEllipsis) {
-        FirstEllipsis = ElementEllipsis;
+      if (!FirstEllipsisLoc.isValid()) {
         FirstEllipsisLoc = ElementEllipsisLoc;
       } else {
         diagnose(ElementEllipsisLoc, diag::multiple_ellipsis_in_tuple)
@@ -1159,47 +1164,45 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       auto InFlight = diagnose(EqualLoc, diag::tuple_type_init);
       if (Init.isNonNull())
         InFlight.fixItRemove(SourceRange(EqualLoc, Init.get()->getEndLoc()));
-      auto Expr = *SyntaxContext->popIf<ParsedExprSyntax>();
-      Initializer = ParsedSyntaxRecorder::makeInitializerClause(*Equal, Expr,
-                                                                *SyntaxContext);
+      Initializer = ParsedSyntaxRecorder::makeInitializerClause(
+          std::move(*Equal),
+          std::move(*SyntaxContext->popIf<ParsedExprSyntax>()),
+          *SyntaxContext);
     }
 
     Comma = consumeTokenSyntaxIf(tok::comma);
 
     auto Element = ParsedSyntaxRecorder::makeTupleTypeElement(
-        InOut, Name, SecondName, Colon, *Type, ElementEllipsis, Initializer,
-        Comma, *SyntaxContext);
+        std::move(InOut), std::move(Name), std::move(SecondName),
+        std::move(Colon), ty.get(), std::move(ElementEllipsis),
+        std::move(Initializer), std::move(Comma), *SyntaxContext);
 
-    Junk.push_back(Element);
+    Junk.push_back(Element.copyDeferred());
 
-    Elements.push_back(Element);
+    Elements.push_back(std::move(Element));
     ElementsLoc.emplace_back(NameLoc, SecondNameLoc, TypeLoc);
 
     return makeParserSuccess();
   });
 
-  if (!Status.isSuccess())
-    return makeParsedResult<ParsedTupleTypeSyntax>(Junk, Status);
-
-  auto ElementList =
-      ParsedSyntaxRecorder::makeTupleTypeElementList(Elements, *SyntaxContext);
-
-  auto TupleType = ParsedSyntaxRecorder::makeTupleType(LParen, ElementList,
-                                                       *RParen, *SyntaxContext);
+  if (!Status.isSuccess()) {
+    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
+    return makeParsedResult(std::move(ty), Status);
+  }
 
   bool IsFunctionType = Tok.isAny(tok::arrow, tok::kw_throws, tok::kw_rethrows);
 
   auto GetNameText = [this](Optional<ParsedTokenSyntax> Name) {
     return !Name ? StringRef()
                  : SourceMgr.extractText(
-                       Name->getRaw().getDeferredTokenRangeWithoutBackticks(),
+                       Name->getRaw().getDeferredTokenRange(),
                        L->getBufferID());
   };
 
   if (!IsFunctionType) {
     for (unsigned i = 0; i < Elements.size(); i++) {
       // true tuples have labels
-      auto Element = Elements[i];
+      auto &Element = Elements[i];
       SourceLoc NameLoc, SecondNameLoc, TypeLoc;
       std::tie(NameLoc, SecondNameLoc, TypeLoc) = ElementsLoc[i];
       // If there were two names, complain.
@@ -1207,7 +1210,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
         auto Diag = diagnose(NameLoc, diag::tuple_type_multiple_labels);
         auto Name = Element.getDeferredName();
         auto NameText = SourceMgr.extractText(
-            Name->getRaw().getDeferredTokenRangeWithoutBackticks(),
+            Name->getRaw().getDeferredTokenRange(),
             L->getBufferID());
         if (NameText == "_") {
           Diag.fixItRemoveChars(NameLoc, TypeLoc);
@@ -1221,7 +1224,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
     for (unsigned i = 0; i < Elements.size(); i++) {
       // If there was a first name, complain; arguments in function types are
       // always unlabeled.
-      auto Element = Elements[i];
+      auto &Element = Elements[i];
       SourceLoc NameLoc, SecondNameLoc, TypeLoc;
       std::tie(NameLoc, SecondNameLoc, TypeLoc) = ElementsLoc[i];
       if (NameLoc.isValid()) {
@@ -1242,7 +1245,14 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
     }
   }
 
-  return makeParsedSuccess(TupleType);
+  auto ElementList =
+      ParsedSyntaxRecorder::makeTupleTypeElementList(Elements, *SyntaxContext);
+
+  auto TupleType = ParsedSyntaxRecorder::makeTupleType(
+      std::move(LParen), std::move(ElementList), std::move(*RParen),
+      *SyntaxContext);
+
+  return makeParsedResult(std::move(TupleType));
 }
 
 /// parseTypeArray - Parse the type-array production, given that we
@@ -1254,39 +1264,33 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
 ///     type-array '[' ']'
 ///     type-array '[' expr ']'
 ///
-Parser::TypeErrorResult Parser::parseTypeArray(ParsedTypeSyntax Base,
+Parser::TypeResult Parser::parseTypeArray(ParsedTypeSyntax Base,
                                                SourceLoc BaseLoc) {
   assert(Tok.isFollowingLSquare());
-  Parser::StructureMarkerRAII ParsingArrayBound(*this, Tok);
-  SmallVector<ParsedSyntax, 0> Junk{Base};
   auto LSquareLoc = Tok.getLoc();
-  auto LSquare = consumeTokenSyntax();
-  Junk.push_back(LSquare);
+  ignoreToken(tok::l_square);
 
-  if (Tok.isNot(tok::r_square)) {
-    auto SizeExprAST = parseExprBasic(diag::expected_expr);
-    if (SizeExprAST.hasCodeCompletion())
-      return makeParsedCodeCompletion<ParsedUnknownTypeSyntax>(Junk);
-    if (SizeExprAST.isNull())
-      return makeParsedError<ParsedUnknownTypeSyntax>(Junk);
-    if (auto ParsedSizeExpr = SyntaxContext->popIf<ParsedExprSyntax>())
-      Junk.push_back(*ParsedSizeExpr);
-  }
+  // Ignore integer literal between '[' and ']'
+  ignoreIf(tok::integer_literal);
 
+  auto RSquareLoc = Tok.getLoc();
   auto RSquare = parseMatchingTokenSyntax(
       tok::r_square, diag::expected_rbracket_array_type, LSquareLoc);
 
   if (RSquare) {
-    Junk.push_back(*RSquare);
     // If we parsed something valid, diagnose it with a fixit to rewrite it to
     // Swift syntax.
     diagnose(LSquareLoc, diag::new_array_syntax)
         .fixItInsert(BaseLoc, "[")
-        .fixItRemove(LSquareLoc);
+        .fixItRemoveChars(LSquareLoc, RSquareLoc);
   }
 
-  auto Unknown = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
-  return makeParsedSuccess(Unknown);
+  ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
+  builder.useElementType(std::move(Base));
+  if (RSquare)
+    builder.useRightSquareBracket(std::move(*RSquare));
+
+  return makeParsedError(builder.build());
 }
 
 /// Parse a collection type.
@@ -1300,56 +1304,60 @@ Parser::TypeResult Parser::parseTypeCollection() {
   auto LSquareLoc = Tok.getLoc();
   auto LSquare = consumeTokenSyntax(tok::l_square);
 
-  auto ElementTypeASTResult = parseType(diag::expected_element_type);
-  auto ElementType = SyntaxContext->popIf<ParsedTypeSyntax>();
-  Status |= ElementTypeASTResult;
+  auto ElementTypeResult = parseTypeSyntax(diag::expected_element_type);
+  Status |= ElementTypeResult.getStatus();
+  auto ElementType = ElementTypeResult.getOrNull();
 
   Optional<ParsedTokenSyntax> Colon;
-  ParserResult<TypeRepr> ValueTypeASTResult;
   Optional<ParsedTypeSyntax> ValueType;
 
   if (Tok.is(tok::colon)) {
     Colon = consumeTokenSyntax(tok::colon);
-    ValueTypeASTResult = parseType(diag::expected_dictionary_value_type);
-    ValueType = SyntaxContext->popIf<ParsedTypeSyntax>();
-    Status |= ValueTypeASTResult;
+    auto ValueTypeResult = parseTypeSyntax(diag::expected_dictionary_value_type);
+    ValueType = ValueTypeResult.getOrNull();
+    Status |= ValueTypeResult.getStatus();
   }
 
   auto Diag = Colon ? diag::expected_rbracket_dictionary_type
                     : diag::expected_rbracket_array_type;
+
   auto RSquare = parseMatchingTokenSyntax(tok::r_square, Diag, LSquareLoc);
   if (!RSquare)
     Status.setIsParseError();
 
   if (!Status.isSuccess()) {
     SmallVector<ParsedSyntax, 0> Pieces;
-    Pieces.push_back(LSquare);
+    Pieces.push_back(std::move(LSquare));
     if (ElementType)
-      Pieces.push_back(*ElementType);
+      Pieces.push_back(std::move(*ElementType));
     if (Colon)
-      Pieces.push_back(*Colon);
+      Pieces.push_back(std::move(*Colon));
     if (ValueType)
-      Pieces.push_back(*ValueType);
+      Pieces.push_back(std::move(*ValueType));
     if (RSquare)
-      Pieces.push_back(*RSquare);
+      Pieces.push_back(std::move(*RSquare));
 
-    return makeParsedResult<ParsedTypeSyntax>(Pieces, Status);
+    ParsedTypeSyntax ty =
+        ParsedSyntaxRecorder::makeUnknownType(Pieces, *SyntaxContext);
+    return makeParsedResult(std::move(ty), Status);
   }
 
   if (Colon)
-    return makeParsedSuccess(ParsedSyntaxRecorder::makeDictionaryType(
-        LSquare, *ElementType, *Colon, *ValueType, *RSquare, *SyntaxContext));
-  
-  return makeParsedSuccess(ParsedSyntaxRecorder::makeArrayType(
-      LSquare, *ElementType, *RSquare, *SyntaxContext));
+    return makeParsedResult(ParsedSyntaxRecorder::makeDictionaryType(
+        std::move(LSquare), std::move(*ElementType), std::move(*Colon),
+        std::move(*ValueType), std::move(*RSquare), *SyntaxContext));
+
+  return makeParsedResult(ParsedSyntaxRecorder::makeArrayType(
+      std::move(LSquare), std::move(*ElementType), std::move(*RSquare),
+      *SyntaxContext));
 }
 
 Parser::TypeResult Parser::parseMetatypeType(ParsedTypeSyntax Base) {
   auto Period = consumeTokenSyntax(); // tok::period or tok::period_prefix
   auto Keyword = consumeTokenSyntax(tok::identifier); // "Type" or "Protocol"
   auto MetatypeType = ParsedSyntaxRecorder::makeMetatypeType(
-      Base, Period, Keyword, *SyntaxContext);
-  return makeParsedSuccess(MetatypeType);
+      std::move(Base), std::move(Period), std::move(Keyword), *SyntaxContext);
+  return makeParsedResult(std::move(MetatypeType));
 }
 
 bool Parser::isOptionalToken(const Token &T) const {
@@ -1405,17 +1413,17 @@ SourceLoc Parser::consumeImplicitlyUnwrappedOptionalToken() {
 
 Parser::TypeResult Parser::parseOptionalType(ParsedTypeSyntax Base) {
   auto Question = consumeOptionalTokenSyntax();
-  auto Optional =
-      ParsedSyntaxRecorder::makeOptionalType(Base, Question, *SyntaxContext);
-  return makeParsedSuccess(Optional);
+  auto Optional = ParsedSyntaxRecorder::makeOptionalType(
+      std::move(Base), std::move(Question), *SyntaxContext);
+  return makeParsedResult(std::move(Optional));
 }
 
 Parser::TypeResult
 Parser::parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base) {
   auto Exclamation = consumeImplicitlyUnwrappedOptionalTokenSyntax();
   auto Unwrapped = ParsedSyntaxRecorder::makeImplicitlyUnwrappedOptionalType(
-      Base, Exclamation, *SyntaxContext);
-  return makeParsedSuccess(Unwrapped);
+      std::move(Base), std::move(Exclamation), *SyntaxContext);
+  return makeParsedResult(std::move(Unwrapped));
 }
 
 //===----------------------------------------------------------------------===//

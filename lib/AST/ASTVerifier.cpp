@@ -22,12 +22,14 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
@@ -165,56 +167,33 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
   return {false, node};
 }
 
-/// Describes a generic environment that might be lazily deserialized.
-///
-/// This class abstracts over a declaration context that may have a generic
-/// environment, ensuring that we don't deserialize the environment.
-struct LazyGenericEnvironment {
-  llvm::PointerUnion<DeclContext *, GenericEnvironment *> storage;
-
-  explicit operator bool() const {
-    if (storage.dyn_cast<GenericEnvironment *>())
-      return true;
-
-    if (auto dc = storage.dyn_cast<DeclContext *>())
-      return dc->getGenericSignatureOfContext();
-
-    return false;
-  }
-
-  bool isLazy() const {
-    if (auto dc = storage.dyn_cast<DeclContext *>())
-      return dc->contextHasLazyGenericEnvironment();
-
-    return false;
-  }
-
-  bool containsPrimaryArchetype(PrimaryArchetypeType *archetype) const {
-    // Assume true so we don't deserialize.
-    if (isLazy()) return true;
-
-    if (auto genericEnv = storage.dyn_cast<GenericEnvironment *>())
-      return archetype->getGenericEnvironment() == genericEnv;
-
-    if (auto dc = storage.dyn_cast<DeclContext *>()) {
-      if (auto genericEnv = dc->getGenericEnvironmentOfContext())
-        return archetype->getGenericEnvironment() == genericEnv;
-    }
-
-    return false;
-  }
-};
-
 namespace {
-  /// Retrieve the "overridden" declaration of this declaration, but only if
-  // it's already been computed.
-  template<typename T>
-  T *getOverriddenDeclIfAvailable(T *decl) {
-    if (!decl->overriddenDeclsComputed()) return nullptr;
+// Retrieve the "overridden" declaration of this declaration, but only if
+// it's already been computed.
+template <typename T> T *getOverriddenDeclIfAvailable(T *decl) {
+  if (!decl->overriddenDeclsComputed())
+    return nullptr;
 
-    return cast_or_null<T>(decl->getOverriddenDecl());
-  }
+  return cast_or_null<T>(decl->getOverriddenDecl());
 }
+
+// Retrieve the generic signature of the innermost context that has been forced
+// so far.
+//
+// This avoids kicking off the request for a generic signature in the verifier.
+static GenericSignature *
+getNearestForcedGenericSignatureOfContext(DeclContext *dc) {
+  do {
+    if (auto decl = dc->getAsDecl())
+      if (auto GC = decl->getAsGenericContext())
+        if (GC->hasComputedGenericSignature())
+          return GC->getGenericSignature();
+  } while ((dc = dc->getParent()));
+
+  return nullptr;
+}
+} // namespace
+
 class Verifier : public ASTWalker {
   PointerUnion<ModuleDecl *, SourceFile *> M;
   ASTContext &Ctx;
@@ -229,8 +208,8 @@ class Verifier : public ASTWalker {
   using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
   SmallVector<ScopeLike, 4> Scopes;
 
-  /// The stack of generic environments.
-  SmallVector<LazyGenericEnvironment, 2> GenericEnv;
+  /// The stack of context generic signatures.
+  SmallVector<GenericSignature *, 2> GenericSig;
 
   /// The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
@@ -270,8 +249,7 @@ class Verifier : public ASTWalker {
         Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
                                  : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()), HadError(Ctx.hadError()) {
-    Scopes.push_back(DC);
-    GenericEnv.push_back({DC});
+    pushScope(DC);
   }
 
 public:
@@ -654,26 +632,38 @@ public:
           }
 
           // Otherwise, the archetype needs to be from this scope.
-          if (GenericEnv.empty() || !GenericEnv.back()) {
+          if (GenericSig.empty() || !GenericSig.back()) {
             Out << "AST verification error: archetype outside of generic "
                    "context: " << root->getString() << "\n";
             return true;
           }
 
-          // Get the primary archetype.
+          // Get the archetype's generic signature.
           auto rootPrimary = cast<PrimaryArchetypeType>(root);
+          auto *archetypeEnv = rootPrimary->getGenericEnvironment();
+          auto *archetypeSig = archetypeEnv->getGenericSignature();
 
-          if (!GenericEnv.back().containsPrimaryArchetype(rootPrimary)) {
-            Out << "AST verification error: archetype "
-                << root->getString() << " not allowed in this context\n";
+          if (GenericSig.back() != archetypeSig) {
+            Out << "Archetype " << root->getString() << " not allowed "
+                << "in this context\n";
+            Out << "Archetype generic signature: "
+                << archetypeSig->getAsString() << "\n";
+            Out << "Context generic signature: "
+                << GenericSig.back()->getAsString() << "\n";
 
-            if (auto env = rootPrimary->getGenericEnvironment()) {
-              if (auto owningDC = env->getOwningDeclContext()) {
-                llvm::errs() << "archetype came from:\n";
-                owningDC->dumpContext();
-                llvm::errs() << "\n";
-              }
-            }
+            return true;
+          }
+
+          // Mapping the archetype out and back in should produce the
+          // same archetype.
+          auto interfaceType = archetype->getInterfaceType();
+          auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
+
+          if (contextType.getPointer() != archetype) {
+            Out << "Archetype " << archetype->getString() << "does not appear"
+                << " inside its own generic environment\n";
+            Out << "Interface type: " << interfaceType.getString() << "\n";
+            Out << "Contextual type: " << contextType.getString() << "\n";
 
             return true;
           }
@@ -714,16 +704,16 @@ public:
 
     void pushScope(DeclContext *scope) {
       Scopes.push_back(scope);
-      GenericEnv.push_back({scope});
+      GenericSig.push_back(::getNearestForcedGenericSignatureOfContext(scope));
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-      assert(GenericEnv.back().storage.get<DeclContext *>() == scope);
+      assert(GenericSig.back() == ::getNearestForcedGenericSignatureOfContext(scope));
       Scopes.pop_back();
-      GenericEnv.pop_back();
+      GenericSig.pop_back();
     }
     void popScope(BraceStmt *scope) {
       assert(Scopes.back().get<BraceStmt*>() == scope);
@@ -2697,15 +2687,14 @@ public:
           const auto &witness = normal->getWitness(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
-            GenericEnv.push_back({genericEnv});
+            GenericSig.push_back(genericEnv->getGenericSignature());
 
           verifyChecked(witness.getRequirementToSyntheticSubs());
           verifyChecked(witness.getSubstitutions());
 
           if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-            assert(GenericEnv.back().storage.dyn_cast<GenericEnvironment *>()
-                     == genericEnv);
-            GenericEnv.pop_back();
+            assert(GenericSig.back() == genericEnv->getGenericSignature());
+            GenericSig.pop_back();
           }
 
           continue;
@@ -2747,32 +2736,7 @@ public:
       }
     }
 
-    void verifyGenericEnvironment(Decl *D,
-                                  GenericSignature *sig,
-                                  GenericEnvironment *env) {
-      if (!sig && !env)
-        return;
-
-      if (sig && env) {
-        for (auto *paramTy : sig->getGenericParams()) {
-          (void)env->mapTypeIntoContext(paramTy);
-        }
-
-        return;
-      }
-
-      Out << "Decl must have both signature and environment, or neither\n";
-      D->dump(Out);
-      abort();
-    }
-
     void verifyChecked(GenericTypeDecl *generic) {
-      if (!generic->hasLazyGenericEnvironment()) {
-        verifyGenericEnvironment(generic,
-                                 generic->getGenericSignature(),
-                                 generic->getGenericEnvironment());
-      }
-
       verifyCheckedBase(generic);
     }
 
@@ -3037,12 +3001,6 @@ public:
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
-      }
-
-      if (!AFD->hasLazyGenericEnvironment()) {
-        verifyGenericEnvironment(AFD,
-                                 AFD->getGenericSignature(),
-                                 AFD->getGenericEnvironment());
       }
 
       // If there is an interface type, it shouldn't have any unresolved

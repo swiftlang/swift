@@ -244,9 +244,10 @@ struct Initialization {
   @WrapperWithInitialValue
   var y = true
 
-  // FIXME: It would be nice if we had a more detailed diagnostic here.
+  // FIXME: For some reason this is type-checked twice, second time around solver complains about <<error type>> argument
   @WrapperWithInitialValue<Int>
-  var y2 = true // expected-error{{'Bool' is not convertible to 'Int'}}
+  var y2 = true // expected-error{{cannot convert value of type 'Bool' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type '<<error type>>' to expected argument type 'Int'}}
 
   mutating func checkTypes(s: String) {
     x2 = s // expected-error{{cannot assign value of type 'String' to type 'Double'}}
@@ -719,6 +720,7 @@ func testDefaultedPrivateMemberwiseLets() {
   _ = DefaultedPrivateMemberwiseLets()
   _ = DefaultedPrivateMemberwiseLets(y: 42)
   _ = DefaultedPrivateMemberwiseLets(x: Wrapper(stored: false)) // expected-error{{incorrect argument label in call (have 'x:', expected 'y:')}}
+  // expected-error@-1 {{cannot convert value of type 'Wrapper<Bool>' to expected argument type 'Int'}}
 }
 
 
@@ -1011,6 +1013,18 @@ struct Foo<T> { // expected-note {{arguments to generic parameter 'T' ('W' and '
   }
 }
 
+extension Foo : Equatable where T : Equatable {
+  static func == (lhs: Foo, rhs: Foo) -> Bool {
+    lhs.wrappedValue == rhs.wrappedValue
+  }
+}
+
+extension Foo : Hashable where T : Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(wrappedValue)
+  }
+}
+
 @propertyWrapper
 struct Bar<T, V> {
   var wrappedValue: T
@@ -1059,6 +1073,8 @@ struct MissingPropertyWrapperUnwrap {
   func d(_: W) {}
   func e(_: Foo<W>) {}
 
+  subscript<T : Hashable>(takesFoo x: Foo<T>) -> Foo<T> { x }
+
   func baz() {
     self.x.foo() // expected-error {{referencing instance method 'foo()' requires wrapper 'Foo<Int>'}}{{10-10=_}}
     self.x.prop  // expected-error {{referencing property 'prop' requires wrapper 'Foo<Int>'}} {{10-10=_}}
@@ -1092,6 +1108,10 @@ struct MissingPropertyWrapperUnwrap {
 
     self.x[q: "ultimate question", 42] // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
     self.x[q: "ultimate question", 42] = true // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
+
+    // SR-11476
+    _ = \Self.[takesFoo: self.x] // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'Foo<Int>', use wrapper instead}}{{31-31=_}}
+    _ = \Foo<W>.[x: self._x] // expected-error {{cannot convert value '_x' of type 'Foo<Int>' to expected type 'Int', use wrapped value instead}} {{26-27=}}
   }
 }
 
@@ -1580,4 +1600,100 @@ protocol SR_11288_P5 {
 
 struct SR_11288_S5<T>: SR_11288_P5 {
   @SR_11288_Wrapper5 var answer = 42 // Okay
+}
+
+// SR-11393
+protocol Copyable: AnyObject {
+    func copy() -> Self
+}
+
+@propertyWrapper
+struct CopyOnWrite<Value: Copyable> {
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+
+  var wrappedValue: Value
+
+  var projectedValue: Value {
+    mutating get {
+      if !isKnownUniquelyReferenced(&wrappedValue) {
+        wrappedValue = wrappedValue.copy()
+      }
+      return wrappedValue
+    }
+    set {
+      wrappedValue = newValue
+    }
+  }
+}
+
+final class CopyOnWriteTest: Copyable {
+    let a: Int
+    init(a: Int) {
+        self.a = a
+    }
+
+    func copy() -> Self {
+        Self.init(a: a)
+    }
+}
+
+struct CopyOnWriteDemo1 {
+  @CopyOnWrite var a = CopyOnWriteTest(a: 3)
+
+  func foo() { // expected-note{{mark method 'mutating' to make 'self' mutable}}
+    _ = $a // expected-error{{cannot use mutating getter on immutable value: 'self' is immutable}}
+  }
+}
+
+@propertyWrapper
+struct NonMutatingProjectedValueSetWrapper<Value> {
+  var wrappedValue: Value
+  var projectedValue: Value {
+    get { wrappedValue }
+    nonmutating set { } 
+  }
+}
+
+struct UseNonMutatingProjectedValueSet {
+  @NonMutatingProjectedValueSetWrapper var x = 17
+
+  func test() { // expected-note{{mark method 'mutating' to make 'self' mutable}}
+    $x = 42 // okay
+    x = 42  // expected-error{{cannot assign to property: 'self' is immutable}}
+  }
+}
+
+// SR-11478
+
+@propertyWrapper
+struct SR_11478_W<Value> {
+  var wrappedValue: Value
+}
+
+class SR_11478_C1 {
+  @SR_11478_W static var bool1: Bool = true // Ok
+  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+}
+
+final class SR_11478_C2 {
+  @SR_11478_W static var bool1: Bool = true // Ok
+  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+}
+
+// SR-11381
+
+@propertyWrapper
+struct SR_11381_W<T> {
+  init(wrappedValue: T) {}
+  var wrappedValue: T {
+    fatalError()
+  }
+}
+
+struct SR_11381_S {
+  @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
 }

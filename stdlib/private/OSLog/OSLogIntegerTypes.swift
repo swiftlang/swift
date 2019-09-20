@@ -99,14 +99,14 @@ extension OSLogInterpolation {
     // two bytes needed for the headers.
     totalBytesForSerializingArguments += byteCount + 2
 
-    preamble = getUpdatedPreamble(isPrivate: isPrivate)
+    preamble = getUpdatedPreamble(isPrivate: isPrivate, isScalar: true)
   }
 
   /// Construct an os_log format specifier from the given parameters.
   /// This function must be constant evaluable and all its arguments
   /// must be known at compile time.
   @inlinable
-  @_semantics("oslog.interpolation.getFormatSpecifier")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getIntegerFormatSpecifier<T>(
@@ -150,7 +150,7 @@ extension OSLogArguments {
 /// Return the number of bytes needed for serializing an integer argument as
 /// specified by os_log. This function must be constant evaluable.
 @inlinable
-@_semantics("oslog.integers.sizeForEncoding")
+@_semantics("constant_evaluable")
 @_effects(readonly)
 @_optimize(none)
 internal func sizeForEncoding<T>(

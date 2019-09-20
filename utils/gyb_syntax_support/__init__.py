@@ -13,6 +13,7 @@ from NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
 from PatternNodes import PATTERN_NODES  # noqa: I201
 from StmtNodes import STMT_NODES  # noqa: I201
 import Token
+from Trivia import TRIVIAS  # noqa: I201
 from TypeNodes import TYPE_NODES  # noqa: I201
 
 
@@ -161,10 +162,16 @@ def hash_token_syntax(token):
     return hash((token.name, token.serialization_code))
 
 
+def hash_trivia(trivia):
+    return hash((trivia.name, trivia.serialization_code, trivia.characters))
+
+
 def calculate_node_hash():
     result = 0
     for node in SYNTAX_NODES:
         result = hash((result, hash_syntax_node(node)))
     for token in SYNTAX_TOKENS:
         result = hash((result, hash_token_syntax(token)))
+    for trivia in TRIVIAS:
+        result = hash((result, hash_trivia(trivia)))
     return result

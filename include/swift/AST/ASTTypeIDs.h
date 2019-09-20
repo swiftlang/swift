@@ -23,9 +23,11 @@ namespace swift {
 
 class CustomAttr;
 class Decl;
+class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;
 class IterableDeclContext;
+class ModuleDecl;
 class NominalTypeDecl;
 class OperatorDecl;
 struct PropertyWrapperBackingPropertyInfo;

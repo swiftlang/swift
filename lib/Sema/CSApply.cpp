@@ -1927,7 +1927,7 @@ namespace {
       }
 
       tc.validateDecl(maxFloatTypeDecl);
-      auto maxType = maxFloatTypeDecl->getUnderlyingTypeLoc().getType();
+      auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_floatLiteral });
@@ -2127,16 +2127,15 @@ namespace {
         return witness;
       };
 
-      auto associatedTypeArray = 
+      auto *interpolationProto = 
         tc.getProtocol(expr->getLoc(),
-             KnownProtocolKind::ExpressibleByStringInterpolation)
-          ->lookupDirect(tc.Context.Id_StringInterpolation);
-      if (associatedTypeArray.empty()) {
+             KnownProtocolKind::ExpressibleByStringInterpolation);
+      auto associatedTypeDecl = interpolationProto->getAssociatedType(
+          tc.Context.Id_StringInterpolation);
+      if (associatedTypeDecl == nullptr) {
         tc.diagnose(expr->getStartLoc(), diag::interpolation_broken_proto);
         return nullptr;
       }
-      auto associatedTypeDecl =
-        cast<AssociatedTypeDecl>(associatedTypeArray.front());
       auto interpolationType =
         simplifyType(DependentMemberType::get(openedType, associatedTypeDecl));
 
@@ -2271,17 +2270,6 @@ namespace {
 
       auto *choiceLocator = cs.getConstraintLocator(locator.withPathElement(
           ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice));
-
-      // We won't have a disjunction choice if we have an IUO function call
-      // wrapped in parens (i.e. '(s.foo)()'), because we only create a
-      // single constraint to bind to an optional type. So, we can just return
-      // false here as there's no need to force unwrap.
-      if (!solution.DisjunctionChoices.count(choiceLocator)) {
-        auto type = choice.getDecl()->getInterfaceType();
-        assert((type && type->is<AnyFunctionType>()) &&
-               "expected a function type");
-        return false;
-      }
 
       return solution.getDisjunctionChoice(choiceLocator);
     }
@@ -4255,11 +4243,11 @@ namespace {
 
         auto locator = cs.getConstraintLocator(
             E, LocatorPathElt::KeyPathComponent(i));
-        if (kind == KeyPathExpr::Component::Kind::UnresolvedSubscript) {
-          locator =
-            cs.getConstraintLocator(locator,
-                                    ConstraintLocator::SubscriptMember);
-        }
+
+        // Adjust the locator such that it includes any additional elements to
+        // point to the component's callee, e.g a SubscriptMember for a
+        // subscript component.
+        locator = cs.getCalleeLocator(locator);
 
         bool isDynamicMember = false;
         // If this is an unresolved link, make sure we resolved it.
@@ -7589,7 +7577,8 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
           auto *transformedExpr = result->second.second;
           // Since this closure has been transformed into something
           // else let's look inside transformed expression instead.
-          return {true, transformedExpr};
+          transformedExpr->walk(*this);
+          return {false, E};
         }
       }
 

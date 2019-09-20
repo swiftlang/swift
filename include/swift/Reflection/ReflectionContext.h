@@ -108,7 +108,7 @@ public:
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
     : super(std::move(reader)) {
-    getBuilder().setSymbolicReferenceResolverReader(*this);
+    getBuilder().setMetadataReader(*this);
   }
 
   ReflectionContext(const ReflectionContext &other) = delete;
@@ -123,7 +123,6 @@ public:
     return sizeof(StoredPointer) * 2;
   }
 
-#if defined(__APPLE__) && defined(__MACH__)
   template <typename T> bool readMachOSections(RemoteAddress ImageStart) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
@@ -277,22 +276,6 @@ public:
     return true;
   }
 
-  bool addImage(RemoteAddress ImageStart) {
-    // We start reading 4 bytes. The first 4 bytes are supposed to be
-    // the magic, so we understand whether this is a 32-bit executable or
-    // a 64-bit one.
-    auto Buf = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
-    if (!Buf)
-      return false;
-    auto HeaderMagic = reinterpret_cast<const uint32_t *>(Buf.get());
-    if (*HeaderMagic == llvm::MachO::MH_MAGIC)
-      return readMachOSections<MachOTraits<4>>(ImageStart);
-    if (*HeaderMagic == llvm::MachO::MH_MAGIC_64)
-      return readMachOSections<MachOTraits<8>>(ImageStart);
-    return false;
-  }
-
-#elif defined(_WIN32)
   bool readPECOFFSections(RemoteAddress ImageStart) {
     auto DOSHdrBuf = this->getReader().readBytes(
         ImageStart, sizeof(llvm::object::dos_header));
@@ -384,15 +367,13 @@ public:
     return true;
   }
 
-  bool addImage(RemoteAddress ImageStart) {
+  bool readPECOFF(RemoteAddress ImageStart) {
     auto Buf = this->getReader().readBytes(ImageStart,
                                            sizeof(llvm::object::dos_header));
     if (!Buf)
       return false;
 
     auto DOSHdr = reinterpret_cast<const llvm::object::dos_header *>(Buf.get());
-    if (!(DOSHdr->Magic[0] == 'M' && DOSHdr->Magic[1] == 'Z'))
-      return false;
 
     auto PEHeaderAddress =
         ImageStart.getAddressData() + DOSHdr->AddressOfNewExeHeader;
@@ -407,7 +388,7 @@ public:
 
     return readPECOFFSections(ImageStart);
   }
-#else // ELF platforms.
+
   template <typename T> bool readELFSections(RemoteAddress ImageStart) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
@@ -506,8 +487,8 @@ public:
     savedBuffers.push_back(std::move(Buf));
     return true;
   }
-
-  bool addImage(RemoteAddress ImageStart) {
+         
+  bool readELF(RemoteAddress ImageStart) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
 
@@ -527,12 +508,48 @@ public:
       return false;
     }
   }
-#endif
+
+  bool addImage(RemoteAddress ImageStart) {
+    // Read the first few bytes to look for a magic header.
+    auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
+    if (!Magic)
+      return false;
+    
+    uint32_t MagicWord;
+    memcpy(&MagicWord, Magic.get(), sizeof(MagicWord));
+    
+    // 32- and 64-bit Mach-O.
+    if (MagicWord == llvm::MachO::MH_MAGIC) {
+      return readMachOSections<MachOTraits<4>>(ImageStart);
+    }
+    
+    if (MagicWord == llvm::MachO::MH_MAGIC_64) {
+      return readMachOSections<MachOTraits<8>>(ImageStart);
+    }
+    
+    // PE. (This just checks for the DOS header; `readPECOFF` will further
+    // validate the existence of the PE header.)
+    auto MagicBytes = (const char*)Magic.get();
+    if (MagicBytes[0] == 'M' && MagicBytes[1] == 'Z') {
+      return readPECOFF(ImageStart);
+    }
+    
+    // ELF.
+    if (MagicBytes[0] == llvm::ELF::ElfMagic[0]
+        && MagicBytes[1] == llvm::ELF::ElfMagic[1]
+        && MagicBytes[2] == llvm::ELF::ElfMagic[2]
+        && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
+      return readELF(ImageStart);
+    }
+    
+    // We don't recognize the format.
+    return false;
+  }
 
   void addReflectionInfo(ReflectionInfo I) {
     getBuilder().addReflectionInfo(I);
   }
-  
+
   bool ownsObject(RemoteAddress ObjectAddress) {
     auto MetadataAddress = readMetadataFromInstance(ObjectAddress.getAddressData());
     if (!MetadataAddress)

@@ -131,6 +131,10 @@ Verbose("v", llvm::cl::desc("Verbose"),
         llvm::cl::cat(Category));
 
 static llvm::cl::opt<bool>
+DebugMapping("debug-mapping", llvm::cl::desc("Dumping information for debug purposes"),
+             llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
 Abi("abi", llvm::cl::desc("Dumping ABI interface"),  llvm::cl::init(false),
     llvm::cl::cat(Category));
 
@@ -234,6 +238,16 @@ static llvm::cl::list<std::string>
 PreferInterfaceForModules("use-interface-for-module", llvm::cl::ZeroOrMore,
                           llvm::cl::desc("Prefer loading these modules via interface"),
                           llvm::cl::cat(Category));
+
+static llvm::cl::opt<std::string>
+BaselineFilePath("baseline-path",
+                 llvm::cl::desc("The path to the Json file that we should use as the baseline"),
+                 llvm::cl::cat(Category));
+
+static llvm::cl::opt<bool>
+UseEmptyBaseline("empty-baseline",
+                llvm::cl::desc("Use empty baseline for diagnostics"),
+                llvm::cl::cat(Category));
 } // namespace options
 
 namespace {
@@ -814,6 +828,26 @@ void swift::ide::api::SDKNodeDeclFunction::diagnose(SDKNode *Right) {
   }
 }
 
+static StringRef getAttrName(DeclAttrKind Kind) {
+  switch (Kind) {
+#define DECL_ATTR(NAME, CLASS, ...)                                           \
+  case DAK_##CLASS:                                                           \
+      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
+#include "swift/AST/Attr.def"
+  case DAK_Count:
+    llvm_unreachable("unrecognized attribute kind.");
+  }
+  llvm_unreachable("covered switch");
+}
+
+static bool shouldDiagnoseAddingAttribute(SDKNodeDecl *D, DeclAttrKind Kind) {
+  return true;
+}
+
+static bool shouldDiagnoseRemovingAttribute(SDKNodeDecl *D, DeclAttrKind Kind) {
+  return true;
+}
+
 void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
   SDKNode::diagnose(Right);
   auto *RD = dyn_cast<SDKNodeDecl>(Right);
@@ -872,13 +906,27 @@ void swift::ide::api::SDKNodeDecl::diagnose(SDKNode *Right) {
     }
   }
 
-  // Check if some attributes with ABI/API-impact have been added/removed.
-  for (auto &Info: Ctx.getBreakingAttributeInfo()) {
-    if (hasDeclAttribute(Info.Kind) != RD->hasDeclAttribute(Info.Kind)) {
-      auto Desc = hasDeclAttribute(Info.Kind) ?
-      Ctx.buffer((llvm::Twine("without ") + Info.Content).str()):
-      Ctx.buffer((llvm::Twine("with ") + Info.Content).str());
-      emitDiag(diag::decl_new_attr, Desc);
+  // Diagnose removing attributes.
+  for (auto Kind: getDeclAttributes()) {
+    if (!RD->hasDeclAttribute(Kind)) {
+      if ((Ctx.checkingABI() ? DeclAttribute::isRemovingBreakingABI(Kind) :
+                               DeclAttribute::isRemovingBreakingAPI(Kind)) &&
+          shouldDiagnoseRemovingAttribute(this, Kind)) {
+        emitDiag(diag::decl_new_attr,
+                Ctx.buffer((llvm::Twine("without ") + getAttrName(Kind)).str()));
+      }
+    }
+  }
+
+  // Diagnose adding attributes.
+  for (auto Kind: RD->getDeclAttributes()) {
+    if (!hasDeclAttribute(Kind)) {
+      if ((Ctx.checkingABI() ? DeclAttribute::isAddingBreakingABI(Kind) :
+                               DeclAttribute::isAddingBreakingAPI(Kind)) &&
+          shouldDiagnoseAddingAttribute(this, Kind)) {
+        emitDiag(diag::decl_new_attr,
+                Ctx.buffer((llvm::Twine("with ") + getAttrName(Kind)).str()));
+      }
     }
   }
 
@@ -1046,7 +1094,7 @@ public:
     ProtocolReqWhitelist(std::move(prWhitelist)) {}
 
   void foundMatch(NodePtr Left, NodePtr Right, NodeMatchReason Reason) override {
-    if (options::Verbose)
+    if (options::DebugMapping)
       debugMatch(Left, Right, Reason, llvm::errs());
     switch (Reason) {
     case NodeMatchReason::Added:
@@ -1100,6 +1148,18 @@ public:
           }
         }
       }
+      if (auto *CD = dyn_cast<SDKNodeDeclConstructor>(Right)) {
+        if (auto *TD = dyn_cast<SDKNodeDeclType>(Right->getParent())) {
+          if (TD->isOpen() && CD->getInitKind() == CtorInitializerKind::Designated) {
+            // If client's subclass provides an implementation of all of its superclass designated
+            // initializers, it automatically inherits all of the superclass convenience initializers.
+            // This means if a new designated init is added to the base class, the inherited
+            // convenience init may be missing and cause breakage.
+            CD->emitDiag(diag::desig_init_added);
+          }
+        }
+      }
+
       return;
     case NodeMatchReason::Removed:
       assert(!Right);
@@ -2512,7 +2572,15 @@ static CheckerOptions getCheckOpts(int argc, char *argv[]) {
   Opts.SwiftOnly = options::SwiftOnly;
   Opts.SkipOSCheck = options::DisableOSChecks;
   for (int i = 1; i < argc; ++i)
-    Opts.ToolArgs.push_back(StringRef(argv[i]));
+    Opts.ToolArgs.push_back(argv[i]);
+
+  if (!options::SDK.empty()) {
+    auto Ver = getSDKVersion(options::SDK);
+    if (!Ver.empty()) {
+      Opts.ToolArgs.push_back("-sdk-version");
+      Opts.ToolArgs.push_back(Ver);
+    }
+  }
   return Opts;
 }
 
@@ -2527,6 +2595,82 @@ static SDKNodeRoot *getSDKRoot(const char *Main, SDKContext &Ctx, bool IsBaselin
 static bool hasBaselineInput() {
   return !options::BaselineModuleInputPaths.empty() ||
     !options::BaselineFrameworkPaths.empty() || !options::BaselineSDK.empty();
+}
+
+enum class ComparisonInputMode: uint8_t {
+  BothJson,
+  BaselineJson,
+  BothLoad,
+};
+
+static ComparisonInputMode checkComparisonInputMode() {
+  if (options::SDKJsonPaths.size() == 2)
+    return ComparisonInputMode::BothJson;
+  else if (hasBaselineInput())
+    return ComparisonInputMode::BothLoad;
+  else
+    return ComparisonInputMode::BaselineJson;
+}
+
+static SDKNodeRoot *getBaselineFromJson(const char *Main, SDKContext &Ctx) {
+  SwiftDeclCollector Collector(Ctx);
+  // If the baseline path has been given, honor that.
+  if (!options::BaselineFilePath.empty()) {
+    Collector.deSerialize(options::BaselineFilePath);
+    return Collector.getSDKRoot();
+  }
+  CompilerInvocation Invok;
+  llvm::StringSet<> Modules;
+  // We need to call prepareForDump to parse target triple.
+  if (prepareForDump(Main, Invok, Modules, true))
+    return nullptr;
+
+  assert(Modules.size() == 1 &&
+         "Cannot find builtin baseline for more than one module");
+  // The path of the swift-api-digester executable.
+  std::string ExePath = llvm::sys::fs::getMainExecutable(Main,
+    reinterpret_cast<void *>(&anchorForGetMainExecutable));
+  llvm::SmallString<128> BaselinePath(ExePath);
+  llvm::sys::path::remove_filename(BaselinePath); // Remove /swift-api-digester
+  llvm::sys::path::remove_filename(BaselinePath); // Remove /bin
+  llvm::sys::path::append(BaselinePath, "lib", "swift", "FrameworkABIBaseline");
+  if (options::UseEmptyBaseline) {
+    // Use the empty baseline for comparison.
+    llvm::sys::path::append(BaselinePath, "nil.json");
+  } else {
+    llvm::sys::path::append(BaselinePath, Modules.begin()->getKey());
+    // Look for ABI or API baseline
+    if (Ctx.checkingABI())
+      llvm::sys::path::append(BaselinePath, "ABI");
+    else
+      llvm::sys::path::append(BaselinePath, "API");
+    // Look for deployment target specific baseline files.
+    auto Triple = Invok.getLangOptions().Target;
+    if (Triple.isMacCatalystEnvironment())
+      llvm::sys::path::append(BaselinePath, "iosmac.json");
+    else if (Triple.isMacOSX())
+      llvm::sys::path::append(BaselinePath, "macos.json");
+    else if (Triple.isiOS())
+      llvm::sys::path::append(BaselinePath, "iphoneos.json");
+    else if (Triple.isTvOS())
+      llvm::sys::path::append(BaselinePath, "appletvos.json");
+    else if (Triple.isWatchOS())
+      llvm::sys::path::append(BaselinePath, "watchos.json");
+    else {
+      llvm::errs() << "Unsupported triple target\n";
+      exit(1);
+    }
+  }
+  StringRef Path = BaselinePath.str();
+  if (!fs::exists(Path)) {
+    llvm::errs() << "Baseline at " << Path << " does not exist\n";
+    exit(1);
+  }
+  if (options::Verbose) {
+    llvm::errs() << "Using baseline at " << Path << "\n";
+  }
+  Collector.deSerialize(Path);
+  return Collector.getSDKRoot();
 }
 
 int main(int argc, char *argv[]) {
@@ -2550,32 +2694,39 @@ int main(int argc, char *argv[]) {
       dumpSDKContent(InitInvok, Modules, options::OutputFile, Opts);
   case ActionType::MigratorGen:
   case ActionType::DiagnoseSDKs: {
-    bool CompareJson = options::SDKJsonPaths.size() == 2;
-    if (!CompareJson && !hasBaselineInput()) {
-      llvm::errs() << "Only two SDK versions can be compared\n";
-      llvm::cl::PrintHelpMessage();
-      return 1;
-    }
+    ComparisonInputMode Mode = checkComparisonInputMode();
     llvm::StringSet<> protocolWhitelist;
     if (!options::ProtReqWhiteList.empty()) {
       if (readFileLineByLine(options::ProtReqWhiteList, protocolWhitelist))
           return 1;
     }
-    if (options::Action == ActionType::MigratorGen)
+    if (options::Action == ActionType::MigratorGen) {
+      assert(Mode == ComparisonInputMode::BothJson && "Only BothJson mode is supported");
       return generateMigrationScript(options::SDKJsonPaths[0],
                                      options::SDKJsonPaths[1],
                                      options::OutputFile, IgnoredUsrs, Opts);
-    else if (CompareJson)
+    }
+    switch(Mode) {
+    case ComparisonInputMode::BothJson: {
       return diagnoseModuleChange(options::SDKJsonPaths[0],
                                   options::SDKJsonPaths[1],
                                   options::OutputFile, Opts,
                                   std::move(protocolWhitelist));
-    else {
+    }
+    case ComparisonInputMode::BaselineJson: {
+      SDKContext Ctx(Opts);
+      return diagnoseModuleChange(Ctx, getBaselineFromJson(argv[0], Ctx),
+                                  getSDKRoot(argv[0], Ctx, false),
+                                  options::OutputFile,
+                                  std::move(protocolWhitelist));
+    }
+    case ComparisonInputMode::BothLoad: {
       SDKContext Ctx(Opts);
       return diagnoseModuleChange(Ctx, getSDKRoot(argv[0], Ctx, true),
                                   getSDKRoot(argv[0], Ctx, false),
                                   options::OutputFile,
                                   std::move(protocolWhitelist));
+    }
     }
   }
   case ActionType::DeserializeSDK:

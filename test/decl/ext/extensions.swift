@@ -103,7 +103,7 @@ protocol P3 {
   func foo() -> Assoc
 }
 
-struct X3 : P3 {
+struct X3 : P3 { // expected-note{{'X3' declared here}}
 }
 
 extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}
@@ -126,7 +126,7 @@ struct WrapperContext {
 }
 
 // Class-constrained extension where protocol does not impose class requirement
-
+// SR-11298
 protocol DoesNotImposeClassReq_1 {}
 	
 class JustAClass: DoesNotImposeClassReq_1 {
@@ -140,8 +140,8 @@ extension DoesNotImposeClassReq_1 where Self: JustAClass {
   }
 }
 	
-let instanceOfJustAClass = JustAClass() // expected-note {{change 'let' to 'var' to make it mutable}}
-instanceOfJustAClass.wrappingProperty = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass' is a 'let' constant}}
+let instanceOfJustAClass = JustAClass()
+instanceOfJustAClass.wrappingProperty = "" // Okay
 
 protocol DoesNotImposeClassReq_2 {
   var property: String { get set }
@@ -150,6 +150,23 @@ protocol DoesNotImposeClassReq_2 {
 extension DoesNotImposeClassReq_2 where Self : AnyObject {
   var wrappingProperty: String {
     get { property }
-    set { property = newValue } // Okay
+    set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
   }
+}
+
+// Reject extension of nominal type via parameterized typealias
+
+struct Nest<Egg> { typealias Contents = Egg }
+struct Tree { 
+  typealias LimbContent = Nest<Int> 
+  typealias BoughPayload = Nest<Nest<Int>>
+}
+
+extension Tree.LimbContent.Contents {
+  // expected-error@-1 {{extension of type 'Tree.LimbContent.Contents' (aka 'Int') must be declared as an extension of 'Int'}}
+  // expected-note@-2 {{did you mean to extend 'Int' instead?}} {{11-36=Int}}
+}
+
+extension Tree.BoughPayload.Contents {
+ // expected-error@-1 {{constrained extension must be declared on the unspecialized generic type 'Nest'}}
 }

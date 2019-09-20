@@ -118,3 +118,47 @@ struct OutterThing<Content : Thing> : Thing {
     }
   }
 }
+
+public protocol W {}
+
+struct Key : W {}
+
+extension W {
+  public static func transform(_ transform: @escaping (P1<Self>) -> ()) -> some W {
+    return Key()
+  }
+}
+
+public struct P1<Key : W> { }
+
+extension P1 {
+  public func transform2<T>(_ transform: @escaping (Key) -> T) { }
+}
+
+public struct T<Content> : W {
+  public init(content : ()->Content) {}
+}
+
+public struct Content<Content> : W {
+  public init(content: Content) {}
+}
+
+extension W {
+  func moo() -> some W {
+    return Content(content: self)
+  }
+}
+
+struct Test<Label : W> {
+  var label: Label
+  // This function used to crash.
+  var dontCrash: some W {
+    return Key.transform { y in
+      y.transform2 { i in
+        T() {
+          return self.label
+        }.moo()
+      }
+    }
+  }
+}

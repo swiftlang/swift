@@ -197,10 +197,11 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // Build a generic signature.
     tc.validateExtension(extension);
 
-    // The extension may not have a generic signature set up yet, as a
-    // recursion breaker, in which case we can't yet confidently reject its
-    // witnesses.
-    if (!extension->getGenericSignature())
+    // FIXME: The extension may not have a generic signature set up yet as
+    // resolving signatures may trigger associated type inference.  This cycle
+    // is now detectable and we should look into untangling it
+    // - see rdar://55263708
+    if (!extension->hasComputedGenericSignature())
       return true;
 
     // The condition here is a bit more fickle than
@@ -531,13 +532,11 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
     if (auto depMemTy = dyn_cast<DependentMemberType>(type)) {
       if (depMemTy->getAssocType() &&
           depMemTy->getAssocType()->getProtocol() != proto) {
-        for (auto member : proto->lookupDirect(depMemTy->getName())) {
-          if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-            auto origProto = depMemTy->getAssocType()->getProtocol();
-            if (proto->inheritsFrom(origProto))
-              return Type(DependentMemberType::get(depMemTy->getBase(),
-                                                   assocType));
-          }
+        if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
+          auto origProto = depMemTy->getAssocType()->getProtocol();
+          if (proto->inheritsFrom(origProto))
+            return Type(DependentMemberType::get(depMemTy->getBase(),
+                                                 assocType));
         }
       }
     }
@@ -1010,14 +1009,12 @@ static void sanitizeProtocolRequirements(
         if (!depMemTy->getAssocType() ||
             depMemTy->getAssocType()->getProtocol() != proto) {
 
-          for (auto member : proto->lookupDirect(depMemTy->getName())) {
-            if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-              Type sanitizedBase = sanitizeType(depMemTy->getBase());
-              if (!sanitizedBase)
-                return Type();
-              return Type(DependentMemberType::get(sanitizedBase,
-                                                   assocType));
-            }
+          if (auto *assocType = proto->getAssociatedType(depMemTy->getName())) {
+            Type sanitizedBase = sanitizeType(depMemTy->getBase());
+            if (!sanitizedBase)
+              return Type();
+            return Type(DependentMemberType::get(sanitizedBase,
+                                                  assocType));
           }
 
           if (depMemTy->getBase()->is<GenericTypeParamType>())
@@ -1069,24 +1066,17 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
                  thisProto->inheritsFrom(conformance->getProtocol())) {
         // Find an associated type with the same name in the given
         // protocol.
-        AssociatedTypeDecl *foundAssocType = nullptr;
-        auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-        flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-        for (auto result : thisProto->lookupDirect(
-                                             assocType->getName(), flags)) {
-          foundAssocType = dyn_cast<AssociatedTypeDecl>(result);
-          if (foundAssocType) break;
-        }
+        auto *foundAssocType = thisProto->getAssociatedType(
+            assocType->getName());
+        if (!foundAssocType) return nullptr;
+        assocType = foundAssocType;
+      } else {
+        return nullptr;
+      }
 
-      if (!foundAssocType) return nullptr;
-      assocType = foundAssocType;
-    } else {
-      return nullptr;
-    }
-
-    Type type = self->typeWitnesses.begin(assocType)->first;
-    return type->mapTypeOutOfContext().getPointer();
-  };
+      Type type = self->typeWitnesses.begin(assocType)->first;
+      return type->mapTypeOutOfContext().getPointer();
+    };
   return options;
 }
 

@@ -145,6 +145,13 @@ void ScopeInfo::addToScope(ValueDecl *D, Parser &TheParser,
                      std::make_pair(CurScope->getDepth(), D));
 }
 
+
+// Disable the "for use only in debugger" warning.
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(push)
+#pragma warning(disable : 4996)
+#endif
+
 void ScopeInfo::dump() const {
 #ifndef NDEBUG
   // Dump out the current list of scopes.
@@ -167,3 +174,7 @@ void ScopeInfo::dump() const {
   llvm::dbgs() << "\n";
 #endif
 }
+
+#if SWIFT_COMPILER_IS_MSVC
+#pragma warning(pop)
+#endif

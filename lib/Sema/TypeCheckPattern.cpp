@@ -705,7 +705,7 @@ static bool validateTypedPattern(TypeChecker &TC,
       hadError = true;
     }
   } else {
-    hadError = TC.validateType(TL, resolution, options);
+    hadError = TypeChecker::validateType(TC.Context, TL, resolution, options);
   }
 
   if (hadError) {
@@ -765,7 +765,7 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
-    hadError |= TC.validateType(TL, resolution, options);
+    hadError |= TypeChecker::validateType(TC.Context, TL, resolution, options);
   }
 
   Type Ty = TL.getType();
@@ -1296,7 +1296,7 @@ recur:
 
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression); 
-    if (validateType(IP->getCastTypeLoc(), resolution, paramOptions))
+    if (validateType(Context, IP->getCastTypeLoc(), resolution, paramOptions))
       return true;
 
     auto castType = IP->getCastTypeLoc().getType();
@@ -1497,7 +1497,7 @@ recur:
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    validateDeclForNameLookup(elt);
+    validateDecl(elt);
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {

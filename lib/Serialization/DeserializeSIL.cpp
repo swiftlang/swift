@@ -13,7 +13,9 @@
 #define DEBUG_TYPE "deserialize"
 #include "DeserializeSIL.h"
 
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
+#include "ModuleFile.h"
 #include "SILFormat.h"
 
 #include "SILSerializationFunctionBuilder.h"
@@ -27,8 +29,6 @@
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/Serialization/BCReadingExtras.h"
-#include "swift/Serialization/ModuleFile.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringExtras.h"
@@ -465,18 +465,20 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
   DeclID clangNodeOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  GenericSignatureID genericEnvID;
+  GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, isExactSelfClass;
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, isExactSelfClass,
-      funcTyID, replacedFunctionID, genericEnvID,
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericSigID,
       clangNodeOwnerID, SemanticsIDs);
 
   if (funcTyID == 0) {
@@ -580,7 +582,15 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
-    fn->setWeakLinked(isWeakLinked);
+    fn->setAlwaysWeakImported(isWeakImported);
+
+    llvm::VersionTuple available;
+    DECODE_VER_TUPLE(available);
+    fn->setAvailabilityForLinkage(
+      available.empty()
+      ? AvailabilityContext::alwaysAvailable()
+      : AvailabilityContext(VersionRange::allGTE(available)));
+
     fn->setIsDynamic(IsDynamicallyReplaceable_t(isDynamic));
     fn->setIsExactSelfClass(IsExactSelfClass_t(isExactSelfClass));
     if (replacedFunction)
@@ -643,7 +653,8 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    genericEnv = MF->getGenericEnvironment(genericEnvID);
+    if (auto *genericSig = MF->getGenericSignature(genericSigID))
+      genericEnv = genericSig->getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
   // no contents.
@@ -2534,18 +2545,20 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   DeclID clangOwnerID;
   TypeID funcTyID;
   IdentifierID replacedFunctionID;
-  GenericSignatureID genericEnvID;
+  GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, isExactSelfClass;
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, isExactSelfClass;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, isSerialized, isThunk,
       isWithoutactuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, effect, numSpecAttrs, hasQualifiedOwnership,
-      isWeakLinked, isDynamic, isExactSelfClass,
-      funcTyID, replacedFunctionID, genericEnvID,
+      isWeakImported, LIST_VER_TUPLE_PIECES(available),
+      isDynamic, isExactSelfClass,
+      funcTyID, replacedFunctionID, genericSigID,
       clangOwnerID, SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);
   if (!linkage) {

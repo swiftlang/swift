@@ -25,13 +25,14 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Frontend/FrontendOptions.h"
-#include "swift/Frontend/ParseableInterfaceSupport.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
@@ -55,6 +56,10 @@ class SerializedModuleLoader;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
 
+namespace Lowering {
+class TypeConverter;
+}
+
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
 ///   - information about the build environment,
@@ -74,7 +79,7 @@ class CompilerInvocation {
   SILOptions SILOpts;
   IRGenOptions IRGenOpts;
   TBDGenOptions TBDGenOpts;
-  ParseableInterfaceOptions ParseableInterfaceOpts;
+  ModuleInterfaceOptions ModuleInterfaceOpts;
   /// The \c SyntaxParsingCache to use when parsing the main file of this
   /// invocation
   SyntaxParsingCache *MainFileSyntaxParsingCache = nullptr;
@@ -204,8 +209,8 @@ public:
   TBDGenOptions &getTBDGenOptions() { return TBDGenOpts; }
   const TBDGenOptions &getTBDGenOptions() const { return TBDGenOpts; }
 
-  ParseableInterfaceOptions &getParseableInterfaceOptions() { return ParseableInterfaceOpts; }
-  const ParseableInterfaceOptions &getParseableInterfaceOptions() const { return ParseableInterfaceOpts; }
+  ModuleInterfaceOptions &getModuleInterfaceOptions() { return ModuleInterfaceOpts; }
+  const ModuleInterfaceOptions &getModuleInterfaceOptions() const { return ModuleInterfaceOpts; }
 
   ClangImporterOptions &getClangImporterOptions() { return ClangImporterOpts; }
   const ClangImporterOptions &getClangImporterOptions() const {
@@ -349,10 +354,10 @@ public:
   /// if not in that mode.
   std::string getTBDPathForWholeModule() const;
 
-  /// ParseableInterfaceOutputPath only makes sense in whole module compilation
-  /// mode, so return the ParseableInterfaceOutputPath when in that mode and
+  /// ModuleInterfaceOutputPath only makes sense in whole module compilation
+  /// mode, so return the ModuleInterfaceOutputPath when in that mode and
   /// fail an assert if not in that mode.
-  std::string getParseableInterfaceOutputPathForWholeModule() const;
+  std::string getModuleInterfaceOutputPathForWholeModule() const;
 
   SerializationOptions
   computeSerializationOptions(const SupplementaryOutputPaths &outs,
@@ -372,6 +377,7 @@ class CompilerInstance {
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
   std::unique_ptr<ASTContext> Context;
+  std::unique_ptr<Lowering::TypeConverter> TheSILTypes;
   std::unique_ptr<SILModule> TheSILModule;
 
   std::unique_ptr<PersistentParserState> PersistentState;
@@ -422,8 +428,6 @@ class CompilerInstance {
 
   bool isWholeModuleCompilation() { return PrimaryBufferIDs.empty(); }
 
-  void createSILModule();
-
 public:
   // Out of line to avoid having to import SILModule.h.
   CompilerInstance();
@@ -447,6 +451,10 @@ public:
 
   SILOptions &getSILOptions() { return Invocation.getSILOptions(); }
   const SILOptions &getSILOptions() const { return Invocation.getSILOptions(); }
+
+  Lowering::TypeConverter &getSILTypes();
+
+  void createSILModule();
 
   void addDiagnosticConsumer(DiagnosticConsumer *DC) {
     Diagnostics.addConsumer(*DC);
@@ -616,7 +624,6 @@ public: // for static functions in Frontend.cpp
 
 private:
   void createREPLFile(const ImplicitImports &implicitImports);
-  std::unique_ptr<DelayedParsingCallbacks> computeDelayedParsingCallback();
 
   void addMainFileToModule(const ImplicitImports &implicitImports);
 
@@ -625,20 +632,17 @@ private:
                               SourceFile::ASTStage_t LimitStage);
 
   void parseLibraryFile(unsigned BufferID,
-                        const ImplicitImports &implicitImports,
-                        DelayedParsingCallbacks *DelayedCB);
+                        const ImplicitImports &implicitImports);
 
   /// Return true if had load error
   bool
-  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports,
-                                     DelayedParsingCallbacks *DelayedCB);
+  parsePartialModulesAndLibraryFiles(const ImplicitImports &implicitImports);
 
   OptionSet<TypeCheckingFlags> computeTypeCheckingOptions();
 
   void forEachFileToTypeCheck(llvm::function_ref<void(SourceFile &)> fn);
 
   void parseAndTypeCheckMainFileUpTo(SourceFile::ASTStage_t LimitStage,
-                                     DelayedParsingCallbacks *DelayedParseCB,
                                      OptionSet<TypeCheckingFlags> TypeCheckOptions);
 
   void finishTypeChecking(OptionSet<TypeCheckingFlags> TypeCheckOptions);

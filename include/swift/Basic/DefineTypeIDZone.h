@@ -33,7 +33,7 @@
 
 // Define a TypeID where the type name and internal name are the same.
 #define SWIFT_TYPEID(Type) SWIFT_TYPEID_NAMED(Type, Type)
-#define SWIFT_REQUEST(Zone, Type) SWIFT_TYPEID_NAMED(Type, Type)
+#define SWIFT_REQUEST(Zone, Type, Sig, Caching, LocOptions) SWIFT_TYPEID_NAMED(Type, Type)
 
 // First pass: put all of the names into an enum so we get values for them.
 template<> struct TypeIDZoneTypes<Zone::SWIFT_TYPEID_ZONE> {

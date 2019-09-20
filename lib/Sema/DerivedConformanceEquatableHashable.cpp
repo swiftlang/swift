@@ -557,8 +557,7 @@ deriveEquatable_eq(
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
   // Compute the interface type.
-  if (auto genericEnv = parentDC->getGenericEnvironmentOfContext())
-    eqDecl->setGenericEnvironment(genericEnv);
+  eqDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   eqDecl->computeType();
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
@@ -684,8 +683,7 @@ deriveHashable_hashInto(
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    hashDecl->setGenericEnvironment(env);
+  hashDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
   hashDecl->setValidationToChecked();
@@ -1039,8 +1037,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of hashValue().
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
+  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
   getterDecl->setValidationToChecked();

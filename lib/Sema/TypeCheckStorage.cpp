@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 using namespace swift;
@@ -268,8 +269,9 @@ void swift::validatePatternBindingEntries(TypeChecker &tc,
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -297,7 +299,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -323,8 +325,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
@@ -1818,6 +1821,7 @@ SynthesizeAccessorRequest::evaluate(Evaluator &evaluator,
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("not an opaque accessor");
   }
+  llvm_unreachable("Unhandled AccessorKind in switch");
 }
 
 llvm::Expected<bool>
@@ -2214,27 +2218,43 @@ getSetterMutatingness(VarDecl *var, DeclContext *dc) {
 llvm::Expected<Optional<PropertyWrapperMutability>>
 PropertyWrapperMutabilityRequest::evaluate(Evaluator &,
                                            VarDecl *var) const {
-  unsigned numWrappers = var->getAttachedPropertyWrappers().size();
-  if (numWrappers < 1)
-    return None;
+  VarDecl *originalVar = var;
+  unsigned numWrappers = originalVar->getAttachedPropertyWrappers().size();
+  bool isProjectedValue = false;
+  if (numWrappers < 1) {
+    originalVar = var->getOriginalWrappedProperty(
+        PropertyWrapperSynthesizedPropertyKind::StorageWrapper);
+    if (!originalVar)
+      return None;
+
+    numWrappers = originalVar->getAttachedPropertyWrappers().size();
+    isProjectedValue = true;
+  }
+
   if (var->getParsedAccessor(AccessorKind::Get))
     return None;
   if (var->getParsedAccessor(AccessorKind::Set))
     return None;
 
+  // Figure out which member we're looking through.
+  auto varMember = isProjectedValue
+    ? &PropertyWrapperTypeInfo::projectedValueVar
+    : &PropertyWrapperTypeInfo::valueVar;
+
   // Start with the traits from the outermost wrapper.
-  auto firstWrapper = var->getAttachedPropertyWrapperTypeInfo(0);
-  if (!firstWrapper.valueVar)
+  auto firstWrapper = originalVar->getAttachedPropertyWrapperTypeInfo(0);
+  if (firstWrapper.*varMember == nullptr)
     return None;
   
   PropertyWrapperMutability result;
   
-  result.Getter = getGetterMutatingness(firstWrapper.valueVar);
-  result.Setter = getSetterMutatingness(firstWrapper.valueVar,
+  result.Getter = getGetterMutatingness(firstWrapper.*varMember);
+  result.Setter = getSetterMutatingness(firstWrapper.*varMember,
                                         var->getInnermostDeclContext());
   
   // Compose the traits of the following wrappers.
-  for (unsigned i = 1; i < numWrappers; ++i) {
+  for (unsigned i = 1; i < numWrappers && !isProjectedValue; ++i) {
+    assert(var == originalVar);
     auto wrapper = var->getAttachedPropertyWrapperTypeInfo(i);
     if (!wrapper.valueVar)
       return None;
@@ -2332,8 +2352,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
-      ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, SourceLoc());
+      ctx, var->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/ nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 

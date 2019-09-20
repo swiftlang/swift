@@ -15,8 +15,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(IDE, CollectOverriddenDeclsRequest)
-SWIFT_REQUEST(IDE, CursorInfoRequest)
-SWIFT_REQUEST(IDE, ProvideDefaultImplForRequest)
-SWIFT_REQUEST(IDE, RangeInfoRequest)
-SWIFT_REQUEST(IDE, ResolveProtocolNameRequest)
+SWIFT_REQUEST(IDE, CollectOverriddenDeclsRequest,
+              ArrayRef<ValueDecl *>(OverridenDeclsOwner), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(IDE, CursorInfoRequest, ide::ResolvedCursorInfo(CursorInfoOwner),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(IDE, ProvideDefaultImplForRequest,
+              ArrayRef<ValueDecl *>(ValueDecl *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(IDE, RangeInfoRequest, ide::ResolvedRangeInfo(RangeInfoOwner),
+              Cached, NoLocationInfo)
+SWIFT_REQUEST(IDE, ResolveProtocolNameRequest,
+              ProtocolDecl *(ProtocolNameOwner), Cached,
+              NoLocationInfo)

@@ -279,28 +279,6 @@ parse_operator:
       auto *assign = new (Context) AssignExpr(equalsLoc);
       SequencedExprs.push_back(assign);
       Message = diag::expected_expr_assignment;
-      if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion) {
-          auto RHS = new (Context) ErrorExpr(
-            SourceRange(Tok.getRange().getStart(), Tok.getRange().getEnd()));
-          assign->setSrc(RHS);
-          SequencedExprs.pop_back();
-          assign->setDest(SequencedExprs.back());
-          SequencedExprs.pop_back();
-          SequencedExprs.push_back(assign);
-          CodeCompletion->completeAssignmentRHS(assign);
-        }
-        consumeToken();
-        if (!SequencedExprs.empty() && (SequencedExprs.size() & 1) == 0) {
-          // Make sure we have odd number of sequence exprs.
-          SequencedExprs.pop_back();
-        }
-        auto Result = SequencedExprs.size() == 1 ?
-          makeParserResult(SequencedExprs[0]):
-          makeParserResult(SequenceExpr::create(Context, SequencedExprs));
-        Result.setHasCodeCompletion();
-        return Result;
-      }
       break;
     }
         
@@ -1312,25 +1290,25 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 template <>
 ParsedExprSyntax Parser::parseExprSyntax<IntegerLiteralExprSyntax>() {
   auto Token = consumeTokenSyntax(tok::integer_literal);
-  return ParsedSyntaxRecorder::makeIntegerLiteralExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makeIntegerLiteralExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
 ParsedExprSyntax Parser::parseExprSyntax<FloatLiteralExprSyntax>() {
   auto Token = consumeTokenSyntax(tok::floating_literal);
-  return ParsedSyntaxRecorder::makeFloatLiteralExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makeFloatLiteralExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
 ParsedExprSyntax Parser::parseExprSyntax<NilLiteralExprSyntax>() {
   auto Token = consumeTokenSyntax(tok::kw_nil);
-  return ParsedSyntaxRecorder::makeNilLiteralExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makeNilLiteralExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
 ParsedExprSyntax Parser::parseExprSyntax<BooleanLiteralExprSyntax>() {
   auto Token = consumeTokenSyntax();
-  return ParsedSyntaxRecorder::makeBooleanLiteralExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makeBooleanLiteralExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
@@ -1341,11 +1319,11 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundFileExprSyntax>() {
         .fixItReplace(Tok.getLoc(), fixit);
 
     auto Token = consumeTokenSyntax(tok::kw___FILE__);
-    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+    return ParsedSyntaxRecorder::makeUnknownExpr({&Token, 1}, *SyntaxContext);
   }
 
   auto Token = consumeTokenSyntax(tok::pound_file);
-  return ParsedSyntaxRecorder::makePoundFileExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makePoundFileExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
@@ -1356,12 +1334,12 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundLineExprSyntax>() {
         .fixItReplace(Tok.getLoc(), fixit);
 
     auto Token = consumeTokenSyntax(tok::kw___LINE__);
-    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+    return ParsedSyntaxRecorder::makeUnknownExpr({&Token, 1}, *SyntaxContext);
   }
 
   // FIXME: #line was renamed to #sourceLocation
   auto Token = consumeTokenSyntax(tok::pound_line);
-  return ParsedSyntaxRecorder::makePoundLineExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makePoundLineExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
@@ -1372,11 +1350,11 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundColumnExprSyntax>() {
         .fixItReplace(Tok.getLoc(), fixit);
 
     auto Token = consumeTokenSyntax(tok::kw___COLUMN__);
-    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+    return ParsedSyntaxRecorder::makeUnknownExpr({&Token, 1}, *SyntaxContext);
   }
 
   auto Token = consumeTokenSyntax(tok::pound_column);
-  return ParsedSyntaxRecorder::makePoundColumnExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makePoundColumnExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
@@ -1387,11 +1365,11 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundFunctionExprSyntax>() {
         .fixItReplace(Tok.getLoc(), fixit);
 
     auto Token = consumeTokenSyntax(tok::kw___FUNCTION__);
-    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+    return ParsedSyntaxRecorder::makeUnknownExpr({&Token, 1}, *SyntaxContext);
   }
 
   auto Token = consumeTokenSyntax(tok::pound_function);
-  return ParsedSyntaxRecorder::makePoundFunctionExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makePoundFunctionExpr(std::move(Token), *SyntaxContext);
 }
 
 template <>
@@ -1402,18 +1380,18 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundDsohandleExprSyntax>() {
         .fixItReplace(Tok.getLoc(), fixit);
 
     auto Token = consumeTokenSyntax(tok::kw___DSO_HANDLE__);
-    return ParsedSyntaxRecorder::makeUnknownExpr({Token}, *SyntaxContext);
+    return ParsedSyntaxRecorder::makeUnknownExpr({&Token, 1}, *SyntaxContext);
   }
 
   auto Token = consumeTokenSyntax(tok::pound_dsohandle);
-  return ParsedSyntaxRecorder::makePoundDsohandleExpr(Token, *SyntaxContext);
+  return ParsedSyntaxRecorder::makePoundDsohandleExpr(std::move(Token), *SyntaxContext);
 }
 
 template <typename SyntaxNode>
 ParserResult<Expr> Parser::parseExprAST() {
   auto Loc = leadingTriviaLoc();
   auto ParsedExpr = parseExprSyntax<SyntaxNode>();
-  SyntaxContext->addSyntax(ParsedExpr);
+  SyntaxContext->addSyntax(std::move(ParsedExpr));
   // todo [gsoc]: improve this somehow
   if (SyntaxContext->isTopNode<UnknownExprSyntax>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
@@ -1519,9 +1497,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
           ParsedSyntaxRecorder::makeIdentifierPattern(
                                   SyntaxContext->popToken(), *SyntaxContext);
       ParsedExprSyntax ExprNode =
-          ParsedSyntaxRecorder::deferUnresolvedPatternExpr(PatternNode,
+          ParsedSyntaxRecorder::deferUnresolvedPatternExpr(std::move(PatternNode),
                                                            *SyntaxContext);
-      SyntaxContext->addSyntax(ExprNode);
+      SyntaxContext->addSyntax(std::move(ExprNode));
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
 
@@ -1916,7 +1894,6 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
 
   // The start location of the entire string literal.
   SourceLoc Loc = Tok.getLoc();
-  SourceLoc EndLoc = Loc.getAdvancedLoc(Tok.getLength());
 
   StringRef OpenDelimiterStr, OpenQuoteStr, CloseQuoteStr, CloseDelimiterStr;
   unsigned DelimiterLength = Tok.getCustomDelimiterLen();
@@ -2036,8 +2013,8 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
                                  Stmts, LiteralCapacity, InterpolationCount);
 
-    auto Body = BraceStmt::create(Context, Loc, Stmts, EndLoc,
-                                  /*implicit=*/false);
+    auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
+                                  /*implicit=*/true);
     AppendingExpr = new (Context) TapExpr(nullptr, Body);
   }
 

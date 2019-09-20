@@ -18,6 +18,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
@@ -242,6 +243,7 @@ class ModelASTWalker : public ASTWalker {
   const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
+  ASTContext &Ctx;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
   static const std::regex &getURLRegex(StringRef Protocol);
@@ -262,6 +264,7 @@ public:
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
         BufferID(File.getBufferID().getValue()),
+        Ctx(File.getASTContext()),
         Walker(Walker) { }
 
   // FIXME: Remove this
@@ -521,13 +524,14 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
+    auto *ParentE = Parent.getAsExpr();
     if (isCurrentCallArgExpr(Tup)) {
       for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
         SourceLoc NameLoc = Tup->getElementNameLoc(I);
         if (NameLoc.isValid())
           passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
       }
-    } else {
+    } else if (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE)) {
       SyntaxStructureNode SN;
       SN.Kind = SyntaxStructureKind::TupleExpression;
       SN.Range = charSourceRangeFromSourceRange(SM, Tup->getSourceRange());
@@ -562,6 +566,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       subExpr->walk(*this);
     }
     return { false, walkToExprPost(SE) };
+  } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+    // Don't visit the child expressions directly. Instead visit the arguments
+    // of each appendStringLiteral/appendInterpolation CallExpr so we don't
+    // try to output structure nodes for those calls.
+    llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
+    ISL->forEachSegment(Ctx, [&](bool isInterpolation, CallExpr *CE) {
+      if (isInterpolation) {
+        if (auto *Arg = CE->getArg())
+          Arg->walk(*this);
+      }
+    });
+    return { false, walkToExprPost(E) };
   }
 
   return { true, E };
@@ -1166,7 +1182,8 @@ bool ModelASTWalker::shouldPassBraceStructureNode(BraceStmt *S) {
   return (!dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<TopLevelCodeDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<CaseStmt>(Parent.getAsStmt()) &&
-          S->getSourceRange().isValid());
+          S->getSourceRange().isValid() &&
+          !S->isImplicit());
 }
 
 ModelASTWalker::PassUntilResult

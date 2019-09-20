@@ -1,6 +1,5 @@
 // RUN: %target-swift-frontend -enable-experimental-static-assert -emit-sil %s -verify
-
-// REQUIRES: optimized_stdlib
+// RUN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
@@ -38,7 +37,6 @@ func loops1(a: Int) -> Int {
 
 func loops2(a: Int) -> Int {
   var x = 42
-  // expected-note @+1 {{operation not supported by the evaluator}}
   for i in 0 ... a {
     x += i
   }
@@ -65,18 +63,6 @@ func test_loops() {
   // expected-error @+2 {{#assert condition not constant}}
   // expected-note @+1 {{control-flow loop found during evaluation}}
   #assert(infiniteLoop() == 1)
-}
-
-// NOTE: We currently hit the limit of 512 on a debug_value in the prelude of
-// this function. TODO: What is the right thing to do here?
-func recursive(a: Int) -> Int {  // expected-note {{limit exceeded here}}
-  return a == 0 ? 0 : recursive(a: a-1)
-}
-
-func test_recursive() {
-  // expected-error @+2 {{#assert condition not constant}}
-  // expected-note @+1 {{exceeded instruction limit: 512 when evaluating the expression at compile time}}
-  #assert(recursive(a: 20000) > 42)
 }
 
 func conditional(_ x: Int) -> Int {

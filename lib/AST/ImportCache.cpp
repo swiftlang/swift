@@ -17,6 +17,8 @@
 
 #include "llvm/ADT/DenseSet.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
 

@@ -39,6 +39,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Parse/Lexer.h"
@@ -485,8 +486,7 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC,
-                               TypeChecker &tc) {
+                               DeclContext *owningDC, TypeChecker &tc) {
   if (!genericParams)
     return;
 
@@ -496,12 +496,9 @@ static void checkGenericParams(GenericParamList *genericParams,
   }
 
   // Force visitation of each of the requirements here.
-  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
-                                                         genericParams),
-                                        TypeResolutionStage::Interface,
-                                        [](Requirement, RequirementRepr *) {
-                                          return false;
-                                        });
+  WhereClauseOwner(owningDC, genericParams)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -620,10 +617,11 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->setDepth(i);
   }
 
-  return checkGenericEnvironment(nestedList.back(), DC,
-                                 /*parentSig=*/nullptr,
-                                 /*allowConcreteGenericParams=*/true,
-                                 /*ext=*/nullptr);
+  auto *sig = TypeChecker::checkGenericSignature(
+             nestedList.back(), DC,
+             /*parentSig=*/nullptr,
+             /*allowConcreteGenericParams=*/true);
+  return (sig ? sig->getGenericEnvironment() : nullptr);
 }
 
 /// Check whether \c current is a redeclaration.
@@ -665,7 +663,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     }
   } else {
     // Look within a module context.
-    currentFile->getParentModule()->lookupValue({ }, current->getBaseName(),
+    currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
     if (tracker)
@@ -1325,7 +1323,6 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add all of the generic parameters.
-  proto->createGenericParamsIfMissing();
   for (auto gp : *proto->getGenericParams())
     builder.addGenericParameter(gp);
 
@@ -1840,7 +1837,8 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (tc.validateType(typeLoc, TypeResolution::forInterface(DC), options))
+  if (TypeChecker::validateType(tc.Context, typeLoc,
+                                TypeResolution::forInterface(DC), options))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -1956,17 +1954,10 @@ void TypeChecker::validateDecl(OperatorDecl *OD) {
   }
 }
 
-bool swift::doesContextHaveValueSemantics(DeclContext *dc) {
-  if (Type contextTy = dc->getDeclaredInterfaceType())
-    return !contextTy->hasReferenceSemantics();
-  return false;
-}
-
 llvm::Expected<SelfAccessKind>
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
-    if (!FD->isInstanceMember() ||
-        !doesContextHaveValueSemantics(FD->getDeclContext())) {
+    if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
       return SelfAccessKind::NonMutating;
     }
     return SelfAccessKind::Mutating;
@@ -1988,8 +1979,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-      if (AD->isInstanceMember() &&
-          doesContextHaveValueSemantics(AD->getDeclContext()))
+      if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
 
@@ -2011,7 +2001,8 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
                                           TypeDecl *source) {
-  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+  WhereClauseOwner(source).visitRequirements(
+      TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::Conformance:
@@ -2334,7 +2325,7 @@ public:
         // Static/class declarations require an initializer unless in a
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
-          // ...but don't enforce this for SIL or parseable interface files.
+          // ...but don't enforce this for SIL or module interface files.
           switch (DC->getParentSourceFile()->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
@@ -2418,6 +2409,8 @@ public:
   void visitSubscriptDecl(SubscriptDecl *SD) {
     TC.validateDecl(SD);
 
+    // Force creation of the generic signature.
+    (void)SD->getGenericSignature();
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
       checkGenericParams(SD->getGenericParams(), SD, TC);
@@ -2468,12 +2461,21 @@ public:
     TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
 
+    // Force the generic signature to be computed in case it emits diagnostics.
+    (void)TAD->getGenericSignature();
+    // Force computing the underlying type in case it emits diagnostics.
+    (void)TAD->getUnderlyingType();
+
     checkAccessControl(TC, TAD);
+
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     TC.validateDecl(OTD);
     TC.checkDeclAttributes(OTD);
+    
+    // Force the generic signature to be computed in case it emits diagnostics.
+    (void)OTD->getGenericSignature();
     
     checkAccessControl(TC, OTD);
   }
@@ -2528,6 +2530,7 @@ public:
       TC.diagnose(NTD->getLoc(),
                   diag::unsupported_nested_protocol,
                   NTD->getName());
+      NTD->setInvalid();
       return;
     }
 
@@ -2723,6 +2726,8 @@ public:
     checkUnsupportedNestedType(CD);
 
     TC.validateDecl(CD);
+    // Force creation of the generic signature.
+    (void)CD->getGenericSignature();
     checkGenericParams(CD->getGenericParams(), CD, TC);
 
     {
@@ -2756,6 +2761,9 @@ public:
     // we're doing here.
     CD->walkSuperclasses(
       [&](ClassDecl *superclass) {
+        if (!superclass->getParentSourceFile())
+          return TypeWalker::Action::Stop;
+
         for (auto *member : superclass->getMembers()) {
           if (auto *vd = dyn_cast<ValueDecl>(member)) {
             if (vd->isPotentiallyOverridable()) {
@@ -2968,7 +2976,7 @@ public:
         return false;
     }
 
-    // Declarations in SIL and parseable interface files don't require
+    // Declarations in SIL and module interface files don't require
     // definitions.
     if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
       switch (sourceFile->Kind) {
@@ -3049,29 +3057,88 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    // Produce any diagnostics for the extended type.
+    auto extType = ED->getExtendedType();
+
+    auto nominal = ED->getExtendedNominal();
+    if (nominal == nullptr) {
+      const bool wasAlreadyInvalid = ED->isInvalid();
+      ED->setInvalid();
+      if (extType && !extType->hasError() && extType->getAnyNominal()) {
+        // If we've got here, then we have some kind of extension of a prima
+        // fascie non-nominal type.  This can come up when we're projecting
+        // typealiases out of bound generic types.
+        //
+        // struct Array<T> { typealias Indices = Range<Int> }
+        // extension Array.Indices.Bound {}
+        //
+        // Offer to rewrite it to the underlying nominal type.
+        auto canExtType = extType->getCanonicalType();
+        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+          .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_nominal_extension_rewrite, canExtType)
+          .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                        canExtType->getString());
+      } else if (!wasAlreadyInvalid) {
+        // If nothing else applies, fall back to a generic diagnostic.
+        ED->diagnose(diag::non_nominal_extension, extType);
+      }
+      return;
+    }
+
     TC.validateExtension(ED);
+
+    extType = ED->getExtendedType();
+    if (extType && !extType->hasError()) {
+      // The first condition catches syntactic forms like
+      //     protocol A & B { ... } // may be protocols or typealiases
+      // The second condition also looks through typealiases and catches
+      //    typealias T = P1 & P2 // P2 is a refined protocol of P1
+      //    extension T { ... }
+      // However, it is trickier to catch cases like
+      //    typealias T = P2 & P1 // P2 is a refined protocol of P1
+      //    extension T { ... }
+      // so we don't do that here.
+      auto extTypeRepr = ED->getExtendedTypeRepr();
+      auto *extTypeNominal = extType->getAnyNominal();
+      bool firstNominalIsNotMostSpecific =
+        extTypeNominal && extTypeNominal != nominal;
+      if (isa<CompositionTypeRepr>(extTypeRepr)
+          || firstNominalIsNotMostSpecific) {
+        auto firstNominalType = nominal->getDeclaredType();
+        auto diag = ED->diagnose(diag::composition_in_extended_type,
+                                 firstNominalType);
+        diag.highlight(extTypeRepr->getSourceRange());
+        if (firstNominalIsNotMostSpecific) {
+          diag.flush();
+          Type mostSpecificProtocol = extTypeNominal->getDeclaredType();
+          ED->diagnose(diag::composition_in_extended_type_alternative,
+                       mostSpecificProtocol)
+            .fixItReplace(extTypeRepr->getSourceRange(),
+                          mostSpecificProtocol->getString());
+        } else {
+          diag.fixItReplace(extTypeRepr->getSourceRange(),
+                            firstNominalType->getString());
+        }
+      }
+    }
 
     checkInheritanceClause(ED);
 
-    if (auto nominal = ED->getExtendedNominal()) {
-      TC.validateDecl(nominal);
+    // Check the raw values of an enum, since we might synthesize
+    // RawRepresentable while checking conformances on this extension.
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      if (enumDecl->hasRawType())
+        checkEnumRawValues(TC, enumDecl);
+    }
 
-      // Check the raw values of an enum, since we might synthesize
-      // RawRepresentable while checking conformances on this extension.
-      if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-        if (enumDecl->hasRawType())
-          checkEnumRawValues(TC, enumDecl);
-      }
-
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-        if (!ED->getGenericParams() &&
-            !ED->isInvalid()) {
-          ED->diagnose(diag::extension_nongeneric_trailing_where,
-                       nominal->getFullName())
+    // Only generic and protocol types are permitted to have
+    // trailing where clauses.
+    if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
+      if (!ED->getGenericParams() && !ED->isInvalid()) {
+        ED->diagnose(diag::extension_nongeneric_trailing_where,
+                     nominal->getFullName())
           .highlight(trailingWhereClause->getSourceRange());
-        }
       }
     }
 
@@ -3398,35 +3465,35 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the underlying type of the given typealias.
-static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
-  TypeResolutionOptions options(
-    (typeAlias->getGenericParams() ?
-     TypeResolverContext::GenericTypeAliasDecl :
-     TypeResolverContext::TypeAliasDecl));
+llvm::Expected<Type>
+UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
+                                TypeAliasDecl *typeAlias) const {
+  TypeResolutionOptions options((typeAlias->getGenericParams()
+                                     ? TypeResolverContext::GenericTypeAliasDecl
+                                     : TypeResolverContext::TypeAliasDecl));
 
   if (!typeAlias->getDeclContext()->isCascadingContextForLookup(
-        /*functionsAreNonCascading*/true)) {
-     options |= TypeResolutionFlags::KnownNonCascadingDependency;
+          /*functionsAreNonCascading*/ true)) {
+    options |= TypeResolutionFlags::KnownNonCascadingDependency;
   }
 
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
-  auto underlyingType = typeAlias->getUnderlyingTypeLoc();
-  if (underlyingType.isNull()) {
-    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
-    typeAlias->setInterfaceType(ErrorType::get(tc.Context));
-    return;
-  }
-
-  if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                    TypeResolution::forInterface(typeAlias, &tc), options)) {
+  auto *underlyingRepr = typeAlias->getUnderlyingTypeRepr();
+  if (!underlyingRepr) {
     typeAlias->setInvalid();
-    typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
+    return ErrorType::get(typeAlias->getASTContext());
   }
 
-  typeAlias->setUnderlyingType(typeAlias->getUnderlyingTypeLoc().getType());
+  auto underlyingLoc = TypeLoc(typeAlias->getUnderlyingTypeRepr());
+  if (TypeChecker::validateType(typeAlias->getASTContext(), underlyingLoc,
+                                TypeResolution::forInterface(typeAlias),
+                                options)) {
+    typeAlias->setInvalid();
+    return ErrorType::get(typeAlias->getASTContext());
+  }
+  return underlyingLoc.getType();
 }
-
 
 /// Bind the given function declaration, which declares an operator, to the corresponding operator declaration.
 llvm::Expected<OperatorDecl *>
@@ -3632,6 +3699,27 @@ static Type buildAddressorResultType(TypeChecker &TC,
   return pointerType;
 }
 
+
+static void validateResultType(TypeChecker &TC,
+                               ValueDecl *decl, ParameterList *params,
+                               TypeLoc &resultTyLoc,
+                               TypeResolution resolution) {
+  // Nothing to do if there's no result type loc to set into.
+  if (resultTyLoc.isNull())
+    return;
+
+  // Check the result type. It is allowed to be opaque.
+  if (auto opaqueTy =
+          dyn_cast_or_null<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())) {
+    // Create the decl and type for it.
+    resultTyLoc.setType(
+        TC.getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
+  } else {
+    TypeChecker::validateType(TC.Context, resultTyLoc, resolution,
+                              TypeResolverContext::FunctionResult);
+  }
+}
+
 void TypeChecker::validateDecl(ValueDecl *D) {
   // Generic parameters are validated as part of their context.
   if (isa<GenericTypeParamDecl>(D))
@@ -3719,18 +3807,19 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
-    // Check generic parameters, if needed.
+
     DeclValidationRAII IBV(typeAlias);
 
-    validateGenericTypeSignature(typeAlias);
-    validateTypealiasType(*this, typeAlias);
+    // Finally, set the interface type.
+    if (!typeAlias->hasInterfaceType())
+      typeAlias->computeType();
+    
     break;
   }
       
   case DeclKind::OpaqueType: {
     auto opaque = cast<OpaqueTypeDecl>(D);
     DeclValidationRAII IBV(opaque);
-    validateGenericTypeSignature(opaque);
     break;
   }
 
@@ -3742,7 +3831,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Check generic parameters, if needed.
     DeclValidationRAII IBV(nominal);
-    validateGenericTypeSignature(nominal);
+    (void)nominal->getGenericSignature();
     nominal->setSignatureIsValidated();
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
@@ -3762,35 +3851,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     // Validate the generic type signature, which is just <Self : P>.
     DeclValidationRAII IBV(proto);
-    validateGenericTypeSignature(proto);
+    (void)proto->getGenericSignature();
     proto->setSignatureIsValidated();
-
-    // See the comment in validateDeclForNameLookup(); we may have validated
-    // the alias before we built the protocol's generic environment.
-    //
-    // FIXME: Hopefully this can all go away with the ITC.
-    for (auto member : proto->getMembers()) {
-      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
-        if (!aliasDecl->isGeneric()) {
-          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
-
-          // The generic environment didn't exist until now, we may have
-          // unresolved types we will need to deal with, and need to record the
-          // appropriate substitutions for that environment. Wipe out the types
-          // and validate them again.
-          aliasDecl->getUnderlyingTypeLoc().setType(Type());
-          aliasDecl->setInterfaceType(Type());
-
-          // Check generic parameters, if needed.
-          if (aliasDecl->hasValidationStarted()) {
-            validateTypealiasType(*this, aliasDecl);
-          } else {
-            DeclValidationRAII IBV(aliasDecl);
-            validateTypealiasType(*this, aliasDecl);
-          }
-        }
-      }
-    }
 
     break;
   }
@@ -3963,11 +4025,17 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         break;
       }
     }
-
-    validateGenericFuncOrSubscriptSignature(FD, FD, FD);
     
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
+    auto resolution = TypeResolution::forInterface(FD,
+                                                   FD->getGenericSignature());
+    typeCheckParameterList(FD->getParameters(), resolution,
+                           TypeResolverContext::AbstractFunctionDecl);
+    validateResultType(*this, FD, FD->getParameters(),
+                       FD->getBodyResultTypeLoc(), resolution);
+    // FIXME: Roll all of this interface type computation into a request.
+    FD->computeType();
     FD->setSignatureIsValidated();
 
     // Member functions need some special validation logic.
@@ -4009,7 +4077,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    validateGenericFuncOrSubscriptSignature(CD, CD, CD);
+    auto res = TypeResolution::forInterface(CD, CD->getGenericSignature());
+    typeCheckParameterList(CD->getParameters(), res,
+                           TypeResolverContext::AbstractFunctionDecl);
+    CD->computeType();
 
     // We want the constructor to be available for name lookup as soon
     // as it has a valid interface type.
@@ -4023,7 +4094,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    validateGenericFuncOrSubscriptSignature(DD, DD, DD);
+    auto res = TypeResolution::forInterface(DD, DD->getGenericSignature());
+    typeCheckParameterList(DD->getParameters(), res,
+                           TypeResolverContext::AbstractFunctionDecl);
+    DD->computeType();
 
     DD->setSignatureIsValidated();
     break;
@@ -4034,7 +4108,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    validateGenericFuncOrSubscriptSignature(SD, SD, SD);
+    auto res = TypeResolution::forInterface(SD, SD->getGenericSignature());
+    typeCheckParameterList(SD->getIndices(), res,
+                           TypeResolverContext::SubscriptDecl);
+    validateResultType(*this, SD, SD->getIndices(),
+                       SD->getElementTypeLoc(), res);
+    SD->computeType();
 
     SD->setSignatureIsValidated();
 
@@ -4095,88 +4174,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   assert(D->hasValidSignature());
 }
 
-void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
-  // Validate the context.
-  auto dc = D->getDeclContext();
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    validateDeclForNameLookup(nominal);
-    if (!nominal->hasInterfaceType())
-      return;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    validateExtension(ext);
-    if (!ext->hasValidSignature())
-      return;
-  }
-
-  switch (D->getKind()) {
-  case DeclKind::Protocol: {
-    auto proto = cast<ProtocolDecl>(D);
-    if (proto->hasInterfaceType())
-      return;
-    proto->computeType();
-
-    break;
-  }
-  case DeclKind::AssociatedType: {
-    auto assocType = cast<AssociatedTypeDecl>(D);
-    if (assocType->hasInterfaceType())
-      return;
-    assocType->computeType();
-    break;
-  }
-  case DeclKind::TypeAlias: {
-    auto typealias = cast<TypeAliasDecl>(D);
-    if (typealias->getUnderlyingTypeLoc().getType())
-      return;
-
-    // Perform earlier validation of typealiases in protocols.
-    if (isa<ProtocolDecl>(dc)) {
-      if (!typealias->getGenericParams()) {
-        if (typealias->isBeingValidated()) return;
-
-        auto helper = [&] {
-          TypeResolutionOptions options(
-            (typealias->getGenericParams() ?
-             TypeResolverContext::GenericTypeAliasDecl :
-             TypeResolverContext::TypeAliasDecl));
-          auto &underlyingTL = typealias->getUnderlyingTypeLoc();
-          if (underlyingTL.isNull() ||
-              validateType(underlyingTL,
-                           TypeResolution::forStructural(typealias), options)) {
-            typealias->setInvalid();
-            underlyingTL.setInvalidType(Context);
-          }
-
-          typealias->setUnderlyingType(underlyingTL.getType());
-
-          // Note that this doesn't set the generic environment of the alias yet,
-          // because we haven't built one for the protocol.
-          //
-          // See how validateDecl() sets the generic environment on alias members
-          // explicitly.
-          //
-          // FIXME: Hopefully this can all go away with the ITC.
-        };
-
-        if (typealias->hasValidationStarted()) {
-          helper();
-        } else {
-          DeclValidationRAII IBV(typealias);
-          helper();
-        }
-
-        return;
-      }
-    }
-    LLVM_FALLTHROUGH;
-  }
-
-  default:
-    validateDecl(D);
-    break;
-  }
-}
-
 llvm::Expected<DeclRange>
 EmittedMembersRequest::evaluate(Evaluator &evaluator,
                                 ClassDecl *CD) const {
@@ -4217,29 +4214,11 @@ EmittedMembersRequest::evaluate(Evaluator &evaluator,
   return CD->getMembers();
 }
 
-/// Determine whether this is a "pass-through" typealias, which has the
-/// same type parameters as the nominal type it references and specializes
-/// the underlying nominal type with exactly those type parameters.
-/// For example, the following typealias \c GX is a pass-through typealias:
-///
-/// \code
-/// struct X<T, U> { }
-/// typealias GX<A, B> = X<A, B>
-/// \endcode
-///
-/// whereas \c GX2 and \c GX3 are not pass-through because \c GX2 has
-/// different type parameters and \c GX3 doesn't pass its type parameters
-/// directly through.
-///
-/// \code
-/// typealias GX2<A> = X<A, A>
-/// typealias GX3<A, B> = X<B, A>
-/// \endcode
-static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
+bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
+                                         Type underlyingType,
+                                         NominalTypeDecl *nominal) {
   // Pass-through only makes sense when the typealias refers to a nominal
   // type.
-  Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
-  auto nominal = underlyingType->getAnyNominal();
   if (!nominal) return false;
 
   // Check that the nominal type and the typealias are either both generic
@@ -4288,129 +4267,6 @@ static bool isPassThroughTypealias(TypeAliasDecl *typealias) {
                     });
 }
 
-/// Form the interface type of an extension from the raw type and the
-/// extension's list of generic parameters.
-static Type formExtensionInterfaceType(
-                         TypeChecker &tc, ExtensionDecl *ext,
-                         Type type,
-                         GenericParamList *genericParams,
-                         SmallVectorImpl<std::pair<Type, Type>> &sameTypeReqs,
-                         bool &mustInferRequirements) {
-  if (type->is<ErrorType>())
-    return type;
-
-  // Find the nominal type declaration and its parent type.
-  if (type->is<ProtocolCompositionType>())
-    type = type->getCanonicalType();
-
-  Type parentType = type->getNominalParent();
-  GenericTypeDecl *genericDecl = type->getAnyGeneric();
-
-  // Reconstruct the parent, if there is one.
-  if (parentType) {
-    // Build the nested extension type.
-    auto parentGenericParams = genericDecl->getGenericParams()
-                                 ? genericParams->getOuterParameters()
-                                 : genericParams;
-    parentType =
-      formExtensionInterfaceType(tc, ext, parentType, parentGenericParams,
-                                 sameTypeReqs, mustInferRequirements);
-  }
-
-  // Find the nominal type.
-  auto nominal = dyn_cast<NominalTypeDecl>(genericDecl);
-  auto typealias = dyn_cast<TypeAliasDecl>(genericDecl);
-  if (!nominal) {
-    Type underlyingType = typealias->getUnderlyingTypeLoc().getType();
-    nominal = underlyingType->getNominalOrBoundGenericNominal();
-  }
-
-  // Form the result.
-  Type resultType;
-  SmallVector<Type, 2> genericArgs;
-  if (!nominal->isGeneric() || isa<ProtocolDecl>(nominal)) {
-    resultType = NominalType::get(nominal, parentType,
-                                  nominal->getASTContext());
-  } else {
-    auto currentBoundType = type->getAs<BoundGenericType>();
-
-    // Form the bound generic type with the type parameters provided.
-    unsigned gpIndex = 0;
-    for (auto gp : *genericParams) {
-      SWIFT_DEFER { ++gpIndex; };
-
-      auto gpType = gp->getDeclaredInterfaceType();
-      genericArgs.push_back(gpType);
-
-      if (currentBoundType) {
-        sameTypeReqs.push_back({gpType,
-                                currentBoundType->getGenericArgs()[gpIndex]});
-      }
-    }
-
-    resultType = BoundGenericType::get(nominal, parentType, genericArgs);
-  }
-
-  // If we have a typealias, try to form type sugar.
-  if (typealias && isPassThroughTypealias(typealias)) {
-    auto typealiasSig = typealias->getGenericSignature();
-    SubstitutionMap subMap;
-    if (typealiasSig) {
-      subMap = typealiasSig->getIdentitySubstitutionMap();
-
-      mustInferRequirements = true;
-    }
-
-    resultType = TypeAliasType::get(typealias, parentType, subMap,
-                                    resultType);
-  }
-
-  return resultType;
-}
-
-/// Check the generic parameters of an extension, recursively handling all of
-/// the parameter lists within the extension.
-static GenericEnvironment *
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
-                            GenericParamList *genericParams) {
-  assert(!ext->getGenericEnvironment());
-
-  // Form the interface type of the extension.
-  bool mustInferRequirements = false;
-  SmallVector<std::pair<Type, Type>, 4> sameTypeReqs;
-  Type extInterfaceType =
-    formExtensionInterfaceType(tc, ext, type, genericParams, sameTypeReqs,
-                               mustInferRequirements);
-
-  // Local function used to infer requirements from the extended type.
-  auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
-
-    builder.inferRequirements(*ext->getModuleContext(),
-                              extInterfaceType,
-                              nullptr,
-                              source);
-
-    for (const auto &sameTypeReq : sameTypeReqs) {
-      builder.addRequirement(
-        Requirement(RequirementKind::SameType, sameTypeReq.first,
-                    sameTypeReq.second),
-        source, ext->getModuleContext());
-    }
-  };
-
-  // Validate the generic type signature.
-  auto *env = tc.checkGenericEnvironment(genericParams,
-                                         ext->getDeclContext(), nullptr,
-                                         /*allowConcreteGenericParams=*/true,
-                                         ext, inferExtendedTypeReqs,
-                                         (mustInferRequirements ||
-                                            !sameTypeReqs.empty()));
-
-  return env;
-}
-
 static bool isNonGenericTypeAliasType(Type type) {
   // A non-generic typealias can extend a specialized type.
   if (auto *aliasType = dyn_cast<TypeAliasType>(type.getPointer()))
@@ -4443,11 +4299,24 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   // Hack to allow extending a generic typealias.
   if (auto *unboundGeneric = extendedType->getAs<UnboundGenericType>()) {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
-      auto extendedNominal = aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
-      if (extendedNominal)
-        return isPassThroughTypealias(aliasDecl)
-               ? extendedType
-               : extendedNominal->getDeclaredType();
+      // Nested Hack to break cycles if this is called before validation has
+      // finished.
+      if (aliasDecl->hasInterfaceType()) {
+        auto extendedNominal =
+            aliasDecl->getDeclaredInterfaceType()->getAnyNominal();
+        if (extendedNominal)
+          return TypeChecker::isPassThroughTypealias(
+                     aliasDecl, aliasDecl->getUnderlyingType(), extendedNominal)
+                     ? extendedType
+                     : extendedNominal->getDeclaredType();
+      } else {
+        if (auto ty = aliasDecl->getStructuralType()
+                          ->getAs<NominalOrBoundGenericNominalType>())
+          return TypeChecker::isPassThroughTypealias(aliasDecl, ty,
+                                                     ty->getDecl())
+                     ? extendedType
+                     : ty->getDecl()->getDeclaredType();
+      }
     }
   }
 
@@ -4488,26 +4357,15 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  auto extendedType = evaluateOrDefault(Context.evaluator,
-                                        ExtendedTypeRequest{ext},
-                                        ErrorType::get(ext->getASTContext()));
-
   if (auto *nominal = ext->getExtendedNominal()) {
-    // If this extension was not already bound, it means it is either in an
-    // inactive conditional compilation block, or otherwise (incorrectly)
-    // nested inside of some other declaration. Make sure the generic
-    // parameter list of the extension exists to maintain invariants.
-    if (!ext->alreadyBoundToNominal())
-      ext->createGenericParamsIfMissing(nominal);
-
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
-
-    if (auto *genericParams = ext->getGenericParams()) {
-      GenericEnvironment *env =
-        checkExtensionGenericParams(*this, ext, extendedType, genericParams);
-      ext->setGenericEnvironment(env);
-    }
+    
+    // FIXME: validateExtension is going to disappear soon.  In the mean time
+    // don't bother computing the generic signature if the extended nominal type
+    // didn't pass validation so we don't crash.
+    if (!nominal->isInvalid())
+      (void)ext->getGenericSignature();
   }
 }
 
@@ -4745,7 +4603,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *SF = classDecl->getParentSourceFile()) {
-    // Allow classes without initializers in SIL and parseable interface files.
+    // Allow classes without initializers in SIL and module interface files.
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:

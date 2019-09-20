@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
@@ -1213,7 +1214,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
-  AssignExpr *AssignmentExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
@@ -1367,7 +1367,6 @@ public:
   void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
@@ -2040,6 +2039,7 @@ public:
                              LookUpConformanceInModule(CurrModule));
     }
     }
+    llvm_unreachable("Unhandled DynamicLookupInfo Kind in switch");
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
@@ -2793,7 +2793,7 @@ public:
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
     if (TAD->hasInterfaceType()) {
-      auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
+      auto underlyingType = TAD->getUnderlyingType();
       if (underlyingType->hasError()) {
         Type parentType;
         if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -4670,13 +4670,6 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E
   this->DotLoc = DotLoc;
 }
 
-void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
-  AssignmentExpr = E;
-  ParsedExpr = E->getDest();
-  CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::AssignmentRHS;
-}
-
 void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
                                                   bool isFirst) {
   CurDeclContext = P.CurDeclContext;
@@ -4905,7 +4898,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addDeclKeywords(Sink);
     addStmtKeywords(Sink, MaybeFuncBody);
     LLVM_FALLTHROUGH;
-  case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
@@ -5370,14 +5362,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                             ContextInfo.isSingleExpressionBody());
     Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
-    break;
-  }
-  case CompletionKind::AssignmentRHS : {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    if (auto destType = ParsedExpr->getType())
-      Lookup.setExpectedTypes(destType->getRValueType(),
-                              /*isSingleExpressionBody*/ false);
-    Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
     break;
   }
   case CompletionKind::CallArg : {

@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -474,7 +475,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
-  SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
+  FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
+                                  DC->getParentSourceFile());
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
@@ -535,9 +537,10 @@ bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
 
 bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookupIfEnabled()
     const {
-  return Loc.isValid() && DC->getParentSourceFile() &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::SIL;
+  if (!Loc.isValid())
+    return false;
+  const auto *const SF = DC->getParentSourceFile();
+  return SF && SF->isSuitableForASTScopes();
 }
 
 #pragma mark context-based lookup definitions

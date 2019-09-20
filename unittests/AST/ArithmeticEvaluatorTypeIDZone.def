@@ -14,6 +14,9 @@
 //  TypeID zone, for use with the TypeID template.
 //
 //===----------------------------------------------------------------------===//
-SWIFT_REQUEST(ArithmeticEvaluator, UncachedEvaluationRule)
-SWIFT_REQUEST(ArithmeticEvaluator, InternallyCachedEvaluationRule)
-SWIFT_REQUEST(ArithmeticEvaluator, ExternallyCachedEvaluationRule)
+SWIFT_REQUEST(ArithmeticEvaluator, UncachedEvaluationRule,
+              double(ArithmeticExpr *), Uncached, HasNearestLocation)
+SWIFT_REQUEST(ArithmeticEvaluator, InternallyCachedEvaluationRule,
+              double(ArithmeticExpr *), Cached, HasNearestLocation)
+SWIFT_REQUEST(ArithmeticEvaluator, ExternallyCachedEvaluationRule,
+              double(ArithmeticExpr *), SeparatelyCached, HasNearestLocation)

@@ -84,11 +84,7 @@ TypeDecl *ASTBuilder::createTypeDecl(NodePointer node) {
       return nullptr;
 
     auto name = Ctx.getIdentifier(node->getChild(1)->getText());
-    auto results = proto->lookupDirect(name);
-    if (results.size() != 1)
-      return nullptr;
-
-    return dyn_cast<AssociatedTypeDecl>(results[0]);
+    return proto->getAssociatedType(name);
   }
 
   auto *DC = findDeclContext(node);
@@ -101,11 +97,9 @@ ASTBuilder::createBuiltinType(StringRef builtinName,
   if (builtinName.startswith(BUILTIN_TYPE_NAME_PREFIX)) {
     SmallVector<ValueDecl *, 1> decls;
 
-    ModuleDecl::AccessPathTy accessPath;
     StringRef strippedName =
         builtinName.drop_front(BUILTIN_TYPE_NAME_PREFIX.size());
-    Ctx.TheBuiltinModule->lookupValue(accessPath,
-                                      Ctx.getIdentifier(strippedName),
+    Ctx.TheBuiltinModule->lookupValue(Ctx.getIdentifier(strippedName),
                                       NLKind::QualifiedLookup,
                                       decls);
     
@@ -585,13 +579,8 @@ Type ASTBuilder::createDependentMemberType(StringRef member,
   if (!base->isTypeParameter())
     return Type();
 
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto member : protocol->lookupDirect(Ctx.getIdentifier(member),
-                                            flags)) {
-    if (auto assocType = dyn_cast<AssociatedTypeDecl>(member))
-      return DependentMemberType::get(base, assocType);
-  }
+  if (auto assocType = protocol->getAssociatedType(Ctx.getIdentifier(member)))
+    return DependentMemberType::get(base, assocType);
 
   return Type();
 }
