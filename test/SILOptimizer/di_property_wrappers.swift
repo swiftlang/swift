@@ -422,6 +422,33 @@ func testComposed() {
   // CHECK-NEXT: .. init Wrapper2<Int>(wrappedValue: 17)
 }
 
+// SR-11477
+
+@propertyWrapper
+struct SR_11477_W {
+  let name: String
+
+  init(name: String = "DefaultParamInit") {
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+struct SR_11477_C {
+  @SR_11477_W var property: Int
+  init() {}
+  func foo() { print(_property.name) }
+}
+
+func testWrapperInitWithDefaultArg() {
+  let use = SR_11477_C()
+  
+  use.foo()
+  // CHECK: DefaultParamInit
+}
 
 testIntStruct()
 testIntClass()
@@ -431,3 +458,4 @@ testDefaultInit()
 testOptIntStruct()
 testDefaultNilOptIntStruct()
 testComposed()
+testWrapperInitWithDefaultArg()

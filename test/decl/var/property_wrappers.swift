@@ -1724,3 +1724,54 @@ struct TestConcrete1 {
     // ...
   }
 }
+
+// SR-11477
+
+// Two initializers that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W1 { // expected-error {{property wrapper type 'SR_11477_W1' has multiple default-value initializers}}
+  let name: String
+
+  init() {} // expected-note {{initializer 'init()' declared here}}
+
+  init(name: String = "DefaultParamInit") { // expected-note {{initializer 'init(name:)' declared here}}
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Two initializers with default arguments that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W2 { // expected-error {{property wrapper type 'SR_11477_W2' has multiple default-value initializers}}
+  let name: String
+
+  init(anotherName: String = "DefaultParamInit") {} // expected-note {{initializer 'init(anotherName:)' declared here}}
+
+  init(name: String = "DefaultParamInit") { // expected-note {{initializer 'init(name:)' declared here}}
+    self.name = name
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}
+
+// Single initializer that can default initialize the wrapper //
+
+@propertyWrapper
+struct SR_11477_W3 { // Okay
+  let name: String
+
+  init() {
+    self.name = "Init"
+  }
+
+  var wrappedValue: Int {
+    get { return 0 }
+  }
+}

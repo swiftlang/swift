@@ -203,16 +203,31 @@ static ConstructorDecl *findInitialValueInit(
 static ConstructorDecl *findDefaultInit(ASTContext &ctx,
                                         NominalTypeDecl *nominal) {
   SmallVector<ConstructorDecl *, 2> defaultValueInitializers;
-  DeclName initName(ctx, DeclBaseName::createConstructor(),
-                    ArrayRef<Identifier>());
   SmallVector<ValueDecl *, 2> decls;
+  auto initName = DeclBaseName::createConstructor();
   nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
     if (!init || init->getDeclContext() != nominal)
       continue;
 
-    defaultValueInitializers.push_back(init);
+    // A constructor which does not have any parameters or where all the
+    // parameters have a default argument can be used to default initialize
+    // the property wrapper type.
+    assert(init->hasParameterList());
+    auto hasParams = init->getParameters()->size() > 0;
+    auto allParamsHaveDefaultArg = false;
+
+    if (hasParams) {
+      allParamsHaveDefaultArg = llvm::all_of(
+          init->getParameters()->getArray(),
+          [](const ParamDecl *decl) { return decl->isDefaultArgument(); });
+    }
+
+    // Skip synthesized default initializers
+    if (!hasParams || (allParamsHaveDefaultArg && !init->isImplicit())) {
+      defaultValueInitializers.push_back(init);
+    }
   }
 
   switch (defaultValueInitializers.size()) {
