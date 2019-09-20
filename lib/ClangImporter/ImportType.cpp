@@ -725,23 +725,13 @@ namespace {
       // Otherwise, recurse on the underlying type.  We need to recompute
       // the hint, and if the typedef uses different bridgeability than the
       // context then we may also need to bypass the typedef.
-      auto underlyingType = type->desugar();
-
-      // Figure out the bridgeability we would normally use for this typedef.
-      auto typedefBridgeability =
-          getTypedefBridgeability(type->getDecl(), underlyingType);
-
-      // Figure out the typedef we should actually use.
-      auto underlyingBridgeability = Bridging;
-      SwiftTypeConverter innerConverter(Impl, AllowNSUIntegerAsInt,
-                                        underlyingBridgeability);
-      auto underlyingResult = innerConverter.Visit(underlyingType);
+      auto underlyingResult = Visit(type->desugar());
 
       // If we used different bridgeability than this typedef normally
       // would because we're in a non-bridgeable context, and therefore
       // the underlying type is different from the mapping of the typedef,
       // use the underlying type.
-      if (underlyingBridgeability != typedefBridgeability &&
+      if (Bridging != getTypedefBridgeability(type->getDecl()) &&
           !underlyingResult.AbstractType->isEqual(mappedType)) {
         return underlyingResult;
       }

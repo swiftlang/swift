@@ -2634,13 +2634,13 @@ namespace {
             return newtype;
 
       if (!SwiftType) {
-        // Import typedefs of blocks as their fully-bridged equivalent Swift
-        // type. That matches how we want to use them in most cases. All other
-        // types should be imported in a non-bridged way.
+        // Note that the code below checks to see if the typedef allows
+        // bridging, i.e. if the imported typealias should name a bridged type
+        // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef, isInSystemModule(DC),
-            getTypedefBridgeability(Decl, ClangType), OTK_Optional);
+            getTypedefBridgeability(Decl), OTK_Optional);
       }
 
       if (!SwiftType)
