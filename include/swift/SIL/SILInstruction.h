@@ -523,6 +523,16 @@ public:
     getAllOperands()[Num1].swap(getAllOperands()[Num2]);
   }
 
+private:
+  /// Predicate used to filter OperandTypeRange.
+  struct OperandToType;
+
+public:
+  using OperandTypeRange =
+      OptionalTransformRange<ArrayRef<Operand>, OperandToType>;
+  // NOTE: We always skip type dependent operands.
+  OperandTypeRange getOperandTypes() const;
+
   /// Return the list of results produced by this instruction.
   bool hasResults() const { return !getResults().empty(); }
   SILInstructionResultArray getResults() const { return getResultsImpl(); }
@@ -698,6 +708,22 @@ SILInstruction::getOperandValues(bool skipTypeDependentOperands) const
     -> OperandValueRange {
   return OperandValueRange(getAllOperands(),
                            OperandToValue(*this, skipTypeDependentOperands));
+}
+
+struct SILInstruction::OperandToType {
+  const SILInstruction &i;
+
+  OperandToType(const SILInstruction &i) : i(i) {}
+
+  Optional<SILType> operator()(const Operand &use) const {
+    if (i.isTypeDependentOperand(use))
+      return None;
+    return use.get()->getType();
+  }
+};
+
+inline auto SILInstruction::getOperandTypes() const -> OperandTypeRange {
+  return OperandTypeRange(getAllOperands(), OperandToType(*this));
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -3007,7 +3033,7 @@ public:
 
   /// Looks up the BuiltinKind of this builtin. Returns None if this is
   /// not a builtin.
-  llvm::Optional<BuiltinValueKind> getBuiltinKind() const {
+  Optional<BuiltinValueKind> getBuiltinKind() const {
     auto I = getBuiltinInfo();
     if (I.ID == BuiltinValueKind::None)
       return None;
