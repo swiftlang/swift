@@ -1183,10 +1183,12 @@ static bool isNSString(Type type) {
 }
 
 static ImportedType adjustTypeForConcreteImport(
-    ClangImporter::Implementation &impl, clang::QualType clangType,
-    Type importedType, ImportTypeKind importKind, ImportHint hint,
+    ClangImporter::Implementation &impl,
+    ImportResult importResult, ImportTypeKind importKind,
     bool allowNSUIntegerAsInt, Bridgeability bridging, OptionalTypeKind optKind,
     bool resugarNSErrorPointer) {
+  Type importedType = importResult.AbstractType;
+  ImportHint hint = importResult.Hint;
 
   if (importKind == ImportTypeKind::Abstract) {
     return {importedType, false};
@@ -1467,8 +1469,8 @@ ImportedType ClangImporter::Implementation::importType(
 
   // Now fix up the type based on how we're concretely using it.
   auto adjustedType = adjustTypeForConcreteImport(
-      *this, type, importResult.AbstractType, importKind, importResult.Hint,
-      allowNSUIntegerAsInt, bridging, optionality, resugarNSErrorPointer);
+      *this, importResult, importKind, allowNSUIntegerAsInt, bridging,
+      optionality, resugarNSErrorPointer);
 
   return adjustedType;
 }
