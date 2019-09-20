@@ -4858,7 +4858,7 @@ public:
   /// Handle `tuple_extract` instruction.
   ///   Original: y = tuple_extract x, <n>
   ///    Tangent: tan[y] = tuple_extract tan[x], <n'>
-  ///                                           ^~~~
+  ///                                            ^~~~
   ///                         tuple tangent space index corresponding to n
   CLONE_AND_EMIT_TANGENT(TupleExtract, tei) {
     auto &diffBuilder = getDifferentialBuilder();
