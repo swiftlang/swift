@@ -1,6 +1,6 @@
 {
   key.offset: 0,
-  key.length: 342,
+  key.length: 358,
   key.diagnostic_stage: source.diagnostic.stage.swift.parse,
   key.syntaxmap: [
     {
@@ -172,6 +172,11 @@
       key.kind: source.lang.swift.syntaxtype.buildconfig.keyword,
       key.offset: 335,
       key.length: 6
+    },
+    {
+      key.kind: source.lang.swift.syntaxtype.comment,
+      key.offset: 343,
+      key.length: 15
     }
   ]
 }
