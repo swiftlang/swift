@@ -219,6 +219,8 @@ enum ContextualTypePurpose {
   CTP_AssignSource,     ///< AssignExpr source operand coerced to result type.
   CTP_SubscriptAssignSource, ///< AssignExpr source operand coerced to subscript
                              ///< result type.
+  CTP_Condition,        ///< Condition expression of various statements e.g.
+                        ///< `if`, `for`, `while` etc.
 
   CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
 };
