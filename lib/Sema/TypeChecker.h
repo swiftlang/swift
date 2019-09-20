@@ -1015,10 +1015,6 @@ public:
     validateDecl(VD);
   }
 
-  virtual void resolveExtension(ExtensionDecl *ext) override {
-    validateExtension(ext);
-  }
-
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
   }

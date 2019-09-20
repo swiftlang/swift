@@ -614,10 +614,14 @@ void swift::typeCheckCompletionDecl(Decl *D) {
   DiagnosticSuppression suppression(Ctx.Diags);
   TypeChecker &TC = createTypeChecker(Ctx);
 
-  if (auto ext = dyn_cast<ExtensionDecl>(D))
-    TC.validateExtension(ext);
-  else
+  if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *nominal = ext->getExtendedNominal()) {
+      // Validate the nominal type declaration being extended.
+      TC.validateDecl(nominal);
+    }
+  } else {
     TC.validateDecl(cast<ValueDecl>(D));
+  }
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,

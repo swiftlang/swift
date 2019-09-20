@@ -3086,9 +3086,14 @@ public:
       return;
     }
 
-    TC.validateExtension(ED);
+    // Validate the nominal type declaration being extended.
+    TC.validateDecl(nominal);
+    // Don't bother computing the generic signature if the extended nominal
+    // type didn't pass validation so we don't crash.
+    if (!nominal->isInvalid())
+      (void)ED->getGenericSignature();
+    ED->setValidationToChecked();
 
-    extType = ED->getExtendedType();
     if (extType && !extType->hasError()) {
       // The first condition catches syntactic forms like
       //     protocol A & B { ... } // may be protocols or typealiases
@@ -3757,7 +3762,20 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (!nominal->hasValidSignature())
       return;
   } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    validateExtension(ext);
+    // If we're currently validating, or have already validated this extension,
+    // there's nothing more to do now.
+    if (!ext->hasValidationStarted()) {
+      DeclValidationRAII IBV(ext);
+
+      if (auto *nominal = ext->getExtendedNominal()) {
+        // Validate the nominal type declaration being extended.
+        validateDecl(nominal);
+        
+        // Eagerly validate the generic signature of the extension.
+        if (!nominal->isInvalid())
+          (void)ext->getGenericSignature();
+      }
+    }
     if (!ext->hasValidSignature())
       return;
   }
@@ -3819,7 +3837,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       
   case DeclKind::OpaqueType: {
     auto opaque = cast<OpaqueTypeDecl>(D);
-    DeclValidationRAII IBV(opaque);
+    opaque->setValidationToChecked();
     break;
   }
 
@@ -3828,11 +3846,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
     nominal->computeType();
-
-    // Check generic parameters, if needed.
-    DeclValidationRAII IBV(nominal);
-    (void)nominal->getGenericSignature();
-    nominal->setSignatureIsValidated();
+    nominal->setValidationToChecked();
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
@@ -3848,11 +3862,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto proto = cast<ProtocolDecl>(D);
     if (!proto->hasInterfaceType())
       proto->computeType();
-
-    // Validate the generic type signature, which is just <Self : P>.
-    DeclValidationRAII IBV(proto);
-    (void)proto->getGenericSignature();
-    proto->setSignatureIsValidated();
+    proto->setValidationToChecked();
 
     break;
   }
@@ -4347,26 +4357,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   return extendedType;
-}
-
-void TypeChecker::validateExtension(ExtensionDecl *ext) {
-  // If we're currently validating, or have already validated this extension,
-  // there's nothing more to do now.
-  if (ext->hasValidationStarted())
-    return;
-
-  DeclValidationRAII IBV(ext);
-
-  if (auto *nominal = ext->getExtendedNominal()) {
-    // Validate the nominal type declaration being extended.
-    validateDecl(nominal);
-    
-    // FIXME: validateExtension is going to disappear soon.  In the mean time
-    // don't bother computing the generic signature if the extended nominal type
-    // didn't pass validation so we don't crash.
-    if (!nominal->isInvalid())
-      (void)ext->getGenericSignature();
-  }
 }
 
 /// Build a default initializer string for the given pattern.
