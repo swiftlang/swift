@@ -1473,7 +1473,7 @@ bool TrailingClosureAmbiguityFailure::diagnoseAsNote() {
     const ParamDecl *param = paramList->getArray().back();
 
     // Sanity-check that the trailing closure corresponds to this parameter.
-    if (!param->hasValidSignature() ||
+    if (!param->hasInterfaceType() ||
         !param->getInterfaceType()->is<AnyFunctionType>())
       return false;
 

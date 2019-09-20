@@ -330,7 +330,7 @@ swift::matchWitness(
     return RequirementMatch(witness, MatchKind::KindConflict);
 
   // If the witness has not been validated yet, do so now.
-  if (!witness->hasValidSignature()) {
+  if (!witness->hasInterfaceType()) {
     auto &ctx = dc->getASTContext();
     ctx.getLazyResolver()->resolveDeclSignature(witness);
   }
@@ -340,7 +340,7 @@ swift::matchWitness(
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->hasValidSignature())
+  if (!witness->hasInterfaceType())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.
@@ -3854,11 +3854,11 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // Make sure we've validated the requirement.
+    // Make sure we've got an interface type.
     if (!requirement->hasInterfaceType())
       TC.validateDecl(requirement);
 
-    if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+    if (requirement->isInvalid() || !requirement->hasInterfaceType()) {
       Conformance->setInvalid();
       continue;
     }

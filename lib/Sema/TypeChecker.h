@@ -1423,7 +1423,7 @@ public:
         [&](VarDecl *var) -> Type {
           validateDecl(var);
 
-          if (!var->hasValidSignature() || var->isInvalid())
+          if (!var->hasInterfaceType() || var->isInvalid())
             return ErrorType::get(Context);
 
           return wantInterfaceType ? value->getInterfaceType()

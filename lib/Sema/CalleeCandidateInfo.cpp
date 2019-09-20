@@ -61,7 +61,7 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
     : declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
 
   if (auto *PD = dyn_cast<ParamDecl>(decl)) {
-    if (PD->hasValidSignature())
+    if (PD->hasInterfaceType())
       entityType = PD->getType();
     else
       entityType = PD->getASTContext().TheUnresolvedType;

@@ -453,7 +453,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     // Validate the requirement.
     tc.validateDecl(req);
-    if (req->isInvalid() || !req->hasValidSignature())
+    if (req->isInvalid() || !req->hasInterfaceType())
       continue;
 
     // Check whether any of the associated types we care about are
@@ -501,7 +501,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   if (!witness->hasInterfaceType())
     tc.validateDecl(witness);
 
-  if (witness->isInvalid() || !witness->hasValidSignature())
+  if (witness->isInvalid() || !witness->hasInterfaceType())
     return Type();
 
   if (!witness->getDeclContext()->isTypeContext()) {
@@ -2039,7 +2039,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   if (!requirement->hasInterfaceType())
     TC.validateDecl(requirement);
 
-  if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+  if (requirement->isInvalid() || !requirement->hasInterfaceType()) {
     Conformance->setInvalid();
     return;
   }

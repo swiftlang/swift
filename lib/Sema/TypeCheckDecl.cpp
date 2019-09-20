@@ -2881,7 +2881,7 @@ public:
     checkUnsupportedNestedType(PD);
 
     TC.validateDecl(PD);
-    if (!PD->hasValidSignature())
+    if (!PD->hasInterfaceType())
       return;
 
     auto *SF = PD->getParentSourceFile();
@@ -3731,12 +3731,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     return;
 
   // Handling validation failure due to re-entrancy is left
-  // up to the caller, who must call hasValidSignature() to
+  // up to the caller, who must call hasInterfaceType() to
   // check that validateDecl() returned a fully-formed decl.
   if (D->hasValidationStarted()) {
     // If this isn't reentrant (i.e. D has already been validated), the
     // signature better be valid.
-    assert(D->isBeingValidated() || D->hasValidSignature());
+    assert(D->isBeingValidated() || D->hasInterfaceType());
     return;
   }
 
@@ -3759,7 +3759,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   auto dc = D->getDeclContext();
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
     validateDecl(nominal);
-    if (!nominal->hasValidSignature())
+    if (!nominal->hasInterfaceType())
       return;
   } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     // If we're currently validating, or have already validated this extension,
@@ -3776,14 +3776,14 @@ void TypeChecker::validateDecl(ValueDecl *D) {
           (void)ext->getGenericSignature();
       }
     }
-    if (!ext->hasValidSignature())
+    if (ext->getValidationState() == Decl::ValidationState::Checking)
       return;
   }
 
   // Validating the parent may have triggered validation of this declaration,
   // so just return if that was the case.
   if (D->hasValidationStarted()) {
-    assert(D->hasValidSignature());
+    assert(D->hasInterfaceType());
     return;
   }
 
@@ -3940,7 +3940,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       auto *storage = accessor->getStorage();
       validateDecl(storage);
-      if (!storage->hasValidSignature())
+      if (!storage->hasInterfaceType())
         return;
     }
 
@@ -4046,7 +4046,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                        FD->getBodyResultTypeLoc(), resolution);
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
-    FD->setSignatureIsValidated();
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
@@ -4091,11 +4090,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeCheckParameterList(CD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
-
-    // We want the constructor to be available for name lookup as soon
-    // as it has a valid interface type.
-    CD->setSignatureIsValidated();
-
     break;
   }
 
@@ -4108,8 +4102,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeCheckParameterList(DD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     DD->computeType();
-
-    DD->setSignatureIsValidated();
     break;
   }
 
@@ -4124,8 +4116,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateResultType(*this, SD, SD->getIndices(),
                        SD->getElementTypeLoc(), res);
     SD->computeType();
-
-    SD->setSignatureIsValidated();
 
     if (SD->getOpaqueResultTypeDecl()) {
       if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
@@ -4170,8 +4160,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // type.
     EED->computeType();
 
-    EED->setSignatureIsValidated();
-
     if (auto argTy = EED->getArgumentInterfaceType()) {
       assert(argTy->isMaterializable());
       (void) argTy;
@@ -4181,7 +4169,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
   }
 
-  assert(D->hasValidSignature());
+  assert(D->hasInterfaceType());
 }
 
 llvm::Expected<DeclRange>

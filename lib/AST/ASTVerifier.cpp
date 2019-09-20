@@ -2968,7 +2968,7 @@ public:
     void verifyChecked(AbstractFunctionDecl *AFD) {
       PrettyStackTraceDecl debugStack("verifying AbstractFunctionDecl", AFD);
 
-      if (!AFD->hasValidSignature()) {
+      if (!AFD->hasInterfaceType()) {
         if (isa<AccessorDecl>(AFD) && AFD->isImplicit())
           return;
 
