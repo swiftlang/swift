@@ -1876,7 +1876,6 @@ void AbstractFunctionBodyScope::beCurrent() {
 }
 bool AbstractFunctionBodyScope::isCurrent() const {
   return bodyWhenLastExpanded == decl->getBody(false);
-  ;
 }
 
 void TopLevelCodeScope::beCurrent() { bodyWhenLastExpanded = decl->getBody(); }
