@@ -3147,9 +3147,32 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
                                              /*Implicit=*/true);
-  
+
   // Check the expression as a condition.
-  bool hadError = typeCheckCondition(matchCall, DC);
+  //
+  // TODO: Type-check of `~=` operator can't (yet) use `typeCheckCondition`
+  // because that utilizes contextual type which interferes with diagnostics.
+  // We don't yet have a full access to pattern-matching context in
+  // constraint system, which is required to enable these situations
+  // to be properly diagnosed.
+  struct ConditionListener : public ExprTypeCheckListener {
+    // Add the appropriate Boolean constraint.
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+      // Otherwise, the result must be convertible to Bool.
+      auto boolDecl = cs.getASTContext().getBoolDecl();
+      if (!boolDecl)
+        return true;
+
+      // Condition must convert to Bool.
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                       boolDecl->getDeclaredType(),
+                       cs.getConstraintLocator(expr));
+      return false;
+    }
+  };
+
+  ConditionListener listener;
+  bool hadError = !typeCheckExpression(matchCall, DC, &listener);
   // Save the type-checked expression in the pattern.
   EP->setMatchExpr(matchCall);
   // Set the type on the pattern.
