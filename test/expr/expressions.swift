@@ -799,14 +799,14 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
-
+  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
   if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
   // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
-  
-  if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
+
+  if x & x {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

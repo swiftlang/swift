@@ -747,6 +747,8 @@ Optional<Diag<Type, Type>> GenericArgumentsMismatchFailure::getDiagnosticFor(
     return diag::cannot_convert_coerce;
   case CTP_SubscriptAssignSource:
     return diag::cannot_convert_subscript_assign;
+  case CTP_Condition:
+    return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
   case CTP_Unused:
@@ -1346,6 +1348,13 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Diag<Type> rvalueDiagID = diag::assignment_lhs_not_lvalue;
   Expr *diagExpr = getRawAnchor();
   SourceLoc loc = diagExpr->getLoc();
+
+  auto &cs = getConstraintSystem();
+  // Assignment is not allowed inside of a condition,
+  // so let's not diagnose immutability, because
+  // most likely the problem is related to use of `=` itself.
+  if (cs.getContextualTypePurpose() == CTP_Condition)
+    return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
     diagExpr = assignExpr->getDest();
@@ -2009,6 +2018,8 @@ getContextualNilDiagnostic(ContextualTypePurpose CTP) {
     return diag::cannot_convert_assign_nil;
   case CTP_SubscriptAssignSource:
     return diag::cannot_convert_subscript_assign_nil;
+  case CTP_Condition:
+    return diag::cannot_convert_condition_value_nil;
   }
   llvm_unreachable("Unhandled ContextualTypePurpose in switch");
 }
@@ -2746,6 +2757,8 @@ ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
   case CTP_SubscriptAssignSource:
     return forProtocol ? diag::cannot_convert_subscript_assign_protocol
                        : diag::cannot_convert_subscript_assign;
+  case CTP_Condition:
+    return diag::cannot_convert_condition_value;
 
   case CTP_ThrowStmt:
   case CTP_Unused:
