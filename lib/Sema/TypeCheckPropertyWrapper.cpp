@@ -208,24 +208,21 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
   nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
   for (const auto &decl : decls) {
     auto init = dyn_cast<ConstructorDecl>(decl);
-    if (!init || init->getDeclContext() != nominal)
+    if (!init || init->getDeclContext() != nominal || init->isGeneric())
       continue;
 
+    assert(init->hasParameterList());
     // A constructor which does not have any parameters or where all the
     // parameters have a default argument can be used to default initialize
     // the property wrapper type.
-    assert(init->hasParameterList());
-    auto hasParams = init->getParameters()->size() > 0;
-    auto allParamsHaveDefaultArg = false;
+    //
+    // A constructor with no parameters will satisfy the check below.
+    bool allParamsHaveDefaultArg = llvm::all_of(
+        init->getParameters()->getArray(),
+        [](const ParamDecl *decl) { return decl->isDefaultArgument(); });
 
-    if (hasParams) {
-      allParamsHaveDefaultArg = llvm::all_of(
-          init->getParameters()->getArray(),
-          [](const ParamDecl *decl) { return decl->isDefaultArgument(); });
-    }
-
-    // Skip synthesized default initializers
-    if (!hasParams || (allParamsHaveDefaultArg && !init->isImplicit())) {
+    // Only add non-synthesized initializers.
+    if (allParamsHaveDefaultArg && !init->isImplicit()) {
       defaultValueInitializers.push_back(init);
     }
   }
