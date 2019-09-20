@@ -63,7 +63,7 @@ SyntaxFactory::makeUnknownSyntax(llvm::ArrayRef<TokenSyntax> Tokens,
 
 Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
   switch(Kind) {
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
 %   if node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}: return makeBlank${node.syntax_kind}();
 %   end
@@ -76,7 +76,7 @@ Syntax SyntaxFactory::makeBlankCollectionSyntax(SyntaxKind Kind) {
 std::pair<unsigned, unsigned>
 SyntaxFactory::countChildren(SyntaxKind Kind){
   switch(Kind) {
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
 %   if not node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}:
 %     child_count = len(node.children)
@@ -92,7 +92,7 @@ SyntaxFactory::countChildren(SyntaxKind Kind){
 bool SyntaxFactory::canServeAsCollectionMemberRaw(SyntaxKind CollectionKind,
                                                   SyntaxKind MemberKind) {
   switch (CollectionKind) {
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
 %   if node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}:
 %     if node.collection_element_choices:
@@ -125,7 +125,7 @@ RC<RawSyntax> SyntaxFactory::createRaw(SyntaxKind Kind,
                                        llvm::ArrayRef<RC<RawSyntax>> Elements,
                                        RC<SyntaxArena> Arena) {
   switch (Kind) {
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
   case SyntaxKind::${node.syntax_kind}: {
 % if node.children:
 %   child_count = len(node.children)
@@ -178,7 +178,7 @@ Optional<Syntax> SyntaxFactory::createSyntax(SyntaxKind Kind,
     return None;
 }
 
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
 %   if node.children:
 %     child_params = []
 %     for child in node.children:
