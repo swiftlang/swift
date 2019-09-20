@@ -206,6 +206,7 @@ private:
 
 public:
   void preOrderDo(function_ref<void(ASTScopeImpl *)>);
+  void preOrderChildrenDo(function_ref<void(ASTScopeImpl *)>);
   void postOrderDo(function_ref<void(ASTScopeImpl *)>);
 
 #pragma mark - source ranges

@@ -267,6 +267,9 @@ ExtensionScope::getCorrespondingNominalTypeDecl() const {
 
 void ASTScopeImpl::preOrderDo(function_ref<void(ASTScopeImpl *)> fn) {
   fn(this);
+  preOrderChildrenDo(fn);
+}
+void ASTScopeImpl::preOrderChildrenDo(function_ref<void(ASTScopeImpl *)> fn) {
   for (auto *child : getChildren())
     child->preOrderDo(fn);
 }

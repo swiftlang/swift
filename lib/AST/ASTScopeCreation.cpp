@@ -758,7 +758,8 @@ ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
 void ASTSourceFileScope::buildScopeTreeEagerly() {
   scopeCreator->beFreezing();
   // Eagerly expand any decls already in the tree.
-  preOrderDo([&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
+  preOrderChildrenDo(
+      [&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
   addNewDeclsToScopeTree();
   scopeCreator->beFrozen();
 }
