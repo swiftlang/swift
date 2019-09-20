@@ -510,7 +510,7 @@ def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
   HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
 def no_toolchain_stdlib_rpath: Flag<["-"], "no-toolchain-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
-  HelpText<"Do not add an rpath entry for the toolchain's standard library, rather than the OS's">;
+  HelpText<"Do not add an rpath entry for the toolchain's standard library (default)">;
 def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't add any rpath entries.">;
