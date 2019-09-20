@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -run-jvp-generation  -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -run-jvp-generation -Xllvm -debug-only=differentiation %s 2>&1 | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -Xllvm -run-jvp-generation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 
@@ -12,8 +12,8 @@ func unary(_ x: Float) -> Float {
   return x * x * x
 }
 // CHECK-DATA-STRUCTURES: struct _AD__unary_bb0__DF__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   @_hasStorage var differential_0: (Float, Float) -> Float { get set }
-// CHECK-DATA-STRUCTURES:   @_hasStorage var differential_1: (Float, Float) -> Float { get set }
+// CHECK-DATA-STRUCTURES:   var differential_0: (Float, Float) -> Float
+// CHECK-DATA-STRUCTURES:   var differential_1: (Float, Float) -> Float
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: enum _AD__unary_bb0__Succ__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES: }
@@ -58,7 +58,7 @@ func binary(x: Float, y: Float) -> Float {
 }
 
 // CHECK-DATA-STRUCTURES: struct _AD__binary_bb0__DF__src_0_wrt_0_1 {
-// CHECK-DATA-STRUCTURES:   @_hasStorage var differential_0: (Float, Float) -> Float { get set }
+// CHECK-DATA-STRUCTURES:   var differential_0: (Float, Float) -> Float
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: enum _AD__binary_bb0__Succ__src_0_wrt_0_1 {
 // CHECK-DATA-STRUCTURES: }

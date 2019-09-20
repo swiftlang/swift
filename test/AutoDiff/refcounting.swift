@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-sil -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-skip-folding-autodiff-function-extraction %s | %FileCheck %s
 
 public class NonTrivialStuff : Equatable {
@@ -38,11 +39,11 @@ func testOwnedVector(_ x: Vector) -> Vector {
 }
 _ = pullback(at: Vector.zero, in: testOwnedVector)
 
-// CHECK-LABEL: struct {{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0 {
-// CHECK-NEXT:   @_hasStorage var pullback_0: (Vector) -> (Vector, Vector) { get set }
-// CHECK-NEXT: }
-// CHECK-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
-// CHECK-NEXT: }
+// CHECK-DATA-STRUCTURES-LABEL: struct {{.*}}testOwnedVector{{.*}}__PB__src_0_wrt_0 {
+// CHECK-DATA-STRUCTURES-NEXT:   var pullback_0: (Vector) -> (Vector, Vector)
+// CHECK-DATA-STRUCTURES-NEXT: }
+// CHECK-DATA-STRUCTURES-LABEL: enum {{.*}}testOwnedVector{{.*}}__Pred__src_0_wrt_0 {
+// CHECK-DATA-STRUCTURES-NEXT: }
 
 // CHECK-LABEL: sil hidden @{{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__pullback_src_0_wrt_0_1
 // CHECK: bb0([[PB_RESULT_SELF:%.*]] : $*Vector, [[PB_RESULT_0:%.*]] : $*UsesMethodOfNoDerivativeMember.TangentVector, [[SEED:%.*]] : $*Vector, [[PB_STRUCT:%.*]] : ${{.*}}UsesMethodOfNoDerivativeMember{{.*}}applied2to{{.*}}__PB__src_0_wrt_0_1):

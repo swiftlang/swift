@@ -392,14 +392,14 @@ public:
 
 class DifferentiableActivityInfo;
 
-/// Information about the VJP/JVP function produced during VJP/JVP generation,
+/// Information about the JVP/VJP function produced during JVP/VJP generation,
 /// e.g. mappings from original values to corresponding values in the
 /// pullback/differential struct.
 ///
 /// A linear map struct is an aggregate value containing linear maps checkpointed
-/// during the VJP/JVP computation. Linear map structs are generated for every
-/// original function during VJP/JVP generation. Linear map struct values are
-/// constructed by VJP/JVP functions and consumed by pullback/differential
+/// during the JVP/VJP computation. Linear map structs are generated for every
+/// original function during JVP/VJP generation. Linear map struct values are
+/// constructed by JVP/VJP functions and consumed by pullback/differential
 /// functions.
 class LinearMapInfo {
 private:
@@ -446,8 +446,8 @@ private:
     auto &astCtx = nominal->getASTContext();
     auto id = astCtx.getIdentifier(name);
     auto *varDecl = new (astCtx) VarDecl(
-        /*IsStatic*/ false, VarDecl::Introducer::Var,
-        /*IsCaptureList*/ false, SourceLoc(), id, nominal);
+        /*IsStatic*/ false, VarDecl::Introducer::Var, /*IsCaptureList*/ false,
+        SourceLoc(), id, nominal);
     varDecl->setAccess(nominal->getEffectiveAccess());
     if (type->hasArchetype())
       varDecl->setInterfaceType(type->mapTypeOutOfContext());
@@ -475,8 +475,8 @@ private:
     llvm_unreachable("No files?");
   }
 
-  /// Compute and set the access level for the given branching trace or linear map data structure,
-  /// given the original function linkage.
+  /// Compute and set the access level for the given nominal type, given the
+  /// original function linkage.
   void computeAccessLevel(
       NominalTypeDecl *nominal, SILLinkage originalLinkage) {
     auto &astCtx = nominal->getASTContext();
@@ -504,11 +504,13 @@ private:
     }
   }
 
-  /// Creates an enum declaration with the given VJP/JVP generic signature, whose
-  /// cases represent the predecessors/successors of the given original block.
+  /// Creates an enum declaration with the given JVP/VJP generic signature,
+  /// whose cases represent the predecessors/successors of the given original
+  /// block.
   EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
                                      SILAutoDiffIndices indices,
-                                     CanGenericSignature genericSig) {
+                                     CanGenericSignature genericSig,
+                                     SILLoopInfo *loopInfo) {
     assert(originalBB->getParent() == original);
     auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
@@ -529,12 +531,15 @@ private:
           "__Pred__" + indices.mangle();
       break;
     }
-
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
-        /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
-        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+        /*EnumLoc*/ SourceLoc(), /*Name*/ enumId, /*NameLoc*/ SourceLoc(),
+        /*Inherited*/ {}, /*GenericParams*/ /*set later*/ nullptr,
+        /*DC*/ &file);
+    // Note: must mark enum as implicit to satisfy assertion in
+    // `Parser::parseDeclListDelayed`.
+    branchingTraceDecl->setImplicit();
     if (genericSig) {
       auto *genericParams =
           cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
@@ -542,8 +547,8 @@ private:
       branchingTraceDecl->setGenericEnvironment(
           genericSig->createGenericEnvironment());
     }
-    branchingTraceDecl->setBraces(loc);
-    computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
+    computeAccessLevel(branchingTraceDecl,
+                       original->getEffectiveSymbolLinkage());
     branchingTraceDecl->computeType();
     assert(branchingTraceDecl->hasInterfaceType());
     file.addVisibleDecl(branchingTraceDecl);
@@ -577,26 +582,14 @@ private:
       // Record enum element declaration.
       branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
     }
-    LLVM_DEBUG({
-      auto &s = getADDebugStream();
-      std::string enumName;
-      switch (kind) {
-      case AutoDiffLinearMapKind::Differential:
-        enumName = "Predecessor";
-        break;
-      case AutoDiffLinearMapKind::Pullback:
-        enumName = "Successor";
-        break;
-      }
-      s << enumName << " branching trace enum created for function @"
-        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
-      branchingTraceDecl->print(s);
-      s << '\n';
-    });
+    // If original block is in a loop, mark branching trace enum as indirect.
+    if (loopInfo->getLoopFor(originalBB))
+      branchingTraceDecl->getAttrs().add(
+          new (astCtx) IndirectAttr(/*Implicit*/ true));
     return branchingTraceDecl;
   }
 
-  /// Creates a struct declaration with the given VJP/JVP generic signature, for
+  /// Creates a struct declaration with the given JVP/VJP generic signature, for
   /// storing the linear map values and predecessor/successor basic block of the
   /// given original block.
   StructDecl *
@@ -605,7 +598,6 @@ private:
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
-
     std::string structName;
     switch (kind) {
     case swift::AutoDiffLinearMapKind::Differential:
@@ -621,12 +613,14 @@ private:
           "__PB__" + indices.mangle();
       break;
     }
-
     auto structId = astCtx.getIdentifier(structName);
-    SourceLoc loc = original->getLocation().getSourceLoc();
     auto *linearMapStruct = new (astCtx) StructDecl(
-        /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
-        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
+        /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
+        /*Inherited*/ {}, /*GenericParams*/ /*set later*/ nullptr,
+        /*DC*/ &file);
+    // Note: must mark struct as implicit to satisfy assertion in
+    // `Parser::parseDeclListDelayed`.
+    linearMapStruct->setImplicit();
     if (genericSig) {
       auto *genericParams =
           cloneGenericParameters(astCtx, linearMapStruct, genericSig);
@@ -634,28 +628,10 @@ private:
       linearMapStruct->setGenericEnvironment(
           genericSig->createGenericEnvironment());
     }
-    linearMapStruct->setBraces(loc);
-    computeAccessLevel(
-        linearMapStruct, original->getEffectiveSymbolLinkage());
+    computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
     linearMapStruct->computeType();
     assert(linearMapStruct->hasInterfaceType());
     file.addVisibleDecl(linearMapStruct);
-    LLVM_DEBUG({
-      auto &s = getADDebugStream();
-      std::string structName;
-      switch (kind) {
-      case AutoDiffLinearMapKind::Differential:
-        structName = "Differential";
-        break;
-      case AutoDiffLinearMapKind::Pullback:
-        structName = "Pullback";
-        break;
-      }
-      s << structName << " struct declaration created for function @"
-        << original->getName() << " bb" << originalBB->getDebugID() << '\n';
-      linearMapStruct->print(s);
-      s << '\n';
-    });
     return linearMapStruct;
   }
 
@@ -692,13 +668,14 @@ private:
     return linearMapDecl;
   }
 
+  /// Given an `apply` instruction, conditionally adds its linear map function
+  /// to the linear map struct if it is active.
   void addLinearMapToStruct(ApplyInst *ai, const SILAutoDiffIndices &indices);
 
-  /// This takes the declared linear map structs and populates
-  /// them with the necessary fields, specifically the linear function (pullback
-  /// or differential) of the corresponding original function call in the
-  /// original function, and the branching enum.
-  void populateLinearMapStructDeclarationFields(
+  /// Generate linear map struct and branching enum declarations for the given
+  /// function. Linear map structs are populated with linear map fields and a
+  /// branching enum field.
+  void generateDifferentiationDataStructures(
       ADContext &context, const SILAutoDiffIndices &indices,
       SILFunction *assocFn);
 
@@ -1529,7 +1506,7 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
     : kind(kind), original(original), activityInfo(activityInfo),
       indices(indices), typeConverter(context.getTypeConverter()),
       builder(builder) {
-  populateLinearMapStructDeclarationFields(context, indices, assocFn);
+  generateDifferentiationDataStructures(context, indices, assocFn);
 }
 
 /// Returns a flag that indicates whether the `apply` instruction should be
@@ -1644,8 +1621,6 @@ if (auto *castInst = dyn_cast<TYPE>(inst)) { \
   return false;
 }
 
-/// Given an `apply` instruction, conditionally adds its linear map function to the
-/// linear map struct if it's active.
 void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
@@ -1746,11 +1721,9 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   addLinearMapDecl(ai, linearMapSILType);
 }
 
-void LinearMapInfo::populateLinearMapStructDeclarationFields(
+void LinearMapInfo::generateDifferentiationDataStructures(
     ADContext &context, const SILAutoDiffIndices &indices,
     SILFunction *assocFn) {
-  LLVM_DEBUG(getADDebugStream() << "Populating linear map structs for " <<
-             original->getName() << '\n');
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
@@ -1768,31 +1741,38 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
     linearMapStructs.insert({&origBB, linearMapStruct});
   }
 
-  // Create branching trace enum for each original block and add it to the
-  // corresponding struct.
-  // TODO: add support for forward mode.
+  // Create branching trace enum for each original block and add it as a field
+  // in the corresponding struct.
+  StringRef traceEnumFieldName;
+  switch (kind) {
+  case AutoDiffLinearMapKind::Differential:
+    traceEnumFieldName = "successor";
+    break;
+  case AutoDiffLinearMapKind::Pullback:
+    traceEnumFieldName = "predecessor";
+    break;
+  }
   for (auto &origBB : *original) {
-    auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *traceEnum = createBranchingTraceDecl(&origBB, indices, assocFnGenSig);
-
-    // If original block is in a loop, mark branching trace enum as indirect.
-    if (loopInfo->getLoopFor(&origBB))
-      traceEnum->getAttrs().add(new (astCtx) IndirectAttr(/*Implicit*/ true));
+    auto *traceEnum =
+        createBranchingTraceDecl(&origBB, indices, assocFnGenSig, loopInfo);
     branchingTraceDecls.insert({&origBB, traceEnum});
     if (origBB.isEntry())
       continue;
+    // Add branching trace enum field to corresponding linear map struct.
+    auto *linearMapStruct = getLinearMapStruct(&origBB);
     auto *traceEnumField =
-        addVarDecl(linearMapStruct, astCtx.getIdentifier("predecessor").str(),
+        addVarDecl(linearMapStruct,
+                   astCtx.getIdentifier(traceEnumFieldName).str(),
                    traceEnum->getDeclaredInterfaceType());
     linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
 
-  // Add the linear function fields to the linear map structs.
+  // Add linear map fields to the linear map structs.
   for (auto &origBB : *original) {
     for (auto &inst : origBB) {
       if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
-        LLVM_DEBUG(getADDebugStream() << "Adding linear map struct field for "
-                   << *ai << '\n');
+        LLVM_DEBUG(getADDebugStream()
+                   << "Adding linear map struct field for " << *ai);
         // Check for active 'inout' arguments.
         bool isInout = false;
         auto paramInfos = ai->getSubstCalleeConv().getParameters();
@@ -1817,6 +1797,28 @@ void LinearMapInfo::populateLinearMapStructDeclarationFields(
       }
     }
   }
+
+  // Print generated linear map structs and branching trace enums.
+  // These declarations do not show up with `-emit-sil` because they are
+  // implicit. Instead, use `-Xllvm -debug-only=differentiation` to test
+  // declarations with FileCheck.
+  LLVM_DEBUG({
+    auto &s = getADDebugStream();
+    PrintOptions printOptions;
+    printOptions.TypeDefinitions = true;
+    printOptions.ExplodePatternBindingDecls = true;
+    printOptions.SkipImplicit = false;
+    s << "Generated linear map structs and branching trace enums for @"
+      << original->getName() << ":\n";
+    for (auto &origBB : *original) {
+      auto *linearMapStruct = getLinearMapStruct(&origBB);
+      linearMapStruct->print(s, printOptions); s << '\n';
+    }
+    for (auto &origBB : *original) {
+      auto *traceEnum = getBranchingTraceDecl(&origBB);
+      traceEnum->print(s, printOptions); s << '\n';
+    }
+  });
 }
 
 class DifferentiableActivityCollection {
@@ -3286,8 +3288,8 @@ private:
   /// predecessor enum argument).
   SmallPtrSet<SILBasicBlock *, 4> remappedBasicBlocks;
 
-  /// A pair of a trampoline block phi argument and its corresponding destination
-  /// block phi argument.
+  /// A pair of a trampoline block phi argument and its corresponding
+  /// destination block phi argument.
   struct TrampolinedArgumentPair {
     SILPhiArgument *trampolineArgument;
     SILPhiArgument *destinationArgument;
@@ -4140,12 +4142,24 @@ private:
 
   bool errorOccurred = false;
 
-  ///
-  /// Differential generation related fields.
-  ///
+  //--------------------------------------------------------------------------//
+  // Differential generation related fields
+  //--------------------------------------------------------------------------//
 
   /// The builder for the differential function.
   SILBuilder differentialAndBuilder;
+
+  /// Mapping from original basic blocks to corresponding differential basic
+  /// blocks.
+  DenseMap<SILBasicBlock *, SILBasicBlock *> diffBBMap;
+
+  /// Mapping from original basic blocks and original values to corresponding
+  /// tangent values.
+  DenseMap<SILValue, AdjointValue> tangentValueMap;
+
+  /// Mapping from original basic blocks and original buffers to corresponding
+  /// tangent buffers.
+  DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
 
   /// Mapping from differential basic blocks to differential struct arguments.
   DenseMap<SILBasicBlock *, SILArgument *> differentialStructArguments;
@@ -4156,25 +4170,15 @@ private:
   /// struct is destructured into the individual elements stored here.
   DenseMap<VarDecl *, SILValue> differentialStructElements;
 
-  /// Mapping from original basic blocks and original values to corresponding
-  /// tangent values.
-  DenseMap<SILValue, AdjointValue> tangentValueMap;
-
-  DenseMap<SILBasicBlock *, SILBasicBlock *> diffBBMap;
+  /// An auxiliary differential local allocation builder.
+  SILBuilder diffLocalAllocBuilder;
 
   /// Stack buffers allocated for storing local tangent values.
   SmallVector<SILValue, 8> differentialLocalAllocations;
 
-  /// Mapping from original blocks to differential values. Used to build differential
-  /// struct instances.
+  /// Mapping from original blocks to differential values. Used to build
+  /// differential struct instances.
   DenseMap<SILBasicBlock *, SmallVector<SILValue, 8>> differentialValues;
-
-  /// Mapping from original basic blocks and original buffers to corresponding
-  /// tangent buffers.
-  DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
-
-  /// An auxiliary differential local allocation builder.
-  SILBuilder diffLocalAllocBuilder;
 
   //--------------------------------------------------------------------------//
   // Getters
@@ -4183,8 +4187,10 @@ private:
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
-  SILFunction &getDifferential() { return differentialAndBuilder.getFunction(); }
   SILBuilder &getDifferentialBuilder() { return differentialAndBuilder; }
+  SILFunction &getDifferential() {
+    return differentialAndBuilder.getFunction();
+  }
   SILArgument *getDifferentialStructArgument(SILBasicBlock *origBB) {
 #ifndef NDEBUG
     auto *diffStruct = differentialStructArguments[origBB]->getType()
@@ -4542,9 +4548,170 @@ public:
                     makeConcreteTangentValue(tanValCopy));
   }
 
+  /// Handle `load` instruction.
+  ///   Original: y = load x
+  ///    Tangent: tan[y] = load tan[x]
+  CLONE_AND_EMIT_TANGENT(Load, li) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = li->getParent();
+    auto loc = li->getLoc();
+    auto tanBuf = getTangentBuffer(bb, li->getOperand());
+    auto tanVal = diffBuilder.emitLoadValueOperation(
+        loc, tanBuf, li->getOwnershipQualifier());
+    setTangentValue(bb, li, makeConcreteTangentValue(tanVal));
+  }
+
+  /// Handle `load_borrow` instruction.
+  ///   Original: y = load_borrow x
+  ///    Tangent: tan[y] = load_borrow tan[x]
+  CLONE_AND_EMIT_TANGENT(LoadBorrow, lbi) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = lbi->getParent();
+    auto loc = lbi->getLoc();
+    auto tanBuf = getTangentBuffer(bb, lbi->getOperand());
+    auto tanVal = diffBuilder.emitLoadBorrowOperation(
+        loc, tanBuf);
+    setTangentValue(bb, lbi, makeConcreteTangentValue(tanVal));
+  }
+
+  /// Handle `store` instruction in the differential.
+  ///   Original: store x to y
+  ///     Tangent: store tan[x] to tan[y]
+  CLONE_AND_EMIT_TANGENT(Store, si) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto loc = si->getLoc();
+    auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
+    auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
+    if (errorOccurred)
+      return;
+    diffBuilder.emitStoreValueOperation(
+        loc, tanValSrc, tanValDest, si->getOwnershipQualifier());
+  }
+
+  /// Handle `store_borrow` instruction in the differential.
+  ///   Original: store_borrow x to y
+  ///    Tangent: store_borrow tan[x] to tan[y]
+  CLONE_AND_EMIT_TANGENT(StoreBorrow, sbi) {
+     auto &diffBuilder = getDifferentialBuilder();
+     auto loc = sbi->getLoc();
+     auto tanValSrc = materializeTangent(getTangentValue(sbi->getSrc()), loc);
+     auto &tanValDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
+     if (errorOccurred)
+       return;
+    diffBuilder.createStoreBorrow(loc, tanValSrc, tanValDest);
+  }
+
+  /// Handle `copy_addr` instruction.
+  ///   Original: copy_addr x to y
+  ///    Tangent: copy_addr tan[x] to tan[y]
+  CLONE_AND_EMIT_TANGENT(CopyAddr, cai) {
+    auto *diffGenEnv = getDifferential().getGenericEnvironment();
+    auto diffGenSig = diffGenEnv
+        ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
+        : nullptr;
+    Lowering::GenericContextScope genericContextScope(
+        context.getTypeConverter(), diffGenSig);
+
+    auto diffBuilder = getDifferentialBuilder();
+    auto loc = cai->getLoc();
+    auto *bb = cai->getParent();
+    auto &tanSrc = getTangentBuffer(bb, cai->getSrc());
+    auto tanDest = getTangentBuffer(bb, cai->getDest());
+    if (errorOccurred)
+      return;
+
+    diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
+                               cai->isInitializationOfDest());
+  }
+
+  /// Handle `begin_access` instruction (and do differentiability checks).
+  ///   Original: y = begin_access x
+  ///    Tangent: tan[y] = begin_access tan[x]
+  CLONE_AND_EMIT_TANGENT(BeginAccess, bai) {
+    // Check for non-differentiable writes.
+    if (bai->getAccessKind() == SILAccessKind::Modify) {
+      if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
+        context.emitNondifferentiabilityError(bai, invoker,
+            diag::autodiff_cannot_differentiate_writes_to_global_variables);
+        errorOccurred = true;
+        return;
+      }
+      if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
+        context.emitNondifferentiabilityError(bai, invoker,
+            diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
+        errorOccurred = true;
+        return;
+      }
+    }
+
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = bai->getParent();
+
+    auto tanSrc = getTangentBuffer(bb, bai->getSource());
+    auto *tanDest = diffBuilder.createBeginAccess(
+        bai->getLoc(), tanSrc, bai->getAccessKind(), bai->getEnforcement(),
+        bai->hasNoNestedConflict(), bai->isFromBuiltin());
+    setTangentBuffer(bb, bai, tanDest);
+  }
+
+  /// Handle `end_access` instruction.
+  ///   Original: begin_access x
+  ///    Tangent: end_access tan[x]
+  CLONE_AND_EMIT_TANGENT(EndAccess, eai) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = eai->getParent();
+    auto loc = eai->getLoc();
+    auto tanSrc = getTangentBuffer(bb, eai->getOperand());
+    diffBuilder.createEndAccess(loc, tanSrc, eai->isAborting());
+  }
+
+  /// Handle `alloc_stack` instruction.
+  ///   Original: y = alloc_stack $T
+  ///    Tangent: tan[y] = alloc_stack $T.Tangent
+  CLONE_AND_EMIT_TANGENT(AllocStack, asi) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *mappedAllocStackInst = diffBuilder.createAllocStack(
+        asi->getLoc(), getRemappedTangentType(asi->getElementType()));
+    bufferMap.try_emplace({asi->getParent(), asi},
+                          mappedAllocStackInst);
+  }
+
+  /// Handle `dealloc_stack` instruction.
+  ///   Original: dealloc_stack x
+  ///    Tangent: dealloc_stack tan[x]
+  CLONE_AND_EMIT_TANGENT(DeallocStack, dsi) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto tanBuf = getTangentBuffer(dsi->getParent(), dsi->getOperand());
+    diffBuilder.createDeallocStack(dsi->getLoc(), tanBuf);
+  }
+
+  /// Handle `destroy_addr` instruction.
+  ///   Original: destroy_addr x
+  ///    Tangent: destroy_addr tan[x]
+  CLONE_AND_EMIT_TANGENT(DestroyAddr, dai) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto tanBuf = getTangentBuffer(dai->getParent(), dai->getOperand());
+    diffBuilder.createDestroyAddr(dai->getLoc(), tanBuf);
+  }
+
+  /// Handle `struct` instruction.
+  ///   Original: y = struct $T (x0, x1, x2, ...)
+  ///    Tangent: tan[y] = struct $T.Tangent (tan[x0], tan[x1], tan[x2], ...)
+  CLONE_AND_EMIT_TANGENT(Struct, si) {
+    auto &diffBuilder = getDifferentialBuilder();
+    SmallVector<SILValue, 4> tangentElements;
+    for (auto elem : si->getElements())
+      tangentElements.push_back(getTangentValue(elem).getConcreteValue());
+    auto tanExtract = diffBuilder.createStruct(
+        si->getLoc(), getRemappedTangentType(si->getType()), tangentElements);
+    setTangentValue(si->getParent(), si, makeConcreteTangentValue(tanExtract));
+  }
+
   /// Handle `struct_extract` instruction.
   ///   Original: y = struct_extract x, #field
-  ///   Tangent: tan[y] = struct_extract tan[x], tan[#field]]
+  ///    Tangent: tan[y] = struct_extract tan[x], #field'
+  ///                                             ^~~~~~~
+  ///                          field in tangent space corresponding to #field
   CLONE_AND_EMIT_TANGENT(StructExtract, sei) {
     assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_extract` with `@noDerivative` field should not be "
@@ -4588,7 +4755,9 @@ public:
 
   /// Handle `struct_element_addr` instruction.
   ///   Original: y = struct_element_addr x, #field
-  ///   Tangent: tan[y] = struct_element_addr tan[x], tan[#field]
+  ///    Tangent: tan[y] = struct_element_addr tan[x], #field'
+  ///                                                  ^~~~~~~
+  ///                          field in tangent space corresponding to #field
   CLONE_AND_EMIT_TANGENT(StructElementAddr, seai) {
     assert(!seai->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_element_addr` with `@noDerivative` field should not be "
@@ -4630,168 +4799,9 @@ public:
     setTangentBuffer(bb, seai, tangentInst);
   }
 
-  /// Handle `load` instruction.
-  ///   Original: y = load x
-  ///   Tangent: tan[y] = load tan[x]
-  CLONE_AND_EMIT_TANGENT(Load, li) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto *bb = li->getParent();
-    auto loc = li->getLoc();
-    auto tanBuf = getTangentBuffer(bb, li->getOperand());
-    auto tanVal = diffBuilder.emitLoadValueOperation(
-        loc, tanBuf, li->getOwnershipQualifier());
-    setTangentValue(bb, li, makeConcreteTangentValue(tanVal));
-  }
-
-  /// Handle `load_borrow` instruction.
-  ///   Original: y = load_borrow x
-  ///   Tangent: tan[y] = load_borrow tan[x]
-  CLONE_AND_EMIT_TANGENT(LoadBorrow, lbi) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto *bb = lbi->getParent();
-    auto loc = lbi->getLoc();
-    auto tanBuf = getTangentBuffer(bb, lbi->getOperand());
-    auto tanVal = diffBuilder.emitLoadBorrowOperation(
-        loc, tanBuf);
-    setTangentValue(bb, lbi, makeConcreteTangentValue(tanVal));
-  }
-
-  /// Handle `store` instruction in the differential.
-  ///    Original: store x to y
-  ///    Tangent: store tan[x] to tan[y]
-  CLONE_AND_EMIT_TANGENT(Store, si) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto loc = si->getLoc();
-    auto tanValSrc = materializeTangent(getTangentValue(si->getSrc()), loc);
-    auto &tanValDest = getTangentBuffer(si->getParent(), si->getDest());
-    if (errorOccurred)
-      return;
-    diffBuilder.emitStoreValueOperation(
-        loc, tanValSrc, tanValDest, si->getOwnershipQualifier());
-  }
-
-  /// Handle `store_borrow` instruction in the differential.
-  ///    Original: store_borrow x to y
-  ///    Tangent: store_borrow tan[x] to tan[y]
-  CLONE_AND_EMIT_TANGENT(StoreBorrow, sbi) {
-     auto &diffBuilder = getDifferentialBuilder();
-     auto loc = sbi->getLoc();
-     auto tanValSrc = materializeTangent(getTangentValue(sbi->getSrc()), loc);
-     auto &tanValDest = getTangentBuffer(sbi->getParent(), sbi->getDest());
-     if (errorOccurred)
-       return;
-    diffBuilder.createStoreBorrow(loc, tanValSrc, tanValDest);
-  }
-
-  /// Handle `copy_addr` instruction.
-  ///   Original: copy_addr x to y
-  ///   Tangent: copy_addr tan[x] to tan[y]
-  CLONE_AND_EMIT_TANGENT(CopyAddr, cai) {
-    auto *diffGenEnv = getDifferential().getGenericEnvironment();
-    auto diffGenSig = diffGenEnv
-        ? diffGenEnv->getGenericSignature()->getCanonicalSignature()
-        : nullptr;
-    Lowering::GenericContextScope genericContextScope(
-        context.getTypeConverter(), diffGenSig);
-
-    auto diffBuilder = getDifferentialBuilder();
-    auto loc = cai->getLoc();
-    auto *bb = cai->getParent();
-    auto &tanSrc = getTangentBuffer(bb, cai->getSrc());
-    auto tanDest = getTangentBuffer(bb, cai->getDest());
-    if (errorOccurred)
-      return;
-
-    diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
-                               cai->isInitializationOfDest());
-  }
-
-  /// Handle `begin_access` instruction (and do differentiability checks).
-  ///   Original: y = begin_access x
-  ///   Tangent: tan[y] = begin_access tan[x]
-  CLONE_AND_EMIT_TANGENT(BeginAccess, bai) {
-    // Check for non-differentiable writes.
-    if (bai->getAccessKind() == SILAccessKind::Modify) {
-      if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
-        context.emitNondifferentiabilityError(bai, invoker,
-            diag::autodiff_cannot_differentiate_writes_to_global_variables);
-        errorOccurred = true;
-        return;
-      }
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
-        context.emitNondifferentiabilityError(bai, invoker,
-            diag::autodiff_cannot_differentiate_writes_to_mutable_captures);
-        errorOccurred = true;
-        return;
-      }
-    }
-
-    auto &diffBuilder = getDifferentialBuilder();
-    auto *bb = bai->getParent();
-
-    auto tanSrc = getTangentBuffer(bb, bai->getSource());
-    auto *tanDest = diffBuilder.createBeginAccess(
-        bai->getLoc(), tanSrc, bai->getAccessKind(), bai->getEnforcement(),
-        bai->hasNoNestedConflict(), bai->isFromBuiltin());
-    setTangentBuffer(bb, bai, tanDest);
-  }
-
-  /// Handle `end_access` instruction.
-  ///   Original: begin_access x
-  ///   Tangent: end_access tan[x]
-  CLONE_AND_EMIT_TANGENT(EndAccess, eai) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto *bb = eai->getParent();
-    auto loc = eai->getLoc();
-    auto tanSrc = getTangentBuffer(bb, eai->getOperand());
-    diffBuilder.createEndAccess(loc, tanSrc, eai->isAborting());
-  }
-
-  /// Handle `alloc_stack` instruction.
-  ///   Original: y = alloc_stack $T
-  ///   Tangent: tan[y] = alloc_stack $T.Tangent
-  CLONE_AND_EMIT_TANGENT(AllocStack, asi) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto *mappedAllocStackInst = diffBuilder.createAllocStack(
-        asi->getLoc(), getRemappedTangentType(asi->getElementType()));
-    bufferMap.try_emplace({asi->getParent(), asi},
-                          mappedAllocStackInst);
-  }
-
-  /// Handle `dealloc_stack` instruction.
-  ///   Original: dealloc_stack x
-  ///   Tangent: dealloc_stack tan[x]
-  CLONE_AND_EMIT_TANGENT(DeallocStack, dsi) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto tanBuf = getTangentBuffer(dsi->getParent(), dsi->getOperand());
-    diffBuilder.createDeallocStack(dsi->getLoc(), tanBuf);
-  }
-
-  /// Handle `destroy_addr` instruction.
-  ///   Original: destroy_addr x
-  ///   Tangent: destroy_addr tan[x]
-  CLONE_AND_EMIT_TANGENT(DestroyAddr, dai) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto tanBuf = getTangentBuffer(dai->getParent(), dai->getOperand());
-    diffBuilder.createDestroyAddr(dai->getLoc(), tanBuf);
-  }
-
-  /// Handle `struct` instruction.
-  ///   Original: y = struct $T (x0, x1, x2, ...)
-  ///   Tangent: tan[y] = struct $T.Tangent (tan[x0], tan[x1], tan[x2], ...)
-  CLONE_AND_EMIT_TANGENT(Struct, si) {
-    auto &diffBuilder = getDifferentialBuilder();
-    SmallVector<SILValue, 4> tangentElements;
-    for (auto elem : si->getElements())
-      tangentElements.push_back(getTangentValue(elem).getConcreteValue());
-    auto tanExtract = diffBuilder.createStruct(
-        si->getLoc(), getRemappedTangentType(si->getType()), tangentElements);
-    setTangentValue(si->getParent(), si, makeConcreteTangentValue(tanExtract));
-  }
-
   /// Handle `tuple` instruction.
   ///   Original: y = tuple (x0, x1, x2, ...)
-  ///   Tangent: tan[y] = tuple (tan[x0], tan[x1], tan[x2], ...)
+  ///    Tangent: tan[y] = tuple (tan[x0], tan[x1], tan[x2], ...)
   CLONE_AND_EMIT_TANGENT(Tuple, ti) {
     auto diffBuilder = getDifferentialBuilder();
 
@@ -4808,34 +4818,10 @@ public:
   }
 
   /// Handle `tuple_extract` instruction.
-  ///   Original: y = tuple_element_addr x, <n>
-  ///   Tangent: tan[y] = tuple_element_addr tan[x], <n>
-  CLONE_AND_EMIT_TANGENT(TupleElementAddr, teai) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
-    unsigned tanIndex = 0;
-    for (unsigned i : range(teai->getFieldNo())) {
-      if (getTangentSpace(
-              origTupleTy->getElement(i).getType()->getCanonicalType()))
-        ++tanIndex;
-    }
-    auto tanType = getRemappedTangentType(teai->getType());
-    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
-    SILValue tanBuf;
-    // If the tangent buffer of the source does not have a tuple type, then
-    // it must represent a "single element tuple type". Use it directly.
-    if (!tanSource->getType().is<TupleType>()) {
-      tanBuf = tanSource;
-    } else {
-      tanBuf = diffBuilder.createTupleElementAddr(
-          teai->getLoc(), tanSource, tanIndex, tanType);
-    }
-    bufferMap.try_emplace({teai->getParent(), teai}, tanBuf);
-  }
-
-  /// Handle `tuple_extract` instruction.
   ///   Original: y = tuple_extract x, <n>
-  ///   Tangent: tan[y] = tuple_extract tan[x], <n>
+  ///    Tangent: tan[y] = tuple_extract tan[x], <n'>
+  ///                                            ^~~~
+  ///                         tuple tangent space index corresponding to n
   CLONE_AND_EMIT_TANGENT(TupleExtract, tei) {
     auto &diffBuilder = getDifferentialBuilder();
     auto loc = tei->getLoc();
@@ -4861,9 +4847,39 @@ public:
     }
   }
 
+  /// Handle `tuple_element_addr` instruction.
+  ///   Original: y = tuple_element_addr x, <n>
+  ///    Tangent: tan[y] = tuple_element_addr tan[x], <n'>
+  ///                                                ^~~~
+  ///                            tuple tangent space index corresponding to n
+  CLONE_AND_EMIT_TANGENT(TupleElementAddr, teai) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
+    unsigned tanIndex = 0;
+    for (unsigned i : range(teai->getFieldNo())) {
+      if (getTangentSpace(
+              origTupleTy->getElement(i).getType()->getCanonicalType()))
+        ++tanIndex;
+    }
+    auto tanType = getRemappedTangentType(teai->getType());
+    auto tanSource = getTangentBuffer(teai->getParent(), teai->getOperand());
+    SILValue tanBuf;
+    // If the tangent buffer of the source does not have a tuple type, then
+    // it must represent a "single element tuple type". Use it directly.
+    if (!tanSource->getType().is<TupleType>()) {
+      tanBuf = tanSource;
+    } else {
+      tanBuf = diffBuilder.createTupleElementAddr(
+          teai->getLoc(), tanSource, tanIndex, tanType);
+    }
+    bufferMap.try_emplace({teai->getParent(), teai}, tanBuf);
+  }
+
   /// Handle `destructure_tuple` instruction.
-  ///   Original: (y0, y1, y2, ...)  = destructure_tuple x, <n>
-  ///   Tangent: (tan[y0], tan[y1], tan[y2], ...) = destructure_tuple tan[x], <n>
+  ///   Original: (y0, y1, ...)  = destructure_tuple x, <n>
+  ///    Tangent: (tan[y0], tan[y1], ...) = destructure_tuple tan[x], <n'>
+  ///                                                                 ^~~~
+  ///                              tuple tangent space index corresponding to n
   CLONE_AND_EMIT_TANGENT(DestructureTuple, dti) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = dti->getParent();
@@ -4895,8 +4911,8 @@ public:
 #undef CLONE_AND_EMIT_TANGENT
 
   /// Handle `apply` instruction.
-  ///   Original: y = apply f(x)
-  ///   Tangent: tan[y] = apply diff_f(tan[x])
+  ///   Original: y = apply f(x0, x1, ...)
+  ///    Tangent: tan[y] = apply diff_f(tan[x0], tan[x1], ...)
   void emitTangentForApplyInst(ApplyInst *ai,
                                const SILAutoDiffIndices &actualIndices,
                                CanSILFunctionType originalDifferentialType) {
@@ -4971,7 +4987,8 @@ public:
       auto *thunkRef = diffBuilder.createFunctionRef(loc, thunk);
       differential = diffBuilder.createPartialApply(
          loc, thunkRef,
-         remapSubstitutionMapInDifferential(thunk->getForwardingSubstitutionMap()),
+         remapSubstitutionMapInDifferential(
+             thunk->getForwardingSubstitutionMap()),
          {differential}, differentialType->getCalleeConvention());
     }
 
@@ -5150,24 +5167,24 @@ private:
     }
     */
 
-    // Create a mapping of the parameters.
-    auto autoDiffIndex = getIndices().parameters->begin();
+    // Initialize tangent mapping for parameters.
+    auto diffParamsIt = getIndices().parameters->begin();
     for (auto index : range(diffParamArgs.size())) {
-      auto *diffParam = diffParamArgs[index];
-      auto *origParam = origParamArgs[*autoDiffIndex];
-      autoDiffIndex++;
-      if (diffParam->getType().isAddress()) {
-        setTangentBuffer(origEntry, origParam, diffParam);
+      auto *diffArg = diffParamArgs[index];
+      auto *origArg = origParamArgs[*diffParamsIt];
+      diffParamsIt++;
+      if (diffArg->getType().isAddress()) {
+        setTangentBuffer(origEntry, origArg, diffArg);
       } else {
         setTangentValue(
-            origEntry, origParam, makeConcreteTangentValue(diffParam));
+            origEntry, origArg, makeConcreteTangentValue(diffArg));
       }
       LLVM_DEBUG(getADDebugStream()
-                 << "Assigned parameter " << *diffParam
-                 << " as the tangent of original result " << *origParam);
+                 << "Assigned parameter " << *diffArg
+                 << " as the tangent of original result " << *origArg);
     }
 
-    // If there are indirect results, create a mapping.
+    // Initialize tangent mapping for indirect results.
     auto origIndResults = original->getIndirectResults();
     auto diffIndResults = differential.getIndirectResults();
     assert(origIndResults.size() == diffIndResults.size());
@@ -5318,14 +5335,13 @@ public:
     if (errorOccurred)
       return;
     if (differentialInfo.shouldDifferentiateInstruction(inst)) {
-      LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]"
-                 << *inst);
+      LLVM_DEBUG(getADDebugStream() << "JVPEmitter visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
       auto beforeInsertion = std::prev(diffBuilder.getInsertionPoint());
 #endif
       TypeSubstCloner::visit(inst);
       LLVM_DEBUG({
-        auto &s = llvm::dbgs() << "[DF] Emitted in Differential:\n";
+        auto &s = llvm::dbgs() << "[TAN] Emitted in differential:\n";
         auto afterInsertion = diffBuilder.getInsertionPoint();
         for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
           s << *it;
@@ -5678,6 +5694,10 @@ private:
   /// Post-order info for the original function.
   PostOrderFunctionInfo *postOrderInfo = nullptr;
 
+  /// Mapping from original basic blocks to corresponding pullback basic blocks.
+  /// Pullback basic blocks always have the predecessor as the single argument.
+  DenseMap<SILBasicBlock *, SILBasicBlock *> pullbackBBMap;
+
   /// Mapping from original basic blocks and original values to corresponding
   /// adjoint values.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, AdjointValue> valueMap;
@@ -5685,10 +5705,6 @@ private:
   /// Mapping from original basic blocks and original buffers to corresponding
   /// adjoint buffers.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
-
-  /// Mapping from original basic blocks to corresponding pullback basic blocks.
-  /// Pullback basic blocks always have the predecessor as the single argument.
-  DenseMap<SILBasicBlock *, SILBasicBlock *> pullbackBBMap;
 
   /// Mapping from pullback basic blocks to pullback struct arguments.
   DenseMap<SILBasicBlock *, SILArgument *> pullbackStructArguments;
@@ -5721,8 +5737,15 @@ private:
 
   llvm::DenseSet<SILValue> blockTemporarySet;
 
+  /// The main builder.
+  SILBuilder builder;
+
+  /// An auxiliary local allocation builder.
+  SILBuilder localAllocBuilder;
+
   /// Stack buffers allocated for storing local adjoint values.
   SmallVector<SILValue, 64> functionLocalAllocations;
+
   /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
@@ -6054,7 +6077,7 @@ private:
   }
 
   SILBasicBlock::iterator getNextFunctionLocalAllocationInsertionPoint() {
-    // If there are no local allocations, insert at the adjont entry beginning.
+    // If there are no local allocations, insert at the pullback entry start.
     if (functionLocalAllocations.empty())
       return getPullback().getEntryBlock()->begin();
     // Otherwise, insert before the last local allocation. Inserting before
@@ -6125,7 +6148,7 @@ private:
         localAllocBuilder.getInsertionPoint());
     emitZeroIndirect(bufObjectType.getASTType(), newBuf, newBuf->getLoc());
     builder.setInsertionPoint(insertionPoint);
-    // Create cleanup for local buffer.
+    // Register the local buffer.
     functionLocalAllocations.push_back(newBuf);
     return (insertion.first->getSecond() = newBuf);
   }
@@ -6498,7 +6521,7 @@ public:
   /// that are not using them.
   SILBasicBlock *buildPullbackSuccessor(
       SILBasicBlock *origBB, SILBasicBlock *origPredBB,
-      SmallDenseMap<SILValue, TrampolineBlockSet> &adjointTrampolineBlockMap,
+      SmallDenseMap<SILValue, TrampolineBlockSet> &pullbackTrampolineBlockMap,
       SmallDenseSet<std::pair<SILBasicBlock *, SILValue>, 4> hasAdjointBuffer) {
     // Get the pullback block and optional pullback trampoline block of the
     // predecessor block.
@@ -6667,7 +6690,7 @@ public:
     }
     // Emit cleanups for all block-local temporaries.
     cleanUpTemporariesForBlock(pbBB, pbLoc);
-    // - If the original block has exactly one predecessor, then the adjoint
+    // - If the original block has exactly one predecessor, then the pullback
     //   block has exactly one successor. Extract the pullback struct value
     //   from the predecessor enum value using `unchecked_take_enum_data_addr`
     //   and `load [take]`, and branch to the pullback successor block.
@@ -6680,14 +6703,14 @@ public:
     if (errorOccurred)
       return;
 
-    LLVM_DEBUG(getADDebugStream() << "PullbackEmitter visited:\n[ORIG]"
-               << *inst);
+    LLVM_DEBUG(getADDebugStream()
+               << "PullbackEmitter visited:\n[ORIG]" << *inst);
 #ifndef NDEBUG
     auto beforeInsertion = std::prev(builder.getInsertionPoint());
 #endif
     SILInstructionVisitor::visit(inst);
     LLVM_DEBUG({
-      auto &s = llvm::dbgs() << "[ADJ] Emitted:\n";
+      auto &s = llvm::dbgs() << "[ADJ] Emitted in pullback:\n";
       auto afterInsertion = builder.getInsertionPoint();
       for (auto it = ++beforeInsertion; it != afterInsertion; ++it)
         s << *it;
