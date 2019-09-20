@@ -498,16 +498,6 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {
   auto unboundDecl = unbound->getDecl();
-
-  // If the unbound decl hasn't been validated yet, we have a circular
-  // dependency that isn't being diagnosed properly.
-  //
-  // FIXME: Delete this condition.  He's dead Jim.
-  if (!unboundDecl->hasComputedGenericSignature()) {
-    TC.diagnose(unboundDecl, diag::circular_reference);
-    return Type();
-  }
-
   auto parentTy = unbound->getParent();
   if (parentTy) {
     parentTy = openUnboundGenericType(parentTy, locator);
