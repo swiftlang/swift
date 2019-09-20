@@ -773,6 +773,9 @@ void ASTSourceFileScope::addNewDeclsToScopeTree() {
   std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
   insertionPoint =
       scopeCreator->addSiblingsToScopeTree(insertionPoint, newNodes);
+
+  // TODO: use childrenCountWhenLastExpanded & regular expansion machinery for ASTSourceFileScope
+  // rdar://55562483
   numberOfDeclsAlreadySeen = SF->Decls.size();
   recordThatIWasExpandedEvenIfNoChildrenWereAdded();
 
