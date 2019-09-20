@@ -87,3 +87,5 @@ OptionalTraps.test("UnwrapNone/Message/Implicit")
 
 runAllTests()
 
+
+// XFAIL: lsan

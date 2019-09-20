@@ -129,3 +129,5 @@ do {
 // CHECK-DECL: generic_typealias.(file).Proto.Alias
 // CHECK-DECL: generic_typealias.(file).Proto extension.OtherAlias
 // CHECK-DECL: generic_typealias.(file).GenericOuter extension.ConditionalAlias
+
+// XFAIL: lsan

@@ -18,3 +18,5 @@ func test() {
 
 // RUN: %sourcekitd-test -req=complete.open -req-opts=callpatternheuristics=0 -pos=7:11 %s -- %s | %FileCheck %s -check-prefix=CALL_PATTERN
 // NO_PATTERN-NOT: key.kind: source.lang.swift.decl.function.constructor
+
+// XFAIL: lsan

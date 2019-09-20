@@ -546,3 +546,5 @@ func useAbstractFunction<T: P>(_ fn: (Int64) -> T) {}
 public func testThinToThick() {
   useAbstractFunction(bar)
 }
+
+// XFAIL: lsan

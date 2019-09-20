@@ -6,3 +6,5 @@
 
 // CHECK: source.lang.swift.decl.var.global (1:5-1:8)
 // CHECK: foo
+
+// XFAIL: lsan

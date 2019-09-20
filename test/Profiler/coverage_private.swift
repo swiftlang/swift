@@ -12,3 +12,5 @@ struct S {
 }
 
 S().visible()
+
+// XFAIL: lsan

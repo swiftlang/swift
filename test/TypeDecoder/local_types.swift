@@ -60,3 +60,4 @@ func foo() {
 
 // DEMANGLE-DECL: $s11local_types3fooyyF5OuterL_V12GenericInnerV
 // CHECK-DECL: local_types.(file).foo().Outer.GenericInner
+// XFAIL: lsan

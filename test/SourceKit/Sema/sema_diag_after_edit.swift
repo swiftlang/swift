@@ -9,3 +9,5 @@ let s : String = "f
 // RUN:    -req=print-diags %s > %t
 // RUN: %FileCheck -check-prefix=CHECK-NODIAG %s < %t
 // CHECK-NODIAG-NOT: key.severity: source.diagnostic.severity.error
+
+// XFAIL: lsan

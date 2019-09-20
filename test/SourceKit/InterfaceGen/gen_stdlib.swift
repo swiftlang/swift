@@ -77,3 +77,5 @@ var x: Int
 // CHECK-FLOAT-NOT: Zip2Sequence
 // CHECK-FLOAT-NOT: struct Bool
 // CHECK-FLOAT-NOT: struct Int
+
+// XFAIL: lsan

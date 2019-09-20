@@ -74,3 +74,5 @@ SetTraps.test("RemoveFirstFromEmpty")
 
 runAllTests()
 
+
+// XFAIL: lsan

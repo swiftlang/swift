@@ -21,3 +21,5 @@ class C {
 // CHECK: key.sourcetext: ") -> PathShape {"
 // CHECK: key.sourcetext: "    ) {}"
 // CHECK: key.sourcetext: "    ) -> Int { get {} }"
+
+// XFAIL: lsan

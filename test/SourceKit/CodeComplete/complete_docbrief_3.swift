@@ -45,3 +45,5 @@ func test() {
 // CHECK-NEXT:       key.modulename: "DocBriefTest"
 // CHECK-NEXT:     }
 
+
+// XFAIL: lsan

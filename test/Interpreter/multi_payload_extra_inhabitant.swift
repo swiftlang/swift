@@ -251,3 +251,5 @@ tests.test("types with more spare bits than used by tags") {
   }
 }
 runAllTests()
+
+// XFAIL: lsan

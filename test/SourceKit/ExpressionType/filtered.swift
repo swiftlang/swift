@@ -90,3 +90,5 @@ func foo(_ c: Proto2Conformer) { _ = c }
 // PROTO2: (999, 1000): Proto2Conformer
 // PROTO2: conforming to: s:8filtered6Proto2P
 // PROTO2: </ExpressionTypes>
+
+// XFAIL: lsan

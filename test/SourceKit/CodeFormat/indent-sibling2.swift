@@ -93,3 +93,5 @@ public func someTestFunc(withArgumentLabel label: String,
 
 //                        "              someOtherArgumentLabel label2: String,"
 // CHECK: key.sourcetext: "              andAnotherArgumentLabel label3: String) {"
+
+// XFAIL: lsan

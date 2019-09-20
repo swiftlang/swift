@@ -226,3 +226,5 @@ func inactiveWithTrailing() {
   // CHECK-NEXT: <#code#>
 }
 #endif
+
+// XFAIL: lsan

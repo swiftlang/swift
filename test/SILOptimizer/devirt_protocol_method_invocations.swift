@@ -288,3 +288,5 @@ func testReabstractedWitness(_ f: ReabstractedP) {
 public func testReabstracted(f: Optional<()->()>) {
   testReabstractedWitness(f)
 }
+
+// XFAIL: lsan

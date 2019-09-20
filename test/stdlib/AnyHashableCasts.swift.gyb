@@ -272,3 +272,5 @@ AnyHashableCasts.test("Wrappers around bridged strings") {
 #endif
 
 runAllTests()
+
+// XFAIL: lsan

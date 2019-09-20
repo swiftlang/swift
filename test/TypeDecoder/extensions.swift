@@ -58,3 +58,5 @@ extension Generic where T: AnyObject {
 // DEMANGLE-DECL: $s10extensions7GenericVAARlzClE18NestedViaAnyObjectV
 // CHECK-DECL: extensions.(file).Generic extension.NestedViaAnyObject
 
+
+// XFAIL: lsan

@@ -38,3 +38,5 @@ class C {
 // CHECK:   key.name: "deinit",
 // CHECK-NOT:   key.selector_name
 // CHECK: }
+
+// XFAIL: lsan

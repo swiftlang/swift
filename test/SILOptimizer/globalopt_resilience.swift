@@ -75,3 +75,5 @@ func returnWrapperStruct() -> WrapperStruct {
 // CHECK: store [[S3]] to %0 : $*WrapperStruct
 // CHECK: [[RESULT:%.*]] = tuple ()
 // CHECK: return [[RESULT]] : $()
+
+// XFAIL: lsan

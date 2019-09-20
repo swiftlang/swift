@@ -10,3 +10,5 @@ public func foobar(_ xs: [Int]) -> [Int] {
   return xs.filter { _ in false }
 }
 
+
+// XFAIL: lsan

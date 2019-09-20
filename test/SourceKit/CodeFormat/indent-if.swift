@@ -20,3 +20,5 @@ if condition,
 // CHECK: key.sourcetext: "    condition,"
 // CHECK: key.sourcetext: "    !condition,"
 // CHECK: key.sourcetext: "    condition {"
+
+// XFAIL: lsan

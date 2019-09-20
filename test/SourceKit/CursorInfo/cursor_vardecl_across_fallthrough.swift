@@ -55,3 +55,5 @@ switch p {
 // CHECKY: y
 // CHECKY: s:33cursor_vardecl_across_fallthrough1yL_SSvp
 // CHECKY: String
+
+// XFAIL: lsan

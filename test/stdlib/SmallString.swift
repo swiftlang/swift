@@ -106,3 +106,5 @@ SmallStringTests.test("Append, repeating") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

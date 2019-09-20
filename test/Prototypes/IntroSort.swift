@@ -395,3 +395,5 @@ suite.test("heapSort") {
 
 runAllTests()
 
+
+// XFAIL: lsan

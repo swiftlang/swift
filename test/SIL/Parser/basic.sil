@@ -1671,3 +1671,5 @@ sil_vtable Foo {
   #Foo.subscript!getter.1: @Foo_subscript_getter
   #Foo.subscript!setter.1: @Foo_subscript_setter [override]
 }
+
+// XFAIL: lsan

@@ -12,3 +12,5 @@ _ = Sss()
 // RUN: %empty-directory(%t.ranges)
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/rename-mismatch.in.json %s >> %t.ranges/rename-mismatch.expected
 // RUN: diff -u %S/find-rename-ranges/rename-mismatch.expected %t.ranges/rename-mismatch.expected
+
+// XFAIL: lsan

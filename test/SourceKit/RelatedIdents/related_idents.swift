@@ -146,3 +146,5 @@ struct Projection<T> {
 // CHECK10-NEXT: 63:10 - 3
 // CHECK10-NEXT: 64:10 - 3
 // CHECK10-NEXT: END RANGES
+
+// XFAIL: lsan

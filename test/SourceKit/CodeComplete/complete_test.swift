@@ -50,3 +50,5 @@ func diff(x: ForDiff) {
 }
 
 // XFAIL: broken_std_regex
+
+// XFAIL: lsan

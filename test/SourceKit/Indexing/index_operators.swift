@@ -21,3 +21,5 @@ struct StructB {
         return lhs
     }
 }
+
+// XFAIL: lsan

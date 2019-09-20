@@ -28,3 +28,5 @@ class KKKK: JJJJJ {
     var LLLL: [JJJJJ]
     init (LLLL: [JJJJJ]) { self.LLLL = LLLL }
 }
+
+// XFAIL: lsan

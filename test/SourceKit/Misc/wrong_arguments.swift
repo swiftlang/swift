@@ -5,3 +5,5 @@
 // CHECK: error: unknown argument: -this_option_does_not_exist
 // CHECK: Use -h or -help for assistance
 
+
+// XFAIL: lsan

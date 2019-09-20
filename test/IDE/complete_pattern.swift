@@ -279,3 +279,5 @@ func test_cc_in_pattern(subject: IntHolder, i1: Int) {
 // CC_IN_PATTERN_1: Begin completions
 // CC_IN_PATTERN_1-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: i1[#Int#]; name=i1
 // CC_IN_PATTERN_1: End completions
+
+// XFAIL: lsan

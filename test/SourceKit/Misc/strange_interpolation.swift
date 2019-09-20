@@ -17,3 +17,5 @@ let x = 1
 #endif
 
 // CHECK: <<NULL>>
+
+// XFAIL: lsan

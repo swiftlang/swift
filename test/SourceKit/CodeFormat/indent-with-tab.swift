@@ -35,3 +35,5 @@ b: Int) {}
 // CHECK: key.sourcetext: "}"
 // CHECK: key.sourcetext: "\t\t b: Int) {}"
 // CHECK: key.sourcetext: "\t\t b: Int) {}"
+
+// XFAIL: lsan

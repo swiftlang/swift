@@ -36,3 +36,5 @@ CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
 
 runAllTests()
 
+
+// XFAIL: lsan

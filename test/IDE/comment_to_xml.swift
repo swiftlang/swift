@@ -8,3 +8,5 @@
 // REQUIRES: no_asan
 // REQUIRES: libxml2
 // WRONG-NOT: CommentXMLInvalid
+
+// XFAIL: lsan

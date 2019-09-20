@@ -15,3 +15,5 @@ foo()
 // CHECK: key.sourcetext: "        repeat {"
 // CHECK: key.sourcetext: "            foo()"
 
+
+// XFAIL: lsan

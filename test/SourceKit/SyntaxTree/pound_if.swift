@@ -5,3 +5,5 @@
 #if swift(<4)
   print(1)
 #endif
+
+// XFAIL: lsan

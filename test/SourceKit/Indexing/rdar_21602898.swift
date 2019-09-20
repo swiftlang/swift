@@ -4,3 +4,5 @@
 protocol P {}
 class C {
 extension Int: P {}
+
+// XFAIL: lsan

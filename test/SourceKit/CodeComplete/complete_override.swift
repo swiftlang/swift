@@ -8,3 +8,5 @@ class Derived : Base {
 // RUN: %sourcekitd-test -req=complete -pos=5:1 %s -- %s > %t.response
 // RUN: diff -u %s.response %t.response
 
+
+// XFAIL: lsan

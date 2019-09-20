@@ -30,3 +30,5 @@ struct MyStruct : Foo {
 }
 getName_wrapper()
 
+
+// XFAIL: lsan

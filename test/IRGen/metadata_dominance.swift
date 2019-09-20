@@ -82,3 +82,5 @@ func testMakeFoo(_ p: P) -> Foo.Type {
 // CHECK-OPT-LABEL: define internal swiftcc %T18metadata_dominance3FooC* @"$s18metadata_dominance3FooCAA1PA2aDP04makeC0ACyFTW"
 // CHECK-OPT-NOT: tail call noalias %swift.refcounted* @swift_allocObject(%swift.type* %Self
 
+
+// XFAIL: lsan

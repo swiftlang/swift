@@ -578,3 +578,5 @@ public class ClassWithResilientThenEmpty {
 // CHECK-NEXT:   [[RESULT:%.*]] = call i8* @swift_lookUpClassMethod(%swift.type* %0, %swift.method_descriptor* %1, %swift.type_descriptor* bitcast (<{{.*}}>* @"$s16class_resilience21ResilientGenericChildCMn" to %swift.type_descriptor*))
 // CHECK-NEXT:   ret i8* [[RESULT]]
 // CHECK-NEXT: }
+
+// XFAIL: lsan

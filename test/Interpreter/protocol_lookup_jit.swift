@@ -4,3 +4,5 @@
 
 // REQUIRES: swift_interpreter
 
+
+// XFAIL: lsan

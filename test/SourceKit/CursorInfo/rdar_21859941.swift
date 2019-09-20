@@ -9,3 +9,5 @@ public extension AnyIterator {
       return AnySequence([])
     }
 }
+
+// XFAIL: lsan

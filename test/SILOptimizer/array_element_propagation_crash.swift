@@ -18,3 +18,5 @@ testit(&a)
 // CHECK: [27, 28]
 print(a)
 
+
+// XFAIL: lsan

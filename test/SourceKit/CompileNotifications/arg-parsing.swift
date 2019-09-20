@@ -59,3 +59,5 @@
 // ARG_PARSE_2: }
 // ARG_PARSE_2-NOT: compile-will-start
 // ARG_PARSE_2-NOT: compile-did-finish
+
+// XFAIL: lsan

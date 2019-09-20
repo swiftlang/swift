@@ -30,3 +30,5 @@ func foo(a: TwoInts) {
 // RUN: %sourcekitd-test -req=index %S/Inputs/Swift.swiftmodule | %FileCheck %s -check-prefix=CHECK-SWIFT1
 // CHECK-SWIFT1-DAG: key.groupname: "Bool"
 // CHECK-SWIFT1-DAG: key.groupname: "Collection"
+
+// XFAIL: lsan

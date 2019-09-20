@@ -27,3 +27,5 @@ public func test_PartialApplyDynamicType() -> Int {
   return result
 }
 
+
+// XFAIL: lsan

@@ -6,3 +6,5 @@ find([1,2,3],1)
 
 // CHECK1: source.lang.swift.ref.function.free
 // CHECK2: <empty cursor info; internal diagnostic: "Resolved to incomplete expression or statement.">
+
+// XFAIL: lsan

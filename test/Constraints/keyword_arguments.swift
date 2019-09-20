@@ -412,3 +412,5 @@ func generic_and_missing_label<T>(x: T) {}
 
 generic_and_missing_label(42)
 // expected-error@-1 {{missing argument label 'x:' in call}} {{27-27=x: }}
+
+// XFAIL: lsan

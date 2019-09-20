@@ -143,3 +143,5 @@ tupleCastTests
 }
 
 runAllTests()
+
+// XFAIL: lsan

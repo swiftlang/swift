@@ -137,3 +137,5 @@ func test6() {
 }
 
 print(test6())
+
+// XFAIL: lsan

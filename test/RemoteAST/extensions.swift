@@ -81,3 +81,4 @@ extension A where T: AnyObject {
 printType(A<C, Int>.ViaAnyObject.self)
 
 stopRemoteAST()
+// XFAIL: lsan

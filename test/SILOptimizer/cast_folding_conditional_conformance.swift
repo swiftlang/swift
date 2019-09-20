@@ -20,3 +20,5 @@ public func foo<T>(_: T.Type) {
     var x = Y<T>() as! P
 }
 
+
+// XFAIL: lsan

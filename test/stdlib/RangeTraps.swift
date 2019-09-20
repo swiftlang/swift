@@ -78,3 +78,5 @@ RangeTraps.test("CountablePartialRangeFrom")
 
 runAllTests()
 
+
+// XFAIL: lsan

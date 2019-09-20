@@ -89,3 +89,5 @@
 
 func libraryFunction() {}
 
+
+// XFAIL: lsan

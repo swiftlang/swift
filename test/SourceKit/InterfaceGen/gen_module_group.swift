@@ -10,3 +10,5 @@
 // GROUPB: P1
 // GROUPB: P2
 // GROUPB-NOT: MyClass
+
+// XFAIL: lsan

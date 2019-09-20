@@ -11,3 +11,5 @@ class Bar<T> {
     Inner.init()
   }
 }
+
+// XFAIL: lsan

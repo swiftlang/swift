@@ -34,3 +34,5 @@ public class _SecretClass {
   public var publicVarInSeretClass: Int = 0
 }
 public class PublicClass {}
+
+// XFAIL: lsan

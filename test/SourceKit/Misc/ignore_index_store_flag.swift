@@ -11,3 +11,5 @@ s.
 // RUN: %sourcekitd-test -req=complete -pos=2:3 %s -- %s -import-objc-header %t/t.h -pch-output-dir %t/pch -index-store-path %t/idx | %FileCheck %s -check-prefix=COMPLETE
 // RUN: not find %t/idx
 // COMPLETE: littleEndian
+
+// XFAIL: lsan

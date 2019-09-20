@@ -46,3 +46,5 @@ func test(value: S) {
 // USESITE-NEXT: <Container>$s4Test1SVD</Container>
 // USESITE-NEXT: <Declaration>public func foo&lt;T&gt;(x: T) -&gt; some <Type usr=[[Base_USR:.*]]>Base</Type> &amp; <Type usr=[[Proto_USR:.*]]>Proto</Type></Declaration>
 // USESITE-NEXT: <decl.function.method.instance><syntaxtype.keyword>public</syntaxtype.keyword> <syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>foo</decl.name>&lt;<decl.generic_type_param usr=[[T_USR:.*]]><decl.generic_type_param.name>T</decl.generic_type_param.name></decl.generic_type_param>&gt;(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type>T</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><syntaxtype.keyword>some</syntaxtype.keyword> <ref.class usr=[[Base_USR]]>Base</ref.class> &amp; <ref.protocol usr=[[Proto_USR]]>Proto</ref.protocol></decl.function.returntype></decl.function.method.instance>
+
+// XFAIL: lsan

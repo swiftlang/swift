@@ -103,3 +103,5 @@ public func modifyEmptyGlobal() {
 public func getFixedLayoutGlobal() -> EmptyResilientStruct {
   return fixedLayoutGlobal
 }
+
+// XFAIL: lsan

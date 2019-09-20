@@ -53,3 +53,5 @@ class C2 {
     }
   }
 }
+
+// XFAIL: lsan

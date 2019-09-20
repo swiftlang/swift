@@ -66,3 +66,5 @@ bb0:
   %3 = load %2 : $*Outer
   return %3 : $Outer
 }
+
+// XFAIL: lsan

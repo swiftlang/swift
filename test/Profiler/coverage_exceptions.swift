@@ -120,3 +120,5 @@ func joo() -> Int {
   } while false // CHECK: [[@LINE]]:11 {{.*}} : (1 - 2)
   return 1
 }
+
+// XFAIL: lsan

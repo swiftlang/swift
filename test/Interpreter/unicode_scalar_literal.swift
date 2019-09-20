@@ -53,3 +53,5 @@ testSuite.test("UnicodeScalar literal type") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

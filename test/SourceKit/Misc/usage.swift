@@ -4,3 +4,5 @@
 
 // CHECK: USAGE: sourcekitd-test [options] <inputs>
 
+
+// XFAIL: lsan

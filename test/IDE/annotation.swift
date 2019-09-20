@@ -366,3 +366,5 @@ func testDynamicMemberLookup(r: Lens<Rectangle>) {
   _ = r.bottomRight.y
   // CHECK: _ = <Param@[[@LINE-4]]:30>r</Param>.<Var@[[@LINE-6]]:7>bottomRight</Var>.<Var@[[@LINE-10]]:7>y</Var>
 }
+
+// XFAIL: lsan

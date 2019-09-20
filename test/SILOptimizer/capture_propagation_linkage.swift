@@ -21,3 +21,5 @@ func createInstance() -> MyClass? {
     return MyClass()
 }
 
+
+// XFAIL: lsan

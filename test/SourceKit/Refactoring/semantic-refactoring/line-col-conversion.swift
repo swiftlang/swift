@@ -2,3 +2,4 @@
 
 var Foo: Int {
 	var missingNewlineAtEndOfFile
+// XFAIL: lsan

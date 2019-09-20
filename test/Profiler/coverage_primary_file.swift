@@ -25,3 +25,5 @@ func main() {
   var b = Box()
   let _ = b.x
 }
+
+// XFAIL: lsan

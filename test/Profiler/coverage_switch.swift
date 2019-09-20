@@ -62,3 +62,5 @@ f2(Algebraic.Type1(1, 1))
 f2(Algebraic.Type2(false))
 f2(Algebraic.Type3)
 f3(Simple.Second)
+
+// XFAIL: lsan

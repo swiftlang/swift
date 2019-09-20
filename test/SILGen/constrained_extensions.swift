@@ -227,3 +227,5 @@ func referenceNestedTypes() {
   _ = Array<AnyObject>.NestedClass()
   _ = Array<AnyObject>.DerivedClass()
 }
+
+// XFAIL: lsan

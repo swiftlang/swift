@@ -35,3 +35,5 @@ c.foo()
 
 // CHECK: [a.ErrorEnum.other, a.ErrorEnum.other]
 print(c.e)
+
+// XFAIL: lsan

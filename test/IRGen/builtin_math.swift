@@ -93,3 +93,5 @@ public func test7( ) -> Float {
 public func test8( ) -> Double {
   return sqrt(-1)
 }
+
+// XFAIL: lsan

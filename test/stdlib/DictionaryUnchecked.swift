@@ -31,3 +31,5 @@ DictionaryUnchecked.test("noCseOnInit") {
 
 runAllTests()
 
+
+// XFAIL: lsan

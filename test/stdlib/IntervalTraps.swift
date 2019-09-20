@@ -54,3 +54,5 @@ IntervalTraps.test("Closed")
 
 runAllTests()
 
+
+// XFAIL: lsan

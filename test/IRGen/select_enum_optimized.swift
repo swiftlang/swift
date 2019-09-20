@@ -158,3 +158,5 @@ func selectNonInt(e: NoPayload) -> String {
   }
 }
 
+
+// XFAIL: lsan

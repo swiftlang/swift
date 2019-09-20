@@ -75,3 +75,5 @@ private class F3 : F2 {
 private var f = F2(v:1)
 f.test()
 print("unary constraint is: \(f)")
+
+// XFAIL: lsan

@@ -9,3 +9,5 @@
 class Cat : Communicate {
   let name = "Felix"
 }
+
+// XFAIL: lsan

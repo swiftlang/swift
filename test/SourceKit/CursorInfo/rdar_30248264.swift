@@ -12,3 +12,5 @@ class A {
     // CHECK2: source.lang.swift.ref.function.operator.prefix
   }
 }
+
+// XFAIL: lsan

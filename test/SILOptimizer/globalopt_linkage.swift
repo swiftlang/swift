@@ -26,3 +26,5 @@ _ = testit()
 
 // CHECK:      // PublicGlobal.getter
 // CHECK-NEXT: sil non_abi @$s{{.*}}PublicGlobal
+
+// XFAIL: lsan

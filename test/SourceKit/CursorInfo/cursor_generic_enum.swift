@@ -22,3 +22,5 @@ public enum ResultTest<Value, Error: MyErrorType> {
         }
     }
 }
+
+// XFAIL: lsan

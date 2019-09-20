@@ -49,3 +49,5 @@ public func test_address_escaping_function_single_block() -> UnsafePointer<Int> 
   return p
 }
 
+
+// XFAIL: lsan

@@ -108,3 +108,5 @@ public func testStructWithMultipleInitsAndInlinedInitializer() {
 }
 
 testStructWithMultipleInitsAndInlinedInitializer()
+
+// XFAIL: lsan

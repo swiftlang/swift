@@ -170,3 +170,5 @@ StringTraps.test("UTF8ViewIndex/offsetCrash")
 
 runAllTests()
 
+
+// XFAIL: lsan

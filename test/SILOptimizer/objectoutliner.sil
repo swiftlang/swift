@@ -245,3 +245,5 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+// XFAIL: lsan

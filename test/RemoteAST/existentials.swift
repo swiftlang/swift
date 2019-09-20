@@ -54,3 +54,4 @@ let metatype : Any.Type = Any.self
 printDynamicTypeAndAddressForExistential(metatype)
 
 stopRemoteAST()
+// XFAIL: lsan

@@ -201,3 +201,5 @@ func swiftOptimizesThisFunctionIncorrectly() -> Bool {
 let result = swiftOptimizesThisFunctionIncorrectly()
 print("Bridge cast result: \(result)") // CHECK-NEXT-objc: Bridge cast result: true
 #endif
+
+// XFAIL: lsan

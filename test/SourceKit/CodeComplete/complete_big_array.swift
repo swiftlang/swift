@@ -4,3 +4,5 @@
 // CHECK: key.sourcetext: "gCubeVertexData"
 // CHECK: key.description: "gCubeVertexData"
 // CHECK: key.typename: "[Float]"
+
+// XFAIL: lsan

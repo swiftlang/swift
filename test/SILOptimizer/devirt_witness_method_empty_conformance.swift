@@ -88,3 +88,5 @@ extension Array : ApplyRegStruct, RegStructable where Element == PublicStruct {
     mutating func applyTransform() {
     }
 }
+
+// XFAIL: lsan

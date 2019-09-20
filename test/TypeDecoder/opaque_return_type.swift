@@ -15,3 +15,5 @@ var prop: some P { return 0 }
 
 // DEMANGLE: $s18opaque_return_type4propQrvpQOyQo_
 // CHECK: some P
+
+// XFAIL: lsan

@@ -5,3 +5,5 @@
 // CHECK1: 2:10 - 1
 // CHECK1: 3:10 - 1
 // CHECK1: END RANGES
+
+// XFAIL: lsan

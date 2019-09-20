@@ -129,3 +129,5 @@
 // RUN: %swift_driver -Fsystem %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
 // RUN: %swiftc_driver -Fsystem %t/test.framework/ %s 2>&1 | %FileCheck -check-prefix SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION %s
 // SEARCH_PATH_INCLUDES_FRAMEWORK_EXTENSION: warning: framework search path ends in ".framework"
+
+// XFAIL: lsan

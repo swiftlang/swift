@@ -32,3 +32,5 @@ struct S<T> {
 // RUN: diff -u %s.response.5 %t.response.5
 // RUN: %sourcekitd-test -req=typecontextinfo -pos=16:18 %s -- %s > %t.response.6
 // RUN: diff -u %s.response.6 %t.response.6
+
+// XFAIL: lsan

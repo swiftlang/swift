@@ -155,3 +155,5 @@ bb9(%29 : $Optional<AA>):
 
 }
 
+
+// XFAIL: lsan

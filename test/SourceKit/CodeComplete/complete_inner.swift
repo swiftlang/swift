@@ -211,3 +211,5 @@ func test009() {
 }
 // FIXME: should have leading dot.
 // LEADING_DOT_S-NOT: .
+
+// XFAIL: lsan

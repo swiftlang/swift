@@ -57,3 +57,5 @@ func foo(
 // RUN: %sourcekitd-test \
 // RUN:   -req=syntax-map %s -pass-as-sourcetext == \
 // RUN:   -req=cursor -pos=5:43 %s -print-raw-response -vfs-files=/target_file2.swift=%S/../Inputs/vfs/other_file_in_target.swift,/CModule/module.modulemap=%S/../Inputs/vfs/CModule/module.modulemap,/CModule/CModule.h=%S/../Inputs/vfs/CModule/CModule.h,/SwiftModule/SwiftModule.swiftmodule=%t/SwiftModule.swiftmodule -- %s /target_file2.swift -I /CModule -I /SwiftModule -target %target-triple | %FileCheck --check-prefix=CHECK-CMODULE %s
+
+// XFAIL: lsan

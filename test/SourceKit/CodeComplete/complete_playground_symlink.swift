@@ -7,3 +7,5 @@
 // RUN: %sourcekitd-test -req=complete -pos=2:1 -text-input %t.dir/input.swift %t.dir/linked.playground -- %t.dir/linked.playground | %FileCheck %s
 
 // CHECK: key.name: "foo_blah"
+
+// XFAIL: lsan

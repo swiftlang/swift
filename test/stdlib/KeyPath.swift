@@ -1021,3 +1021,5 @@ keyPath.test("nested generics") {
 
 runAllTests()
 
+
+// XFAIL: lsan

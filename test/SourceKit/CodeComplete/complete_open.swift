@@ -65,3 +65,5 @@ func foo() {
 // EMPTY-NEXT: ],
 // EMPTY-NEXT: key.kind: source.lang.swift.codecomplete.group
 // EMPTY-NEXT: key.name: ""
+
+// XFAIL: lsan

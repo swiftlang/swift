@@ -48,3 +48,5 @@ testSuite.test("Character literal type") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

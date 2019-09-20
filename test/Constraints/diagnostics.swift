@@ -1273,3 +1273,5 @@ takesGenericFunction(true) // expected-error {{cannot convert value of type 'Boo
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
 takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any], [Any])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+// XFAIL: lsan

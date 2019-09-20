@@ -48,3 +48,5 @@ func foo() {
 // CHECK: key.sourcetext: "    {"
 // CHECK: key.sourcetext: "        foo()"
 // CHECK: key.sourcetext: "    }"
+
+// XFAIL: lsan

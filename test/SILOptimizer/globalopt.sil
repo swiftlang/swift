@@ -477,3 +477,5 @@ bb5:
 
 sil [_semantics "availability.test"] @test_availability : $@convention(thin) () -> Builtin.Int1
 
+
+// XFAIL: lsan

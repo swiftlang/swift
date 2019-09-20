@@ -21,3 +21,4 @@ protocol Proto {}
 
 // CHECK: @thick Proto.Type
 // CHECK: @objc_metatype Proto.Type
+// XFAIL: lsan

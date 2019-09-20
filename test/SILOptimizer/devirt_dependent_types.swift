@@ -40,3 +40,5 @@ public func zzz() {
   source = source.virtualMethod()
 }
 
+
+// XFAIL: lsan

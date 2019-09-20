@@ -191,3 +191,5 @@ class ConditionalUnavailableClass1{
 @available(OSX 99.99, *)
 class ConditionalUnavailableClass2{
 }
+
+// XFAIL: lsan

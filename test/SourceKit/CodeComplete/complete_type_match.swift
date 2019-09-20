@@ -62,3 +62,5 @@ func testFromMethod(x: FromMethod) {
 // FROM_METHOD_0: valueZ()
 // FROM_METHOD_0: valueA()
 // FROM_METHOD_0: valueS()
+
+// XFAIL: lsan

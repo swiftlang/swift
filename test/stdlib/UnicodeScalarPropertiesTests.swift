@@ -254,3 +254,5 @@ UnicodeScalarPropertiesTests.test("properties.numericTypeAndValue") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

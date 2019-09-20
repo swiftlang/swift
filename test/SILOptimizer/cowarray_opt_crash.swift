@@ -33,3 +33,5 @@ test {
   print(v.count)
 }
 
+
+// XFAIL: lsan

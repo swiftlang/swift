@@ -1078,3 +1078,5 @@ public func getStaticProp() -> HasStaticProp {
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RP]] : $Builtin.RawPointer to [strict] $*HasStaticProp
 // CHECK: load [copy] [[ADR]] : $*HasStaticProp
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13getStaticPropAA03HaseF0CyF'
+
+// XFAIL: lsan

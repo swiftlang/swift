@@ -169,3 +169,5 @@ func test6(x: DoesEverything) {
 // KNOWN: ===
 // KNOWN: !==
 // KNOWN: ~=
+
+// XFAIL: lsan

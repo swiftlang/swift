@@ -861,3 +861,5 @@ suite.test("partitionPoint") {
 
 runAllTests()
 
+
+// XFAIL: lsan

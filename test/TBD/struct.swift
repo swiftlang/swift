@@ -285,3 +285,5 @@ private struct StructPrivateGeneric<T, U, V> {
 
   private static func privateStaticGeneric<A>(_: A) {}
 }
+
+// XFAIL: lsan

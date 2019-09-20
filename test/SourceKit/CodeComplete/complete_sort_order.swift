@@ -213,3 +213,5 @@ func test7() {
 // CASE_0: CaseSensitiveCheck
 // CASE_0: CaseSensitiveCheck(
 // CASE_0: ]
+
+// XFAIL: lsan

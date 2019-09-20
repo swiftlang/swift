@@ -30,3 +30,5 @@ func brokenEnums() {
     return "one"
   }
 }
+
+// XFAIL: lsan

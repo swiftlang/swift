@@ -57,3 +57,5 @@ func typeCheckOnly() {
 }
 
 #endif
+
+// XFAIL: lsan

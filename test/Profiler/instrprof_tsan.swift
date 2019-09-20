@@ -10,3 +10,5 @@ func empty() {
 }
 
 empty()
+
+// XFAIL: lsan

@@ -401,3 +401,5 @@ EnumTestSuite.test("TrapOnUnexpected/NestedSwiftExhaustive")
 #endif
 
 runAllTests()
+
+// XFAIL: lsan

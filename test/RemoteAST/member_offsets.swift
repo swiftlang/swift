@@ -83,3 +83,4 @@ printTypeMemberOffset(B<Float>.self, "f")
 // CHECK-NEXT: type has no member named 'f'
 
 stopRemoteAST()
+// XFAIL: lsan

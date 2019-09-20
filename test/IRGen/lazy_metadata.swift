@@ -114,3 +114,5 @@ public func callfuncD() {
   consume4(d)
 }
 
+
+// XFAIL: lsan

@@ -176,3 +176,5 @@ func test7(x: Arr) {
 // MAP-NEXT: map()
 // MAP-NEXT: withUnsafeMutablePointer()
 // MAP-NEXT: ]
+
+// XFAIL: lsan

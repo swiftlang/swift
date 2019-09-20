@@ -96,3 +96,5 @@
 // CHECK-NEXT:     key.length: 3
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+
+// XFAIL: lsan

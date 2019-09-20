@@ -17,3 +17,5 @@ struct Person {
 // CASE1: source.lang.swift.ref.var.instance (2:9-2:13)
 // CASE2: source.lang.swift.ref.var.local (3:10-3:15)
 // CASE3: source.lang.swift.decl.var.parameter (7:15-7:16)
+
+// XFAIL: lsan

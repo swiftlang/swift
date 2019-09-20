@@ -14,3 +14,5 @@ class A {
     // CHECK2: source.lang.swift.ref.var.instance
   }
 }
+
+// XFAIL: lsan

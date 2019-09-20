@@ -37,3 +37,5 @@ class Foo {}
 /*
 *
 func foo2() {}
+
+// XFAIL: lsan

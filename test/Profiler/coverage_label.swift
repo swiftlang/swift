@@ -23,3 +23,5 @@ func foo() { // CHECK-DAG: [[@LINE]]:12 -> [[@LINE+19]]:2 : 0
 }
 
 foo()
+
+// XFAIL: lsan

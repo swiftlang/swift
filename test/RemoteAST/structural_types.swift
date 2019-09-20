@@ -75,3 +75,4 @@ foo() { (x: Int) -> Int in return x }
 // CHECK: found type: (Int) -> Int
 
 stopRemoteAST()
+// XFAIL: lsan

@@ -113,3 +113,5 @@ func testAcceptColorTagged(i: Int, s: String) {
 // CAPTURED_VALUE_METHOD: <Container>$sSiD</Container>
 // CAPTURED_VALUE_METHOD: <Declaration>func tag&lt;Tag&gt;(_ tag: Tag) -&gt; <Type usr="s:11BuilderTest6TaggedV">Tagged</Type>&lt;Tag, <Type usr="s:Si">Int</Type>&gt;</Declaration>
 // CAPTURED_VALUE_METHOD: <decl.function.method.instance><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>tag</decl.name>&lt;Tag&gt;(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>tag</decl.var.parameter.name>: <decl.var.parameter.type>Tag</decl.var.parameter.type></decl.var.parameter>) -&gt; <decl.function.returntype><ref.struct usr="s:11BuilderTest6TaggedV">Tagged</ref.struct>&lt;Tag, <ref.struct usr="s:Si">Int</ref.struct>&gt;</decl.function.returntype></decl.function.method.instance>
+
+// XFAIL: lsan

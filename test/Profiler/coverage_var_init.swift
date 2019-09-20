@@ -27,3 +27,5 @@ final class VarInit {
 }
 
 VarInit().coverageFunction()
+
+// XFAIL: lsan

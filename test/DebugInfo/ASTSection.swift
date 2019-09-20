@@ -29,3 +29,5 @@ func objCUser(_ obj: ObjCClass) {}
 
 // LINETABLE-CHECK-NOT: ASTSection
 
+
+// XFAIL: lsan

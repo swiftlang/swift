@@ -38,3 +38,5 @@ struct Foo {
 // CHECK: key.sourcetext: "        ]"
 // CHECK: key.sourcetext: "        ])"
 // CHECK: key.sourcetext: "        ])"
+
+// XFAIL: lsan

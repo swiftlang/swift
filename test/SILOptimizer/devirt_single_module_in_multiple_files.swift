@@ -15,3 +15,5 @@ public func test() {
 // CHECK: %{{.*}} = class_method %{{.*}} : $Problem2, #Problem2.run!1 : (Problem2) -> () -> Int, $@convention(method) (@guaranteed Problem2) -> Int
 // CHECK-NEXT: apply
 // CHECK: return
+
+// XFAIL: lsan

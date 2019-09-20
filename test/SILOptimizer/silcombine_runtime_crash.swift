@@ -19,3 +19,5 @@ save(value: 0)
 
 // CHECK: ok
 print("ok")
+
+// XFAIL: lsan

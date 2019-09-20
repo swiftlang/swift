@@ -67,3 +67,5 @@ struct OtherStruct {
 // CHECK2_DECL: source.lang.swift.decl.var.global (34:5-34:14)
 // CHECK2_REF: source.lang.swift.ref.var.global (34:5-34:14)
 // CHECK2-NEXT: someValue
+
+// XFAIL: lsan

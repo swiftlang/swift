@@ -15,3 +15,5 @@ func foo(x : Bool) { // CHECK: [[@LINE]]:20 -> {{[0-9]+}}:2 : 0
 
 foo(x: true);
 foo(x: false);
+
+// XFAIL: lsan

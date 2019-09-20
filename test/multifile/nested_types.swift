@@ -22,3 +22,5 @@ public func test() {
 
   print("a \(c)")
 }
+
+// XFAIL: lsan

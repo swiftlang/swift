@@ -32,3 +32,5 @@ bb2:
   return %0 : $Builtin.Int8
 }
 
+
+// XFAIL: lsan

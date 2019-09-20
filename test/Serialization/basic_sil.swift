@@ -16,3 +16,5 @@ import def_basic
 func test_all() {
   serialize_all()
 }
+
+// XFAIL: lsan

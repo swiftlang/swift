@@ -11,3 +11,5 @@
 // COMPILE_1: <empty cursor info; internal diagnostic: "Unable to resolve cursor info.">
 // COMPILE_1-NOT: compile-will-start
 // COMPILE_1-NOT: compile-did-finish
+
+// XFAIL: lsan

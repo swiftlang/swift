@@ -39,3 +39,5 @@ extension MyCollection : BidirectionalCollection
     fatalError()
   }
 }
+
+// XFAIL: lsan

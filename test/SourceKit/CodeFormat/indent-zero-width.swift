@@ -20,3 +20,5 @@ b: Int) {}
 // CHECK: key.sourcetext: "var test : Int"
 // CHECK: key.sourcetext: "    test = 1"
 // CHECK: key.sourcetext: "         b: Int) {}"
+
+// XFAIL: lsan

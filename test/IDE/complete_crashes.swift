@@ -378,3 +378,5 @@ struct test_54215016 {
 // RDAR_54215016: Begin completions
   }
 }
+
+// XFAIL: lsan

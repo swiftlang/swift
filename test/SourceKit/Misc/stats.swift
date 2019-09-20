@@ -57,3 +57,5 @@ func foo() {}
 // SEMA_4: 1 {{.*}} source.statistic.max-asts-in-memory
 // SEMA_4: 1 {{.*}} source.statistic.num-ast-cache-hits
 // SEMA_4: 0 {{.*}} source.statistic.num-ast-snaphost-uses
+
+// XFAIL: lsan

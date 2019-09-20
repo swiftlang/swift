@@ -83,3 +83,5 @@
 // RUN: cd %t && %target-build-swift -c -emit-module -output-file-map ./output.json -incremental ./foo.swift ./bar.swift ./baz.swift -module-name testmodule -v 2>&1
 // RUN: diff %t/testmodule.swiftmodule %t-moduleonly.swiftmodule
 // RUN: diff %t/testmodule.swiftdoc %t-moduleonly.swiftdoc
+
+// XFAIL: lsan

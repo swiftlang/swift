@@ -142,3 +142,4 @@ struct N {
 N.testPrivate()
 
 stopRemoteAST()
+// XFAIL: lsan

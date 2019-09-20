@@ -35,3 +35,5 @@ testit()
 // CHECK: ok
 print("ok")
 
+
+// XFAIL: lsan

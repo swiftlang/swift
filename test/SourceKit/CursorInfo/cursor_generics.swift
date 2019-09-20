@@ -37,3 +37,5 @@ class MyType<T> {
 // RUN: %sourcekitd-test -req=cursor -pos=18:14 %s -- %s | %FileCheck -check-prefix=CHECK5 %s
 // CHECK5: source.lang.swift.ref.var.instance
 // CHECK5: <Declaration>let items: [<Type usr="s:Si">Int</Type>]</Declaration>
+
+// XFAIL: lsan

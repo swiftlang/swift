@@ -345,3 +345,5 @@ class TestTypesWithoutName2 {
 }
 
 // NO_COMPLETION-NOT: Begin completions
+
+// XFAIL: lsan

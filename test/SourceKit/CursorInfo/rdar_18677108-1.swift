@@ -11,3 +11,5 @@ class CameraViewController
     cameraController.checkDeviceAuthorizationStatusAndConfigureDevice()
   }
 }
+
+// XFAIL: lsan

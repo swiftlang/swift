@@ -12,3 +12,5 @@ func foo() {
 }
 
 
+
+// XFAIL: lsan

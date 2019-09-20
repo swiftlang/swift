@@ -2188,3 +2188,5 @@ func testWrapSuccess(promise: Int, seal: Resolver<Void>) {
   // COMPLETE_CALL_RESULT: Pattern/CurrModule:                 ({#Void#}, {#Bool#})[#Void#]; name=(Void, Bool)
   // COMPLETE_CALL_RESULT: End completions
 }
+
+// XFAIL: lsan

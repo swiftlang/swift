@@ -110,3 +110,5 @@ do {
 // CHECK: (P & Q).Protocol
 // CHECK: (C & P & Q).Protocol
 // CHECK: (P & Q & AnyObject).Protocol
+
+// XFAIL: lsan

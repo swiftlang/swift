@@ -9,3 +9,5 @@ import func test_module.globalFunc
 func test() {
   globalFunc()
 }
+
+// XFAIL: lsan

@@ -60,3 +60,5 @@ func test(r: Lens<Rectangle>) {
 // YREF: ACTIONS BEGIN
 // YREF: source.refactoring.kind.rename.global
 // YREF: ACTIONS END
+
+// XFAIL: lsan

@@ -13,3 +13,5 @@ func hasStaticViolation() {
   var l = X()
   takesInout(&l.f, &l.f)
 }
+
+// XFAIL: lsan

@@ -106,3 +106,5 @@ func inner2() -> Any.Type {
 func inner3() -> Any.Type {
   return SG11<ConformsToP1, ConformsToP2>.InnerTEqualsConformsToP1<ConformsToP3>.self
 }
+
+// XFAIL: lsan

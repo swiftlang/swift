@@ -1134,3 +1134,5 @@ func testUnbound2(x: OuterStruct<Int>.Inner.#^UNBOUND_DOT_2^#) {}
 
 func testGenericArgForOptional() -> Set<#^GENERICARG_OPTIONAL^#>? {}
 // GENERICARG_OPTIONAL: Begin completions
+
+// XFAIL: lsan

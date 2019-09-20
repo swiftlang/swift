@@ -11,3 +11,5 @@ struct S : P {
 
   func f() {}
 }
+
+// XFAIL: lsan

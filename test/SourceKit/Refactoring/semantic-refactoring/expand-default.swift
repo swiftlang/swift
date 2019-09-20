@@ -14,3 +14,5 @@ func foo(e : E) {
 // RUN: diff -u %S/expand-default.swift.expected %t.result/expand-default.swift.expected
 
 // REQUIRES-ANY: OS=macosx, OS=linux-gnu
+
+// XFAIL: lsan

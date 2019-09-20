@@ -125,3 +125,5 @@ func goo() {
 eoo()
 foo()
 goo()
+
+// XFAIL: lsan

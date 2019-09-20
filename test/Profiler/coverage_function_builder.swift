@@ -29,3 +29,5 @@ func test1() -> Int {
     8
   }
 }
+
+// XFAIL: lsan

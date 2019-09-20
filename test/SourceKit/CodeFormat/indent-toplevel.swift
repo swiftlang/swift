@@ -12,3 +12,5 @@ var someProperty: String {
 // CHECK: key.sourcetext: "for i in 0...5 {"
 // CHECK: key.sourcetext: "}"
 // CHECK: key.sourcetext: "    "
+
+// XFAIL: lsan

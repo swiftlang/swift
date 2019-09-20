@@ -10,3 +10,5 @@ func testClangModule() {
 
 // CHECK-TOP:     fooHelperFunc1
 // CHECK-TOP-NOT: fooHelperFunc1({#(a): Int32#})[#Int32#]; name=fooHelperFunc1(a: Int32){{; name=.+$}}
+
+// XFAIL: lsan

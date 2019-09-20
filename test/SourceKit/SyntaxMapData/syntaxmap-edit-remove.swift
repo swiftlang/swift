@@ -55,3 +55,5 @@
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT: ],
+
+// XFAIL: lsan

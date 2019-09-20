@@ -20,3 +20,5 @@ func foo() {
 // RUN: diff -u %S/local-rename-lazy.swift.expected %t.result/local-rename-lazy.swift.expected
 
 // REQUIRES-ANY: OS=macosx, OS=linux-gnu
+
+// XFAIL: lsan

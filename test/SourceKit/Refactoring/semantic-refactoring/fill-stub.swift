@@ -9,3 +9,5 @@ class C1 : P {}
 // RUN: diff -u %S/fill-stub.swift.expected %t.result/fill-stub.swift.expected
 
 // REQUIRES-ANY: OS=macosx, OS=linux-gnu
+
+// XFAIL: lsan

@@ -86,3 +86,5 @@
 public func test_func1() {
   print("Hello")
 }
+
+// XFAIL: lsan

@@ -41,3 +41,5 @@ testSuite.test("StaticString literal type") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

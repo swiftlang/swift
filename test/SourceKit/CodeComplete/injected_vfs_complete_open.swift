@@ -49,3 +49,5 @@ func foo(
 // INNER_CMODULE: key.name: "StructDefinedInCModule"
 // INNER_CMODULE: key.name: "StructDefinedInCModule."
 // INNER_CMODULE: key.name: "StructDefinedInCModule("
+
+// XFAIL: lsan

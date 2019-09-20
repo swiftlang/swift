@@ -42,3 +42,5 @@ x
 //                        "foo(a: ["
 // CHECK: key.sourcetext: "    3: 3"
 // CHECK: key.sourcetext: "    x"
+
+// XFAIL: lsan

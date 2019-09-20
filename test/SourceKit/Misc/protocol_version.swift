@@ -2,3 +2,5 @@
 
 // CHECK: key.version_major: 1
 // CHECK: key.version_minor: 0
+
+// XFAIL: lsan

@@ -376,3 +376,5 @@ struct RACStruct {
 }
 
 extension RACStruct : RandomAccessCollection {}
+
+// XFAIL: lsan

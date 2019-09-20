@@ -13,3 +13,5 @@ struct S {
     }
   }
 }
+
+// XFAIL: lsan

@@ -21,3 +21,5 @@ class BaseChatViewController {
 extension BaseChatViewController: ChatDataSourceDelegateProtocol {
     func chatDataSourceDidUpdate() { fatalError() }
 }
+
+// XFAIL: lsan

@@ -35,3 +35,5 @@ func operators(a : Bool, b : Bool) {
 // CHECK: %[[INDEX:.*]] = integer_literal $Builtin.Int32, 0
 // CHECK: builtin "int_instrprof_increment"(%[[NAME]] : {{.*}}, %[[HASH]] : {{.*}}, %[[NCOUNTS]] : {{.*}}, %[[INDEX]] : {{.*}})
 // CHECK-NOT: builtin "int_instrprof_increment"
+
+// XFAIL: lsan

@@ -32,3 +32,5 @@ func DictS(_ a: [Int: S]) {
 // CHECK: (291, 292): Int?
 // CHECK: (295, 332): Int?
 // CHECK: (295, 320): Int
+
+// XFAIL: lsan

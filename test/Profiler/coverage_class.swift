@@ -59,3 +59,5 @@ struct S2 {
 class C2 {
   lazy var offset: Int = true ? 30 : 55
 }
+
+// XFAIL: lsan

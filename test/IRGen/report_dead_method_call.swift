@@ -58,3 +58,5 @@ public class PublicBase {
 	}
 }
 
+
+// XFAIL: lsan

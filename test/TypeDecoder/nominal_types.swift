@@ -188,3 +188,5 @@ extension STSContainer℠ where T == STSOuter {
 // CHECK-DECL: nominal_types.(file).GenericOuter.GenericInner
 // CHECK-DECL: nominal_types.(file).P
 // CHECK-DECL: nominal_types.(file).Constrained
+
+// XFAIL: lsan

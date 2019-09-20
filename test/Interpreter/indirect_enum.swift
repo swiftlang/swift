@@ -37,3 +37,5 @@ func main() {
 
 main()
 
+
+// XFAIL: lsan

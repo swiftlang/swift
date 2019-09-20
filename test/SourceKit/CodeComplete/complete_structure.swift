@@ -125,3 +125,5 @@ struct S2: P1 {
   #^ASSOCIATED_TYPE_1^#
 }
 // ASSOCIATED_TYPE_1: {name:T = }{params:{l:Type}}
+
+// XFAIL: lsan

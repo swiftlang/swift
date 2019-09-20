@@ -37,3 +37,5 @@
 // CHECK-NEXT:     key.length: 1
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
+
+// XFAIL: lsan

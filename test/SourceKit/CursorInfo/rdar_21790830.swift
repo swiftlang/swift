@@ -4,3 +4,5 @@ extension Undeclared {
 
 // RUN: %sourcekitd-test -req=cursor -pos=2:8 %s -- %s
 // CHECK: <Declaration>func foo()
+
+// XFAIL: lsan

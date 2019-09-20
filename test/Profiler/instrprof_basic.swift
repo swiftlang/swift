@@ -60,3 +60,5 @@ func exceptions() {
 
   // CHECK-NOT: builtin "int_instrprof_increment"
 }
+
+// XFAIL: lsan

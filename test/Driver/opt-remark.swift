@@ -47,3 +47,5 @@ func foo() {
   // REMARK_PASSED-NOT: remark: Not profitable
   small()
 }
+
+// XFAIL: lsan

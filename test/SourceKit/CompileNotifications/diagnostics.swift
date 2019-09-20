@@ -87,3 +87,5 @@
 // RUN: %sourcekitd-test -req=track-compiles == -req=syntax-map %s | %FileCheck %s -check-prefix=SYNTACTIC
 // SYNTACTIC: key.syntaxmap:
 // SYNTACTIC_NOT: key.notification: source.notification.compile-did-finish
+
+// XFAIL: lsan

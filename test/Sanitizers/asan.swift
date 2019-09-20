@@ -38,3 +38,5 @@ a.deinitialize(count: 1)
 a.deallocate()
 
 // CHECK: AddressSanitizer: heap-use-after-free
+
+// XFAIL: lsan

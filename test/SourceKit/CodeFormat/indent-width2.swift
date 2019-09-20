@@ -29,3 +29,5 @@ test = 1
 // CHECK: key.sourcetext: "  "
 // CHECK: key.sourcetext: "}"
 
+
+// XFAIL: lsan

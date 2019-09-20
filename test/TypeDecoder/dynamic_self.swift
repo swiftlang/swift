@@ -15,3 +15,5 @@ class Me {
 
 // DEMANGLE: $s12dynamic_self2MeCXDXMTD
 // CHECK: @thick Self.Type
+
+// XFAIL: lsan

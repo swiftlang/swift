@@ -6,3 +6,5 @@
 
 // CHECK:      source.lang.swift.decl.function.free (1:6-1:20)
 // CHECK-NEXT: foo2
+
+// XFAIL: lsan

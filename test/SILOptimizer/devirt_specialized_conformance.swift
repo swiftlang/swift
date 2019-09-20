@@ -74,3 +74,5 @@ func testWithUnsafeBytes<T>(_ t: T) {
 }
 
 testWithUnsafeBytes([])
+
+// XFAIL: lsan

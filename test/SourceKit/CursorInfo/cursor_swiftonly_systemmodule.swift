@@ -38,3 +38,5 @@ func test() {
 // CHECK-NEXT: <Declaration>func someFunc()</Declaration>
 // CHECK-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>someFunc</decl.name>()</decl.function.free>
 // CHECK-NEXT: </LocalizationKey>
+
+// XFAIL: lsan

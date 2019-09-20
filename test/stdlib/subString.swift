@@ -248,3 +248,5 @@ SubstringTests.test("Substring.base") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

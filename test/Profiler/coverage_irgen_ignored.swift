@@ -5,3 +5,5 @@
 // CHECK-IGNORED-NOT: profc
 func foo() {}
 foo()
+
+// XFAIL: lsan

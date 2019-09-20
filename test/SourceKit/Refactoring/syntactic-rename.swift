@@ -154,3 +154,5 @@ _ = Memberwise2.init(m: 2, n: Memberwise1(x: 34))
 // RUN: diff -u %S/find-rename-ranges/rename-P.expected %t.ranges/rename-P.expected
 // RUN: %sourcekitd-test -req=find-rename-ranges -rename-spec %S/syntactic-rename/keywordbase.in.json %s -- -swift-version 4 >> %t.ranges/keywordbase.expected
 // RUN: diff -u %S/find-rename-ranges/keywordbase.expected %t.ranges/keywordbase.expected
+
+// XFAIL: lsan

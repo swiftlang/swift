@@ -9,3 +9,5 @@ for i in 0...a.count {
   let x = 0
 }
 
+
+// XFAIL: lsan

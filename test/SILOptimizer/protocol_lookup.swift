@@ -30,3 +30,5 @@ class StaticWibble : StaticBar, StaticFoo {
 // CHECK: StaticWibble.foo
 print(StaticWibble.mightHaveFoo())
 
+
+// XFAIL: lsan

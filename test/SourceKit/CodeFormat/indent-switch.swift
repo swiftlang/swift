@@ -143,3 +143,5 @@ func foo4() {
 // CHECK: key.sourcetext: "        default:"
 // CHECK: key.sourcetext: "            break"
 // CHECK: key.sourcetext: "    }"
+
+// XFAIL: lsan

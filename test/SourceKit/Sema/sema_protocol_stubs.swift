@@ -10,3 +10,5 @@ class C1: P1, P2 {}
 // CHECK: key.description: "type 'C1' does not conform to protocol 'P1'"
 // CHECK: key.description: "type 'C1' does not conform to protocol 'P2'"
 // CHECK: key.description: "do you want to add protocol stubs?"
+
+// XFAIL: lsan

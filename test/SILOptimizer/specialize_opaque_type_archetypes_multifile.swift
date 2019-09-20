@@ -23,3 +23,5 @@ public func test() {
   print(bar(5))
   print(bar2(5))
 }
+
+// XFAIL: lsan

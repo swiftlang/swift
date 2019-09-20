@@ -3750,3 +3750,5 @@ bb0(%0 : $@thin T.Type):
   %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
   return %1 : $Builtin.Int1
 }
+
+// XFAIL: lsan

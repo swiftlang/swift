@@ -7,3 +7,5 @@ class Cl{
   var L : CALayer = {
     let layer = CALayer()
     layer.transform = #^TOK1^#
+
+// XFAIL: lsan

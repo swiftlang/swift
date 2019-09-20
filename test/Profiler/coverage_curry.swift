@@ -15,3 +15,5 @@ func testS0CurriedInstanceMethods(s0: S0, a: Int, b: Int) {
   _ = S0.f1(a:b:)(s0)(a, b)
   let f1OneLevel = S0.f1(s0)
 }
+
+// XFAIL: lsan

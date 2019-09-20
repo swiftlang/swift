@@ -20,3 +20,5 @@ func test46103190() {
   let _: [String: Rdar46103190Impl] = Rdar46103190Impl.StringMap()
   let _: [String: Rdar46103190Impl] = Rdar46103190Alias()
 }
+
+// XFAIL: lsan

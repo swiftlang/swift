@@ -8,3 +8,5 @@ class ImageSet {
     /*here:*/StandImageSet()
   }
 }
+
+// XFAIL: lsan

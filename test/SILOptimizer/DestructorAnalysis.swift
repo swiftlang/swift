@@ -20,3 +20,5 @@ d.append([Foo()])
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Foo>
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Array<Foo>>
 // CHECK-DAG: mayStoreToMemoryOnDestruction is true: Array<Element>
+
+// XFAIL: lsan

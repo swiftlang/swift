@@ -7,3 +7,5 @@ func foo() -> String {
 // RUN: diff -u %S/localize-string.swift.expected %t.result/localize-string.swift.expected
 
 // REQUIRES-ANY: OS=macosx, OS=linux-gnu
+
+// XFAIL: lsan

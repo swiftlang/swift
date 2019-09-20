@@ -13,3 +13,5 @@ func foo() {
 
 // DEMANGLE: $sSiXSq_SfXSaSdSSXSDSbXSptD
 // CHECK: (Int?, [Float], [Double : String], (Bool))
+
+// XFAIL: lsan

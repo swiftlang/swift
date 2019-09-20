@@ -59,3 +59,5 @@ func resyncParser2() {}
 
 // RUN: %sourcekitd-test -req=cursor -pos=21:6 %s -- %s | %FileCheck -check-prefix=EQEQ3 %s
 // EQEQ3: <decl.function.operator.infix><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>== </decl.name>(<decl.var.parameter><decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>, <decl.var.parameter><decl.var.parameter.name>y</decl.var.parameter.name>: <decl.var.parameter.type><ref.class usr="s:14cursor_invalid1CC">C</ref.class></decl.var.parameter.type></decl.var.parameter>)</decl.function.operator.infix>
+
+// XFAIL: lsan

@@ -820,3 +820,5 @@ bb14:                                             // Preds: bb12 bb1
   %32 = struct $Int32 (%31 : $Builtin.Int32)      // user: %33
   return %32 : $Int32                             // id: %33
 } // end sil function 'promote_with_unreachable_block_nest_bug'
+
+// XFAIL: lsan

@@ -15,3 +15,5 @@ public func testit() {
   print("Hello")
 }
 
+
+// XFAIL: lsan

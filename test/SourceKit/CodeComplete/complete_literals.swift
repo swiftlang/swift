@@ -95,3 +95,5 @@ let x3: Opaque = #^EXPR6,,colo,ni,tru,fals^#
 // LITERAL_NO_TYPE: key.kind: source.lang.swift.literal.boolean
 // LITERAL_NO_TYPE-NOT: source.lang.swift.literal
 // LITERAL_NO_TYPE: ]
+
+// XFAIL: lsan

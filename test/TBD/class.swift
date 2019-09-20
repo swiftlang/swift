@@ -344,3 +344,5 @@ private class PrivateGeneric<T, U, V> {
 
   private static func privateStaticGeneric<A>(_: A, default_: Int = 0) {}
 }
+
+// XFAIL: lsan

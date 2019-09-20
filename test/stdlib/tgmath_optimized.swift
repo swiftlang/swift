@@ -39,3 +39,5 @@ TGMathTestSuite.test("sqrt") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

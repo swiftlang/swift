@@ -8,3 +8,5 @@ subscript (__PLACEHOLDER_0__) -> __PLACEHOLDER_1__ {
 }
 
 // RUN: %sourcekitd-test -req=format -line=1 -length=1 %s >%t.response
+
+// XFAIL: lsan

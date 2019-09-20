@@ -51,3 +51,5 @@ func test() {
 // CHECK-NEXT:       key.associated_usrs: "s:12DocBriefTest1SV3fooyyF s:12DocBriefTest1PP3fooyyF",
 // CHECK-NEXT:       key.modulename: "DocBriefTest"
 // CHECK-NEXT:     }
+
+// XFAIL: lsan

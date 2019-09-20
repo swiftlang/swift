@@ -11,3 +11,5 @@
 
 // CHECK2: source.lang.swift.ref.var.instance ({{.*}}forbid_typecheck_2.swift:10:7-10:13)
 // CHECK2: member
+
+// XFAIL: lsan

@@ -15,3 +15,5 @@ struct MicroSequence : Sequence, IteratorProtocol {
   }
 }
 
+
+// XFAIL: lsan

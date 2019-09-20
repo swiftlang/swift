@@ -7,3 +7,5 @@ import MyModule
 _ = fooSwiftFunc()
 
 // CHECK: <Group>GroupA</Group>
+
+// XFAIL: lsan

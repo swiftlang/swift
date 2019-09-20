@@ -93,3 +93,5 @@ DictionaryTraps.test("RemoveInvalidIndex4")
 }
 
 runAllTests()
+
+// XFAIL: lsan

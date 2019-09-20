@@ -74,3 +74,5 @@ extension D {
 // CHECK6: public func foo()
 // CHECK6: public func unconditionalFunc1()
 // CHECK6: public func unconditionalFunc2(t: Int) -> Int
+
+// XFAIL: lsan

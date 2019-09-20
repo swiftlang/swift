@@ -13,3 +13,5 @@ class DesignatedStubs : Gizmo {
 
 // CHECK-RELEASE-NOT: unimplemented_initializer.swift",
 
+
+// XFAIL: lsan

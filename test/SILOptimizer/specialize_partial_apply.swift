@@ -244,3 +244,5 @@ print(testit3_throwing(false))
 // CHECK-OUTPUT: 125
 print(testit3_throwing(true))
 
+
+// XFAIL: lsan

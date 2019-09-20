@@ -27,3 +27,5 @@ func test() {
 // WITH_HIDING: fromAuxFile()
 // WITH_HIDING: fromMainModule()
 // WITH_HIDING-NOT: fromImportedByAuxFile
+
+// XFAIL: lsan

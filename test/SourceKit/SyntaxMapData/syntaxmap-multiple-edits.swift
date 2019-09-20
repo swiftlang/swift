@@ -249,3 +249,5 @@
 // CHECK-NEXT:   }
 // CHECK-NEXT: ],
 
+
+// XFAIL: lsan

@@ -7,3 +7,5 @@ struct Foo {
 
   let baz : Array < Int >
       }
+
+// XFAIL: lsan

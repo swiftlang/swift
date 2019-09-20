@@ -23,3 +23,5 @@ final class VarInit {
     return "Hello"
   }
 }
+
+// XFAIL: lsan

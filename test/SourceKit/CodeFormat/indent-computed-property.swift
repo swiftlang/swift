@@ -72,3 +72,5 @@ class C3 {
                           "    didSet {"
 // CHECK: key.sourcetext: "        print()"
 // CHECK: key.sourcetext: "  {}"
+
+// XFAIL: lsan

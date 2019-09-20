@@ -332,3 +332,5 @@ public func testVarTuple(s: S3) -> Int32 {
 }
 
 
+
+// XFAIL: lsan

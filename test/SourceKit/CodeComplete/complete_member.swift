@@ -76,3 +76,5 @@ func testOverrideUSR() {
 // CHECK-OVERRIDE_USR-NEXT:     key.associated_usrs: "s:15complete_member7DerivedC3fooyyF s:15complete_member4BaseC3fooyyF",
 // CHECK-OVERRIDE_USR-NEXT:     key.modulename: "complete_member"
 // CHECK-OVERRIDE_USR-NEXT: }
+
+// XFAIL: lsan

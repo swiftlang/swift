@@ -143,3 +143,5 @@ DynamicallyReplaceable.test("DynamicallyReplaceable") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

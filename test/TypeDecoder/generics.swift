@@ -121,3 +121,4 @@ struct OuterBoth<A : First & Second, B : First & Second> {
 
 // DEMANGLE-DECL: $s8generics6SecondP5AssocQa
 // CHECK-DECL: generics.(file).Second.Assoc
+// XFAIL: lsan

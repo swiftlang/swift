@@ -23,3 +23,5 @@ final public class Escaper {
   }
 }
 
+
+// XFAIL: lsan

@@ -27,3 +27,5 @@ sil_coverage_map "/some/other/file.sil" "someFunction" "/some/other/file.sil:som
   17:9 -> 17:17: (0 + (2 - 3))
   22:11->139:2 : (zero + 1)
 }
+
+// XFAIL: lsan

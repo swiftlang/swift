@@ -12,3 +12,5 @@ func call_auto_closure() {
   }
   let _ = use_auto_closure(false || true)
 }
+
+// XFAIL: lsan

@@ -36,3 +36,5 @@ private var privateVarGetSet: Int {
     get { return 0 }
     set {}
 }
+
+// XFAIL: lsan

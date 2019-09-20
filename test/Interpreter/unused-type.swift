@@ -15,3 +15,5 @@ struct Dummy: Foo {
 
 // CHECK: ok
 print("ok")
+
+// XFAIL: lsan

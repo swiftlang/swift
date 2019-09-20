@@ -19,3 +19,5 @@
 // MANGLED-NEXT: $s3Foo4BaruCD
 // MANGLED-NEXT: $ss4BeerCD
 // MANGLED-NEXT: END MANGLE
+
+// XFAIL: lsan

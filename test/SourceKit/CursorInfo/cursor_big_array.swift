@@ -3,3 +3,5 @@
 // CHECK: gCubeVertexData
 // CHECK: s:9big_array15gCubeVertexDataSaySfGv
 // CHECK: [Float]
+
+// XFAIL: lsan

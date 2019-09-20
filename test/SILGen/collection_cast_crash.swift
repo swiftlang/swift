@@ -64,3 +64,5 @@ let s: Set<KeyClass> = Set()
 
 setUpCast(s)
 setDownCast(s)
+
+// XFAIL: lsan

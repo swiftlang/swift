@@ -66,3 +66,5 @@ func SArrayGen() -> [S] { return [] }
 
 // RUN: %sourcekitd-test -req=cursor -pos=37:22 %s -- %s | %FileCheck -check-prefix=CHECK7 %s
 // CHECK7: <Container>$s21cursor_info_container1SVXSaD</Container>
+
+// XFAIL: lsan

@@ -27,3 +27,5 @@ s.
 // RUN: not find %t/test
 // RUN: %sourcekitd-test -req=complete -pos=2:3 %s -- -emit-module -module-name test %s  -o %t/test.swiftmodule | %FileCheck %s
 // RUN: not find %t/test.swiftmodule
+
+// XFAIL: lsan

@@ -219,3 +219,5 @@ keyPathMultiModule.test("identity across multiple modules") {
 }
 
 runAllTests()
+
+// XFAIL: lsan

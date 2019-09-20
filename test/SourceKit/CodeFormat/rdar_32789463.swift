@@ -14,3 +14,5 @@ $
 // CHECK: key.sourcetext: "    let $: <#Type#>"
 // CHECK: key.sourcetext: "    = foo(\"foo \\($) bar\") {"
 // CHECK: key.sourcetext: "$"
+
+// XFAIL: lsan
