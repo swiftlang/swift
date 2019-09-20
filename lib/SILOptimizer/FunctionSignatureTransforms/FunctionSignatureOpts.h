@@ -111,9 +111,13 @@ struct ArgumentDescriptor {
     return Arg->hasConvention(P);
   }
 
+  /// Returns true if all function signature opt passes are able to process
+  /// this.
   bool canOptimizeLiveArg() const {
-    if (Arg->getType().isObject())
+    if (Arg->getType().isObject()) {
       return true;
+    }
+
     // @in arguments of generic types can be processed.
     if (Arg->getType().hasArchetype() &&
         Arg->getType().isAddress() &&
