@@ -152,13 +152,6 @@ enum class ImportTypeKind {
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter,
 
-  /// Import the type pointed to by a pointer or reference.
-  ///
-  /// This provides special treatment for pointer-to-ObjC-pointer
-  /// types, which get imported as pointers to *checked* optional,
-  /// *Pointer<NSFoo?>, instead of implicitly unwrapped optional as usual.
-  Pointee,
-
   /// Import the type of an ObjC property.
   ///
   /// This enables the conversion of bridged types. Properties are always
