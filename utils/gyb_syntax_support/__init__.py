@@ -11,6 +11,7 @@ from NodeSerializationCodes import SYNTAX_NODE_SERIALIZATION_CODES, \
     verify_syntax_node_serialization_codes
 
 from PatternNodes import PATTERN_NODES  # noqa: I201
+from SILOnlyNodes import SILONLY_NODES  # noqa: I201
 from StmtNodes import STMT_NODES  # noqa: I201
 import Token
 from Trivia import TRIVIAS  # noqa: I201
