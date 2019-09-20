@@ -759,6 +759,26 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
+bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto *AE = cast<AssignExpr>(getAnchor());
+  auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
+                                               : CTP_AssignSource;
+
+  ContextualFailure failure(
+      root, cs, CTP, getFromType(), getToType(),
+      cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
+  return failure.diagnose(asNote);
+}
+
+IgnoreAssignmentDestinationType *
+IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
+                                        Type destTy,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
+}
+
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   InOutConversionFailure failure(root, cs, getFromType(), getToType(),

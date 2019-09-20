@@ -2353,6 +2353,15 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
+    return llvm::any_of(conversionsOrFixes,
+                        [kind](const RestrictionOrFix correction) {
+                          if (auto restriction = correction.getRestriction())
+                            return restriction == kind;
+                          return false;
+                        });
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -2391,19 +2400,38 @@ bool ConstraintSystem::repairFailures(
 
       if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
         return true;
+
+      // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
+      // give solver a chance to determine which generic parameters are
+      // mismatched and produce a fix for that.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+        return false;
+
+      // If the situation has to do with protocol composition types and
+      // destination doesn't have one of the conformances e.g. source is
+      // `X & Y` but destination is only `Y` or vice versa, there is a
+      // tailored "missing conformance" fix for that.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+        return false;
+
+      // If this is an attempt to assign something to a value of optional type
+      // there is a possiblity that the problem is related to escapiness, so
+      // fix has to be delayed.
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::ValueToOptional))
+        return false;
+
+      // If the destination of an assignment is l-value type
+      // it leaves only possible reason for failure - a type mismatch.
+      if (getType(AE->getDest())->is<LValueType>()) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+        return true;
+      }
     }
 
     return false;
   }
-
-  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
-    return llvm::any_of(conversionsOrFixes,
-                        [kind](const RestrictionOrFix correction) {
-                          if (auto restriction = correction.getRestriction())
-                            return restriction == kind;
-                          return false;
-                        });
-  };
 
   auto elt = path.back();
   switch (elt.getKind()) {
