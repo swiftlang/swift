@@ -221,9 +221,38 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
         init->getParameters()->getArray(),
         [](const ParamDecl *decl) { return decl->isDefaultArgument(); });
 
-    // Only add non-synthesized initializers.
-    if (allParamsHaveDefaultArg && !init->isImplicit()) {
+    if (allParamsHaveDefaultArg) {
       defaultValueInitializers.push_back(init);
+    }
+  }
+
+  if (defaultValueInitializers.size() > 1) {
+    // Let's find the single most specialized init. If we don't have one, then
+    // we'll diagnose later.
+    if (auto TC = static_cast<TypeChecker *>(ctx.getLazyResolver())) {
+      Optional<unsigned> bestIdx;
+      for (unsigned i = 1, n = defaultValueInitializers.size(); i != n; ++i) {
+        auto bestOrPrevIdx = bestIdx ? bestIdx.getValue() : i - 1;
+        auto firstInit =
+            cast<ValueDecl>(defaultValueInitializers[bestOrPrevIdx]);
+        auto secondInit = cast<ValueDecl>(defaultValueInitializers[i]);
+
+        switch (TC->compareDeclarations(nominal, firstInit, secondInit)) {
+        case Comparison::Better:
+          bestIdx = bestOrPrevIdx;
+          break;
+        case Comparison::Worse:
+          bestIdx = i;
+          break;
+        case Comparison::Unordered:
+          break;
+        }
+      }
+
+      if (bestIdx.hasValue()) {
+        auto bestInit = defaultValueInitializers[bestIdx.getValue()];
+        defaultValueInitializers = {bestInit};
+      }
     }
   }
 
@@ -235,7 +264,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
     break;
 
   default:
-    // Diagnose ambiguous init() initializers.
+    // Diagnose ambiguous default value initializers.
     nominal->diagnose(diag::property_wrapper_ambiguous_default_value_init,
                       nominal->getDeclaredType());
     for (auto init : defaultValueInitializers) {
@@ -245,7 +274,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
     return nullptr;
   }
 
-  // 'init()' must be as accessible as the nominal type.
+  // The initializer must be as accessible as the nominal type.
   auto init = defaultValueInitializers.front();
   if (init->getFormalAccess() < nominal->getFormalAccess()) {
     init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
