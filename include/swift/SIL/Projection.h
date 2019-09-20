@@ -22,11 +22,12 @@
 #ifndef SWIFT_SIL_PROJECTION_H
 #define SWIFT_SIL_PROJECTION_H
 
+#include "swift/AST/TypeAlignments.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Basic/PointerIntEnum.h"
-#include "swift/AST/TypeAlignments.h"
-#include "swift/SIL/SILValue.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/ADT/Hashing.h"
@@ -751,17 +752,17 @@ public:
   ~ProjectionTreeNode() = default;
   ProjectionTreeNode(const ProjectionTreeNode &) = default;
 
-  llvm::ArrayRef<unsigned> getChildProjections() {
-     return llvm::makeArrayRef(ChildProjections);
+  bool isLeaf() const { return ChildProjections.empty(); }
+
+  ArrayRef<unsigned> getChildProjections() const {
+    return llvm::makeArrayRef(ChildProjections);
   }
 
-  llvm::Optional<Projection> &getProjection() { return Proj; }
+  Optional<Projection> &getProjection() { return Proj; }
 
   const ArrayRef<Operand *> getNonProjUsers() const {
     return llvm::makeArrayRef(NonProjUsers);
   }
-
-  bool isLeaf() const { return ChildProjections.empty(); }
 
   SILType getType() const { return NodeType; }
 
