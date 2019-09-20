@@ -482,34 +482,40 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 
   ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUse{
       DC, initialIsCascadingUse};
-  const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
-  if (useASTScopesForLookup() && !compareToASTScopes) {
+  const bool crosscheckUnqualifiedLookup =
+      Ctx.LangOpts.CrosscheckUnqualifiedLookup;
+  if (useASTScopesForLookup()) {
     static bool haveWarned = false;
     if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
     lookInASTScopes();
-    return;
-  }
-
+  } else {
 #ifndef NDEBUG
-  stopForDebuggingIfStartingTargetLookup(false);
+    stopForDebuggingIfStartingTargetLookup(false);
 #endif
 
-  if (Name.isOperator())
-    lookupOperatorInDeclContexts(contextAndIsCascadingUse);
-  else
-    lookupNamesIntroducedBy(contextAndIsCascadingUse);
+    if (Name.isOperator())
+      lookupOperatorInDeclContexts(contextAndIsCascadingUse);
+    else
+      lookupNamesIntroducedBy(contextAndIsCascadingUse);
+  }
 
-  if (compareToASTScopes && useASTScopesForLookupIfEnabled()) {
+  if (crosscheckUnqualifiedLookup && useASTScopesForLookupIfEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
-    UnqualifiedLookupFactory scopeLookup(Name, DC, Loc, options,
-                                         results, indexOfFirstOuterResult);
-    scopeLookup.lookInASTScopes();
-    assert(verifyEqualTo(std::move(scopeLookup), "UnqualifedLookup",
-                         "Scope lookup"));
+    UnqualifiedLookupFactory altLookup(Name, DC, Loc, options, results,
+                                       indexOfFirstOuterResult);
+    if (!useASTScopesForLookup())
+      altLookup.lookInASTScopes();
+    else if (Name.isOperator())
+      altLookup.lookupOperatorInDeclContexts(contextAndIsCascadingUse);
+    else
+      altLookup.lookupNamesIntroducedBy(contextAndIsCascadingUse);
+
+    assert(
+        verifyEqualTo(std::move(altLookup), "main lookup", "alternate lookup"));
   }
 }
 
