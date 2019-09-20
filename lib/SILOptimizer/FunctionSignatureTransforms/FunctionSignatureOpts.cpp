@@ -65,7 +65,7 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //===----------------------------------------------------------------------===//
 
 /// Set to true to enable the support for partial specialization.
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
     FSOEnableGenerics("sil-fso-enable-generics", llvm::cl::init(true),
                       llvm::cl::desc("Support function signature optimization "
                                      "of generic functions"));
