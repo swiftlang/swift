@@ -1239,9 +1239,9 @@ public:
   /// When `isParsingQualifiedDeclName` is true:
   /// - Parses the type qualifier from a qualified decl name, and returns a
   ///   parser result for the type of the qualifier.
-  /// - Positions the parser at the final declaration name.
+  /// - Positions the parser at the '.' before the final declaration name.
   /// - For example, 'Foo.Bar.f' parses as 'Foo.Bar' and the parser gets
-  ///   positioned at 'f'.
+  ///   positioned at '.f'.
   /// - If there is no type qualification (e.g. when parsing just 'f'), returns
   ///   an empty parser error.
   TypeResult parseTypeIdentifier(bool isParsingQualifiedDeclName = false);
@@ -1454,6 +1454,13 @@ public:
   bool canParseGenericArguments();
 
   bool canParseTypedPattern();
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Determines whether a type qualifier for a decl name can be parsed. e.g.:
+  ///   'Foo.f' -> true
+  ///   'Foo.Bar.f' -> true
+  ///   'f' -> false
+  bool canParseTypeQualifierForDeclName();
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing

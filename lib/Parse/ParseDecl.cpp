@@ -1224,20 +1224,19 @@ Parser::parseDifferentiatingAttribute(SourceLoc atLoc, SourceLoc loc) {
 static bool parseBaseTypeForQualifiedDeclName(Parser &P, TypeRepr *&baseType) {
   baseType = nullptr;
 
-  auto currentPosition = P.getParserPosition();
-  bool canParseBaseType = P.canParseTypeIdentifier();
-  P.backtrackToPosition(currentPosition);
-  if (!canParseBaseType)
+  if (!P.canParseTypeQualifierForDeclName())
     return false;
 
   SourceLoc loc = P.Tok.getLoc();
   auto result = P.parseTypeIdentifier(/*isParsingQualifiedDeclName*/ true);
-
-  // `parseTypeIdentifier` returns an error result with zero nodes in the case
-  // where there is no base type. So we return true if we see zero nodes in
-  // an error result. But we return false if we see an error result with nodes.
   if (!result.isSuccess())
-    return !result.isNull();
+    return true;
+
+  // Consume the period.
+  if (P.Tok.is(tok::period) || P.Tok.is(tok::period_prefix))
+    P.consumeToken();
+  else if (P.startsWithSymbol(P.Tok, '.'))
+    P.consumeStartingCharacterOfCurrentToken(tok::period);
 
   P.SyntaxContext->addSyntax(result.get());
   auto node = P.SyntaxContext->topNode<TypeSyntax>();
