@@ -705,7 +705,7 @@ static bool validateTypedPattern(TypeChecker &TC,
       hadError = true;
     }
   } else {
-    hadError = TC.validateType(TL, resolution, options);
+    hadError = TypeChecker::validateType(TC.Context, TL, resolution, options);
   }
 
   if (hadError) {
@@ -727,9 +727,11 @@ static bool validateTypedPattern(TypeChecker &TC,
       subPattern = parenPattern->getSubPattern();
 
     if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      auto &C = resolution.getDeclContext()->getASTContext();
-      namedPattern->getDecl()->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+      // FIXME: This needs to be done as part of
+      // IsImplicitlyUnwrappedOptionalRequest::evaluate(); we just
+      // need to find the right TypedPattern there for the VarDecl
+      // in order to recover it's TypeRepr.
+      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
     } else {
       assert(isa<AnyPattern>(subPattern) &&
              "Unexpected pattern nested in typed pattern!");
@@ -763,21 +765,7 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
-    hadError |= TC.validateType(TL, resolution, options);
-  }
-
-  auto *TR = TL.getTypeRepr();
-  if (auto *STR = dyn_cast_or_null<SpecifierTypeRepr>(TR))
-    TR = STR->getBase();
-
-  // If this is declared with '!' indicating that it is an Optional
-  // that we should implicitly unwrap if doing so is required to type
-  // check, then add an attribute to the decl.
-  if (!decl->isVariadic() && TR &&
-      TR->getKind() == TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto &C = resolution.getDeclContext()->getASTContext();
-    decl->getAttrs().add(
-          new (C) ImplicitlyUnwrappedOptionalAttr(/* implicit= */ true));
+    hadError |= TypeChecker::validateType(TC.Context, TL, resolution, options);
   }
 
   Type Ty = TL.getType();
@@ -801,32 +789,6 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   return hadError;
 }
 
-/// Given a type of a function parameter, request layout for any
-/// nominal types that IRGen could use as metadata sources.
-static void requestLayoutForMetadataSources(TypeChecker &tc, Type type) {
-  type->getCanonicalType().visit([&tc](CanType type) {
-    // Generic types are sources for typemetadata and conformances. If a
-    // parameter is of dependent type then the body of a function with said
-    // parameter could potentially require the generic type's layout to
-    // recover them.
-    if (auto *classDecl = type->getClassOrBoundGenericClass()) {
-      tc.requestClassLayout(classDecl);
-    }
-  });
-}
-
-/// Request nominal layout for any types that could be sources of type metadata
-/// or conformances.
-void TypeChecker::requestRequiredNominalTypeLayoutForParameters(
-    ParameterList *PL) {
-  for (auto param : *PL) {
-    if (!param->hasInterfaceType())
-      continue;
-
-    requestLayoutForMetadataSources(*this, param->getInterfaceType());
-  }
-}
-
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL,
                                          TypeResolution resolution,
@@ -834,8 +796,6 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
   bool hadError = false;
   
   for (auto param : *PL) {
-    checkDeclAttributesEarly(param);
-
     auto typeRepr = param->getTypeLoc().getTypeRepr();
     if (!typeRepr &&
         param->hasInterfaceType()) {
@@ -864,8 +824,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
     } else {
       param->setInterfaceType(type);
     }
-    
-    checkTypeModifyingDeclAttributes(param);
+
     if (!hadError) {
       auto *nestedRepr = typeRepr;
 
@@ -1020,6 +979,46 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
   llvm_unreachable("bad pattern kind!");
 }
 
+namespace {
+
+/// We need to allow particular matches for backwards compatibility, so we
+/// "repair" the pattern if needed, so that the exhaustiveness checker receives
+/// well-formed input. Also emit diagnostics warning the user to fix their code.
+///
+/// See SR-11160 and SR-11212 for more discussion.
+//
+// type ~ (T1, ..., Tn) (n >= 2)
+//   1a. pat ~ ((P1, ..., Pm)) (m >= 2)
+//   1b. pat
+// type ~ ((T1, ..., Tn)) (n >= 2)
+//   2. pat ~ (P1, ..., Pm) (m >= 2)
+void implicitlyUntuplePatternIfApplicable(TypeChecker *TC,
+                                          Pattern *&enumElementInnerPat,
+                                          Type enumPayloadType) {
+  if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
+    if (tupleType->getNumElements() >= 2
+        && enumElementInnerPat->getKind() == PatternKind::Paren) {
+      auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
+      if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
+        if (tuplePattern->getNumElements() >= 2) {
+          TC->diagnose(tuplePattern->getLoc(),
+                       diag::matching_tuple_pattern_with_many_assoc_values);
+          enumElementInnerPat = semantic;
+        }
+      } else {
+        TC->diagnose(enumElementInnerPat->getLoc(),
+                     diag::matching_pattern_with_many_assoc_values);
+      }
+    }
+  } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
+    if (tupleType->getNumElements() >= 2
+        && enumElementInnerPat->getKind() == PatternKind::Tuple)
+      TC->diagnose(enumElementInnerPat->getLoc(),
+                   diag::matching_many_patterns_with_tupled_assoc_value);
+  }
+}
+}
+
 /// Perform top-down type coercion on the given pattern.
 bool TypeChecker::coercePatternToType(Pattern *&P, TypeResolution resolution,
                                       Type type,
@@ -1111,19 +1110,25 @@ recur:
     VarDecl *var = NP->getDecl();
     if (var->isInvalid())
       type = ErrorType::get(Context);
-    var->setType(type);
-    // FIXME: wtf
-    if (type->hasTypeParameter())
-      var->setInterfaceType(type);
-    else
-      var->setInterfaceType(type->mapTypeOutOfContext());
 
-    checkTypeModifyingDeclAttributes(var);
-    if (var->getAttrs().hasAttribute<ReferenceOwnershipAttr>())
-      type = var->getType()->getReferenceStorageReferent();
-    else if (!var->isInvalid())
-      type = var->getType();
+    Type interfaceType = type;
+    if (interfaceType->hasArchetype())
+      interfaceType = interfaceType->mapTypeOutOfContext();
+
+    // In SIL mode, VarDecls are written as having reference storage types.
+    if (type->is<ReferenceStorageType>()) {
+      assert(interfaceType->is<ReferenceStorageType>());
+      type = type->getReferenceStorageReferent();
+    } else {
+      if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+        interfaceType = checkReferenceOwnershipAttr(var, interfaceType, attr);
+    }
+
+    // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
+    var->setInterfaceType(interfaceType);
+    var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
+
     var->getTypeLoc() = tyLoc;
     var->getTypeLoc().setType(var->getType());
 
@@ -1291,7 +1296,7 @@ recur:
 
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression); 
-    if (validateType(IP->getCastTypeLoc(), resolution, paramOptions))
+    if (validateType(Context, IP->getCastTypeLoc(), resolution, paramOptions))
       return true;
 
     auto castType = IP->getCastTypeLoc().getType();
@@ -1400,11 +1405,11 @@ recur:
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
-              diagnose(EEP->getLoc(),
-                       diag::availability_decl_unavailable_rename,
-                       /*"getter" prefix*/2, EEP->getName(), /*replaced*/false,
-                       /*special kind*/0, Rename.str())
-                .fixItReplace(EEP->getLoc(), Rename.str());
+              diagnose(
+                  EEP->getLoc(), diag::availability_decl_unavailable_rename,
+                  /*"getter" prefix*/ 2, EEP->getName(), /*replaced*/ false,
+                  /*special kind*/ 0, Rename.str(), /*message*/ StringRef())
+                  .fixItReplace(EEP->getLoc(), Rename.str());
 
               return true;
             }
@@ -1492,7 +1497,7 @@ recur:
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    validateDeclForNameLookup(elt);
+    validateDecl(elt);
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
@@ -1513,6 +1518,9 @@ recur:
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+
+      ::implicitlyUntuplePatternIfApplicable(this, sub, elementType);
+
       if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);
@@ -1646,8 +1654,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
       param->setType(ty);
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
-    
-    checkTypeModifyingDeclAttributes(param);
   };
 
   // Coerce each parameter to the respective type.

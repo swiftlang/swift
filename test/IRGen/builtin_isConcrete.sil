@@ -1,0 +1,28 @@
+// RUN: %target-swift-frontend -emit-ir -parse-sil %s -module-name Swift -parse-stdlib | %FileCheck %s
+
+import Builtin
+
+struct MyInt {
+  var value: Builtin.Int32
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc i1 @isConcrete_true() {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret i1 true
+// CHECK-NEXT:  }
+sil @isConcrete_true : $@convention(thin) (@thin MyInt.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin MyInt.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin MyInt.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: define{{( protected| dllexport)?}} swiftcc i1 @isConcrete_false(%swift.type* %T) {{.*}} {
+// CHECK-NEXT:  entry:
+// CHECK:         ret i1 false
+// CHECK-NEXT:  }
+sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  // FIXME: Explicit specialization is required here when it shouldn't be
+  %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}

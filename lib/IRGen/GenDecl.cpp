@@ -47,6 +47,7 @@
 #include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/Target/TargetMachine.h"
 #include "llvm/Transforms/Utils/ModuleUtils.h"
 
 #include "Callee.h"
@@ -1248,6 +1249,14 @@ void IRGenerator::noteUseOfTypeGlobals(NominalTypeDecl *type,
                                        RequireMetadata_t requireMetadata) {
   if (!type)
     return;
+  
+  // Force emission of ObjC protocol descriptors used by type refs.
+  if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+    if (proto->isObjC()) {
+      PrimaryIGM->getAddrOfObjCProtocolRecord(proto, NotForDefinition);
+      return;
+    }
+  }
 
   if (!hasLazyMetadata(type))
     return;
@@ -1719,8 +1728,7 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
   // TODO: there are probably cases where we can avoid redoing the
   // entire linkage computation.
   UniversalLinkageInfo linkInfo(IGM);
-  bool weakImported = entity.isWeakImported(IGM.getSwiftModule(),
-                                            IGM.getAvailabilityContext());
+  bool weakImported = entity.isWeakImported(IGM.getSwiftModule());
   auto IRL =
       getIRLinkage(linkInfo, entity.getLinkage(ForDefinition),
                    ForDefinition, weakImported);
@@ -1740,13 +1748,11 @@ LinkInfo LinkInfo::get(IRGenModule &IGM, const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   return LinkInfo::get(UniversalLinkageInfo(IGM),
                        IGM.getSwiftModule(),
-                       IGM.getAvailabilityContext(),
                        entity, isDefinition);
 }
 
 LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
                        ModuleDecl *swiftModule,
-                       AvailabilityContext availabilityContext,
                        const LinkEntity &entity,
                        ForDefinition_t isDefinition) {
   LinkInfo result;
@@ -1762,7 +1768,7 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
       ForDefinition_t(swiftModule->isStdlibModule() || isDefinition);
 
   entity.mangle(result.Name);
-  bool weakImported = entity.isWeakImported(swiftModule, availabilityContext);
+  bool weakImported = entity.isWeakImported(swiftModule);
   result.IRL = getIRLinkage(linkInfo, entity.getLinkage(isStdlibOrDefinition),
                             isDefinition, weakImported);
   result.ForDefinition = isDefinition;
@@ -2562,7 +2568,11 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
   // rdar://problem/50968433: Unnamed_addr constants appear to get emitted
   // with incorrect alignment by the LLVM JIT in some cases. Don't use
   // unnamed_addr as a workaround.
-  if (!IGM.getOptions().UseJIT) {
+  // rdar://problem/53836960: i386 ld64 also mis-links relative references
+  // to GOT entries.
+  if (!IGM.getOptions().UseJIT
+      && (!IGM.Triple.isOSDarwin()
+          || IGM.Triple.getArch() != llvm::Triple::x86)) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -3411,20 +3421,27 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
 /// Get or create a type metadata cache variable.  These are an
 /// implementation detail of type metadata access functions.
 llvm::Constant *
-IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                              ForDefinition_t forDefinition) {
+IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type) {
   assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   auto variable =
-    getAddrOfLLVMVariable(entity, forDefinition, DebugTypeInfo());
+    getAddrOfLLVMVariable(entity, ForDefinition, DebugTypeInfo());
 
   // Zero-initialize if we're asking for a definition.
-  if (forDefinition) {
-    cast<llvm::GlobalVariable>(variable)->setInitializer(
-      llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
-  }
+  cast<llvm::GlobalVariable>(variable)->setInitializer(
+    llvm::ConstantPointerNull::get(TypeMetadataPtrTy));
 
   return variable;
+}
+
+/// Get or create a type metadata cache variable.  These are an
+/// implementation detail of type metadata access functions.
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
+                                                      ConstantInit definition) {
+  assert(!type->hasArchetype() && !type->hasTypeParameter());
+  LinkEntity entity = LinkEntity::forTypeMetadataDemanglingCacheVariable(type);
+  return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
 llvm::Constant *

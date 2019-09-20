@@ -161,7 +161,7 @@ static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
   }
 
   // The initializer must not be failable.
-  if (init->getFailability() != OTK_None) {
+  if (init->isFailable()) {
     init->diagnose(diag::property_wrapper_failable_init, initName);
     return nullptr;
   }
@@ -215,7 +215,7 @@ static ConstructorDecl *findDefaultInit(ASTContext &ctx,
   }
 
   // The initializer must not be failable.
-  if (init->getFailability() != OTK_None) {
+  if (init->isFailable()) {
     init->diagnose(diag::property_wrapper_failable_init, initName);
     return nullptr;
   }
@@ -494,7 +494,8 @@ AttachedPropertyWrapperTypeRequest::evaluate(Evaluator &evaluator,
   options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (tc.validateType(customAttr->getTypeLoc(), resolution, options))
+  if (TypeChecker::validateType(tc.Context, customAttr->getTypeLoc(),
+                                resolution, options))
     return ErrorType::get(ctx);
 
   return customAttr->getTypeLoc().getType();

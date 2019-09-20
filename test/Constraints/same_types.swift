@@ -60,7 +60,7 @@ func fail1<
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == X, U.Foo == Y, T.Foo == U.Foo { // expected-error{{'U.Foo' cannot be equal to both 'Y' and 'X'}}
   // expected-note@-1{{same-type constraint 'T.Foo' == 'X' written here}}
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
 func fail2<
@@ -68,7 +68,7 @@ func fail2<
 >(_ t: T, u: U) -> (X, Y)
   where T.Foo == U.Foo, T.Foo == X, U.Foo == Y { // expected-error{{'U.Foo' cannot be equal to both 'Y' and 'X'}}
   // expected-note@-1{{same-type constraint 'T.Foo' == 'X' written here}}
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Y'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
 func test4<T: Barrable>(_ t: T) -> Y where T.Bar == Y {
@@ -98,14 +98,14 @@ func fail4<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar == Y, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Y.Foo' (aka 'X') implied here}}
   T.Bar.Foo == Z { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Z' and 'Y.Foo' (aka 'X')}}
-  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
 func fail5<T: Barrable>(_ t: T) -> (Y, Z)
   where
   T.Bar.Foo == Z, // expected-note{{same-type constraint 'T.Bar.Foo' == 'Z' written here}}
   T.Bar == Y { // expected-error{{'T.Bar.Foo' cannot be equal to both 'Y.Foo' (aka 'X') and 'Z'}}
-  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type 'X' to return type 'Z'}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
 func test8<T: Fooable>(_ t: T)

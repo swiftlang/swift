@@ -298,7 +298,7 @@
 // CHECK: primaryArchetype: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: dependentMember1: A.Inner
+// CHECK: dependentMember1: A.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Inner)
 
@@ -347,11 +347,11 @@
 // CHECK: primaryArchetype: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: dependentMember1: A.Outer
+// CHECK: dependentMember1: A.TypesToReflect.P2.Outer
 // CHECK: (dependent_member protocol=14TypesToReflect2P2P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Outer)
 
-// CHECK: dependentMember2: A.Outer.Inner
+// CHECK: dependentMember2: A.TypesToReflect.P2.Outer.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (dependent_member protocol=14TypesToReflect2P2P
 // CHECK:     (generic_type_parameter depth=0 index=0) member=Outer) member=Inner)
@@ -456,7 +456,7 @@
 // CHECK: primaryArchetype: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: dependentMember1: A.Inner
+// CHECK: dependentMember1: A.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Inner)
 
@@ -509,11 +509,11 @@
 // CHECK: primaryArchetype: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: dependentMember1: A.Outer
+// CHECK: dependentMember1: A.TypesToReflect.P2.Outer
 // CHECK: (dependent_member protocol=14TypesToReflect2P2P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Outer)
 
-// CHECK: dependentMember2: A.Outer.Inner
+// CHECK: dependentMember2: A.TypesToReflect.P2.Outer.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (dependent_member protocol=14TypesToReflect2P2P
 // CHECK:     (generic_type_parameter depth=0 index=0) member=Outer) member=Inner)
@@ -594,7 +594,7 @@
 // CHECK: Primary: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: DependentMemberInner: A.Inner
+// CHECK: DependentMemberInner: A.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Inner)
 
@@ -637,11 +637,11 @@
 // CHECK: Primary: A
 // CHECK: (generic_type_parameter depth=0 index=0)
 
-// CHECK: DependentMemberOuter: A.Outer
+// CHECK: DependentMemberOuter: A.TypesToReflect.P2.Outer
 // CHECK: (dependent_member protocol=14TypesToReflect2P2P
 // CHECK:   (generic_type_parameter depth=0 index=0) member=Outer)
 
-// CHECK: DependentMemberInner: A.Outer.Inner
+// CHECK: DependentMemberInner: A.TypesToReflect.P2.Outer.TypesToReflect.P1.Inner
 // CHECK: (dependent_member protocol=14TypesToReflect2P1P
 // CHECK:   (dependent_member protocol=14TypesToReflect2P2P
 // CHECK:     (generic_type_parameter depth=0 index=0) member=Outer) member=Inner)

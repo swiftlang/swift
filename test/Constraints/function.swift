@@ -53,7 +53,7 @@ func process(_ line: UInt = #line) -> Int { return 0 }
 func dangerous() throws {}
 
 func test() {
-  process {         // expected-error {{invalid conversion from throwing function of type '() throws -> ()' to non-throwing function type '() -> Void'}}
+  process {         // expected-error {{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '() -> Void'}}
     try dangerous()
     test()
   }
@@ -169,7 +169,7 @@ func returnsTakesEscapingFn() -> (@escaping () -> Int) -> Void { takesEscapingFn
 prefix operator ^^^
 prefix func ^^^(_ x: Int) -> (@escaping () -> Int) -> Void { takesEscapingFn }
 
-func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: T) { // expected-note 11{{parameter 'fn' is implicitly non-escaping}}
+func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: T) { // expected-note 12{{parameter 'fn' is implicitly non-escaping}}
   (any as! (@escaping () -> Int) -> Void)(fn)
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 
@@ -181,6 +181,9 @@ func testWeirdFnExprs<T>(_ fn: () -> Int, _ cond: Bool, _ any: Any, genericArg: 
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 
   (^^^5)(fn)
+  // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
+
+  (try! takesEscapingFn)(fn)
   // expected-error@-1 {{passing non-escaping parameter 'fn' to function expecting an @escaping closure}}
 
   var optFn: Optional = takesEscapingFn

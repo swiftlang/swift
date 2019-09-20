@@ -122,18 +122,21 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   // expected-error@+1{{}}
   _ = \(() -> ()).noMember
 
+  let _: (A) -> Prop = \.property
   let _: PartialKeyPath<A> = \.property
   let _: KeyPath<A, Prop> = \.property
   let _: WritableKeyPath<A, Prop> = \.property
   let _: ReferenceWritableKeyPath<A, Prop> = \.property
   //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, Prop>' to specified type 'ReferenceWritableKeyPath<A, Prop>'}}
 
+  let _: (A) -> A = \.[sub]
   let _: PartialKeyPath<A> = \.[sub]
   let _: KeyPath<A, A> = \.[sub]
   let _: WritableKeyPath<A, A> = \.[sub]
   let _: ReferenceWritableKeyPath<A, A> = \.[sub]
-  // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>}}
+  //expected-error@-1 {{cannot convert value of type 'WritableKeyPath<A, A>' to specified type 'ReferenceWritableKeyPath<A, A>'}}
 
+  let _: (A) -> Prop? = \.optProperty?
   let _: PartialKeyPath<A> = \.optProperty?
   let _: KeyPath<A, Prop?> = \.optProperty?
   // expected-error@+1{{cannot convert}}
@@ -141,6 +144,7 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<A, Prop?> = \.optProperty?
 
+  let _: (A) -> A? = \.optProperty?[sub]
   let _: PartialKeyPath<A> = \.optProperty?[sub]
   let _: KeyPath<A, A?> = \.optProperty?[sub]
   // expected-error@+1{{cannot convert}}
@@ -153,18 +157,21 @@ func testKeyPath(sub: Sub, optSub: OptSub,
   let _: KeyPath<A, Prop?> = \.property[optSub]?.optProperty!
   let _: KeyPath<A, A?> = \.property[optSub]?.optProperty![sub]
 
+  let _: (C<A>) -> A = \.value
   let _: PartialKeyPath<C<A>> = \.value
   let _: KeyPath<C<A>, A> = \.value
   let _: WritableKeyPath<C<A>, A> = \.value
   let _: ReferenceWritableKeyPath<C<A>, A> = \.value
   // expected-error@-1 {{cannot convert value of type 'WritableKeyPath<C<A>, A>' to specified type 'ReferenceWritableKeyPath<C<A>, A>'}}
 
+  let _: (C<A>) -> A = \C.value
   let _: PartialKeyPath<C<A>> = \C.value
   let _: KeyPath<C<A>, A> = \C.value
   let _: WritableKeyPath<C<A>, A> = \C.value
   // expected-error@+1{{cannot convert}}
   let _: ReferenceWritableKeyPath<C<A>, A> = \C.value
 
+  let _: (Prop) -> B = \.nonMutatingProperty
   let _: PartialKeyPath<Prop> = \.nonMutatingProperty
   let _: KeyPath<Prop, B> = \.nonMutatingProperty
   let _: WritableKeyPath<Prop, B> = \.nonMutatingProperty
@@ -534,23 +541,19 @@ func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
 }
 
-// Crash in diagnostics
-struct AmbiguousSubscript {
+// Crash in diagnostics + SR-11438
+struct UnambiguousSubscript {
   subscript(sub: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(_:)' declared here}}
-
   subscript(y y: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(y:)' declared here}}
 }
 
-func useAmbiguousSubscript(_ sub: Sub) {
-  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
-  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+func useUnambiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<UnambiguousSubscript> = \.[sub]
 }
 
 struct BothUnavailableSubscript {
   @available(*, unavailable)
-  subscript(sub: Sub) -> Int { get { } set { } }
+  subscript(sub: Sub) -> Int { get { } set { } } // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   subscript(y y: Sub) -> Int { get { } set { } }
@@ -558,7 +561,7 @@ struct BothUnavailableSubscript {
 
 func useBothUnavailableSubscript(_ sub: Sub) {
   let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{'subscript(_:)' is unavailable}}
 }
 
 // SR-6106
@@ -704,6 +707,8 @@ var identity8: PartialKeyPath = \Container.self
 var identity9: PartialKeyPath<Container> = \Container.self
 var identity10: PartialKeyPath<Container> = \.self
 var identity11: AnyKeyPath = \Container.self
+var identity12: (Container) -> Container = \Container.self
+var identity13: (Container) -> Container = \.self
 
 var interleavedIdentityComponents = \Container.self.base.self?.self.i.self
 

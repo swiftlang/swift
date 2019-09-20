@@ -40,8 +40,6 @@ public let RangeIteration = [
 ]
 #endif
 
-public var check: UInt64 = 0
-
 @inline(never)
 func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
   return x &+ y
@@ -50,7 +48,7 @@ func sum(_ x: UInt64, _ y: UInt64) -> UInt64 {
 @inline(never)
 public func run_RangeIterationSigned(_ N: Int) {
   let range = 0..<100000
-  check = 0
+  var check: UInt64 = 0
   for _ in 1...N {
     for e in range {
       check = sum(check, UInt64(e))
@@ -65,7 +63,7 @@ public func run_RangeIterationSigned(_ N: Int) {
 @inline(never)
 public func run_RangeIterationSigned64(_ N: Int) {
   let range: Range<Int64> = 0..<100000
-  check = 0
+  var check: UInt64 = 0
   for _ in 1...N {
     for e in range {
       check = sum(check, UInt64(e))
@@ -78,7 +76,7 @@ public func run_RangeIterationSigned64(_ N: Int) {
 @inline(never)
 public func run_RangeIterationUnsigned(_ N: Int) {
   let range: Range<UInt> = 0..<100000
-  check = 0
+  var check: UInt64 = 0
   for _ in 1...N {
     for e in range {
       check = sum(check, UInt64(e))

@@ -136,9 +136,9 @@ public:
     SmallVector<BranchPropagatedUser, 32> allRegularUsers;
     llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
     llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
-    auto linearLifetimeResult =
-        valueHasLinearLifetime(value, lifetimeEndingUsers, allRegularUsers,
-                               visitedBlocks, deadEndBlocks, errorBehavior);
+    LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+    auto linearLifetimeResult = checker.checkValue(
+        value, lifetimeEndingUsers, allRegularUsers, errorBehavior);
     result = !linearLifetimeResult.getFoundError();
 
     return result.getValue();
@@ -672,7 +672,8 @@ void SILInstruction::verifyOperandOwnership() const {
                       "with the operand's operand ownership kind map.\n";
       llvm::errs() << "Value: " << opValue;
       llvm::errs() << "Value Ownership Kind: " << valueOwnershipKind << "\n";
-      llvm::errs() << "Instruction: " << *this;
+      llvm::errs() << "Instruction:\n";
+      printInContext(llvm::errs());
       llvm::errs() << "Operand Ownership Kind Map: " << operandOwnershipKindMap;
     }
 

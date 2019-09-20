@@ -436,8 +436,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   
   auto initDecl =
     new (C) ConstructorDecl(name, SourceLoc(),
-                            /*Failability=*/ OTK_Optional,
-                            /*FailabilityLoc=*/SourceLoc(),
+                            /*Failable=*/ true, /*FailabilityLoc=*/SourceLoc(),
                             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                             paramList,
                             /*GenericParams=*/nullptr, parentDC);
@@ -446,8 +445,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);
 
   // Compute the interface type of the initializer.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType();
 
   initDecl->copyFormalAccessFrom(enumDecl, /*sourceIsParentContext*/true);

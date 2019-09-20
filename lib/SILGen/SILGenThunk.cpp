@@ -26,6 +26,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -149,7 +150,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   auto *vd = thunk.getDecl();
 
   if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
+    assert(!SGM.M.Types.hasLoweredLocalCaptures(SILDeclRef(fd)) &&
            "methods cannot have captures");
     (void) fd;
   }

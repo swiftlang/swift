@@ -137,10 +137,22 @@ static void fixupReferenceCounts(
       }
 
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(copy, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -175,12 +187,23 @@ static void fixupReferenceCounts(
     // TODO: Do we need to lifetime extend here?
     case ParameterConvention::Direct_Unowned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(v, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -203,12 +226,23 @@ static void fixupReferenceCounts(
     // apply has another use that would destroy our value first.
     case ParameterConvention::Direct_Owned: {
       v = SILBuilderWithScope(pai).emitCopyValueOperation(loc, v);
-
       visitedBlocks.clear();
+
       // If we need to insert compensating destroys, do so.
-      auto error =
-          valueHasLinearLifetime(v, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      //
+      // NOTE: We use pai here since in non-ossa code emitCopyValueOperation
+      // returns the operand of the strong_retain which may have a ValueBase
+      // that is not in the same block. An example of where this is important is
+      // if we are performing emitCopyValueOperation in non-ossa code on an
+      // argument when the partial_apply is not in the entrance block. In truth,
+      // the linear lifetime checker does not /actually/ care what the value is
+      // (ignoring diagnostic error msgs that we do not care about here), it
+      // just cares about the block the value is in. In a forthcoming commit, I
+      // am going to change this to use a different API on the linear lifetime
+      // checker that makes this clearer.
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite}, {}, errorBehavior,
+                                      &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();

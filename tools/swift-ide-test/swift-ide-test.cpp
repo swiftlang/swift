@@ -14,13 +14,14 @@
 #include "ModuleAPIDiff.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/DebuggerClient.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/ASTMangler.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/USRGeneration.h"
@@ -308,6 +309,13 @@ ImportObjCHeader("import-objc-header",
 static llvm::cl::opt<bool>
 EnableSourceImport("enable-source-import", llvm::cl::Hidden,
                    llvm::cl::cat(Category), llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+DisableFunctionBuilderOneWayConstraints(
+    "disable-function-builder-one-way-constraints",
+    llvm::cl::desc("Disable one-way constraints in function builders"),
+    llvm::cl::cat(Category),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 SkipDeinit("skip-deinit",
@@ -1957,9 +1965,11 @@ public:
     OS << "</synthesized>";
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     OS << "<ref:" << Decl::getKindName(TD->getKind()) << '>';
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
     OS << "</ref>";
   }
   void printModuleRef(ModuleEntity Mod, Identifier Name) override {
@@ -2228,7 +2238,7 @@ static int doPrintDecls(const CompilerInvocation &InitInvok,
   for (const auto &name : DeclsToPrint) {
     ASTContext &ctx = CI.getASTContext();
     UnqualifiedLookup lookup(ctx.getIdentifier(name),
-                             CI.getPrimarySourceFile(), nullptr);
+                             CI.getPrimarySourceFile());
     for (auto result : lookup.Results) {
       result.getValueDecl()->print(*Printer, Options);
 
@@ -2658,7 +2668,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
     }
 
     SmallVector<ModuleDecl::ImportedModule, 16> scratch;
-    M->forAllVisibleModules({}, [&](const ModuleDecl::ImportedModule &next) {
+    for (auto next : namelookup::getAllImports(M)) {
       llvm::outs() << next.second->getName();
       if (next.second->isClangModule())
         llvm::outs() << " (Clang)";
@@ -2677,7 +2687,7 @@ static int doPrintModuleImports(const CompilerInvocation &InitInvok,
           llvm::outs() << " (Clang)";
         llvm::outs() << "\n";
       }
-    });
+    }
   }
 
   return ExitCode;
@@ -3319,6 +3329,8 @@ int main(int argc, char *argv[]) {
     options::ImportObjCHeader;
   InitInvok.getLangOptions().EnableAccessControl =
     !options::DisableAccessControl;
+  InitInvok.getLangOptions().FunctionBuilderOneWayConstraints =
+    !options::DisableFunctionBuilderOneWayConstraints;
   InitInvok.getLangOptions().CodeCompleteInitsInPostfixExpr |=
       options::CodeCompleteInitsInPostfixExpr;
   InitInvok.getLangOptions().CodeCompleteCallPatternHeuristics |=

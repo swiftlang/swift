@@ -33,7 +33,7 @@ class FakeNSObject {
 class Cat : FakeNSObject {
   let x: LifetimeTracked
 
-  // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC
+  // CHECK-LABEL: sil hidden [exact_self_class] @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC
   // CHECK: function_ref @$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_Sbtcfc :
   // CHECK: end sil function '$s40definite_init_failable_initializers_objc3CatC1n5afterACSgSi_SbtcfC'
 
@@ -91,7 +91,7 @@ class Cat : FakeNSObject {
   // CHECK-LABEL: sil hidden @$s40definite_init_failable_initializers_objc3CatC4fail5afterACSgSb_Sbtcfc : $@convention(method) (Bool, Bool, @owned Cat) -> @owned Optional<Cat>
   // CHECK: bb0(%0 : $Bool, %1 : $Bool, %2 : $Cat):
     // CHECK-NEXT: [[HAS_RUN_INIT_BOX:%.+]] = alloc_stack $Builtin.Int1
-    // CHECK-NEXT: [[SELF_BOX:%.+]] = alloc_stack $Cat
+    // CHECK-NEXT: [[SELF_BOX:%.+]] = alloc_stack [dynamic_lifetime] $Cat
     // CHECK:      store %2 to [[SELF_BOX]] : $*Cat
     // CHECK-NEXT: [[COND:%.+]] = struct_extract %0 : $Bool, #Bool._value
     // CHECK-NEXT: cond_br [[COND]], bb1, bb2

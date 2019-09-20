@@ -199,6 +199,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CALL_RESULT | %FileCheck %s -check-prefix=COMPLETE_CALL_RESULT
 
 // Test code completion of expressions that produce a value.
 
@@ -2172,4 +2173,18 @@ func testInCollectionLiteral(value: SimpleStruct) {
   let _: [String: String] = [
     value.#^IN_DICTIONARY_LITERAL_2^# : "test"
   ]
+}
+
+// rdar://problem/54047322
+struct Resolver<T> {
+  func fulfill(_ value: T) {}
+}
+func wrapSuccess<T>(_ onSuccess: @escaping (T) -> Void) -> (T, Bool) -> Void {
+  fatalError()
+}
+func testWrapSuccess(promise: Int, seal: Resolver<Void>) {
+  wrapSuccess(seal.fulfill)#^COMPLETE_CALL_RESULT^#
+  // COMPLETE_CALL_RESULT: Begin completions
+  // COMPLETE_CALL_RESULT: Pattern/CurrModule:                 ({#Void#}, {#Bool#})[#Void#]; name=(Void, Bool)
+  // COMPLETE_CALL_RESULT: End completions
 }

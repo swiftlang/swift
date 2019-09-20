@@ -15,6 +15,7 @@ do {
   concreteLabeled(x: 3)
   concreteLabeled(x: (3))
   concreteLabeled((x: 3)) // expected-error {{missing argument label 'x:' in call}}
+  // expected-error@-1 {{cannot convert value of type '(x: Int)' to expected argument type 'Int'}}
 
   concreteTwo(3, 4)
   concreteTwo((3, 4)) // expected-error {{missing argument for parameter #2 in call}}
@@ -1411,7 +1412,7 @@ func processArrayOfFunctions(f1: [((Bool, Bool)) -> ()],
   }
 
   f2.forEach { (block: ((Bool, Bool)) -> ()) in
-  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '(@escaping (Bool, Bool) -> ()) -> Void}}
+  // expected-error@-1 {{cannot convert value of type '(((Bool, Bool)) -> ()) -> ()' to expected argument type '(@escaping (Bool, Bool) -> ()) throws -> Void'}}
     block(p)
     block((c, c))
     block(c, c)

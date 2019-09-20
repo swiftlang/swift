@@ -62,8 +62,8 @@ func dupC<T : C>(_ x: T) -> (T, T) { return (x, x) }
 func callDupC(_ c: C) { _ = dupC(c) }
 // CHECK-LABEL: define hidden swiftcc void @"$s14generic_tuples8callDupCyyAA1CCF"(%T14generic_tuples1CC*)
 // CHECK-NEXT: entry:
-// CHECK:      [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s14generic_tuples1CCMa"(i64 0)
-// CHECK-NEXT: [[METATYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
+// CHECK:      [[REQUEST:%.*]] = call {{.*}} @"$s14generic_tuples1CCMa"
+// CHECK-NEXT: [[METATYPE:%.*]] = extractvalue {{.*}} [[REQUEST]]
 // CHECK-NEXT: [[TUPLE:%.*]] = call swiftcc { %T14generic_tuples1CC*, %T14generic_tuples1CC* } @"$s14generic_tuples4dupCyx_xtxAA1CCRbzlF"(%T14generic_tuples1CC* %0, %swift.type* [[METATYPE]])
 // CHECK-NEXT: [[LEFT:%.*]] = extractvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUPLE]], 0
 // CHECK-NEXT: [[RIGHT:%.*]] = extractvalue { %T14generic_tuples1CC*, %T14generic_tuples1CC* } [[TUPLE]], 1
@@ -89,27 +89,4 @@ func unlump2<T>(_ x: (T, Int, T)) -> T { return x.0 }
 // CHECK: define hidden swiftcc i64 @"$s14generic_tuples7unlump3ySix_Sixt_tlF"(%swift.opaque* noalias nocapture, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 func unlump3<T>(_ x: (T, Int, T)) -> Int { return x.1 }
 
-
-// CHECK: tuple_existentials
-func tuple_existentials() {
-  // Empty tuple:
-  var a : Any = ()
-  // CHECK: store %swift.type* getelementptr inbounds (%swift.full_type, %swift.full_type* @"$sytN", i32 0, i32 1),
-
-  // 2 element tuple
-  var t2 = (1,2.0)
-  a = t2
-  // CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata2(i64 %0, {{.*}}@"$sSiN{{.*}}",{{.*}}@"$sSdN{{.*}}", i8* null, i8** null)
-
-
-  // 3 element tuple
-  var t3 = ((),(),())
-  a = t3
-  // CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata3(i64 %0, {{.*}}@"$sytN{{.*}},{{.*}}@"$sytN{{.*}},{{.*}}@"$sytN{{.*}}, i8* null, i8** null)
-
-  // 4 element tuple
-  var t4 = (1,2,3,4)
-  a = t4
-  // CHECK: call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata(i64 %0, i64 4, {{.*}}, i8* null, i8** null)
-}
 

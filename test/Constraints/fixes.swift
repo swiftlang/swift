@@ -146,14 +146,17 @@ struct Q {
 }
 let q = Q(s: nil)
 let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-note@-1{{chain the optional using '?'}}{{18-18=?}}
-// expected-note@-2{{force-unwrap using '!'}}{{18-18=!}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int?'}}
+// expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
+// expected-note@-3{{force-unwrap using '!'}}{{18-18=!}}
 let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-note@-1{{chain the optional using '?'}}{{17-17=?}}
-// expected-note@-2{{force-unwrap using '!'}}{{17-17=!}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int'}}
+// expected-note@-2{{chain the optional using '?'}}{{17-17=?}}
+// expected-note@-3{{force-unwrap using '!'}}{{17-17=!}}
 let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-note@-1{{chain the optional using '?'}}{{18-18=?}}
-// expected-note@-2{{force-unwrap using '!'}}{{18-18=!}}
+// expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int?'}}
+// expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
+// expected-note@-3{{force-unwrap using '!'}}{{18-18=!}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
 // expected-note@-1{{chain the optional using '?' to access member 'utf8' only for non-'nil' base values}}{{12-12=?}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
@@ -317,4 +320,19 @@ func test_explicit_call_with_overloads() {
 
   foo(S().foo)
   // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{14-14=()}}
+}
+
+// SR-11476
+func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
+  struct S {
+    subscript(x: Int) -> Int { x }
+  }
+
+  var i: Int?
+  _ = \S.[i] // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{12-12= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
+
+  _ = \S.[nil] // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+  _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
 }

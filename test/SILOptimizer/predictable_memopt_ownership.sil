@@ -1166,7 +1166,7 @@ bb3:
   br bbEnd(%5 : $Optional<Builtin.NativeObject>)
 
 bb4:
-  destroy_value %3a : $Builtin.NativeObject
+  store %3a to [init] %1 : $*Builtin.NativeObject
   br bb5
 
 bb5:
@@ -1213,7 +1213,7 @@ bb3:
   br bbEnd(%5 : $Optional<Builtin.NativeObject>)
 
 bb4:
-  destroy_value %3a : $Builtin.NativeObject
+  store %3a to [init] %1 : $*Builtin.NativeObject
   br bb5
 
 bb5:
@@ -1255,7 +1255,7 @@ bb3:
   br bbEnd(%5 : $Optional<Builtin.NativeObject>)
 
 bb4:
-  destroy_value %3a : $Builtin.NativeObject
+  store %3a to [init] %1 : $*Builtin.NativeObject
   br bb5
 
 bb5:

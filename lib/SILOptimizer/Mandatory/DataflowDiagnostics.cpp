@@ -194,7 +194,8 @@ class EmitDFDiagnostics : public SILFunctionTransform {
 
     if (M.getASTContext().LangOpts.EnableExperimentalStaticAssert) {
       SymbolicValueBumpAllocator allocator;
-      ConstExprEvaluator constantEvaluator(allocator);
+      ConstExprEvaluator constantEvaluator(allocator,
+                                           getOptions().AssertConfig);
       for (auto &BB : *getFunction())
         for (auto &I : BB)
           diagnosePoundAssert(&I, M, constantEvaluator);

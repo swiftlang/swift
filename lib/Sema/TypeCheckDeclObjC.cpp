@@ -21,7 +21,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/StringExtras.h"
 using namespace swift;
@@ -627,7 +629,7 @@ bool swift::isRepresentableInObjC(
       kind = ForeignErrorConvention::NilResult;
 
       // Only non-failing initializers can throw.
-      if (ctor->getFailability() != OTK_None) {
+      if (ctor->isFailable()) {
         if (Diagnose) {
           AFD->diagnose(diag::objc_invalid_on_failing_init,
                         getObjCDiagnosticAttrKind(Reason))
@@ -1014,15 +1016,14 @@ static void checkObjCBridgingFunctions(ModuleDecl *mod,
                                        StringRef forwardConversion,
                                        StringRef reverseConversion) {
   assert(mod);
-  ModuleDecl::AccessPathTy unscopedAccess = {};
   SmallVector<ValueDecl *, 4> results;
 
   auto &ctx = mod->getASTContext();
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(bridgedTypeName),
+  mod->lookupValue(ctx.getIdentifier(bridgedTypeName),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(forwardConversion),
+  mod->lookupValue(ctx.getIdentifier(forwardConversion),
                    NLKind::QualifiedLookup, results);
-  mod->lookupValue(unscopedAccess, ctx.getIdentifier(reverseConversion),
+  mod->lookupValue(ctx.getIdentifier(reverseConversion),
                    NLKind::QualifiedLookup, results);
 
   for (auto D : results) {
@@ -1339,7 +1340,7 @@ static bool isCIntegerType(Type type) {
   auto matchesStdlibTypeNamed = [&](StringRef name) {
     auto identifier = ctx.getIdentifier(name);
     SmallVector<ValueDecl *, 2> foundDecls;
-    stdlibModule->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+    stdlibModule->lookupValue(identifier, NLKind::UnqualifiedLookup,
                               foundDecls);
     for (auto found : foundDecls) {
       auto foundType = dyn_cast<TypeDecl>(found);
@@ -1795,10 +1796,12 @@ void swift::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
       return;
   }
 
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
-    if (import.second->getName() == Ctx.Id_Foundation)
+  for (auto import : namelookup::getAllImports(&SF)) {
+    if (import.second->getName() == Ctx.Id_Foundation) {
       ImportsFoundationModule = true;
-  });
+      break;
+    }
+  }
 
   if (ImportsFoundationModule)
     return;
@@ -1851,7 +1854,7 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   return { 4, func->getFullName() };
 }
 
-bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                DeclName targetName) {
   if (decl->isImplicit()) return false;
   if (decl->getFullName() == targetName) return false;
@@ -1919,7 +1922,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, ValueDecl *decl,
   return false;
 }
 
-bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, ValueDecl *decl,
+bool swift::fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
                                    Optional<ObjCSelector> nameOpt,
                                    Optional<ObjCSelector> targetNameOpt,
                                    bool ignoreImpliedName) {

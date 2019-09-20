@@ -184,8 +184,8 @@ func keyedSubscripting(_ b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{ambiguous subscript with base type 'NSMutableDictionary' and index type '_'}}
-  let q = dict[nil]  // expected-error {{ambiguous subscript}}
+  dict[nil] = a // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
+  let q = dict[nil]  // expected-error {{'nil' is not compatible with expected argument type 'NSCopying'}}
   _ = q
 }
 
@@ -479,8 +479,7 @@ func testProtocolClassShadowing(_ obj: ClassInHelper, p: ProtoInHelper) {
 
 func testDealloc(_ obj: NSObject) {
   // dealloc is subsumed by deinit.
-  // FIXME: Special-case diagnostic in the type checker?
-  obj.dealloc() // expected-error{{value of type 'NSObject' has no member 'dealloc'}}
+  obj.dealloc() // expected-error{{'dealloc()' is unavailable in Swift: use 'deinit' to define a de-initializer}}
 }
 
 func testConstantGlobals() {

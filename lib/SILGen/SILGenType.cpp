@@ -25,6 +25,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -648,7 +649,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Lower the witness thunk type with the requirement's abstraction level.
   auto witnessSILFnType = getNativeSILFunctionType(
-      M, AbstractionPattern(reqtOrigTy), reqtSubstTy,
+      M.Types, AbstractionPattern(reqtOrigTy), reqtSubstTy,
       requirement, witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
@@ -939,13 +940,16 @@ public:
   void emitType() {
     SGM.emitLazyConformancesForType(theType);
 
-    for (Decl *member : theType->getMembers())
-      visit(member);
-
     // Build a vtable if this is a class.
     if (auto theClass = dyn_cast<ClassDecl>(theType)) {
+      for (Decl *member : theClass->getEmittedMembers())
+        visit(member);
+
       SILGenVTable genVTable(SGM, theClass);
       genVTable.emitVTable();
+    } else {
+      for (Decl *member : theType->getMembers())
+        visit(member);
     }
 
     // Build a default witness table if this is a protocol that needs one.
@@ -1050,9 +1054,9 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    for (auto *accessor : asd->getAllAccessors())
-      if (!accessor->hasForcedStaticDispatch())
-        visitFuncDecl(accessor);
+    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+      visitFuncDecl(accessor);
+    });
   }
 };
 
@@ -1182,9 +1186,9 @@ public:
   }
 
   void visitAccessors(AbstractStorageDecl *asd) {
-    for (auto *accessor : asd->getAllAccessors())
-      if (!accessor->hasForcedStaticDispatch())
-        visitFuncDecl(accessor);
+    asd->visitEmittedAccessors([&](AccessorDecl *accessor) {
+      visitFuncDecl(accessor);
+    });
   }
 };
 

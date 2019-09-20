@@ -142,18 +142,10 @@ static SILDeclRef getBridgeToObjectiveC(CanType NativeType,
     return SILDeclRef();
 
   auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
   // bridgeToObjectiveC
   DeclName Name(Ctx, Ctx.Id_bridgeToObjectiveC, llvm::ArrayRef<Identifier>());
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+    Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
@@ -173,19 +165,11 @@ SILDeclRef getBridgeFromObjectiveC(CanType NativeType,
   if (!ConformanceRef)
     return SILDeclRef();
   auto Conformance = ConformanceRef->getConcrete();
-  FuncDecl *Requirement = nullptr;
   // _unconditionallyBridgeFromObjectiveC
   DeclName Name(Ctx, Ctx.getIdentifier("_unconditionallyBridgeFromObjectiveC"),
                 llvm::makeArrayRef(Identifier()));
-  auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-  flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-  for (auto Member : Proto->lookupDirect(Name, flags)) {
-    if (auto Func = dyn_cast<FuncDecl>(Member)) {
-      Requirement = Func;
-      break;
-    }
-  }
-  assert(Requirement);
+  auto *Requirement = dyn_cast_or_null<FuncDecl>(
+      Proto->getSingleRequirement(Name));
   if (!Requirement)
     return SILDeclRef();
 
@@ -737,7 +721,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
   // release_value %17 : $Optional<NSString>
   //
   auto *Enum = dyn_cast<EnumInst>(Arg);
-  if (!Enum)
+  if (!Enum || !Enum->hasOperand())
     return BridgedArgument();
 
   if (SILBasicBlock::iterator(Enum) == Enum->getParent()->begin())

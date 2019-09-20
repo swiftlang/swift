@@ -30,6 +30,8 @@
 namespace swift {
 
 class AbstractStorageDecl;
+class AccessorDecl;
+enum class AccessorKind;
 class GenericParamList;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
@@ -38,8 +40,8 @@ class SpecializeAttr;
 class TypeAliasDecl;
 struct TypeLoc;
 class ValueDecl;
-class AbstractStorageDecl;
 enum class OpaqueReadOwnership: uint8_t;
+class StorageImplInfo;
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -55,10 +57,6 @@ class InheritedTypeRequest :
                               TypeResolutionStage),
                          CacheKind::SeparatelyCached>
 {
-  /// Retrieve the TypeLoc for this inherited type.
-  TypeLoc &getTypeLoc(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                      unsigned index) const;
-
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -136,10 +134,10 @@ public:
 
 /// Request to determine the set of declarations that were are overridden
 /// by the given declaration.
-class OverriddenDeclsRequest
-  : public SimpleRequest<OverriddenDeclsRequest,
-                         llvm::TinyPtrVector<ValueDecl *>(ValueDecl *),
-                         CacheKind::SeparatelyCached> {
+class OverriddenDeclsRequest :
+  public SimpleRequest<OverriddenDeclsRequest,
+                       llvm::TinyPtrVector<ValueDecl *>(ValueDecl *),
+                       CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -181,7 +179,7 @@ public:
 void simple_display(llvm::raw_ostream &out, CtorInitializerKind initKind);
 
 /// Computes the kind of initializer for a given \c ConstructorDecl
-class InitKindRequest:
+class InitKindRequest :
     public SimpleRequest<InitKindRequest,
                          CtorInitializerKind(ConstructorDecl *),
                          CacheKind::Cached> {
@@ -201,7 +199,7 @@ public:
 };
 
 /// Determine whether the given protocol declaration is class-bounded.
-class ProtocolRequiresClassRequest:
+class ProtocolRequiresClassRequest :
     public SimpleRequest<ProtocolRequiresClassRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
@@ -227,7 +225,7 @@ public:
 
 /// Determine whether an existential conforming to a protocol can be matched
 /// with a generic type parameter constrained to that protocol.
-class ExistentialConformsToSelfRequest:
+class ExistentialConformsToSelfRequest :
     public SimpleRequest<ExistentialConformsToSelfRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
@@ -253,7 +251,7 @@ public:
 
 /// Determine whether we are allowed to refer to an existential type conforming
 /// to this protocol.
-class ExistentialTypeSupportedRequest:
+class ExistentialTypeSupportedRequest :
     public SimpleRequest<ExistentialTypeSupportedRequest,
                          bool(ProtocolDecl *),
                          CacheKind::SeparatelyCached> {
@@ -372,10 +370,10 @@ struct WhereClauseOwner {
   WhereClauseOwner(Decl *decl);
 
   WhereClauseOwner(DeclContext *dc, GenericParamList *genericParams)
-    : dc(dc), source(genericParams) { }
+      : dc(dc), source(genericParams) {}
 
   WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
-    : dc(dc), source(attr) { }
+      : dc(dc), source(attr) {}
 
   SourceLoc getLoc() const;
 
@@ -394,6 +392,19 @@ struct WhereClauseOwner {
                          const WhereClauseOwner &rhs) {
     return !(lhs == rhs);
   }
+
+public:
+  /// Retrieve the array of requirements.
+  MutableArrayRef<RequirementRepr> getRequirements() const;
+
+  /// Visit each of the requirements,
+  ///
+  /// \returns true after short-circuiting if the callback returned \c true
+  /// for any of the requirements.
+  bool
+  visitRequirements(TypeResolutionStage stage,
+                    llvm::function_ref<bool(Requirement, RequirementRepr *)>
+                        callback) const &&;
 };
 
 void simple_display(llvm::raw_ostream &out, const WhereClauseOwner &owner);
@@ -406,17 +417,6 @@ class RequirementRequest :
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  /// Retrieve the array of requirements from the given owner.
-  static MutableArrayRef<RequirementRepr> getRequirements(WhereClauseOwner);
-
-  /// Visit each of the requirements in the given owner,
-  ///
-  /// \returns true after short-circuiting if the callback returned \c true
-  /// for any of the requirements.
-  static bool visitRequirements(
-      WhereClauseOwner, TypeResolutionStage stage,
-      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback);
 
 private:
   friend SimpleRequest;
@@ -434,6 +434,9 @@ public:
   // Source location
   SourceLoc getNearestLoc() const;
 
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+                           
   // Separate caching.
   bool isCached() const;
   Optional<Requirement> getCachedResult() const;
@@ -503,20 +506,6 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
-
-private:
-  KnownProtocolKind getKnownProtocolKind() const {
-    return std::get<0>(getStorage());
-  }
-  const DeclContext *getDeclContext() const {
-    return std::get<1>(getStorage());
-  }
-
-  static const char *getTypeName(KnownProtocolKind);
-  static bool getPerformLocalLookup(KnownProtocolKind);
-  TypeChecker &getTypeChecker() const;
-  SourceFile *getSourceFile() const;
-  Type &getCache() const;
 };
 
 /// Retrieve information about a property wrapper type.
@@ -1010,6 +999,216 @@ public:
   void cacheResult(AccessorDecl *value) const;
 };
 
+class EmittedMembersRequest :
+    public SimpleRequest<EmittedMembersRequest,
+                         DeclRange(ClassDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<DeclRange>
+  evaluate(Evaluator &evaluator, ClassDecl *classDecl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<DeclRange> getCachedResult() const;
+  void cacheResult(DeclRange value) const;
+};
+
+class IsImplicitlyUnwrappedOptionalRequest :
+    public SimpleRequest<IsImplicitlyUnwrappedOptionalRequest,
+                         bool(ValueDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, ValueDecl *value) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class ClassAncestryFlagsRequest :
+    public SimpleRequest<ClassAncestryFlagsRequest,
+                         AncestryFlags (ClassDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<AncestryFlags>
+  evaluate(Evaluator &evaluator, ClassDecl *value) const;
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out, AncestryFlags value);
+
+class AbstractGenericSignatureRequest :
+    public SimpleRequest<AbstractGenericSignatureRequest,
+                         GenericSignature *(GenericSignature *,
+                                            SmallVector<GenericTypeParamType *, 2>,
+                                            SmallVector<Requirement, 2>),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator,
+           GenericSignature *baseSignature,
+           SmallVector<GenericTypeParamType *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+
+  /// Abstract generic signature requests never have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+};
+
+class InferredGenericSignatureRequest :
+    public SimpleRequest<InferredGenericSignatureRequest,
+                         GenericSignature *(ModuleDecl *,
+                                            GenericSignature *,
+                                            SmallVector<GenericParamList *, 2>,
+                                            SmallVector<Requirement, 2>,
+                                            SmallVector<TypeLoc, 2>,
+                                            bool),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator,
+           ModuleDecl *module,
+           GenericSignature *baseSignature,
+           SmallVector<GenericParamList *, 2> addedParameters,
+           SmallVector<Requirement, 2> addedRequirements,
+           SmallVector<TypeLoc, 2> inferenceSources,
+           bool allowConcreteGenericParams) const;
+
+public:
+  // Separate caching.
+  bool isCached() const;
+
+  /// Inferred generic signature requests don't have source-location info.
+  SourceLoc getNearestLoc() const {
+    return SourceLoc();
+  }
+                           
+  // Cycle handling.
+  void noteCycleStep(DiagnosticEngine &diags) const;
+};
+
+void simple_display(llvm::raw_ostream &out, const TypeLoc source);
+
+class ExtendedTypeRequest
+    : public SimpleRequest<ExtendedTypeRequest,
+                           Type(ExtensionDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &eval, ExtensionDecl *) const;
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class FunctionOperatorRequest :
+    public SimpleRequest<FunctionOperatorRequest,
+                         OperatorDecl *(FuncDecl *),
+                         CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<OperatorDecl *>
+  evaluate(Evaluator &evaluator, FuncDecl *value) const;
+  
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+class GenericSignatureRequest :
+    public SimpleRequest<GenericSignatureRequest,
+                         GenericSignature *(GenericContext *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<GenericSignature *>
+  evaluate(Evaluator &evaluator, GenericContext *value) const;
+  
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<GenericSignature *> getCachedResult() const;
+  void cacheResult(GenericSignature *value) const;
+};
+
+/// Compute the interface type of the underlying definition type of a typealias declaration.
+class UnderlyingTypeRequest :
+    public SimpleRequest<UnderlyingTypeRequest,
+                         Type(TypeAliasDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator,
+                                TypeAliasDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
@@ -1020,25 +1219,23 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
 }
 
 void simple_display(llvm::raw_ostream &out, Type value);
+void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
 
-/// The zone number for the type checker.
-#define SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE 10
-
-#define SWIFT_TYPEID_ZONE SWIFT_TYPE_CHECKER_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
-}
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+  template<>                                                                   \
+  inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,              \
+                              const RequestType &request) {                    \
+    ++stats.getFrontendCounters().RequestType;                                 \
+  }
 #include "swift/AST/TypeCheckerTypeIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

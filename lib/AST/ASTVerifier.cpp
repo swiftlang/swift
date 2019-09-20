@@ -22,12 +22,14 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
@@ -165,56 +167,33 @@ std::pair<bool, Expr *> dispatchVisitPreExprHelper(
   return {false, node};
 }
 
-/// Describes a generic environment that might be lazily deserialized.
-///
-/// This class abstracts over a declaration context that may have a generic
-/// environment, ensuring that we don't deserialize the environment.
-struct LazyGenericEnvironment {
-  llvm::PointerUnion<DeclContext *, GenericEnvironment *> storage;
-
-  explicit operator bool() const {
-    if (storage.dyn_cast<GenericEnvironment *>())
-      return true;
-
-    if (auto dc = storage.dyn_cast<DeclContext *>())
-      return dc->getGenericSignatureOfContext();
-
-    return false;
-  }
-
-  bool isLazy() const {
-    if (auto dc = storage.dyn_cast<DeclContext *>())
-      return dc->contextHasLazyGenericEnvironment();
-
-    return false;
-  }
-
-  bool containsPrimaryArchetype(PrimaryArchetypeType *archetype) const {
-    // Assume true so we don't deserialize.
-    if (isLazy()) return true;
-
-    if (auto genericEnv = storage.dyn_cast<GenericEnvironment *>())
-      return archetype->getGenericEnvironment() == genericEnv;
-
-    if (auto dc = storage.dyn_cast<DeclContext *>()) {
-      if (auto genericEnv = dc->getGenericEnvironmentOfContext())
-        return archetype->getGenericEnvironment() == genericEnv;
-    }
-
-    return false;
-  }
-};
-
 namespace {
-  /// Retrieve the "overridden" declaration of this declaration, but only if
-  // it's already been computed.
-  template<typename T>
-  T *getOverriddenDeclIfAvailable(T *decl) {
-    if (!decl->overriddenDeclsComputed()) return nullptr;
+// Retrieve the "overridden" declaration of this declaration, but only if
+// it's already been computed.
+template <typename T> T *getOverriddenDeclIfAvailable(T *decl) {
+  if (!decl->overriddenDeclsComputed())
+    return nullptr;
 
-    return cast_or_null<T>(decl->getOverriddenDecl());
-  }
+  return cast_or_null<T>(decl->getOverriddenDecl());
 }
+
+// Retrieve the generic signature of the innermost context that has been forced
+// so far.
+//
+// This avoids kicking off the request for a generic signature in the verifier.
+static GenericSignature *
+getNearestForcedGenericSignatureOfContext(DeclContext *dc) {
+  do {
+    if (auto decl = dc->getAsDecl())
+      if (auto GC = decl->getAsGenericContext())
+        if (GC->hasComputedGenericSignature())
+          return GC->getGenericSignature();
+  } while ((dc = dc->getParent()));
+
+  return nullptr;
+}
+} // namespace
+
 class Verifier : public ASTWalker {
   PointerUnion<ModuleDecl *, SourceFile *> M;
   ASTContext &Ctx;
@@ -229,8 +208,8 @@ class Verifier : public ASTWalker {
   using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
   SmallVector<ScopeLike, 4> Scopes;
 
-  /// The stack of generic environments.
-  SmallVector<LazyGenericEnvironment, 2> GenericEnv;
+  /// The stack of context generic signatures.
+  SmallVector<GenericSignature *, 2> GenericSig;
 
   /// The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
@@ -270,8 +249,7 @@ class Verifier : public ASTWalker {
         Ctx(M.is<ModuleDecl *>() ? M.get<ModuleDecl *>()->getASTContext()
                                  : M.get<SourceFile *>()->getASTContext()),
         Out(llvm::errs()), HadError(Ctx.hadError()) {
-    Scopes.push_back(DC);
-    GenericEnv.push_back({DC});
+    pushScope(DC);
   }
 
 public:
@@ -654,26 +632,38 @@ public:
           }
 
           // Otherwise, the archetype needs to be from this scope.
-          if (GenericEnv.empty() || !GenericEnv.back()) {
+          if (GenericSig.empty() || !GenericSig.back()) {
             Out << "AST verification error: archetype outside of generic "
                    "context: " << root->getString() << "\n";
             return true;
           }
 
-          // Get the primary archetype.
+          // Get the archetype's generic signature.
           auto rootPrimary = cast<PrimaryArchetypeType>(root);
+          auto *archetypeEnv = rootPrimary->getGenericEnvironment();
+          auto *archetypeSig = archetypeEnv->getGenericSignature();
 
-          if (!GenericEnv.back().containsPrimaryArchetype(rootPrimary)) {
-            Out << "AST verification error: archetype "
-                << root->getString() << " not allowed in this context\n";
+          if (GenericSig.back() != archetypeSig) {
+            Out << "Archetype " << root->getString() << " not allowed "
+                << "in this context\n";
+            Out << "Archetype generic signature: "
+                << archetypeSig->getAsString() << "\n";
+            Out << "Context generic signature: "
+                << GenericSig.back()->getAsString() << "\n";
 
-            if (auto env = rootPrimary->getGenericEnvironment()) {
-              if (auto owningDC = env->getOwningDeclContext()) {
-                llvm::errs() << "archetype came from:\n";
-                owningDC->dumpContext();
-                llvm::errs() << "\n";
-              }
-            }
+            return true;
+          }
+
+          // Mapping the archetype out and back in should produce the
+          // same archetype.
+          auto interfaceType = archetype->getInterfaceType();
+          auto contextType = archetypeEnv->mapTypeIntoContext(interfaceType);
+
+          if (contextType.getPointer() != archetype) {
+            Out << "Archetype " << archetype->getString() << "does not appear"
+                << " inside its own generic environment\n";
+            Out << "Interface type: " << interfaceType.getString() << "\n";
+            Out << "Contextual type: " << contextType.getString() << "\n";
 
             return true;
           }
@@ -714,16 +704,16 @@ public:
 
     void pushScope(DeclContext *scope) {
       Scopes.push_back(scope);
-      GenericEnv.push_back({scope});
+      GenericSig.push_back(::getNearestForcedGenericSignatureOfContext(scope));
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-      assert(GenericEnv.back().storage.get<DeclContext *>() == scope);
+      assert(GenericSig.back() == ::getNearestForcedGenericSignatureOfContext(scope));
       Scopes.pop_back();
-      GenericEnv.pop_back();
+      GenericSig.pop_back();
     }
     void popScope(BraceStmt *scope) {
       assert(Scopes.back().get<BraceStmt*>() == scope);
@@ -748,17 +738,17 @@ public:
     void cleanup(NODE *fn) {                                    \
       popFunction(fn);                                          \
     }
-#define SCOPE_LIKE(NODE)                                        \
-    bool shouldVerify(NODE *fn) {                               \
-      pushScope(fn);                                            \
-      if (fn->hasLazyMembers())                                 \
+#define TYPE_LIKE(NODE)                                         \
+    bool shouldVerify(NODE *dc) {                               \
+      pushScope(dc);                                            \
+      if (dc->hasLazyMembers())                                 \
         return false;                                           \
-      if (fn->getASTContext().hasUnparsedMembers(fn))           \
+      if (dc->hasUnparsedMembers())                             \
         return false;                                           \
-      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
+      return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(dc));\
     }                                                           \
-    void cleanup(NODE *fn) {                                    \
-      popScope(fn);                                             \
+    void cleanup(NODE *dc) {                                    \
+      popScope(dc);                                             \
     }
 
     FUNCTION_LIKE(AbstractClosureExpr)
@@ -767,10 +757,10 @@ public:
     FUNCTION_LIKE(FuncDecl)
     FUNCTION_LIKE(EnumElementDecl)
     FUNCTION_LIKE(SubscriptDecl)
-    SCOPE_LIKE(NominalTypeDecl)
-    SCOPE_LIKE(ExtensionDecl)
+    TYPE_LIKE(NominalTypeDecl)
+    TYPE_LIKE(ExtensionDecl)
 
-#undef SCOPE_LIKE
+#undef TYPE_LIKE
 #undef FUNCTION_LIKE
 
     bool shouldVerify(BraceStmt *BS) {
@@ -968,12 +958,8 @@ public:
           Overridden->dump(Out);
           abort();
         }
-      }
-      
-      if (D->didEarlyAttrValidation() &&
-          D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!D->isInvalid() && D->hasInterfaceType() &&
-            !isa<ClassDecl>(D->getDeclContext()) &&
+
+        if (!isa<ClassDecl>(D->getDeclContext()) &&
             !isa<ProtocolDecl>(D->getDeclContext()) &&
             !isa<ExtensionDecl>(D->getDeclContext())) {
           PrettyStackTraceDecl debugStack("verifying override", D);
@@ -983,7 +969,6 @@ public:
         }
       }
 
-      
       verifyCheckedAlwaysBase(D);
     }
 
@@ -1061,7 +1046,7 @@ public:
         abort();
       }
 
-      if (ctor->getFailability() == OTK_None && !ctor->isInvalid()) {
+      if (!ctor->isFailable() && !ctor->isInvalid()) {
         Out << "non-failable initializer contains a 'fail' statement\n";
         ctor->dump(Out);
         abort();
@@ -2441,6 +2426,13 @@ public:
           abort();
         }
       }
+      //      if (auto *VD = dyn_cast<VarDecl>(ASD->getStorage())) {
+      //        const bool foundIt =
+      //            llvm::any_of(vd->getAllAccessors(),
+      //                         [&](AccessorDecl *VDA) { return VDA == ASD; });
+      //        Out << "Accessor for a VarDecl must be listed in its accessors";
+      //        abort();
+      //      }
 
       verifyCheckedBase(ASD);
     }
@@ -2519,9 +2511,8 @@ public:
         }
       }
 
-      if (var->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        auto varTy = var->getInterfaceType()
-                         ->getReferenceStorageReferent();
+      if (var->isImplicitlyUnwrappedOptional()) {
+        auto varTy = var->getValueInterfaceType();
 
         // FIXME: Update to look for plain Optional once
         // ImplicitlyUnwrappedOptional is removed
@@ -2696,15 +2687,14 @@ public:
           const auto &witness = normal->getWitness(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
-            GenericEnv.push_back({genericEnv});
+            GenericSig.push_back(genericEnv->getGenericSignature());
 
           verifyChecked(witness.getRequirementToSyntheticSubs());
           verifyChecked(witness.getSubstitutions());
 
           if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-            assert(GenericEnv.back().storage.dyn_cast<GenericEnvironment *>()
-                     == genericEnv);
-            GenericEnv.pop_back();
+            assert(GenericSig.back() == genericEnv->getGenericSignature());
+            GenericSig.pop_back();
           }
 
           continue;
@@ -2746,32 +2736,7 @@ public:
       }
     }
 
-    void verifyGenericEnvironment(Decl *D,
-                                  GenericSignature *sig,
-                                  GenericEnvironment *env) {
-      if (!sig && !env)
-        return;
-
-      if (sig && env) {
-        for (auto *paramTy : sig->getGenericParams()) {
-          (void)env->mapTypeIntoContext(paramTy);
-        }
-
-        return;
-      }
-
-      Out << "Decl must have both signature and environment, or neither\n";
-      D->dump(Out);
-      abort();
-    }
-
     void verifyChecked(GenericTypeDecl *generic) {
-      if (!generic->hasLazyGenericEnvironment()) {
-        verifyGenericEnvironment(generic,
-                                 generic->getGenericSignature(),
-                                 generic->getGenericEnvironment());
-      }
-
       verifyCheckedBase(generic);
     }
 
@@ -2944,8 +2909,9 @@ public:
       if (!CD->isInvalid() &&
           CD->getDeclContext()->getDeclaredInterfaceType()->getAnyNominal() !=
               Ctx.getOptionalDecl()) {
-        bool resultIsOptional = (bool) CD->getResultInterfaceType()->getOptionalObjectType();
-        auto declIsOptional = CD->getFailability() != OTK_None;
+        bool resultIsOptional = (bool) CD->getResultInterfaceType()
+            ->getOptionalObjectType();
+        auto declIsOptional = CD->isFailable();
 
         if (resultIsOptional != declIsOptional) {
           Out << "Initializer has result optionality/failability mismatch\n";
@@ -2968,25 +2934,8 @@ public:
         }
       }
 
-      if (CD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        if (!CD->getInterfaceType() ||
-            !CD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected ConstructorDecl to have a function type!\n";
-          CD->dump(llvm::errs());
-          abort();
-        }
-
-        if (CD->getFailability() != OTK_ImplicitlyUnwrappedOptional) {
-          Out << "Expected IUO failability for constructor with IUO decl "
-                 "attribute!\n";
-          CD->dump(llvm::errs());
-          abort();
-        }
-
+      if (CD->isFailable()) {
         auto resultTy = CD->getResultInterfaceType();
-
-        // FIXME: Update to look for plain Optional once
-        // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on constructors with optional return types\n";
@@ -2994,9 +2943,8 @@ public:
           abort();
         }
       } else {
-        if (CD->getFailability() == OTK_ImplicitlyUnwrappedOptional) {
-          Out << "Expected IUO decl attribute for constructor with IUO "
-                 "failability!\n";
+        if (CD->isImplicitlyUnwrappedOptional()) {
+          Out << "Expected failable constructor if result is IUO\n";
           CD->dump(llvm::errs());
           abort();
         }
@@ -3053,12 +3001,6 @@ public:
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();
-      }
-
-      if (!AFD->hasLazyGenericEnvironment()) {
-        verifyGenericEnvironment(AFD,
-                                 AFD->getGenericSignature(),
-                                 AFD->getGenericEnvironment());
       }
 
       // If there is an interface type, it shouldn't have any unresolved
@@ -3185,17 +3127,8 @@ public:
         }
       }
 
-      if (FD->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>()) {
-        if (!FD->getInterfaceType() ||
-            !FD->getInterfaceType()->is<AnyFunctionType>()) {
-          Out << "Expected FuncDecl to have a function type!\n";
-          abort();
-        }
-
+      if (FD->isImplicitlyUnwrappedOptional()) {
         auto resultTy = FD->getResultInterfaceType();
-
-        // FIXME: Update to look for plain Optional once
-        // ImplicitlyUnwrappedOptional is removed
         if (!resultTy->getOptionalObjectType()) {
           Out << "implicitly unwrapped optional attribute should only be set "
                  "on functions with optional return types\n";
@@ -3282,16 +3215,11 @@ public:
             NumDestructors++;
           }
         }
-        if (NumDestructors != 1) {
-          Out << "every class should have exactly one destructor, "
+        if (NumDestructors > 1) {
+          Out << "every class should have at most one destructor, "
                  "explicitly provided or created by the type checker\n";
           abort();
         }
-      }
-      
-      if (!CD->hasDestructor()) {
-        Out << "every class's 'has destructor' bit must be set\n";
-        abort();
       }
 
       verifyCheckedBase(CD);
@@ -3637,8 +3565,8 @@ public:
 
     void checkSourceRanges(Decl *D) {
       PrettyStackTraceDecl debugStack("verifying ranges", D);
-
-      if (!D->getSourceRange().isValid()) {
+      const auto SR = D->getSourceRange();
+      if (!SR.isValid()) {
         // We don't care about source ranges on implicitly-generated
         // decls.
         if (D->isImplicit())
@@ -3649,8 +3577,16 @@ public:
         Out << "\n";
         abort();
       }
-      checkSourceRanges(D->getSourceRange(), Parent,
-                        [&]{ D->print(Out); });
+      // ASTScope lookup depends on Decls having correct ordering.
+      // Move the order check to isGoodSourceRange after extending
+      // the invariant to Exprs, etc., per rdar://53637494
+      if (Ctx.SourceMgr.isBeforeInBuffer(SR.End, SR.Start)) {
+        Out << "backwards source range for decl: ";
+        D->print(Out);
+        Out << "\n";
+        abort();
+      }
+      checkSourceRanges(SR, Parent, [&] { D->print(Out); });
     }
 
     /// Verify that the given source ranges is contained within the
@@ -3668,7 +3604,9 @@ public:
         if (D->isImplicit())
           return;
         // FIXME: This is not working well for decl parents.
-        return;
+        // But it must work when using lazy ASTScopes for IterableDeclContexts
+        if (!isa<IterableDeclContext>(D))
+          return;
       } else if (Stmt *S = Parent.getAsStmt()) {
         Enclosing = S->getSourceRange();
         if (S->isImplicit())

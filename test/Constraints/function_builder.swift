@@ -212,6 +212,18 @@ print(mbuilders.methodBuilder(13))
 // CHECK: ("propertyBuilder", 12)
 print(mbuilders.propertyBuilder)
 
+// SR-11439: Operator builders
+infix operator ^^^
+func ^^^ (lhs: Int, @TupleBuilder rhs: (Int) -> (String, Int)) -> (String, Int) {
+  return rhs(lhs)
+}
+
+// CHECK: ("hello", 6)
+print(5 ^^^ {
+  "hello"
+  $0 + 1
+})
+
 struct Tagged<Tag, Entity> {
   let tag: Tag
   let entity: Entity
@@ -276,18 +288,20 @@ struct TagAccepter<Tag> {
 }
 
 func testAcceptColorTagged(b: Bool, i: Int, s: String, d: Double) {
+  // FIXME: When we support buildExpression, drop the "Color" prefix
   // CHECK: Tagged<
   acceptColorTagged {
-    i.tag(.red)
-    s.tag(.green)
-    d.tag(.blue)
+    i.tag(Color.red)
+    s.tag(Color.green)
+    d.tag(Color.blue)
   }
 
+  // FIXME: When we support buildExpression, drop the "Color" prefix
   // CHECK: Tagged<
   TagAccepter<Color>.acceptTagged {
-    i.tag(.red)
-    s.tag(.green)
-    d.tag(.blue)
+    i.tag(Color.red)
+    s.tag(Color.green)
+    d.tag(Color.blue)
   }
 
   // CHECK: Tagged<

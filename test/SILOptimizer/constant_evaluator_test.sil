@@ -279,7 +279,7 @@ bb0:
   %0 = integer_literal $Builtin.Int64, -5
   %2 = function_ref @factorial : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
   %3 = apply %2(%0) : $@convention(thin) (Builtin.Int64) -> Builtin.Int64
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: 512 when evaluating the expression at compile time
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: exceeded instruction limit: {{.*}} when evaluating the expression at compile time
     // CHECK: {{.*}}: note: limit exceeded here
   return %3 : $Builtin.Int64
 }
@@ -464,7 +464,7 @@ bb0:
   // function_ref readLine(strippingNewline:)
   %2 = function_ref @$ss8readLine16strippingNewlineSSSgSb_tF : $@convention(thin) (Bool) -> @owned Optional<String>
   %3 = apply %2(%1) : $@convention(thin) (Bool) -> @owned Optional<String>
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to a function whose body is not available
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered call to 'Swift.readLine(strippingNewline: Swift.Bool) -> Swift.Optional<Swift.String>' whose body is not available
   release_value %3 : $Optional<String>
   %5 = tuple ()
   return %5 : $()
@@ -1152,3 +1152,64 @@ bb0:
   cond_fail %19 : $Builtin.Int1
   return %18 : $Builtin.Int64
 } // CHECK: Returns int: 36
+
+// Tests for builtin "ptrtoint_Word", which is supported only for string
+// constants in order to handle 'StaticString' construction.
+
+// CHECK-LABEL: @interpretPtrToInt
+sil @interpretPtrToInt : $@convention(thin) () -> Builtin.Word {
+  %0 = string_literal utf8 "Fatal error"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  return %1 : $Builtin.Word
+} // CHECK: Returns string: "Fatal error"
+
+// CHECK-LABEL: @interpretStaticStringInit
+sil @interpretStaticStringInit : $@convention(thin) () -> Builtin.Word {
+  %0 = string_literal utf8 "static error message"
+  %1 = integer_literal $Builtin.Word, 11
+  %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = integer_literal $Builtin.Int8, 2
+  %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
+  %5 = struct_extract %4 : $StaticString, #StaticString._startPtrOrData
+  return %5 : $Builtin.Word
+} // CHECK: Returns string: "static error message"
+
+// Tests for builtin "assert_configuration". Constant evaluator evaluates this
+// builtin to 0, meaning that the the configuration is "debug".
+
+// CHECK-LABEL: @interpretAssertConfiguration
+sil @interpretAssertConfiguration : $@convention(thin) () -> Builtin.Int32 {
+  %0 = builtin "assert_configuration"() : $Builtin.Int32
+  return %0 : $Builtin.Int32
+} // CHECK: Returns int: 0
+
+// Tests for "assertionFailure" stdlib functions. Such functions have the
+// @_semantics attribute: "programtermination_point"
+
+sil [noinline] [_semantics "programtermination_point"] [canonical] @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+
+// CHECK-LABEL: @interpretAssertionFailure
+sil @interpretAssertionFailure : $@convention(thin) () -> Never {
+  // Construct error prefix.
+  %0 = string_literal utf8 "error-prefix"
+  %1 = integer_literal $Builtin.Word, 12
+  %2 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = integer_literal $Builtin.Int8, 2
+  %4 = struct $StaticString (%2 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int8)
+
+  // Construct error message.
+  %10 = string_literal utf8 "message"
+  %11 = integer_literal $Builtin.Word, 7
+  %12 = builtin "ptrtoint_Word"(%10 : $Builtin.RawPointer) : $Builtin.Word
+  %13 = integer_literal $Builtin.Int8, 2
+  %14 = struct $StaticString (%12 : $Builtin.Word, %11 : $Builtin.Word, %13 : $Builtin.Int8)
+
+  // Construct line number.
+  %20 = integer_literal $Builtin.Int64, 1208
+  %21 = struct $UInt64 (%20 : $Builtin.Int64)
+
+  %22 = function_ref @$assertionFailure : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+  %23 = apply %22(%4, %14, %21) : $@convention(thin) (StaticString, StaticString, UInt64) -> Never
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: error-prefix: message
+  unreachable
+}

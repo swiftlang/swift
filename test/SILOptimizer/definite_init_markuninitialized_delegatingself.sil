@@ -156,7 +156,7 @@ sil @selfinit_mystruct3 : $@convention(thin) () -> @owned MyStruct3
 sil hidden [ossa] @test_conditional_destroy_delegating_init : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int1
-// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyStruct3
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack [dynamic_lifetime] $MyStruct3
 
   %2 = alloc_stack $MyStruct3
   %3 = mark_uninitialized [delegatingself] %2 : $*MyStruct3
@@ -209,7 +209,7 @@ sil @selfinit_myclass3 : $@convention(thin) (@owned MyClass3) -> @owned MyClass3
 sil hidden [ossa] @test_conditional_destroy_class_delegating_init : $@convention(thin) (Builtin.Int1, @owned MyClass3) -> () {
 bb0(%0 : $Builtin.Int1, %1 : @owned $MyClass3):
 // CHECK:  [[CONTROL:%[0-9]+]] = alloc_stack $Builtin.Int2
-// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack $MyClass3
+// CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_stack [dynamic_lifetime] $MyClass3
 
   %2 = alloc_stack $MyClass3
   %3 = mark_uninitialized [delegatingselfallocated] %2 : $*MyClass3

@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Defer.h"
@@ -309,7 +309,7 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     StringRef ModuleDocFilename,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
-  if (LoadMode == ModuleLoadingMode::OnlyParseable)
+  if (LoadMode == ModuleLoadingMode::OnlyInterface)
     return std::make_error_code(std::errc::not_supported);
 
   llvm::SmallString<256> ModulePath{DirPath};
@@ -548,7 +548,6 @@ FileUnit *SerializedModuleLoaderBase::loadAST(
     // We've loaded the file. Now try to bring it into the AST.
     auto fileUnit = new (Ctx) SerializedASTFile(M, *loadedModuleFile,
                                                 extendedInfo.isSIB());
-    fileUnit->setParseableInterface(extendedInfo.getParseableInterface());
     M.addFile(*fileUnit);
     if (extendedInfo.isTestable())
       M.setTestingEnabled();
@@ -947,13 +946,14 @@ bool SerializedASTFile::isSystemModule() const {
   return false;
 }
 
-void SerializedASTFile::lookupValue(ModuleDecl::AccessPathTy accessPath,
-                                    DeclName name, NLKind lookupKind,
+void SerializedASTFile::lookupValue(DeclName name, NLKind lookupKind,
                                     SmallVectorImpl<ValueDecl*> &results) const{
-  if (!ModuleDecl::matchesAccessPath(accessPath, name))
-    return;
-  
   File.lookupValue(name, results);
+}
+
+StringRef
+SerializedASTFile::getFilenameForPrivateDecl(const ValueDecl *decl) const {
+  return File.FilenamesForPrivateValues.lookup(decl);
 }
 
 TypeDecl *SerializedASTFile::lookupLocalType(llvm::StringRef MangledName) const{

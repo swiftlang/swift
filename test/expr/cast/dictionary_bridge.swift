@@ -80,7 +80,9 @@ func testUpcastBridge() {
   dictOB = dictBB as [ObjC: BridgedToObjC]
 
   dictBB = dictBO // expected-error{{cannot assign value of type '[BridgedToObjC : ObjC]' to type '[BridgedToObjC : BridgedToObjC]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Value' ('ObjC' and 'BridgedToObjC') are expected to be equal}}
   dictBB = dictOB // expected-error{{cannot assign value of type '[ObjC : BridgedToObjC]' to type '[BridgedToObjC : BridgedToObjC]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Key' ('ObjC' and 'BridgedToObjC') are expected to be equal}}
 
   dictDO = dictBB // expected-error{{cannot assign value of type '[BridgedToObjC : BridgedToObjC]' to type '[DerivesObjC : ObjC]'}}
   //expected-note@-1 {{arguments to generic parameter 'Key' ('BridgedToObjC' and 'DerivesObjC') are expected to be equal}}

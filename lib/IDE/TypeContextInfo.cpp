@@ -175,7 +175,6 @@ void ContextInfoCallbacks::getImplicitMembers(
   } LocalConsumer(CurDeclContext, T, Result);
 
   lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
-                           CurDeclContext->getASTContext().getLazyResolver(),
                            /*includeInstanceMembers=*/false);
 }
 

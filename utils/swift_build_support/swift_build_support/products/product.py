@@ -56,6 +56,13 @@ class Product(object):
         """
         raise NotImplementedError
 
+    def install(self, host_target):
+        """install() -> void
+
+        Install to the toolchain, for a non-build-script-impl product.
+        """
+        raise NotImplementedError
+
     def __init__(self, args, toolchain, source_dir, build_dir):
         self.args = args
         self.toolchain = toolchain

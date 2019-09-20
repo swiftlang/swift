@@ -25,8 +25,8 @@
 // RUN: not %swiftc_driver -import-objc-header fake.h -import-underlying-module -c %s 2>&1 | %FileCheck -check-prefix=FRAMEWORK_BRIDGING_HEADER %s
 // FRAMEWORK_BRIDGING_HEADER: error: using bridging headers with framework targets is unsupported
 
-// RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
-// RUN: not %swiftc_driver -import-objc-header fake.h -emit-parseable-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-module-interface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
+// RUN: not %swiftc_driver -import-objc-header fake.h -emit-module-interface-path fake.swiftinterface %s 2>&1 | %FileCheck -check-prefix=BRIDGING_HEADER_SWIFTINTERFACE %s
 // BRIDGING_HEADER_SWIFTINTERFACE: error: using bridging headers with module interfaces is unsupported
 
 // RUN: %swift_driver -### | %FileCheck -check-prefix=DEFAULT_REPL %s
@@ -100,10 +100,6 @@
 // RUN: %swiftc_driver -driver-print-jobs -assume-single-threaded %s | %FileCheck -check-prefix=ASSUME_SINGLE_THREADED %s
 // ASSUME_SINGLE_THREADED: swift
 // ASSUME_SINGLE_THREADED: -frontend {{.*}} -assume-single-threaded
-
-// RUN: not %swiftc_driver -incremental -autolink-force-load %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
-// RUN: not %swiftc_driver -autolink-force-load -incremental %s 2>&1 | %FileCheck -check-prefix=AUTOLINK_FORCE_LOAD %s
-// AUTOLINK_FORCE_LOAD: error: '-autolink-force-load' is not supported with '-incremental'
 
 // RUN: %swift_driver -### -g -debug-info-format=codeview %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_CODEVIEW %s
 // RUN: %swift_driver -### -g -debug-info-format=dwarf %s | %FileCheck -check-prefix DEBUG_INFO_FORMAT_DWARF %s

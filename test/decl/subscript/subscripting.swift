@@ -354,7 +354,7 @@ struct SubscriptTest1 {
   subscript(arg: Protocol) -> Bool { return true } // expected-note 2 {{declared here}}
 
   subscript(arg: (foo: Bool, bar: (Int, baz: SubClass)), arg2: String) -> Bool { return true }
-  // expected-note@-1 2 {{declared here}}
+  // expected-note@-1 3 {{declared here}}
 }
 
 func testSubscript1(_ s1 : SubscriptTest1) {
@@ -368,6 +368,7 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{60-61=]}}
   _ = s1.subscript((fo: true, (5, baz: SubClass())), "hello")
   // expected-error@-1 {{cannot convert value of type '(fo: Bool, (Int, baz: SubClass))' to expected argument type '(foo: Bool, bar: (Int, baz: SubClass))'}}
+  // expected-error@-2 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}}
   _ = s1.subscript(SubSubClass())
   // expected-error@-1 {{value of type 'SubscriptTest1' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{33-34=]}}
   _ = s1.subscript(ClassConformingToProtocol())
@@ -392,17 +393,16 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 }
 
 struct SubscriptTest2 {
-  subscript(a : String, b : Int) -> Int { return 0 }
+  subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' at position #1}}
   // expected-note@-1 {{declared here}}
-  subscript(a : String, b : String) -> Int { return 0 }
+    subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' at position #1}}
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
   _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an argument of type 'String'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
 
-  let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an argument of type '(String, Double)'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
+  let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
 
   _ = s2.subscript("hello", 6)
   // expected-error@-1 {{value of type 'SubscriptTest2' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{30-31=]}}

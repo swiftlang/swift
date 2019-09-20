@@ -381,3 +381,43 @@ bb8:
 bb9:
   br bb7
 }
+
+sil @infinite_loop_get_optional_nsobject : $@convention(thin) () -> @autoreleased Optional<NSObject>
+sil @infinite_loop_get_superview : $@convention(thin) (NSObject) -> @autoreleased Optional<NSObject>
+
+// Just make sure we do not infinite loop here when looking for successors.
+// CHECK-LABEL: sil @infinite_loop_1 : $@convention(thin) () -> @owned Optional<NSObject> {
+// CHECK: } // end sil function 'infinite_loop_1'
+sil @infinite_loop_1 : $@convention(thin) () -> @owned Optional<NSObject> {
+bb0:
+  %13 = function_ref @infinite_loop_get_optional_nsobject : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  %14 = apply %13() : $@convention(thin) () -> @autoreleased Optional<NSObject>
+  br bb1(%14 : $Optional<NSObject>)
+
+bb1(%16 : $Optional<NSObject>):
+  retain_value %16 : $Optional<NSObject>
+  switch_enum %16 : $Optional<NSObject>, case #Optional.some!enumelt.1: bb2, case #Optional.none!enumelt: bb5
+
+bb2(%19 : $NSObject):
+  release_value %16 : $Optional<NSObject>
+  %21 = enum $Optional<NSObject>, #Optional.none!enumelt
+  release_value %16 : $Optional<NSObject>
+  return %21 : $Optional<NSObject>
+
+bb3:
+  %24 = unchecked_enum_data %16 : $Optional<NSObject>, #Optional.some!enumelt.1
+  strong_retain %24 : $NSObject
+  %26 = function_ref @infinite_loop_get_superview : $@convention(thin) (NSObject) -> @autoreleased Optional<NSObject>
+  %27 = apply %26(%24) : $@convention(thin) (NSObject) -> @autoreleased Optional<NSObject>
+  strong_release %24 : $NSObject
+  release_value %16 : $Optional<NSObject>
+  br bb1(%27 : $Optional<NSObject>)
+
+bb4:
+  release_value %16 : $Optional<NSObject>
+  br bb1(%16 : $Optional<NSObject>)
+
+bb5:
+  release_value %16 : $Optional<NSObject>
+  switch_enum %16 : $Optional<NSObject>, case #Optional.none!enumelt: bb4, default bb3
+}

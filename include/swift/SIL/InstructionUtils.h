@@ -142,47 +142,37 @@ bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);
 
-/// A utility class for evaluating whether a newly parsed or deserialized
-/// function has qualified or unqualified ownership.
+/// Given a polymorphic builtin \p bi that may be generic and thus have in/out
+/// params, stash all of the information needed for either specializing while
+/// inlining or propagating the type in constant propagation.
 ///
-/// The reason that we are using this is that we would like to avoid needing to
-/// add code to the SILParser or to the Serializer to support this temporary
-/// staging concept of a function having qualified or unqualified
-/// ownership. Once SemanticARC is complete, SILFunctions will always have
-/// qualified ownership, so the notion of an unqualified ownership function will
-/// no longer exist.
-///
-/// Thus we note that there are three sets of instructions in SIL from an
-/// ownership perspective:
-///
-///    a. ownership qualified instructions
-///    b. ownership unqualified instructions
-///    c. instructions that do not have ownership semantics (think literals,
-///       geps, etc).
-///
-/// The set of functions can be split into ownership qualified and ownership
-/// unqualified using the rules that:
-///
-///    a. a function can never contain both ownership qualified and ownership
-///       unqualified instructions.
-///    b. a function that contains only instructions without ownership semantics
-///       is considered ownership qualified.
-///
-/// Thus we can know when parsing/serializing what category of function we have
-/// and set the bit appropriately.
-class FunctionOwnershipEvaluator {
-  NullablePtr<SILFunction> F;
-  bool HasOwnershipQualifiedInstruction = false;
+/// NOTE: If we perform this transformation, our builtin will no longer have any
+/// substitutions since we only substitute to concrete static overloads.
+struct PolymorphicBuiltinSpecializedOverloadInfo {
+  Identifier staticOverloadIdentifier;
+  SmallVector<SILType, 8> argTypes;
+  SILType resultType;
+  bool hasOutParam = false;
+
+#ifndef NDEBUG
+private:
+  bool isInitialized = false;
+#endif
 
 public:
-  FunctionOwnershipEvaluator() {}
-  FunctionOwnershipEvaluator(SILFunction *F) : F(F) {}
-  void reset(SILFunction *NewF) {
-    F = NewF;
-    HasOwnershipQualifiedInstruction = false;
-  }
-  bool evaluate(SILInstruction *I);
+  PolymorphicBuiltinSpecializedOverloadInfo() = default;
+
+  bool init(SILFunction *fn, BuiltinValueKind builtinKind,
+            ArrayRef<SILType> oldOperandTypes, SILType oldResultType);
+
+  bool init(BuiltinInst *bi);
 };
+
+/// Given a polymorphic builtin \p bi, analyze its types and create a builtin
+/// for the static overload that the builtin corresponds to. If \p bi is not a
+/// polymorphic builtin or does not have any available overload for these types,
+/// return SILValue().
+SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
 
 } // end namespace swift
 

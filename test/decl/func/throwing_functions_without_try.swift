@@ -51,3 +51,20 @@ func baz2() -> Int {
   x = try foo() // expected-error{{errors thrown from here are not handled}}
   return x
 }
+
+// SR-11016
+
+protocol SR_11016_P {
+  func bar() throws
+}
+
+class SR_11016_C {
+  var foo: SR_11016_P?
+
+  func someMethod() throws {
+    foo?.bar() // expected-error {{call can throw but is not marked with 'try'}}
+    // expected-note @-1 {{did you mean to use 'try'?}}{{5-5=try }}
+    // expected-note @-2 {{did you mean to handle error as optional value?}}{{5-5=try? }}
+    // expected-note @-3 {{did you mean to disable error propagation?}}{{5-5=try! }}
+  }
+}

@@ -16,6 +16,9 @@
 
 from __future__ import absolute_import
 
+import os
+import platform
+import re
 from numbers import Number
 
 from . import shell
@@ -177,3 +180,96 @@ class CMake(object):
                            '-jobs', str(jobs)]
 
         return build_args
+
+    # Determine the version of the installed CMake binary.
+    def installed_cmake_version(self, cmake_binary):
+        version = shell.capture([cmake_binary, '--version'], dry_run=False,
+                                echo=True, optional=True)
+        (c_major, c_minor, c_patch) = (0, 0, 0)
+        if version is not None:
+            x = re.findall(r'cmake version (\d+)\.(\d+)\.(\d+)',
+                           version.rstrip())
+            if len(x) == 1:
+                (c_major, c_minor, c_patch) = map(int, x[0])
+
+        return (c_major, c_minor, c_patch)
+
+    # Determine the version of the checked out CMake source.
+    def cmake_source_version(self, cmake_source_dir):
+        cmake_version_file = os.path.join(cmake_source_dir, 'Source',
+                                          'CMakeVersion.cmake')
+        major = -1
+        minor = -1
+        patch = -1
+
+        file = open(cmake_version_file, "r")
+        for line in file.readlines():
+            m = re.findall(r'set\(CMake_VERSION_MAJOR (\d+)\)', line)
+            if len(m) == 1:
+                major = int(m[0])
+                continue
+
+            m = re.findall(r'set\(CMake_VERSION_MINOR (\d+)\)', line)
+            if len(m) == 1:
+                minor = int(m[0])
+                continue
+
+            m = re.findall(r'set\(CMake_VERSION_PATCH (\d+)\)', line)
+            if len(m) == 1:
+                patch = int(m[0])
+                continue
+
+        if major == -1 or minor == -1 or patch == -1:
+            raise RuntimeError("Cant determine CMake version from %s"
+                               % cmake_version_file)
+
+        return (major, minor, patch)
+
+    # Build CMake from source.
+    def build_cmake(self, source_root, build_root):
+        cmake_bootstrap = os.path.join(source_root, 'cmake', 'bootstrap')
+
+        if hasattr(self.args, 'build_script_impl_args'):
+            for opt in self.args.build_script_impl_args:
+                m = re.findall('--build-dir=(.*)', opt)
+                if len(m) == 1:
+                    build_root = m[0]
+
+        cmake_build_dir = os.path.join(build_root, 'cmake-%s' %
+                                       self.args.host_target)
+        if not os.path.isdir(cmake_build_dir):
+            os.makedirs(cmake_build_dir)
+
+        cwd = os.getcwd()
+        os.chdir(cmake_build_dir)
+        shell.call_without_sleeping([cmake_bootstrap], echo=True)
+        shell.call_without_sleeping(['make', '-j%s' % self.args.build_jobs],
+                                    echo=True)
+        os.chdir(cwd)
+        return os.path.join(cmake_build_dir, 'bin', 'cmake')
+
+    # For Linux only, determine the version of the installed CMake compared to
+    # the source and build the source if necessary. Returns the path to the
+    # cmake binary.
+    def check_cmake_version(self, source_root, build_root):
+        if platform.system() != 'Linux':
+            return
+
+        cmake_source_dir = os.path.join(source_root, 'cmake')
+        # If the source is not checked out then don't attempt to build cmake.
+        if not os.path.isdir(cmake_source_dir):
+            return
+
+        cmake_binary = 'cmake'
+        try:
+            if self.args.cmake is not None:
+                cmake_binary = self.args.cmake
+        except AttributeError:
+            cmake_binary = 'cmake'
+
+        installed_ver = self.installed_cmake_version(cmake_binary)
+        if installed_ver > self.cmake_source_version(cmake_source_dir):
+            return
+        else:
+            # Build CMake from source and return the path to the executable.
+            return self.build_cmake(source_root, build_root)

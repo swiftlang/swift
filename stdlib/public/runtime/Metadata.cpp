@@ -2197,9 +2197,6 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
 static void initGenericClassObjCName(ClassMetadata *theClass) {
   // Use the remangler to generate a mangled name from the type metadata.
   Demangle::StackAllocatedDemangler<4096> Dem;
-  // Resolve symbolic references to a unique mangling that can be encoded in
-  // the class name.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
 
   auto demangling = _swift_buildDemanglingForMetadata(theClass, Dem);
 
@@ -3952,9 +3949,15 @@ void Metadata::dump() const {
   printf("Kind: %s.\n", getStringForMetadataKind(getKind()).data());
   printf("Value Witnesses: %p.\n", getValueWitnesses());
 
-  auto *contextDescriptor = getTypeContextDescriptor();
-  printf("Name: %s.\n", contextDescriptor->Name.get());
-  printf("Type Context Description: %p.\n", contextDescriptor);
+  if (auto *contextDescriptor = getTypeContextDescriptor()) {
+    printf("Name: %s.\n", contextDescriptor->Name.get());
+    printf("Type Context Description: %p.\n", contextDescriptor);
+  }
+
+  if (auto *tuple = dyn_cast<TupleTypeMetadata>(this)) {
+    printf("Labels: %s.\n", tuple->Labels);
+  }
+
   printf("Generic Args: %p.\n", getGenericArgs());
 
 #if SWIFT_OBJC_INTEROP
@@ -5149,8 +5152,6 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
   if (!verificationEnabled) return;
   
   Demangle::StackAllocatedDemangler<1024> Dem;
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.

@@ -368,8 +368,8 @@ static Type getAdjustedParamType(const AnyFunctionType::Param &param) {
 // Is a particular parameter of a function or subscript declaration
 // declared to be an IUO?
 static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
-  return swift::getParameterAt(decl, paramNum)->getAttrs()
-      .hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  return swift::getParameterAt(decl, paramNum)
+    ->isImplicitlyUnwrappedOptional();
 }
 
 /// Determine whether the first declaration is as "specialized" as
@@ -822,17 +822,27 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         continue;
       }
 
-      // Dynamic member lookup through a keypath is better than one using string
-      // because it carries more type information.
-      if (choice1.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup &&
-          choice2.getKind() == OverloadChoiceKind::DynamicMemberLookup) {
-        score1 += weight;
+      if (choice1.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (choice2.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+          // Dynamic member lookup through a keypath is better than one using
+          // string because it carries more type information.
+          score1 += weight;
+        else
+          // Otherwise let's prefer non-dynamic declaration.
+          score2 += weight;
+
         continue;
       }
 
-      if (choice1.getKind() == OverloadChoiceKind::DynamicMemberLookup &&
-          choice2.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        score2 += weight;
+      if (choice2.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (choice1.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+          // Dynamic member lookup through a keypath is better than one using
+          // string because it carries more type information.
+          score2 += weight;
+        else
+          // Otherwise let's prefer non-dynamic declaration.
+          score1 += weight;
+
         continue;
       }
 
@@ -1104,7 +1114,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         ++score1;
       continue;
     }
-    
+
     // FIXME:
     // This terrible hack is in place to support equality comparisons of non-
     // equatable option types to 'nil'. Until we have a way to constrain a type

@@ -6,6 +6,7 @@ target_compile_definitions(swiftDemangle PRIVATE
 target_link_libraries(swiftDemangle PRIVATE
   swiftDemangling)
 
+add_dependencies(compiler swiftDemangle)
 swift_install_in_component(TARGETS swiftDemangle
   LIBRARY
     DESTINATION "lib${LLVM_LIBDIR_SUFFIX}"

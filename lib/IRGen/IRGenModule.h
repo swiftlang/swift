@@ -23,6 +23,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/ClusteredBitVector.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptimizationMode.h"
@@ -725,6 +726,7 @@ public:
                                                ReferenceCounting style) const;
 
   llvm::Type *getFixedBufferTy();
+  llvm::PointerType *getExistentialPtrTy(unsigned numTables);
   llvm::Type *getValueWitnessTy(ValueWitness index);
   Signature getValueWitnessSignature(ValueWitness index);
 
@@ -820,6 +822,13 @@ public:
   }
 
   clang::CodeGen::CodeGenModule &getClangCGM() const;
+  
+  CanType getRuntimeReifiedType(CanType type);
+  CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
+  SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
+  std::pair<CanType, ProtocolConformanceRef>
+  substOpaqueTypesWithUnderlyingTypes(CanType type,
+                                      ProtocolConformanceRef conformance);
 
   bool isResilient(NominalTypeDecl *decl, ResilienceExpansion expansion);
   bool hasResilientMetadata(ClassDecl *decl, ResilienceExpansion expansion);
@@ -1059,9 +1068,16 @@ public:
   /// reflection metadata.
   llvm::SetVector<CanType> BuiltinTypes;
 
-  llvm::Constant *getTypeRef(Type type, GenericSignature *genericSig,
-                             MangledTypeRefRole role);
-  llvm::Constant *getTypeRef(CanType type, MangledTypeRefRole role);
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(Type type, GenericSignature *genericSig, MangledTypeRefRole role);
+  
+  std::pair<llvm::Constant *, unsigned>
+  getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
+
+  std::pair<llvm::Constant *, unsigned>
+  getLoweredTypeRef(SILType loweredType, CanGenericSignature genericSig,
+                    MangledTypeRefRole role);
+
   llvm::Constant *emitWitnessTableRefString(CanType type,
                                             ProtocolConformanceRef conformance,
                                             GenericSignature *genericSig,
@@ -1099,7 +1115,8 @@ public:
                                              CanSILFunctionType substCalleeType,
                                              SubstitutionMap subs,
                                              const HeapLayout &layout);
-  llvm::Constant *getAddrOfBoxDescriptor(CanType boxedType);
+  llvm::Constant *getAddrOfBoxDescriptor(SILType boxedType,
+                                         CanGenericSignature genericSig);
 
   /// Produce an associated type witness that refers to the given type.
   llvm::Constant *getAssociatedTypeWitness(Type type, bool inProtocolContext);
@@ -1199,6 +1216,8 @@ public:
   void constructInitialFnAttributes(llvm::AttrBuilder &Attrs,
                                     OptimizationMode FuncOptMode =
                                       OptimizationMode::NotSet);
+  void setHasFramePointer(llvm::AttrBuilder &Attrs, bool HasFP);
+  void setHasFramePointer(llvm::Function *F, bool HasFP);
   llvm::AttributeList constructInitialAttributes();
 
   void emitProtocolDecl(ProtocolDecl *D);
@@ -1293,8 +1312,9 @@ public:
                                              NominalTypeDecl *nominal,
                                              ArrayRef<llvm::Type *> genericArgs,
                                              ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type,
-                                               ForDefinition_t forDefinition);
+  llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
+  llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
+                                                       ConstantInit definition);
 
   llvm::Constant *getAddrOfClassMetadataBounds(ClassDecl *D,
                                                ForDefinition_t forDefinition);

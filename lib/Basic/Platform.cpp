@@ -328,6 +328,16 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
     return llvm::Triple(newArch, newVendor, newOS, *newEnvironment);
   }
 
+  // android - drop the API level.  That is not pertinent to the module; the API
+  // availability is handled by the clang importer.
+  if (triple.isAndroid()) {
+    StringRef environment =
+        llvm::Triple::getEnvironmentTypeName(triple.getEnvironment());
+
+    return llvm::Triple(triple.getArchName(), triple.getVendorName(),
+                        triple.getOSName(), environment);
+  }
+
   // Other platforms get no normalization.
   return triple;
 }
@@ -341,6 +351,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     if (Major == 10) {
       if (Minor <= 14) {
         return llvm::VersionTuple(5, 0);
+      } else if (Minor <= 15) {
+        return llvm::VersionTuple(5, 1);
       } else {
         return None;
       }
@@ -351,6 +363,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     Triple.getiOSVersion(Major, Minor, Micro);
     if (Major <= 12) {
       return llvm::VersionTuple(5, 0);
+    } else if (Major <= 13) {
+      return llvm::VersionTuple(5, 1);
     } else {
       return None;
     }
@@ -358,6 +372,8 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple){
     Triple.getWatchOSVersion(Major, Minor, Micro);
     if (Major <= 5) {
       return llvm::VersionTuple(5, 0);
+    } else if (Major <= 6) {
+      return llvm::VersionTuple(5, 1);
     } else {
       return None;
     }

@@ -85,32 +85,8 @@ public:
   LazyMemberLoader *loader;
 };
 
-/// A class that can lazily parse members for an iterable decl context.
-class LazyMemberParser {
-public:
-  virtual ~LazyMemberParser() = default;
-
-  /// Populates a given decl context \p IDC with all of its members.
-  ///
-  /// The implementation should add the members to IDC.
-  virtual void parseMembers(IterableDeclContext *IDC) = 0;
-
-  /// Return whether the iterable decl context needs parsing.
-  virtual bool hasUnparsedMembers(const IterableDeclContext *IDC) = 0;
-
-  /// Parse all delayed decl list members.
-  virtual void parseAllDelayedDeclLists() = 0;
-};
-
-/// Context data for generic contexts.
-class LazyGenericContextData : public LazyContextData {
-public:
-  /// The context data used for loading the generic environment.
-  uint64_t genericEnvData = 0;
-};
-
 /// Context data for iterable decl contexts.
-class LazyIterableDeclContextData : public LazyGenericContextData {
+class LazyIterableDeclContextData : public LazyContextData {
 public:
   /// The context data used for loading all of the members of the iterable
   /// context.
@@ -161,10 +137,6 @@ public:
   /// Returns the default definition type for \p ATD.
   virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                          uint64_t contextData) = 0;
-
-  /// Returns the generic environment.
-  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) = 0;
 
   /// Loads the requirement signature for a protocol.
   virtual void

@@ -1,0 +1,890 @@
+// RUN: %target-sil-opt -mandatory-combine %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Trivial declarations
+
+struct MyInt {
+  var value: Builtin.Int64
+}
+
+// Generic declarations
+
+protocol Addable {
+  static var an: Self { get }
+}
+
+// Class declarations
+
+class Klass {
+  init()
+  deinit
+}
+
+// Existential declarations
+
+protocol Proto {
+  static var an: Proto { get }
+}
+
+// Trivial support
+
+sil @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+
+sil @constant_zero : $@convention(thin) () -> MyInt 
+
+sil @identity_int : $@convention(thin) (MyInt) -> MyInt 
+
+// Generic support
+
+sil @first_of_three_addables : $@convention(thin) <A where A : Addable> (@in_guaranteed A, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>) -> @
+out A
+
+// Class support
+
+sil [exact_self_class] @klass_alloc_init : $@convention(method) (@thick Klass.Type) -> @owned Klass
+
+// Klass.init()
+sil @klass_init : $@convention(method) (@owned Klass) -> @owned Klass
+// Klass.deinit
+sil @klass_deinit : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject
+
+// Klass.__deallocating_deinit
+sil @klass_dealloc_deinit : $@convention(method) (@owned Klass) -> ()
+
+sil_vtable Klass {
+  #Klass.init!allocator.1: (Klass.Type) -> () -> Klass : @klass_alloc_init
+  #Klass.deinit!deallocator.1: @klass_dealloc_deinit
+}
+
+sil @first_of_three_klasses : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+
+// Existential support
+
+sil @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+
+sil @get_proto : $@convention(thin) () -> @out Proto
+
+// Mixed support
+
+sil @proto_from_proto_and_myint : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+
+sil @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+
+sil @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+
+///////////
+// Tests //
+///////////
+
+////////////////////////
+// Trivial, No Return //
+////////////////////////
+
+// All trivial arguments.  No partial apply arguments.  No apply arguments.
+// CHECK-LABEL: sil hidden @trivial_nocapture_noargs : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}()
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_noargs'
+sil hidden @trivial_nocapture_noargs : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = function_ref @constant_zero : $@convention(thin) () -> MyInt
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> MyInt
+  strong_retain %1 : $@callee_guaranteed () -> MyInt
+  %2 = apply %1() : $@callee_guaranteed () -> MyInt
+  strong_release %1 : $@callee_guaranteed () -> MyInt
+  strong_release %1 : $@callee_guaranteed () -> MyInt
+  return %2 : $MyInt
+} // end sil function 'trivial_nocapture_noargs'
+
+// All trivial arguments.  Partial apply arguments.  No apply arguments.
+// CHECK-LABEL: sil hidden @trivial_capture_noargs : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'trivial_capture_noargs'
+sil hidden @trivial_capture_noargs : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (MyInt) -> MyInt
+  strong_retain %3 : $@callee_guaranteed () -> MyInt
+  %4 = apply %3() : $@callee_guaranteed () -> MyInt
+  strong_release %3 : $@callee_guaranteed () -> MyInt
+  strong_release %3 : $@callee_guaranteed () -> MyInt
+  return %4 : $MyInt
+} // end sil function 'trivial_capture_noargs'
+
+// All trivial arguments.  No partial apply arguments.  Apply arguments.
+// CHECK-LABEL: sil hidden @trivial_nocapture_args : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_args'
+sil hidden @trivial_nocapture_args : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2() : $@convention(thin) (MyInt) -> MyInt
+  strong_retain %3 : $@callee_guaranteed (MyInt) -> MyInt
+  %4 = apply %3(%1) : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %3 : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %3 : $@callee_guaranteed (MyInt) -> MyInt
+  return %4 : $MyInt
+} // end sil function 'trivial_nocapture_args'
+
+// All trivial arguments.  Partial apply arguments.  Apply arguments.
+// CHECK-LABEL: sil hidden @trivial_capture_args : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}({{%.*}}, {{%.*}}, {{%.*}})
+// CHECK: return  [[RESULT]]
+// CHECK: } // end sil function 'trivial_capture_args'
+sil hidden @trivial_capture_args : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $MyInt (%3 : $Builtin.Int64)
+  %6 = function_ref @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  %7 = partial_apply [callee_guaranteed] %6(%1, %4) : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  strong_retain %7 : $@callee_guaranteed (MyInt) -> MyInt
+  %10 = integer_literal $Builtin.Int64, 15
+  %11 = struct $MyInt (%10 : $Builtin.Int64)
+  %12 = apply %7(%11) : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %7 : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %7 : $@callee_guaranteed (MyInt) -> MyInt
+  return %12 : $MyInt
+} // end sil function 'trivial_capture_args'
+
+/////////////////////
+// Trivial, Return //
+/////////////////////
+
+// All trivial arguments.  No partial apply arguments.  No apply arguments.  Return partial apply.
+// CHECK-LABEL: sil hidden @trivial_nocapture_noargs_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @constant_zero
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]()
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed () -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_noargs_ret'
+sil hidden @trivial_nocapture_noargs_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+bb0:
+  %0 = function_ref @constant_zero : $@convention(thin) () -> MyInt
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> MyInt
+  strong_retain %1 : $@callee_guaranteed () -> MyInt
+  %2 = apply %1() : $@callee_guaranteed () -> MyInt
+  strong_release %1 : $@callee_guaranteed () -> MyInt
+  strong_release %1 : $@callee_guaranteed () -> MyInt
+  %3 = tuple (%2 : $MyInt, %1 : $@callee_guaranteed () -> MyInt)
+  return %3 : $(MyInt, @callee_guaranteed () -> MyInt)
+} // end sil function 'trivial_nocapture_noargs_ret'
+
+// All trivial arguments.  Partial apply arguments.  No apply arguments.  Return partial apply.
+// CHECK-LABEL: sil hidden @trivial_capture_noargs_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @identity_int
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]([[FIRST_ARGUMENT:%.*]]) :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]([[FIRST_ARGUMENT]])
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed () -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_capture_noargs_ret'
+sil hidden @trivial_capture_noargs_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (MyInt) -> MyInt
+  strong_retain %3 : $@callee_guaranteed () -> MyInt
+  %4 = apply %3() : $@callee_guaranteed () -> MyInt
+  strong_release %3 : $@callee_guaranteed () -> MyInt
+  strong_release %3 : $@callee_guaranteed () -> MyInt
+  %5 = tuple (%4 : $MyInt, %3 : $@callee_guaranteed () -> MyInt)
+  return %5 : $(MyInt, @callee_guaranteed () -> MyInt)
+} // end sil function 'trivial_capture_noargs_ret'
+
+// All trivial arguments.  No partial apply arguments.  Apply arguments.  Return partial apply.
+// CHECK-LABEL: sil hidden @trivial_nocapture_args_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @identity_int
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]({{%.*}})
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed (MyInt) -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_args_ret'
+sil hidden @trivial_nocapture_args_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2() : $@convention(thin) (MyInt) -> MyInt
+  strong_retain %3 : $@callee_guaranteed (MyInt) -> MyInt
+  %4 = apply %3(%1) : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %3 : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %3 : $@callee_guaranteed (MyInt) -> MyInt
+  %5 = tuple (%4 : $MyInt, %3 : $@callee_guaranteed (MyInt) -> MyInt)
+  return %5 : $(MyInt, @callee_guaranteed (MyInt) -> MyInt)
+} // end sil function 'trivial_nocapture_args_ret'
+
+// All trivial arguments.  Partial apply arguments.  Apply arguments.  Return partial apply.
+// CHECK-LABEL: sil hidden @trivial_capture_args_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_ints
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]([[FIRST_ARGUMENT:%.*]], [[SECOND_ARGUMENT:%.*]]) :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]({{%.*}}, [[FIRST_ARGUMENT]], [[SECOND_ARGUMENT]])
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed (MyInt) -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_capture_args_ret'
+sil hidden @trivial_capture_args_ret : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $MyInt (%3 : $Builtin.Int64)
+  %6 = function_ref @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  %7 = partial_apply [callee_guaranteed] %6(%1, %4) : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  strong_retain %7 : $@callee_guaranteed (MyInt) -> MyInt
+  %10 = integer_literal $Builtin.Int64, 15
+  %11 = struct $MyInt (%10 : $Builtin.Int64)
+  %12 = apply %7(%11) : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %7 : $@callee_guaranteed (MyInt) -> MyInt
+  %14 = tuple (%12 : $MyInt, %7 : $@callee_guaranteed (MyInt) -> MyInt)
+  return %14 : $(MyInt, @callee_guaranteed (MyInt) -> MyInt)
+} // end sil function 'trivial_capture_args_ret'
+
+/////////////
+// Generic //
+/////////////
+
+// All generic arguments.  Partial apply arguments.  Apply arguments.
+// CHECK-LABEL: sil hidden @generic_capture_args : $@convention(thin) <A where A : Addable> () -> @out A {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_addables
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]<A>
+// Use %0 explicitly because that is the out parameter.
+// CHECK: apply [[PARTIAL_APPLY_RESULT]](%0, {{%.*}})
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function 'generic_capture_args'
+sil hidden @generic_capture_args : $@convention(thin) <A where A : Addable> () -> @out A {
+bb0(%0 : $*A):
+  %1 = alloc_stack $A, let, name "x"
+  %2 = metatype $@thick A.Type
+  %3 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %4 = apply %3<A>(%1, %2) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %5 = alloc_stack $A, let, name "y"
+  %6 = metatype $@thick A.Type
+  %7 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %8 = apply %7<A>(%5, %6) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %9 = function_ref @first_of_three_addables : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable>
+ { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  %10 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
+  %11 = project_box %10 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
+  copy_addr %5 to [initialization] %11 : $*A
+  %13 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
+  %14 = project_box %13 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
+  copy_addr %1 to [initialization] %14 : $*A
+  %16 = partial_apply [callee_guaranteed] %9<A>(%10, %13) : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  strong_retain %16 : $@callee_guaranteed (@in_guaranteed A) -> @out A
+  %19 = metatype $@thick A.Type
+  %20 = alloc_stack $A
+  %21 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %22 = apply %21<A>(%20, %19) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %23 = apply %16(%0, %20) : $@callee_guaranteed (@in_guaranteed A) -> @out A
+  destroy_addr %20 : $*A
+  dealloc_stack %20 : $*A
+  strong_release %16 : $@callee_guaranteed (@in_guaranteed A) -> @out A
+  strong_release %16 : $@callee_guaranteed (@in_guaranteed A) -> @out A
+  destroy_addr %5 : $*A
+  dealloc_stack %5 : $*A
+  destroy_addr %1 : $*A
+  dealloc_stack %1 : $*A
+  %32 = tuple ()
+  return %32 : $()
+} // end sil function 'generic_capture_args'
+
+
+///////////
+// Class //
+///////////
+
+// All class arguments.  Partial apply arguments.  Apply arguments.
+// CHECK-LABEL: sil hidden @class_capture_args : $@convention(thin) () -> @owned Klass {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_klasses
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}, {{%.*}}) :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'class_capture_args'
+sil hidden @class_capture_args : $@convention(thin) () -> @owned Klass {
+bb0:
+  %0 = metatype $@thick Klass.Type
+  %1 = function_ref @klass_alloc_init : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %2 = apply %1(%0) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %6 = apply %1(%0) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %8 = function_ref @first_of_three_klasses : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+  strong_retain %2 : $Klass
+  strong_retain %6 : $Klass
+  %11 = partial_apply [callee_guaranteed] %8(%2, %6) : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+  strong_retain %11 : $@callee_guaranteed (@guaranteed Klass) -> @owned Klass
+  %16 = apply %1(%0) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %17 = apply %11(%16) : $@callee_guaranteed (@guaranteed Klass) -> @owned Klass
+  strong_release %16 : $Klass
+  strong_release %11 : $@callee_guaranteed (@guaranteed Klass) -> @owned Klass
+  strong_release %11 : $@callee_guaranteed (@guaranteed Klass) -> @owned Klass
+  strong_release %6 : $Klass
+  strong_release %2 : $Klass
+  return %17 : $Klass
+} // end sil function 'class_capture_args'
+
+/////////////////
+// Existential //
+/////////////////
+
+// All existential arguments.  Partial apply arguments.  Apply arguments.
+// CHECK-LABEL: sil hidden @existential_capture_args : $@convention(thin) () -> @out Proto {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_protos
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}, {{%.*}}) :
+// Use %0 explicitly because that is the out parameter.
+// CHECK: apply [[PARTIAL_APPLY_RESULT]](%0, {{%.*}})
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function 'existential_capture_args'
+sil hidden @existential_capture_args : $@convention(thin) () -> @out Proto {
+bb0(%0 : $*Proto):
+  %1 = alloc_stack $Proto, let, name "x"
+  %2 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %3 = apply %2(%1) : $@convention(thin) () -> @out Proto
+  %4 = alloc_stack $Proto, let, name "y"
+  %6 = apply %2(%4) : $@convention(thin) () -> @out Proto
+  %7 = function_ref @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+  %8 = alloc_box ${ var Proto }
+  %9 = project_box %8 : ${ var Proto }, 0
+  copy_addr %1 to [initialization] %9 : $*Proto
+  %11 = alloc_box ${ var Proto }
+  %12 = project_box %11 : ${ var Proto }, 0
+  copy_addr %4 to [initialization] %12 : $*Proto
+  %14 = partial_apply [callee_guaranteed] %7(%8, %11) : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+  strong_retain %14 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  %17 = alloc_stack $Proto
+  %19 = apply %2(%17) : $@convention(thin) () -> @out Proto
+  %20 = apply %14(%0, %17) : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  destroy_addr %17 : $*Proto
+  dealloc_stack %17 : $*Proto
+  strong_release %14 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  strong_release %14 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  destroy_addr %4 : $*Proto
+  dealloc_stack %4 : $*Proto
+  destroy_addr %1 : $*Proto
+  dealloc_stack %1 : $*Proto
+  %29 = tuple ()
+  return %29 : $()
+} // end sil function 'existential_capture_args'
+
+///////////
+// Mixed //
+///////////
+
+// Mixed arguments.  Trivial partial apply argument.  Existential argument.
+// CHECK-LABEL: sil hidden @mixed_trivialcapture_existentialarg : $@convention(thin) () -> @out Proto {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @proto_from_proto_and_myint
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}) :
+// Use %0 explicitly because that is the out parameter.
+// CHECK: apply [[PARTIAL_APPLY_RESULT]](%0, {{%.*}})
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function 'mixed_trivialcapture_existentialarg'
+sil hidden @mixed_trivialcapture_existentialarg : $@convention(thin) () -> @out Proto {
+bb0(%0 : $*Proto):
+  %1 = integer_literal $Builtin.Int64, 5
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %4 = function_ref @proto_from_proto_and_myint : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+  strong_retain %5 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  %8 = alloc_stack $Proto
+  %9 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %10 = apply %9(%8) : $@convention(thin) () -> @out Proto
+  %11 = apply %5(%0, %8) : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  destroy_addr %8 : $*Proto
+  dealloc_stack %8 : $*Proto
+  strong_release %5 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  strong_release %5 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  %16 = tuple ()
+  return %16 : $()
+} // end sil function 'mixed_trivialcapture_existentialarg'
+
+// Mixed arguments.  Existential partial apply argument.  Trivial argument.
+// CHECK-LABEL: sil hidden @mixed_existentialcapture_trivialarg : $@convention(thin) () -> MyInt {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @myint_from_myint_and_proto
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}) :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'mixed_existentialcapture_trivialarg'
+sil hidden @mixed_existentialcapture_trivialarg : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = alloc_stack $Proto, let, name "x"
+  %1 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %2 = apply %1(%0) : $@convention(thin) () -> @out Proto
+  %3 = function_ref @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+  %4 = alloc_box ${ var Proto }
+  %5 = project_box %4 : ${ var Proto }, 0
+  copy_addr %0 to [initialization] %5 : $*Proto
+  %7 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+  strong_retain %7 : $@callee_guaranteed (MyInt) -> MyInt
+  %10 = integer_literal $Builtin.Int64, 5
+  %11 = struct $MyInt (%10 : $Builtin.Int64)
+  %12 = apply %7(%11) : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %7 : $@callee_guaranteed (MyInt) -> MyInt
+  strong_release %7 : $@callee_guaranteed (MyInt) -> MyInt
+  destroy_addr %0 : $*Proto
+  dealloc_stack %0 : $*Proto
+  return %12 : $MyInt
+} // end sil function 'mixed_existentialcapture_trivialarg'
+
+// Mixed arguments.  Mixed partial apply arguments.  No arguments.
+// CHECK-LABEL: sil hidden @mixed_mixedcapture_noargs : $@convention(thin) () -> MyInt {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @myint_from_proto_and_myint
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}, {{%.*}}) :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]()
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'mixed_mixedcapture_noargs'
+sil hidden @mixed_mixedcapture_noargs : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = alloc_stack $Proto, let, name "y"
+  %4 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %5 = apply %4(%3) : $@convention(thin) () -> @out Proto
+  %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  %7 = alloc_box ${ var Proto }
+  %8 = project_box %7 : ${ var Proto }, 0
+  copy_addr %3 to [initialization] %8 : $*Proto
+  %10 = partial_apply [callee_guaranteed] %6(%7, %1) : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  strong_retain %10 : $@callee_guaranteed () -> MyInt
+  %13 = apply %10() : $@callee_guaranteed () -> MyInt
+  strong_release %10 : $@callee_guaranteed () -> MyInt
+  strong_release %10 : $@callee_guaranteed () -> MyInt
+  destroy_addr %3 : $*Proto
+  dealloc_stack %3 : $*Proto
+  return %13 : $MyInt
+} // end sil function 'mixed_mixedcapture_noargs'
+
+// Mixed arguments.  No partial apply arguments.  Mixed arguments.
+// CHECK-LABEL: sil hidden @mixed_nocapture_mixedargs : $@convention(thin) () -> MyInt {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @myint_from_proto_and_myint
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]({{%.*}}, {{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'mixed_nocapture_mixedargs'
+sil hidden @mixed_nocapture_mixedargs : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = alloc_stack $Proto, let, name "y"
+  %4 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %5 = apply %4(%3) : $@convention(thin) () -> @out Proto
+  %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  %7 = alloc_box ${ var Proto }
+  %8 = project_box %7 : ${ var Proto }, 0
+  copy_addr %3 to [initialization] %8 : $*Proto
+  %10 = partial_apply [callee_guaranteed] %6() : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  strong_retain %10 : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
+  %13 = apply %10(%7, %1) : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
+  strong_release %10 : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
+  strong_release %10 : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
+  destroy_addr %3 : $*Proto
+  dealloc_stack %3 : $*Proto
+  return %13 : $MyInt
+} // end sil function 'mixed_nocapture_mixedargs'
+
+//////////////
+//////////////
+//// OSSA ////
+//////////////
+//////////////
+
+////////////////////////
+// Trivial, No Return //
+////////////////////////
+
+// All trivial arguments.  No partial apply arguments.  No apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_nocapture_noargs_ossa : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}()
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_noargs_ossa'
+sil [ossa] @trivial_nocapture_noargs_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = function_ref @constant_zero : $@convention(thin) () -> MyInt
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> MyInt
+  %2 = apply %1() : $@callee_guaranteed () -> MyInt
+  destroy_value %1 : $@callee_guaranteed () -> MyInt
+  return %2 : $MyInt
+} // end sil function 'trivial_nocapture_noargs_ossa'
+
+// All trivial arguments.  Partial apply arguments.  No apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_capture_noargs_ossa : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'trivial_capture_noargs_ossa'
+sil [ossa] @trivial_capture_noargs_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (MyInt) -> MyInt
+  %4 = apply %3() : $@callee_guaranteed () -> MyInt
+  destroy_value %3 : $@callee_guaranteed () -> MyInt
+  return %4 : $MyInt
+} // end sil function 'trivial_capture_noargs_ossa'
+
+// All trivial arguments.  No partial apply arguments.  Apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_nocapture_args_ossa : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_args_ossa'
+sil [ossa] @trivial_nocapture_args_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2() : $@convention(thin) (MyInt) -> MyInt
+  %4 = apply %3(%1) : $@callee_guaranteed (MyInt) -> MyInt
+  destroy_value %3 : $@callee_guaranteed (MyInt) -> MyInt
+  return %4 : $MyInt
+} // end sil function 'trivial_nocapture_args_ossa'
+
+// All trivial arguments.  Partial apply arguments.  Apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_capture_args_ossa : $@convention(thin) () -> MyInt {
+// CHECK-NOT: partial_apply
+// CHECK: [[RESULT:%.*]] = apply {{%.*}}({{%.*}}, {{%.*}}, {{%.*}})
+// CHECK: return  [[RESULT]]
+// CHECK: } // end sil function 'trivial_capture_args_ossa'
+sil [ossa] @trivial_capture_args_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $MyInt (%3 : $Builtin.Int64)
+  %6 = function_ref @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  %7 = partial_apply [callee_guaranteed] %6(%1, %4) : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  %10 = integer_literal $Builtin.Int64, 15
+  %11 = struct $MyInt (%10 : $Builtin.Int64)
+  %12 = apply %7(%11) : $@callee_guaranteed (MyInt) -> MyInt
+  destroy_value %7 : $@callee_guaranteed (MyInt) -> MyInt
+  return %12 : $MyInt
+} // end sil function 'trivial_capture_args_ossa'
+
+/////////////////////
+// Trivial, Return //
+/////////////////////
+
+// All trivial arguments.  No partial apply arguments.  No apply arguments.  Return partial apply.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_nocapture_noargs_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @constant_zero
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]()
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed () -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_noargs_ret_ossa'
+sil [ossa] @trivial_nocapture_noargs_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+bb0:
+  %0 = function_ref @constant_zero : $@convention(thin) () -> MyInt
+  %1 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> MyInt
+  %2 = apply %1() : $@callee_guaranteed () -> MyInt
+  %3 = tuple (%2 : $MyInt, %1 : $@callee_guaranteed () -> MyInt)
+  return %3 : $(MyInt, @callee_guaranteed () -> MyInt)
+} // end sil function 'trivial_nocapture_noargs_ret_ossa'
+
+// All trivial arguments.  Partial apply arguments.  No apply arguments.  Return partial apply.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_capture_noargs_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @identity_int
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]([[FIRST_ARGUMENT:%.*]]) :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]([[FIRST_ARGUMENT]])
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed () -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_capture_noargs_ret_ossa'
+sil [ossa] @trivial_capture_noargs_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed () -> MyInt) {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (MyInt) -> MyInt
+  %4 = apply %3() : $@callee_guaranteed () -> MyInt
+  %5 = tuple (%4 : $MyInt, %3 : $@callee_guaranteed () -> MyInt)
+  return %5 : $(MyInt, @callee_guaranteed () -> MyInt)
+} // end sil function 'trivial_capture_noargs_ret_ossa'
+
+// All trivial arguments.  No partial apply arguments.  Apply arguments.  Return partial apply.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_nocapture_args_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @identity_int
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]({{%.*}})
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed (MyInt) -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_nocapture_args_ret_ossa'
+sil [ossa] @trivial_nocapture_args_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %2 = function_ref @identity_int : $@convention(thin) (MyInt) -> MyInt
+  %3 = partial_apply [callee_guaranteed] %2() : $@convention(thin) (MyInt) -> MyInt
+  %4 = apply %3(%1) : $@callee_guaranteed (MyInt) -> MyInt
+  %5 = tuple (%4 : $MyInt, %3 : $@callee_guaranteed (MyInt) -> MyInt)
+  return %5 : $(MyInt, @callee_guaranteed (MyInt) -> MyInt)
+} // end sil function 'trivial_nocapture_args_ret_ossa'
+
+// All trivial arguments.  Partial apply arguments.  Apply arguments.  Return partial apply.  OSSA.
+// CHECK-LABEL: sil [ossa] @trivial_capture_args_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_ints
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]([[FIRST_ARGUMENT:%.*]], [[SECOND_ARGUMENT:%.*]]) :
+// CHECK: [[APPLY_RESULT:%.]] = apply [[FUNCTION_REF]]({{%.*}}, [[FIRST_ARGUMENT]], [[SECOND_ARGUMENT]])
+// CHECK: [[TUPLE_RESULT:%.*]] = tuple ([[APPLY_RESULT]] : $MyInt, [[PARTIAL_APPLY_RESULT]] : $@callee_guaranteed (MyInt) -> MyInt)
+// CHECK: return [[TUPLE_RESULT]]
+// CHECK: } // end sil function 'trivial_capture_args_ret_ossa'
+sil [ossa] @trivial_capture_args_ret_ossa : $@convention(thin) () -> (MyInt, @owned @callee_guaranteed (MyInt) -> MyInt) {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = integer_literal $Builtin.Int64, 10
+  %4 = struct $MyInt (%3 : $Builtin.Int64)
+  %6 = function_ref @first_of_three_ints : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  %7 = partial_apply [callee_guaranteed] %6(%1, %4) : $@convention(thin) (MyInt, MyInt, MyInt) -> MyInt
+  %10 = integer_literal $Builtin.Int64, 15
+  %11 = struct $MyInt (%10 : $Builtin.Int64)
+  %12 = apply %7(%11) : $@callee_guaranteed (MyInt) -> MyInt
+  %14 = tuple (%12 : $MyInt, %7 : $@callee_guaranteed (MyInt) -> MyInt)
+  return %14 : $(MyInt, @callee_guaranteed (MyInt) -> MyInt)
+} // end sil function 'trivial_capture_args_ret_ossa'
+
+/////////////
+// Generic //
+/////////////
+
+// All generic arguments.  Partial apply arguments.  Apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @generic_capture_args_ossa : $@convention(thin) <A where A : Addable> () -> @out A {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_addables
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]<A>
+// Use %0 explicitly because that is the out parameter.
+// CHECK: apply [[PARTIAL_APPLY_RESULT]](%0, {{%.*}})
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function 'generic_capture_args_ossa'
+sil [ossa] @generic_capture_args_ossa : $@convention(thin) <A where A : Addable> () -> @out A {
+bb0(%0 : $*A):
+  %1 = alloc_stack $A, let, name "x"
+  %2 = metatype $@thick A.Type
+  %3 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %4 = apply %3<A>(%1, %2) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %5 = alloc_stack $A, let, name "y"
+  %6 = metatype $@thick A.Type
+  %7 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %8 = apply %7<A>(%5, %6) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %9 = function_ref @first_of_three_addables : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable>
+ { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  %10 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
+  %11 = project_box %10 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
+  copy_addr %5 to [initialization] %11 : $*A
+  %13 = alloc_box $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>
+  %14 = project_box %13 : $<τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <A>, 0
+  copy_addr %1 to [initialization] %14 : $*A
+  %16 = partial_apply [callee_guaranteed] %9<A>(%10, %13) : $@convention(thin) <τ_0_0 where τ_0_0 : Addable> (@in_guaranteed τ_0_0, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>, @guaranteed <τ_0_0 where τ_0_0 : Addable> { var τ_0_0 } <τ_0_0>) -> @out τ_0_0
+  %19 = metatype $@thick A.Type
+  %20 = alloc_stack $A
+  %21 = witness_method $A, #Addable.an!getter.1 : <Self where Self : Addable> (Self.Type) -> () -> Self : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %22 = apply %21<A>(%20, %19) : $@convention(witness_method: Addable) <τ_0_0 where τ_0_0 : Addable> (@thick τ_0_0.Type) -> @out τ_0_0
+  %23 = apply %16(%0, %20) : $@callee_guaranteed (@in_guaranteed A) -> @out A
+  destroy_addr %20 : $*A
+  dealloc_stack %20 : $*A
+  destroy_value %16 : $@callee_guaranteed (@in_guaranteed A) -> @out A
+  destroy_addr %5 : $*A
+  dealloc_stack %5 : $*A
+  destroy_addr %1 : $*A
+  dealloc_stack %1 : $*A
+  %32 = tuple ()
+  return %32 : $()
+} // end sil function 'generic_capture_args_ossa'
+
+///////////
+// Class //
+///////////
+
+// All class arguments.  Partial apply arguments.  Apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @class_capture_args_ossa : $@convention(thin) () -> @owned Klass {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_klasses
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}, {{%.*}}) :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'class_capture_args_ossa'
+sil [ossa] @class_capture_args_ossa : $@convention(thin) () -> @owned Klass {
+bb0:
+  %0 = metatype $@thick Klass.Type
+  %1 = function_ref @klass_alloc_init : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %2 = apply %1(%0) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %6 = apply %1(%0) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %8 = function_ref @first_of_three_klasses : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+  %2a = copy_value %2 : $Klass
+  %6a = copy_value %6 : $Klass
+  %11 = partial_apply [callee_guaranteed] %8(%2a, %6a) : $@convention(thin) (@guaranteed Klass, @guaranteed Klass, @guaranteed Klass) -> @owned Klass
+  %16 = apply %1(%0) : $@convention(method) (@thick Klass.Type) -> @owned Klass
+  %17 = apply %11(%16) : $@callee_guaranteed (@guaranteed Klass) -> @owned Klass
+  destroy_value %16 : $Klass
+  destroy_value %11 : $@callee_guaranteed (@guaranteed Klass) -> @owned Klass
+  destroy_value %6 : $Klass
+  destroy_value %2 : $Klass
+  return %17 : $Klass
+} // end sil function 'class_capture_args_ossa'
+
+/////////////////
+// Existential //
+/////////////////
+
+// All existential arguments.  Partial apply arguments.  Apply arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @existential_capture_args_ossa : $@convention(thin) () -> @out Proto {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @first_of_three_protos
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}, {{%.*}}) :
+// Use %0 explicitly because that is the out parameter.
+// CHECK: apply [[PARTIAL_APPLY_RESULT]](%0, {{%.*}})
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function 'existential_capture_args_ossa'
+sil [ossa] @existential_capture_args_ossa : $@convention(thin) () -> @out Proto {
+bb0(%0 : $*Proto):
+  %1 = alloc_stack $Proto, let, name "x"
+  %2 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %3 = apply %2(%1) : $@convention(thin) () -> @out Proto
+  %4 = alloc_stack $Proto, let, name "y"
+  %6 = apply %2(%4) : $@convention(thin) () -> @out Proto
+  %7 = function_ref @first_of_three_protos : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+  %8 = alloc_box ${ var Proto }
+  %9 = project_box %8 : ${ var Proto }, 0
+  copy_addr %1 to [initialization] %9 : $*Proto
+  %11 = alloc_box ${ var Proto }
+  %12 = project_box %11 : ${ var Proto }, 0
+  copy_addr %4 to [initialization] %12 : $*Proto
+  %14 = partial_apply [callee_guaranteed] %7(%8, %11) : $@convention(thin) (@in_guaranteed Proto, @guaranteed { var Proto }, @guaranteed { var Proto }) -> @out Proto
+  %17 = alloc_stack $Proto
+  %19 = apply %2(%17) : $@convention(thin) () -> @out Proto
+  %20 = apply %14(%0, %17) : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  destroy_addr %17 : $*Proto
+  dealloc_stack %17 : $*Proto
+  destroy_value %14 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  destroy_addr %4 : $*Proto
+  dealloc_stack %4 : $*Proto
+  destroy_addr %1 : $*Proto
+  dealloc_stack %1 : $*Proto
+  %29 = tuple ()
+  return %29 : $()
+} // end sil function 'existential_capture_args_ossa'
+
+///////////
+// Mixed //
+///////////
+
+// Mixed arguments.  Trivial partial apply argument.  Existential argument.  OSSA.
+// CHECK-LABEL: sil [ossa] @mixed_trivialcapture_existentialarg_ossa : $@convention(thin) () -> @out Proto {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @proto_from_proto_and_myint
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}) :
+// Use %0 explicitly because that is the out parameter.
+// CHECK: apply [[PARTIAL_APPLY_RESULT]](%0, {{%.*}})
+// CHECK: [[RESULT:%.*]] = tuple ()
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function 'mixed_trivialcapture_existentialarg_ossa'
+sil [ossa] @mixed_trivialcapture_existentialarg_ossa : $@convention(thin) () -> @out Proto {
+bb0(%0 : $*Proto):
+  %1 = integer_literal $Builtin.Int64, 5
+  %2 = struct $MyInt (%1 : $Builtin.Int64)
+  %4 = function_ref @proto_from_proto_and_myint : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+  %5 = partial_apply [callee_guaranteed] %4(%2) : $@convention(thin) (@in_guaranteed Proto, MyInt) -> @out Proto
+  %8 = alloc_stack $Proto
+  %9 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %10 = apply %9(%8) : $@convention(thin) () -> @out Proto
+  %11 = apply %5(%0, %8) : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  destroy_addr %8 : $*Proto
+  dealloc_stack %8 : $*Proto
+  destroy_value %5 : $@callee_guaranteed (@in_guaranteed Proto) -> @out Proto
+  %16 = tuple ()
+  return %16 : $()
+} // end sil function 'mixed_trivialcapture_existentialarg_ossa'
+
+// Mixed arguments.  Existential partial apply argument.  Trivial argument.  OSSA.
+// CHECK-LABEL: sil [ossa] @mixed_existentialcapture_trivialarg_ossa : $@convention(thin) () -> MyInt {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @myint_from_myint_and_proto
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}) :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]({{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'mixed_existentialcapture_trivialarg_ossa'
+sil [ossa] @mixed_existentialcapture_trivialarg_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = alloc_stack $Proto, let, name "x"
+  %1 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %2 = apply %1(%0) : $@convention(thin) () -> @out Proto
+  %3 = function_ref @myint_from_myint_and_proto : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+  %4 = alloc_box ${ var Proto }
+  %5 = project_box %4 : ${ var Proto }, 0
+  copy_addr %0 to [initialization] %5 : $*Proto
+  %7 = partial_apply [callee_guaranteed] %3(%4) : $@convention(thin) (MyInt, @guaranteed { var Proto }) -> MyInt
+  %10 = integer_literal $Builtin.Int64, 5
+  %11 = struct $MyInt (%10 : $Builtin.Int64)
+  %12 = apply %7(%11) : $@callee_guaranteed (MyInt) -> MyInt
+  destroy_value %7 : $@callee_guaranteed (MyInt) -> MyInt
+  destroy_addr %0 : $*Proto
+  dealloc_stack %0 : $*Proto
+  return %12 : $MyInt
+} // end sil function 'mixed_existentialcapture_trivialarg_ossa'
+
+// Mixed arguments.  Mixed partial apply arguments.  No arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @mixed_mixedcapture_noargs_ossa : $@convention(thin) () -> MyInt {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @myint_from_proto_and_myint
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]({{%.*}}, {{%.*}}) :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]()
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'mixed_mixedcapture_noargs_ossa'
+sil [ossa] @mixed_mixedcapture_noargs_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = alloc_stack $Proto, let, name "y"
+  %4 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %5 = apply %4(%3) : $@convention(thin) () -> @out Proto
+  %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  %7 = alloc_box ${ var Proto }
+  %8 = project_box %7 : ${ var Proto }, 0
+  copy_addr %3 to [initialization] %8 : $*Proto
+  %10 = partial_apply [callee_guaranteed] %6(%7, %1) : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  %13 = apply %10() : $@callee_guaranteed () -> MyInt
+  destroy_value %10 : $@callee_guaranteed () -> MyInt
+  destroy_addr %3 : $*Proto
+  dealloc_stack %3 : $*Proto
+  return %13 : $MyInt
+} // end sil function 'mixed_mixedcapture_noargs_ossa'
+
+// Mixed arguments.  No partial apply arguments.  Mixed arguments.  OSSA.
+// CHECK-LABEL: sil [ossa] @mixed_nocapture_mixedargs_ossa : $@convention(thin) () -> MyInt {
+// CHECK: [[FUNCTION_REF:%.*]] = function_ref @myint_from_proto_and_myint
+// CHECK: [[PARTIAL_APPLY_RESULT:%.*]] = partial_apply [callee_guaranteed] [[FUNCTION_REF]]() :
+// CHECK: [[RESULT:%.*]] = apply [[PARTIAL_APPLY_RESULT]]({{%.*}}, {{%.*}})
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'mixed_nocapture_mixedargs_ossa'
+sil [ossa] @mixed_nocapture_mixedargs_ossa : $@convention(thin) () -> MyInt {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 5
+  %1 = struct $MyInt (%0 : $Builtin.Int64)
+  %3 = alloc_stack $Proto, let, name "y"
+  %4 = function_ref @get_proto : $@convention(thin) () -> @out Proto
+  %5 = apply %4(%3) : $@convention(thin) () -> @out Proto
+  %6 = function_ref @myint_from_proto_and_myint : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  %7 = alloc_box ${ var Proto }
+  %8 = project_box %7 : ${ var Proto }, 0
+  copy_addr %3 to [initialization] %8 : $*Proto
+  %10 = partial_apply [callee_guaranteed] %6() : $@convention(thin) (@guaranteed { var Proto }, MyInt) -> MyInt
+  %13 = apply %10(%7, %1) : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
+  destroy_value %10 : $@callee_guaranteed (@guaranteed { var Proto }, MyInt) -> MyInt
+  destroy_value %7  : ${ var Proto }
+  destroy_addr %3 : $*Proto
+  dealloc_stack %3 : $*Proto
+  return %13 : $MyInt
+} // end sil function 'mixed_nocapture_mixedargs_ossa'
+

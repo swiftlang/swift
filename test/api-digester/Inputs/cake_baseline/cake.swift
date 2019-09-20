@@ -193,3 +193,20 @@ public class Zoo {
     return Cat()
   }
 }
+
+public func returnFunctionTypeOwnershipChange() -> (C1) -> () { return { _ in } }
+
+@objc(OldObjCClass)
+public class SwiftObjcClass {
+  @objc(OldObjCFool:OldObjCA:OldObjCB:)
+  public func foo(a:Int, b:Int, c: Int) {}
+}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+open class AddingNewDesignatedInit {
+  public init() {}
+  public convenience init(foo: Int) {
+    self.init()
+    print(foo)
+  }
+}

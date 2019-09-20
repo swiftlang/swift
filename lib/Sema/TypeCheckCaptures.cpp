@@ -24,6 +24,7 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -32,7 +33,7 @@ using namespace swift;
 namespace {
 
 class FindCapturedVars : public ASTWalker {
-  TypeChecker &TC;
+  ASTContext &Context;
   SmallVector<CapturedValue, 4> Captures;
   llvm::SmallDenseMap<ValueDecl*, unsigned, 4> captureEntryNumber;
   SourceLoc GenericParamCaptureLoc;
@@ -44,12 +45,12 @@ class FindCapturedVars : public ASTWalker {
   bool NoEscape, ObjC;
 
 public:
-  FindCapturedVars(TypeChecker &tc,
+  FindCapturedVars(ASTContext &Context,
                    SourceLoc CaptureLoc,
                    DeclContext *CurDC,
                    bool NoEscape,
                    bool ObjC)
-      : TC(tc), CaptureLoc(CaptureLoc), CurDC(CurDC),
+      : Context(Context), CaptureLoc(CaptureLoc), CurDC(CurDC),
         NoEscape(NoEscape), ObjC(ObjC) {}
 
   CaptureInfo getCaptureInfo() const {
@@ -71,7 +72,7 @@ public:
     if (Captures.empty())
       result.setCaptures(None);
     else
-      result.setCaptures(TC.Context.AllocateCopy(Captures));
+      result.setCaptures(Context.AllocateCopy(Captures));
 
     return result;
   }
@@ -219,7 +220,7 @@ public:
     // can safely ignore them.
     // FIXME(TapExpr): This is probably caused by the scoping 
     // algorithm's ignorance of TapExpr. We should fix that.
-    if (D->getBaseName() == D->getASTContext().Id_dollarInterpolation)
+    if (D->getBaseName() == Context.Id_dollarInterpolation)
       return { false, DRE };
 
     // Capture the generic parameters of the decl, unless it's a
@@ -228,11 +229,8 @@ public:
     if (!D->getDeclContext()->isLocalContext()) {
       if (!ObjC || !D->isObjC() || isa<ConstructorDecl>(D)) {
         if (auto subMap = DRE->getDeclRef().getSubstitutions()) {
-          auto genericSig = subMap.getGenericSignature();
-          for (auto gp : genericSig->getGenericParams()) {
-            if (auto type = Type(gp).subst(subMap)) {
-              checkType(type, DRE->getLoc());
-            }
+          for (auto type : subMap.getReplacementTypes()) {
+            checkType(type, DRE->getLoc());
           }
         }
       }
@@ -273,14 +271,14 @@ public:
         // This is not supported since nominal types cannot capture values.
         if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
           if (DC->isLocalContext()) {
-            TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
-                        NTD->getDescriptiveKind(),
-                        D->getBaseName().getIdentifier());
+            Context.Diags.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
+                                   NTD->getDescriptiveKind(),
+                                   D->getBaseName().getIdentifier());
 
-            TC.diagnose(NTD->getLoc(), diag::kind_declared_here,
-                        DescriptiveDeclKind::Type);
+            NTD->diagnose(diag::kind_declared_here,
+                          DescriptiveDeclKind::Type);
 
-            TC.diagnose(D, diag::decl_declared_here, D->getFullName());
+            D->diagnose(diag::decl_declared_here, D->getFullName());
             return { false, DRE };
           }
         }
@@ -327,11 +325,8 @@ public:
     return { false, DRE };
   }
 
-  void propagateCaptures(AnyFunctionRef innerClosure, SourceLoc captureLoc) {
-    TC.computeCaptures(innerClosure);
-
-    auto &captureInfo = innerClosure.getCaptureInfo();
-
+  void propagateCaptures(const CaptureInfo &captureInfo,
+                         SourceLoc loc) {
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl()->getDeclContext() == CurDC)
@@ -349,18 +344,19 @@ public:
       if (!NoEscape)
         Flags &= ~CapturedValue::IsNoEscape;
 
-      addCapture(CapturedValue(capture.getDecl(), Flags, captureLoc));
+      addCapture(CapturedValue(capture.getDecl(), Flags, capture.getLoc()));
     }
 
     if (GenericParamCaptureLoc.isInvalid())
       if (captureInfo.hasGenericParamCaptures())
-        GenericParamCaptureLoc = innerClosure.getLoc();
+        GenericParamCaptureLoc = loc;
 
-    if (DynamicSelfCaptureLoc.isInvalid())
+    if (DynamicSelfCaptureLoc.isInvalid()) {
       if (captureInfo.hasDynamicSelfCapture()) {
-        DynamicSelfCaptureLoc = innerClosure.getLoc();
+        DynamicSelfCaptureLoc = loc;
         DynamicSelf = captureInfo.getDynamicSelfType();
       }
+    }
 
     if (!OpaqueValue) {
       if (captureInfo.hasOpaqueValueCapture())
@@ -370,14 +366,8 @@ public:
 
   bool walkToDeclPre(Decl *D) override {
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      propagateCaptures(AFD, AFD->getLoc());
-
-      // Can default parameter initializers capture state?  That seems like
-      // a really bad idea.
-      for (auto *param : *AFD->getParameters())
-        if (auto E = param->getDefaultValue())
-          E->walk(*this);
-
+      TypeChecker::computeCaptures(AFD);
+      propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
       return false;
     }
 
@@ -571,7 +561,8 @@ public:
     // list computed; we just propagate it, filtering out stuff that they
     // capture from us.
     if (auto *SubCE = dyn_cast<AbstractClosureExpr>(E)) {
-      propagateCaptures(SubCE, SubCE->getStartLoc());
+      TypeChecker::computeCaptures(SubCE);
+      propagateCaptures(SubCE->getCaptureInfo(), SubCE->getLoc());
       return { false, E };
     }
 
@@ -597,7 +588,10 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   if (!AFR.getBody())
     return;
 
-  FindCapturedVars finder(*this,
+  PrettyStackTraceAnyFunctionRef trace("computing captures for", AFR);
+
+  auto &Context = AFR.getAsDeclContext()->getASTContext();
+  FindCapturedVars finder(Context,
                           AFR.getLoc(),
                           AFR.getAsDeclContext(),
                           AFR.isKnownNoEscape(),
@@ -608,43 +602,76 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
     finder.checkType(AFR.getType(), AFR.getLoc());
   }
 
-  auto captures = finder.getCaptureInfo();
-
   // A generic function always captures outer generic parameters.
+  bool isGeneric = false;
   auto *AFD = AFR.getAbstractFunctionDecl();
-  if (AFD) {
-    if (AFD->getGenericParams())
-      captures.setGenericParamCaptures(true);
-  }
+  if (AFD)
+    isGeneric = AFD->isGeneric();
 
+  auto captures = finder.getCaptureInfo();
+  if (isGeneric)
+    captures.setGenericParamCaptures(true);
   AFR.setCaptureInfo(captures);
+
+  // Compute captures for default argument expressions.
+  if (auto *AFD = AFR.getAbstractFunctionDecl()) {
+    for (auto *P : *AFD->getParameters()) {
+      if (auto E = P->getDefaultValue()) {
+        FindCapturedVars finder(Context,
+                                E->getLoc(),
+                                AFD,
+                                /*isNoEscape=*/false,
+                                /*isObjC=*/false);
+        E->walk(finder);
+
+        if (!AFD->getDeclContext()->isLocalContext() &&
+            finder.getDynamicSelfCaptureLoc().isValid()) {
+          Context.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                                 diag::dynamic_self_default_arg);
+        }
+
+        auto captures = finder.getCaptureInfo();
+        if (isGeneric)
+          captures.setGenericParamCaptures(true);
+        P->setDefaultArgumentCaptureInfo(captures);
+      }
+    }
+  }
 
   // Extensions of generic ObjC functions can't use generic parameters from
   // their context.
   if (AFD && finder.getGenericParamCaptureLoc().isValid()) {
     if (auto Clas = AFD->getParent()->getSelfClassDecl()) {
       if (Clas->usesObjCGenericsModel()) {
-        diagnose(AFD->getLoc(),
-                 diag::objc_generic_extension_using_type_parameter);
+        AFD->diagnose(diag::objc_generic_extension_using_type_parameter);
 
         // If it's possible, suggest adding @objc.
         Optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
             isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
                                   errorConvention)) {
-          diagnose(AFD->getLoc(),
+          AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");
         }
 
-        diagnose(finder.getGenericParamCaptureLoc(),
-                 diag::objc_generic_extension_using_type_parameter_here);
+        Context.Diags.diagnose(
+            finder.getGenericParamCaptureLoc(),
+            diag::objc_generic_extension_using_type_parameter_here);
       }
     }
   }
 }
 
+static bool isLazy(PatternBindingDecl *PBD) {
+  if (auto var = PBD->getSingleVar())
+    return var->getAttrs().hasAttribute<LazyAttr>();
+  return false;
+}
+
 void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
+  auto &ctx = typeDecl->getASTContext();
+
   for (auto member : typeDecl->getMembers()) {
     // Ignore everything other than PBDs.
     auto *PBD = dyn_cast<PatternBindingDecl>(member);
@@ -659,16 +686,16 @@ void TypeChecker::checkPatternBindingCaptures(NominalTypeDecl *typeDecl) {
       if (init == nullptr)
         continue;
 
-      FindCapturedVars finder(*this,
+      FindCapturedVars finder(ctx,
                               init->getLoc(),
                               PBD->getInitContext(i),
                               /*NoEscape=*/false,
                               /*ObjC=*/false);
       init->walk(finder);
 
-      if (finder.getDynamicSelfCaptureLoc().isValid()) {
-        diagnose(finder.getDynamicSelfCaptureLoc(),
-                 diag::dynamic_self_stored_property_init);
+      if (finder.getDynamicSelfCaptureLoc().isValid() && !isLazy(PBD)) {
+        ctx.Diags.diagnose(finder.getDynamicSelfCaptureLoc(),
+                           diag::dynamic_self_stored_property_init);
       }
 
       auto captures = finder.getCaptureInfo();

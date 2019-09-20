@@ -35,6 +35,7 @@ static void declareOptionalType(ASTContext &ctx, SourceFile *fileForLookups,
 
 TestContext::TestContext(ShouldDeclareOptionalTypes optionals)
     : Ctx(*ASTContext::get(LangOpts, SearchPathOpts, SourceMgr, Diags)) {
+  registerParseRequestFunctions(Ctx.evaluator);
   registerTypeCheckerRequestFunctions(Ctx.evaluator);
   auto stdlibID = Ctx.getIdentifier(STDLIB_NAME);
   auto *module = ModuleDecl::create(stdlibID, Ctx);

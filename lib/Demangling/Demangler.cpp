@@ -493,11 +493,13 @@ void Demangler::clear() {
 }
 
 Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
-                                              StringRef MangledName)
+        StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> TheSymbolicReferenceResolver)
 // Save the current demangler state so we can restore it.
   : Dem(Dem),
     NodeStack(Dem.NodeStack), Substitutions(Dem.Substitutions),
-    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos)
+    NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
+    SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
   // Reset the demangler state for a nested job.
   Dem.NodeStack.init(Dem, 16);
@@ -505,6 +507,7 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
   Dem.NumWords = 0;
   Dem.Text = MangledName;
   Dem.Pos = 0;
+  Dem.SymbolicReferenceResolver = std::move(TheSymbolicReferenceResolver);
 }
 
 Demangler::DemangleInitRAII::~DemangleInitRAII() {
@@ -514,10 +517,13 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   Dem.NumWords = NumWords;
   Dem.Text = Text;
   Dem.Pos = Pos;
+  Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
 }
 
-NodePointer Demangler::demangleSymbol(StringRef MangledName) {
-  DemangleInitRAII state(*this, MangledName);
+NodePointer Demangler::demangleSymbol(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
 
   // Demangle old-style class and protocol names, which are still used in the
   // ObjC metadata.
@@ -561,8 +567,10 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName) {
   return topLevel;
 }
 
-NodePointer Demangler::demangleType(StringRef MangledName) {
-  DemangleInitRAII state(*this, MangledName);
+NodePointer Demangler::demangleType(StringRef MangledName,
+        std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver) {
+  DemangleInitRAII state(*this, MangledName,
+                         std::move(SymbolicReferenceResolver));
 
   parseAndPushNodes();
 
@@ -701,6 +709,7 @@ NodePointer Demangler::demangleSymbolicReference(unsigned char rawKind,
   NodePointer resolved = nullptr;
   if (SymbolicReferenceResolver)
     resolved = SymbolicReferenceResolver(kind, direct, value, at);
+    
   // With no resolver, or a resolver that failed, refuse to demangle further.
   if (!resolved)
     return nullptr;
@@ -1788,36 +1797,50 @@ NodePointer Demangler::demangleImplFunctionType() {
 
 NodePointer Demangler::demangleMetatype() {
   switch (nextChar()) {
+    case 'a':
+      return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'A':
+      return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
+                             popProtocolConformance());
+    case 'B':
+      return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
+                               popNode(Node::Kind::Type));
     case 'c':
       return createWithChild(Node::Kind::ProtocolConformanceDescriptor,
                              popProtocolConformance());
+    case 'C': {
+      NodePointer Ty = popNode(Node::Kind::Type);
+      if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
+        return nullptr;
+      return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
+                             Ty->getChild(0));
+    }
+    case 'D':
+      return createWithPoppedType(Node::Kind::TypeMetadataDemanglingCache);
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
-    case 'P':
-      return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
-    case 'a':
-      return createWithPoppedType(Node::Kind::TypeMetadataAccessFunction);
+    case 'F':
+      return createWithChild(Node::Kind::ReflectionMetadataFieldDescriptor,
+                             popNode(Node::Kind::Type));
     case 'g':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessor,
                              popNode());
     case 'h':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorImpl,
                              popNode());
+    case 'i':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
+    case 'I':
+      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
     case 'j':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorKey,
                              popNode());
     case 'k':
       return createWithChild(Node::Kind::OpaqueTypeDescriptorAccessorVar,
                              popNode());
-    case 'I':
-      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationCache);
-    case 'i':
-      return createWithPoppedType(Node::Kind::TypeMetadataInstantiationFunction);
-    case 'r':
-      return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
     case 'l':
       return createWithPoppedType(
-                            Node::Kind::TypeMetadataSingletonInitializationCache);
+                          Node::Kind::TypeMetadataSingletonInitializationCache);
     case 'L':
       return createWithPoppedType(Node::Kind::TypeMetadataLazyCache);
     case 'm':
@@ -1828,35 +1851,23 @@ NodePointer Demangler::demangleMetatype() {
       return createWithPoppedType(Node::Kind::ClassMetadataBaseOffset);
     case 'p':
       return createWithChild(Node::Kind::ProtocolDescriptor, popProtocol());
+    case 'P':
+      return createWithPoppedType(Node::Kind::GenericTypeMetadataPattern);
     case 'Q':
       return createWithChild(Node::Kind::OpaqueTypeDescriptor, popNode());
+    case 'r':
+      return createWithPoppedType(Node::Kind::TypeMetadataCompletionFunction);
+    case 's':
+      return createWithPoppedType(Node::Kind::ObjCResilientClassStub);
     case 'S':
       return createWithChild(Node::Kind::ProtocolSelfConformanceDescriptor,
                              popProtocol());
+    case 't':
+      return createWithPoppedType(Node::Kind::FullObjCResilientClassStub);
     case 'u':
       return createWithPoppedType(Node::Kind::MethodLookupFunction);
     case 'U':
       return createWithPoppedType(Node::Kind::ObjCMetadataUpdateFunction);
-    case 's':
-      return createWithPoppedType(Node::Kind::ObjCResilientClassStub);
-    case 't':
-      return createWithPoppedType(Node::Kind::FullObjCResilientClassStub);
-    case 'B':
-      return createWithChild(Node::Kind::ReflectionMetadataBuiltinDescriptor,
-                             popNode(Node::Kind::Type));
-    case 'F':
-      return createWithChild(Node::Kind::ReflectionMetadataFieldDescriptor,
-                             popNode(Node::Kind::Type));
-    case 'A':
-      return createWithChild(Node::Kind::ReflectionMetadataAssocTypeDescriptor,
-                             popProtocolConformance());
-    case 'C': {
-      NodePointer Ty = popNode(Node::Kind::Type);
-      if (!Ty || !isAnyGeneric(Ty->getChild(0)->getKind()))
-        return nullptr;
-      return createWithChild(Node::Kind::ReflectionMetadataSuperclassDescriptor,
-                             Ty->getChild(0));
-    }
     case 'V':
       return createWithChild(Node::Kind::PropertyDescriptor,
                              popNode(isEntity));
@@ -1917,79 +1928,96 @@ NodePointer Demangler::demanglePrivateContextDescriptor() {
 
 NodePointer Demangler::demangleArchetype() {
   switch (nextChar()) {
-    case 'a': {
-      NodePointer Ident = popNode(Node::Kind::Identifier);
-      NodePointer ArcheTy = popTypeAndGetChild();
-      NodePointer AssocTy = createType(
-            createWithChildren(Node::Kind::AssociatedTypeRef, ArcheTy, Ident));
-      addSubstitution(AssocTy);
-      return AssocTy;
-    }
-    case 'O': {
-      auto definingContext = popContext();
-      return createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext);
-    }
-    case 'o': {
-      auto index = demangleIndex();
-      Vector<NodePointer> boundGenericArgs;
-      NodePointer retroactiveConformances;
-      if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
-        return nullptr;
-      auto Name = popNode();
-      auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
-                                     createNode(Node::Kind::Index, index));
-      auto boundGenerics = createNode(Node::Kind::TypeList);
-      for (unsigned i = boundGenericArgs.size(); i-- > 0;)
-        boundGenerics->addChild(boundGenericArgs[i], *this);
-      opaque->addChild(boundGenerics, *this);
-      if (retroactiveConformances)
-        opaque->addChild(retroactiveConformances, *this);
-      
-      auto opaqueTy = createType(opaque);
-      addSubstitution(opaqueTy);
-      return opaqueTy;
-    }
-    case 'r': {
-      return createType(createNode(Node::Kind::OpaqueReturnType));
-    }
-    case 'y': {
-      NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
-      addSubstitution(T);
-      return T;
-    }
-    case 'z': {
-      NodePointer T = demangleAssociatedTypeSimple(
-                                            getDependentGenericParamType(0, 0));
-      addSubstitution(T);
-      return T;
-    }
-    case 'Y': {
-      NodePointer T = demangleAssociatedTypeCompound(
-                                                   demangleGenericParamIndex());
-      addSubstitution(T);
-      return T;
-    }
-    case 'Z': {
-      NodePointer T = demangleAssociatedTypeCompound(
-                                            getDependentGenericParamType(0, 0));
-      addSubstitution(T);
-      return T;
-    }
-    default:
+  case 'a': {
+    NodePointer Ident = popNode(Node::Kind::Identifier);
+    NodePointer ArcheTy = popTypeAndGetChild();
+    NodePointer AssocTy = createType(
+          createWithChildren(Node::Kind::AssociatedTypeRef, ArcheTy, Ident));
+    addSubstitution(AssocTy);
+    return AssocTy;
+  }
+  case 'O': {
+    auto definingContext = popContext();
+    return createWithChild(Node::Kind::OpaqueReturnTypeOf, definingContext);
+  }
+  case 'o': {
+    auto index = demangleIndex();
+    Vector<NodePointer> boundGenericArgs;
+    NodePointer retroactiveConformances;
+    if (!demangleBoundGenerics(boundGenericArgs, retroactiveConformances))
       return nullptr;
+    auto Name = popNode();
+    auto opaque = createWithChildren(Node::Kind::OpaqueType, Name,
+                                   createNode(Node::Kind::Index, index));
+    auto boundGenerics = createNode(Node::Kind::TypeList);
+    for (unsigned i = boundGenericArgs.size(); i-- > 0;)
+      boundGenerics->addChild(boundGenericArgs[i], *this);
+    opaque->addChild(boundGenerics, *this);
+    if (retroactiveConformances)
+      opaque->addChild(retroactiveConformances, *this);
+    
+    auto opaqueTy = createType(opaque);
+    addSubstitution(opaqueTy);
+    return opaqueTy;
+  }
+  case 'r': {
+    return createType(createNode(Node::Kind::OpaqueReturnType));
+  }
+
+  case 'x': {
+    NodePointer T = demangleAssociatedTypeSimple(nullptr);
+    addSubstitution(T);
+    return T;
+  }
+      
+  case 'X': {
+    NodePointer T = demangleAssociatedTypeCompound(nullptr);
+    addSubstitution(T);
+    return T;
+  }
+
+  case 'y': {
+    NodePointer T = demangleAssociatedTypeSimple(demangleGenericParamIndex());
+    addSubstitution(T);
+    return T;
+  }
+  case 'Y': {
+    NodePointer T = demangleAssociatedTypeCompound(
+                                                 demangleGenericParamIndex());
+    addSubstitution(T);
+    return T;
+  }
+
+  case 'z': {
+    NodePointer T = demangleAssociatedTypeSimple(
+                                          getDependentGenericParamType(0, 0));
+    addSubstitution(T);
+    return T;
+  }
+  case 'Z': {
+    NodePointer T = demangleAssociatedTypeCompound(
+                                          getDependentGenericParamType(0, 0));
+    addSubstitution(T);
+    return T;
+  }
+  default:
+    return nullptr;
   }
 }
 
-NodePointer Demangler::demangleAssociatedTypeSimple(
-                                                  NodePointer GenericParamIdx) {
-  NodePointer GPI = createType(GenericParamIdx);
+NodePointer Demangler::demangleAssociatedTypeSimple(NodePointer Base) {
   NodePointer ATName = popAssocTypeName();
+  NodePointer BaseTy;
+  if (Base) {
+    BaseTy = createType(Base);
+  } else {
+    BaseTy = popNode(Node::Kind::Type);
+  }
   return createType(createWithChildren(Node::Kind::DependentMemberType,
-                                       GPI, ATName));
+                                       BaseTy, ATName));
 }
 
-NodePointer Demangler::demangleAssociatedTypeCompound(
-                                                  NodePointer GenericParamIdx) {
+NodePointer Demangler::demangleAssociatedTypeCompound(NodePointer Base) {
   Vector<NodePointer> AssocTyNames(*this, 4);
   bool firstElem = false;
   do {
@@ -1999,15 +2027,19 @@ NodePointer Demangler::demangleAssociatedTypeCompound(
       return nullptr;
     AssocTyNames.push_back(AssocTyName, *this);
   } while (!firstElem);
-
-  NodePointer Base = GenericParamIdx;
+    
+  NodePointer BaseTy;
+  if (Base)
+    BaseTy = createType(Base);
+  else
+    BaseTy = popNode(Node::Kind::Type);
 
   while (NodePointer AssocTy = AssocTyNames.pop_back_val()) {
     NodePointer depTy = createNode(Node::Kind::DependentMemberType);
-    depTy = addChild(depTy, createType(Base));
-    Base = addChild(depTy, AssocTy);
+    depTy = addChild(depTy, BaseTy);
+    BaseTy = createType(addChild(depTy, AssocTy));
   }
-  return createType(Base);
+  return BaseTy;
 }
 
 NodePointer Demangler::popAssocTypeName() {

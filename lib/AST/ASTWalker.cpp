@@ -131,8 +131,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitExtensionDecl(ExtensionDecl *ED) {
-    if (doIt(ED->getExtendedTypeLoc()))
-      return true;
+    if (auto *typeRepr = ED->getExtendedTypeRepr())
+      if (doIt(typeRepr))
+        return true;
     for (auto &Inherit : ED->getInherited()) {
       if (doIt(Inherit))
         return true;
@@ -164,7 +165,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
-    // If there is a single variable, walk it's attributes.
     bool isPropertyWrapperBackingProperty = false;
     if (auto singleVar = PBD->getSingleVar()) {
       isPropertyWrapperBackingProperty =
@@ -232,7 +232,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return true;
     }
 
-    return doIt(TAD->getUnderlyingTypeLoc());
+    if (auto typerepr = TAD->getUnderlyingTypeRepr())
+      if (doIt(typerepr))
+        return true;
+    return false;
   }
   
   bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
@@ -1114,6 +1117,18 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitKeyPathDotExpr(KeyPathDotExpr *E) { return E; }
+
+  Expr *visitOneWayExpr(OneWayExpr *E) {
+    if (auto oldSubExpr = E->getSubExpr()) {
+      if (auto subExpr = doIt(oldSubExpr)) {
+        E->setSubExpr(subExpr);
+      } else {
+        return nullptr;
+      }
+    }
+
+    return E;
+  }
 
   Expr *visitTapExpr(TapExpr *E) {
     if (auto oldSubExpr = E->getSubExpr()) {

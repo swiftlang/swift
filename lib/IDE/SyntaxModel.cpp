@@ -18,6 +18,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
@@ -242,6 +243,7 @@ class ModelASTWalker : public ASTWalker {
   const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
+  ASTContext &Ctx;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
   static const std::regex &getURLRegex(StringRef Protocol);
@@ -262,6 +264,7 @@ public:
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
         BufferID(File.getBufferID().getValue()),
+        Ctx(File.getASTContext()),
         Walker(Walker) { }
 
   // FIXME: Remove this
@@ -301,7 +304,13 @@ private:
     /// Like ExcludeNodeAtLocation, and skip past any node at the location.
     DisplaceNodeAtLocation
   };
-  bool passTokenNodesUntil(SourceLoc Loc, PassNodesBehavior Behavior);
+  struct PassUntilResult {
+    bool shouldContinue;
+    Optional<SyntaxNode> MatchedToken;
+  };
+
+  PassUntilResult
+  passTokenNodesUntil(SourceLoc Loc, PassNodesBehavior Pass);
   bool passNonTokenNode(const SyntaxNode &Node);
   bool passNode(const SyntaxNode &Node);
   bool pushStructureNode(const SyntaxStructureNode &Node,
@@ -433,8 +442,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       if (NR.isValid()) {
         SN.Range = charSourceRangeFromSourceRange(SM, SourceRange(NR.getStart(),
                                                             Elem->getEndLoc()));
-        passTokenNodesUntil(NR.getStart(),
-                            PassNodesBehavior::ExcludeNodeAtLocation);
+        passTokenNodesUntil(NR.getStart(), ExcludeNodeAtLocation);
       }
       else
         SN.Range = SN.BodyRange;
@@ -516,13 +524,14 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
+    auto *ParentE = Parent.getAsExpr();
     if (isCurrentCallArgExpr(Tup)) {
       for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
         SourceLoc NameLoc = Tup->getElementNameLoc(I);
         if (NameLoc.isValid())
           passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
       }
-    } else {
+    } else if (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE)) {
       SyntaxStructureNode SN;
       SN.Kind = SyntaxStructureKind::TupleExpression;
       SN.Range = charSourceRangeFromSourceRange(SM, Tup->getSourceRange());
@@ -557,6 +566,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       subExpr->walk(*this);
     }
     return { false, walkToExprPost(SE) };
+  } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+    // Don't visit the child expressions directly. Instead visit the arguments
+    // of each appendStringLiteral/appendInterpolation CallExpr so we don't
+    // try to output structure nodes for those calls.
+    llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
+    ISL->forEachSegment(Ctx, [&](bool isInterpolation, CallExpr *CE) {
+      if (isInterpolation) {
+        if (auto *Arg = CE->getArg())
+          Arg->walk(*this);
+      }
+    });
+    return { false, walkToExprPost(E) };
   }
 
   return { true, E };
@@ -776,7 +797,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Kind = SyntaxStructureKind::Extension;
     SN.Range = charSourceRangeFromSourceRange(SM, ED->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, ED->getBraces());
-    SourceRange NSR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange NSR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      NSR = repr->getSourceRange();
     SN.NameRange = charSourceRangeFromSourceRange(SM, NSR);
 
     for (const TypeLoc &TL : ED->getInherited()) {
@@ -972,7 +995,8 @@ bool ModelASTWalker::walkToTypeReprPre(TypeRepr *T) {
       return false;
 
   } else if (auto IdT = dyn_cast<ComponentIdentTypeRepr>(T)) {
-    if (!passTokenNodesUntil(IdT->getIdLoc(), ExcludeNodeAtLocation))
+    if (!passTokenNodesUntil(IdT->getIdLoc(),
+                             ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (TokenNodes.empty() ||
         TokenNodes.front().Range.getStart() != IdT->getIdLoc())
@@ -1025,7 +1049,7 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
     return false;
   if (isa<CustomAttr>(D) || isa<AvailableAttr>(D)) {
     if (!passTokenNodesUntil(D->getRangeWithAt().Start,
-                        PassNodesBehavior::ExcludeNodeAtLocation))
+                             ExcludeNodeAtLocation).shouldContinue)
       return false;
     if (auto *CA = dyn_cast<CustomAttr>(D)) {
       if (auto *Repr = CA->getTypeLoc().getTypeRepr()) {
@@ -1048,7 +1072,8 @@ bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
     } else {
         assert(0 && "No TokenNodes?");
     }
-    if (!passTokenNodesUntil(D->getRange().End, PassNodesBehavior::IncludeNodeAtLocation))
+    if (!passTokenNodesUntil(D->getRange().End,
+                             IncludeNodeAtLocation).shouldContinue)
       return false;
     return true;
   }
@@ -1067,11 +1092,11 @@ bool ModelASTWalker::handleAttrs(const DeclAttributes &Attrs) {
 }
 
 bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
-  SmallVector<SourceRange, 4> Ranges;
-  Attrs.getAttrRanges(Ranges);
+  SmallVector<SourceLoc, 4> AttrLocs;
+  Attrs.getAttrLocs(AttrLocs);
   SmallVector<DeclAttributeAndRange, 4> DeclRanges;
-  for (auto R : Ranges) {
-    DeclRanges.push_back(std::make_pair(nullptr, R));
+  for (auto AttrLoc : AttrLocs) {
+    DeclRanges.push_back(std::make_pair(nullptr, SourceRange(AttrLoc)));
   }
   return handleAttrRanges(DeclRanges);
 }
@@ -1099,20 +1124,34 @@ bool ModelASTWalker::handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges
   DeclRanges = SortedRanges;
 
   SourceLoc BeginLoc = DeclRanges.front().second.Start;
-
   auto Toks = slice_token_array(AllTokensInFile, BeginLoc,
                                 DeclRanges.back().second.End);
 
   auto passAttrNode = [&](SourceRange AttrRange) -> bool {
     SourceRange Range = AttrRange;
-    if (!passNonTokenNode({SyntaxNodeKind::AttributeBuiltin,
-                           charSourceRangeFromSourceRange(SM, Range)}))
+    auto PassUntilResult = passTokenNodesUntil(Range.Start,
+                                               ExcludeNodeAtLocation);
+    if (!PassUntilResult.shouldContinue)
       return false;
 
-    while (!TokenNodes.empty() &&
-           SM.rangeContainsTokenLoc(AttrRange,
-                                    TokenNodes.front().Range.getStart()))
-      TokenNodes = TokenNodes.slice(1);
+    if (PassUntilResult.MatchedToken) {
+      // Type attribute ranges don't have the correct end location (it only
+      // covers the @ itself), so use matched token's range instead.
+      CharSourceRange AdjustedRange = charSourceRangeFromSourceRange(SM, Range);
+      AdjustedRange.widen(PassUntilResult.MatchedToken->Range);
+      if (!passNode({SyntaxNodeKind::AttributeBuiltin, AdjustedRange}))
+        return false;
+      TokenNodes = TokenNodes.drop_while([&](SyntaxNode TokenNode) {
+        return AdjustedRange.contains(TokenNode.Range.getStart());
+      });
+    } else {
+        // Make sure we're revisiting something, rather than dealing with bad
+        // source locations
+        assert((TokenNodes.empty() ||
+                SM.isBeforeInBuffer(AttrRange.End,
+                                    TokenNodes.front().Range.getStart())) &&
+               "AttrRange doesn't align with any TokenNode?");
+    }
     return true;
   };
 
@@ -1143,34 +1182,40 @@ bool ModelASTWalker::shouldPassBraceStructureNode(BraceStmt *S) {
   return (!dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<TopLevelCodeDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<CaseStmt>(Parent.getAsStmt()) &&
-          S->getSourceRange().isValid());
+          S->getSourceRange().isValid() &&
+          !S->isImplicit());
 }
 
-bool ModelASTWalker::passTokenNodesUntil(SourceLoc Loc,
-                                         PassNodesBehavior Behavior) {
+ModelASTWalker::PassUntilResult
+ModelASTWalker::passTokenNodesUntil(SourceLoc Loc,
+                                    PassNodesBehavior Behavior) {
   assert(Loc.isValid());
   unsigned I = 0;
+  Optional<SyntaxNode> MatchedToken;
   for (unsigned E = TokenNodes.size(); I != E; ++I) {
-    SourceLoc TokLoc = TokenNodes[I].Range.getStart();
-    if (SM.isBeforeInBuffer(Loc, TokLoc)) {
+    SourceLoc StartLoc = TokenNodes[I].Range.getStart();
+    if (SM.isBeforeInBuffer(Loc, StartLoc)) {
       break;
     }
-    if (TokLoc == Loc && Behavior != IncludeNodeAtLocation) {
-      if (Behavior == DisplaceNodeAtLocation) {
-        // Skip past the node directly at the specified location, allowing the
-        // caller to effectively replace it.
-        ++I;
+    if (StartLoc == Loc) {
+      MatchedToken = TokenNodes[I];
+      if (Behavior != IncludeNodeAtLocation) {
+        if (Behavior == DisplaceNodeAtLocation) {
+          // Skip past the node directly at the specified location, allowing the
+          // caller to effectively replace it.
+          ++I;
+        }
+        break;
       }
-      break;
     }
     if (!AvoidPassingSyntaxToken) {
       if (!passNode(TokenNodes[I]))
-        return false;
+        return {false, None};
     }
   }
 
   TokenNodes = TokenNodes.slice(I);
-  return true;
+  return {true, MatchedToken};
 }
 
 bool ModelASTWalker::passNonTokenNode(const SyntaxNode &Node) {
@@ -1181,7 +1226,8 @@ bool ModelASTWalker::passNonTokenNode(const SyntaxNode &Node) {
   if (!SM.isBeforeInBuffer(LastLoc, Node.Range.getStart()))
     return true;
 
-  if (!passTokenNodesUntil(Node.Range.getStart(), DisplaceNodeAtLocation))
+  if (!passTokenNodesUntil(Node.Range.getStart(),
+                           DisplaceNodeAtLocation).shouldContinue)
     return false;
   if (!passNode(Node))
     return false;
@@ -1223,7 +1269,8 @@ bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
   if (shouldAvoidPssingSyntaxToken(Node))
     AvoidPassingSyntaxToken ++;
 
-  if (!passTokenNodesUntil(Node.Range.getStart(), ExcludeNodeAtLocation))
+  if (!passTokenNodesUntil(Node.Range.getStart(),
+                           ExcludeNodeAtLocation).shouldContinue)
     return false;
   if (!Walker.walkToSubStructurePre(Node))
     return false;
@@ -1245,7 +1292,8 @@ bool ModelASTWalker::popStructureNode() {
   // VarDecls are popped before we see their TypeRepr, so if we pass the token
   // nodes now they will not change from identifier to a type-identifier.
   if (!Node.hasSubstructure()) {
-    if (!passTokenNodesUntil(Node.Range.getEnd(), IncludeNodeAtLocation))
+    if (!passTokenNodesUntil(Node.Range.getEnd(),
+                             IncludeNodeAtLocation).shouldContinue)
       return false;
   }
   if (!Walker.walkToSubStructurePost(Node))

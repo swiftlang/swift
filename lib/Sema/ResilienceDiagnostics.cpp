@@ -21,6 +21,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;
@@ -265,6 +266,7 @@ void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
   public:
     GenericTypeFinder(const SourceFile &SF, Callback callback)
         : SF(SF), callback(callback) {}
+
 
     Action visitBoundGenericType(BoundGenericType *ty) override {
       ModuleDecl *useModule = SF.getParentModule();

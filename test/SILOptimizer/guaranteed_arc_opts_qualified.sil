@@ -158,3 +158,27 @@ bb0(%0 : $C, %1 : $Builtin.Int32):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil @mixed_test_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NOT: retain
+// CHECK-NOT: release
+// CHECK: } // end sil function 'mixed_test_1'
+sil @mixed_test_1 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  strong_retain %0 : $Builtin.NativeObject
+  release_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @mixed_test_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-NOT: retain
+// CHECK-NOT: release
+// CHECK: } // end sil function 'mixed_test_2'
+sil @mixed_test_2 : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
+bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  retain_value %0 : $Builtin.NativeObject
+  strong_release %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
+}

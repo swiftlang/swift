@@ -127,8 +127,7 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   if (!varDecl->hasInterfaceType())
     return TypeNotValidated;
 
-  bool isIUO =
-      varDecl->getAttrs().hasAttribute<ImplicitlyUnwrappedOptionalAttr>();
+  bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
   return typeConformsToCodable(context, varDecl->getValueInterfaceType(),
                                isIUO, proto);
 }
@@ -762,8 +761,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  if (auto env = conformanceDC->getGenericEnvironmentOfContext())
-    encodeDecl->setGenericEnvironment(env);
+  encodeDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
 
   encodeDecl->setValidationToChecked();
@@ -967,7 +965,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
         // If the init is failable, we should have already bailed one level
         // above.
         ConstructorDecl *superInitDecl = cast<ConstructorDecl>(result.front());
-        assert(superInitDecl->getFailability() == OTK_None);
+        assert(!superInitDecl->isFailable());
 
         // super
         auto *superRef = new (C) SuperRefExpr(initDecl->getImplicitSelfDecl(),
@@ -1030,7 +1028,8 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
   DeclName name(C, DeclBaseName::createConstructor(), paramList);
 
   auto *initDecl =
-      new (C) ConstructorDecl(name, SourceLoc(), OTK_None, SourceLoc(),
+      new (C) ConstructorDecl(name, SourceLoc(),
+                              /*Failable=*/false,SourceLoc(),
                               /*Throws=*/true, SourceLoc(), paramList,
                               /*GenericParams=*/nullptr, conformanceDC);
   initDecl->setImplicit();
@@ -1043,8 +1042,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  if (auto env = conformanceDC->getGenericEnvironmentOfContext())
-    initDecl->setGenericEnvironment(env);
+  initDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
 
   initDecl->setValidationToChecked();
@@ -1122,7 +1120,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement) {
                                 requirement->getFullName(), memberName,
                                 accessScope.accessLevelForDiagnostics());
           return false;
-        } else if (initializer->getFailability() != OTK_None) {
+        } else if (initializer->isFailable()) {
           // We can't call super.init() if it's failable, since init(from:)
           // isn't failable.
           initializer->diagnose(diag::decodable_super_init_is_failable_here,

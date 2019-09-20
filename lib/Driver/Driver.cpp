@@ -206,12 +206,16 @@ static void validateSearchPathArgs(DiagnosticEngine &diags,
 }
 
 static void validateAutolinkingArgs(DiagnosticEngine &diags,
-                                    const ArgList &args) {
+                                    const ArgList &args,
+                                    const llvm::Triple &T) {
   auto *forceLoadArg = args.getLastArg(options::OPT_autolink_force_load);
   if (!forceLoadArg)
     return;
   auto *incrementalArg = args.getLastArg(options::OPT_incremental);
   if (!incrementalArg)
+    return;
+
+  if (T.supportsCOMDAT())
     return;
 
   // Note: -incremental can itself be overridden by other arguments later
@@ -223,14 +227,15 @@ static void validateAutolinkingArgs(DiagnosticEngine &diags,
 }
 
 /// Perform miscellaneous early validation of arguments.
-static void validateArgs(DiagnosticEngine &diags, const ArgList &args) {
+static void validateArgs(DiagnosticEngine &diags, const ArgList &args,
+                         const llvm::Triple &T) {
   validateBridgingHeaderArgs(diags, args);
   validateWarningControlArgs(diags, args);
   validateProfilingArgs(diags, args);
   validateDebugInfoArgs(diags, args);
   validateCompilationConditionArgs(diags, args);
   validateSearchPathArgs(diags, args);
-  validateAutolinkingArgs(diags, args);
+  validateAutolinkingArgs(diags, args, T);
 }
 
 std::unique_ptr<ToolChain>
@@ -783,7 +788,7 @@ Driver::buildCompilation(const ToolChain &TC,
   std::unique_ptr<DerivedArgList> TranslatedArgList(
       translateInputAndPathArgs(*ArgList, workingDirectory));
 
-  validateArgs(Diags, *TranslatedArgList);
+  validateArgs(Diags, *TranslatedArgList, TC.getTriple());
     
   // Perform toolchain specific args validation.
   TC.validateArguments(Diags, *TranslatedArgList);
@@ -1819,7 +1824,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_TBD:
       case file_types::TY_ModuleTrace:
       case file_types::TY_OptRecord:
-      case file_types::TY_SwiftParseableInterfaceFile:
+      case file_types::TY_SwiftModuleInterfaceFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -2542,7 +2547,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
                          options::OPT_emit_module_interface_path))
-    chooseParseableInterfacePath(C, JA, workingDirectory, Buf, Output.get());
+    chooseModuleInterfacePath(C, JA, workingDirectory, Buf, Output.get());
 
   if (C.getArgs().hasArg(options::OPT_update_code) && isa<CompileJobAction>(JA))
     chooseRemappingOutputPath(C, OutputMap, Output.get());
@@ -2839,7 +2844,7 @@ void Driver::chooseRemappingOutputPath(Compilation &C,
   }
 }
 
-void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
+void Driver::chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                           StringRef workingDirectory,
                                           llvm::SmallString<128> &buffer,
                                           CommandOutput *output) const {
@@ -2861,9 +2866,9 @@ void Driver::chooseParseableInterfacePath(Compilation &C, const JobAction *JA,
   StringRef outputPath = *getOutputFilenameFromPathArgOrAsTopLevel(
       C.getOutputInfo(), C.getArgs(),
       options::OPT_emit_module_interface_path,
-      file_types::TY_SwiftParseableInterfaceFile,
+      file_types::TY_SwiftModuleInterfaceFile,
       /*TreatAsTopLevelOutput*/true, workingDirectory, buffer);
-  output->setAdditionalOutputForType(file_types::TY_SwiftParseableInterfaceFile,
+  output->setAdditionalOutputForType(file_types::TY_SwiftModuleInterfaceFile,
                                      outputPath);
 }
 

@@ -87,8 +87,6 @@ public:
 // Type relation checking
 //----------------------------------------------------------------------------//
 enum class TypeRelation: uint8_t {
-  EqualTo,
-  PossiblyEqualTo,
   ConvertTo,
 };
 
@@ -158,8 +156,6 @@ struct TypeRelationCheckInput {
     out << " is ";
     switch(owner.Relation) {
 #define CASE(NAME) case TypeRelation::NAME: out << #NAME << " "; break;
-    CASE(EqualTo)
-    CASE(PossiblyEqualTo)
     CASE(ConvertTo)
 #undef CASE
     }
@@ -258,22 +254,21 @@ public:
 };
 
 /// The zone number for the IDE.
-#define SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE 97
-#define SWIFT_TYPEID_ZONE SWIFT_IDE_TYPE_CHECK_REQUESTS_TYPEID_ZONE
+#define SWIFT_TYPEID_ZONE IDETypeChecking
 #define SWIFT_TYPEID_HEADER "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
 #undef SWIFT_TYPEID_ZONE
 #undef SWIFT_TYPEID_HEADER
 
 // Set up reporting of evaluated requests.
-#define SWIFT_TYPEID(RequestType)                                \
-template<>                                                       \
-inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,  \
-                            const RequestType &request) {        \
-  ++stats.getFrontendCounters().RequestType;                     \
+#define SWIFT_REQUEST(Zone, RequestType, Sig, Caching, LocOptions)             \
+template<>                                                                     \
+inline void reportEvaluatedRequest(UnifiedStatsReporter &stats,                \
+                            const RequestType &request) {                      \
+  ++stats.getFrontendCounters().RequestType;                                   \
 }
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
-#undef SWIFT_TYPEID
+#undef SWIFT_REQUEST
 
 } // end namespace swift
 

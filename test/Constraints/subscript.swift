@@ -143,7 +143,7 @@ class C_r25601561 {
 // rdar://problem/31977679 - Misleading diagnostics when using subscript with incorrect argument
 
 func r31977679_1(_ properties: [String: String]) -> Any? {
-  return properties[0] // expected-error {{cannot subscript a value of type '[String : String]' with an argument of type 'Int'}}
+  return properties[0] // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
 }
 
 func r31977679_2(_ properties: [String: String]) -> Any? {
@@ -176,4 +176,30 @@ func rdar_45825806() {
 
   let s = S()
   _ = s[takesPtr: [1, 2, 3]] // Ok
+}
+
+func test_generic_subscript_requirements_mismatch_diagnostics() {
+  struct S {
+    subscript<T: StringProtocol>(_: T) -> T { // expected-note {{where 'T' = 'Int'}}
+      fatalError()
+    }
+
+    subscript<T, U: Collection>(v v: [T]) -> U where U.Element == T {
+      fatalError()
+    }
+
+    subscript<T: Collection>(number num: T) -> Int where T.Element: BinaryInteger {
+      // expected-note@-1 {{'T.Element' = 'String'}}
+      return 42
+    }
+  }
+
+  var s = S()
+  _ = s[42] // expected-error {{subscript 'subscript(_:)' requires that 'Int' conform to 'StringProtocol'}}
+
+  var arr: [Int] = []
+  let _: [String] = s[v: arr] // expected-error {{cannot convert value of type '[Int]' to expected argument type '[String]'}}
+  // expected-note@-1 {{arguments to generic parameter 'Element' ('Int' and 'String') are expected to be equal}}
+
+  s[number: ["hello"]] // expected-error {{subscript 'subscript(number:)' requires that 'String' conform to 'BinaryInteger'}}
 }

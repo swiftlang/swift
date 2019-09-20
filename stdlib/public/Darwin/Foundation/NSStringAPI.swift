@@ -1368,7 +1368,7 @@ extension StringProtocol where Index == String.Index {
   /// - Parameter leftover: The remaining range. Pass `nil` If you do
   ///   not need this value.
   ///
-  /// - Returns: `true` iff some characters were converted.
+  /// - Returns: `true` if some characters were converted, `false` otherwise.
   ///
   /// - Note: Conversion stops when the buffer fills or when the
   ///   conversion isn't possible due to the chosen encoding.
@@ -1668,8 +1668,8 @@ extension StringProtocol where Index == String.Index {
   // No need to make these unavailable on earlier OSes, since they can
   // forward trivially to rangeOfString.
 
-  /// Returns `true` iff `other` is non-empty and contained within
-  /// `self` by case-sensitive, non-literal search.
+  /// Returns `true` if `other` is non-empty and contained within `self` by
+  /// case-sensitive, non-literal search. Otherwise, returns `false`.
   ///
   /// Equivalent to `self.rangeOfString(other) != nil`
   public func contains<T : StringProtocol>(_ other: T) -> Bool {

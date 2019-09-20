@@ -400,11 +400,12 @@ public:
   //===--------------------------------------------------------------------===//
 
   AllocStackInst *createAllocStack(SILLocation Loc, SILType elementType,
-                                   Optional<SILDebugVariable> Var = None) {
+                                   Optional<SILDebugVariable> Var = None,
+                                   bool hasDynamicLifetime = false) {
     Loc.markAsPrologue();
     return insert(AllocStackInst::create(getSILDebugLocation(Loc), elementType,
                                          getFunction(), C.OpenedArchetypes,
-                                         Var));
+                                         Var, hasDynamicLifetime));
   }
 
   AllocRefInst *createAllocRef(SILLocation Loc, SILType ObjectType,
@@ -439,10 +440,12 @@ public:
   }
 
   AllocBoxInst *createAllocBox(SILLocation Loc, CanSILBoxType BoxType,
-                               Optional<SILDebugVariable> Var = None) {
+                               Optional<SILDebugVariable> Var = None,
+                               bool hasDynamicLifetime = false) {
     Loc.markAsPrologue();
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
-                                       C.OpenedArchetypes, Var));
+                                       C.OpenedArchetypes, Var,
+                                       hasDynamicLifetime));
   }
 
   AllocExistentialBoxInst *
@@ -893,17 +896,25 @@ public:
     return insert(new (getModule()) \
       Store##Name##Inst(getSILDebugLocation(Loc), value, dest, isInit)); \
   }
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  Name##ToRefInst *create##Name##ToRef(SILLocation Loc, SILValue op, \
-                                       SILType ty) { \
-    return insert(new (getModule()) \
-      Name##ToRefInst(getSILDebugLocation(Loc), op, ty)); \
-  } \
-  RefTo##Name##Inst *createRefTo##Name(SILLocation Loc, SILValue op, \
-                                       SILType ty) { \
-    return insert(new (getModule()) \
-      RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty)); \
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  Name##ToRefInst *create##Name##ToRef(SILLocation Loc, SILValue op,           \
+                                       SILType ty) {                           \
+    return insert(new (getModule())                                            \
+                      Name##ToRefInst(getSILDebugLocation(Loc), op, ty));      \
+  }                                                                            \
+  RefTo##Name##Inst *createRefTo##Name(SILLocation Loc, SILValue op,           \
+                                       SILType ty) {                           \
+    return insert(new (getModule())                                            \
+                      RefTo##Name##Inst(getSILDebugLocation(Loc), op, ty));    \
+  }                                                                            \
+  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc,              \
+                                                 SILValue operand) {           \
+    auto type = getFunction().getLoweredType(                                  \
+        operand->getType().getASTType().getReferenceStorageReferent());        \
+    return insert(new (getModule()) Copy##Name##ValueInst(                     \
+        getSILDebugLocation(Loc), operand, type));                             \
   }
+
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name) \
   StrongRetain##Name##Inst *createStrongRetain##Name(SILLocation Loc, \
@@ -922,13 +933,6 @@ public:
                                            Atomicity atomicity) { \
     return insert(new (getModule()) \
       Name##ReleaseInst(getSILDebugLocation(Loc), Operand, atomicity)); \
-  } \
-  Copy##Name##ValueInst *createCopy##Name##Value(SILLocation Loc, \
-                                                 SILValue operand) { \
-    auto type = getFunction().getLoweredType( \
-      operand->getType().getASTType().getReferenceStorageReferent()); \
-    return insert(new (getModule()) \
-      Copy##Name##ValueInst(getSILDebugLocation(Loc), operand, type)); \
   }
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
@@ -1742,13 +1746,7 @@ public:
         getSILDebugLocation(Loc), valueType, operand));
   }
   ProjectBoxInst *createProjectBox(SILLocation Loc, SILValue boxOperand,
-                                   unsigned index) {
-    auto boxTy = boxOperand->getType().castTo<SILBoxType>();
-    auto fieldTy = boxTy->getFieldType(getModule(), index);
-
-    return insert(new (getModule()) ProjectBoxInst(
-        getSILDebugLocation(Loc), boxOperand, index, fieldTy));
-  }
+                                   unsigned index);
   ProjectExistentialBoxInst *createProjectExistentialBox(SILLocation Loc,
                                                          SILType valueTy,
                                                          SILValue boxOperand) {

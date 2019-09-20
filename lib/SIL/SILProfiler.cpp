@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -1078,6 +1079,9 @@ void SILProfiler::assignRegionCounters() {
   PGOFuncName = llvm::getPGOFuncName(
       CurrentFuncName, getEquivalentPGOLinkage(CurrentFuncLinkage),
       CurrentFileName);
+
+  assert((!CurrentFuncName.empty() && !PGOFuncName.empty()) &&
+         "Expected covered region to be named");
 
   LLVM_DEBUG(llvm::dbgs() << "Assigning counters to: " << CurrentFuncName
                           << "\n");

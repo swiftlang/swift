@@ -328,3 +328,65 @@ func rdar52779809(_ ref1: Ref<S>, _ ref2: Ref<Q>) {
   // CHECK: function_ref @$s29keypath_dynamic_member_lookup3RefV0B6Memberqd__s7KeyPathCyxqd__G_tcluig
   _ = ref2.bar // Ok
 }
+
+func make_sure_delayed_keypath_dynamic_member_works() {
+  @propertyWrapper @dynamicMemberLookup
+  struct Wrapper<T> {
+    var storage: T? = nil
+
+    var wrappedValue: T {
+      get { storage! }
+    }
+
+    var projectedValue: Wrapper<T> { self }
+
+    init() { }
+
+    init(wrappedValue: T) {
+      storage = wrappedValue
+    }
+
+    subscript<Property>(dynamicMember keyPath: KeyPath<T, Property>) -> Wrapper<Property> {
+      get { .init() }
+    }
+  }
+
+  struct Field {
+    @Wrapper var v: Bool = true
+  }
+
+  struct Arr {
+    var fields: [Field] = []
+  }
+
+  struct Test {
+    @Wrapper var data: Arr
+
+    func test(_ index: Int) {
+      let _ = self.$data.fields[index].v.wrappedValue
+    }
+  }
+}
+
+
+// SR-11465 - Ambiguity in expression which matches both dynamic member lookup and declaration from constrained extension
+
+@dynamicMemberLookup
+struct SR_11465<RawValue> {
+  var rawValue: RawValue
+
+  subscript<Subject>(dynamicMember keyPath: KeyPath<RawValue, Subject>) -> Subject {
+    rawValue[keyPath: keyPath]
+  }
+}
+
+extension SR_11465: Hashable, Equatable where RawValue: Hashable {
+  func hash(into hasher: inout Hasher) {
+    hasher.combine(self.rawValue)
+  }
+}
+
+func test_constrained_ext_vs_dynamic_member() {
+  // CHECK: function_ref @$s29keypath_dynamic_member_lookup8SR_11465VAASHRzlE9hashValueSivg
+  _ = SR_11465<Int>(rawValue: 1).hashValue // Ok, keep choice from constrained extension
+}

@@ -368,6 +368,7 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   NO_REFERENCE(ObjCSelector);
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
+  PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
 
 #undef SIMPLE_REFERENCE
@@ -539,6 +540,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
   case ExprKind::LazyInitializer:
+  case ExprKind::OneWay:
     return false;
 
   case ExprKind::NilLiteral:
@@ -1726,6 +1728,11 @@ Expr *CallExpr::getDirectCallee() const {
       continue;
     }
 
+    if (auto ctorCall = dyn_cast<ConstructorRefCallExpr>(fn)) {
+      fn = ctorCall->getFn();
+      continue;
+    }
+
     return fn;
   }
 }
@@ -2223,6 +2230,20 @@ TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
 
 VarDecl * TapExpr::getVar() const {
   return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
+}
+
+SourceLoc TapExpr::getEndLoc() const {
+  // Include the body in the range, assuming the body follows the SubExpr.
+  // Also, be (perhaps overly) defensive about null pointers & invalid
+  // locations.
+  if (auto *const b = getBody()) {
+    const auto be = b->getEndLoc();
+    if (be.isValid())
+      return be;
+  }
+  if (auto *const se = getSubExpr())
+    return se->getEndLoc();
+  return SourceLoc();
 }
 
 // See swift/Basic/Statistic.h for declaration: this enables tracing Exprs, is

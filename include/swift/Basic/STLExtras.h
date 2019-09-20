@@ -578,6 +578,8 @@ public:
     return *Op(*Current);
   }
 
+  reference operator*() { return *Op(*Current); }
+
   OptionalTransformIterator &operator++() {
     ++Current;
     skipNonMatching();
@@ -611,7 +613,7 @@ makeOptionalTransformIterator(Iterator current, Iterator end,
 
 /// A range filtered and transformed by the optional transform.
 template <typename Range, typename OptionalTransform,
-          typename Iterator = typename Range::iterator>
+          typename Iterator = decltype(std::declval<Range>().begin())>
 class OptionalTransformRange {
 
   Iterator First, Last;
@@ -862,6 +864,17 @@ Iterator removeAdjacentIf(const Iterator first, const Iterator last,
   return insertionPoint;
 }
 
+namespace detail {
+template <bool...> struct bool_pack;
+} // namespace detail
+
+template <bool... b>
+using all_true =
+    std::is_same<detail::bool_pack<b..., true>, detail::bool_pack<true, b...>>;
+
+/// traits class for checking whether Ts consists only of compound types.
+template <class... Ts>
+using are_all_compound = all_true<std::is_compound<Ts>::value...>;
 
 } // end namespace swift
 

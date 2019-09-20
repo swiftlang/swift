@@ -465,7 +465,7 @@ struct Outer {
 }
 
 // rdar://problem/39514009 - don't crash when trying to diagnose members with special names
-print("hello")[0] // expected-error {{value of tuple type '()' has no member 'subscript'}}
+print("hello")[0] // expected-error {{value of type '()' has no subscripts}}
 
 
 func rdar40537782() {
@@ -602,8 +602,10 @@ func rdar50679161() {
         var _ = Q(
           a: v + foo.w,
           // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
           b: v + foo.h
           // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
         )
       }
     }

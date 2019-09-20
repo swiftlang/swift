@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
@@ -161,7 +162,7 @@ void RequirementRepr::print(ASTPrinter &out) const {
   printImpl(out, /*AsWritten=*/true);
 }
 
-void GenericParamList::print(llvm::raw_ostream &OS) {
+void GenericParamList::print(llvm::raw_ostream &OS) const {
   OS << '<';
   interleave(*this,
              [&](const GenericTypeParamDecl *P) {
@@ -369,15 +370,6 @@ static StringRef getCtorInitializerKindString(CtorInitializerKind value) {
   }
 
   llvm_unreachable("Unhandled CtorInitializerKind in switch.");
-}
-static StringRef getOptionalTypeKindString(OptionalTypeKind value) {
-  switch (value) {
-    case OTK_None: return "none";
-    case OTK_Optional: return "Optional";
-    case OTK_ImplicitlyUnwrappedOptional: return "ImplicitlyUnwrappedOptional";
-  }
-
-  llvm_unreachable("Unhandled OptionalTypeKind in switch.");
 }
 static StringRef getAssociativityString(Associativity value) {
   switch (value) {
@@ -625,9 +617,9 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (TAD->getUnderlyingTypeLoc().getType()) {
+      if (auto underlying = TAD->getUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << TAD->getUnderlyingTypeLoc().getType().getString();
+          << underlying.getString();
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
@@ -769,9 +761,9 @@ namespace {
       auto VarD = dyn_cast<VarDecl>(VD);
       if (VD->isFinal() && !(VarD && VarD->isLet()))
         OS << " final";
-      if (VD->isObjC())
+      if (VD->getAttrs().hasAttribute<ObjCAttr>())
         OS << " @objc";
-      if (VD->isDynamic())
+      if (VD->getAttrs().hasAttribute<DynamicAttr>())
         OS << " dynamic";
       if (auto *attr =
               VD->getAttrs().getAttribute<DynamicReplacementAttr>()) {
@@ -906,8 +898,16 @@ namespace {
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
         printRec(entry.getPattern());
+        if (entry.getOriginalInit()) {
+          OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Original init:\n";
+          printRec(entry.getOriginalInit());
+        }
         if (entry.getInit()) {
           OS << '\n';
+          OS.indent(Indent + 2);
+          OS << "Processed init:\n";
           printRec(entry.getInit());
         }
       }
@@ -988,9 +988,17 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+      }
+
+      if (P->getDefaultValue() &&
+        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+        OS << " ";
+        P->getDefaultArgumentCaptureInfo().print(
+          PrintWithColorRAII(OS, CapturesColor).getOS());
+      }
 
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
@@ -1092,9 +1100,11 @@ namespace {
         PrintWithColorRAII(OS, DeclModifierColor) << " required";
       PrintWithColorRAII(OS, DeclModifierColor) << " "
         << getCtorInitializerKindString(CD->getInitKind());
-      if (CD->getFailability() != OTK_None)
+      if (CD->isFailable())
         PrintWithColorRAII(OS, DeclModifierColor) << " failable="
-          << getOptionalTypeKindString(CD->getFailability());
+          << (CD->isImplicitlyUnwrappedOptional()
+              ? "ImplicitlyUnwrappedOptional"
+              : "Optional");
       printAbstractFunctionDecl(CD);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }
@@ -2786,6 +2796,13 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 
+  void visitOneWayExpr(OneWayExpr *E) {
+    printCommon(E, "one_way_expr");
+    OS << '\n';
+    printRec(E->getSubExpr());
+    PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
   void visitTapExpr(TapExpr *E) {
     printCommon(E, "tap_expr");
     PrintWithColorRAII(OS, DeclColor) << " var=";
@@ -2937,6 +2954,13 @@ public:
       printRec(elem.Type);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
+  }
+
+  void visitImplicitlyUnwrappedOptionalTypeRepr(
+      ImplicitlyUnwrappedOptionalTypeRepr *T) {
+    printCommon("implicitly_unwrapped_optional");
+    OS << "\n";
+    printRec(T->getBase());
   }
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {
@@ -3363,6 +3387,12 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
+      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      if (auto underlying = T->getSinglyDesugaredType()) {
+        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+      } else {
+        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+      }
       if (T->getParent())
         printRec("parent", T->getParent());
 
@@ -3504,10 +3534,6 @@ namespace {
       printArchetypeCommon(T, "primary_archetype_type", label);
       printField("name", T->getFullName());
       OS << "\n";
-      auto genericEnv = T->getGenericEnvironment();
-      if (auto owningDC = genericEnv->getOwningDeclContext()) {
-        owningDC->printContext(OS, Indent + 2);
-      }
       printArchetypeNestedTypes(T);
       PrintWithColorRAII(OS, ParenthesisColor) << ')';
     }

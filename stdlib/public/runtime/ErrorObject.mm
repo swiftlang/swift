@@ -42,6 +42,24 @@
 using namespace swift;
 using namespace swift::hashable_support;
 
+@interface NSObject (MakeTheCompilerHappy)
++ (id) dictionary; //declare this so we can call it below without warnings
+@end
+
+// Mimic the memory layout of NSError so things don't go haywire when we
+// switch superclasses to the real thing.
+@interface __SwiftNSErrorLayoutStandin : NSObject {
+  @private
+  void *_reserved;
+  NSInteger _code;
+  id _domain;
+  id _userInfo;
+}
+@end
+
+@implementation __SwiftNSErrorLayoutStandin
+@end
+
 /// A subclass of NSError used to represent bridged native Swift errors.
 /// This type cannot be subclassed, and should not ever be instantiated
 /// except by the Swift runtime.
@@ -49,7 +67,7 @@ using namespace swift::hashable_support;
 /// NOTE: older runtimes called this _SwiftNativeNSError. The two must
 /// coexist, so it was renamed. The old name must not be used in the new
 /// runtime.
-@interface __SwiftNativeNSError : NSError
+@interface __SwiftNativeNSError : __SwiftNSErrorLayoutStandin
 @end
 
 @implementation __SwiftNativeNSError
@@ -71,7 +89,7 @@ using namespace swift::hashable_support;
 // layout. This gives us a buffer in case NSError decides to change its stored
 // property order.
 
-- (NSString*)domain {
+- (id /* NSString */)domain {
   auto error = (const SwiftError*)self;
   // The domain string should not be nil; if it is, then this error box hasn't
   // been initialized yet as an NSError.
@@ -79,7 +97,7 @@ using namespace swift::hashable_support;
   assert(domain
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
-  return cf_const_cast<NSString*>(domain);
+  return cf_const_cast<id>(domain);
 }
 
 - (NSInteger)code {
@@ -87,13 +105,13 @@ using namespace swift::hashable_support;
   return error->code.load(SWIFT_MEMORY_ORDER_CONSUME);
 }
 
-- (NSDictionary*)userInfo {
+- (id /* NSDictionary */)userInfo {
   auto error = (const SwiftError*)self;
   auto userInfo = error->userInfo.load(SWIFT_MEMORY_ORDER_CONSUME);
   assert(userInfo
          && "Error box used as NSError before initialization");
   // Don't need to .retain.autorelease since it's immutable.
-  return cf_const_cast<NSDictionary*>(userInfo);
+  return cf_const_cast<id>(userInfo);
 }
 
 - (id)copyWithZone:(NSZone *)zone {
@@ -153,7 +171,7 @@ using namespace swift::hashable_support;
 @end
 
 Class swift::getNSErrorClass() {
-  return SWIFT_LAZY_CONSTANT([NSError class]);
+  return SWIFT_LAZY_CONSTANT(objc_lookUpClass("NSError"));
 }
 
 const Metadata *swift::getNSErrorMetadata() {
@@ -161,8 +179,25 @@ const Metadata *swift::getNSErrorMetadata() {
     swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass()));
 }
 
+static Class getAndBridgeSwiftNativeNSErrorClass() {
+  Class nsErrorClass = swift::getNSErrorClass();
+  Class ourClass = [__SwiftNativeNSError class];
+  // We want "err as AnyObject" to do *something* even without Foundation
+  if (nsErrorClass) {
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated-declarations"
+      class_setSuperclass(ourClass, nsErrorClass);
+    #pragma clang diagnostic pop
+  }
+  return ourClass;
+}
+
 static Class getSwiftNativeNSErrorClass() {
-  return SWIFT_LAZY_CONSTANT([__SwiftNativeNSError class]);
+  return SWIFT_LAZY_CONSTANT(getAndBridgeSwiftNativeNSErrorClass());
+}
+
+static id getEmptyNSDictionary() {
+  return [objc_lookUpClass("NSDictionary") dictionary];
 }
 
 /// Allocate a catchable error object.
@@ -274,7 +309,7 @@ bool SwiftError::isPureNSError() const {
 
 const Metadata *SwiftError::getType() const {
   if (isPureNSError()) {
-    auto asError = reinterpret_cast<NSError *>(const_cast<SwiftError *>(this));
+    id asError = reinterpret_cast<id>(const_cast<SwiftError *>(this));
     return swift_getObjCClassMetadata((ClassMetadata*)[asError class]);
   }
   return type;
@@ -363,9 +398,9 @@ swift::swift_getErrorValue(const SwiftError *errorObject,
 #define getErrorDomainNSString \
   MANGLE_SYM(s23_getErrorDomainNSStringyyXlSPyxGs0B0RzlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-NSString *getErrorDomainNSString(const OpaqueValue *error,
-                                 const Metadata *T,
-                                 const WitnessTable *Error);
+id getErrorDomainNSString(const OpaqueValue *error,
+                          const Metadata *T,
+                          const WitnessTable *Error);
 
 // internal func _getErrorCode<T : Error>(_ x: UnsafePointer<T>) -> Int
 #define getErrorCode \
@@ -379,7 +414,7 @@ NSInteger getErrorCode(const OpaqueValue *error,
 #define getErrorUserInfoNSDictionary \
   MANGLE_SYM(s29_getErrorUserInfoNSDictionaryyyXlSgSPyxGs0B0RzlF)
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-NSDictionary *getErrorUserInfoNSDictionary(
+id getErrorUserInfoNSDictionary(
                 const OpaqueValue *error,
                 const Metadata *T,
                 const WitnessTable *Error);
@@ -387,9 +422,9 @@ NSDictionary *getErrorUserInfoNSDictionary(
 // @_silgen_name("_swift_stdlib_getErrorDefaultUserInfo")
 // internal func _getErrorDefaultUserInfo<T : Error>(_ x: T) -> AnyObject
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
-NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
-                                                    const Metadata *T,
-                                                    const WitnessTable *Error) {
+id _swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
+                                         const Metadata *T,
+                                         const WitnessTable *Error) {
   // public func Foundation._getErrorDefaultUserInfo<T: Error>(_ error: T)
   //   -> AnyObject?
   auto foundationGetDefaultUserInfo = getErrorBridgingInfo().GetErrorDefaultUserInfo;
@@ -407,7 +442,7 @@ NSDictionary *_swift_stdlib_getErrorDefaultUserInfo(OpaqueValue *error,
 /// at +1.
 id
 swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
-  auto ns = reinterpret_cast<NSError *>(errorObject);
+  id ns = reinterpret_cast<id>(errorObject);
 
   // If we already have a domain set, then we've already initialized.
   // If this is a real NSError, then Cocoa and Core Foundation's initializers
@@ -431,13 +466,13 @@ swift::_swift_stdlib_bridgeErrorToNSError(SwiftError *errorObject) {
   auto type = errorObject->getType();
   auto witness = errorObject->getErrorConformance();
 
-  NSString *domain = getErrorDomainNSString(value, type, witness);
+  id domain = getErrorDomainNSString(value, type, witness);
   NSInteger code = getErrorCode(value, type, witness);
-  NSDictionary *userInfo = getErrorUserInfoNSDictionary(value, type, witness);
+  id userInfo = getErrorUserInfoNSDictionary(value, type, witness);
 
   // Never produce an empty userInfo dictionary.
   if (!userInfo)
-    userInfo = SWIFT_LAZY_CONSTANT(@{});
+    userInfo = SWIFT_LAZY_CONSTANT(getEmptyNSDictionary());
 
   // The error code shouldn't change, so we can store it blindly, even if
   // somebody beat us to it. The store can be relaxed, since we'll do a
@@ -480,7 +515,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
   if (![reinterpret_cast<id>(object) isKindOfClass: NSErrorClass])
     return false;
 
-  NSError *srcInstance = reinterpret_cast<NSError *>(object);
+  id srcInstance = reinterpret_cast<id>(object);
 
   // A __SwiftNativeNSError box can always be unwrapped to cast the value back
   // out as an Error existential.
@@ -523,7 +558,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
   auto *destTypeExistential = dyn_cast<ExistentialTypeMetadata>(destType);
   if (destTypeExistential &&
       destTypeExistential->getRepresentation() == ExistentialTypeRepresentation::Error) {
-    auto destBoxAddr = reinterpret_cast<NSError**>(dest);
+    auto destBoxAddr = reinterpret_cast<id*>(dest);
     *destBoxAddr = objc_retain(srcInstance);
     return true;
   }

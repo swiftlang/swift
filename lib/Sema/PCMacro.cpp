@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 
 using namespace swift;
@@ -435,7 +436,7 @@ public:
 
               SourceRange SR = PBD->getSourceRange();
               if (!SR.isValid()) {
-                SR = PBD->getOrigInitRange(0);
+                SR = PBD->getOriginalInitRange(0);
               }
 
               Added<Stmt *> LogBefore = buildLoggerCall(SR, true);

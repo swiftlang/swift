@@ -20,7 +20,7 @@ using namespace swift;
 
 namespace swift {
 llvm::cl::opt<unsigned>
-    ConstExprLimit("constexpr-limit", llvm::cl::init(512),
+    ConstExprLimit("constexpr-limit", llvm::cl::init(1024),
                    llvm::cl::desc("Number of instructions interpreted in a"
                                   " constexpr function"));
 }
@@ -42,7 +42,7 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
     os << "uninit\n";
     return;
   case RK_Unknown: {
-    os << "unknown(" << (int)getUnknownReason() << "): ";
+    os << "unknown(" << (int)getUnknownReason().getKind() << "): ";
     getUnknownNode()->dump();
     return;
   }
@@ -571,9 +571,18 @@ SymbolicValue SymbolicValue::lookThroughSingleElementAggregates() const {
 }
 
 bool SymbolicValue::isUnknownDueToUnevaluatedInstructions() {
-  auto unknownReason = getUnknownReason();
-  return (unknownReason == UnknownReason::ReturnedByUnevaluatedInstruction ||
-          unknownReason == UnknownReason::MutatedByUnevaluatedInstruction);
+  auto unknownKind = getUnknownReason().getKind();
+  return (unknownKind == UnknownReason::ReturnedByUnevaluatedInstruction ||
+          unknownKind == UnknownReason::MutatedByUnevaluatedInstruction);
+}
+
+static void getWitnessMethodName(WitnessMethodInst *witnessMethodInst,
+                                 SmallVectorImpl<char> &methodName) {
+  assert(witnessMethodInst);
+  SILDeclRef witnessMember = witnessMethodInst->getMember();
+  if (witnessMember.hasDecl()) {
+    witnessMember.getDecl()->getFullName().getString(methodName);
+  }
 }
 
 /// Given that this is an 'Unknown' value, emit diagnostic notes providing
@@ -587,12 +596,20 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   ASTContext &ctx = unknownNode->getModule()->getASTContext();
 
   // Extract the location of the instruction/construct that triggered the error
-  // during interpretation, if available.
-  Optional<SourceLoc> triggerLoc = None;
-  if (auto badInst = dyn_cast<SILInstruction>(unknownNode)) {
-    triggerLoc = skipInternalLocations(badInst->getDebugLocation())
-                     .getLocation()
-                     .getSourceLoc();
+  // during interpretation, if available. If the instruction is internal to
+  // stdlib and has an invalid location, find the innermost call that has a
+  // valid location.
+  SourceLoc triggerLoc;
+  bool triggerLocSkipsInternalLocs = false;
+  if (auto *badInst = dyn_cast<SILInstruction>(unknownNode)) {
+    SILDebugLocation debugLoc = badInst->getDebugLocation();
+    SourceLoc initialSourceLoc = debugLoc.getLocation().getSourceLoc();
+    if (initialSourceLoc.isValid()) {
+      triggerLoc = initialSourceLoc;
+    } else {
+      triggerLocSkipsInternalLocs = true;
+      triggerLoc = skipInternalLocations(debugLoc).getLocation().getSourceLoc();
+    }
   }
 
   // Determine the top-level expression where the error happens and use it as
@@ -602,7 +619,7 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   // the faulty top-level expression location cannot be found.
   auto diagLoc =
       errorCallStack.empty()
-          ? (triggerLoc ? triggerLoc.getValue() : fallbackLoc.getSourceLoc())
+          ? (triggerLoc.isValid() ? triggerLoc : fallbackLoc.getSourceLoc())
           : errorCallStack.front();
   if (diagLoc.isInvalid()) {
     return;
@@ -611,79 +628,119 @@ void SymbolicValue::emitUnknownDiagnosticNotes(SILLocation fallbackLoc) {
   // Emit a note at the trigger location as well if it is different from the
   // top-level expression.
   bool emitTriggerLocInDiag =
-      triggerLoc ? diagLoc != triggerLoc.getValue() : false;
+      triggerLoc.isValid() ? diagLoc != triggerLoc : false;
 
-  switch (unknownReason) {
+  switch (unknownReason.getKind()) {
   case UnknownReason::Default:
     diagnose(ctx, diagLoc, diag::constexpr_unknown_reason_default);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_unevaluable_operation);
+      diagnose(ctx, triggerLoc, diag::constexpr_unevaluable_operation,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::TooManyInstructions:
     diagnose(ctx, diagLoc, diag::constexpr_too_many_instructions,
              ConstExprLimit);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_limit_exceeding_instruction);
+      diagnose(ctx, triggerLoc, diag::constexpr_limit_exceeding_instruction,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::Loop:
     diagnose(ctx, diagLoc, diag::constexpr_loop_found_note);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_loop_instruction);
+      diagnose(ctx, triggerLoc, diag::constexpr_loop_instruction,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::Overflow:
     diagnose(ctx, diagLoc, diag::constexpr_overflow);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_overflow_operation);
+      diagnose(ctx, triggerLoc, diag::constexpr_overflow_operation,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::Trap:
-    diagnose(ctx, diagLoc, diag::constexpr_trap);
+  case UnknownReason::Trap: {
+    const char *message = unknownReason.getTrapMessage();
+    diagnose(ctx, diagLoc, diag::constexpr_trap, StringRef(message));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_trap_operation);
+      diagnose(ctx, triggerLoc, diag::constexpr_trap_operation,
+               triggerLocSkipsInternalLocs);
     return;
+  }
   case UnknownReason::InvalidOperandValue:
     diagnose(ctx, diagLoc, diag::constexpr_invalid_operand_seen);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_operand_invalid_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_operand_invalid_here,
+               triggerLocSkipsInternalLocs);
     return;
   case UnknownReason::NotTopLevelConstant: {
     // For top-level errors, trigger loc is better than diagLoc.
-    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    auto loc = emitTriggerLocInDiag ? triggerLoc : diagLoc;
     diagnose(ctx, loc, diag::constexpr_value_unknown_at_top_level);
     return;
   }
   case UnknownReason::MutipleTopLevelWriters: {
     // For top-level errors, trigger loc is better than diagLoc.
-    auto loc = emitTriggerLocInDiag ? *triggerLoc : diagLoc;
+    auto loc = emitTriggerLocInDiag ? triggerLoc : diagLoc;
     diagnose(ctx, loc, diag::constexpr_multiple_writers_found_at_top_level);
     return;
   }
-  case UnknownReason::UnsupportedInstruction:
-    diagnose(ctx, diagLoc, diag::constexpr_unsupported_instruction_found);
+  case UnknownReason::UnsupportedInstruction: {
+    // Get the name of the unsupported instruction.
+    auto *unsupportedInst = dyn_cast<SILInstruction>(unknownNode);
+    assert(unsupportedInst);
+    SmallString<4> instName(getSILInstructionName(unsupportedInst->getKind()));
+    if (auto *builtinInst = dyn_cast<BuiltinInst>(unsupportedInst)) {
+      instName.append(" ");
+      instName.append(builtinInst->getName().str());
+    }
+
+    diagnose(ctx, diagLoc, diag::constexpr_unsupported_instruction_found,
+             instName);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc,
-               diag::constexpr_unsupported_instruction_found_here);
+      diagnose(ctx, triggerLoc,
+               diag::constexpr_unsupported_instruction_found_here,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::CalleeImplementationUnknown:
-    diagnose(ctx, diagLoc, diag::constexpr_unknown_function_called);
+  }
+  case UnknownReason::CalleeImplementationUnknown: {
+    SILFunction *callee = unknownReason.getCalleeWithoutImplmentation();
+    std::string demangledCalleeName =
+        Demangle::demangleSymbolAsString(callee->getName());
+    diagnose(ctx, diagLoc, diag::constexpr_found_callee_with_no_body,
+             StringRef(demangledCalleeName));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_unknown_function_called_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_callee_with_no_body,
+               triggerLocSkipsInternalLocs);
     return;
+  }
   case UnknownReason::UntrackedSILValue:
     diagnose(ctx, diagLoc, diag::constexpr_untracked_sil_value_use_found);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_untracked_sil_value_used_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_untracked_sil_value_used_here,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::UnknownWitnessMethodConformance:
-    diagnose(ctx, diagLoc,
-             diag::constexpr_witness_call_with_no_conformance_found);
+  case UnknownReason::UnknownWitnessMethodConformance: {
+    SmallString<8> witnessMethodName;
+    getWitnessMethodName(dyn_cast<WitnessMethodInst>(unknownNode),
+                         witnessMethodName);
+    diagnose(ctx, diagLoc, diag::constexpr_unresolvable_witness_call,
+             witnessMethodName);
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+      diagnose(ctx, triggerLoc,
+               diag::constexpr_witness_call_with_no_conformance,
+               triggerLocSkipsInternalLocs);
     return;
-  case UnknownReason::UnresolvableWitnessMethod:
-    diagnose(ctx, diagLoc, diag::constexpr_witness_call_with_no_target_found);
+  }
+  case UnknownReason::NoWitnesTableEntry: {
+    SmallString<8> witnessMethodName;
+    getWitnessMethodName(dyn_cast<WitnessMethodInst>(unknownNode),
+                         witnessMethodName);
+
+    diagnose(ctx, diagLoc, diag::constexpr_unresolvable_witness_call,
+             StringRef(witnessMethodName));
     if (emitTriggerLocInDiag)
-      diagnose(ctx, *triggerLoc, diag::constexpr_witness_call_found_here);
+      diagnose(ctx, triggerLoc, diag::constexpr_no_witness_table_entry,
+               triggerLocSkipsInternalLocs);
     return;
+  }
   case UnknownReason::ReturnedByUnevaluatedInstruction:
     diagnose(ctx, diagLoc, diag::constexpr_returned_by_unevaluated_instruction);
     break;
