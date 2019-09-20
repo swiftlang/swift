@@ -11,8 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 %{
-  word_size = int(CMAKE_SIZEOF_VOID_P)
-
   allOrderings = [
     # Swift enum case,         Capitalized API name,    documentation name,        llvm name,   failure name, isLoad, isStore
     ('relaxed',                'Relaxed',               'relaxed',                 'monotonic', 'monotonic',  True,   True),
@@ -33,12 +31,14 @@
         yield (enumOrder, capitalOrder, docOrder, llvmOrder)
 
   integerOperations = [
-    ('Add', '&+'),
-    ('And', '&'),
-    ('Or', '|'),
-    ('Xor', '^')
+    ('WrappingAdd', 'add', '&+'),
+    (        'And', 'and', '&'),
+    (         'Or', 'or',  '|'),
+    (        'Xor', 'xor', '^')
   ]
 }%
+
+//------------------------------------------------------------------------------
 
 extension UnsafeMutableRawPointer {
 % for (enumOrder, capitalOrder, docOrder, llvmOrder) in loadOrderings():
@@ -46,8 +46,8 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}LoadWord() -> Int {
-    return Int(Builtin.atomicload_${llvmOrder}_Word(_rawValue))
+  func _atomic${capitalOrder}LoadWord() -> UInt {
+    return UInt(Builtin.atomicload_${llvmOrder}_Word(_rawValue))
   }
 % end
 }
@@ -59,7 +59,7 @@ extension UnsafeMutableRawPointer {
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}StoreWord(_ desired: Int) {
+  func _atomic${capitalOrder}StoreWord(_ desired: UInt) {
     Builtin.atomicstore_${llvmOrder}_Word(_rawValue, desired._builtinWordValue)
   }
 % end
@@ -71,27 +71,27 @@ extension UnsafeMutableRawPointer {
   @_transparent
   public // backdeployment
   func _atomic${capitalOrder}CompareExchangeWord(
-    expected: inout Int,
-    desired: Int
+    expected: inout UInt,
+    desired: UInt
   ) -> Bool {
     let (oldValue, won) = Builtin.cmpxchg_${llvmOrder}_${failureOrder}_Word(
       _rawValue, expected._builtinWordValue, desired._builtinWordValue)
-    expected = Int(oldValue)
+    expected = UInt(oldValue)
     return Bool(won)
   }
 % end
 }
 
 extension UnsafeMutableRawPointer {
-% for (operationName, operator) in integerOperations:
+% for (swiftName, builtinName, operator) in integerOperations:
 %   for _, capitalOrder, docOrder, llvmOrder, _, _, _ in allOrderings:
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}FetchThen${operationName}Word(_ operand: Int) -> Int {
-    let value = Builtin.atomicrmw_${operationName.lower()}_${llvmOrder}_Word(
+  func _atomic${capitalOrder}FetchThen${swiftName}Word(_ operand: UInt) -> UInt {
+    let value = Builtin.atomicrmw_${builtinName}_${llvmOrder}_Word(
       _rawValue, operand._builtinWordValue)
-    return Int(value)
+    return UInt(value)
   }
 %   end
 % end
@@ -102,7 +102,7 @@ extension UnsafeMutableRawPointer {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeMutableRawPointer {
   @_transparent
-  public func _atomicLoadWord(ordering: AtomicMemoryOrdering) -> Int {
+  public func _atomicLoadWord(ordering: AtomicMemoryOrdering) -> UInt {
     switch ordering {
     case .relaxed:
       return _atomicRelaxedLoadWord()
@@ -121,7 +121,10 @@ extension UnsafeMutableRawPointer {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeMutableRawPointer {
   @_transparent
-  public func _atomicStoreWord(_ desired: Int, ordering: AtomicMemoryOrdering) {
+  public func _atomicStoreWord(
+    _ desired: UInt,
+    ordering: AtomicMemoryOrdering
+  ) {
     switch ordering {
     case .relaxed:
       _atomicRelaxedStoreWord(desired)
@@ -141,8 +144,8 @@ extension UnsafeMutableRawPointer {
 extension UnsafeMutableRawPointer {
   @_transparent
   public func _atomicCompareExchangeWord(
-    expected: inout Int,
-    desired: Int,
+    expected: inout UInt,
+    desired: UInt,
     ordering: AtomicMemoryOrdering
   ) -> Bool {
     switch ordering {
@@ -176,26 +179,26 @@ extension UnsafeMutableRawPointer {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeMutableRawPointer {
-% for (operationName, op) in integerOperations:
+% for (swiftName, _, op) in integerOperations:
   @_transparent
   @discardableResult
-  public func _atomicFetchThen${operationName}Word(
-    _ operand: Int,
+  public func _atomicFetchThen${swiftName}Word(
+    _ operand: UInt,
     ordering: AtomicMemoryOrdering
-  ) -> Int {
+  ) -> UInt {
     switch ordering {
     case .relaxed:
-      return _atomicRelaxedFetchThen${operationName}Word(operand)
+      return _atomicRelaxedFetchThen${swiftName}Word(operand)
     case .acquiring:
-      return _atomicAcquiringFetchThen${operationName}Word(operand)
+      return _atomicAcquiringFetchThen${swiftName}Word(operand)
     case .releasing:
-      return _atomicReleasingFetchThen${operationName}Word(operand)
+      return _atomicReleasingFetchThen${swiftName}Word(operand)
     case .acquiringAndReleasing:
-      return _atomicAcquiringAndReleasingFetchThen${operationName}Word(operand)
+      return _atomicAcquiringAndReleasingFetchThen${swiftName}Word(operand)
     case .sequentiallyConsistent:
-      return _atomicFetchThen${operationName}Word(operand)
+      return _atomicFetchThen${swiftName}Word(operand)
     @unknown default:
-      return _atomicFetchThen${operationName}Word(operand)
+      return _atomicFetchThen${swiftName}Word(operand)
     }
   }
 
@@ -204,16 +207,19 @@ extension UnsafeMutableRawPointer {
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeMutableRawPointer {
-% for (operationName, op) in integerOperations:
+% for (swiftName, _, op) in integerOperations:
   @_transparent
   @discardableResult
-  public func _atomic${operationName}ThenFetchWord(
-    _ operand: Int,
+  public func _atomic${swiftName}ThenFetchWord(
+    _ operand: UInt,
     ordering: AtomicMemoryOrdering = .sequentiallyConsistent
-  ) -> Int {
-    let old = _atomicFetchThen${operationName}Word(operand, ordering: ordering)
+  ) -> UInt {
+    let old = _atomicFetchThen${swiftName}Word(operand, ordering: ordering)
     return old ${op} operand
   }
 
 % end
 }
+
+
+//------------------------------------------------------------------------------

@@ -52,7 +52,7 @@ public struct _stdlib_ShardedAtomicCounter {
     // FIXME: We should use UnsafeAtomicInt here, but we don't want to constrain
     // availability.
     let raw = UnsafeMutableRawPointer(self._shardsPtr + shardIndex)
-    _ = raw._atomicRelaxedFetchThenAddWord(operand)
+    _ = raw._atomicRelaxedFetchThenWrappingAddWord(UInt(bitPattern: operand))
   }
 
   // FIXME: non-atomic as a whole!
@@ -64,7 +64,7 @@ public struct _stdlib_ShardedAtomicCounter {
       // FIXME: We should use UnsafeAtomicInt here, but we don't want to constrain
       // availability.
       let raw = UnsafeMutableRawPointer(shards + i)
-      result += raw._atomicRelaxedLoadWord()
+      result += Int(bitPattern: raw._atomicRelaxedLoadWord())
     }
     return result
   }

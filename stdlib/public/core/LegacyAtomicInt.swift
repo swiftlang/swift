@@ -30,28 +30,33 @@ public final class _stdlib_AtomicInt {
   }
 
   public func store(_ desired: Int) {
-    _valuePtr._atomicStoreWord(desired)
+    _valuePtr._atomicStoreWord(UInt(bitPattern: desired))
   }
 
   public func load() -> Int {
-    return _valuePtr._atomicLoadWord()
+    return Int(bitPattern: _valuePtr._atomicLoadWord())
   }
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
-    return _valuePtr._atomicFetchThenAddWord(operand)
+    let word = _valuePtr._atomicFetchThenWrappingAddWord(
+      UInt(bitPattern: operand))
+    return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    return _valuePtr._atomicFetchThenAndWord(operand)
+    let word = _valuePtr._atomicFetchThenAndWord(UInt(bitPattern: operand))
+    return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    return _valuePtr._atomicFetchThenOrWord(operand)
+    let word = _valuePtr._atomicFetchThenOrWord(UInt(bitPattern: operand))
+    return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    return _valuePtr._atomicFetchThenXorWord(operand)
+    let word = _valuePtr._atomicFetchThenXorWord(UInt(bitPattern: operand))
+    return Int(bitPattern: word)
   }
 
   public func addAndFetch(_ operand: Int) -> Int {
@@ -68,9 +73,12 @@ public final class _stdlib_AtomicInt {
   }
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    return _valuePtr._atomicCompareExchangeWord(
-      expected: &expected,
-      desired: desired)
+    var expectedWord = UInt(bitPattern: expected)
+    let success = _valuePtr._atomicCompareExchangeWord(
+      expected: &expectedWord,
+      desired: UInt(bitPattern: desired))
+    expected = Int(bitPattern: expectedWord)
+    return success
   }
 }
 
@@ -85,9 +93,12 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   expected: UnsafeMutablePointer<Int>,
   desired: Int
 ) -> Bool {
-  return UnsafeMutableRawPointer(target)._atomicCompareExchangeWord(
-    expected: &expected.pointee,
-    desired: desired)
+  var expectedWord = UInt(bitPattern: expected.pointee)
+  let success = UnsafeMutableRawPointer(target)._atomicCompareExchangeWord(
+    expected: &expectedWord,
+    desired: UInt(bitPattern: desired))
+  expected.pointee = Int(bitPattern: expectedWord)
+  return success
 }
 
 
@@ -102,7 +113,7 @@ public // Existing uses outside stdlib
 func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>
 ) -> Int {
-  return UnsafeMutableRawPointer(target)._atomicLoadWord()
+  return Int(bitPattern: UnsafeMutableRawPointer(target)._atomicLoadWord())
 }
 
 @available(*, deprecated)
@@ -115,7 +126,7 @@ internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int
 ) {
-  UnsafeMutableRawPointer(target)._atomicStoreWord(desired)
+  UnsafeMutableRawPointer(target)._atomicStoreWord(UInt(bitPattern: desired))
 }
 
 // Warning: no overflow checking.
@@ -132,7 +143,9 @@ func _swift_stdlib_atomicFetchAddInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  return UnsafeMutableRawPointer(target)._atomicFetchThenAddWord(operand)
+  let raw = UnsafeMutableRawPointer(target)
+  let word = raw._atomicFetchThenWrappingAddWord(UInt(bitPattern: operand))
+  return Int(bitPattern: word)
 }
 
 @available(*, deprecated)
@@ -145,7 +158,8 @@ func _swift_stdlib_atomicFetchAndInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  return UnsafeMutableRawPointer(target)._atomicFetchThenAndWord(operand)
+  let raw = UnsafeMutableRawPointer(target)
+  return Int(bitPattern: raw._atomicFetchThenAndWord(UInt(bitPattern: operand)))
 }
 
 @available(*, deprecated)
@@ -158,7 +172,8 @@ func _swift_stdlib_atomicFetchOrInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  return UnsafeMutableRawPointer(target)._atomicFetchThenOrWord(operand)
+  let raw = UnsafeMutableRawPointer(target)
+  return Int(bitPattern: raw._atomicFetchThenOrWord(UInt(bitPattern: operand)))
 }
 
 @available(*, deprecated)
@@ -171,7 +186,8 @@ func _swift_stdlib_atomicFetchXorInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  return UnsafeMutableRawPointer(target)._atomicFetchThenXorWord(operand)
+  let raw = UnsafeMutableRawPointer(target)
+  return Int(bitPattern: raw._atomicFetchThenXorWord(UInt(bitPattern: operand)))
 }
 
 // Warning: no overflow checking.
@@ -182,7 +198,8 @@ internal func _swift_stdlib_atomicFetchAddInt32(
   operand: Int32
 ) -> Int32 {
   let value = Builtin.atomicrmw_add_seqcst_Int32(
-    target._rawValue, operand._value)
+    target._rawValue,
+    operand._value)
   return Int32(value)
 }
 
