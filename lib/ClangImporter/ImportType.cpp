@@ -384,9 +384,7 @@ namespace {
       }
 
       // All other C pointers to concrete types map to
-      // UnsafeMutablePointer<T> or OpaquePointer (FIXME:, except in
-      // parameter position under the pre-
-      // intrinsic-pointer-conversion regime.)
+      // UnsafeMutablePointer<T> or OpaquePointer.
 
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
@@ -478,9 +476,6 @@ namespace {
     }
     
     ImportResult VisitConstantArrayType(const clang::ConstantArrayType *type) {
-      // FIXME: In a function argument context, arrays should import as
-      // pointers.
-      
       // FIXME: Map to a real fixed-size Swift array type when we have those.
       // Importing as a tuple at least fills the right amount of space, and
       // we can cheese static-offset "indexing" using .$n operations.
@@ -545,8 +540,7 @@ namespace {
       if (type->isVariadic())
         return Type();
 
-      // Import the result type.  We currently provide no mechanism
-      // for this to be audited.
+      // Import the result type.
       auto resultTy = Impl.importTypeIgnoreIUO(
           type->getReturnType(), ImportTypeKind::Result, AllowNSUIntegerAsInt,
           Bridging, OTK_Optional);
@@ -566,7 +560,7 @@ namespace {
         // FIXME: If we were walking TypeLocs, we could actually get parameter
         // names. The probably doesn't matter outside of a FuncDecl, which
         // we'll have to special-case, but it's an interesting bit of data loss.
-        // We also lose `noescape`. <https://bugs.swift.org/browse/SR-2529>
+        // <https://bugs.swift.org/browse/SR-2529>
         params.push_back(FunctionType::Param(swiftParamTy));
       }
 
@@ -637,8 +631,8 @@ namespace {
 
     ImportResult VisitObjCTypeParamType(const clang::ObjCTypeParamType *type) {
       // FIXME: This drops any added protocols on the floor, which is the whole
-      // point of ObjCTypeParamType. When not in Swift 3 compatibility mode, we
-      // should adjust the resulting type accordingly.
+      // point of ObjCTypeParamType. Fixing this might be source-breaking,
+      // though. rdar://problem/29763975
       if (auto result = importObjCTypeParamDecl(type->getDecl()))
         return result.getValue();
       // Fall back to importing the desugared type, which uses the parameter's
