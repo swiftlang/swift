@@ -1635,12 +1635,6 @@ public:
       return;
     }
 
-    // At this point, we know that we have a Builtin that is a Swift Builtin
-    // rather than an llvm intrinsic. Make sure our name corresponds to an
-    // actual ValueDecl. Otherwise, we have an invalid builtin.
-    require(getBuiltinValueDecl(BI->getModule().getASTContext(), BI->getName()),
-            "Invalid builtin name?!");
-
     require(BI->getModule().getStage() != SILStage::Lowered ||
                 !isPolymorphicBuiltin(*BI->getBuiltinKind()),
             "Polymorphic builtins are illegal in lowered SIL?!");
