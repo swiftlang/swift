@@ -102,7 +102,7 @@ extension UnsafeMutableRawPointer {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeMutableRawPointer {
   @_transparent
-  public func _atomicLoadWord(ordering: AtomicMemoryOrdering) -> UInt {
+  public func _atomicLoadWord(ordering: MemoryOrdering) -> UInt {
     switch ordering {
     case .relaxed:
       return _atomicRelaxedLoadWord()
@@ -123,7 +123,7 @@ extension UnsafeMutableRawPointer {
   @_transparent
   public func _atomicStoreWord(
     _ desired: UInt,
-    ordering: AtomicMemoryOrdering
+    ordering: MemoryOrdering
   ) {
     switch ordering {
     case .relaxed:
@@ -146,7 +146,7 @@ extension UnsafeMutableRawPointer {
   public func _atomicCompareExchangeWord(
     expected: inout UInt,
     desired: UInt,
-    ordering: AtomicMemoryOrdering
+    ordering: MemoryOrdering
   ) -> Bool {
     switch ordering {
     case .relaxed:
@@ -184,7 +184,7 @@ extension UnsafeMutableRawPointer {
   @discardableResult
   public func _atomicFetchThen${swiftName}Word(
     _ operand: UInt,
-    ordering: AtomicMemoryOrdering
+    ordering: MemoryOrdering
   ) -> UInt {
     switch ordering {
     case .relaxed:
@@ -212,7 +212,7 @@ extension UnsafeMutableRawPointer {
   @discardableResult
   public func _atomic${swiftName}ThenFetchWord(
     _ operand: UInt,
-    ordering: AtomicMemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .sequentiallyConsistent
   ) -> UInt {
     let old = _atomicFetchThen${swiftName}Word(operand, ordering: ordering)
     return old ${op} operand
