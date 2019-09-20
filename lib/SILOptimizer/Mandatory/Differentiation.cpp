@@ -1800,7 +1800,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 
   // Print generated linear map structs and branching trace enums.
   // These declarations do not show up with `-emit-sil` because they are
-  // implicit. Instead, using `-Xllvm -debug-only=differentiation` to test
+  // implicit. Instead, use `-Xllvm -debug-only=differentiation` to test
   // declarations with FileCheck.
   LLVM_DEBUG({
     auto &s = getADDebugStream();
