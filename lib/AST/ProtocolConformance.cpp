@@ -128,10 +128,12 @@ ProtocolConformanceRef::subst(Type origType,
 
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
-    auto optConformance =
-      proto->getModuleContext()->lookupExistentialConformance(substType, proto);
-    assert(optConformance && "existential type didn't self-conform");
-    return *optConformance;
+    if (auto optConformance =
+          proto->getModuleContext()->lookupExistentialConformance(
+            substType, proto))
+      return *optConformance;
+
+    return ProtocolConformanceRef::forInvalid();
   }
 
   // Check the conformance map.
@@ -140,7 +142,7 @@ ProtocolConformanceRef::subst(Type origType,
     return *result;
   }
 
-  llvm_unreachable("Invalid conformance substitution");
+  return ProtocolConformanceRef::forInvalid();
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
