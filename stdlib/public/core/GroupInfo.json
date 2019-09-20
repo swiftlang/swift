@@ -197,7 +197,6 @@
     "Bitset.swift"
   ],
   "Misc": [
-    "Atomics.swift",
     "ErrorType.swift",
     "Identifiable.swift",
     "InputStream.swift",
@@ -210,11 +209,13 @@
     "Print.swift",
     "REPL.swift",
     "Random.swift",
+    "RawAtomics.swift",
     "Runtime.swift",
     "RuntimeFunctionCounters.swift",
     "Shims.swift",
     "ThreadLocalStorage.swift",
     "Unmanaged.swift",
+    "UnsafeAtomics.swift",
     "Availability.swift",
     "CommandLine.swift",
     "Tuple.swift",

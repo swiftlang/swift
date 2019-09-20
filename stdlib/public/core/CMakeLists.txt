@@ -30,7 +30,6 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
-  Atomics.swift.gyb
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
@@ -186,15 +185,16 @@ set(SWIFTLIB_ESSENTIAL
   MigrationSupport.swift)
 
 set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
-  Atomics.swift.gyb
   BuiltinMath.swift.gyb
   Codable.swift.gyb
   FloatingPointParsing.swift.gyb
   FloatingPointTypes.swift.gyb
   IntegerTypes.swift.gyb
   Mirrors.swift.gyb
+  RawAtomics.swift.gyb
   Runtime.swift.gyb
   UnavailableStringAPIs.swift.gyb
+  UnsafeAtomics.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
   )
