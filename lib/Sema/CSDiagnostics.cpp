@@ -1294,6 +1294,13 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
   Expr *diagExpr = getRawAnchor();
   SourceLoc loc = diagExpr->getLoc();
 
+  auto &cs = getConstraintSystem();
+  // Assignment is not allowed inside of a condition,
+  // so let's not diagnose immutability, because
+  // most likely the problem is related to use of `=` itself.
+  if (cs.getContextualTypePurpose() == CTP_Condition)
+    return false;
+
   if (auto assignExpr = dyn_cast<AssignExpr>(diagExpr)) {
     diagExpr = assignExpr->getDest();
   }
