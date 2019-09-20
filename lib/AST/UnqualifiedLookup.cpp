@@ -473,6 +473,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 #ifndef NDEBUG
   ++lookupCounter;
   auto localCounter = lookupCounter;
+  (void)localCounter; // for debugging
 #endif
   FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
                                   DC->getParentSourceFile());
