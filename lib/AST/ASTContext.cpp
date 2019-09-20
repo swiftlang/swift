@@ -100,9 +100,10 @@ using AssociativityCacheType =
                  Associativity>;
 
 #define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
-  MACRO(NSError) \
-  MACRO(NSNumber) \
-  MACRO(NSValue)
+  MACRO(NSCopying, ProtocolDecl) \
+  MACRO(NSError, ClassDecl) \
+  MACRO(NSNumber, ClassDecl) \
+  MACRO(NSValue, ClassDecl)
 
 struct OverrideSignatureKey {
   GenericSignature *baseMethodSig;
@@ -219,9 +220,9 @@ struct ASTContext::Implementation {
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
-#define CACHE_FOUNDATION_DECL(NAME) \
+#define CACHE_FOUNDATION_DECL(NAME, DECLTYPE) \
   /** The declaration of Foundation.NAME. */ \
-  ClassDecl *NAME##Decl = nullptr;
+  DECLTYPE *NAME##Decl = nullptr;
 FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #undef CACHE_FOUNDATION_DECL
 
@@ -850,18 +851,18 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
   return getImpl().ObjCBoolDecl;
 }
 
-#define GET_FOUNDATION_DECL(NAME) \
-ClassDecl *ASTContext::get##NAME##Decl() const { \
+#define GET_FOUNDATION_DECL(NAME, DECLTYPE) \
+DECLTYPE *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
     if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
       /* Note: lookupQualified() will search both the Foundation module \
        * and the Clang Foundation module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
-      if (decls.size() == 1 && isa<ClassDecl>(decls[0])) { \
-        auto classDecl = cast<ClassDecl>(decls[0]); \
-        if (classDecl->getGenericParams() == nullptr) { \
-          getImpl().NAME##Decl = classDecl; \
+      if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
+        auto decl = cast<DECLTYPE>(decls[0]); \
+        if (isa<ProtocolDecl>(decl) || decl->getGenericParams() == nullptr) { \
+          getImpl().NAME##Decl = decl; \
         } \
       } \
     } \

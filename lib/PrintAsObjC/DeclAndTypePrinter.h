@@ -56,12 +56,6 @@ private:
   /// Cached for convenience.
   Identifier ID_CFTypeRef;
 
-  /// The protocol type 'NSCopying', or a null type if Foundation has not been
-  /// imported.
-  ///
-  /// Cached for convenience.
-  Optional<Type> NSCopyingType;
-
   Implementation getImpl();
 
 public:
