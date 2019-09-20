@@ -1460,6 +1460,12 @@ public:
       AbstractionPattern origResultType,
       SGFContext C);
 
+  RValue emitApplyOfPropertyWrapperBackingInitializer(
+      SILLocation loc,
+      VarDecl *var,
+      RValue &&originalValue,
+      SGFContext C = SGFContext());
+
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
   RValue emitMonomorphicApply(SILLocation loc,

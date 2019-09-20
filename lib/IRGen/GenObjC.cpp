@@ -458,6 +458,7 @@ namespace {
       case SILDeclRef::Kind::StoredPropertyInitializer:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
+      case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:

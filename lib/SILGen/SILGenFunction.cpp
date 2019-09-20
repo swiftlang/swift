@@ -22,6 +22,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Initializer.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
@@ -127,6 +128,7 @@ DeclName SILGenModule::getMagicFunctionName(SILDeclRef ref) {
   case SILDeclRef::Kind::DefaultArgGenerator:
     return getMagicFunctionName(cast<DeclContext>(ref.getDecl()));
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return getMagicFunctionName(cast<VarDecl>(ref.getDecl())->getDeclContext());
   case SILDeclRef::Kind::IVarInitializer:
     return getMagicFunctionName(cast<ClassDecl>(ref.getDecl()));
@@ -666,6 +668,7 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
+  auto *dc = function.getDecl()->getInnermostDeclContext();
   MagicFunctionName = SILGenModule::getMagicFunctionName(function);
 
   RegularLocation Loc(value);
@@ -684,18 +687,52 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     }
   }
 
+  // For a property wrapper backing initializer, form a parameter list
+  // containing the wrapped value.
+  ParameterList *params = nullptr;
+  if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+    auto &ctx = getASTContext();
+    auto param = new (ctx) ParamDecl(ParamDecl::Specifier::Owned,
+                                     SourceLoc(), SourceLoc(),
+                                     ctx.getIdentifier("$input_value"),
+                                     SourceLoc(),
+                                     ctx.getIdentifier("$input_value"),
+                                     dc);
+    param->setInterfaceType(function.getDecl()->getInterfaceType());
+
+    params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());
+  }
+
   CaptureInfo captureInfo;
   if (function.getAnyFunctionRef())
     captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
-  auto *dc = function.getDecl()->getInnermostDeclContext();
   auto interfaceType = value->getType()->mapTypeOutOfContext();
-  emitProlog(captureInfo, /*paramList=*/nullptr, /*selfParam=*/nullptr,
+  emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
   if (EmitProfilerIncrement)
     emitProfilerIncrement(value);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
-  emitReturnExpr(Loc, value);
+
+  {
+    llvm::Optional<SILGenFunction::OpaqueValueRAII> opaqueValue;
+
+    // For a property wrapper backing initializer, bind the opaque value used
+    // in the initializer expression to the given parameter.
+    if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+      auto var = cast<VarDecl>(function.getDecl());
+      auto wrappedInfo = var->getPropertyWrapperBackingPropertyInfo();
+      auto param = params->get(0);
+      opaqueValue.emplace(*this, wrappedInfo.underlyingValue,
+                          maybeEmitValueOfLocalVarDecl(param));
+
+      assert(value == wrappedInfo.initializeFromOriginal);
+    }
+
+    emitReturnExpr(Loc, value);
+  }
+
   emitEpilog(Loc);
+  mergeCleanupBlocks();
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {

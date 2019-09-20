@@ -155,6 +155,14 @@ std::string ASTMangler::mangleInitializerEntity(const VarDecl *var,
   return finalize();
 }
 
+std::string ASTMangler::mangleBackingInitializerEntity(const VarDecl *var,
+                                                       SymbolKind SKind) {
+  beginMangling();
+  appendBackingInitializerEntity(var);
+  appendSymbolKind(SKind);
+  return finalize();
+}
+
 std::string ASTMangler::mangleNominalType(const NominalTypeDecl *decl) {
   beginMangling();
   appendAnyGenericType(decl);
@@ -2326,6 +2334,11 @@ void ASTMangler::appendDefaultArgumentEntity(const DeclContext *func,
 void ASTMangler::appendInitializerEntity(const VarDecl *var) {
   appendEntity(var, "vp", var->isStatic());
   appendOperator("fi");
+}
+
+void ASTMangler::appendBackingInitializerEntity(const VarDecl *var) {
+  appendEntity(var, "vp", var->isStatic());
+  appendOperator("fP");
 }
 
 /// Is this declaration a method for mangling purposes? If so, we'll leave the
