@@ -70,6 +70,12 @@ static llvm::cl::opt<bool>
                       llvm::cl::desc("Support function signature optimization "
                                      "of generic functions"));
 
+static llvm::cl::opt<bool>
+    FSOOptimizeIfNotCalled("sil-fso-optimize-if-not-called",
+                           llvm::cl::init(false),
+                           llvm::cl::desc("Optimize even if a function isn't "
+                                          "called. For testing only!"));
+
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
   switch (Rep) {
@@ -631,6 +637,9 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
     LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
     return false;
   }
+
+  // If we are asked to assume a caller for testing purposes, set the flag.
+  hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
