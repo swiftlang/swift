@@ -1514,3 +1514,11 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
     NewNodes.clear();
   }
 }
+
+void ProjectionTree::getUsers(SmallPtrSetImpl<SILInstruction *> &users) const {
+  for (auto *node : ProjectionTreeNodes) {
+    for (auto *op : node->getNonProjUsers()) {
+      users.insert(op->getUser());
+    }
+  }
+}

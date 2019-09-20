@@ -757,9 +757,9 @@ public:
 
   llvm::Optional<Projection> &getProjection() { return Proj; }
 
-  llvm::SmallVector<Operand *, 4> getNonProjUsers() const {
-    return NonProjUsers;
-  };
+  const ArrayRef<Operand *> getNonProjUsers() const {
+    return llvm::makeArrayRef(NonProjUsers);
+  }
 
   bool isLeaf() const { return ChildProjections.empty(); }
 
@@ -960,7 +960,9 @@ public:
   void
   replaceValueUsesWithLeafUses(SILBuilder &B, SILLocation Loc,
                                llvm::SmallVectorImpl<SILValue> &Leafs);
- 
+
+  void getUsers(SmallPtrSetImpl<SILInstruction *> &users) const;
+
 private:
   void createRoot(SILType BaseTy) {
     assert(ProjectionTreeNodes.empty() &&
