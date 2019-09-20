@@ -134,7 +134,7 @@ extension UnsafeMutableRawPointer {
       _atomicStoreWord(desired)
     case .acquiring, .acquiringAndReleasing:
       _preconditionFailure("invalid memory ordering for atomic store")
-    @unknown default:
+    default:
       _atomicStoreWord(desired)
     }
   }
@@ -169,7 +169,7 @@ extension UnsafeMutableRawPointer {
       return _atomicCompareExchangeWord(
         expected: &expected,
         desired: desired)
-    @unknown default:
+    default:
       return _atomicCompareExchangeWord(
         expected: &expected,
         desired: desired)
@@ -197,7 +197,7 @@ extension UnsafeMutableRawPointer {
       return _atomicAcquiringAndReleasingFetchThen${swiftName}Word(operand)
     case .sequentiallyConsistent:
       return _atomicFetchThen${swiftName}Word(operand)
-    @unknown default:
+    default:
       return _atomicFetchThen${swiftName}Word(operand)
     }
   }

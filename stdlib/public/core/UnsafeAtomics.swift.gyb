@@ -25,31 +25,96 @@
   ]
 }%
 
-// NOT @frozen
+@frozen
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
-public enum AtomicMemoryOrdering {
+public struct AtomicMemoryOrdering {
+  // This struct works like a non-frozen enum whose cases aren't reorderable.
+
+  @usableFromInline
+  internal var _rawValue: Int
+
+  @inlinable @_transparent // Debug performance
+  internal init(_rawValue: Int) {
+    self._rawValue = _rawValue
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicMemoryOrdering {
   // FIXME: Explain these ordering levels in more detail.
 
   /// Guarantees the atomicity of the specific operation on which it is applied,
   /// but imposes no ordering constraints on any other reads or writes.
-  case relaxed
+  @_transparent // Debug performance
+  public static var relaxed: AtomicMemoryOrdering {
+    AtomicMemoryOrdering(_rawValue: 0)
+  }
+
   /// An acquiring load prevents the effects of subsequent load and store
   /// operations on the current thread from appearing to happen before the
   /// effect of the atomic operation itself.
-  case acquiring
+  @_transparent // Debug performance
+  public static var acquiring: AtomicMemoryOrdering {
+    AtomicMemoryOrdering(_rawValue: 1)
+  }
+
   /// A releasing store prevents the effects of previous load and store
   /// operations on the current thread from appearing to happen after the effect
   /// of the atomic operation itself.
-  case releasing
+  @_transparent // Debug performance
+  public static var releasing: AtomicMemoryOrdering {
+    AtomicMemoryOrdering(_rawValue: 2)
+  }
+
   /// An acquiring-and-releasing operation is a combination of `.acquiring` and
   /// `.releasing`; it prevents all neighboring load and store operations on the
   /// current thread from appearing to happen in a different order in relation
   /// to the atomic operation.
-  case acquiringAndReleasing
+  @_transparent // Debug performance
+  public static var acquiringAndReleasing: AtomicMemoryOrdering {
+    AtomicMemoryOrdering(_rawValue: 3)
+  }
+
   /// In addition to ensuring the same constraints as `acquiringAndReleasing`,
   /// this ordering level also establishes a single total modification ordering
   /// of all atomic operations that have this ordering level.
-  case sequentiallyConsistent // Default, strongest
+  @_transparent // Debug performance
+  public static var sequentiallyConsistent: AtomicMemoryOrdering {
+    AtomicMemoryOrdering(_rawValue: 4)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicMemoryOrdering: Equatable {
+  @_transparent // Debug performance
+  public static func ==(
+    left: AtomicMemoryOrdering,
+    right: AtomicMemoryOrdering
+  ) -> Bool {
+    return left._rawValue == right._rawValue
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicMemoryOrdering: Hashable {
+  @inlinable
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_rawValue)
+  }
+}
+
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension AtomicMemoryOrdering: CustomStringConvertible {
+  public var description: String {
+    switch self {
+    case .relaxed: return "relaxed"
+    case .acquiring: return "acquiring"
+    case .releasing: return "releasing"
+    case .acquiringAndReleasing: return "acquiringAndReleasing"
+    case .sequentiallyConsistent: return "sequentiallyConsistent"
+    default: return "AtomicMemoryOrdering(\(_rawValue))"
+    }
+  }
 }
 
 //------------------------------------------------------------------------------
