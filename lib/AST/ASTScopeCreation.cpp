@@ -774,6 +774,7 @@ void ASTSourceFileScope::addNewDeclsToScopeTree() {
   insertionPoint =
       scopeCreator->addSiblingsToScopeTree(insertionPoint, newNodes);
   numberOfDeclsAlreadySeen = SF->Decls.size();
+  recordThatIWasExpandedEvenIfNoChildrenWereAdded();
 
   // Too slow to perform all the time:
   //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
@@ -1098,6 +1099,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
                    "accurate before expansion, the insertion point before "
                    "expansion must be the same as after expansion.");
   }
+  recordThatIWasExpandedEvenIfNoChildrenWereAdded();
   beCurrent();
   ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()),
                  "Bad range.");
@@ -1743,8 +1745,10 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
   if (scopeCreator.getIsFrozen() ||
       (isCurrent() &&
-          !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup))
+       !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup)) {
+    ASTScopeAssert(wasEverExpanded(), "Cannot be current if unexpanded.");
     return false;
+  }
   reexpand(scopeCreator);
   return true;
 }
@@ -1830,40 +1834,45 @@ IterableTypeBodyPortion::insertionPointForDeferredExpansion(
   return s->getParent().get();
 }
 
+bool ASTScopeImpl::isCurrent() const {
+  return wasEverExpanded() && isCurrentIfWasExpanded();
+}
 
 void ASTScopeImpl::beCurrent() {}
-bool ASTScopeImpl::isCurrent() const { return true; }
+bool ASTScopeImpl::isCurrentIfWasExpanded() const { return true; }
 
 void IterableTypeScope::beCurrent() { portion->beCurrent(this); }
-bool IterableTypeScope::isCurrent() const { return portion->isCurrent(this); }
+bool IterableTypeScope::isCurrentIfWasExpanded() const {
+  return portion->isCurrentIfWasExpanded(this);
+}
 
 void GenericTypeOrExtensionWholePortion::beCurrent(IterableTypeScope *s) const {
   s->makeWholeCurrent();
 }
-bool GenericTypeOrExtensionWholePortion::isCurrent(
+bool GenericTypeOrExtensionWholePortion::isCurrentIfWasExpanded(
     const IterableTypeScope *s) const {
   return s->isWholeCurrent();
 }
 void GenericTypeOrExtensionWherePortion::beCurrent(IterableTypeScope *) const {}
-bool GenericTypeOrExtensionWherePortion::isCurrent(
+bool GenericTypeOrExtensionWherePortion::isCurrentIfWasExpanded(
     const IterableTypeScope *) const {
   return true;
 }
 void IterableTypeBodyPortion::beCurrent(IterableTypeScope *s) const {
   s->makeBodyCurrent();
 }
-bool IterableTypeBodyPortion::isCurrent(const IterableTypeScope *s) const {
+bool IterableTypeBodyPortion::isCurrentIfWasExpanded(
+    const IterableTypeScope *s) const {
   return s->isBodyCurrent();
 }
 
 void IterableTypeScope::makeWholeCurrent() {
-  ASTScopeAssert(!shouldHaveABody() || !getChildren().empty(),
-                 "Should have been expanded");
+  ASTScopeAssert(wasEverExpanded(), "Should have been expanded");
 }
 bool IterableTypeScope::isWholeCurrent() const {
   // Whole starts out unexpanded, and is lazily built but will have at least a
   // body scope child
-  return !getChildren().empty();
+  return wasEverExpanded();
 }
 void IterableTypeScope::makeBodyCurrent() {
   memberCount = getIterableDeclContext().get()->getMemberCount();
@@ -1875,12 +1884,12 @@ bool IterableTypeScope::isBodyCurrent() const {
 void AbstractFunctionBodyScope::beCurrent() {
   bodyWhenLastExpanded = decl->getBody(false);
 }
-bool AbstractFunctionBodyScope::isCurrent() const {
+bool AbstractFunctionBodyScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == decl->getBody(false);
 }
 
 void TopLevelCodeScope::beCurrent() { bodyWhenLastExpanded = decl->getBody(); }
-bool TopLevelCodeScope::isCurrent() const {
+bool TopLevelCodeScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == decl->getBody();
 }
 
@@ -1899,7 +1908,7 @@ void PatternEntryDeclScope::beCurrent() {
     return;
   varCountWhenLastExpanded = countVars(getPatternEntry());
 }
-bool PatternEntryDeclScope::isCurrent() const {
+bool PatternEntryDeclScope::isCurrentIfWasExpanded() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
     return false;
   if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
@@ -1913,7 +1922,7 @@ bool PatternEntryDeclScope::isCurrent() const {
 void WholeClosureScope::beCurrent() {
   bodyWhenLastExpanded = closureExpr->getBody();
 }
-bool WholeClosureScope::isCurrent() const {
+bool WholeClosureScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == closureExpr->getBody();
 }
 
@@ -1933,9 +1942,12 @@ NullablePtr<ASTScopeImpl> TopLevelCodeScope::getParentOfRescuedScopes() {
 
 #pragma mark rescuing & reusing
 std::vector<ASTScopeImpl *> ASTScopeImpl::rescueScopesToReuse() {
+  // If I was never expanded, then there won't be any rescuable scopes.
+  if (!wasEverExpanded())
+    return {};
   if (auto *p = getParentOfRescuedScopes().getPtrOrNull()) {
     return p->rescueYoungestChildren(p->getChildren().size() -
-                                     p->childrenCountWhenLastExpanded);
+                                     p->getChildrenCountWhenLastExpanded());
   }
   return {};
 }
@@ -1967,8 +1979,18 @@ ASTScopeImpl::rescueYoungestChildren(const unsigned int count) {
   return youngestChildren;
 }
 
+unsigned ASTScopeImpl::getChildrenCountWhenLastExpanded() const {
+  ASTScopeAssert(wasEverExpanded(), "meaningless");
+  return childrenCountWhenLastExpanded;
+}
+bool ASTScopeImpl::wasEverExpanded() const {
+  return childrenCountWhenLastExpanded != childrenCountBeforeExpansion;
+}
 void ASTScopeImpl::setChildrenCountWhenLastExpanded() {
   childrenCountWhenLastExpanded = getChildren().size();
+}
+void ASTScopeImpl::recordThatIWasExpandedEvenIfNoChildrenWereAdded() {
+  setChildrenCountWhenLastExpanded();
 }
 
 bool AbstractFunctionDeclScope::shouldCreateAccessorScope(

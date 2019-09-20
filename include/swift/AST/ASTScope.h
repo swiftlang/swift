@@ -138,7 +138,10 @@ private:
   /// Because expansion returns an insertion point,
   /// if a scope is reexpanded, the children added NOT by expansion must be
   /// rescued and reused.
-  unsigned childrenCountWhenLastExpanded = 0;
+  /// It's good to know if it was ever expanded, so initialize to an impossible
+  /// value.
+  const unsigned childrenCountBeforeExpansion = ~0;
+  unsigned childrenCountWhenLastExpanded = childrenCountBeforeExpansion;
 
   /// Can clear storedChildren, so must remember this
   bool haveAddedCleanup = false;
@@ -327,10 +330,16 @@ public:
   /// Return the scope into which to place subsequent decls
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
+  unsigned getChildrenCountWhenLastExpanded() const;
+  bool wasEverExpanded() const;
+
 protected:
+  void setChildrenCountWhenLastExpanded();
+  void recordThatIWasExpandedEvenIfNoChildrenWereAdded();
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
   virtual void beCurrent();
-  virtual bool isCurrent() const;
+  bool isCurrent() const;
+  virtual bool isCurrentIfWasExpanded() const;
 
 private:
   /// Compare the pre-expasion range with the post-expansion range and return
@@ -370,9 +379,6 @@ private:
   void reexpand(ScopeCreator &);
 
   virtual ScopeCreator &getScopeCreator();
-
-protected:
-  void setChildrenCountWhenLastExpanded();
 
 #pragma mark - - creation queries
 public:
@@ -591,7 +597,7 @@ public:
   getReferrentOfScope(const GenericTypeOrExtensionScope *s) const;
 
   virtual void beCurrent(IterableTypeScope *) const = 0;
-  virtual bool isCurrent(const IterableTypeScope *) const = 0;
+  virtual bool isCurrentIfWasExpanded(const IterableTypeScope *) const = 0;
   virtual NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const = 0;
   virtual SourceRange
@@ -628,7 +634,7 @@ public:
     /// lazy, might as well do it for all \c IterableTypeScopes.
 
     void beCurrent(IterableTypeScope *) const override;
-    bool isCurrent(const IterableTypeScope *) const override;
+    bool isCurrentIfWasExpanded(const IterableTypeScope *) const override;
 
     NullablePtr<ASTScopeImpl>
     insertionPointForDeferredExpansion(IterableTypeScope *) const override;
@@ -674,7 +680,7 @@ public:
                                         bool omitAssertions) const override;
 
   void beCurrent(IterableTypeScope *) const override;
-  bool isCurrent(const IterableTypeScope *) const override;
+  bool isCurrentIfWasExpanded(const IterableTypeScope *) const override;
 
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
@@ -696,7 +702,7 @@ public:
                                         bool omitAssertions) const override;
 
   void beCurrent(IterableTypeScope *) const override;
-  bool isCurrent(const IterableTypeScope *) const override;
+  bool isCurrentIfWasExpanded(const IterableTypeScope *) const override;
   NullablePtr<ASTScopeImpl>
   insertionPointForDeferredExpansion(IterableTypeScope *) const override;
   SourceRange
@@ -807,7 +813,7 @@ public:
 
 protected:
   void beCurrent() override;
-  bool isCurrent() const override;
+  bool isCurrentIfWasExpanded() const override;
 
 public:
   void makeWholeCurrent();
@@ -1041,7 +1047,7 @@ public:
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
   void beCurrent() override;
-  bool isCurrent() const override;
+  bool isCurrentIfWasExpanded() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -1217,7 +1223,7 @@ public:
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
   void beCurrent() override;
-  bool isCurrent() const override;
+  bool isCurrentIfWasExpanded() const override;
 
 private:
   AnnotatedInsertionPoint
@@ -1391,7 +1397,7 @@ public:
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
   void beCurrent() override;
-  bool isCurrent() const override;
+  bool isCurrentIfWasExpanded() const override;
 
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
@@ -1462,7 +1468,7 @@ public:
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
   void beCurrent() override;
-  bool isCurrent() const override;
+  bool isCurrentIfWasExpanded() const override;
 
 private:
   AnnotatedInsertionPoint
