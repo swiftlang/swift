@@ -2753,78 +2753,107 @@ bool RefactoringActionLocalizeString::performChange() {
   return false;
 }
 
+struct MemberwiseParameter {
+  Identifier Name;
+  Type MemberType;
+  Expr *DefaultExpr;
+
+  MemberwiseParameter(Identifier name, Type type, Expr *initialExpr)
+    : Name(name), MemberType(type), DefaultExpr(initialExpr) {}
+};
+
 static void generateMemberwiseInit(SourceEditConsumer &EditConsumer,
-                            SourceManager &SM,
-                            SmallVectorImpl<std::string>& memberNameVector,
-                            SmallVectorImpl<std::string>& memberTypeVector,
-                            SourceLoc targetLocation) {
+                                   SourceManager &SM,
+                                   ArrayRef<MemberwiseParameter> memberVector,
+                                   SourceLoc targetLocation) {
   
-  assert(!memberTypeVector.empty());
-  assert(memberTypeVector.size() == memberNameVector.size());
-  
+  assert(!memberVector.empty());
+
   EditConsumer.accept(SM, targetLocation, "\ninternal init(");
-  
-  for (size_t i = 0, n = memberTypeVector.size(); i < n ; i++) {
-    EditConsumer.accept(SM, targetLocation, memberNameVector[i] + ": " +
-                        memberTypeVector[i]);
-    
-    if (i != memberTypeVector.size() - 1) {
-      EditConsumer.accept(SM, targetLocation, ", ");
+  auto insertMember = [&SM](const MemberwiseParameter &memberData,
+                            llvm::raw_ostream &OS, bool wantsSeparator) {
+    OS << memberData.Name << ": " << memberData.MemberType.getString();
+    if (auto *expr = memberData.DefaultExpr) {
+      if (isa<NilLiteralExpr>(expr)) {
+        OS << " = nil";
+      } else if (expr->getSourceRange().isValid()) {
+        auto range =
+          Lexer::getCharSourceRangeFromSourceRange(
+            SM, expr->getSourceRange());
+        OS << " = " << SM.extractText(range);
+      }
     }
+
+    if (wantsSeparator) {
+      OS << ", ";
+    }
+  };
+
+  // Process the initial list of members, inserting commas as appropriate.
+  std::string Buffer;
+  llvm::raw_string_ostream OS(Buffer);
+  for (const auto &memberData : memberVector.drop_back()) {
+    insertMember(memberData, OS, /*wantsSeparator*/ true);
   }
-  
-  EditConsumer.accept(SM, targetLocation, ") {\n");
-  
-  for (auto varName: memberNameVector) {
-    EditConsumer.accept(SM, targetLocation,
-                        "self." + varName + " = " + varName + "\n");
+
+  // Process the last (or perhaps, only) member.
+  insertMember(memberVector.back(), OS, /*wantsSeparator*/ false);
+
+  // Synthesize the body.
+  OS << ") {\n";
+  for (auto &member : memberVector) {
+    // self.<property> = <property>
+    OS << "self." << member.Name << " = " << member.Name << "\n";
   }
-  
-  EditConsumer.accept(SM, targetLocation, "}\n");
+  OS << "}\n";
+
+  // Accept the entire edit.
+  EditConsumer.accept(SM, targetLocation, OS.str());
 }
-  
-static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
-                           SmallVectorImpl<std::string>& memberNameVector,
-                           SmallVectorImpl<std::string>& memberTypeVector) {
-  
+
+static SourceLoc
+collectMembersForInit(ResolvedCursorInfo CursorInfo,
+                      SmallVectorImpl<MemberwiseParameter> &memberVector) {
+
   if (!CursorInfo.ValueD)
     return SourceLoc();
   
-  ClassDecl *classDecl = dyn_cast<ClassDecl>(CursorInfo.ValueD);
-  if (!classDecl || classDecl->getStoredProperties().empty() ||
+  NominalTypeDecl *nominalDecl = dyn_cast<NominalTypeDecl>(CursorInfo.ValueD);
+  if (!nominalDecl || nominalDecl->getStoredProperties().empty() ||
       CursorInfo.IsRef) {
     return SourceLoc();
   }
-  
-  SourceLoc bracesStart = classDecl->getBraces().Start;
+
+  SourceLoc bracesStart = nominalDecl->getBraces().Start;
   if (!bracesStart.isValid())
     return SourceLoc();
   
   SourceLoc targetLocation = bracesStart.getAdvancedLoc(1);
   if (!targetLocation.isValid())
     return SourceLoc();
-  
-  for (auto varDecl : classDecl->getStoredProperties()) {
-    auto parentPatternBinding = varDecl->getParentPatternBinding();
-    if (!parentPatternBinding)
+
+  for (auto varDecl : nominalDecl->getStoredProperties()) {
+    auto patternBinding = varDecl->getParentPatternBinding();
+    if (!patternBinding)
       continue;
-    
-    auto varDeclIndex =
-      parentPatternBinding->getPatternEntryIndexForVarDecl(varDecl);
-    
-    if (auto init = varDecl->getParentPatternBinding()->getInit(varDeclIndex)) {
-      if (init->getStartLoc().isValid())
-        continue;
+
+    if (!varDecl->isMemberwiseInitialized(/*preferDeclaredProperties=*/true)) {
+      continue;
     }
-    
-    StringRef memberName = varDecl->getName().str();
-    memberNameVector.push_back(memberName.str());
-    
-    std::string memberType = varDecl->getType().getString();
-    memberTypeVector.push_back(memberType);
+
+    auto &entry = patternBinding->getPatternEntryForVarDecl(varDecl);
+    bool isExplicitlyInitialized =
+      entry.isInitialized() && entry.getEqualLoc().isValid();
+    Expr *defaultInit = nullptr;
+    if (isExplicitlyInitialized || patternBinding->isDefaultInitializable()) {
+      defaultInit = varDecl->getParentInitializer();
+    }
+
+    memberVector.emplace_back(varDecl->getName(),
+                              varDecl->getType(), defaultInit);
   }
   
-  if (memberNameVector.empty() || memberTypeVector.empty()) {
+  if (memberVector.empty()) {
     return SourceLoc();
   }
   
@@ -2834,25 +2863,18 @@ static SourceLoc collectMembersForInit(ResolvedCursorInfo CursorInfo,
 bool RefactoringActionMemberwiseInitLocalRefactoring::
 isApplicable(ResolvedCursorInfo Tok, DiagnosticEngine &Diag) {
   
-  SmallVector<std::string, 8> memberNameVector;
-  SmallVector<std::string, 8> memberTypeVector;
-  
-  return collectMembersForInit(Tok, memberNameVector,
-                               memberTypeVector).isValid();
+  SmallVector<MemberwiseParameter, 8> memberVector;
+  return collectMembersForInit(Tok, memberVector).isValid();
 }
     
 bool RefactoringActionMemberwiseInitLocalRefactoring::performChange() {
   
-  SmallVector<std::string, 8> memberNameVector;
-  SmallVector<std::string, 8> memberTypeVector;
-  
-  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberNameVector,
-                                         memberTypeVector);
+  SmallVector<MemberwiseParameter, 8> memberVector;
+  SourceLoc targetLocation = collectMembersForInit(CursorInfo, memberVector);
   if (targetLocation.isInvalid())
     return true;
   
-  generateMemberwiseInit(EditConsumer, SM, memberNameVector,
-                         memberTypeVector, targetLocation);
+  generateMemberwiseInit(EditConsumer, SM, memberVector, targetLocation);
   
   return false;
 }
