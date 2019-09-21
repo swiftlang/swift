@@ -304,15 +304,17 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         switch (Kind) {
-        case RequirementKind::Conformance:
-          // FIXME: This could be more accurate; check
-          // conformance instead of subtyping
-          if (!isConvertibleTo(First, Second, /*openArchetypes=*/true, *DC))
+        case RequirementKind::Conformance: {
+          auto *M = DC->getParentModule();
+          auto *Proto = Second->castTo<ProtocolType>()->getDecl();
+          if (!First->isTypeParameter() &&
+              !First->is<ArchetypeType>() &&
+              !M->conformsToProtocol(First, Proto))
             return true;
-          else if (!isConvertibleTo(First, Second, /*openArchetypes=*/false,
-                                    *DC))
+          if (!M->conformsToProtocol(First, Proto))
             MergeInfo.addRequirement(GenericSig, First, Second, Kind);
           break;
+        }
 
         case RequirementKind::Superclass:
           if (!Second->isBindableToSuperclassOf(First)) {

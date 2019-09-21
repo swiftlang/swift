@@ -3445,15 +3445,6 @@ Type TypeChecker::substMemberTypeWithBase(ModuleDecl *module,
           aliasDecl, baseTy,
           aliasDecl->getASTContext());
     }
-
-    // FIXME: If this is a protocol typealias and we haven't built the
-    // protocol's generic environment yet, do so now, to ensure the
-    // typealias's underlying type has fully resolved dependent
-    // member types.
-    if (auto *protoDecl = dyn_cast<ProtocolDecl>(aliasDecl->getDeclContext())) {
-      ASTContext &ctx = protoDecl->getASTContext();
-      ctx.getLazyResolver()->resolveProtocolEnvironment(protoDecl);
-    }
   }
 
   Type resultType;

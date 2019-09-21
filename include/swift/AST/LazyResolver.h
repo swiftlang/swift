@@ -60,9 +60,6 @@ public:
   /// consistency and provides the value a type.
   virtual void resolveDeclSignature(ValueDecl *VD) = 0;
 
-  /// Resolve the generic environment of the given protocol.
-  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) = 0;
-
   /// Resolve the type of an extension.
   ///
   /// This can be called to ensure that the members of an extension can be

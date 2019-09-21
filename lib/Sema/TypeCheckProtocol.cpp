@@ -3405,6 +3405,8 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
+  // FIXME: This is incorrect; depTy is written in terms of the protocol's
+  // associated types, and we need to substitute in known type witnesses.
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
