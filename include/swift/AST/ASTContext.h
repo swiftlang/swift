@@ -460,6 +460,8 @@ public:
   /// Retrieve the declaration of ObjectiveC.ObjCBool.
   StructDecl *getObjCBoolDecl() const;
 
+  /// Retrieve the declaration of Foundation.NSCopying.
+  ProtocolDecl *getNSCopyingDecl() const;
   /// Retrieve the declaration of Foundation.NSError.
   ClassDecl *getNSErrorDecl() const;
   /// Retrieve the declaration of Foundation.NSNumber.

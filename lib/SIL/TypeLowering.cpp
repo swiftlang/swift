@@ -2310,15 +2310,12 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   }
 
   // Cache the uniqued set of transitive captures.
-  auto inserted = LoweredCaptures.insert({fn, CaptureInfo()});
+  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
+                   capturesOpaqueValue, capturesGenericParams};
+  auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
-  auto &cachedCaptures = inserted.first->second;
-  cachedCaptures.setGenericParamCaptures(capturesGenericParams);
-  cachedCaptures.setDynamicSelfType(capturesDynamicSelf);
-  cachedCaptures.setOpaqueValue(capturesOpaqueValue);
-  cachedCaptures.setCaptures(Context.AllocateCopy(resultingCaptures));
-  
-  return cachedCaptures;
+  (void)inserted;
+  return info;
 }
 
 /// Given that type1 is known to be a subtype of type2, check if the two

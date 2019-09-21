@@ -178,19 +178,18 @@ enum class ImportTypeKind {
   Enum
 };
 
-/// Controls whether a typedef for \p type should name the fully-bridged Swift
-/// type or the original Clang type.
+/// Controls whether \p decl, when imported, should name the fully-bridged
+/// Swift type or the original Clang type.
 ///
 /// In either case we end up losing sugar at some uses sites, so this is more
 /// about what the right default is.
-static inline Bridgeability getTypedefBridgeability(
-                                          const clang::TypedefNameDecl *decl,
-                                          clang::QualType type) {
-    return decl->hasAttr<clang::SwiftBridgedTypedefAttr>()
-      ? Bridgeability::Full
-        : type->isBlockPointerType()
-        ? Bridgeability::Full
-          : Bridgeability::None;
+static inline Bridgeability
+getTypedefBridgeability(const clang::TypedefNameDecl *decl) {
+  if (decl->hasAttr<clang::SwiftBridgedTypedefAttr>() ||
+      decl->getUnderlyingType()->isBlockPointerType()) {
+    return Bridgeability::Full;
+  }
+  return Bridgeability::None;
 }
 
 /// Describes the kind of the C type that can be mapped to a stdlib
@@ -942,9 +941,6 @@ public:
 
   /// Retrieve the NSObject protocol type.
   Type getNSObjectProtocolType();
-
-  /// Retrieve the NSCopying protocol type.
-  Type getNSCopyingType();
 
   /// Determines whether the given type matches an implicit type
   /// bound of "Hashable", which is used to validate NSDictionary/NSSet.
