@@ -598,6 +598,12 @@ bool PolymorphicBuiltinSpecializedOverloadInfo::init(
 
   auto &ctx = fn->getASTContext();
   staticOverloadIdentifier = ctx.getIdentifier(staticOverloadName);
+
+  // Ok, we have our overload identifier. Grab the builtin info from the
+  // cache. If we did not actually found a valid builtin value kind for our
+  // overload, then we do not have a static overload for the passed in types, so
+  // return false.
+  builtinInfo = &fn->getModule().getBuiltinInfo(staticOverloadIdentifier);
   return true;
 }
 
