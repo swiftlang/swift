@@ -859,6 +859,11 @@ GenericParamList *GenericContext::getGenericParams() const {
 bool GenericContext::hasComputedGenericSignature() const {
   return GenericSigAndBit.getInt();
 }
+      
+bool GenericContext::isComputingGenericSignature() const {
+  return getASTContext().evaluator.hasActiveRequest(
+                 GenericSignatureRequest{const_cast<GenericContext*>(this)});
+}
 
 GenericSignature *GenericContext::getGenericSignature() const {
   return evaluateOrDefault(

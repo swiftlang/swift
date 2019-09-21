@@ -531,7 +531,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     assert(CRState == ConditionalRequirementsState::Computing);
     CRState = ConditionalRequirementsState::Uncomputed;
   };
-
+  
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();
   // A non-extension conformance won't have conditional requirements.
@@ -550,30 +550,24 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  // The type is generic, but the extension doesn't have a signature yet, so
-  // we might be in a recursive validation situation.
-  if (!ext->hasComputedGenericSignature()) {
-    // If the extension is invalid, it won't ever get a signature, so we
-    // "succeed" with an empty result instead.
-    if (ext->isInvalid()) {
-      success({});
-      return;
-    }
+  // If the extension is invalid, it won't ever get a signature, so we
+  // "succeed" with an empty result instead.
+  if (ext->isInvalid()) {
+    success({});
+    return;
+  }
 
-    // Otherwise we'll try again later.
+  // Recursively validating the signature comes up frequently as expanding
+  // conformance requirements might re-enter this method.  We can at least catch
+  // this and come back to these requirements later.
+  //
+  // FIXME: In the long run, break this cycle in a more principled way.
+  if (ext->isComputingGenericSignature()) {
     failure();
     return;
   }
-  
-  // FIXME: All of this will be removed when validateExtension goes away.
-  auto extensionSig = ext->getGenericSignature();
-  if (!extensionSig) {
-    if (auto lazyResolver = ctxt.getLazyResolver()) {
-      lazyResolver->resolveExtension(ext);
-      extensionSig = ext->getGenericSignature();
-    }
-  }
 
+  auto extensionSig = ext->getGenericSignature();
   auto canExtensionSig = extensionSig->getCanonicalSignature();
   auto canTypeSig = typeSig->getCanonicalSignature();
   if (canTypeSig == canExtensionSig) {
