@@ -3803,6 +3803,8 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
 // SWIFT_ENABLE_TENSORFLOW
 /// Adapted from `SILGenModule::getOrCreateReabstractionThunk`.
 /// TODO: Dedupe with `getOrCreateReabstractionThunk` in Differentiation.cpp.
+/// TODO: Consider better reabstraction mechanism.
+/// TODO: Enable ownership for reabstraction thunks.
 ManagedValue
 SILGenFunction::getThunkedAutoDiffAssociatedFunction(
     ManagedValue fn, CanSILFunctionType fromType, CanSILFunctionType toType) {

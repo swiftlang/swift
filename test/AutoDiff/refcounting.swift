@@ -56,29 +56,20 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK: bb0([[PB_RESULT:%.*]] : $*Vector, [[SEED:%.*]] : $*Vector, [[PB_STRUCT:%.*]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0):
 // CHECK:   [[LOCAL_BUF0:%.*]] = alloc_stack $Vector
 // CHECK:   [[LOCAL_BUF1:%.*]] = alloc_stack $Vector
-// CHECK:   [[SEED_LOAD:%.*]] = load [[SEED]]
-// CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
 // CHECK:   [[LOCAL_BUF2:%.*]] = alloc_stack $Vector
-// CHECK:   [[NEEDED_COTAN0:%.*]] = apply [[PB0]]([[SEED_LOAD]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
-// CHECK-NOT:  release_value [[NEEDED_COTAN0]] : $Vector
-// CHECK:   store [[NEEDED_COTAN0]] to [[LOCAL_BUF2]]
-// CHECK:   [[ADD_EQUALS_FN:%.*]] = function_ref @$ss18AdditiveArithmeticPsE2peoiyyxz_xtFZ
-// CHECK:   {{%.*}} = apply [[ADD_EQUALS_FN]]<Vector>([[LOCAL_BUF1]], [[LOCAL_BUF2]], {{%.*}})
-// CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
+// CHECK:   [[PB0:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_0
+// CHECK:   [[PB1:%.*]] = struct_extract [[PB_STRUCT]] : ${{.*}}subset_pullback_releases_unused_ones{{.*}}, #{{.*}}subset_pullback_releases_unused_ones{{.*}}__PB__src_0_wrt_0.pullback_1
 // CHECK:   [[LOCAL_BUF3:%.*]] = alloc_stack $Vector
-// CHECK:   [[NEEDED_COTAN0_LOAD:%.*]] = load [[LOCAL_BUF1]]
-// CHECK:   [[NEEDED_COTAN1:%.*]] = apply [[PB1]]([[NEEDED_COTAN0_LOAD]]) : $@callee_guaranteed (@guaranteed Vector) -> @owned Vector
-// CHECK:   store [[NEEDED_COTAN1]] to [[LOCAL_BUF3]]
 // CHECK:   destroy_addr [[LOCAL_BUF3]] : $*Vector
 // CHECK:   dealloc_stack [[LOCAL_BUF3]] : $*Vector
-// CHECK:   copy_addr [take] [[LOCAL_BUF0]] to [initialization] [[PB_RESULT]]
+// CHECK:   [[LOCAL_BUF4:%.*]] = alloc_stack $Vector
+// CHECK:   destroy_addr [[LOCAL_BUF4]] : $*Vector
+// CHECK:   dealloc_stack [[LOCAL_BUF4]] : $*Vector
+// CHECK:   destroy_addr [[LOCAL_BUF2]] : $*Vector
+// CHECK:   dealloc_stack [[LOCAL_BUF2]] : $*Vector
 // CHECK:   destroy_addr [[LOCAL_BUF1]] : $*Vector
 // CHECK:   dealloc_stack [[LOCAL_BUF1]] : $*Vector
-
-// HECK:   retain_value [[NEEDED_COTAN1]] : $Vector
-// HECK:   release_value [[NEEDED_COTAN0]] : $Vector
-// HECK:   release_value [[NEEDED_COTAN1]] : $Vector
-// HECK:   return [[NEEDED_COTAN1]] : $Vector
+// CHECK:   dealloc_stack [[LOCAL_BUF0]] : $*Vector
 
 // TODO: Update this SIL test after ad-all-indirect patch.
 // Matching buffers is difficult because many local buffers are allocated.

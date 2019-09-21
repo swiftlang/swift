@@ -381,23 +381,14 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
   } else if (isLargeLoadableType(env, storageType, IGM)) {
     if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
       return SILParameterInfo(storageType.getASTType(),
-      // SWIFT_ENABLE_TENSORFLOW
-                               ParameterConvention::Indirect_In_Guaranteed,
-                              param.getDifferentiability());
-      // SWIFT_ENABLE_TENSORFLOW_END
+                             ParameterConvention::Indirect_In_Guaranteed);
     else
       return SILParameterInfo(storageType.getASTType(),
-      // SWIFT_ENABLE_TENSORFLOW
-                               ParameterConvention::Indirect_In_Constant,
-                              param.getDifferentiability());
-      // SWIFT_ENABLE_TENSORFLOW_END
+                             ParameterConvention::Indirect_In_Constant);
   } else {
     auto newType = getNewSILType(env, storageType, IGM);
     return SILParameterInfo(newType.getASTType(),
-      // SWIFT_ENABLE_TENSORFLOW
-                            param.getConvention(),
-                            param.getDifferentiability());
-      // SWIFT_ENABLE_TENSORFLOW_END
+                            param.getConvention());
   }
 }
 
@@ -2911,12 +2902,6 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
-        // SWIFT_ENABLE_TENSORFLOW
-        } else if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(&I)) {
-          conversionInstrs.insert(ADFI);
-        } else if (auto *ADFEI = dyn_cast<AutoDiffFunctionExtractInst>(&I)) {
-          conversionInstrs.insert(ADFEI);
-        // SWIFT_ENABLE_TENSORFLOW END
         }
       }
     }

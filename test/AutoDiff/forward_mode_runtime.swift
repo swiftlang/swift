@@ -233,24 +233,24 @@ ForwardModeTests.test("TrackedDivision") {
 }
 
 ForwardModeTests.test("TrackedMultipleMultiplication") {
-  func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
+  func multiply(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     return x * y * x
   }
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: add)
+  let (y, differential) = valueWithDifferential(at: 4, 5, in: multiply)
   expectEqual(80, y)
   // 2yx+xx
   expectEqual(56, differential(1, 1))
 }
 
 ForwardModeTests.test("TrackedWithLets") {
-  func add(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
+  func foo(x: Tracked<Float>, y: Tracked<Float>) -> Tracked<Float> {
     let a = x + y
     let b = a * a // (x+y)^2
     let c = b / x + y // (x+y)^2/x+y
     return c
   }
   // (3x^2+2xy-y^2)/x^2+1
-  let (y, differential) = valueWithDifferential(at: 4, 5, in: add)
+  let (y, differential) = valueWithDifferential(at: 4, 5, in: foo)
   expectEqual(25.25, y)
   expectEqual(4.9375, differential(1, 1))
 }
@@ -259,33 +259,44 @@ ForwardModeTests.test("TrackedWithLets") {
 // Tuples
 //===----------------------------------------------------------------------===//
 
-ForwardModeTests.test("SimpleTupleExtractLet") {
-  func foo(_ x: Float) -> Float {
-    let tuple = (2*x, x)
+ForwardModeTests.test("TupleExtract") {
+  func tuple_extract(_ x: Float) -> Float {
+    let tuple = (2 * x, x)
     return tuple.0
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: foo)
+  let (y, differential) = valueWithDifferential(at: 4, in: tuple_extract)
   expectEqual(8, y)
   expectEqual(2, differential(1))
 }
 
-ForwardModeTests.test("SimpleTupleExtractVar") {
-  func foo(_ x: Float) -> Float {
-    let tuple = (2*x, x)
+ForwardModeTests.test("TupleElementAddr") {
+  func tuple_element_addr(_ x: Float) -> Float {
+    var tuple = (2 * x, x)
     return tuple.0
   }
-  let (y, differential) = valueWithDifferential(at: 4, in: foo)
+  let (y, differential) = valueWithDifferential(at: 4, in: tuple_element_addr)
   expectEqual(8, y)
   expectEqual(2, differential(1))
 }
 
-ForwardModeTests.test("TupleSideEffects") {
-  func foo(_ x: Float) -> Float {
+ForwardModeTests.test("DestructureTuple") {
+  func destructure_tuple(_ x: Float) -> Float {
+    let tuple = (2 * x, x)
+    let (a, b) = tuple
+    return a
+  }
+  let (y, differential) = valueWithDifferential(at: 4, in: destructure_tuple)
+  expectEqual(8, y)
+  expectEqual(2, differential(1))
+}
+
+ForwardModeTests.test("TupleMutation") {
+  func tuple_var_mutation(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x
     return x * tuple.0
   }
-  expectEqual(27, derivative(at: 3, in: foo))
+  expectEqual(27, derivative(at: 3, in: tuple_var_mutation))
 
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
@@ -592,7 +603,7 @@ ForwardModeTests.test("GenericTrackedBinaryAdd") {
 }
 
 ForwardModeTests.test("GenericTrackedBinaryLets") {
-  func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
+  func foo<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
     where T: Differentiable & SignedNumeric,
           T == T.TangentVector,
           T == T.Magnitude {
@@ -602,14 +613,14 @@ ForwardModeTests.test("GenericTrackedBinaryLets") {
   }
   // 4y + 4x
   let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
-    add(Tracked(x), Tracked(y))
+    foo(Tracked(x), Tracked(y))
   }
   expectEqual(80, y)
   expectEqual(36, differential(1, 1))
 }
 
 ForwardModeTests.test("GenericTrackedBinaryVars") {
-  func add<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
+  func foo<T>(_ x: Tracked<T>, _ y: Tracked<T>) -> Tracked<T>
     where T: Differentiable & SignedNumeric,
           T == T.TangentVector,
           T == T.Magnitude {
@@ -621,7 +632,7 @@ ForwardModeTests.test("GenericTrackedBinaryVars") {
   }
   // 4y + 4x
   let (y, differential) = valueWithDifferential(at: 4, 5) { (x: Float, y: Float) in
-    add(Tracked(x), Tracked(y))
+    foo(Tracked(x), Tracked(y))
   }
   expectEqual(80, y)
   expectEqual(36, differential(1, 1))
@@ -1058,7 +1069,7 @@ ForwardModeTests.test("CaptureGlobal") {
   expectEqual(30, derivative(at: 0, in: foo))
 }
 
-ForwardModeTests.test("SideEffects") {
+ForwardModeTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x
     a = a * x
@@ -1068,13 +1079,13 @@ ForwardModeTests.test("SideEffects") {
   expectEqual(4 * 27, derivative(at: 3, in: fourthPower))
 }
 
-ForwardModeTests.test("TupleSideEffects") {
-  func foo(_ x: Float) -> Float {
+ForwardModeTests.test("TupleMutation") {
+  func tuple_var_mutation(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x
     return x * tuple.0
   }
-  expectEqual(27, derivative(at: 3, in: foo))
+  expectEqual(27, derivative(at: 3, in: tuple_var_mutation))
 
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
@@ -1173,7 +1184,6 @@ ForwardModeTests.test("StructMemberwiseInitializer") {
     // Custom initializer with `@differentiable`.
     @differentiable
     init(x: Float) {
-      print(x)
       self.x = x
     }
   }
@@ -1209,7 +1219,7 @@ ForwardModeTests.test("StructConstantStoredProperty") {
   expectEqual(20, derivative(at: 3, in: testStructInit))
 }
 
-ForwardModeTests.test("StructSideEffects") {
+ForwardModeTests.test("StructMutation") {
   struct Point : AdditiveArithmetic, Differentiable {
     var x: Float
     var y: Float

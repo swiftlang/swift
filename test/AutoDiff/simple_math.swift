@@ -86,7 +86,7 @@ SimpleMathTests.test("GlobalDiffableFunc") {
   expectEqual(1, gradient(at: 1, in: foo_diffable))
 }
 
-SimpleMathTests.test("SideEffects") {
+SimpleMathTests.test("Mutation") {
   func fourthPower(x: Float) -> Float {
     var a = x
     a = a * x
@@ -96,13 +96,13 @@ SimpleMathTests.test("SideEffects") {
   expectEqual(4 * 27, gradient(at: 3, in: fourthPower))
 }
 
-SimpleMathTests.test("TupleSideEffects") {
-  func foo(_ x: Float) -> Float {
+SimpleMathTests.test("TupleMutation") {
+  func tuple_var_mutation(_ x: Float) -> Float {
     var tuple = (x, x)
     tuple.0 = tuple.0 * x
     return x * tuple.0
   }
-  expectEqual(27, gradient(at: 3, in: foo))
+  expectEqual(27, gradient(at: 3, in: tuple_var_mutation))
 
   func fifthPower(_ x: Float) -> Float {
     var tuple = (x, x)
@@ -208,7 +208,6 @@ SimpleMathTests.test("StructMemberwiseInitializer") {
     // Custom initializer with `@differentiable`.
     @differentiable
     init(x: Float) {
-      print(x)
       self.x = x
     }
   }
@@ -245,7 +244,7 @@ SimpleMathTests.test("StructConstantStoredProperty") {
   expectEqual(20, gradient(at: 3, in: testStructInit))
 }
 
-SimpleMathTests.test("StructSideEffects") {
+SimpleMathTests.test("StructMutation") {
   struct Point : AdditiveArithmetic, Differentiable {
     var x: Float
     var y: Float
