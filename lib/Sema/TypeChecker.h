@@ -1015,10 +1015,6 @@ public:
     validateDecl(VD);
   }
 
-  virtual void resolveProtocolEnvironment(ProtocolDecl *proto) override {
-    validateDecl(proto);
-  }
-
   virtual void resolveExtension(ExtensionDecl *ext) override {
     validateExtension(ext);
   }

@@ -160,15 +160,6 @@ namespace {
     explicit operator bool() const { return (bool) AbstractType; }
   };
 
-  static OptionalTypeKind getOptionalKind(ImportTypeKind kind,
-                                          OptionalTypeKind OptKind) {
-    // Import pointee types as true Optional.
-    if (OptKind == OTK_ImplicitlyUnwrappedOptional &&
-        kind == ImportTypeKind::Pointee)
-      return OTK_Optional;
-    return OptKind;
-  }
-
   class SwiftTypeConverter :
     public clang::TypeVisitor<SwiftTypeConverter, ImportResult>
   {
@@ -415,7 +406,7 @@ namespace {
         pointeeType = Impl.getNamedSwiftType(Impl.getStdlibModule(), "Void");
       else
         pointeeType = Impl.importTypeIgnoreIUO(
-            pointeeQualType, ImportTypeKind::Pointee, AllowNSUIntegerAsInt,
+            pointeeQualType, ImportTypeKind::Value, AllowNSUIntegerAsInt,
             Bridgeability::None);
 
       // If the pointed-to type is unrepresentable in Swift, or its C
@@ -501,7 +492,7 @@ namespace {
       // we can cheese static-offset "indexing" using .$n operations.
 
       Type elementType = Impl.importTypeIgnoreIUO(
-          type->getElementType(), ImportTypeKind::Pointee, AllowNSUIntegerAsInt,
+          type->getElementType(), ImportTypeKind::Value, AllowNSUIntegerAsInt,
           Bridgeability::None);
       if (!elementType)
         return Type();
@@ -1117,7 +1108,6 @@ static bool canBridgeTypes(ImportTypeKind importKind) {
   case ImportTypeKind::Value:
   case ImportTypeKind::Variable:
   case ImportTypeKind::AuditedVariable:
-  case ImportTypeKind::Pointee:
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
     return false;
@@ -1145,7 +1135,6 @@ static bool isCFAudited(ImportTypeKind importKind) {
   case ImportTypeKind::ObjCCollectionElement:
   case ImportTypeKind::Variable:
   case ImportTypeKind::Result:
-  case ImportTypeKind::Pointee:
   case ImportTypeKind::Enum:
   case ImportTypeKind::RecordField:
     return false;
@@ -1419,7 +1408,6 @@ static ImportedType adjustTypeForConcreteImport(
   // optional type.
   bool isIUO = false;
   if (importKind != ImportTypeKind::Typedef && canImportAsOptional(hint)) {
-    optKind = getOptionalKind(importKind, optKind);
     isIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
     if (optKind != OTK_None)
       importedType = OptionalType::get(importedType);
@@ -2065,14 +2053,11 @@ ImportedType ClangImporter::Implementation::importMethodType(
     bool paramIsIUO;
     if (kind == SpecialMethodKind::NSDictionarySubscriptGetter &&
         paramTy->isObjCIdType()) {
-      auto optKind =
-          getOptionalKind(ImportTypeKind::Parameter, optionalityOfParam);
-
       swiftParamTy = SwiftContext.getNSCopyingDecl()->getDeclaredType();
-      if (optKind != OTK_None)
+      if (optionalityOfParam != OTK_None)
         swiftParamTy = OptionalType::get(swiftParamTy);
 
-      paramIsIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
+      paramIsIUO = optionalityOfParam == OTK_ImplicitlyUnwrappedOptional;
     } else {
       ImportTypeKind importKind = ImportTypeKind::Parameter;
       if (param->hasAttr<clang::CFReturnsRetainedAttr>())
