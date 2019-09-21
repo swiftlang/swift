@@ -29,7 +29,7 @@ namespace syntax {
 
 class SyntaxArena;
 
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
 %   if node.is_buildable():
 %     child_count = len(node.children)
 class ${node.name}Builder {
