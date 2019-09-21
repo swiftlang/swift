@@ -37,6 +37,10 @@
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output-[[OUTPUT]].swiftdoc"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output-[[OUTPUT]].swiftsourceinfo"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "diagnostics",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output-[[OUTPUT]].dia"
 // CHECK-NEXT:     }
@@ -84,6 +88,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output.swift.tmp.swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}parseable_output.swift.tmp.swiftsourceinfo"
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "objc-header",
