@@ -23,6 +23,8 @@ void _stdlib_destroyTLS(void *);
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void *_stdlib_createTLS(void);
 
+#if !SWIFT_TLS_HAS_RESERVED_PTHREAD_SPECIFIC || (defined(_WIN32) && !defined(__CYGWIN__))
+
 static void
 #if defined(_M_IX86)
 __stdcall
@@ -30,6 +32,8 @@ __stdcall
 destroyTLS_CCAdjustmentThunk(void *ptr) {
   _stdlib_destroyTLS(ptr);
 }
+
+#endif
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
 
