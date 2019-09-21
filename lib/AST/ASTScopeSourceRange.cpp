@@ -309,7 +309,12 @@ SourceRange GenericTypeOrExtensionWholePortion::getChildlessSourceRangeOf(
 
 SourceRange
 ExtensionScope::moveStartPastExtendedNominal(const SourceRange sr) const {
-  return SourceRange(getLocAfterExtendedNominal(decl), sr.End);
+  const auto start = getLocAfterExtendedNominal(decl);
+  // Illegal code can have an endLoc that is before the end of the
+  // ExtendedNominal, so push the end back, too, in that case.
+  const auto end =
+      getSourceManager().isBeforeInBuffer(sr.End, start) ? start : sr.End;
+  return SourceRange(start, end);
 }
 
 SourceRange
