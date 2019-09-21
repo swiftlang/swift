@@ -1257,7 +1257,7 @@ do {
   s.requirementTwo(3.0, 4.0)
   s.requirementTwo((3.0, 4.0)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.requirementTuple(3.0, 4.0) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(Double, Double)'}} {{22-22=(}} {{30-30=)}}
+  s.requirementTuple(3.0, 4.0) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element)' (aka '(Double, Double)')}} {{22-22=(}} {{30-30=)}}
   s.requirementTuple((3.0, 4.0))
 
   let sTwo = GenericConforms<(Double, Double)>()
@@ -1284,7 +1284,7 @@ do {
   s.requirementTwo(a, b)
   s.requirementTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(Double, Double)'}} {{22-22=(}} {{26-26=)}}
+  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element)' (aka '(Double, Double)')}} {{22-22=(}} {{26-26=)}}
   s.requirementTuple((a, b))
 
   let sTwo = GenericConforms<(Double, Double)>()
@@ -1309,7 +1309,7 @@ do {
   s.requirementTwo(a, b)
   s.requirementTwo((a, b)) // expected-error {{missing argument for parameter #2 in call}}
 
-  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(Double, Double)'}} {{22-22=(}} {{26-26=)}}
+  s.requirementTuple(a, b) // expected-error {{instance method 'requirementTuple' expects a single parameter of type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element)' (aka '(Double, Double)')}} {{22-22=(}} {{26-26=)}}
   s.requirementTuple((a, b))
 
   var sTwo = GenericConforms<(Double, Double)>()
@@ -1331,9 +1331,9 @@ do {
   s.takesClosure({ x in })
   s.takesClosure({ (x: Double) in })
 
-  s.takesClosureTwo({ _ = $0 }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
-  s.takesClosureTwo({ x in }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
-  s.takesClosureTwo({ (x: (Double, Double)) in }) // expected-error {{contextual closure type '(Double, Double) -> ()' expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ _ = $0 }) // expected-error {{contextual closure type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element) -> ()' (aka '(Double, Double) -> ()') expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ x in }) // expected-error {{contextual closure type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element) -> ()' (aka '(Double, Double) -> ()') expects 2 arguments, but 1 was used in closure body}}
+  s.takesClosureTwo({ (x: (Double, Double)) in }) // expected-error {{contextual closure type '(GenericConforms<Double>.Element, GenericConforms<Double>.Element) -> ()' (aka '(Double, Double) -> ()') expects 2 arguments, but 1 was used in closure body}}
   s.takesClosureTwo({ _ = $0; _ = $1 })
   s.takesClosureTwo({ (x, y) in })
   s.takesClosureTwo({ (x: Double, y:Double) in })
