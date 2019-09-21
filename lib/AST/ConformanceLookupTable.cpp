@@ -798,8 +798,8 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   // Everything about this conformance is nailed down, so we can now ensure that
   // the extension is fully resolved.
   if (auto resolver = nominal->getASTContext().getLazyResolver()) {
-    if (auto ED = dyn_cast<ExtensionDecl>(conformingDC)) {
-      resolver->resolveExtension(ED);
+    if (auto ext = dyn_cast<ExtensionDecl>(conformingDC)) {
+      resolver->resolveDeclSignature(ext->getExtendedNominal());
     } else {
       resolver->resolveDeclSignature(cast<NominalTypeDecl>(conformingDC));
     }

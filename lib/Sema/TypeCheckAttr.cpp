@@ -1151,7 +1151,7 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
     return false;
 
   auto *index = indices->get(0);
-  if (index->isVariadic() || !index->hasValidSignature())
+  if (index->isVariadic() || !index->hasInterfaceType())
     return false;
 
   if (ignoreLabel) {

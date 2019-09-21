@@ -56,9 +56,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
   if (!ED->isConstrainedExtension())
     return true;
 
-  TypeChecker *TC = &TypeChecker::createForContext((DC->getASTContext()));
-  TC->validateExtension(const_cast<ExtensionDecl *>(ED));
-
+  (void)TypeChecker::createForContext(DC->getASTContext());
   GenericSignature *genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());
