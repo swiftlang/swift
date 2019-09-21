@@ -724,8 +724,11 @@ public:
 
 ASTScope::ASTScope(SourceFile *SF) : impl(createScopeTree(SF)) {}
 
-void ASTScope::buildScopeTreeEagerly() {
-  impl->buildScopeTreeEagerly();
+void ASTScope::buildFullyExpandedTree() { impl->buildFullyExpandedTree(); }
+
+void ASTScope::
+    buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals() {
+  impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 }
 
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
@@ -733,10 +736,14 @@ ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   return scopeCreator->sourceFileScope;
 }
 
-void ASTSourceFileScope::buildScopeTreeEagerly() {
-  // Eagerly expand any decls already in the tree.
+void ASTSourceFileScope::buildFullyExpandedTree() {
+  addNewDeclsToScopeTree();
   preOrderChildrenDo(
       [&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
+}
+
+void ASTSourceFileScope::
+    buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals() {
   addNewDeclsToScopeTree();
 }
 
