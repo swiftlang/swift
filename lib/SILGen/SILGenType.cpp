@@ -603,7 +603,11 @@ SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// TODO: Move this to a common location (SILFunctionType.cpp).
+/// Given a linear map function type, return its normalized maximally
+/// indirect version:
+/// - Parameters are indirect guaranteed.
+/// - Results are indirect.
+// TODO: Consider deduping with the version in SILFunction.cpp.
 static CanSILFunctionType
 normalizeAutoDiffLinearMapType(CanSILFunctionType assocFnType) {
   SmallVector<SILParameterInfo, 4> parameters;
@@ -622,7 +626,10 @@ normalizeAutoDiffLinearMapType(CanSILFunctionType assocFnType) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// TODO: Move this to a common location (SILFunctionType.cpp).
+/// Given a JVP/VJP function type, return its normalized version:
+/// - Returned original result(s) are indirect.
+/// - Returned linear map is maximally indirect.
+// TODO: Consider deduping with the version in SILFunction.cpp.
 static CanSILFunctionType
 normalizeAutoDiffAssociatedFunctionType(CanSILFunctionType assocFnType) {
   SmallVector<SILResultInfo, 2> results;
