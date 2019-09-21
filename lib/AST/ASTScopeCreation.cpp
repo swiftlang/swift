@@ -651,7 +651,7 @@ public:
   }
 
   bool shouldBeLazy() const {
-    return !getIsFreezing() && ctx.LangOpts.LazyASTScopes;
+    return /*!getIsFreezing() &&*/ ctx.LangOpts.LazyASTScopes;
   }
 
 public:
@@ -1746,7 +1746,7 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 #pragma mark - reexpandIfObsolete
 
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (scopeCreator.getIsFrozen() ||
+  if (/* scopeCreator.getIsFrozen() || */
       (isCurrent() &&
        !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup)) {
     ASTScopeAssert(wasEverExpanded(), "Cannot be current if unexpanded.");
