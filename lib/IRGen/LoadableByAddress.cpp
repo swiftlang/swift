@@ -381,10 +381,10 @@ SILParameterInfo LargeSILTypeMapper::getNewParameter(GenericEnvironment *env,
   } else if (isLargeLoadableType(env, storageType, IGM)) {
     if (param.getConvention() == ParameterConvention::Direct_Guaranteed)
       return SILParameterInfo(storageType.getASTType(),
-                             ParameterConvention::Indirect_In_Guaranteed);
+                               ParameterConvention::Indirect_In_Guaranteed);
     else
       return SILParameterInfo(storageType.getASTType(),
-                             ParameterConvention::Indirect_In_Constant);
+                               ParameterConvention::Indirect_In_Constant);
   } else {
     auto newType = getNewSILType(env, storageType, IGM);
     return SILParameterInfo(newType.getASTType(),
@@ -2902,6 +2902,10 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
+        } else if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(&I)) {
+          conversionInstrs.insert(ADFI);
+        } else if (auto *ADFEI = dyn_cast<AutoDiffFunctionExtractInst>(&I)) {
+          conversionInstrs.insert(ADFEI);
         }
       }
     }
