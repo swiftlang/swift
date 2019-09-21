@@ -117,8 +117,6 @@ def update_single_repository(pool_args):
                 except Exception:
                     pass
 
-            shell.run(["git", "fetch", "--recurse-submodules=yes", "--tags"],
-                      echo=True)
             if checkout_target:
                 shell.run(['git', 'status', '--porcelain', '-uno'],
                           echo=False)

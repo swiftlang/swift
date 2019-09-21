@@ -4420,11 +4420,6 @@ private:
                                             SILValue());
     if (!insertion.second) { // not inserted
       auto &tanBuf = insertion.first->getSecond();
-      if (valueInOriginal->getType().isObject() && isa<BeginAccessInst>(tanBuf)) {
-        llvm::errs() << "FAILURE!\n";
-        valueInOriginal->dumpInContext();
-        tanBuf->dumpInContext();
-      }
       assert(!(valueInOriginal->getType().isObject() &&
                isa<BeginAccessInst>(tanBuf)) &&
              "Original object values should not have `begin_access` tangent "
@@ -5815,7 +5810,7 @@ private:
   /// An auxiliary local allocation builder.
   SILBuilder localAllocBuilder;
 
-  /// Stack buffers allocated for storing local adjoint values.
+  /// Local adjoint buffer allocations.
   SmallVector<SILValue, 64> functionLocalAllocations;
 
   /// A set used to remember local allocations that were destroyed.
@@ -6641,7 +6636,6 @@ public:
     // adjoint buffer. Used to propagate adjoint buffers from active values to
     // pullback successor blocks. `SmallMapVector` is used for deterministic
     // `copy_addr` generation order.
-    // SmallMapVector<std::pair<SILBasicBlock *, SILValue>, SILValue, 4>
     SmallDenseMap<SILBasicBlock *, SmallMapVector<SILValue, SILValue, 4>>
         activeValueAdjointBufferMap;
 
