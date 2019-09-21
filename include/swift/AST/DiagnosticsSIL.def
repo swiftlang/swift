@@ -522,6 +522,16 @@ ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
       "builtin must used only on string literals", ())
 
+ERROR(polymorphic_builtin_passed_non_trivial_non_builtin_type, none, "Argument "
+      "of type %0 can not be passed as an argument to a Polymorphic "
+      "builtin. Polymorphic builtins can only be passed arguments that are "
+      "trivial builtin typed", (Type))
+
+ERROR(polymorphic_builtin_passed_type_without_static_overload, none, "Static"
+      " overload %0 does not exist for polymorphic builtin '%1'. Static "
+      "overload implied by passing argument of type %2",
+      (Identifier, StringRef, Type))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
