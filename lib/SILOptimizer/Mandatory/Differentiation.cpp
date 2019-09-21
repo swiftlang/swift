@@ -3995,8 +3995,11 @@ class AdjointValueBase {
 };
 
 /// A symbolic adjoint value that is capable of representing zero value 0 and
-/// 1, in addition to a materialized SILValue. This is expected to be passed
+/// in addition to a materialized SILValue. This is expected to be passed
 /// around by value in most cases, as it's two words long.
+// NOTE(TF-625): `AdjointValue` is deprecated; differentials/pullbacks have
+// been canonicalized to be maximally indirect, so only tangent/adjoint buffers
+// are used.
 class AdjointValue final {
   friend class PullbackEmitter;
 
