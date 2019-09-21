@@ -3262,7 +3262,7 @@ public:
     //
     // FIXME: Once accessor synthesis and getInterfaceType() itself are
     // request-ified this goes away.
-    if (!fn->hasValidSignature()) {
+    if (!fn->hasInterfaceType()) {
       assert(fn->isImplicit());
       S.M->getASTContext().getLazyResolver()->resolveDeclSignature(
           const_cast<AccessorDecl *>(fn));

@@ -1329,7 +1329,7 @@ DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
         // variables would be accessible to name lookup of the subexpression and
         // may thus leak in.  Reset them to UnresolvedTypes for safe measures.
         assert(llvm::all_of(*closure->getParameters(), [](const ParamDecl *PD) {
-          if (PD->hasValidSignature()) {
+          if (PD->hasInterfaceType()) {
             auto paramTy = PD->getType();
             return !(paramTy->hasTypeVariable() || paramTy->hasError());
           }
@@ -5345,7 +5345,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
         if (auto DRE = dyn_cast<DeclRefExpr>(childExpr)) {
           if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
             auto paramType =
-                param->hasValidSignature() ? param->getType() : Type();
+                param->hasInterfaceType() ? param->getType() : Type();
             if (!paramType || paramType->hasTypeVariable()) {
               hasUnresolvedParams = true;
               return nullptr;

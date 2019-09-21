@@ -2046,7 +2046,7 @@ public:
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
-    assert(VD->hasValidSignature());
+    assert(VD->hasInterfaceType());
     Type T = VD->getInterfaceType();
 
     if (ExprType) {
@@ -2135,7 +2135,7 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
-    if (!VD->hasValidSignature())
+    if (!VD->hasInterfaceType())
       return;
 
     // Add a type annotation.

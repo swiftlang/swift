@@ -1015,10 +1015,6 @@ public:
     validateDecl(VD);
   }
 
-  virtual void resolveExtension(ExtensionDecl *ext) override {
-    validateExtension(ext);
-  }
-
   virtual void resolveImplicitConstructors(NominalTypeDecl *nominal) override {
     addImplicitConstructors(nominal);
   }
@@ -1427,7 +1423,7 @@ public:
         [&](VarDecl *var) -> Type {
           validateDecl(var);
 
-          if (!var->hasValidSignature() || var->isInvalid())
+          if (!var->hasInterfaceType() || var->isInvalid())
             return ErrorType::get(Context);
 
           return wantInterfaceType ? value->getInterfaceType()
