@@ -176,22 +176,6 @@ template <typename T> T *getOverriddenDeclIfAvailable(T *decl) {
 
   return cast_or_null<T>(decl->getOverriddenDecl());
 }
-
-// Retrieve the generic signature of the innermost context that has been forced
-// so far.
-//
-// This avoids kicking off the request for a generic signature in the verifier.
-static GenericSignature *
-getNearestForcedGenericSignatureOfContext(DeclContext *dc) {
-  do {
-    if (auto decl = dc->getAsDecl())
-      if (auto GC = decl->getAsGenericContext())
-        if (GC->hasComputedGenericSignature())
-          return GC->getGenericSignature();
-  } while ((dc = dc->getParent()));
-
-  return nullptr;
-}
 } // namespace
 
 class Verifier : public ASTWalker {
@@ -208,8 +192,9 @@ class Verifier : public ASTWalker {
   using ScopeLike = llvm::PointerUnion<DeclContext *, BraceStmt *>;
   SmallVector<ScopeLike, 4> Scopes;
 
-  /// The stack of context generic signatures.
-  SmallVector<GenericSignature *, 2> GenericSig;
+  /// The stack of generic contexts.
+  using GenericLike = llvm::PointerUnion<DeclContext *, GenericSignature *>;
+  SmallVector<GenericLike, 2> Generics;
 
   /// The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
@@ -632,7 +617,7 @@ public:
           }
 
           // Otherwise, the archetype needs to be from this scope.
-          if (GenericSig.empty() || !GenericSig.back()) {
+          if (Generics.empty() || !Generics.back()) {
             Out << "AST verification error: archetype outside of generic "
                    "context: " << root->getString() << "\n";
             return true;
@@ -643,13 +628,20 @@ public:
           auto *archetypeEnv = rootPrimary->getGenericEnvironment();
           auto *archetypeSig = archetypeEnv->getGenericSignature();
 
-          if (GenericSig.back() != archetypeSig) {
+          auto genericCtx = Generics.back();
+          GenericSignature *genericSig;
+          if (auto *genericDC = genericCtx.dyn_cast<DeclContext *>())
+            genericSig = genericDC->getGenericSignatureOfContext();
+          else
+            genericSig = genericCtx.get<GenericSignature *>();
+
+          if (genericSig != archetypeSig) {
             Out << "Archetype " << root->getString() << " not allowed "
                 << "in this context\n";
             Out << "Archetype generic signature: "
                 << archetypeSig->getAsString() << "\n";
             Out << "Context generic signature: "
-                << GenericSig.back()->getAsString() << "\n";
+                << genericSig->getAsString() << "\n";
 
             return true;
           }
@@ -704,16 +696,16 @@ public:
 
     void pushScope(DeclContext *scope) {
       Scopes.push_back(scope);
-      GenericSig.push_back(::getNearestForcedGenericSignatureOfContext(scope));
+      Generics.push_back(scope);
     }
     void pushScope(BraceStmt *scope) {
       Scopes.push_back(scope);
     }
     void popScope(DeclContext *scope) {
       assert(Scopes.back().get<DeclContext*>() == scope);
-      assert(GenericSig.back() == ::getNearestForcedGenericSignatureOfContext(scope));
+      assert(Generics.back().get<DeclContext*>() == scope);
       Scopes.pop_back();
-      GenericSig.pop_back();
+      Generics.pop_back();
     }
     void popScope(BraceStmt *scope) {
       assert(Scopes.back().get<BraceStmt*>() == scope);
@@ -2687,14 +2679,15 @@ public:
           const auto &witness = normal->getWitness(req);
 
           if (auto *genericEnv = witness.getSyntheticEnvironment())
-            GenericSig.push_back(genericEnv->getGenericSignature());
+            Generics.push_back(genericEnv->getGenericSignature());
 
           verifyChecked(witness.getRequirementToSyntheticSubs());
           verifyChecked(witness.getSubstitutions());
 
           if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-            assert(GenericSig.back() == genericEnv->getGenericSignature());
-            GenericSig.pop_back();
+            assert(Generics.back().get<GenericSignature*>()
+                   == genericEnv->getGenericSignature());
+            Generics.pop_back();
           }
 
           continue;
