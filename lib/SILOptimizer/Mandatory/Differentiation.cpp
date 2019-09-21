@@ -4099,12 +4099,6 @@ public:
   }
 };
 
-inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const AdjointValue &adjVal) {
-  adjVal.print(os);
-  return os;
-}
-
 } // end anonymous namespace
 
 namespace {
@@ -4147,10 +4141,6 @@ private:
   /// Mapping from original basic blocks to corresponding differential basic
   /// blocks.
   DenseMap<SILBasicBlock *, SILBasicBlock *> diffBBMap;
-
-  /// Mapping from original basic blocks and original values to corresponding
-  /// tangent values.
-  DenseMap<SILValue, AdjointValue> tangentValueMap;
 
   /// Mapping from original basic blocks and original buffers to corresponding
   /// tangent buffers.
@@ -4317,7 +4307,7 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Tangent materialization
+  // Zero emission
   //--------------------------------------------------------------------------//
 
   void emitZeroIndirect(CanType type, SILValue bufferAccess,
@@ -4344,48 +4334,6 @@ private:
           "Unimplemented: Emit thunks for abstracting zero initialization");
     }
     }
-  }
-
-  SILValue emitZeroDirect(CanType type, SILLocation loc) {
-    auto diffBuilder = getDifferentialBuilder();
-    auto silType = getModule().Types.getLoweredLoadableType(
-        type, ResilienceExpansion::Minimal);
-    auto *buffer = diffBuilder.createAllocStack(loc, silType);
-    emitZeroIndirect(type, buffer, loc);
-    auto loaded = diffBuilder.emitLoadValueOperation(
-        loc, buffer, LoadOwnershipQualifier::Take);
-    diffBuilder.createDeallocStack(loc, buffer);
-    return loaded;
-  }
-
-  [[deprecated]]
-  SILValue materializeTangentDirect(AdjointValue val, SILLocation loc) {
-    assert(val.getType().isObject());
-    LLVM_DEBUG(getADDebugStream()
-               << "Materializing tangents for " << val << '\n');
-    switch (val.getKind()) {
-    case AdjointValueKind::Zero: {
-      auto zeroVal = emitZeroDirect(val.getSwiftType(), loc);
-      return zeroVal;
-    }
-    case AdjointValueKind::Aggregate:
-      llvm_unreachable(
-          "Tuples and structs are not supported in forward mode yet.");
-    case AdjointValueKind::Concrete:
-      return val.getConcreteValue();
-  }
-  }
-
-  [[deprecated]]
-  SILValue materializeTangent(AdjointValue val, SILLocation loc) {
-    if (val.isConcrete()) {
-      LLVM_DEBUG(getADDebugStream()
-                 << "Materializing tangent: Value is concrete.\n");
-      return val.getConcreteValue();
-    }
-    LLVM_DEBUG(getADDebugStream() << "Materializing tangent: Value is "
-                                     "non-concrete. Materializing directly.\n");
-    return materializeTangentDirect(val, loc);
   }
 
   //--------------------------------------------------------------------------//
@@ -4489,50 +4437,6 @@ private:
         getTangentSpace(remapSILTypeInDifferential(type).getASTType())
             ->getCanonicalType(),
         type.getCategory());
-  }
-
-  //--------------------------------------------------------------------------//
-  // Tangent value mapping
-  //--------------------------------------------------------------------------//
-
-  /// Get the tangent for an original value. The given value must be in the
-  /// original function.
-  ///
-  /// This method first tries to find an entry in `tangentValueMap`. If an entry
-  /// doesn't exist, create a zero tangent.
-  [[deprecated]]
-  AdjointValue getTangentValue(SILValue originalValue) {
-    assert(originalValue->getType().isObject());
-    assert(originalValue->getFunction() == original);
-    auto insertion = tangentValueMap.try_emplace(
-        originalValue, makeZeroTangentValue(
-        getRemappedTangentType(originalValue->getType())));
-    return insertion.first->getSecond();
-  }
-
-  /// Map the tangent value to the given original value.
-  [[deprecated]]
-  void setTangentValue(SILBasicBlock *origBB, SILValue originalValue,
-                       AdjointValue newTangentValue) {
-    if (auto *defInst = originalValue->getDefiningInstruction()) {
-      bool isTupleTypedApplyResult =
-          isa<ApplyInst>(defInst) && originalValue->getType().is<TupleType>();
-      assert(!isTupleTypedApplyResult &&
-             "Should not set tangent value for tuple-typed result from `apply` "
-             "instruction; use `destructure_tuple` on `apply` result and set "
-             "tangent value for `destructure_tuple` results instead.");
-    }
-    assert(originalValue->getType().isObject());
-    assert(newTangentValue.getType().isObject());
-    assert(originalValue->getFunction() == original);
-    LLVM_DEBUG(getADDebugStream() << "Adding tangent for " << originalValue);
-    // The tangent value must be in the tangent space.
-    assert(newTangentValue.getType() ==
-           getRemappedTangentType(originalValue->getType()));
-    auto insertion =
-        tangentValueMap.try_emplace(originalValue, newTangentValue);
-    auto inserted = insertion.second;
-    assert(inserted && "The tangent value should not already exist.");
   }
 
   //--------------------------------------------------------------------------//
@@ -5765,10 +5669,6 @@ private:
   /// Pullback basic blocks always have the predecessor as the single argument.
   DenseMap<SILBasicBlock *, SILBasicBlock *> pullbackBBMap;
 
-  /// Mapping from original basic blocks and original values to corresponding
-  /// adjoint values.
-  DenseMap<std::pair<SILBasicBlock *, SILValue>, AdjointValue> valueMap;
-
   /// Mapping from original basic blocks and original buffers to corresponding
   /// adjoint buffers.
   DenseMap<std::pair<SILBasicBlock *, SILValue>, SILValue> bufferMap;
@@ -5915,49 +5815,16 @@ private:
   }
 
   //--------------------------------------------------------------------------//
-  // Symbolic value materializers
-  //--------------------------------------------------------------------------//
-
-  /// Materialize an adjoint value. The type of the given adjoint value must be
-  /// loadable.
-  SILValue materializeAdjointDirect(AdjointValue val, SILLocation loc);
-
-  /// Materialize an adjoint value indirectly to a SIL buffer.
-  void materializeAdjointIndirect(AdjointValue val, SILValue destBuffer,
-                                  SILLocation loc);
-
-  //--------------------------------------------------------------------------//
-  // Helpers for symbolic value materializers
+  // Zero emission
   //--------------------------------------------------------------------------//
 
   /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
   /// must conform to `AdditiveArithmetic`.
   void emitZeroIndirect(CanType type, SILValue bufferAccess, SILLocation loc);
 
-  /// Emit a zero value by calling `AdditiveArithmetic.zero`. The given type
-  /// must conform to `AdditiveArithmetic` and be loadable in SIL.
-  SILValue emitZeroDirect(CanType type, SILLocation loc);
-
   //--------------------------------------------------------------------------//
-  // Accumulator
+  // Accumulation
   //--------------------------------------------------------------------------//
-
-  /// Materialize an adjoint value in the most efficient way.
-  SILValue materializeAdjoint(AdjointValue val, SILLocation loc);
-
-  /// Given two adjoint values, accumulate them.
-  AdjointValue accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
-                                        SILLocation loc);
-
-  /// Given two materialized adjoint values, accumulate them. These two
-  /// adjoints must be objects of loadable type.
-  SILValue accumulateDirect(SILValue lhs, SILValue rhs, SILLocation loc);
-
-  /// Given two materialized adjoint values, accumulate them using
-  /// `AdditiveArithmetic.+`, depending on the differentiation mode.
-  void accumulateIndirect(SILValue resultBufAccess,
-                          SILValue lhsBufAccess, SILValue rhsBufAccess,
-                          SILLocation loc);
 
   /// Given two buffers of an `AdditiveArithmetic` type, accumulate the right
   /// hand side into the left hand side using `+=`.
@@ -5992,96 +5859,6 @@ private:
   /// pullback function's substitution map.
   SubstitutionMap remapSubstitutionMap(SubstitutionMap substMap) {
     return substMap.subst(getPullback().getForwardingSubstitutionMap());
-  }
-
-  //--------------------------------------------------------------------------//
-  // Managed value mapping
-  //--------------------------------------------------------------------------//
-
-  /// Returns true if the original value has a corresponding adjoint value.
-  [[deprecated]]
-  bool hasAdjointValue(SILBasicBlock *origBB, SILValue originalValue) const {
-    assert(origBB->getParent() == &getOriginal());
-    assert(originalValue->getType().isObject());
-    return valueMap.count({origBB, originalValue});
-  }
-
-  /// Initializes an original value's corresponding adjoint value. It must not
-  /// have an adjoint value before this function is called.
-  [[deprecated]]
-  void setAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
-                       AdjointValue adjointValue) {
-    LLVM_DEBUG(getADDebugStream() << "Setting adjoint value for "
-                                  << originalValue);
-    assert(origBB->getParent() == &getOriginal());
-    assert(originalValue->getType().isObject());
-    assert(adjointValue.getType().isObject());
-    assert(originalValue->getFunction() == &getOriginal());
-    // The adjoint value must be in the tangent space.
-    assert(adjointValue.getType() ==
-               getRemappedTangentType(originalValue->getType()));
-    auto insertion = valueMap.try_emplace({origBB, originalValue},
-                                          adjointValue);
-    LLVM_DEBUG(getADDebugStream()
-                   << "The existing adjoint value will be replaced: "
-                   << insertion.first->getSecond());
-    if (!insertion.second)
-      insertion.first->getSecond() = adjointValue;
-  }
-
-  /// Get the adjoint for an original value. The given value must be in the
-  /// original function.
-  ///
-  /// This method first tries to find an entry in `adjointMap`. If an adjoint
-  /// doesn't exist, create a zero adjoint.
-  [[deprecated]]
-  AdjointValue getAdjointValue(SILBasicBlock *origBB, SILValue originalValue) {
-    assert(origBB->getParent() == &getOriginal());
-    assert(originalValue->getType().isObject());
-    assert(originalValue->getFunction() == &getOriginal());
-    auto insertion = valueMap.try_emplace(
-        {origBB, originalValue}, makeZeroAdjointValue(
-            getRemappedTangentType(originalValue->getType())));
-    auto it = insertion.first;
-    return it->getSecond();
-  }
-
-  [[deprecated]]
-  /// Add an adjoint value for the given original value.
-  void addAdjointValue(SILBasicBlock *origBB, SILValue originalValue,
-                       AdjointValue newAdjointValue, SILLocation loc) {
-    assert(origBB->getParent() == &getOriginal());
-    assert(originalValue->getType().isObject());
-    assert(newAdjointValue.getType().isObject());
-    assert(originalValue->getFunction() == &getOriginal());
-    LLVM_DEBUG(getADDebugStream() << "Adding adjoint for " << originalValue);
-    // The adjoint value must be in the tangent space.
-    assert(newAdjointValue.getType() ==
-               getRemappedTangentType(originalValue->getType()));
-    auto insertion =
-        valueMap.try_emplace({origBB, originalValue}, newAdjointValue);
-    auto inserted = insertion.second;
-    if (inserted)
-      return;
-    // If adjoint already exists, accumulate the adjoint onto the existing
-    // adjoint.
-    auto it = insertion.first;
-    auto existingValue = it->getSecond();
-    valueMap.erase(it);
-    auto adjVal = accumulateAdjointsDirect(existingValue, newAdjointValue, loc);
-    setAdjointValue(origBB, originalValue, adjVal);
-  }
-
-  /// Get the pullback block argument corresponding to the given original block
-  /// and active value.
-  SILArgument *getActiveValuePullbackBlockArgument(SILBasicBlock *origBB,
-                                                   SILValue activeValue) {
-    assert(origBB->getParent() == &getOriginal());
-    auto pullbackBBArg =
-        activeValuePullbackBBArgumentMap[{origBB, activeValue}];
-    assert(pullbackBBArg);
-    assert(pullbackBBArg->getParent() == getPullbackBlock(origBB));
-    return pullbackBBArg;
   }
 
   //--------------------------------------------------------------------------//
@@ -6236,6 +6013,18 @@ private:
   SILBasicBlock *getPullbackTrampolineBlock(
       SILBasicBlock *originalBlock, SILBasicBlock *successorBlock) {
     return pullbackTrampolineBBMap.lookup({originalBlock, successorBlock});
+  }
+
+  /// Get the pullback block argument corresponding to the given original block
+  /// and active value.
+  SILArgument *getActiveValuePullbackBlockArgument(SILBasicBlock *origBB,
+                                                   SILValue activeValue) {
+    assert(origBB->getParent() == &getOriginal());
+    auto pullbackBBArg =
+        activeValuePullbackBBArgumentMap[{origBB, activeValue}];
+    assert(pullbackBBArg);
+    assert(pullbackBBArg->getParent() == getPullbackBlock(origBB));
+    return pullbackBBArg;
   }
 
 public:
@@ -6543,7 +6332,7 @@ public:
       return pullbackBB;
 
     // Otherwise, the pullback successor is the pullback trampoline block,
-    // which branches to the pullback block and propagates adjoint values of
+    // which branches to the pullback block and propagates adjoint buffers of
     // active values.
     assert(pullbackTrampolineBB->getNumArguments() == 1);
     auto loc = origBB->getParent()->getLocation();
@@ -6788,7 +6577,7 @@ public:
       genericSig = fn->getLoweredFunctionType()->getGenericSignature();
       fnRef = builder.createFunctionRef(ai->getLoc(), fn);
     }
-    assert(arrayAdjBuf && "Array does not have adjoint value");
+    assert(arrayAdjBuf && "Array does not have adjoint buffer");
     assert(genericSig && "No generic signature");
     assert(fnRef && "cannot create function_ref");
     // Two loops because the tuple_extract instructions can be reached in
@@ -7317,99 +7106,6 @@ AdjointValue PullbackEmitter::makeAggregateAdjointValue(
   return AdjointValue::createAggregate(allocator, remapType(type), elements);
 }
 
-[[deprecated]]
-SILValue PullbackEmitter::materializeAdjointDirect(
-    AdjointValue val, SILLocation loc) {
-  assert(val.getType().isObject());
-  LLVM_DEBUG(getADDebugStream() <<
-             "Materializing adjoints for " << val << '\n');
-  switch (val.getKind()) {
-  case AdjointValueKind::Zero:
-    return recordTemporary(emitZeroDirect(val.getType().getASTType(), loc));
-  case AdjointValueKind::Aggregate: {
-    SmallVector<SILValue, 8> elements;
-    for (auto i : range(val.getNumAggregateElements())) {
-      auto eltVal = materializeAdjointDirect(val.getAggregateElement(i), loc);
-      elements.push_back(builder.emitCopyValueOperation(loc, eltVal));
-    }
-    if (val.getType().is<TupleType>())
-      return recordTemporary(
-          builder.createTuple(loc, val.getType(), elements));
-    else
-      return recordTemporary(
-          builder.createStruct(loc, val.getType(), elements));
-  }
-  case AdjointValueKind::Concrete:
-    return val.getConcreteValue();
-  }
-}
-
-[[deprecated]]
-SILValue PullbackEmitter::materializeAdjoint(AdjointValue val,
-                                             SILLocation loc) {
-  if (val.isConcrete()) {
-    LLVM_DEBUG(getADDebugStream()
-        << "Materializing adjoint: Value is concrete.\n");
-    return val.getConcreteValue();
-  }
-  LLVM_DEBUG(getADDebugStream() << "Materializing adjoint: Value is "
-                                   "non-concrete. Materializing directly.\n");
-  return materializeAdjointDirect(val, loc);
-}
-
-void PullbackEmitter::materializeAdjointIndirect(
-    AdjointValue val, SILValue destBufferAccess, SILLocation loc) {
-  switch (val.getKind()) {
-  /// Given a `%buf : *T, emit instructions that produce a zero or an aggregate
-  /// of zeros of the expected type. When `T` conforms to
-  /// `AdditiveArithmetic`, we emit a call to `AdditiveArithmetic.zero`. When
-  /// `T` is a builtin float, we emit a `float_literal` instruction.
-  /// Otherwise, we assert that `T` must be an aggregate where each element
-  /// conforms to `AdditiveArithmetic` or is a builtin float. We expect to emit
-  /// a zero for each element and use the appropriate aggregate constructor
-  /// instruction (in this case, `tuple`) to produce a tuple. But currently,
-  /// since we need indirect passing for aggregate instruction, we just use
-  /// `tuple_element_addr` to get element buffers and write elements to them.
-  case AdjointValueKind::Zero:
-    emitZeroIndirect(val.getSwiftType(), destBufferAccess, loc);
-    break;
-  /// Given a `%buf : *(T0, T1, T2, ...)` or `%buf : *Struct` recursively emit
-  /// instructions to materialize the symbolic tuple or struct, filling the
-  /// buffer.
-  case AdjointValueKind::Aggregate: {
-    if (auto *tupTy = val.getSwiftType()->getAs<TupleType>()) {
-      for (auto idx : range(val.getNumAggregateElements())) {
-        auto eltTy = SILType::getPrimitiveAddressType(
-            tupTy->getElementType(idx)->getCanonicalType());
-        auto *eltBuf =
-            builder.createTupleElementAddr(loc, destBufferAccess, idx, eltTy);
-        materializeAdjointIndirect(
-            val.getAggregateElement(idx), eltBuf, loc);
-      }
-    } else if (auto *structDecl =
-                   val.getSwiftType()->getStructOrBoundGenericStruct()) {
-      auto fieldIt = structDecl->getStoredProperties().begin();
-      for (unsigned i = 0; fieldIt != structDecl->getStoredProperties().end();
-           ++fieldIt, ++i) {
-        auto eltBuf =
-            builder.createStructElementAddr(loc, destBufferAccess, *fieldIt);
-        materializeAdjointIndirect(
-            val.getAggregateElement(i), eltBuf, loc);
-      }
-    } else {
-      llvm_unreachable("Not an aggregate type");
-    }
-    break;
-  }
-  /// Value is already materialized!
-  case AdjointValueKind::Concrete:
-    auto concreteVal = val.getConcreteValue();
-    builder.emitStoreValueOperation(loc, concreteVal, destBufferAccess,
-                                    StoreOwnershipQualifier::Init);
-    break;
-  }
-}
-
 void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
                                        SILLocation loc) {
   auto tangentSpace = getTangentSpace(type);
@@ -7431,211 +7127,6 @@ void PullbackEmitter::emitZeroIndirect(CanType type, SILValue bufferAccess,
   case VectorSpace::Kind::Function: {
     llvm_unreachable(
       "Unimplemented: Emit thunks for abstracting zero initialization");
-  }
-  }
-}
-
-SILValue PullbackEmitter::emitZeroDirect(CanType type, SILLocation loc) {
-  auto silType = getModule().Types.getLoweredLoadableType(
-      type, ResilienceExpansion::Minimal);
-  auto *buffer = builder.createAllocStack(loc, silType);
-  emitZeroIndirect(type, buffer, loc);
-  auto loaded = builder.emitLoadValueOperation(
-      loc, buffer, LoadOwnershipQualifier::Take);
-  builder.createDeallocStack(loc, buffer);
-  return loaded;
-}
-
-AdjointValue
-PullbackEmitter::accumulateAdjointsDirect(AdjointValue lhs, AdjointValue rhs,
-                                          SILLocation loc) {
-  LLVM_DEBUG(getADDebugStream()
-             << "Materializing adjoint directly.\nLHS: " << lhs
-             << "\nRHS: " << rhs << '\n');
-  switch (lhs.getKind()) {
-  // x
-  case AdjointValueKind::Concrete: {
-    auto lhsVal = lhs.getConcreteValue();
-    switch (rhs.getKind()) {
-    // x + y
-    case AdjointValueKind::Concrete: {
-      auto rhsVal = rhs.getConcreteValue();
-      auto sum = recordTemporary(accumulateDirect(lhsVal, rhsVal, loc));
-      return makeConcreteAdjointValue(sum);
-    }
-    // x + 0 => x
-    case AdjointValueKind::Zero:
-      return lhs;
-    // x + (y, z) => (x.0 + y, x.1 + z)
-    case AdjointValueKind::Aggregate:
-      SmallVector<AdjointValue, 8> newElements;
-      auto lhsTy = lhsVal->getType().getASTType();
-      auto lhsValCopy = builder.emitCopyValueOperation(loc, lhsVal);
-      if (auto *tupTy = lhsTy->getAs<TupleType>()) {
-        auto elts = builder.createDestructureTuple(loc, lhsValCopy);
-        llvm::for_each(elts->getResults(),
-                       [this](SILValue result) { recordTemporary(result); });
-        for (auto i : indices(elts->getResults())) {
-          auto rhsElt = rhs.getAggregateElement(i);
-          newElements.push_back(accumulateAdjointsDirect(
-              makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
-        }
-      } else if (auto *structDecl = lhsTy->getStructOrBoundGenericStruct()) {
-        auto elts =
-            builder.createDestructureStruct(lhsVal.getLoc(), lhsValCopy);
-        llvm::for_each(elts->getResults(),
-                       [this](SILValue result) { recordTemporary(result); });
-        for (unsigned i : indices(elts->getResults())) {
-          auto rhsElt = rhs.getAggregateElement(i);
-          newElements.push_back(
-              accumulateAdjointsDirect(
-                  makeConcreteAdjointValue(elts->getResult(i)), rhsElt, loc));
-        }
-      } else {
-        llvm_unreachable("Not an aggregate type");
-      }
-      return makeAggregateAdjointValue(lhsVal->getType(), newElements);
-    }
-  }
-  // 0
-  case AdjointValueKind::Zero:
-    // 0 + x => x
-    return rhs;
-  // (x, y)
-  case AdjointValueKind::Aggregate:
-    switch (rhs.getKind()) {
-    // (x, y) + z => (x + z.0, y + z.1)
-    case AdjointValueKind::Concrete:
-    // x + 0 => x
-    case AdjointValueKind::Zero:
-      return lhs;
-    // (x, y) + (z, w) => (x + z, y + w)
-    case AdjointValueKind::Aggregate: {
-      SmallVector<AdjointValue, 8> newElements;
-      for (auto i : range(lhs.getNumAggregateElements()))
-        newElements.push_back(accumulateAdjointsDirect(
-            lhs.getAggregateElement(i), rhs.getAggregateElement(i), loc));
-      return makeAggregateAdjointValue(lhs.getType(), newElements);
-    }
-    }
-  }
-}
-
-[[deprecated]]
-SILValue PullbackEmitter::accumulateDirect(SILValue lhs, SILValue rhs,
-                                           SILLocation loc) {
-  // TODO: Optimize for the case when lhs == rhs.
-  LLVM_DEBUG(getADDebugStream() <<
-             "Emitting adjoint accumulation for lhs: " << lhs <<
-             " and rhs: " << rhs << "\n");
-  assert(lhs->getType() == rhs->getType() && "Adjoints must have equal types!");
-  assert(lhs->getType().isObject() && rhs->getType().isObject() &&
-         "Adjoint types must be both object types!");
-  auto adjointTy = lhs->getType();
-  auto adjointASTTy = adjointTy.getASTType();
-  auto tangentSpace = getTangentSpace(adjointASTTy);
-  auto lhsCopy = builder.emitCopyValueOperation(loc, lhs);
-  auto rhsCopy = builder.emitCopyValueOperation(loc, rhs);
-  assert(tangentSpace && "No tangent space for this type");
-  switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector: {
-    // Allocate buffers for inputs and output.
-    auto *resultBuf = builder.createAllocStack(loc, adjointTy);
-    auto *lhsBuf = builder.createAllocStack(loc, adjointTy);
-    auto *rhsBuf = builder.createAllocStack(loc, adjointTy);
-    // Initialize input buffers.
-    builder.emitStoreValueOperation(loc, lhsCopy, lhsBuf,
-                                    StoreOwnershipQualifier::Init);
-    builder.emitStoreValueOperation(loc, rhsCopy, rhsBuf,
-                                    StoreOwnershipQualifier::Init);
-    accumulateIndirect(resultBuf, lhsBuf, rhsBuf, loc);
-    builder.emitDestroyAddr(loc, lhsBuf);
-    builder.emitDestroyAddr(loc, rhsBuf);
-    // Deallocate input buffers.
-    builder.createDeallocStack(loc, rhsBuf);
-    builder.createDeallocStack(loc, lhsBuf);
-    auto val = builder.emitLoadValueOperation(
-        loc, resultBuf, LoadOwnershipQualifier::Take);
-    // Deallocate result buffer.
-    builder.createDeallocStack(loc, resultBuf);
-    return val;
-  }
-  case VectorSpace::Kind::Tuple: {
-    SmallVector<SILValue, 8> adjElements;
-    auto lhsElts = builder.createDestructureTuple(loc, lhsCopy)->getResults();
-    auto rhsElts = builder.createDestructureTuple(loc, rhsCopy)->getResults();
-    for (auto zipped : llvm::zip(lhsElts, rhsElts))
-      adjElements.push_back(
-          accumulateDirect(std::get<0>(zipped), std::get<1>(zipped), loc));
-    return builder.createTuple(loc, adjointTy, adjElements);
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint accumulation");
-  }
-  }
-}
-
-void PullbackEmitter::accumulateIndirect(
-    SILValue resultBufAccess, SILValue lhsBufAccess, SILValue rhsBufAccess,
-    SILLocation loc) {
-  // TODO: Optimize for the case when lhs == rhs.
-  assert(lhsBufAccess->getType() == rhsBufAccess->getType() &&
-         "Adjoint values must have same type!");
-  assert(lhsBufAccess->getType().isAddress() &&
-         rhsBufAccess->getType().isAddress() &&
-         "Adjoint values must both have address types!");
-  auto adjointTy = lhsBufAccess->getType();
-  auto adjointASTTy = adjointTy.getASTType();
-  auto *swiftMod = getModule().getSwiftModule();
-  auto tangentSpace = adjointASTTy->getAutoDiffAssociatedTangentSpace(
-      LookUpConformanceInModule(swiftMod));
-  assert(tangentSpace && "No tangent space for this type");
-  switch (tangentSpace->getKind()) {
-  case VectorSpace::Kind::Vector: {
-    auto *proto = getContext().getAdditiveArithmeticProtocol();
-    auto *combinerFuncDecl = getContext().getPlusDecl();
-    // Call the combiner function and return.
-    auto adjointParentModule = tangentSpace->getNominal()
-        ? tangentSpace->getNominal()->getModuleContext()
-        : getModule().getSwiftModule();
-    auto confRef = adjointParentModule->lookupConformance(adjointASTTy,
-                                                           proto);
-    assert(confRef.hasValue() && "Missing conformance to `AdditiveArithmetic`");
-    SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);
-    auto silFnTy = getContext().getTypeConverter().getConstantType(declRef);
-    // %0 = witness_method @+
-    auto witnessMethod = builder.createWitnessMethod(loc, adjointASTTy,
-                                                     *confRef, declRef,
-                                                     silFnTy);
-    auto subMap = SubstitutionMap::getProtocolSubstitutions(
-        proto, adjointASTTy, *confRef);
-    // %1 = metatype $T.Type
-    auto metatypeType =
-        CanMetatypeType::get(adjointASTTy, MetatypeRepresentation::Thick);
-    auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
-    auto metatype = builder.createMetatype(loc, metatypeSILType);
-    // %2 = apply $0(%result, %new, %old, %1)
-    builder.createApply(loc, witnessMethod, subMap,
-                        {resultBufAccess, rhsBufAccess, lhsBufAccess, metatype},
-                        /*isNonThrowing*/ false);
-    builder.emitDestroyValueOperation(loc, witnessMethod);
-    return;
-  }
-  case VectorSpace::Kind::Tuple: {
-    auto tupleType = tangentSpace->getTuple();
-    for (unsigned i : range(tupleType->getNumElements())) {
-      auto *destAddr = builder.createTupleElementAddr(loc, resultBufAccess, i);
-      auto *eltAddrLHS = builder.createTupleElementAddr(loc, lhsBufAccess, i);
-      auto *eltAddrRHS = builder.createTupleElementAddr(loc, rhsBufAccess, i);
-      accumulateIndirect(destAddr, eltAddrLHS, eltAddrRHS, loc);
-    }
-    return;
-  }
-  case VectorSpace::Kind::Function: {
-    llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
-        "accumulation");
   }
   }
 }
@@ -7689,7 +7180,7 @@ void PullbackEmitter::accumulateIndirect(SILValue lhsDestAccess,
   }
   case VectorSpace::Kind::Function: {
     llvm_unreachable(
-        "Unimplemented: Emit thunks for abstracting adjoint value "
+        "Unimplemented: Emit thunks for abstracting adjoint buffer "
         "accumulation");
   }
   }
