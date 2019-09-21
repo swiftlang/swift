@@ -1079,11 +1079,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
                     ? DesignatedInitKind::Chaining
                     : DesignatedInitKind::Stub;
 
-      // We have a designated initializer. Create an override of it.
-      // FIXME: Validation makes sure we get a generic signature here.
-      if (!decl->hasInterfaceType())
-        ctx.getLazyResolver()->resolveDeclSignature(decl);
-
       if (auto ctor = createDesignatedInitOverride(
                         decl, superclassCtor, kind, ctx)) {
         decl->addMember(ctor);
