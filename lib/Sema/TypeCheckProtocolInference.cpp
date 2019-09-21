@@ -189,11 +189,6 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (extendedNominal == nullptr)
       return true;
     
-    // Validate the nominal type being extended.
-    tc.validateDecl(extendedNominal);
-    if (extendedNominal->isInvalid())
-      return true;
-    
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
     if (!isa<ProtocolDecl>(extendedNominal))
