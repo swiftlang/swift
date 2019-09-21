@@ -3963,29 +3963,25 @@ case TypeKind::Id:
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType && !oldParentType->hasTypeParameter() &&
-        !oldParentType->hasArchetype()) {
+    if (oldParentType) {
       newParentType = oldParentType.transformRec(fn);
       if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
     for (Type oldReplacementType : subMap.getReplacementTypes()) {
-      if (oldReplacementType->hasTypeParameter() ||
-          oldReplacementType->hasArchetype())
-        return newUnderlyingType;
-
       Type newReplacementType = oldReplacementType.transformRec(fn);
       if (!newReplacementType)
         return newUnderlyingType;
 
       // If anything changed with the replacement type, we lose the sugar.
       // FIXME: This is really unfortunate.
-      if (!newReplacementType->isEqual(oldReplacementType))
+      if (newReplacementType.getPointer() != oldReplacementType.getPointer())
         return newUnderlyingType;
     }
 
-    if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+    if (oldParentType.getPointer() == newParentType.getPointer() &&
+        oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
     return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
