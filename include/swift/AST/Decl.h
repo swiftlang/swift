@@ -1536,6 +1536,7 @@ public:
   /// \endcode
   bool isGeneric() const { return getGenericParams() != nullptr; }
   bool hasComputedGenericSignature() const;
+  bool isComputingGenericSignature() const;
   
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
