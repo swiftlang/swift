@@ -2720,14 +2720,6 @@ void ValueDecl::setInterfaceType(Type type) {
   TypeAndAccess.setPointer(type);
 }
 
-bool ValueDecl::hasValidSignature() const {
-  if (!hasInterfaceType())
-    return false;
-  // FIXME -- The build blows up if the correct code is used:
-  // return getValidationState() > ValidationState::CheckingWithValidSignature;
-  return getValidationState() != ValidationState::Checking;
-}
-
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
                                               bool skipIsObjCResolution) const {
   if (auto func = dyn_cast<AbstractFunctionDecl>(this))

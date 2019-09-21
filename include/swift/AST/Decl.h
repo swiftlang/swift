@@ -279,7 +279,6 @@ public:
   enum class ValidationState {
     Unchecked,
     Checking,
-    CheckingWithValidSignature,
     Checked,
   };
 
@@ -850,17 +849,9 @@ public:
     case ValidationState::Checked:
       return false;
     case ValidationState::Checking:
-    case ValidationState::CheckingWithValidSignature:
       return true;
     }
     llvm_unreachable("Unknown ValidationState");
-  }
-
-  /// Update the validation state for the declaration to allow access to the
-  /// generic signature.
-  void setSignatureIsValidated() {
-    assert(getValidationState() == ValidationState::Checking);
-    setValidationState(ValidationState::CheckingWithValidSignature);
   }
 
   bool hasValidationStarted() const {
@@ -1769,11 +1760,6 @@ public:
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
 
-  /// Whether we have fully checked the extension signature.
-  bool hasValidSignature() const {
-    return getValidationState() > ValidationState::CheckingWithValidSignature;
-  }
-
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
   }
@@ -2608,8 +2594,6 @@ public:
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
-
-  bool hasValidSignature() const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.

@@ -2881,7 +2881,7 @@ public:
     checkUnsupportedNestedType(PD);
 
     TC.validateDecl(PD);
-    if (!PD->hasValidSignature())
+    if (!PD->hasInterfaceType())
       return;
 
     auto *SF = PD->getParentSourceFile();
@@ -3086,9 +3086,14 @@ public:
       return;
     }
 
-    TC.validateExtension(ED);
+    // Validate the nominal type declaration being extended.
+    TC.validateDecl(nominal);
+    // Don't bother computing the generic signature if the extended nominal
+    // type didn't pass validation so we don't crash.
+    if (!nominal->isInvalid())
+      (void)ED->getGenericSignature();
+    ED->setValidationToChecked();
 
-    extType = ED->getExtendedType();
     if (extType && !extType->hasError()) {
       // The first condition catches syntactic forms like
       //     protocol A & B { ... } // may be protocols or typealiases
@@ -3726,12 +3731,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     return;
 
   // Handling validation failure due to re-entrancy is left
-  // up to the caller, who must call hasValidSignature() to
+  // up to the caller, who must call hasInterfaceType() to
   // check that validateDecl() returned a fully-formed decl.
   if (D->hasValidationStarted()) {
     // If this isn't reentrant (i.e. D has already been validated), the
     // signature better be valid.
-    assert(D->isBeingValidated() || D->hasValidSignature());
+    assert(D->isBeingValidated() || D->hasInterfaceType());
     return;
   }
 
@@ -3754,18 +3759,31 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   auto dc = D->getDeclContext();
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
     validateDecl(nominal);
-    if (!nominal->hasValidSignature())
+    if (!nominal->hasInterfaceType())
       return;
   } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    validateExtension(ext);
-    if (!ext->hasValidSignature())
+    // If we're currently validating, or have already validated this extension,
+    // there's nothing more to do now.
+    if (!ext->hasValidationStarted()) {
+      DeclValidationRAII IBV(ext);
+
+      if (auto *nominal = ext->getExtendedNominal()) {
+        // Validate the nominal type declaration being extended.
+        validateDecl(nominal);
+        
+        // Eagerly validate the generic signature of the extension.
+        if (!nominal->isInvalid())
+          (void)ext->getGenericSignature();
+      }
+    }
+    if (ext->getValidationState() == Decl::ValidationState::Checking)
       return;
   }
 
   // Validating the parent may have triggered validation of this declaration,
   // so just return if that was the case.
   if (D->hasValidationStarted()) {
-    assert(D->hasValidSignature());
+    assert(D->hasInterfaceType());
     return;
   }
 
@@ -3819,7 +3837,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       
   case DeclKind::OpaqueType: {
     auto opaque = cast<OpaqueTypeDecl>(D);
-    DeclValidationRAII IBV(opaque);
+    opaque->setValidationToChecked();
     break;
   }
 
@@ -3828,11 +3846,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Class: {
     auto nominal = cast<NominalTypeDecl>(D);
     nominal->computeType();
-
-    // Check generic parameters, if needed.
-    DeclValidationRAII IBV(nominal);
-    (void)nominal->getGenericSignature();
-    nominal->setSignatureIsValidated();
+    nominal->setValidationToChecked();
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
@@ -3848,11 +3862,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto proto = cast<ProtocolDecl>(D);
     if (!proto->hasInterfaceType())
       proto->computeType();
-
-    // Validate the generic type signature, which is just <Self : P>.
-    DeclValidationRAII IBV(proto);
-    (void)proto->getGenericSignature();
-    proto->setSignatureIsValidated();
+    proto->setValidationToChecked();
 
     break;
   }
@@ -3930,7 +3940,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       auto *storage = accessor->getStorage();
       validateDecl(storage);
-      if (!storage->hasValidSignature())
+      if (!storage->hasInterfaceType())
         return;
     }
 
@@ -4036,7 +4046,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                        FD->getBodyResultTypeLoc(), resolution);
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
-    FD->setSignatureIsValidated();
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
@@ -4081,11 +4090,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeCheckParameterList(CD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
-
-    // We want the constructor to be available for name lookup as soon
-    // as it has a valid interface type.
-    CD->setSignatureIsValidated();
-
     break;
   }
 
@@ -4098,8 +4102,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeCheckParameterList(DD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     DD->computeType();
-
-    DD->setSignatureIsValidated();
     break;
   }
 
@@ -4114,8 +4116,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateResultType(*this, SD, SD->getIndices(),
                        SD->getElementTypeLoc(), res);
     SD->computeType();
-
-    SD->setSignatureIsValidated();
 
     if (SD->getOpaqueResultTypeDecl()) {
       if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
@@ -4160,8 +4160,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // type.
     EED->computeType();
 
-    EED->setSignatureIsValidated();
-
     if (auto argTy = EED->getArgumentInterfaceType()) {
       assert(argTy->isMaterializable());
       (void) argTy;
@@ -4171,7 +4169,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
   }
 
-  assert(D->hasValidSignature());
+  assert(D->hasInterfaceType());
 }
 
 llvm::Expected<DeclRange>
@@ -4347,26 +4345,6 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   }
 
   return extendedType;
-}
-
-void TypeChecker::validateExtension(ExtensionDecl *ext) {
-  // If we're currently validating, or have already validated this extension,
-  // there's nothing more to do now.
-  if (ext->hasValidationStarted())
-    return;
-
-  DeclValidationRAII IBV(ext);
-
-  if (auto *nominal = ext->getExtendedNominal()) {
-    // Validate the nominal type declaration being extended.
-    validateDecl(nominal);
-    
-    // FIXME: validateExtension is going to disappear soon.  In the mean time
-    // don't bother computing the generic signature if the extended nominal type
-    // didn't pass validation so we don't crash.
-    if (!nominal->isInvalid())
-      (void)ext->getGenericSignature();
-  }
 }
 
 /// Build a default initializer string for the given pattern.

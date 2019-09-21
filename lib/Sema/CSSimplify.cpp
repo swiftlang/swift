@@ -2144,7 +2144,7 @@ static ConstraintFix *fixPropertyWrapperFailure(
   };
 
   auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
-    if (!decl->hasValidSignature() || !type)
+    if (!decl->hasInterfaceType() || !type)
       return nullptr;
 
     if (baseTy->isEqual(type))

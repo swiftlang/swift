@@ -188,15 +188,17 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // Invalid case.
     if (extendedNominal == nullptr)
       return true;
-
+    
+    // Validate the nominal type being extended.
+    tc.validateDecl(extendedNominal);
+    if (extendedNominal->isInvalid())
+      return true;
+    
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
     if (!isa<ProtocolDecl>(extendedNominal))
       return !extension->isConstrainedExtension();
-
-    // Build a generic signature.
-    tc.validateExtension(extension);
-
+    
     // FIXME: The extension may not have a generic signature set up yet as
     // resolving signatures may trigger associated type inference.  This cycle
     // is now detectable and we should look into untangling it
@@ -204,6 +206,9 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!extension->hasComputedGenericSignature())
       return true;
 
+    // Build a generic signature.
+    auto *extensionSig = extension->getGenericSignature();
+    
     // The condition here is a bit more fickle than
     // `isExtensionApplied`. That check would prematurely reject
     // extensions like `P where AssocType == T` if we're relying on a
@@ -212,8 +217,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
     auto selfTy = extension->getSelfInterfaceType();
-    for (const Requirement &reqt
-         : extension->getGenericSignature()->getRequirements()) {
+    for (const Requirement &reqt : extensionSig->getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
@@ -449,7 +453,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
 
     // Validate the requirement.
     tc.validateDecl(req);
-    if (req->isInvalid() || !req->hasValidSignature())
+    if (req->isInvalid() || !req->hasInterfaceType())
       continue;
 
     // Check whether any of the associated types we care about are
@@ -497,7 +501,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   if (!witness->hasInterfaceType())
     tc.validateDecl(witness);
 
-  if (witness->isInvalid() || !witness->hasValidSignature())
+  if (witness->isInvalid() || !witness->hasInterfaceType())
     return Type();
 
   if (!witness->getDeclContext()->isTypeContext()) {
@@ -2035,7 +2039,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   if (!requirement->hasInterfaceType())
     TC.validateDecl(requirement);
 
-  if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+  if (requirement->isInvalid() || !requirement->hasInterfaceType()) {
     Conformance->setInvalid();
     return;
   }

@@ -819,7 +819,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
         if (auto *param = dyn_cast<ParamDecl>(var))
           return getType(param);
 
-        if (!var->hasValidSignature()) {
+        if (!var->hasInterfaceType()) {
           if (!var->isInvalid()) {
             TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
                         var->getDescriptiveKind(), var->getName());
