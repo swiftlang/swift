@@ -1739,10 +1739,10 @@ bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
 }
 
 void ASTScopeImpl::reexpand(ScopeCreator &scopeCreator) {
-  auto scopesToReuse = rescueScopesToReuse();
+  auto astAncestorScopes = rescueASTAncestorScopesForReuseFromMeOrDescendants();
   disownDescendants(scopeCreator);
   expandAndBeCurrent(scopeCreator);
-  addReusedScopes(scopesToReuse);
+  replaceASTAncestorScopes(astAncestorScopes);
 }
 
 #pragma mark getScopeCreator
@@ -1911,34 +1911,43 @@ bool WholeClosureScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == closureExpr->getBody();
 }
 
-#pragma mark getParentOfRescuedScopes
-NullablePtr<ASTScopeImpl> ASTScopeImpl::getParentOfRescuedScopes() {
+#pragma mark getParentOfASTAncestorScopesToBeRescued
+NullablePtr<ASTScopeImpl>
+ASTScopeImpl::getParentOfASTAncestorScopesToBeRescued() {
   return this;
 }
 NullablePtr<ASTScopeImpl>
-AbstractFunctionBodyScope::getParentOfRescuedScopes() {
+AbstractFunctionBodyScope::getParentOfASTAncestorScopesToBeRescued() {
   // Reexpansion always creates a new body as the first child
+  // That body contains the scopes to be rescued.
   return getChildren().empty() ? nullptr : getChildren().front();
 }
-NullablePtr<ASTScopeImpl> TopLevelCodeScope::getParentOfRescuedScopes() {
+NullablePtr<ASTScopeImpl>
+TopLevelCodeScope::getParentOfASTAncestorScopesToBeRescued() {
   // Reexpansion always creates a new body as the first child
+  // That body contains the scopes to be rescued.
   return getChildren().empty() ? nullptr : getChildren().front();
 }
 
 #pragma mark rescuing & reusing
-std::vector<ASTScopeImpl *> ASTScopeImpl::rescueScopesToReuse() {
-  // If I was never expanded, then there won't be any rescuable scopes.
-  if (!wasEverExpanded())
+std::vector<ASTScopeImpl *>
+ASTScopeImpl::rescueASTAncestorScopesForReuseFromMeOrDescendants() {
+// If I was never expanded, then there won't be any rescuable scopes.
+  if (!getWasExpanded())
     return {};
-  if (auto *p = getParentOfRescuedScopes().getPtrOrNull()) {
-    return p->rescueYoungestChildren(p->getChildren().size() -
-                                     p->getChildrenCountWhenLastExpanded());
+  if (auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull()) {
+    return p->rescueASTAncestorScopesForReuseFromMe(
+        p->getChildren().size() - p->getChildrenCountWhenLastExpanded());
   }
+  ASTScopeAssert(
+      scopesFromASTAncestors == 0,
+      "If receives ASTAncestor scopes, must know where to find parent");
   return {};
 }
 
-void ASTScopeImpl::addReusedScopes(ArrayRef<ASTScopeImpl *> scopesToAdd) {
-  auto *p = getParentOfRescuedScopes().getPtrOrNull();
+void ASTScopeImpl::replaceASTAncestorScopes(
+    ArrayRef<ASTScopeImpl *> scopesToAdd) {
+  auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull();
   if (!p) {
     ASTScopeAssert(scopesToAdd.empty(), "Non-empty body disappeared?!");
     return;
@@ -1952,16 +1961,17 @@ void ASTScopeImpl::addReusedScopes(ArrayRef<ASTScopeImpl *> scopesToAdd) {
 }
 
 std::vector<ASTScopeImpl *>
-ASTScopeImpl::rescueYoungestChildren(const unsigned int count) {
-  std::vector<ASTScopeImpl *> youngestChildren;
+ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe(const unsigned int count) {
+  std::vector<ASTScopeImpl *> astAncestorScopes;
   for (unsigned i = getChildren().size() - count; i < getChildren().size(); ++i)
-    youngestChildren.push_back(getChildren()[i]);
+    astAncestorScopes.push_back(getChildren()[i]);
   // So they don't get disowned and children cleared.
   for (unsigned i = 0; i < count; ++i) {
     storedChildren.back()->emancipate();
     storedChildren.pop_back();
+    --scopesFromASTAncestors;
   }
-  return youngestChildren;
+  return astAncestorScopes;
 }
 
 unsigned ASTScopeImpl::getChildrenCountWhenLastExpanded() const {

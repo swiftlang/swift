@@ -193,12 +193,14 @@ protected:
 
 public: // for addReusedBodyScopes
   void addChild(ASTScopeImpl *child, ASTContext &);
-  std::vector<ASTScopeImpl *> rescueYoungestChildren(unsigned count);
+  std::vector<ASTScopeImpl *>
+  rescueASTAncestorScopesForReuseFromMe(unsigned count);
 
   /// When reexpanding, do we always create a new body?
-  virtual NullablePtr<ASTScopeImpl> getParentOfRescuedScopes();
-  std::vector<ASTScopeImpl *> rescueScopesToReuse();
-  void addReusedScopes(ArrayRef<ASTScopeImpl *>);
+  virtual NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued();
+  std::vector<ASTScopeImpl *>
+  rescueASTAncestorScopesForReuseFromMeOrDescendants();
+  void replaceASTAncestorScopes(ArrayRef<ASTScopeImpl *>);
 
 private:
   void removeChildren();
@@ -1073,7 +1075,7 @@ public:
   Decl *getDecl() const { return decl; }
   static bool isAMethod(const AbstractFunctionDecl *);
 
-  NullablePtr<ASTScopeImpl> getParentOfRescuedScopes() override;
+  NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 
 protected:
   bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
@@ -1496,7 +1498,7 @@ public:
   Decl *getDecl() const { return decl; }
   NullablePtr<const void> getReferrent() const override;
 
-  NullablePtr<ASTScopeImpl> getParentOfRescuedScopes() override;
+  NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued() override;
 };
 
 /// The \c _@specialize attribute.
