@@ -6757,9 +6757,9 @@ public:
 
   /// Handle `struct_extract` instruction.
   ///   Original: y = struct_extract x, #field
-  ///    Adjoint: adj[x] += struct (0, ..., #field': adj[y], ..., 0)
-  ///                                       ^~~~~~~
-  ///                     field in tangent space corresponding to #field
+  ///    Adjoint: adj[x].field' += adj[y]
+  ///                    ^~~~~~
+  ///        field in tangent space corresponding to #field
   void visitStructExtractInst(StructExtractInst *sei) {
     assert(!sei->getField()->getAttrs().hasAttribute<NoDerivativeAttr>() &&
            "`struct_extract` with `@noDerivative` field should not be "
@@ -6772,8 +6772,6 @@ public:
     assert(!getModule().Types.getTypeLowering(
                tangentVectorTy, ResilienceExpansion::Minimal)
                    .isAddressOnly());
-    auto tangentVectorSILTy =
-        SILType::getPrimitiveObjectType(tangentVectorTy);
     auto *tangentVectorDecl =
         tangentVectorTy->getStructOrBoundGenericStruct();
     assert(tangentVectorDecl);
@@ -6798,14 +6796,10 @@ public:
       tanField = cast<VarDecl>(tanFieldLookup.front());
     }
     // Accumulate adjoint for the `struct_extract` operand.
+    auto adjStruct = getAdjointBuffer(bb, sei->getOperand());
     auto adjElt = getAdjointBuffer(bb, sei);
-    auto tmp = builder.createAllocStack(loc, tangentVectorSILTy);
-    emitZeroIndirect(tangentVectorTy, tmp, loc);
-    auto adjEltDest = builder.createStructElementAddr(loc, tmp, tanField);
+    auto adjEltDest = builder.createStructElementAddr(loc, adjStruct, tanField);
     accumulateIndirect(adjEltDest, adjElt, loc);
-    addToAdjointBuffer(bb, sei->getOperand(), tmp, loc);
-    builder.createDestroyAddr(loc, tmp);
-    builder.createDeallocStack(loc, tmp);
   }
 
   /// Handle `tuple` instruction.
