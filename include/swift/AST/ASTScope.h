@@ -135,6 +135,8 @@ private:
   /// Must clear source range change whenever this changes
   Children storedChildren;
 
+  bool wasExpanded = false;
+
   /// Because expansion returns an insertion point,
   /// if a scope is reexpanded, the children added NOT by expansion must be
   /// rescued and reused.
@@ -340,11 +342,11 @@ public:
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
   unsigned getChildrenCountWhenLastExpanded() const;
-  bool wasEverExpanded() const;
+  bool getWasExpanded() const { return wasExpanded; }
 
 protected:
   void setChildrenCountWhenLastExpanded();
-  void recordThatIWasExpandedEvenIfNoChildrenWereAdded();
+  void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
   virtual void beCurrent();
   bool isCurrent() const;

@@ -760,7 +760,7 @@ void ASTSourceFileScope::addNewDeclsToScopeTree() {
   // TODO: use childrenCountWhenLastExpanded & regular expansion machinery for ASTSourceFileScope
   // rdar://55562483
   numberOfDeclsAlreadySeen = SF->Decls.size();
-  recordThatIWasExpandedEvenIfNoChildrenWereAdded();
+  setWasExpanded();
 
   // Too slow to perform all the time:
   //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
@@ -1085,7 +1085,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
                    "accurate before expansion, the insertion point before "
                    "expansion must be the same as after expansion.");
   }
-  recordThatIWasExpandedEvenIfNoChildrenWereAdded();
+  setWasExpanded();
   beCurrent();
   ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()),
                  "Bad range.");
@@ -1731,7 +1731,7 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
   if (isCurrent() &&
       !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup) {
-    ASTScopeAssert(wasEverExpanded(), "Cannot be current if unexpanded.");
+    ASTScopeAssert(getWasExpanded(), "Cannot be current if unexpanded.");
     return false;
   }
   assertThatTreeDoesNotShrink([&] { this->reexpand(scopeCreator); });
@@ -1820,7 +1820,7 @@ IterableTypeBodyPortion::insertionPointForDeferredExpansion(
 }
 
 bool ASTScopeImpl::isCurrent() const {
-  return wasEverExpanded() && isCurrentIfWasExpanded();
+  return getWasExpanded() && isCurrentIfWasExpanded();
 }
 
 void ASTScopeImpl::beCurrent() {}
@@ -1852,12 +1852,12 @@ bool IterableTypeBodyPortion::isCurrentIfWasExpanded(
 }
 
 void IterableTypeScope::makeWholeCurrent() {
-  ASTScopeAssert(wasEverExpanded(), "Should have been expanded");
+  ASTScopeAssert(getWasExpanded(), "Should have been expanded");
 }
 bool IterableTypeScope::isWholeCurrent() const {
   // Whole starts out unexpanded, and is lazily built but will have at least a
   // body scope child
-  return wasEverExpanded();
+  return getWasExpanded();
 }
 void IterableTypeScope::makeBodyCurrent() {
   memberCount = getIterableDeclContext().get()->getMemberCount();
@@ -1975,17 +1975,12 @@ ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe(const unsigned int count) {
 }
 
 unsigned ASTScopeImpl::getChildrenCountWhenLastExpanded() const {
-  ASTScopeAssert(wasEverExpanded(), "meaningless");
+  ASTScopeAssert(getWasExpanded(), "meaningless");
   return childrenCountWhenLastExpanded;
 }
-bool ASTScopeImpl::wasEverExpanded() const {
-  return childrenCountWhenLastExpanded != childrenCountBeforeExpansion;
-}
+
 void ASTScopeImpl::setChildrenCountWhenLastExpanded() {
   childrenCountWhenLastExpanded = getChildren().size();
-}
-void ASTScopeImpl::recordThatIWasExpandedEvenIfNoChildrenWereAdded() {
-  setChildrenCountWhenLastExpanded();
 }
 
 bool AbstractFunctionDeclScope::shouldCreateAccessorScope(
