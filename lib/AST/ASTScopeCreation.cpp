@@ -1741,7 +1741,7 @@ bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
     ASTScopeAssert(getWasExpanded(), "Cannot be current if unexpanded.");
     return false;
   }
-  this->reexpand(scopeCreator);
+  reexpand(scopeCreator);
   return true;
 }
 
@@ -1941,9 +1941,6 @@ TopLevelCodeScope::getParentOfASTAncestorScopesToBeRescued() {
 #pragma mark rescuing & reusing
 std::vector<ASTScopeImpl *>
 ASTScopeImpl::rescueASTAncestorScopesForReuseFromMeOrDescendants() {
-// If I was never expanded, then there won't be any rescuable scopes.
-  if (!getWasExpanded())
-    return {};
   if (auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull()) {
     return p->rescueASTAncestorScopesForReuseFromMe();
   }
@@ -1962,7 +1959,7 @@ void ASTScopeImpl::replaceASTAncestorScopes(
   }
   auto &ctx = getASTContext();
   for (auto *s : scopesToAdd) {
-    p->addChild(s, ctx); // NONORGANIC
+    p->addChild(s, ctx);
     ASTScopeAssert(s->verifyThatThisNodeComeAfterItsPriorSibling(),
                    "Ensure search will work");
   }
