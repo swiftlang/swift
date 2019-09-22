@@ -1741,7 +1741,7 @@ bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
     ASTScopeAssert(getWasExpanded(), "Cannot be current if unexpanded.");
     return false;
   }
-  assertThatTreeDoesNotShrink([&] { this->reexpand(scopeCreator); });
+  this->reexpand(scopeCreator);
   return true;
 }
 

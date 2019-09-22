@@ -296,6 +296,7 @@ unsigned ASTScopeImpl::countDescendants() const {
   return count - 1;
 }
 
+// Can fail if a subscope is lazy and not reexpanded
 void ASTScopeImpl::assertThatTreeDoesNotShrink(function_ref<void()> fn) {
 #ifndef NDEBUG
   unsigned beforeCount = countDescendants();
