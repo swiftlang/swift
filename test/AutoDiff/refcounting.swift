@@ -79,14 +79,13 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 
 // The vjp should not release pullback values.
 //
-// CHECK-LABEL: sil hidden @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@owned Vector, @owned @callee_guaranteed (@in_guaranteed Vector) -> @out Vector)
+// CHECK-LABEL: sil hidden @{{.*}}testOwnedVector{{.*}}__vjp_src_0_wrt_0 : $@convention(thin) (@guaranteed Vector) -> (@out Vector, @owned @callee_guaranteed (@in_guaranteed Vector) -> @out Vector)
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
 // CHECK:   [[ADD_JVP:%.*]] = function_ref @{{.*}}Vector_plus__jvp_src_0_wrt_0_1{{.*}}
 // CHECK:   [[ADD_VJP:%.*]] = function_ref @{{.*}}Vector_plus__vjp_src_0_wrt_0_1{{.*}}
 // CHECK:   [[ADD_AD_FUNC:%.*]] = autodiff_function [wrt 0 1] [order 1] [[ADD]] {{.*}} with {[[ADD_JVP]] {{.*}}, [[ADD_VJP]] {{.*}}}
 // CHECK:   [[ADD_AD_FUNC_EXTRACT:%.*]] = autodiff_function_extract [vjp] [order 1] [[ADD_AD_FUNC]]
-// CHECK:   [[ADD_VJP_RESULT:%.*]] = apply [[ADD_AD_FUNC_EXTRACT]]({{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@owned Vector, @owned @callee_guaranteed (@in_guaranteed Vector) -> (@out Vector, @out Vector))
-// CHECK:   [[ADD_PULLBACK:%.*]] = tuple_extract [[ADD_VJP_RESULT]] : $(Vector, @callee_guaranteed (@in_guaranteed Vector) -> (@out Vector, @out Vector)), 1
+// CHECK:   [[ADD_PULLBACK:%.*]] = apply [[ADD_AD_FUNC_EXTRACT]]([[ADD_VJP_RESULT:%.*]], {{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@out Vector, @owned @callee_guaranteed (@in_guaranteed Vector) -> (@out Vector, @out Vector))
 // CHECK-NOT:   release_value [[ADD_VJP_RESULT]]
 // CHECK-NOT:   release_value [[ADD_PULLBACK]]
 

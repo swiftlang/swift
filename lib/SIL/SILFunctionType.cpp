@@ -264,8 +264,9 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   SmallVector<SILResultInfo, 4> newResults;
   newResults.reserve(getNumResults() + 1);
   for (auto &result : getResults()) {
-    auto mappedResult = result.getWithType(
-        result.getType()->getCanonicalType(assocFnGenSig));
+    auto mappedResult = SILResultInfo(
+        result.getType()->getCanonicalType(assocFnGenSig),
+        ResultConvention::Indirect);
     newResults.push_back(mappedResult);
   }
   newResults.push_back({closureType->getCanonicalType(assocFnGenSig),
@@ -2480,8 +2481,10 @@ normalizeAutoDiffLinearMapType(CanSILFunctionType assocFnType) {
 static CanSILFunctionType
 normalizeAutoDiffAssociatedFunctionType(CanSILFunctionType assocFnType) {
   SmallVector<SILResultInfo, 2> results;
+  // Convert original direct results to indirect results.
   for (auto result : assocFnType->getResults().drop_back())
-    results.push_back(result);
+    results.push_back(
+        SILResultInfo(result.getType(), ResultConvention::Indirect));
   auto linearMapResult = assocFnType->getResults().back();
   auto linearMapFnType =
       linearMapResult.getSILStorageType().castTo<SILFunctionType>();

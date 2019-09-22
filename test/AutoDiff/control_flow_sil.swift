@@ -42,8 +42,8 @@ func cond(_ x: Float) -> Float {
 // CHECK-DATA-STRUCTURES:   case bb1(_AD__cond_bb1__PB__src_0_wrt_0)
 // CHECK-DATA-STRUCTURES: }
 
-// CHECK-SIL-LABEL: sil hidden [ossa] @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) {
-// CHECK-SIL: bb0([[INPUT_ARG:%.*]] : $Float):
+// CHECK-SIL-LABEL: sil hidden [ossa] @AD__cond__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (@out Float, @owned @callee_guaranteed (@in_guaranteed Float) -> @out Float) {
+// CHECK-SIL: bb0([[VJP_RESULT:%.*]] : $*Float, [[INPUT_ARG:%.*]] : $Float):
 // CHECK-SIL:   [[BB0_PB_STRUCT:%.*]] = struct $_AD__cond_bb0__PB__src_0_wrt_0 ()
 // CHECK-SIL:   cond_br {{%.*}}, bb1, bb3
 
@@ -69,8 +69,8 @@ func cond(_ x: Float) -> Float {
 // CHECK-SIL:   [[BB3_PB_STRUCT:%.*]] = struct $_AD__cond_bb3__PB__src_0_wrt_0
 // CHECK-SIL:   [[PULLBACK_REF:%.*]] = function_ref @AD__cond__pullback_src_0_wrt_0
 // CHECK-SIL:   [[PB:%.*]] = partial_apply [callee_guaranteed] [[PULLBACK_REF]]([[BB3_PB_STRUCT]])
-// CHECK-SIL:   [[VJP_RESULT:%.*]] = tuple ([[ORIG_RES]] : $Float, [[PB]] : $@callee_guaranteed (@in_guaranteed Float) -> @out Float)
-// CHECK-SIL:   return [[VJP_RESULT]]
+// CHECK-SIL:   store [[ORIG_RES]] to [trivial] [[VJP_RESULT]]
+// CHECK-SIL:   return [[PB]]
 
 // CHECK-SIL-LABEL: sil hidden [ossa] @AD__cond__pullback_src_0_wrt_0 : $@convention(thin) (@in_guaranteed Float, @owned _AD__cond_bb3__PB__src_0_wrt_0) -> @out Float {
 // CHECK-SIL: bb0([[PB_RESULT:%.*]] : $*Float, [[SEED:%.*]] : $*Float, [[BB3_PB_STRUCT:%.*]] : @owned $_AD__cond_bb3__PB__src_0_wrt_0):

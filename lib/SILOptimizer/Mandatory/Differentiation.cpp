@@ -3536,8 +3536,8 @@ public:
     // Get the value in the VJP corresponding to the original result.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
-    SmallVector<SILValue, 8> origResults;
-    extractAllElements(origResult, builder, origResults);
+    SmallVector<SILValue, 8> origDirectResults;
+    extractAllElements(origResult, builder, origDirectResults);
 
     // Get and partially apply the pullback.
     auto vjpGenericEnv = vjp->getGenericEnvironment();
@@ -3549,12 +3549,17 @@ public:
         loc, pullbackRef, vjpSubstMap, {pbStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    // Return a tuple of the original result and pullback.
-    SmallVector<SILValue, 8> directResults;
-    directResults.append(origResults.begin(), origResults.end());
-    directResults.push_back(pullbackPartialApply);
+    // Return VJP results: original indrect results and pullback.
+    assert(origDirectResults.size() + original->getIndirectResults().size() ==
+               vjp->getIndirectResults().size());
+    for (unsigned i : range(origDirectResults.size())) {
+      auto origDirectResult = origDirectResults[i];
+      auto vjpIndirectResult = vjp->getIndirectResults()[i];
+      builder.emitStoreValueOperation(loc, origDirectResult, vjpIndirectResult,
+                                      StoreOwnershipQualifier::Init);
+    }
     builder.createReturn(
-        ri->getLoc(), joinElements(directResults, builder, loc));
+        ri->getLoc(), joinElements({pullbackPartialApply}, builder, loc));
   }
 
   void visitBranchInst(BranchInst *bi) {
@@ -3702,22 +3707,15 @@ public:
 
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
 
-    // Get the parameter indices required for differentiating this function.
-    SmallVector<SILValue, 4> allResults;
-    // Only append the results from the `destruct_tuple` instruction which are
-    // active, we don't consider the result of the original apply if it's a
-    // tuple.
-    if (auto *dti = getSingleDestructureTupleUser(ai)) {
-      for (auto result : dti->getResults())
-        allResults.push_back(result);
-    } else {
-      allResults.push_back(ai);
-    }
-    allResults.append(ai->getIndirectSILResults().begin(),
-                      ai->getIndirectSILResults().end());
+    // Get the parameter indices required for differentiating this `apply`.
+    SmallVector<SILValue, 8> origDirResults;
+    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origAllResults;
+    collectAllActualResultsInTypeOrder(
+        ai, origDirResults, ai->getIndirectSILResults(), origAllResults);
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
+    collectMinimalIndicesForFunctionCall(ai, origAllResults, getIndices(),
                                          activityInfo, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
@@ -3738,8 +3736,9 @@ public:
     }
 
     // Form expected indices, assuming there's only one result.
+    auto activeResultIndex = activeResultIndices.front();
     SILAutoDiffIndices indices(
-        activeResultIndices.front(),
+        activeResultIndex,
         AutoDiffIndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
@@ -3841,8 +3840,7 @@ public:
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
       // TODO(TF-689): Make `autodiff_function` store result indices and remove
       // `ADContext::resultIndices`.
-      context.getResultIndices()[autoDiffFuncInst] =
-          activeResultIndices.front();
+      context.getResultIndices()[autoDiffFuncInst] = activeResultIndex;
 
       auto borrowedADFunc =
           builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
@@ -3867,6 +3865,20 @@ public:
     auto numVJPArgs =
         vjpFnTy->getNumParameters() + vjpFnTy->getNumIndirectFormalResults();
     vjpArgs.reserve(numVJPArgs);
+    // Create VJP indirect result allocations for original direct results.
+    SmallVector<SILValue, 4> vjpIndirectResults;
+    assert(originalFnTy->getNumResults() == vjpFnTy->getNumResults() - 1);
+    assert(originalFnTy->getNumResults() == origAllResults.size());
+    for (unsigned i : range(originalFnTy->getNumResults())) {
+      auto origResInfo = originalFnTy->getResults()[i];
+      auto vjpResInfo = vjpFnTy->getResults()[i];
+      if (origResInfo.isFormalDirect() && vjpResInfo.isFormalIndirect()) {
+        auto indirectResult =
+            builder.createAllocStack(loc, origResInfo.getSILStorageType());
+        vjpIndirectResults.push_back(indirectResult);
+        vjpArgs.push_back(indirectResult);
+      }
+    }
     // Collect substituted arguments.
     for (auto origArg : ai->getArguments())
       vjpArgs.push_back(getOpValue(origArg));
@@ -3881,17 +3893,21 @@ public:
     // Get the VJP results (original results and pullback).
     SmallVector<SILValue, 8> vjpDirectResults;
     extractAllElements(vjpCall, getBuilder(), vjpDirectResults);
-    ArrayRef<SILValue> originalDirectResults =
-        ArrayRef<SILValue>(vjpDirectResults).drop_back(1);
-    SILValue originalDirectResult = joinElements(originalDirectResults,
-                                                 getBuilder(),
-                                                 vjpCall->getLoc());
-    SILValue pullback = vjpDirectResults.back();
 
-    // Store the original result to the value map.
+    // Store the original result in the value map.
+    SmallVector<SILValue, 8> vjpLoadedIndirectResults;
+    for (auto vjpIndirectResult : reversed(vjpIndirectResults)) {
+      auto load = builder.emitLoadValueOperation(
+          loc, vjpIndirectResult, LoadOwnershipQualifier::Take);
+      vjpLoadedIndirectResults.push_back(load);
+      builder.createDeallocStack(loc, vjpIndirectResult);
+    }
+    SILValue originalDirectResult = joinElements(vjpLoadedIndirectResults,
+                                                 getBuilder(), loc);
     mapValue(ai, originalDirectResult);
 
     // Checkpoint the pullback.
+    SILValue pullback = vjpDirectResults.back();
     auto *pullbackDecl = pullbackInfo.lookUpLinearMapDecl(ai);
 
     // If actual pullback type does not match lowered pullback type, reabstract
@@ -5369,8 +5385,13 @@ public:
     createEntryArguments(jvp);
     prepareForDifferentialGeneration();
     // Clone.
-    SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
-                                       entry->getArguments().end());
+    SmallVector<SILValue, 4> entryArgs;
+    // Skip extra JVP indirect results, corresponding to original direct
+    // results.
+    auto jvpNumExtraIndirectResults = jvp->getIndirectResults().size() -
+                                      original->getIndirectResults().size();
+    entryArgs.append(entry->getArguments().begin() + jvpNumExtraIndirectResults,
+                     entry->getArguments().end());
     cloneFunctionBody(original, entry, entryArgs);
     emitReturnInstForDifferential();
     // If errors occurred, back out.
@@ -5465,24 +5486,15 @@ public:
 
     LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
 
-    // Get the parameter indices required for differentiating this function.
-    SmallVector<SILValue, 4> allResults;
-    // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
-    // results of the `destructure_tuple` user to `allResults` instead of adding
-    // the `apply` result itself.
-    // Otherwise, add `apply` result to `allResults`.
-    if (auto *dti = getSingleDestructureTupleUser(ai)) {
-      for (auto result : dti->getResults())
-        allResults.push_back(result);
-    } else {
-      allResults.push_back(ai);
-    }
-
-    allResults.append(ai->getIndirectSILResults().begin(),
-                      ai->getIndirectSILResults().end());
+    // Get the parameter indices required for differentiating this `apply`.
+    SmallVector<SILValue, 8> origDirResults;
+    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origAllResults;
+    collectAllActualResultsInTypeOrder(
+        ai, origDirResults, ai->getIndirectSILResults(), origAllResults);
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
+    collectMinimalIndicesForFunctionCall(ai, origAllResults, getIndices(),
                                          activityInfo, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
@@ -5502,8 +5514,9 @@ public:
       return;
     }
     // Form expected indices, assuming there's only one result.
+    auto activeResultIndex = activeResultIndices.front();
     SILAutoDiffIndices indices(
-        activeResultIndices.front(),
+        activeResultIndex,
         AutoDiffIndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
@@ -5599,8 +5612,9 @@ public:
 
       // Record the `autodiff_function` instruction.
       context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
-      context.getResultIndices()[autoDiffFuncInst] =
-          activeResultIndices.front();
+      // TODO(TF-689): Make `autodiff_function` store result indices and remove
+      // `ADContext::resultIndices`.
+      context.getResultIndices()[autoDiffFuncInst] = activeResultIndex;
 
       auto borrowedADFunc =
           builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
@@ -5612,12 +5626,37 @@ public:
       builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
     }
 
+    // RAII that pushes the JVP generic signature to `module.Types` so that
+    // calls to `module.Types.getTypeLowering()` below will know the JVP's
+    // generic parameter types.
+    // Necessary for `emitLoadValueOperation` calls and differential lowered
+    // type calculation below.
+    auto jvpGenSig = SubsMap.getGenericSignature()
+        ? SubsMap.getGenericSignature()->getCanonicalSignature()
+        : nullptr;
+    Lowering::GenericContextScope genericContextScope(
+        context.getTypeConverter(), jvpGenSig);
+
     // Call the JVP using the original parameters.
     SmallVector<SILValue, 8> jvpArgs;
     auto jvpFnTy = getOpType(jvpValue->getType()).castTo<SILFunctionType>();
     auto numJVPArgs =
         jvpFnTy->getNumParameters() + jvpFnTy->getNumIndirectFormalResults();
     jvpArgs.reserve(numJVPArgs);
+    // Create JVP indirect result allocations for original direct results.
+    SmallVector<SILValue, 4> jvpIndirectResults;
+    assert(originalFnTy->getNumResults() == jvpFnTy->getNumResults() - 1);
+    assert(originalFnTy->getNumResults() == origAllResults.size());
+    for (unsigned i : range(originalFnTy->getNumResults())) {
+      auto origResInfo = originalFnTy->getResults()[i];
+      auto jvpResInfo = jvpFnTy->getResults()[i];
+      if (origResInfo.isFormalDirect() && jvpResInfo.isFormalIndirect()) {
+        auto indirectResult =
+            builder.createAllocStack(loc, jvpResInfo.getSILStorageType());
+        jvpIndirectResults.push_back(indirectResult);
+        jvpArgs.push_back(indirectResult);
+      }
+    }
     // Collect substituted arguments.
     for (auto origArg : ai->getArguments())
       jvpArgs.push_back(getOpValue(origArg));
@@ -5634,11 +5673,17 @@ public:
     // Get the JVP results (original results and differential).
     SmallVector<SILValue, 8> jvpDirectResults;
     extractAllElements(jvpCall, builder, jvpDirectResults);
-    auto originalDirectResults =
-        ArrayRef<SILValue>(jvpDirectResults).drop_back(1);
-    auto originalDirectResult =
-        joinElements(originalDirectResults, getBuilder(), jvpCall->getLoc());
 
+    // Store the original result in the value map.
+    SmallVector<SILValue, 8> jvpLoadedIndirectResults;
+    for (auto jvpIndirectResult : reversed(jvpIndirectResults)) {
+      auto load = builder.emitLoadValueOperation(
+          loc, jvpIndirectResult, LoadOwnershipQualifier::Take);
+      jvpLoadedIndirectResults.push_back(load);
+      builder.createDeallocStack(loc, jvpIndirectResult);
+    }
+    SILValue originalDirectResult = joinElements(jvpLoadedIndirectResults,
+                                                 getBuilder(), loc);
     mapValue(ai, originalDirectResult);
 
     // Some instructions that produce the callee may have been cloned.
@@ -5654,16 +5699,8 @@ public:
     // This is used later to construct a differential struct.
     auto differential = jvpDirectResults.back();
     auto *differentialDecl = differentialInfo.lookUpLinearMapDecl(ai);
-    auto originalDifferentialType =
+    auto actualDifferentialType =
         getOpType(differential->getType()).getAs<SILFunctionType>();
-    auto differentialType =
-        remapType(differential->getType())
-            .castTo<SILFunctionType>();
-    auto jvpGenSig = SubsMap.getGenericSignature()
-        ? SubsMap.getGenericSignature()->getCanonicalSignature()
-        : nullptr;
-    Lowering::GenericContextScope genericContextScope(
-        context.getTypeConverter(), jvpGenSig);
     auto loweredDifferentialType =
         getOpType(context.getTypeConverter().getLoweredType(
             differentialDecl->getInterfaceType()->getCanonicalType(),
@@ -5671,21 +5708,21 @@ public:
             .castTo<SILFunctionType>();
     // If actual differential type does not match lowered differential type,
     // reabstract the differential using a thunk.
-    if (!loweredDifferentialType->isEqual(originalDifferentialType)) {
+    if (!loweredDifferentialType->isEqual(actualDifferentialType)) {
       SILOptFunctionBuilder fb(context.getTransform());
       auto *thunk = getOrCreateReabstractionThunk(
           fb, context.getModule(), loc, &getDifferential(),
-          differentialType, loweredDifferentialType);
+          actualDifferentialType, loweredDifferentialType);
       auto *thunkRef = builder.createFunctionRef(loc, thunk);
       differential = builder.createPartialApply(
           loc, thunkRef,
           getOpSubstitutionMap(thunk->getForwardingSubstitutionMap()),
-          {differential}, differentialType->getCalleeConvention());
+          {differential}, actualDifferentialType->getCalleeConvention());
     }
     differentialValues[ai->getParent()].push_back(differential);
 
     // Differential emission.
-    emitTangentForApplyInst(ai, indices, originalDifferentialType);
+    emitTangentForApplyInst(ai, indices, actualDifferentialType);
   }
 
   void visitReturnInst(ReturnInst *ri) {
@@ -5697,8 +5734,8 @@ public:
     // Get the JVP value corresponding to the original functions's return value.
     auto *origRetInst = cast<ReturnInst>(origExit->getTerminator());
     auto origResult = getOpValue(origRetInst->getOperand());
-    SmallVector<SILValue, 8> origResults;
-    extractAllElements(origResult, builder, origResults);
+    SmallVector<SILValue, 8> origDirectResults;
+    extractAllElements(origResult, builder, origDirectResults);
 
     // Get and partially apply the differential.
     auto jvpGenericEnv = jvp->getGenericEnvironment();
@@ -5711,12 +5748,17 @@ public:
         loc, differentialRef, jvpSubstMap, {diffStructVal},
         ParameterConvention::Direct_Guaranteed);
 
-    // Return a tuple of the original result and pullback.
-    SmallVector<SILValue, 8> directResults;
-    directResults.append(origResults.begin(), origResults.end());
-    directResults.push_back(differentialPartialApply);
+    // Return JVP results: original indrect results and differential.
+    assert(origDirectResults.size() + original->getIndirectResults().size() ==
+               jvp->getIndirectResults().size());
+    for (unsigned i : range(origDirectResults.size())) {
+      auto origDirectResult = origDirectResults[i];
+      auto jvpIndirectResult = jvp->getIndirectResults()[i];
+      builder.emitStoreValueOperation(loc, origDirectResult, jvpIndirectResult,
+                                      StoreOwnershipQualifier::Init);
+    }
     builder.createReturn(
-        ri->getLoc(), joinElements(directResults, builder, loc));
+        ri->getLoc(), joinElements({differentialPartialApply}, builder, loc));
   }
 
   void visitBranchInst(BranchInst *bi) {
@@ -7704,8 +7746,12 @@ bool VJPEmitter::run() {
   createEntryArguments(vjp);
 
   // Clone.
-  SmallVector<SILValue, 4> entryArgs(entry->getArguments().begin(),
-                                     entry->getArguments().end());
+  SmallVector<SILValue, 4> entryArgs;
+  // Skip extra VJP indirect results, corresponding to original direct results.
+  auto vjpNumExtraIndirectResults =
+      vjp->getIndirectResults().size() - original->getIndirectResults().size();
+  entryArgs.append(entry->getArguments().begin() + vjpNumExtraIndirectResults,
+                   entry->getArguments().end());
   cloneFunctionBody(original, entry, entryArgs);
   // If errors occurred, back out.
   if (errorOccurred)
@@ -7786,9 +7832,9 @@ static SILFunction *createEmptyVJP(
               .str();
   auto vjpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
-  // will know the VJP's generic parameter types.
+  // RAII that pushes the VJP generic signature to `module.Types` so that calls
+  // to `module.Types.getTypeLowering()` below will know the VJP's generic
+  // parameter types.
   Lowering::GenericContextScope genericContextScope(
       module.Types, vjpGenericSig);
 
@@ -7836,9 +7882,9 @@ static SILFunction *createEmptyJVP(
               .str();
   auto jvpGenericSig = getAssociatedFunctionGenericSignature(attr, original);
 
-  // RAII that pushes the original function's generic signature to
-  // `module.Types` so that calls to `module.Types.getTypeLowering()` below
-  // will know the VJP's generic parameter types.
+  // RAII that pushes the JVP generic signature to `module.Types` so that calls
+  // to `module.Types.getTypeLowering()` below will know the JVP's generic
+  // parameter types.
   Lowering::GenericContextScope genericContextScope(
       module.Types, jvpGenericSig);
 
@@ -8380,9 +8426,6 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   // Extract all direct results.
   SmallVector<SILValue, 8> directResults;
   extractAllElements(apply, builder, directResults);
-  auto originalDirectResults = ArrayRef<SILValue>(directResults).drop_back(1);
-  auto originalDirectResult =
-      joinElements(originalDirectResults, builder, apply->getLoc());
   auto linearMap = directResults.back();
 
   auto linearMapType = linearMap->getType().castTo<SILFunctionType>();
@@ -8399,13 +8442,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
       ParameterConvention::Direct_Guaranteed);
 
   assert(origFnType->getResults().size() == 1);
-  if (origFnType->getResults().front().isFormalDirect()) {
-    auto result = joinElements(
-        {originalDirectResult, newDerivative}, builder, loc);
-    builder.createReturn(loc, result);
-  } else {
-    builder.createReturn(loc, newDerivative);
-  }
+  builder.createReturn(loc, newDerivative);
 
   getGeneratedFunctions().push_back(thunk);
   return {thunk, interfaceSubs};

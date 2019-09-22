@@ -3737,6 +3737,14 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   SmallVector<AllocStackInst *, 8> localAllocations;
   SmallVector<SILValue, 8> argumentsToFree;
   SmallVector<SILValue, 8> arguments;
+  // Check if original result is direct.
+  // If so, create an indirect result local allocation.
+  assert(origFnType->getResults().size() == 1);
+  auto origResInfo = origFnType->getResults().front();
+  SILArgument *assocFnIndirectResult = nullptr;
+  if (origResInfo.isFormalDirect())
+    assocFnIndirectResult = indirectResults.pop_back_val();
+  // Collect original indirect results.
   for (auto *indRes : indirectResults)
     arguments.push_back(indRes);
   forwardFunctionArgumentsConvertingOwnership(
@@ -3789,14 +3797,12 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   if (directResults.size() > 1) {
     auto originalDirectResults =
         ArrayRef<SILValue>(directResults).drop_back(1);
-    auto originalDirectResult =
-        joinElements(originalDirectResults, thunkSGF.B, apply.getLoc());
-    auto thunkResult = joinElements(
-        {originalDirectResult, linearMap.getValue()}, thunkSGF.B, loc);
-    createReturn(thunkResult);
-  } else {
-    createReturn(linearMap.getValue());
+    assert(originalDirectResults.size() == 1);
+    thunkSGF.B.emitStoreValueOperation(
+        loc, originalDirectResults.front(), assocFnIndirectResult,
+        StoreOwnershipQualifier::Init);
   }
+  createReturn(linearMap.getValue());
   return thunk;
 }
 
