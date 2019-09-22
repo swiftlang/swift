@@ -288,3 +288,21 @@ const StmtConditionElement &
 ConditionalClauseScope::getStmtConditionElement() const {
   return getCond()[index];
 }
+
+unsigned ASTScopeImpl::countDescendants() const {
+  unsigned count = 0;
+  const_cast<ASTScopeImpl *>(this)->preOrderDo(
+      [&](ASTScopeImpl *) { ++count; });
+  return count - 1;
+}
+
+void ASTScopeImpl::assertThatTreeDoesNotShrink(function_ref<void()> fn) {
+#ifndef NDEBUG
+  unsigned beforeCount = countDescendants();
+#endif
+  fn();
+#ifndef NDEBUG
+  unsigned afterCount = countDescendants();
+  ASTScopeAssert(beforeCount <= afterCount, "shrank?!");
+#endif
+}

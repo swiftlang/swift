@@ -234,6 +234,12 @@ public:
   bool doesRangeMatch(unsigned start, unsigned end, StringRef file = "",
                       StringRef className = "");
 
+  unsigned countDescendants() const;
+
+  /// Make sure that when the argument is executed, there are as many
+  /// descendants after as before.
+  void assertThatTreeDoesNotShrink(function_ref<void()>);
+
 private:
   SourceRange computeSourceRangeOfScope(bool omitAssertions = false) const;
   SourceRange
