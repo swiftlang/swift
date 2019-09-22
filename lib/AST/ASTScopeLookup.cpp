@@ -96,8 +96,9 @@ const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     //    fileScope->dump();
     llvm::errs() << "\n\n";
 
-    if (fileScope->crossCheckWithAST())
-      llvm::errs() << "Tree creation missed some DeclContexts.\n";
+    // Might distort things
+    //    if (fileScope->crossCheckWithAST())
+    //      llvm::errs() << "Tree creation missed some DeclContexts.\n";
   }
 
   ASTScopeAssert(startingScope, "ASTScopeImpl: could not find startingScope");
