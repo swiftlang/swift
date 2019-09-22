@@ -4798,34 +4798,6 @@ public:
     }
   }
 
-  /// Handle `tuple_extract` instruction.
-  ///   Original: y = tuple_extract x, <n>
-  ///    Tangent: tan[y] = tuple_extract tan[x], <n'>
-  ///                                            ^~~~
-  ///                         tuple tangent space index corresponding to n
-  CLONE_AND_EMIT_TANGENT(TupleExtract, tei) {
-    auto &diffBuilder = getDifferentialBuilder();
-    auto origTupleTy = tei->getOperand()->getType().castTo<TupleType>();
-    unsigned tanIndex = 0;
-    for (unsigned i : range(tei->getFieldNo())) {
-      if (getTangentSpace(
-              origTupleTy->getElement(i).getType()->getCanonicalType()))
-        ++tanIndex;
-    }
-    auto tanType = getRemappedTangentType(tei->getType());
-    auto tanTuple = getTangentBuffer(tei->getParent(), tei->getOperand());
-    SILValue tanElt;
-    // If the tangent buffer of the source does not have a tuple type, then
-    // it must represent a "single element tuple type". Use it directly.
-    if (!tanTuple->getType().is<TupleType>()) {
-      tanElt = tanTuple;
-    } else {
-      tanElt = diffBuilder.createTupleElementAddr(
-          tei->getLoc(), tanTuple, tanIndex, tanType);
-    }
-    bufferMap.try_emplace({tei->getParent(), tei}, tanElt);
-  }
-
   /// Handle `tuple_element_addr` instruction.
   ///   Original: y = tuple_element_addr x, <n>
   ///    Tangent: tan[y] = tuple_element_addr tan[x], <n'>
@@ -6842,57 +6814,17 @@ public:
   ///             ...
   void visitTupleInst(TupleInst *ti) {
     auto *bb = ti->getParent();
-    auto adjBuf = getAdjointBuffer(bb, ti);
+    auto loc = ti->getLoc();
+    auto adjTuple = getAdjointBuffer(bb, ti);
     unsigned adjIdx = 0;
     for (auto i : range(ti->getNumOperands())) {
       if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
         continue;
-      auto adjElt = adjBuf;
-      if (adjBuf->getType().is<TupleType>())
-        adjElt = builder.createTupleElementAddr(ti->getLoc(), adjBuf, adjIdx++);
-      addToAdjointBuffer(bb, ti->getOperand(i), adjElt, ti->getLoc());
+      auto adjElt = adjTuple;
+      if (adjTuple->getType().is<TupleType>())
+        adjElt = builder.createTupleElementAddr(loc, adjTuple, adjIdx++);
+      addToAdjointBuffer(bb, ti->getOperand(i), adjElt, loc);
     }
-  }
-
-  /// Handle `tuple_extract` instruction.
-  ///   Original: y = tuple_extract x, <n>
-  ///    Adjoint: adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
-  ///                                         ^~~~~~
-  ///                            n'-th element, where n' is tuple tangent space
-  ///                            index corresponding to n
-  void visitTupleExtractInst(TupleExtractInst *tei) {
-    auto *bb = tei->getParent();
-    auto loc = tei->getLoc();
-    auto adjBuf = getAdjointBuffer(bb, tei);
-
-    auto tupleTy = tei->getTupleType();
-    auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
-    auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
-    if (!tupleTanTupleTy) {
-      addToAdjointBuffer(bb, tei->getOperand(), adjBuf, loc);
-      return;
-    }
-
-    // Accumulate adjoint for the `tuple_extract` operand.
-    auto tmp = builder.createAllocStack(loc, tupleTanTy);
-    unsigned adjIdx = 0;
-    for (unsigned i : range(tupleTy->getNumElements())) {
-      if (!getTangentSpace(
-              tupleTy->getElement(i).getType()->getCanonicalType()))
-        continue;
-      auto tmpElement = builder.createTupleElementAddr(loc, tmp, adjIdx);
-      if (tei->getFieldNo() == i) {
-        builder.createCopyAddr(
-            loc, adjBuf, tmpElement, IsNotTake, IsInitialization);
-      } else {
-        auto tanEltType =
-            tupleTanTupleTy->getElementType(adjIdx++)->getCanonicalType();
-        emitZeroIndirect(tanEltType, tmpElement, loc);
-      }
-    }
-    addToAdjointBuffer(bb, tei->getOperand(), tmp, loc);
-    builder.createDestroyAddr(loc, tmp);
-    builder.createDeallocStack(loc, tmp);
   }
 
   /// Handle `destructure_tuple` instruction.
