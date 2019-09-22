@@ -105,6 +105,7 @@ Most diagnostics have no reason to change behavior under editor mode. An example
 
 - `%%` - Emits a literal percent sign.
 
+
 ### Diagnostic Verifier ###
 
 (This section is specific to the Swift compiler's diagnostic engine.)
@@ -120,3 +121,50 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
 - (Required) The expected error message. The message should be enclosed in double curly braces and should not include the `error:`/`warning:`/`note:`/`remark:` prefix. For example, `// expected-error {{invalid redeclaration of 'y'}}` would match an error with that message on the same line. The expected message does not need to match the emitted message verbatim. As long as the expected message is a substring of the original message, they will match.
 
 - (Optional) Expected fix-its. These are each enclosed in double curly braces and appear after the expected message. An expected fix-it consists of a column range followed by the text it's expected to be replaced with. For example, `let r : Int i = j // expected-error{{consecutive statements}} {{12-12=;}}` will match a fix-it attached to the consecutive statements error which inserts a semicolon at column 12, just after the 't' in 'Int'. The special {{none}} specifier is also supported, which will cause the diagnostic match to fail if unexpected fix-its are produced.
+
+
+### Public Diagnostics ###
+
+In order to make it easy to search the web or documentation for information about a diagnostic, some diagnostics are designated "public" by associating them with a "public diagnostic". A public diagnostic may correspond to multiple closely related compiler-internal diagnostics. It provides a unique identifier which can unambiguously refer to the diagnostic and remain stable across compiler versions. 
+
+Diagnostics which should be made public include errors and warnings which a Swift programmer might reasonably encounter while using officially supported language features. Diagnostics which should not be made public include those which enforce restrictions on private/underscored features (e.g. `@_implements`), and those which only compiler developers are likely to encounter (e.g. SIL parsing errors). In general, notes should not be made public as they are considered part of their parent error or warning. However, _rare_ exceptions may be made for notes which are independent of a specific error and warning (e.g. constraint fixes diagnosed as notes in ambiguous cases when typechecking).
+
+Public diagnostics are defined in `PublicDiagnostics.def`. Currently, a public diagnostic is defined by:
+
+- A unique name, which serves as its identifier
+
+- The compiler version it was introduced in
+
+-  (optionally) The compiler version it was removed in (i.e. the compiler version which no longer emits any internal diagnostics associated with it)
+
+In the future, this may expand to also include documentation and reference material which explains the diagnostic in greater detail, similar to `rustc`'s `explain` command. 
+
+It's important that once a diagnostic is made public it remains stable so that documentation and other resources which reference it remain up-to-date and accurate across different versions of the compiler. To maintain stability, a public diagnostic:
+
+- _Cannot_ be removed entirely once shipped as part of a compiler release. However, if the compiler no longer emits any corresponding compiler-internal diagnostics, it may be marked as removed in a specific version.
+
+- _Can_ add, remove, or modify associated compiler-internal diagnostics. However, any changes to compiler-internal diagnostics should not substantially change the meaning of the public diagnostic. A good rule of thumb here is to look at existing posts/blogs/documentation related to the diagnostic, and only make the changes if they don't invalidate those resources. If there's any doubt, err on the side of marking the old public diagnostic as removed and introducing a new one.
+
+Because introducing a new public diagnostic requires this commitment to stability, new compiler-internal diagnostics which meet the criteria to be designated public are not required to do so immediately. Sometimes, it may be better to iterate on the diagnostics of a new feature for a period of time before stabilizing them. However, the intent is that every diagnostic which meets the criteria will eventually be declared public.
+
+### Public Diagnostic Naming ###
+
+Public diagnostic names are displayed at the end of a diagnostic message in command line output, enclosed in square brackets.
+
+```
+error: invalid redeclaration of 'y' [InvalidRedeclaration]
+```
+
+- Names should be written in UpperCamelCase.
+
+- Names should not be longer than 2-3 words wherever possible. Longer names make it harder to fit diagnostic messages on a single line.
+
+- Names should not use terminology which is internal to the compiler (e.g. nominal types, name mangling). Generally, a term of art should only be used if it is defined in _The Swift Programming Language_.
+
+- Names should not include "Error", "Warning", "Note", or other words which only convey the diagnostic type without additional information.
+
+- Names may include abbreviations, but only where the meaning is obvious and they are necessary to maintain a reasonable length. Reasonable abbreviations include shortening "Argument" to "Arg" or "Reference" to "Ref". Avoid simply removing vowels from common words. For example, don't shorten "Invalid" to "Invld".
+
+- Names should omit needless words like "a", "the", "in", etc.
+
+- Names should, when possible, include important key words from the diagnostic message.
