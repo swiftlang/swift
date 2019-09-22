@@ -137,13 +137,8 @@ private:
 
   bool wasExpanded = false;
 
-  /// Because expansion returns an insertion point,
-  /// if a scope is reexpanded, the children added NOT by expansion must be
-  /// rescued and reused.
-  /// It's good to know if it was ever expanded, so initialize to an impossible
-  /// value.
-  const unsigned childrenCountBeforeExpansion = ~0;
-  unsigned childrenCountWhenLastExpanded = childrenCountBeforeExpansion;
+  /// For use-before-def, ASTAncestor scopes may be added to a BraceStmt.
+  unsigned astAncestorScopeCount = 0;
 
   /// Can clear storedChildren, so must remember this
   bool haveAddedCleanup = false;
@@ -195,8 +190,7 @@ protected:
 
 public: // for addReusedBodyScopes
   void addChild(ASTScopeImpl *child, ASTContext &);
-  std::vector<ASTScopeImpl *>
-  rescueASTAncestorScopesForReuseFromMe(unsigned count);
+  std::vector<ASTScopeImpl *> rescueASTAncestorScopesForReuseFromMe();
 
   /// When reexpanding, do we always create a new body?
   virtual NullablePtr<ASTScopeImpl> getParentOfASTAncestorScopesToBeRescued();
@@ -341,11 +335,12 @@ public:
   /// Return the scope into which to place subsequent decls
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
-  unsigned getChildrenCountWhenLastExpanded() const;
+  unsigned getASTAncestorScopeCount() const { return astAncestorScopeCount; }
   bool getWasExpanded() const { return wasExpanded; }
 
 protected:
-  void setChildrenCountWhenLastExpanded();
+  void resetASTAncestorScopeCount() { astAncestorScopeCount = 0; }
+  void increaseASTAncestorScopeCount(unsigned c) { astAncestorScopeCount += c; }
   void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
   virtual void beCurrent();

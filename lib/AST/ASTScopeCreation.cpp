@@ -204,15 +204,25 @@ public:
 
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
-  ASTScopeImpl *addSiblingsToScopeTree(ASTScopeImpl *const insertionPoint,
-                                       ArrayRef<ASTNode> nodesOrDeclsToAdd) {
+  ASTScopeImpl *
+  addSiblingsToScopeTree(ASTScopeImpl *const insertionPoint,
+                         ASTScopeImpl *const organicInsertionPoint,
+                         ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
     for (auto nd : expandIfConfigClausesThenCullAndSortElementsOrMembers(
              nodesOrDeclsToAdd)) {
-      if (shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd))
-        ip = addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
-      else
+      if (!shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd)) {
+        // FIXME: Could the range get lost if the node is ever reexpanded?
         ip->widenSourceRangeForIgnoredASTNode(nd);
+      } else {
+        const unsigned preCount = ip->getChildren().size();
+        auto *const newIP =
+            addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
+        if (ip != organicInsertionPoint)
+          ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
+                                            preCount);
+        ip = newIP;
+      }
     }
     return ip;
   }
@@ -755,9 +765,9 @@ void ASTSourceFileScope::addNewDeclsToScopeTree() {
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
   std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
   insertionPoint =
-      scopeCreator->addSiblingsToScopeTree(insertionPoint, newNodes);
+      scopeCreator->addSiblingsToScopeTree(insertionPoint, this, newNodes);
 
-  // TODO: use childrenCountWhenLastExpanded & regular expansion machinery for ASTSourceFileScope
+  // TODO: use regular expansion machinery for ASTSourceFileScope
   // rdar://55562483
   numberOfDeclsAlreadySeen = SF->Decls.size();
   setWasExpanded();
@@ -1054,9 +1064,6 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   ASTScopeAssert(!child->getParent(), "child should not already have parent");
   child->parent = this;
   clearCachedSourceRangesOfMeAndAncestors();
-  // It's possible that some callees do lookups back into the tree.
-  // So make sure childrenCountWhenLastExpanded is up to date.
-  setChildrenCountWhenLastExpanded();
 }
 
 void ASTScopeImpl::removeChildren() {
@@ -1262,7 +1269,7 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // TODO: remove the sort after performing rdar://53254395
   auto *insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(this, stmt->getElements());
+      scopeCreator.addSiblingsToScopeTree(this, this, stmt->getElements());
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
   return {
@@ -1721,7 +1728,7 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  scopeCreator.addSiblingsToScopeTree(this, nodes);
+  scopeCreator.addSiblingsToScopeTree(this, this, nodes);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }
@@ -1741,6 +1748,8 @@ bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
 void ASTScopeImpl::reexpand(ScopeCreator &scopeCreator) {
   auto astAncestorScopes = rescueASTAncestorScopesForReuseFromMeOrDescendants();
   disownDescendants(scopeCreator);
+  // If the expansion recurses back into the tree for lookup, the ASTAncestor
+  // scopes will have already been rescued and won't be found! HERE
   expandAndBeCurrent(scopeCreator);
   replaceASTAncestorScopes(astAncestorScopes);
 }
@@ -1936,11 +1945,10 @@ ASTScopeImpl::rescueASTAncestorScopesForReuseFromMeOrDescendants() {
   if (!getWasExpanded())
     return {};
   if (auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull()) {
-    return p->rescueASTAncestorScopesForReuseFromMe(
-        p->getChildren().size() - p->getChildrenCountWhenLastExpanded());
+    return p->rescueASTAncestorScopesForReuseFromMe();
   }
   ASTScopeAssert(
-      scopesFromASTAncestors == 0,
+      getASTAncestorScopeCount() == 0,
       "If receives ASTAncestor scopes, must know where to find parent");
   return {};
 }
@@ -1954,33 +1962,26 @@ void ASTScopeImpl::replaceASTAncestorScopes(
   }
   auto &ctx = getASTContext();
   for (auto *s : scopesToAdd) {
-    p->addChild(s, ctx);
+    p->addChild(s, ctx); // NONORGANIC
     ASTScopeAssert(s->verifyThatThisNodeComeAfterItsPriorSibling(),
                    "Ensure search will work");
   }
+  p->increaseASTAncestorScopeCount(scopesToAdd.size());
 }
 
 std::vector<ASTScopeImpl *>
-ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe(const unsigned int count) {
+ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe() {
   std::vector<ASTScopeImpl *> astAncestorScopes;
-  for (unsigned i = getChildren().size() - count; i < getChildren().size(); ++i)
+  for (unsigned i = getChildren().size() - getASTAncestorScopeCount();
+       i < getChildren().size(); ++i)
     astAncestorScopes.push_back(getChildren()[i]);
   // So they don't get disowned and children cleared.
-  for (unsigned i = 0; i < count; ++i) {
+  for (unsigned i = 0; i < getASTAncestorScopeCount(); ++i) {
     storedChildren.back()->emancipate();
     storedChildren.pop_back();
-    --scopesFromASTAncestors;
   }
+  resetASTAncestorScopeCount();
   return astAncestorScopes;
-}
-
-unsigned ASTScopeImpl::getChildrenCountWhenLastExpanded() const {
-  ASTScopeAssert(getWasExpanded(), "meaningless");
-  return childrenCountWhenLastExpanded;
-}
-
-void ASTScopeImpl::setChildrenCountWhenLastExpanded() {
-  childrenCountWhenLastExpanded = getChildren().size();
 }
 
 bool AbstractFunctionDeclScope::shouldCreateAccessorScope(
