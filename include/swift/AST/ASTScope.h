@@ -209,6 +209,7 @@ private:
 
 public:
   void preOrderDo(function_ref<void(ASTScopeImpl *)>);
+  /// Like preorderDo but without myself.
   void preOrderChildrenDo(function_ref<void(ASTScopeImpl *)>);
   void postOrderDo(function_ref<void(ASTScopeImpl *)>);
 
