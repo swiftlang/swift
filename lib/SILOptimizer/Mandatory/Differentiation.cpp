@@ -4730,9 +4730,9 @@ public:
       tanField = cast<VarDecl>(tanFieldLookup.front());
     }
     auto tanStruct = getTangentBuffer(bb, sei->getOperand());
-    auto *tanStructExtract =
+    auto *tanElt =
         diffBuilder.createStructElementAddr(sei->getLoc(), tanStruct, tanField);
-    setTangentBuffer(bb, sei, tanStructExtract);
+    setTangentBuffer(bb, sei, tanElt);
   }
 
   /// Handle `struct_element_addr` instruction.
@@ -4772,9 +4772,9 @@ public:
       tanField = cast<VarDecl>(tanFieldLookup.front());
     }
     auto tanStruct = getTangentBuffer(bb, seai->getOperand());
-    auto *tanStructElementAddr = diffBuilder.createStructElementAddr(
+    auto *tanElt = diffBuilder.createStructElementAddr(
         seai->getLoc(), tanStruct, tanField);
-    setTangentBuffer(bb, seai, tanStructElementAddr);
+    setTangentBuffer(bb, seai, tanElt);
   }
 
   /// Handle `tuple` instruction.
@@ -4833,6 +4833,7 @@ public:
   ///                            tuple tangent space index corresponding to n
   CLONE_AND_EMIT_TANGENT(TupleElementAddr, teai) {
     auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = teai->getParent();
     auto origTupleTy = teai->getOperand()->getType().castTo<TupleType>();
     unsigned tanIndex = 0;
     for (unsigned i : range(teai->getFieldNo())) {
@@ -4851,7 +4852,7 @@ public:
       tanElt = diffBuilder.createTupleElementAddr(
           teai->getLoc(), tanTuple, tanIndex, tanType);
     }
-    bufferMap.try_emplace({teai->getParent(), teai}, tanElt);
+    setTangentBuffer(bb, teai, tanElt);
   }
 
   /// Handle `destructure_tuple` instruction.
@@ -5140,7 +5141,7 @@ private:
       // should not be overwritten.
       diffBuilder.setInsertionPoint(
           differential.getEntryBlock(),
-           getNextDifferentialLocalAllocationInsertionPoint());
+          getNextDifferentialLocalAllocationInsertionPoint());
       auto *diffArgCopy =
           diffBuilder.createAllocStack(diffLoc, diffArg->getType());
       diffBuilder.createCopyAddr(diffLoc, diffArg, diffArgCopy, IsNotTake,
@@ -5924,19 +5925,7 @@ private:
     return lastLocalAlloc->getDefiningInstruction()->getIterator();
   }
 
-  SILValue makeLocalAllocation(SILLocation loc, SILType type) {
-    // Set insertion point for local allocation builder: before the last local
-    // allocation, or at the start of the adjoint function's entry if no local
-    // allocations exist yet.
-    localAllocBuilder.setInsertionPoint(
-        getPullback().getEntryBlock(),
-        getNextFunctionLocalAllocationInsertionPoint());
-    // Allocate local buffer and initialize to zero.
-    return localAllocBuilder.createAllocStack(loc, type);
-  }
-
   SILValue &getAdjointBuffer(SILBasicBlock *origBB, SILValue valueInOriginal) {
-    // assert(valueInOriginal->getType().isAddress());
     assert(valueInOriginal->getFunction() == &getOriginal());
     auto insertion = bufferMap.try_emplace({origBB, valueInOriginal},
                                            SILValue());
@@ -6837,11 +6826,11 @@ public:
       tanField = cast<VarDecl>(tanFieldLookup.front());
     }
     // Accumulate adjoint for the `struct_extract` operand.
-    auto av = getAdjointBuffer(bb, sei);
+    auto adjElt = getAdjointBuffer(bb, sei);
     auto tmp = builder.createAllocStack(loc, tangentVectorSILTy);
     emitZeroIndirect(tangentVectorTy, tmp, loc);
-    auto tmpElement = builder.createStructElementAddr(loc, tmp, tanField);
-    accumulateIndirect(tmpElement, av, loc);
+    auto adjEltDest = builder.createStructElementAddr(loc, tmp, tanField);
+    accumulateIndirect(adjEltDest, adjElt, loc);
     addToAdjointBuffer(bb, sei->getOperand(), tmp, loc);
     builder.createDestroyAddr(loc, tmp);
     builder.createDeallocStack(loc, tmp);
@@ -6915,20 +6904,20 @@ public:
     auto *bb = dti->getParent();
     auto loc = dti->getLoc();
     auto tupleTanTy = getRemappedTangentType(dti->getOperand()->getType());
-    // Accumulate adjoint for the `tuple_extract` operand.
+    // Accumulate adjoint for the `destructure_tuple` operand.
     auto adjTuple = getAdjointBuffer(bb, dti->getOperand());
     unsigned adjIdx = 0;
     for (auto origElt : dti->getResults()) {
       if (!getTangentSpace(origElt->getType().getASTType()))
         continue;
-      auto adjEltBuf = getAdjointBuffer(bb, origElt);
-      SILValue destElt;
+      auto adjElt = getAdjointBuffer(bb, origElt);
+      SILValue adjEltDest;
       if (tupleTanTy.is<TupleType>()) {
-        destElt = builder.createTupleElementAddr(loc, adjTuple, adjIdx++);
+        adjEltDest = builder.createTupleElementAddr(loc, adjTuple, adjIdx++);
       } else {
-        destElt = adjTuple;
+        adjEltDest = adjTuple;
       }
-      accumulateIndirect(destElt, adjEltBuf, loc);
+      accumulateIndirect(adjEltDest, adjElt, loc);
     }
   }
 
