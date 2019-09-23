@@ -1654,10 +1654,6 @@ public:
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
       return;
     }
-
-    require(BI->getModule().getStage() != SILStage::Lowered ||
-                !isPolymorphicBuiltin(*BI->getBuiltinKind()),
-            "Polymorphic builtins are illegal in lowered SIL?!");
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
