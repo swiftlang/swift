@@ -144,37 +144,6 @@ public:
     return result.getValue();
   }
 
-  using user_array_transform =
-      std::function<SILInstruction *(BranchPropagatedUser)>;
-  using user_array = TransformArrayRef<user_array_transform>;
-
-  /// A function that returns a range of lifetime ending users found for the
-  /// given value.
-  user_array getLifetimeEndingUsers() const {
-    assert(result.hasValue() && "Can not call until check() is called");
-    assert(result.getValue() && "Can not call if check() returned false");
-
-    user_array_transform transform(
-        [](BranchPropagatedUser user) -> SILInstruction * {
-          return user.getInst();
-        });
-    return user_array(ArrayRef<BranchPropagatedUser>(lifetimeEndingUsers),
-                      transform);
-  }
-
-  /// A function that returns a range of regular (i.e. "non lifetime ending")
-  /// users found for the given value.
-  user_array getRegularUsers() const {
-    assert(result.hasValue() && "Can not call until check() is called");
-    assert(result.getValue() && "Can not call if check() returned false");
-
-    user_array_transform transform(
-        [](BranchPropagatedUser user) -> SILInstruction * {
-          return user.getInst();
-        });
-    return user_array(ArrayRef<BranchPropagatedUser>(regularUsers), transform);
-  }
-
 private:
   bool checkUses();
   bool gatherUsers(SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers,
