@@ -1463,20 +1463,13 @@ static void collectMinimalIndicesForFunctionCall(
   // need to find all `tuple_extract`s on that tuple, and determine if each
   // found extracted element is useful.
   // Collect direct results being retrieved using `tuple_extract`.
-  SILInstructionResultArray directResults;
-#ifndef NDEBUG
-  bool foundDestructure = false;
-#endif
-  for (auto *use : ai->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-#ifndef NDEBUG
-      assert(!foundDestructure &&
-             "Found multiple destructure_tuple's on apply's result");
-      foundDestructure = true;
-#endif
-      directResults = dti->getResults();
-    }
-  }
+  SmallVector<SILValue, 8> directResults(convs.getNumDirectSILResults());
+  if (auto *dti = getSingleDestructureTupleUser(ai)) {
+    directResults.append(dti->getResults().begin(), dti->getResults().end());
+  } else {
+    for (auto *use : ai->getUses())
+      if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
+        directResults[tei->getFieldNo()] = tei;
   // Add differentiation indices based on activity analysis.
   unsigned dirResIdx = 0;
   unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
@@ -1656,7 +1649,6 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   });
   if (!hasActiveResults || !hasActiveArguments)
     return;
-
 
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
@@ -2379,39 +2371,39 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
 /// Given a value, collect all `tuple_extract` users in `result` if value is a
 /// tuple. Otherwise, add the value directly to `result`.
 static void collectAllExtractedElements(SILValue val,
-                                        SmallVectorImpl<SILValue> &result) {
+                                        SmallVectorImpl<SILValue> &results) {
   auto tupleType = val->getType().getAs<TupleType>();
   if (!tupleType) {
-    result.push_back(val);
+    results.push_back(val);
     return;
   }
-  result.reserve(tupleType->getNumElements());
-  bool visitedDTI = false;
-  for (auto *use : val->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-      assert(!visitedDTI && "More than one 'destructure_tuple'!?");
-      visitedDTI = true;
-      result.append(dti->getResults().begin(), dti->getResults().end());
-    }
+  if (auto *dti = getSingleDestructureTupleUser(val)) {
+    results.reserve(tupleType->getNumElements());
+    results.append(dti->getResults().begin(), dti->getResults().end());
+  } else {
+    results.resize(tupleType->getNumElements());
+    for (auto *use : val->getUses())
+      if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
+        results[tei->getFieldNo()] = tei;
   }
-  assert(result.size() == tupleType->getNumElements());
+  assert(results.size() == tupleType->getNumElements());
 }
 
 /// Given a value, extracts all elements to `result` from this value if it's a
 /// tuple. Otherwise, add this value directly to `result`.
 static void extractAllElements(SILValue val, SILBuilder &builder,
-                               SmallVectorImpl<SILValue> &result) {
+                               SmallVectorImpl<SILValue> &results) {
   if (auto tupleType = val->getType().getAs<TupleType>()) {
     if (builder.hasOwnership()) {
       auto elts =
           builder.createDestructureTuple(val.getLoc(), val)->getResults();
-      result.append(elts.begin(), elts.end());
+      results.append(elts.begin(), elts.end());
     } else {
       for (auto i : range(tupleType->getNumElements()))
-        result.push_back(builder.createTupleExtract(val.getLoc(), val, i));
+        results.push_back(builder.createTupleExtract(val.getLoc(), val, i));
     }
   } else {
-    result.push_back(val);
+    results.push_back(val);
   }
 }
 
@@ -4798,6 +4790,35 @@ public:
     }
   }
 
+  /// Handle `tuple_extract` instruction.
+  ///   Original: y = tuple_extract x, <n>
+  ///    Tangent: tan[y] = tuple_extract tan[x], <n'>
+  ///                                            ^~~~
+  ///                         tuple tangent space index corresponding to n
+  CLONE_AND_EMIT_TANGENT(TupleExtract, tei) {
+    auto &diffBuilder = getDifferentialBuilder();
+    auto *bb = tei->getParent();
+    auto origTupleTy = tei->getOperand()->getType().castTo<TupleType>();
+    unsigned tanIndex = 0;
+    for (unsigned i : range(tei->getFieldNo())) {
+      if (getTangentSpace(
+              origTupleTy->getElement(i).getType()->getCanonicalType()))
+        ++tanIndex;
+    }
+    auto tanType = getRemappedTangentType(tei->getType());
+    auto tanTuple = getTangentBuffer(tei->getParent(), tei->getOperand());
+    SILValue tanElt;
+    // If the tangent buffer of the source does not have a tuple type, then
+    // it must represent a "single element tuple type". Use it directly.
+    if (!tanTuple->getType().is<TupleType>()) {
+      tanElt = tanTuple;
+    } else {
+      tanElt = diffBuilder.createTupleElementAddr(
+          tei->getLoc(), tanTuple, tanIndex, tanType);
+    }
+    setTangentBuffer(bb, tei, tanElt);
+  }
+
   /// Handle `tuple_element_addr` instruction.
   ///   Original: y = tuple_element_addr x, <n>
   ///    Tangent: tan[y] = tuple_element_addr tan[x], <n'>
@@ -6770,8 +6791,7 @@ public:
     auto tangentVectorTy =
         getTangentSpace(structTy)->getType()->getCanonicalType();
     assert(!getModule().Types.getTypeLowering(
-               tangentVectorTy, ResilienceExpansion::Minimal)
-                   .isAddressOnly());
+               tangentVectorTy, ResilienceExpansion::Minimal).isAddressOnly());
     auto *tangentVectorDecl =
         tangentVectorTy->getStructOrBoundGenericStruct();
     assert(tangentVectorDecl);
@@ -6819,6 +6839,41 @@ public:
         adjElt = builder.createTupleElementAddr(loc, adjTuple, adjIdx++);
       addToAdjointBuffer(bb, ti->getOperand(i), adjElt, loc);
     }
+  }
+
+  /// Handle `tuple_extract` instruction.
+  ///   Original: y = tuple_extract x, <n>
+  ///    Adjoint: adj[x] += tuple (0, 0, ..., adj[y], ..., 0, 0)
+  ///                                         ^~~~~~
+  ///                            n'-th element, where n' is tuple tangent space
+  ///                            index corresponding to n
+  void visitTupleExtractInst(TupleExtractInst *tei) {
+    auto *bb = tei->getParent();
+    auto loc = tei->getLoc();
+    auto adjBuf = getAdjointBuffer(bb, tei);
+
+    auto tupleTy = tei->getTupleType();
+    auto tupleTanTy = getRemappedTangentType(tei->getOperand()->getType());
+    auto tupleTanTupleTy = tupleTanTy.getAs<TupleType>();
+    if (!tupleTanTupleTy) {
+      addToAdjointBuffer(bb, tei->getOperand(), adjBuf, loc);
+      return;
+    }
+
+    unsigned adjIdx = 0;
+    for (unsigned i : range(tupleTy->getNumElements())) {
+      if (!getTangentSpace(
+              tupleTy->getElement(i).getType()->getCanonicalType()))
+        continue;
+      if (tei->getFieldNo() == i)
+        break;
+      ++adjIdx;
+    }
+    // Accumulate adjoint for the `tuple_extract` operand.
+    auto adjTuple = getAdjointBuffer(bb, tei->getOperand());
+    auto adjElt = getAdjointBuffer(bb, tei);
+    auto adjEltDest = builder.createTupleElementAddr(loc, adjTuple, adjIdx);
+    accumulateIndirect(adjEltDest, adjElt, loc);
   }
 
   /// Handle `destructure_tuple` instruction.
