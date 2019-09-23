@@ -1194,6 +1194,85 @@ static bool isNSString(Type type) {
   return false;
 }
 
+static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
+                                           Type importedType,
+                                           bool resugarNSErrorPointer) {
+  PointerTypeKind PTK;
+  auto elementType = importedType->getAnyPointerElementType(PTK);
+  if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
+    return Type();
+
+  auto elementObj = elementType->getOptionalObjectType();
+  if (!elementObj)
+    return Type();
+
+  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  if (!elementClass)
+    return Type();
+
+  // FIXME: Avoid string comparison by caching this identifier.
+  if (elementClass->getName().str() !=
+        impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
+    return Type();
+
+  ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
+  if (!foundationModule ||
+      foundationModule->getName()
+        != elementClass->getModuleContext()->getName())
+    return Type();
+
+
+  if (resugarNSErrorPointer)
+    return impl.getNamedSwiftType(
+      foundationModule,
+        impl.SwiftContext.getSwiftName(
+          KnownFoundationEntity::NSErrorPointer));
+
+  // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?
+  // so we have to manually make them match. We also want to assume this in
+  // general for error out-parameters even if they weren't marked nullable in C.
+  // Or at least we do for source-compatibility reasons...
+  return OptionalType::get(importedType);
+}
+
+static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
+                                      Type importedType,
+                                      ImportTypeKind importKind) {
+  PointerTypeKind PTK;
+  auto elementType = importedType->getAnyPointerElementType(PTK);
+  if (!elementType || PTK != PTK_UnsafeMutablePointer)
+    return Type();
+
+  auto insideOptionalType = elementType->getOptionalObjectType();
+  bool isOptional = (bool) insideOptionalType;
+  if (!insideOptionalType)
+    insideOptionalType = elementType;
+
+  auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
+  if (!boundGenericTy)
+    return Type();
+
+  auto boundGenericBase = boundGenericTy->getDecl();
+  if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
+    return Type();
+
+  assert(boundGenericTy->getGenericArgs().size() == 1 &&
+         "signature of Unmanaged has changed");
+
+  auto resultTy = boundGenericTy->getGenericArgs().front();
+  if (isOptional)
+    resultTy = OptionalType::get(resultTy);
+
+  PointerTypeKind pointerKind;
+  if (importKind == ImportTypeKind::CFRetainedOutParameter)
+    pointerKind = PTK_UnsafeMutablePointer;
+  else
+    pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
+
+  resultTy = getPointerTo(resultTy, pointerKind);
+  return resultTy;
+}
+
 static ImportedType adjustTypeForConcreteImport(
     ClangImporter::Implementation &impl,
     ImportResult importResult, ImportTypeKind importKind,
@@ -1217,7 +1296,6 @@ static ImportedType adjustTypeForConcreteImport(
 
   case ImportHint::ObjCPointer:
   case ImportHint::CFunctionPointer:
-  case ImportHint::OtherPointer:
     break;
 
   case ImportHint::Void:
@@ -1234,7 +1312,9 @@ static ImportedType adjustTypeForConcreteImport(
     if (isNSString(importedType)) {
       if (importKind == ImportTypeKind::Variable ||
           importKind == ImportTypeKind::AuditedVariable) {
-        return {hint.BridgedType, false};
+        importedType = hint.BridgedType;
+        optKind = OTK_None;
+        break;
       }
     }
 
@@ -1292,14 +1372,14 @@ static ImportedType adjustTypeForConcreteImport(
     // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
     // losslessly.
     if (bridging == Bridgeability::Full && canBridgeTypes(importKind))
-      return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
+      importedType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
     break;
 
   case ImportHint::NSUInteger:
     // When NSUInteger is used as an enum's underlying type or if it does not
     // come from a system module, make sure it stays unsigned.
     if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt)
-      return {impl.SwiftContext.getUIntDecl()->getDeclaredType(), false};
+      importedType = impl.SwiftContext.getUIntDecl()->getDeclaredType();
     break;
 
   case ImportHint::CFPointer:
@@ -1328,98 +1408,32 @@ static ImportedType adjustTypeForConcreteImport(
       optKind = OTK_None;
     }
     break;
+
+  case ImportHint::OtherPointer:
+    // Special-case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
+    if (importKind == ImportTypeKind::Parameter) {
+      if (Type result = maybeImportNSErrorOutParameter(impl, importedType,
+                                                       resugarNSErrorPointer)) {
+        importedType = result;
+        optKind = OTK_None;
+        break;
+      }
+    }
+
+    // Remove 'Unmanaged' from audited CF out-parameters.
+    if (importKind == ImportTypeKind::CFRetainedOutParameter ||
+        importKind == ImportTypeKind::CFUnretainedOutParameter) {
+      if (Type outParamTy = maybeImportCFOutParameter(impl, importedType,
+                                                      importKind)) {
+        importedType = outParamTy;
+        break;
+      }
+    }
+
+    break;
   }
 
   assert(importedType);
-
-  // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
-  auto maybeImportNSErrorPointer = [&]() -> Type {
-    if (importKind != ImportTypeKind::Parameter)
-      return Type();
-
-    PointerTypeKind PTK;
-    auto elementType = importedType->getAnyPointerElementType(PTK);
-    if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
-      return Type();
-
-    auto elementObj = elementType->getOptionalObjectType();
-    if (!elementObj)
-      return Type();
-
-    auto elementClass = elementObj->getClassOrBoundGenericClass();
-    if (!elementClass)
-      return Type();
-
-    // FIXME: Avoid string comparison by caching this identifier.
-    if (elementClass->getName().str() !=
-          impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
-      return Type();
-
-    ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
-    if (!foundationModule ||
-        foundationModule->getName()
-          != elementClass->getModuleContext()->getName())
-      return Type();
-
-
-    if (resugarNSErrorPointer)
-      return impl.getNamedSwiftType(
-        foundationModule,
-          impl.SwiftContext.getSwiftName(
-            KnownFoundationEntity::NSErrorPointer));
-
-    // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?
-    // so we have to manually make them match.
-    return OptionalType::get(importedType);
-  };
-
-  if (Type result = maybeImportNSErrorPointer()) {
-    return {result, false};
-  }
-
-  auto maybeImportCFOutParameter = [&]() -> Type {
-    if (importKind != ImportTypeKind::CFRetainedOutParameter &&
-        importKind != ImportTypeKind::CFUnretainedOutParameter) {
-      return Type();
-    }
-
-    PointerTypeKind PTK;
-    auto elementType = importedType->getAnyPointerElementType(PTK);
-    if (!elementType || PTK != PTK_UnsafeMutablePointer)
-      return Type();
-
-    auto insideOptionalType = elementType->getOptionalObjectType();
-    bool isOptional = (bool) insideOptionalType;
-    if (!insideOptionalType)
-      insideOptionalType = elementType;
-
-    auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
-    if (!boundGenericTy)
-      return Type();
-
-    auto boundGenericBase = boundGenericTy->getDecl();
-    if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
-      return Type();
-
-    assert(boundGenericTy->getGenericArgs().size() == 1 &&
-           "signature of Unmanaged has changed");
-
-    auto resultTy = boundGenericTy->getGenericArgs().front();
-    if (isOptional)
-      resultTy = OptionalType::get(resultTy);
-
-    PointerTypeKind pointerKind;
-    if (importKind == ImportTypeKind::CFRetainedOutParameter)
-      pointerKind = PTK_UnsafeMutablePointer;
-    else
-      pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
-
-    resultTy = getPointerTo(resultTy, pointerKind);
-    return resultTy;
-  };
-  if (Type outParamTy = maybeImportCFOutParameter()) {
-    importedType = outParamTy;
-  }
 
   if (importKind == ImportTypeKind::RecordField &&
       importedType->isAnyClassReferenceType()) {
@@ -1435,10 +1449,10 @@ static ImportedType adjustTypeForConcreteImport(
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
   bool isIUO = false;
-  if (importKind != ImportTypeKind::Typedef && canImportAsOptional(hint)) {
+  if (importKind != ImportTypeKind::Typedef && optKind != OTK_None &&
+      canImportAsOptional(hint)) {
     isIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
-    if (optKind != OTK_None)
-      importedType = OptionalType::get(importedType);
+    importedType = OptionalType::get(importedType);
   }
 
   return {importedType, isIUO};
