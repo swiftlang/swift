@@ -1750,7 +1750,7 @@ void ASTScopeImpl::reexpand(ScopeCreator &scopeCreator) {
   auto astAncestorScopes = rescueASTAncestorScopesForReuseFromMeOrDescendants();
   disownDescendants(scopeCreator);
   // If the expansion recurses back into the tree for lookup, the ASTAncestor
-  // scopes will have already been rescued and won't be found! HERE
+  // scopes will have already been rescued and won't be found!
   expandAndBeCurrent(scopeCreator);
   replaceASTAncestorScopes(astAncestorScopes);
 }
