@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -typecheck %s -application-extension -emit-tbd -emit-tbd-path %t/safe.tbd
 // RUN: %target-swift-frontend -typecheck %s -emit-tbd -emit-tbd-path %t/not-safe.tbd
