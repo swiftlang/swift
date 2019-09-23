@@ -155,13 +155,10 @@ struct PolymorphicBuiltinSpecializedOverloadInfo {
   SILType resultType;
   bool hasOutParam;
 
-#ifndef NDEBUG
 private:
   bool isInitialized;
 
 public:
-#endif
-
   PolymorphicBuiltinSpecializedOverloadInfo()
       : builtinInfo(nullptr), staticOverloadIdentifier(), argTypes(),
         resultType(), hasOutParam(false), isInitialized(false) {}
