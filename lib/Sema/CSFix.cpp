@@ -815,6 +815,36 @@ static bool isValueOfRawRepresentable(ConstraintSystem &cs,
   return false;
 }
 
+ExpandArrayIntoVarargs *
+ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
+                                Type paramType,
+                                ConstraintLocatorBuilder locator) {
+  auto constraintLocator = cs.getConstraintLocator(locator);
+  auto elementType = cs.isArrayType(argType);
+  if (elementType &&
+      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
+          ->getParameterFlags()
+          .isVariadic()) {
+    auto options = ConstraintSystem::TypeMatchOptions(
+        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
+        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
+    auto result =
+        cs.matchTypes(*elementType, paramType,
+                      ConstraintKind::ArgumentConversion, options, locator);
+    if (result.isSuccess())
+      return new (cs.getAllocator())
+          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
+  }
+
+  return nullptr;
+}
+
+bool ExpandArrayIntoVarargs::diagnose(Expr *root, bool asNote) const {
+  ExpandArrayIntoVarargsFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
 ExplicitlyConstructRawRepresentable *
 ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
                                              Type paramType,
