@@ -1063,6 +1063,7 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (auto decl = declOrNull) {
+        CS.getTypeChecker().validateDecl(decl);
         OverloadChoice choice =
             OverloadChoice(baseTy, decl, FunctionRefKind::DoubleApply);
         CS.addBindOverloadConstraint(memberTy, choice, memberLocator,
