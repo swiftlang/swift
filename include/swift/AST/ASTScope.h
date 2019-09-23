@@ -43,10 +43,10 @@
 /// \p message must be a string literal
 #define ASTScopeAssert(predicate, message)                                     \
   assert((predicate) && message                                                \
-         " Try compiling with '-disable-astScope-lookup'.")
+         " Try compiling with '-disable-astscope-lookup'.")
 
 #define ASTScope_unreachable(message)                                          \
-  llvm_unreachable(message " Try compiling with '-disable-astScope-lookup'.")
+  llvm_unreachable(message " Try compiling with '-disable-astscope-lookup'.")
 
 namespace swift {
 
