@@ -839,8 +839,8 @@ public:
     unsigned newArgIdx = Arguments.size();
     auto argLoc =
         Locator
-            .withPathElement(
-                LocatorPathElt::ApplyArgToParam(newArgIdx, paramIdx))
+            .withPathElement(LocatorPathElt::ApplyArgToParam(
+                newArgIdx, paramIdx, param.getParameterFlags()))
             .withPathElement(LocatorPathElt::SynthesizedArgument(newArgIdx));
 
     auto *argType = CS.createTypeVariable(
