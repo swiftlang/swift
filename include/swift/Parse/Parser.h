@@ -876,7 +876,7 @@ public:
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
   bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
-  llvm::Optional<ParsedTokenSyntax> parseTokenSyntax(tok K,
+  llvm::Optional<ParsedTokenSyntax> parseTokenSyntax(tok K, SourceLoc &TokLoc,
                                                      const Diagnostic &D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
@@ -896,7 +896,8 @@ public:
                           SourceLoc OtherLoc);
 
   llvm::Optional<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc);
+  parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
