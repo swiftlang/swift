@@ -1198,6 +1198,8 @@ public:
   bool diagnoseAsError() override;
 
 private:
+  bool diagnoseSingleMissingArgument() const;
+
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(ClosureExpr *closure);
