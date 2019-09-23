@@ -1740,7 +1740,8 @@ void CallEmission::emitYieldsToExplosion(Explosion &out) {
     auto indirectStructTy = cast<llvm::StructType>(
       indirectPointer->getType()->getPointerElementType());
     auto layout = IGF.IGM.DataLayout.getStructLayout(indirectStructTy);
-    Address indirectBuffer(indirectPointer, Alignment(layout->getAlignment()));
+    Address indirectBuffer(indirectPointer,
+                           Alignment(layout->getAlignment().value()));
 
     for (auto i : indices(indirectStructTy->elements())) {
       // Skip padding.
@@ -2071,7 +2072,8 @@ static void emitCoerceAndExpand(IRGenFunction &IGF, Explosion &in,
 
   // Make the alloca at least as aligned as the coercion struct, just
   // so that the element accesses we make don't end up under-aligned.
-  Alignment coercionTyAlignment = Alignment(coercionTyLayout->getAlignment());
+  Alignment coercionTyAlignment =
+      Alignment(coercionTyLayout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(temporary.getAddress());
   if (alloca->getAlignment() < coercionTyAlignment.getValue()) {
     alloca->setAlignment(coercionTyAlignment.getValue());
@@ -2677,8 +2679,8 @@ llvm::Value *irgen::emitYield(IRGenFunction &IGF,
       resultStructTy->getElementType(resultStructTy->getNumElements() - 1)
                     ->getPointerElementType());
     auto layout = IGF.IGM.DataLayout.getStructLayout(bufferStructTy);
-    indirectBuffer = IGF.createAlloca(bufferStructTy,
-                                      Alignment(layout->getAlignment()));
+    indirectBuffer = IGF.createAlloca(
+        bufferStructTy, Alignment(layout->getAlignment().value()));
     indirectBufferSize = Size(layout->getSizeInBytes());
     IGF.Builder.CreateLifetimeStart(*indirectBuffer, indirectBufferSize);
 
@@ -3022,7 +3024,7 @@ void IRGenFunction::emitScalarReturn(llvm::Type *resultType,
 static void adjustAllocaAlignment(const llvm::DataLayout &DL,
                                   Address allocaAddr, llvm::StructType *type) {
   auto layout = DL.getStructLayout(type);
-  Alignment layoutAlignment = Alignment(layout->getAlignment());
+  Alignment layoutAlignment = Alignment(layout->getAlignment().value());
   auto alloca = cast<llvm::AllocaInst>(allocaAddr.getAddress());
   if (alloca->getAlignment() < layoutAlignment.getValue()) {
     alloca->setAlignment(layoutAlignment.getValue());
