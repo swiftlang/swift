@@ -81,9 +81,9 @@ public:
   /// ${line}
 %       end
 %       if child.is_optional:
-  llvm::Optional<${child.type_name}> get${child.name}();
+  llvm::Optional<${child.type_name}> get${child.name}() const;
 %       else:
-  ${child.type_name} get${child.name}();
+  ${child.type_name} get${child.name}() const;
 %       end
 
 %       child_node = NODE_MAP.get(child.syntax_kind)
