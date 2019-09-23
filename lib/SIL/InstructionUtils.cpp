@@ -536,10 +536,8 @@ void swift::findClosuresForFunctionValue(
 bool PolymorphicBuiltinSpecializedOverloadInfo::init(
     SILFunction *fn, BuiltinValueKind builtinKind,
     ArrayRef<SILType> oldOperandTypes, SILType oldResultType) {
-#ifndef NDEBUG
   assert(!isInitialized && "Expected uninitialized info");
   SWIFT_DEFER { isInitialized = true; };
-#endif
   if (!isPolymorphicBuiltin(builtinKind))
     return false;
 
@@ -608,10 +606,8 @@ bool PolymorphicBuiltinSpecializedOverloadInfo::init(
 }
 
 bool PolymorphicBuiltinSpecializedOverloadInfo::init(BuiltinInst *bi) {
-#ifndef NDEBUG
   assert(!isInitialized && "Can not init twice?!");
   SWIFT_DEFER { isInitialized = true; };
-#endif
 
   // First quickly make sure we have a /real/ BuiltinValueKind, not an intrinsic
   // or None.
