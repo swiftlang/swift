@@ -1697,3 +1697,29 @@ struct SR_11381_W<T> {
 struct SR_11381_S {
   @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
 }
+
+// rdar://problem/53349209 - regression in property wrapper inference
+struct Concrete1: P {}
+
+@propertyWrapper struct ConcreteWrapper {
+  var wrappedValue: Concrete1 { get { fatalError() } }
+}
+
+struct TestConcrete1 {
+  @ConcreteWrapper() var s1
+
+  func f() {
+    // Good:
+    let _: P = self.s1
+
+    // Bad:
+    self.g(s1: self.s1)
+
+    // Ugly:
+    self.g(s1: self.s1 as P)
+  }
+
+  func g(s1: P) {
+    // ...
+  }
+}
