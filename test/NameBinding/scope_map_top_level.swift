@@ -37,7 +37,7 @@ var i: Int = b.my_identity()
 // CHECK-EXPANDED-NEXT:       `-BraceStmtScope {{.*}}, [8:1 - 21:28]
 // CHECK-EXPANDED-NEXT:         `-GuardStmtScope {{.*}}, [8:1 - 21:28]
 // CHECK-EXPANDED-NEXT:           |-ConditionalClauseScope, [8:7 - 8:22] index 0
-// CHECK-EXPANDED-NEXT:             `-ConditionalClausePatternUseScope, [8:22 - 8:22] let b?
+// CHECK-EXPANDED-NEXT:             `-ConditionalClausePatternUseScope, [8:22 - 8:22] let b{{\??}}
 // CHECK-EXPANDED-NEXT:           |-BraceStmtScope {{.*}}, [8:22 - 9:1]
 // CHECK-EXPANDED-NEXT:           `-LookupParentDiversionScope, [9:1 - 21:28]
 // CHECK-EXPANDED-NEXT:             |-AbstractFunctionDeclScope {{.*}}, [11:1 - 11:13] 'foo()'
