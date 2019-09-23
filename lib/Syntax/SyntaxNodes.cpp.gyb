@@ -55,14 +55,14 @@ void ${node.name}::validate() const {
 
 %   for child in node.children:
 %     if child.is_optional:
-llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() {
+llvm::Optional<${child.type_name}> ${node.name}::get${child.name}() const {
   auto ChildData = Data->getChild(Cursor::${child.name});
   if (!ChildData)
     return llvm::None;
   return ${child.type_name} {Root, ChildData.get()};
 }
 %     else:
-${child.type_name} ${node.name}::get${child.name}() {
+${child.type_name} ${node.name}::get${child.name}() const {
   return ${child.type_name} {Root, Data->getChild(Cursor::${child.name}).get()};
 }
 %     end
