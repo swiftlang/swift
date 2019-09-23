@@ -7213,7 +7213,10 @@ private:
          ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
-  SILValue getCondition() const { return getAllOperands()[ConditionIdx].get(); }
+  const Operand *getConditionOperand() const {
+    return &getAllOperands()[ConditionIdx];
+  }
+  SILValue getCondition() const { return getConditionOperand()->get(); }
   void setCondition(SILValue newCondition) {
     getAllOperands()[ConditionIdx].set(newCondition);
   }
@@ -7257,6 +7260,11 @@ public:
   MutableArrayRef<Operand> getFalseOperands() {
     // The remaining arguments are 'false' operands.
     return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
+
+  /// Returns true if \p op is mapped to the condition operand of the cond_br.
+  bool isConditionOperand(Operand *op) const {
+    return getConditionOperand() == op;
   }
 
   bool isConditionOperandIndex(unsigned OpIndex) const {
