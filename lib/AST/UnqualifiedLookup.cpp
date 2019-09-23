@@ -227,15 +227,15 @@ namespace {
           whereToLook, isCascadingUse.getValueOr(resolution)};
       }
     };
-    
-    bool useASTScopesForExperimentalLookup() const;
-    
+
+    bool useASTScopesForLookup() const;
+
     /// For testing, assume this lookup is enabled:
-    bool useASTScopesForExperimentalLookupIfEnabled() const;
-    
+    bool useASTScopesForLookupIfEnabled() const;
+
     void lookUpTopLevelNamesInModuleScopeContext(DeclContext *);
 
-    void experimentallyLookInASTScopes();
+    void lookInASTScopes();
 
     /// Can lookup stop searching for results, assuming hasn't looked for outer
     /// results yet?
@@ -473,7 +473,8 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
 void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 #ifndef NDEBUG
   ++lookupCounter;
-  stopForDebuggingIfStartingTargetLookup(false);
+  auto localCounter = lookupCounter;
+  (void)localCounter; // for debugging
 #endif
   FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
                                   DC->getParentSourceFile());
@@ -482,30 +483,40 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
 
   ContextAndUnresolvedIsCascadingUse contextAndIsCascadingUse{
       DC, initialIsCascadingUse};
-  const bool compareToASTScopes = Ctx.LangOpts.CompareToASTScopeLookup;
-  if (useASTScopesForExperimentalLookup() && !compareToASTScopes) {
+  const bool crosscheckUnqualifiedLookup =
+      Ctx.LangOpts.CrosscheckUnqualifiedLookup;
+  if (useASTScopesForLookup()) {
     static bool haveWarned = false;
     if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;
       llvm::errs() << "WARNING: TRYING Scope exclusively\n";
     }
-    experimentallyLookInASTScopes();
-    return;
+    lookInASTScopes();
+  } else {
+#ifndef NDEBUG
+    stopForDebuggingIfStartingTargetLookup(false);
+#endif
+
+    if (Name.isOperator())
+      lookupOperatorInDeclContexts(contextAndIsCascadingUse);
+    else
+      lookupNamesIntroducedBy(contextAndIsCascadingUse);
   }
 
-  if (Name.isOperator())
-    lookupOperatorInDeclContexts(contextAndIsCascadingUse);
-  else
-    lookupNamesIntroducedBy(contextAndIsCascadingUse);
-
-  if (compareToASTScopes && useASTScopesForExperimentalLookupIfEnabled()) {
+  if (crosscheckUnqualifiedLookup && useASTScopesForLookupIfEnabled()) {
     ResultsVector results;
     size_t indexOfFirstOuterResult = 0;
-    UnqualifiedLookupFactory scopeLookup(Name, DC, Loc, options,
-                                         results, indexOfFirstOuterResult);
-    scopeLookup.experimentallyLookInASTScopes();
-    assert(verifyEqualTo(std::move(scopeLookup), "UnqualifedLookup",
-                         "Scope lookup"));
+    UnqualifiedLookupFactory altLookup(Name, DC, Loc, options, results,
+                                       indexOfFirstOuterResult);
+    if (!useASTScopesForLookup())
+      altLookup.lookInASTScopes();
+    else if (Name.isOperator())
+      altLookup.lookupOperatorInDeclContexts(contextAndIsCascadingUse);
+    else
+      altLookup.lookupNamesIntroducedBy(contextAndIsCascadingUse);
+
+    assert(
+        verifyEqualTo(std::move(altLookup), "main lookup", "alternate lookup"));
   }
 }
 
@@ -530,13 +541,11 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
   recordCompletionOfAScope();
 }
 
-bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
-  return Ctx.LangOpts.EnableASTScopeLookup &&
-         useASTScopesForExperimentalLookupIfEnabled();
+bool UnqualifiedLookupFactory::useASTScopesForLookup() const {
+  return Ctx.LangOpts.EnableASTScopeLookup && useASTScopesForLookupIfEnabled();
 }
 
-bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookupIfEnabled()
-    const {
+bool UnqualifiedLookupFactory::useASTScopesForLookupIfEnabled() const {
   if (!Loc.isValid())
     return false;
   const auto *const SF = DC->getParentSourceFile();
@@ -1098,7 +1107,7 @@ UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
 
 #pragma mark ASTScopeImpl support
 
-void UnqualifiedLookupFactory::experimentallyLookInASTScopes() {
+void UnqualifiedLookupFactory::lookInASTScopes() {
 
   ASTScopeDeclConsumerForUnqualifiedLookup consumer(*this);
 
@@ -1142,7 +1151,7 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
     // In order to preserve the behavior of the existing context-based lookup,
     // which finds all results for non-local variables at the top level instead
     // of stopping at the first one, ignore results at the top level that are
-    // not local variables. The caller \c experimentallyLookInASTScopes will
+    // not local variables. The caller \c lookInASTScopes will
     // then do the appropriate work when the scope lookup fails. In
     // FindLocalVal::visitBraceStmt, it sees PatternBindingDecls, not VarDecls,
     // so a VarDecl at top level would not be found by the context-based lookup.

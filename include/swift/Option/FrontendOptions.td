@@ -122,8 +122,8 @@ def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
   
-def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
-  HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
+def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
+  HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
 def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
   HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
