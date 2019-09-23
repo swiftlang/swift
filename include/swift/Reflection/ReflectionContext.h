@@ -242,12 +242,12 @@ public:
     auto RemoteStartAddress = static_cast<uint64_t>(RangeStart);
 
     ReflectionInfo info = {
-        {{FieldMdSec.first, FieldMdSec.second}, 0},
-        {{AssocTySec.first, AssocTySec.second}, 0},
-        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
-        {{CaptureSec.first, CaptureSec.second}, 0},
-        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
-        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
+        {FieldMdSec.first, FieldMdSec.second},
+        {AssocTySec.first, AssocTySec.second},
+        {BuiltinTySec.first, BuiltinTySec.second},
+        {CaptureSec.first, CaptureSec.second},
+        {TypeRefMdSec.first, TypeRefMdSec.second},
+        {ReflStrMdSec.first, ReflStrMdSec.second},
         LocalStartAddress,
         RemoteStartAddress};
 
@@ -372,12 +372,12 @@ public:
         static_cast<uintptr_t>(ImageStart.getAddressData());
 
     ReflectionInfo Info = {
-        {{FieldMdSec.first, FieldMdSec.second}, 0},
-        {{AssocTySec.first, AssocTySec.second}, 0},
-        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
-        {{CaptureSec.first, CaptureSec.second}, 0},
-        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
-        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
+        {FieldMdSec.first, FieldMdSec.second},
+        {AssocTySec.first, AssocTySec.second},
+        {BuiltinTySec.first, BuiltinTySec.second},
+        {CaptureSec.first, CaptureSec.second},
+        {TypeRefMdSec.first, TypeRefMdSec.second},
+        {ReflStrMdSec.first, ReflStrMdSec.second},
         LocalStartAddress,
         RemoteStartAddress};
     this->addReflectionInfo(Info);
@@ -492,12 +492,12 @@ public:
         static_cast<uint64_t>(ImageStart.getAddressData());
 
     ReflectionInfo info = {
-        {{FieldMdSec.first, FieldMdSec.second}, 0},
-        {{AssocTySec.first, AssocTySec.second}, 0},
-        {{BuiltinTySec.first, BuiltinTySec.second}, 0},
-        {{CaptureSec.first, CaptureSec.second}, 0},
-        {{TypeRefMdSec.first, TypeRefMdSec.second}, 0},
-        {{ReflStrMdSec.first, ReflStrMdSec.second}, 0},
+        {FieldMdSec.first, FieldMdSec.second},
+        {AssocTySec.first, AssocTySec.second},
+        {BuiltinTySec.first, BuiltinTySec.second},
+        {CaptureSec.first, CaptureSec.second},
+        {TypeRefMdSec.first, TypeRefMdSec.second},
+        {ReflStrMdSec.first, ReflStrMdSec.second},
         LocalStartAddress,
         RemoteStartAddress};
 
@@ -621,7 +621,7 @@ public:
       if (CD == nullptr)
         return nullptr;
 
-      auto Info = getBuilder().getClosureContextInfo(*CD, 0);
+      auto Info = getBuilder().getClosureContextInfo(*CD);
 
       return getClosureContextInfo(ObjectAddress, Info);
     }
