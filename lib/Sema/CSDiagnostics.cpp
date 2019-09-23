@@ -3740,6 +3740,10 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   if (label.empty()) {
     emitDiagnostic(insertLoc, diag::missing_argument_positional, position + 1)
         .fixItInsert(insertLoc, insertText.str());
+  } else if (isPropertyWrapperInitialization()) {
+    auto *TE = cast<TypeExpr>(fnExpr);
+    emitDiagnostic(TE->getLoc(), diag::property_wrapper_missing_arg_init, label,
+                   resolveType(TE->getInstanceType())->getString());
   } else {
     emitDiagnostic(insertLoc, diag::missing_argument_named, label)
         .fixItInsert(insertLoc, insertText.str());
@@ -3878,6 +3882,23 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   // Add a note which points to the overload choice location.
   emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
   return true;
+}
+
+bool MissingArgumentsFailure::isPropertyWrapperInitialization() const {
+  auto *call = dyn_cast<CallExpr>(getRawAnchor());
+  if (!(call && call->isImplicit()))
+    return false;
+
+  auto TE = dyn_cast<TypeExpr>(call->getFn());
+  if (!TE)
+    return false;
+
+  auto instanceTy = TE->getInstanceType();
+  if (!instanceTy)
+    return false;
+
+  auto *NTD = resolveType(instanceTy)->getAnyNominal();
+  return NTD && NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
 }
 
 bool ClosureParamDestructuringFailure::diagnoseAsError() {

@@ -1207,6 +1207,11 @@ private:
   /// Diagnose cases when instead of multiple distinct arguments
   /// call got a single tuple argument with expected arity/types.
   bool diagnoseInvalidTupleDestructuring() const;
+
+  /// Determine whether missing arguments are associated with
+  /// an implicit call to a property wrapper initializer e.g.
+  /// `@Foo(answer: 42) var question = "ultimate question"`
+  bool isPropertyWrapperInitialization() const;
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
