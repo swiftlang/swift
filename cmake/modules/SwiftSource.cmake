@@ -351,7 +351,8 @@ function(_compile_swift_files
     swift_install_in_component(DIRECTORY "${specific_module_dir}"
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                               OPTIONAL)
+                               OPTIONAL
+                               PATTERN "Private" EXCLUDE)
   else()
     swift_install_in_component(FILES ${module_outputs}
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
