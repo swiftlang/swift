@@ -75,12 +75,15 @@ namespace {
       /// 'Bool'.
       Boolean,
 
+      /// The source type is 'NSUInteger'.
+      NSUInteger,
+
+      /// The source type is 'va_list'.
+      VAList,
+
       /// The source type is an Objective-C class type bridged to a Swift
       /// type.
       ObjCBridged,
-
-      /// The source type is 'NSUInteger'.
-      NSUInteger,
 
       /// The source type is an Objective-C object pointer type.
       ObjCPointer,
@@ -139,6 +142,7 @@ namespace {
     case ImportHint::CFunctionPointer:
     case ImportHint::OtherPointer:
     case ImportHint::SwiftNewtypeFromCFPointer:
+    case ImportHint::VAList:
       return true;
     }
 
@@ -655,6 +659,7 @@ namespace {
         case ImportHint::CFunctionPointer:
         case ImportHint::OtherPointer:
         case ImportHint::SwiftNewtypeFromCFPointer:
+        case ImportHint::VAList:
           return {mappedType, underlying.Hint};
 
         case ImportHint::Boolean:
@@ -684,6 +689,10 @@ namespace {
           break;
         }
 
+        static const llvm::StringLiteral vaListNames[] = {
+          "va_list", "__gnuc_va_list", "__va_list"
+        };
+
         ImportHint hint = ImportHint::None;
         if (type->getDecl()->getName() == "BOOL") {
           hint = ImportHint::Boolean;
@@ -692,6 +701,9 @@ namespace {
           hint = ImportHint::Boolean;
         } else if (type->getDecl()->getName() == "NSUInteger") {
           hint = ImportHint::NSUInteger;
+        } else if (llvm::is_contained(vaListNames,
+                                      type->getDecl()->getName())) {
+          hint = ImportHint::VAList;
         } else if (isImportedCFPointer(type->desugar(), mappedType)) {
           hint = ImportHint::CFPointer;
         } else if (mappedType->isAnyExistentialType()) { // id, Class
@@ -770,8 +782,11 @@ namespace {
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
       if (clangCtx.hasSameType(type->getOriginalType(),
-                               clangCtx.getBuiltinVaListType()))
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CVaListPointer");
+                               clangCtx.getBuiltinVaListType())) {
+        return {Impl.getNamedSwiftType(Impl.getStdlibModule(),
+                                       "CVaListPointer"),
+                ImportHint::VAList};
+      }
       return Visit(type->desugar());
     }
 
@@ -1273,6 +1288,16 @@ static ImportedType adjustTypeForConcreteImport(
         importedType = getUnmanagedType(impl, underlyingType);
     }
     break;
+
+  case ImportHint::VAList:
+    // Treat va_list specially: null-unspecified va_list parameters should be
+    // assumed to be non-optional. (Most people don't even think of va_list as a
+    // pointer, and it's not a portable assumption anyway.)
+    if (importKind == ImportTypeKind::Parameter &&
+        optKind == OTK_ImplicitlyUnwrappedOptional) {
+      optKind = OTK_None;
+    }
+    break;
   }
 
   // For anything else, if we completely failed to import the type
@@ -1380,19 +1405,6 @@ static ImportedType adjustTypeForConcreteImport(
     // FIXME: This should apply to blocks as well, but Unmanaged is constrained
     // to AnyObject.
     importedType = getUnmanagedType(impl, importedType);
-  }
-
-  // Treat va_list specially: null-unspecified va_list parameters should be
-  // assumed to be non-optional. (Most people don't even think of va_list as a
-  // pointer, and it's not a portable assumption anyway.)
-  if (importKind == ImportTypeKind::Parameter &&
-      optKind == OTK_ImplicitlyUnwrappedOptional) {
-    if (auto *nominal = importedType->getNominalOrBoundGenericNominal()) {
-      if (nominal->getName().str() == "CVaListPointer" &&
-          nominal->getParentModule()->isStdlibModule()) {
-        optKind = OTK_None;
-      }
-    }
   }
 
   // Wrap class, class protocol, function, and metatype types in an
