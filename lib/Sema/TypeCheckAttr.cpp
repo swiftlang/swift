@@ -1071,7 +1071,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  TC.validateDecl(decl);
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)decl->getInterfaceType();
   auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
@@ -1242,7 +1243,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto oneCandidate = candidates.front().getValueDecl();
     candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      TC.validateDecl(cand);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)cand->getInterfaceType();
       return isValidDynamicMemberLookupSubscript(cand, decl, TC);
     });
 
@@ -1265,7 +1267,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    TC.validateDecl(cand);
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)cand->getInterfaceType();
     return isValidDynamicMemberLookupSubscript(cand, decl, TC,
                                                /*ignoreLabel*/ true);
   });
@@ -2133,7 +2136,8 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   // Filter out any accessors that won't work.
   if (!results.empty()) {
     auto replacementStorage = replacement->getStorage();
-    TC.validateDecl(replacementStorage);
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)replacementStorage->getInterfaceType();
     Type replacementStorageType = getDynamicComparisonType(replacementStorage);
     results.erase(std::remove_if(results.begin(), results.end(),
         [&](ValueDecl *result) {
@@ -2145,7 +2149,8 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
             return true;
 
           // Check for type mismatch.
-          TC.validateDecl(result);
+          // FIXME(InterfaceTypeRequest): Remove this.
+          (void)result->getInterfaceType();
           auto resultType = getDynamicComparisonType(result);
           if (!resultType->isEqual(replacementStorageType) &&
               !resultType->matches(
@@ -2179,7 +2184,9 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   }
 
   assert(!isa<FuncDecl>(results[0]));
-  TC.validateDecl(results[0]);
+  
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)results[0]->getInterfaceType();
   auto *origStorage = cast<AbstractStorageDecl>(results[0]);
   if (!origStorage->isDynamic()) {
     TC.diagnose(attr->getLocation(),
@@ -2195,8 +2202,8 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   if (!origAccessor)
     return nullptr;
 
-  TC.validateDecl(origAccessor);
-
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)origAccessor->getInterfaceType();
   if (origAccessor->isImplicit() &&
       !(origStorage->getReadImpl() == ReadImplKind::Stored &&
         origStorage->getWriteImpl() == WriteImplKind::Stored)) {
@@ -2228,9 +2235,9 @@ findReplacedFunction(DeclName replacedFunctionName,
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
-
-    if (TC)
-      TC->validateDecl(result);
+    
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)result->getInterfaceType();
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
     matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
     if (result->getInterfaceType()->getCanonicalType()->matches(
@@ -2351,7 +2358,8 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
       if (attr->isInvalid())
         return;
 
-       TC.validateDecl(accessor);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)accessor->getInterfaceType();
        auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
                                          accessor, attr, TC);
        if (!orig)

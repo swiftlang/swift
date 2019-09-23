@@ -423,10 +423,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     auto *typeDecl = cast<TypeDecl>(decl);
 
     // FIXME: This should happen before we attempt shadowing checks.
-    if (!typeDecl->hasInterfaceType()) {
-      dc->getASTContext().getLazyResolver()->resolveDeclSignature(typeDecl);
-      if (!typeDecl->hasInterfaceType()) // FIXME: recursion-breaking hack
-        continue;
+    if (!typeDecl->getInterfaceType()) {
+      // FIXME: recursion-breaking hack
+      continue;
     }
 
     auto memberType = typeDecl->getDeclaredInterfaceType();

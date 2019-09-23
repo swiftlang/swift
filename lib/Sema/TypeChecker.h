@@ -1421,9 +1421,7 @@ public:
     return getUnopenedTypeOfReference(
         value, baseType, UseDC,
         [&](VarDecl *var) -> Type {
-          validateDecl(var);
-
-          if (!var->hasInterfaceType() || var->isInvalid())
+          if (!var->getInterfaceType() || var->isInvalid())
             return ErrorType::get(Context);
 
           return wantInterfaceType ? value->getInterfaceType()

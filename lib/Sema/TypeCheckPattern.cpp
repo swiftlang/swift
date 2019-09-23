@@ -1497,7 +1497,7 @@ recur:
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    validateDecl(elt);
+    auto argType = elt->getArgumentInterfaceType();
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
@@ -1510,7 +1510,7 @@ recur:
       }
       
       Type elementType;
-      if (auto argType = elt->getArgumentInterfaceType())
+      if (argType)
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
@@ -1524,7 +1524,7 @@ recur:
       if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);
-    } else if (auto argType = elt->getArgumentInterfaceType()) {
+    } else if (argType) {
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.

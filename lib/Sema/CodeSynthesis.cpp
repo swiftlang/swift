@@ -213,7 +213,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      ctx.getLazyResolver()->resolveDeclSignature(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
       if (var->getAttrs().hasAttribute<LazyAttr>()) {
@@ -540,9 +539,6 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   auto *superclassCtor = (ConstructorDecl *) context;
 
-  if (!superclassCtor->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(superclassCtor);
-
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
@@ -856,9 +852,7 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 
-      if (!var->hasInterfaceType())
-        ctx.getLazyResolver()->resolveDeclSignature(var);
-      if (!var->hasInterfaceType())
+      if (!var->getInterfaceType())
         return;
     }
   }
@@ -923,9 +917,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->hasInterfaceType())
-          ctx.getLazyResolver()->resolveDeclSignature(ctor);
-        if (!ctor->hasInterfaceType())
+        if (!ctor->getInterfaceType())
           return;
       }
     }

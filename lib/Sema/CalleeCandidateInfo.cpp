@@ -593,9 +593,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = TypeChecker::lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
-        if (!ctor.getValueDecl()->hasInterfaceType())
-          CS.getTypeChecker().validateDecl(ctor.getValueDecl());
-        if (ctor.getValueDecl()->hasInterfaceType())
+        if (ctor.getValueDecl()->getInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });
       }
     }
