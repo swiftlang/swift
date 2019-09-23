@@ -95,7 +95,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-/// Returns true if F is a function which the pass know show to specialize
+/// Returns true if F is a function which the pass knows how to specialize
 /// function signatures for.
 static bool canSpecializeFunction(SILFunction *F,
                                   const CallerAnalysis::FunctionInfo *FuncInfo,
@@ -622,7 +622,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
 // Run the optimization.
 bool FunctionSignatureTransform::run(bool hasCaller) {
-  bool Changed = false;
+  // We use a reference here on purpose so our transformations can know if we
+  // are going to make a thunk and thus should just optimize.
+  bool &Changed = TransformDescriptor.Changed;
+  bool hasOnlyDirectInModuleCallers =
+      TransformDescriptor.hasOnlyDirectInModuleCallers;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
   // Never repeat the same function signature optimization on the same function.
@@ -657,7 +661,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // Run DeadArgument elimination transformation. We only specialize
   // if this function has a caller inside the current module or we have
   // already created a thunk.
-  if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectInModuleCallers) &&
+      DeadArgumentAnalyzeParameters()) {
     Changed = true;
     LLVM_DEBUG(llvm::dbgs() << "  remove dead arguments\n");
     DeadArgumentTransformFunction();
@@ -675,7 +680,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // In order to not miss any opportunity, we send the optimized function
   // to the passmanager to optimize any opportunities exposed by argument
   // explosion.
-  if ((hasCaller || Changed) && ArgumentExplosionAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectInModuleCallers) &&
+      ArgumentExplosionAnalyzeParameters()) {
     Changed = true;
   }
 
@@ -830,7 +836,8 @@ public:
     SILOptFunctionBuilder FuncBuilder(*this);
     // Owned to guaranteed optimization.
     FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
-                                   ArgumentDescList, ResultDescList);
+                                   ArgumentDescList, ResultDescList,
+                                   FuncInfo.foundAllCallers());
 
     bool Changed = false;
     if (OptForPartialApply) {
