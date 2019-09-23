@@ -3461,11 +3461,16 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     //   case (let (_, _, _)) + 1: break
     // }
     if (callExpr->isImplicit() && overloadName == "~=") {
-      auto *locator =
-          CS.getConstraintLocator(callExpr,
-                                  {ConstraintLocator::ApplyArgument,
-                                   LocatorPathElt::ApplyArgToParam(0, 0)},
-                                  /*summaryFlags=*/0);
+      auto flags = ParameterTypeFlags();
+      if (calleeInfo.candidates.size() == 1)
+        if (auto fnType = calleeInfo.candidates[0].getFunctionType())
+          flags = fnType->getParams()[0].getParameterFlags();
+
+      auto *locator = CS.getConstraintLocator(
+          callExpr,
+          {ConstraintLocator::ApplyArgument,
+           LocatorPathElt::ApplyArgToParam(0, 0, flags)},
+          /*summaryFlags=*/0);
 
       ArgumentMismatchFailure failure(expr, CS, lhsType, rhsType, locator);
       return failure.diagnosePatternMatchingMismatch();
