@@ -252,7 +252,7 @@ namespace swift {
     bool DisableParserLookup = false;
 
     /// Should  we compare to ASTScope-based resolution for debugging?
-    bool CompareToASTScopeLookup = false;
+    bool CrosscheckUnqualifiedLookup = false;
 
     /// Should  we stress ASTScope-based resolution for debugging?
     bool StressASTScopeLookup = false;
