@@ -121,20 +121,24 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducingValue::visitLocalScopeEndingInstructions(
-    function_ref<void(SILInstruction *)> visitor) const {
+void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
+    function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
   case BorrowScopeIntroducerKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
   case BorrowScopeIntroducerKind::BeginBorrow:
-    for (auto *inst : cast<BeginBorrowInst>(value)->getEndBorrows()) {
-      visitor(inst);
+    for (auto *use : cast<BeginBorrowInst>(value)->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        visitor(use);
+      }
     }
     return;
   case BorrowScopeIntroducerKind::LoadBorrow:
-    for (auto *inst : cast<LoadBorrowInst>(value)->getEndBorrows()) {
-      visitor(inst);
+    for (auto *use : cast<LoadBorrowInst>(value)->getUses()) {
+      if (isa<EndBorrowInst>(use->getUser())) {
+        visitor(use);
+      }
     }
     return;
   }
@@ -203,8 +207,8 @@ bool BorrowScopeIntroducingValue::areInstructionsWithinScope(
     return true;
 
   // Otherwise, gather up our local scope ending instructions.
-  visitLocalScopeEndingInstructions(
-      [&scratchSpace](SILInstruction *i) { scratchSpace.emplace_back(i); });
+  visitLocalScopeEndingUses(
+      [&scratchSpace](Operand *op) { scratchSpace.emplace_back(op); });
 
   LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
   return checker.validateLifetime(value, scratchSpace, instructions);
