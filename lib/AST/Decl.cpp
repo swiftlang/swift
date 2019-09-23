@@ -6555,17 +6555,6 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   if (decl->isEffectiveLinkageMoreVisibleThan(base))
     return true;
 
-  // FIXME: Remove this once getInterfaceType() has been request-ified.
-  if (!decl->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(decl));
-  }
-
-  if (!base->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(base));
-  }
-
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction
   // change is OK; we don't want to add a whole new vtable entry just

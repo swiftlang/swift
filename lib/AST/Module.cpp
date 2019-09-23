@@ -1817,14 +1817,15 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName,
   auto found = ValidatedOpaqueReturnTypes.find(MangledName);
   if (found != ValidatedOpaqueReturnTypes.end())
     return found->second;
-  
+    
   // If there are unvalidated decls with opaque types, go through and validate
   // them now.
   if (resolver && !UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
     while (!UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
       ValueDecl *decl = *UnvalidatedDeclsWithOpaqueReturnTypes.begin();
       UnvalidatedDeclsWithOpaqueReturnTypes.erase(decl);
-      resolver->resolveDeclSignature(decl);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)decl->getInterfaceType();
     }
     
     found = ValidatedOpaqueReturnTypes.find(MangledName);
