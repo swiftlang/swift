@@ -60,6 +60,36 @@ bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
 
+/// Returns a specialization of the given pointer type for the given pointee.
+///
+/// \p kind must not be a raw pointer kind.
+static Type getPointerTo(Type pointee, PointerTypeKind kind) {
+  ASTContext &ctx = pointee->getASTContext();
+  NominalTypeDecl *pointerDecl = ([&ctx, kind] {
+    switch (kind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
+      llvm_unreachable("these pointer types don't take arguments");
+    case PTK_UnsafePointer:
+      return ctx.getUnsafePointerDecl();
+    case PTK_UnsafeMutablePointer:
+      return ctx.getUnsafeMutablePointerDecl();
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return ctx.getAutoreleasingUnsafeMutablePointerDecl();
+    }
+    llvm_unreachable("bad kind");
+  }());
+
+  // Specifically handle AUMP being missing to allow testing more of ObjC
+  // interop on non-Apple platforms.
+  assert((pointerDecl || kind == PTK_AutoreleasingUnsafeMutablePointer) &&
+         "could not find standard pointer type");
+  if (!pointerDecl)
+    return Type();
+
+  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, pointee);
+}
+
 namespace {
   /// Various types that we want to do something interesting to after
   /// importing them.
@@ -409,9 +439,7 @@ namespace {
       }
 
       if (quals.hasConst()) {
-        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                     "UnsafePointer",
-                                                     pointeeType),
+        return {getPointerTo(pointeeType, PTK_UnsafePointer),
                 ImportHint::OtherPointer};
       }
 
@@ -420,16 +448,12 @@ namespace {
       if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
           quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
         return {
-          Impl.getNamedSwiftTypeSpecialization(
-            Impl.getStdlibModule(), "AutoreleasingUnsafeMutablePointer",
-            pointeeType),
+          getPointerTo(pointeeType, PTK_AutoreleasingUnsafeMutablePointer),
           ImportHint::OtherPointer};
       }
 
       // All other mutable pointers map to UnsafeMutablePointer.
-      return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                   "UnsafeMutablePointer",
-                                                   pointeeType),
+      return {getPointerTo(pointeeType, PTK_UnsafeMutablePointer),
               ImportHint::OtherPointer};
     }
 
@@ -1182,6 +1206,11 @@ static ImportedType adjustTypeForConcreteImport(
     return {importedType, false};
   }
 
+  // If we completely failed to import the type, give up now.
+  // Special-case for 'void' which is valid in result positions.
+  if (!importedType && hint != ImportHint::Void)
+    return {Type(), false};
+
   switch (hint) {
   case ImportHint::None:
     break;
@@ -1193,11 +1222,12 @@ static ImportedType adjustTypeForConcreteImport(
 
   case ImportHint::Void:
     // 'void' can only be imported as a function result type.
-    if (importKind == ImportTypeKind::AuditedResult ||
-        importKind == ImportTypeKind::Result) {
-      return {impl.getNamedSwiftType(impl.getStdlibModule(), "Void"), false};
+    if (importKind != ImportTypeKind::AuditedResult &&
+        importKind != ImportTypeKind::Result) {
+      return {Type(), false};
     }
-    return {Type(), false};
+    importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
+    break;
 
   case ImportHint::ObjCBridged:
     // Import NSString * globals as non-optional String.
@@ -1300,10 +1330,7 @@ static ImportedType adjustTypeForConcreteImport(
     break;
   }
 
-  // For anything else, if we completely failed to import the type
-  // abstractly, give up now.
-  if (!importedType)
-    return {Type(), false};
+  assert(importedType);
 
   // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
   auto maybeImportNSErrorPointer = [&]() -> Type {
@@ -1381,15 +1408,13 @@ static ImportedType adjustTypeForConcreteImport(
     if (isOptional)
       resultTy = OptionalType::get(resultTy);
 
-    StringRef pointerName;
+    PointerTypeKind pointerKind;
     if (importKind == ImportTypeKind::CFRetainedOutParameter)
-      pointerName = "UnsafeMutablePointer";
+      pointerKind = PTK_UnsafeMutablePointer;
     else
-      pointerName = "AutoreleasingUnsafeMutablePointer";
+      pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
 
-    resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                    pointerName,
-                                                    resultTy);
+    resultTy = getPointerTo(resultTy, pointerKind);
     return resultTy;
   };
   if (Type outParamTy = maybeImportCFOutParameter()) {
@@ -2335,33 +2360,6 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,
   if (!module) return Type();
 
   return getNamedSwiftType(module, name);
-}
-
-Type
-ClangImporter::Implementation::
-getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
-                                ArrayRef<Type> args) {
-  if (!module)
-    return Type();
-
-  // Look for the type.
-  SmallVector<ValueDecl *, 2> results;
-  module->lookupValue(SwiftContext.getIdentifier(name),
-                      NLKind::UnqualifiedLookup, results);
-  if (results.size() == 1) {
-    if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {
-      if (auto params = nominalDecl->getGenericParams()) {
-        if (params->size() == args.size()) {
-          // When we form the bound generic type, make sure we get the
-          // substitutions.
-          auto *BGT = BoundGenericType::get(nominalDecl, Type(), args);
-          return BGT;
-        }
-      }
-    }
-  }
-
-  return Type();
 }
 
 Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
