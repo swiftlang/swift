@@ -764,8 +764,6 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)assocType->getInterfaceType();
   if (assocType->hasDefaultDefinitionType())
     return assocType;
 

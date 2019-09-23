@@ -2136,8 +2136,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   // Filter out any accessors that won't work.
   if (!results.empty()) {
     auto replacementStorage = replacement->getStorage();
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)replacementStorage->getInterfaceType();
     Type replacementStorageType = getDynamicComparisonType(replacementStorage);
     results.erase(std::remove_if(results.begin(), results.end(),
         [&](ValueDecl *result) {
@@ -2149,8 +2147,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
             return true;
 
           // Check for type mismatch.
-          // FIXME(InterfaceTypeRequest): Remove this.
-          (void)result->getInterfaceType();
           auto resultType = getDynamicComparisonType(result);
           if (!resultType->isEqual(replacementStorageType) &&
               !resultType->matches(
@@ -2236,8 +2232,6 @@ findReplacedFunction(DeclName replacedFunctionName,
     if (result->isStatic() != replacement->isStatic())
       continue;
     
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)result->getInterfaceType();
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
     matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
     if (result->getInterfaceType()->getCanonicalType()->matches(
