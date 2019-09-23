@@ -997,6 +997,6 @@ StructuralTypeRequest::evaluate(Evaluator &evaluator,
   Type parent;
   auto parentDC = typeAlias->getDeclContext();
   if (parentDC->isTypeContext())
-    parent = parentDC->getDeclaredInterfaceType();
+    parent = parentDC->getSelfInterfaceType();
   return TypeAliasType::get(typeAlias, parent, subs, type);
 }
