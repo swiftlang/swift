@@ -379,13 +379,9 @@ namespace {
 
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
-      Type pointeeType;
-      if (pointeeQualType->isVoidType())
-        pointeeType = Impl.getNamedSwiftType(Impl.getStdlibModule(), "Void");
-      else
-        pointeeType = Impl.importTypeIgnoreIUO(
-            pointeeQualType, ImportTypeKind::Value, AllowNSUIntegerAsInt,
-            Bridgeability::None);
+      Type pointeeType = Impl.importTypeIgnoreIUO(
+          pointeeQualType, ImportTypeKind::Value, AllowNSUIntegerAsInt,
+          Bridgeability::None);
 
       // If the pointed-to type is unrepresentable in Swift, or its C
       // alignment is greater than the maximum Swift alignment, import as
