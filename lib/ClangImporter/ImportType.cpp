@@ -1167,18 +1167,112 @@ static ImportedType adjustTypeForConcreteImport(
     return {importedType, false};
   }
 
-  // 'void' can only be imported as a function result type.
-  if (hint == ImportHint::Void &&
-      (importKind == ImportTypeKind::AuditedResult ||
-       importKind == ImportTypeKind::Result)) {
-    return {impl.getNamedSwiftType(impl.getStdlibModule(), "Void"), false};
+  switch (hint) {
+  case ImportHint::None:
+    break;
+
+  case ImportHint::ObjCPointer:
+  case ImportHint::CFunctionPointer:
+  case ImportHint::OtherPointer:
+    break;
+
+  case ImportHint::Void:
+    // 'void' can only be imported as a function result type.
+    if (importKind == ImportTypeKind::AuditedResult ||
+        importKind == ImportTypeKind::Result) {
+      return {impl.getNamedSwiftType(impl.getStdlibModule(), "Void"), false};
+    }
+    return {Type(), false};
+
+  case ImportHint::ObjCBridged:
+    // Import NSString * globals as non-optional String.
+    if (isNSString(importedType)) {
+      if (importKind == ImportTypeKind::Variable ||
+          importKind == ImportTypeKind::AuditedVariable) {
+        return {hint.BridgedType, false};
+      }
+    }
+
+    // If we have a bridged Objective-C type and we are allowed to
+    // bridge, do so.
+    if (canBridgeTypes(importKind) &&
+        importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
+        !(importKind == ImportTypeKind::Typedef &&
+          bridging == Bridgeability::None)) {
+      // id and Any can be bridged without Foundation. There would be
+      // bootstrapping issues with the ObjectiveC module otherwise.
+      if (hint.BridgedType->isAny()
+          || impl.tryLoadFoundationModule()
+          || impl.ImportForwardDeclarations) {
+
+        // Set the bridged type if it wasn't done already.
+        if (!importedType->isEqual(hint.BridgedType))
+          importedType = hint.BridgedType;
+      }
+    }
+    break;
+
+  case ImportHint::Block: {
+    // SwiftTypeConverter turns block pointers into @convention(block) types.
+    // In some contexts, we bridge them to use the Swift function type
+    // representation. This includes typedefs of block types, which use the
+    // Swift function type representation.
+    if (!canBridgeTypes(importKind))
+      break;
+
+    // Determine the function type representation we need.
+    //
+    // For Objective-C collection arguments, we cannot bridge from a block
+    // to a Swift function type, so force the block representation. Normally
+    // the mapped type will have a block representation (making this a no-op),
+    // but in cases where the Clang type was written as a typedef of a
+    // block type, that typedef will have a Swift function type
+    // representation. This code will then break down the imported type
+    // alias and produce a function type with block representation.
+    auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
+    if (importKind == ImportTypeKind::ObjCCollectionElement) {
+      requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
+    }
+
+    auto fTy = importedType->castTo<FunctionType>();
+    FunctionType::ExtInfo einfo = fTy->getExtInfo();
+    if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
+      einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
+      importedType = fTy->withExtInfo(einfo);
+    }
+    break;
   }
 
-  // Import NSString * globals as String.
-  if (hint == ImportHint::ObjCBridged && isNSString(importedType) &&
-      (importKind == ImportTypeKind::Variable ||
-       importKind == ImportTypeKind::AuditedVariable)) {
-    return {hint.BridgedType, false};
+  case ImportHint::Boolean:
+    // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
+    // losslessly.
+    if (bridging == Bridgeability::Full && canBridgeTypes(importKind))
+      return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
+    break;
+
+  case ImportHint::NSUInteger:
+    // When NSUInteger is used as an enum's underlying type or if it does not
+    // come from a system module, make sure it stays unsigned.
+    if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt)
+      return {impl.SwiftContext.getUIntDecl()->getDeclaredType(), false};
+    break;
+
+  case ImportHint::CFPointer:
+    // Wrap CF pointers up as unmanaged types, unless this is an audited
+    // context.
+    if (!isCFAudited(importKind))
+      importedType = getUnmanagedType(impl, importedType);
+    break;
+
+  case ImportHint::SwiftNewtypeFromCFPointer:
+    // For types we import as new types in Swift, if the use is CF un-audited,
+    // then we have to force it to be unmanaged
+    if (!isCFAudited(importKind)) {
+      auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
+      if (underlyingType)
+        importedType = getUnmanagedType(impl, underlyingType);
+    }
+    break;
   }
 
   // For anything else, if we completely failed to import the type
@@ -1276,87 +1370,6 @@ static ImportedType adjustTypeForConcreteImport(
   if (Type outParamTy = maybeImportCFOutParameter()) {
     importedType = outParamTy;
   }
-
-  // SwiftTypeConverter turns block pointers into @convention(block) types.
-  // In some contexts, we bridge them to use the Swift function type
-  // representation. This includes typedefs of block types, which use the
-  // Swift function type representation.
-  if (hint == ImportHint::Block) {
-    if (canBridgeTypes(importKind)) {
-      // Determine the function type representation we need.
-      //
-      // For Objective-C collection arguments, we cannot bridge from a block
-      // to a Swift function type, so force the block representation. Normally
-      // the mapped type will have a block representation (making this a no-op),
-      // but in cases where the Clang type was written as a typedef of a
-      // block type, that typedef will have a Swift function type
-      // representation. This code will then break down the imported type
-      // alias and produce a function type with block representation.
-      auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
-      if (importKind == ImportTypeKind::ObjCCollectionElement) {
-        requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
-      }
-
-      auto fTy = importedType->castTo<FunctionType>();
-      FunctionType::ExtInfo einfo = fTy->getExtInfo();
-      if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
-        einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
-        importedType = fTy->withExtInfo(einfo);
-      }
-    }
-  }
-
-  // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
-  // losslessly.
-  if (hint == ImportHint::Boolean && bridging == Bridgeability::Full &&
-      canBridgeTypes(importKind)) {
-    return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
-  }
-
-  // When NSUInteger is used as an enum's underlying type or if it does not come
-  // from a system module, make sure it stays unsigned.
-  if (hint == ImportHint::NSUInteger) {
-    if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt) {
-      return {impl.SwiftContext.getUIntDecl()->getDeclaredType(), false};
-    }
-  }
-
-  // Wrap CF pointers up as unmanaged types, unless this is an audited
-  // context.
-  if (hint == ImportHint::CFPointer && !isCFAudited(importKind)) {
-    importedType = getUnmanagedType(impl, importedType);
-  }
-
-  // For types we import as new types in Swift, if the use is CF un-audited,
-  // then we have to force it to be unmanaged
-  if (hint == ImportHint::SwiftNewtypeFromCFPointer &&
-      !isCFAudited(importKind)) {
-    auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
-    if (underlyingType)
-      importedType = getUnmanagedType(impl, underlyingType);
-  }
-
-  // If we have a bridged Objective-C type and we are allowed to
-  // bridge, do so.
-  if (hint == ImportHint::ObjCBridged &&
-      canBridgeTypes(importKind) &&
-      importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
-      !(importKind == ImportTypeKind::Typedef &&
-        bridging == Bridgeability::None)) {
-    // id and Any can be bridged without Foundation. There would be
-    // bootstrapping issues with the ObjectiveC module otherwise.
-    if (hint.BridgedType->isAny()
-        || impl.tryLoadFoundationModule()
-        || impl.ImportForwardDeclarations) {
-
-      // Set the bridged type if it wasn't done already.
-      if (!importedType->isEqual(hint.BridgedType))
-        importedType = hint.BridgedType;
-    }
-  }
-
-  if (!importedType)
-    return {importedType, false};
 
   if (importKind == ImportTypeKind::RecordField &&
       importedType->isAnyClassReferenceType()) {
