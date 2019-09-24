@@ -53,32 +53,32 @@ typedef struct swift_reflection_section {
 typedef struct swift_reflection_info {
   struct {
     swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
+    swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
   } field;
 
   struct {
     swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
+    swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
   } associated_types;
 
   struct {
     swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
+    swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
   } builtin_types;
 
   struct {
     swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
+    swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
   } capture;
 
   struct {
     swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
+    swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
   } type_references;
 
   struct {
     swift_reflection_section_t section;
-    swift_reflection_ptr_t offset;
+    swift_reflection_ptr_t offset; ///< DEPRECATED. Must be zero
   } reflection_strings;
 
   // Start address in local and remote address spaces.

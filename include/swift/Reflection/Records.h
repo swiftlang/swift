@@ -80,14 +80,12 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char *)((uintptr_t)MangledTypeName.get() + Offset));
+  StringRef getMangledTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
-  StringRef getFieldName(uintptr_t Offset, uintptr_t Low,
-                         uintptr_t High) const {
-    uintptr_t nameAddr = (uintptr_t)FieldName.get() + Offset;
+  StringRef getFieldName(uintptr_t Low, uintptr_t High) const {
+    uintptr_t nameAddr = (uintptr_t)FieldName.get();
     if (nameAddr < Low || nameAddr > High)
       return "";
     return (const char *)nameAddr;
@@ -216,18 +214,16 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char *)((uintptr_t)MangledTypeName.get() + Offset));
+  StringRef getMangledTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
   bool hasSuperclass() const {
     return Superclass;
   }
 
-  StringRef getSuperclass(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)Superclass.get() + Offset));
+  StringRef getSuperclass() const {
+    return Demangle::makeSymbolicMangledNameStringRef(Superclass.get());
   }
 };
 
@@ -271,13 +267,13 @@ class AssociatedTypeRecord {
   const RelativeDirectPointer<const char> SubstitutedTypeName;
 
 public:
-  StringRef getName(uintptr_t Offset) const {
-    return (const char*)((uintptr_t)Name.get() + Offset);
+  StringRef getName() const {
+    return Name.get();
   }
 
-  StringRef getMangledSubstitutedTypeName(uintptr_t Offset) const {
+  StringRef getMangledSubstitutedTypeName() const {
     return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)SubstitutedTypeName.get() + Offset));
+                                                    SubstitutedTypeName.get());
   }
 };
 
@@ -352,14 +348,12 @@ public:
     return const_iterator { End, End };
   }
 
-  StringRef getMangledProtocolTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)ProtocolTypeName.get() + Offset));
+  StringRef getMangledProtocolTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(ProtocolTypeName.get());
   }
 
-  StringRef getMangledConformingTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)ConformingTypeName.get() + Offset));
+  StringRef getMangledConformingTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(ConformingTypeName.get());
   }
 };
 
@@ -425,9 +419,8 @@ public:
     return TypeName;
   }
 
-  StringRef getMangledTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)TypeName.get() + Offset));
+  StringRef getMangledTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(TypeName.get());
   }
 };
 
@@ -473,9 +466,8 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)MangledTypeName.get() + Offset));
+  StringRef getMangledTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 };
 
@@ -520,18 +512,17 @@ public:
     return MangledTypeName;
   }
 
-  StringRef getMangledTypeName(uintptr_t Offset) const {
-    return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)MangledTypeName.get() + Offset));
+  StringRef getMangledTypeName() const {
+    return Demangle::makeSymbolicMangledNameStringRef(MangledTypeName.get());
   }
 
   bool hasMangledMetadataSource() const {
     return MangledMetadataSource;
   }
 
-  StringRef getMangledMetadataSource(uintptr_t Offset) const {
+  StringRef getMangledMetadataSource() const {
     return Demangle::makeSymbolicMangledNameStringRef(
-      (const char*)((uintptr_t)MangledMetadataSource.get() + Offset));
+                                                   MangledMetadataSource.get());
   }
 };
 
