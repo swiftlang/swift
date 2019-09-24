@@ -1579,9 +1579,10 @@ public:
   /// that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentInfo> ArgumentInfos;
 
-  /// Form a locator with given anchor which then could be used
-  /// to retrieve argument information cached in the constraint system.
-  ConstraintLocator *getArgumentInfoLocator(Expr *anchor);
+  /// Form a locator that can be used to retrieve argument information cached in
+  /// the constraint system for the callee described by the anchor of the
+  /// passed locator.
+  ConstraintLocator *getArgumentInfoLocator(ConstraintLocator *locator);
 
   /// Retrieve the argument info that is associated with a member
   /// reference at the given locator.
@@ -1589,6 +1590,17 @@ public:
 
   ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
     return resolvedOverloadSets;
+  }
+
+  ResolvedOverloadSetListItem *
+  findSelectedOverloadFor(ConstraintLocator *locator) const {
+    auto resolvedOverload = getResolvedOverloadSets();
+    while (resolvedOverload) {
+      if (resolvedOverload->Locator == locator)
+        return resolvedOverload;
+      resolvedOverload = resolvedOverload->Previous;
+    }
+    return nullptr;
   }
 
   ResolvedOverloadSetListItem *findSelectedOverloadFor(Expr *expr) const {
@@ -2008,10 +2020,26 @@ public:
     return e != ExprWeights.end() ? e->second.second : nullptr;
   }
 
-  /// Returns a locator describing the callee for a given expression. For
-  /// a function application, this is a locator describing the function expr.
-  /// For an unresolved dot/member, this is a locator to the member.
-  ConstraintLocator *getCalleeLocator(Expr *expr);
+  /// Returns a locator describing the callee for the anchor of a given locator.
+  ///
+  /// - For an unresolved dot/member anchor, this will be a locator describing
+  /// the member.
+  ///
+  /// - For a subscript anchor, this will be a locator describing the subscript
+  /// member.
+  ///
+  /// - For a key path anchor with a property/subscript component path element,
+  /// this will be a locator describing the decl referenced by the component.
+  ///
+  /// - For a function application anchor, this will be a locator describing the
+  /// 'direct callee' of the call. For example, for the expression \c x.foo?()
+  /// the returned locator will describe the member \c foo.
+  ///
+  /// Note that because this function deals with the anchor, given a locator
+  /// anchored on \c functionA(functionB()) with path elements pointing to the
+  /// argument \c functionB(), the returned callee locator will describe
+  /// \c functionA rather than \c functionB.
+  ConstraintLocator *getCalleeLocator(ConstraintLocator *locator);
 
 public:
 
@@ -2035,7 +2063,7 @@ public:
 
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
-  bool recordFix(ConstraintFix *fix);
+  bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
   void recordHole(TypeVariableType *typeVar);
 
@@ -2463,7 +2491,7 @@ public:
   static bool isCollectionType(Type t);
 
   /// Determine if the type in question is AnyHashable.
-  bool isAnyHashableType(Type t);
+  static bool isAnyHashableType(Type t);
 
   /// Call Expr::isTypeReference on the given expression, using a
   /// custom accessor for the type on the expression that reads the
@@ -3950,7 +3978,7 @@ void simplifyLocator(Expr *&anchor,
 ///
 /// \returns the anchor expression if it fully describes the locator, or
 /// null otherwise.
-Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
+Expr *simplifyLocatorToAnchor(ConstraintLocator *locator);
 
 /// Retrieve argument at specified index from given expression.
 /// The expression could be "application", "subscript" or "member" call.
@@ -3958,6 +3986,22 @@ Expr *simplifyLocatorToAnchor(ConstraintSystem &cs, ConstraintLocator *locator);
 /// \returns argument expression or `nullptr` if given "base" expression
 /// wasn't of one of the kinds listed above.
 Expr *getArgumentExpr(Expr *expr, unsigned index);
+
+/// Determine whether given locator points to one of the arguments
+/// associated with implicit `~=` (pattern-matching) operator
+bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
+
+/// Determine whether given locator points to one of the arguments
+/// associated with `===` and `!==` operators.
+bool isArgumentOfReferenceEqualityOperator(ConstraintLocator *locator);
+
+/// Determine whether given expression is a reference to a
+/// pattern-matching operator `~=`
+bool isPatternMatchingOperator(Expr *expr);
+
+/// If given expression references operator overlaod(s)
+/// extract and produce name of the operator.
+Optional<Identifier> getOperatorName(Expr *expr);
 
 // Check whether argument of the call at given position refers to
 // parameter marked as `@autoclosure`. This function is used to

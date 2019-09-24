@@ -91,10 +91,7 @@ GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   assert(stage == TypeResolutionStage::Interface);
   if (!complete.builder) {
     auto genericSig = getGenericSignature();
-    ASTContext &ctx = genericSig->getASTContext();
-    complete.builder = ctx.getOrCreateGenericSignatureBuilder(
-                                          genericSig->getCanonicalSignature());
-
+    complete.builder = genericSig->getGenericSignatureBuilder();
   }
 
   return complete.builder;
@@ -1223,6 +1220,12 @@ static Type diagnoseUnknownType(TypeResolution resolution,
       diags.diagnose(comp->getIdLoc(), diag::invalid_member_type,
                      comp->getIdentifier(), parentType)
         .highlight(parentRange);
+      // Note where the type was defined, this can help diagnose if the user
+      // expected name lookup to find a module when there's a conflicting type.
+      if (auto typeDecl = parentType->getNominalOrBoundGenericNominal()) {
+        ctx.Diags.diagnose(typeDecl, diag::decl_declared_here,
+                           typeDecl->getFullName());
+      }
     }
   }
   return ErrorType::get(ctx);
@@ -1712,25 +1715,26 @@ Type TypeChecker::resolveIdentifierType(
 /// Validate whether type associated with @autoclosure attribute is correct,
 /// it supposed to be a function type with no parameters.
 /// \returns true if there was an error, false otherwise.
-static bool validateAutoClosureAttr(TypeChecker &TC, const SourceLoc &loc,
+static bool validateAutoClosureAttr(DiagnosticEngine &Diags, const SourceLoc &loc,
                                     Type paramType) {
   if (auto *fnType = paramType->getAs<FunctionType>()) {
     if (fnType->getNumParams() != 0) {
-      TC.diagnose(loc, diag::autoclosure_function_input_nonunit);
+      Diags.diagnose(loc, diag::autoclosure_function_input_nonunit);
       return true;
     }
     // A function type with no parameters.
     return false;
   }
 
-  TC.diagnose(loc, diag::autoclosure_function_type);
+  Diags.diagnose(loc, diag::autoclosure_function_type);
   return true;
 }
 
 /// Check whether the type associated with particular source location
 /// has `@autoclosure` attribute, and if so, validate that such use is correct.
 /// \returns true if there was an error, false otherwise.
-static bool validateAutoClosureAttributeUse(TypeChecker &TC, const TypeLoc &loc,
+static bool validateAutoClosureAttributeUse(DiagnosticEngine &Diags,
+                                            const TypeLoc &loc,
                                             Type type,
                                             TypeResolutionOptions options) {
   auto *TR = loc.getTypeRepr();
@@ -1742,7 +1746,7 @@ static bool validateAutoClosureAttributeUse(TypeChecker &TC, const TypeLoc &loc,
     if (auto *ATR = dyn_cast<AttributedTypeRepr>(TR)) {
       const auto attrLoc = ATR->getAttrs().getLoc(TAK_autoclosure);
       if (attrLoc.isValid())
-        return validateAutoClosureAttr(TC, attrLoc, type);
+        return validateAutoClosureAttr(Diags, attrLoc, type);
     }
   }
 
@@ -1756,7 +1760,7 @@ static bool validateAutoClosureAttributeUse(TypeChecker &TC, const TypeLoc &loc,
       isValid &= llvm::none_of(
           fnType->getParams(), [&](const FunctionType::Param &param) {
             return param.isAutoClosure() &&
-                   validateAutoClosureAttr(TC, loc.getLoc(),
+                   validateAutoClosureAttr(Diags, loc.getLoc(),
                                            param.getPlainType());
           });
     }
@@ -1765,7 +1769,8 @@ static bool validateAutoClosureAttributeUse(TypeChecker &TC, const TypeLoc &loc,
   return !isValid;
 }
 
-bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
+bool TypeChecker::validateType(ASTContext &Context, TypeLoc &Loc,
+                               TypeResolution resolution,
                                TypeResolutionOptions options) {
   // If we've already validated this type, don't do so again.
   if (Loc.wasValidated())
@@ -1782,10 +1787,11 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
       // Diagnose types that are illegal in SIL.
     } else if (options.contains(TypeResolutionFlags::SILType)
                && !type->isLegalSILType()) {
-      diagnose(Loc.getLoc(), diag::illegal_sil_type, type);
+      Context.Diags.diagnose(Loc.getLoc(), diag::illegal_sil_type, type);
       Loc.setInvalidType(Context);
       return true;
-    } else if (validateAutoClosureAttributeUse(*this, Loc, type, options)) {
+    } else if (validateAutoClosureAttributeUse(Context.Diags, Loc,
+                                               type, options)) {
       type = ErrorType::get(Context);
     }
   }
@@ -1795,7 +1801,7 @@ bool TypeChecker::validateType(TypeLoc &Loc, TypeResolution resolution,
     const DeclContext *DC = resolution.getDeclContext();
     if (options.isAnyExpr() || DC->getParent()->isLocalContext())
       if (DC->getResilienceExpansion() == ResilienceExpansion::Minimal)
-        diagnoseGenericTypeExportability(Loc, DC);
+        TypeChecker::diagnoseGenericTypeExportability(Loc, DC);
   }
 
   return type->hasError();
@@ -2274,6 +2280,17 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
           rep = FunctionType::Representation::Swift;
         } else {
           rep = *parsedRep;
+          
+          if (attrs.has(TAK_autoclosure)) {
+            // @convention(c) and @convention(block) are not allowed with an @autoclosure type.
+            if (rep == FunctionType::Representation::CFunctionPointer ||
+                rep == FunctionType::Representation::Block) {
+              diagnose(attrs.getLoc(TAK_convention),
+                       diag::invalid_autoclosure_and_convention_attributes,
+                       attrs.getConvention());
+              attrs.clearAttribute(TAK_convention);
+            }
+          }
         }
       }
 
@@ -3710,8 +3727,7 @@ Type swift::resolveCustomAttrType(CustomAttr *attr, DeclContext *dc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
 
   ASTContext &ctx = dc->getASTContext();
-  auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-  if (tc.validateType(attr->getTypeLoc(), resolution, options))
+  if (TypeChecker::validateType(ctx, attr->getTypeLoc(), resolution, options))
     return Type();
 
   // We always require the type to resolve to a nominal type.

@@ -1479,7 +1479,11 @@ bool TypeBase::isExactSuperclassOf(Type ty) {
          ty->getSuperclass()->getAnyNominal()->hasClangNode())))
     return false;
 
+  SmallPtrSet<ClassDecl *, 8> seen;
   do {
+    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+      if (!seen.insert(classDecl).second)
+        return false;
     if (ty->isEqual(this))
       return true;
   } while ((ty = ty->getSuperclass()));
@@ -1510,6 +1514,10 @@ bool TypeBase::isBindableTo(Type b) {
       if (orig->requiresClass() && !subst->satisfiesClassConstraint())
         return false;
 
+      if (auto superclass = orig->getSuperclass())
+        if (!superclass->isBindableToSuperclassOf(subst))
+          return false;
+
       // TODO: If the archetype has a superclass constraint, check that the
       // substitution is a subclass.
       
@@ -1528,7 +1536,7 @@ bool TypeBase::isBindableTo(Type b) {
       if (CanType(orig) == subst)
         return true;
       
-      llvm_unreachable("not a valid canonical type substitution");
+      return false;
     }
     
     bool visitNominalType(NominalType *nom, CanType subst) {
@@ -1580,10 +1588,10 @@ bool TypeBase::isBindableTo(Type b) {
     }
     
     bool visitDependentMemberType(DependentMemberType *dt, CanType subst) {
-      llvm_unreachable("can't visit dependent types");
+      return true;
     }
     bool visitGenericTypeParamType(GenericTypeParamType *dt, CanType subst) {
-      llvm_unreachable("can't visit dependent types");
+      return true;
     }
     
     bool visitFunctionType(FunctionType *func, CanType subst) {
@@ -1591,6 +1599,9 @@ bool TypeBase::isBindableTo(Type b) {
         if (func->getExtInfo() != substFunc->getExtInfo())
           return false;
         
+        if (func->getParams().size() != substFunc->getParams().size())
+          return false;
+
         for (unsigned i : indices(func->getParams())) {
           if (!visit(func->getParams()[i].getOldType(),
                      substFunc.getParams()[i].getOldType()))
@@ -1708,20 +1719,13 @@ bool TypeBase::isBindableToSuperclassOf(Type ty) {
   if (!ty->mayHaveSuperclass())
     return false;
 
-  // If the type is itself an archetype, we could always potentially bind it
-  // to the superclass (via external retroactive conformance, even if the
-  // type isn't statically known to conform).
-  //
-  // We could theoretically reject cases where the set of conformances is known
-  // (say the protocol or classes are private or internal).
-  if (is<ArchetypeType>())
-    return true;
-  
+  SmallPtrSet<ClassDecl *, 8> seen;
   do {
+    if (auto *classDecl = ty->getClassOrBoundGenericClass())
+      if (!seen.insert(classDecl).second)
+        return false;
     if (isBindableTo(ty))
       return true;
-    if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
-      return false;
   } while ((ty = ty->getSuperclass()));
   return false;
 }

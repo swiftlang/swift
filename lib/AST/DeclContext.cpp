@@ -92,7 +92,6 @@ GenericTypeParamType *DeclContext::getProtocolSelfType() const {
 
   GenericParamList *genericParams;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
-    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     genericParams = proto->getGenericParams();
   } else {
     genericParams = cast<ExtensionDecl>(this)->getGenericParams();
@@ -173,17 +172,6 @@ GenericEnvironment *DeclContext::getGenericEnvironmentOfContext() const {
   } while ((dc = dc->getParent()));
 
   return nullptr;
-}
-
-bool DeclContext::contextHasLazyGenericEnvironment() const {
-  auto dc = this;
-  do {
-    if (auto decl = dc->getAsDecl())
-      if (auto GC = decl->getAsGenericContext())
-        return GC->hasLazyGenericEnvironment();
-  } while ((dc = dc->getParent()));
-
-  return false;
 }
 
 Type DeclContext::mapTypeIntoContext(Type type) const {
@@ -819,6 +807,12 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
+unsigned IterableDeclContext::getMemberCount() const {
+  if (hasUnparsedMembers())
+    loadAllMembers();
+  return MemberCount;
+}
+
 void IterableDeclContext::loadAllMembers() const {
   ASTContext &ctx = getASTContext();
 
@@ -1049,6 +1043,7 @@ SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   case DeclContextKind::SerializedLocal:
     return extractNearestSourceLoc(dc->getParent());
   }
+  llvm_unreachable("Unhandled DeclCopntextKindin switch");
 }
 
 #define DECL(Id, Parent) \

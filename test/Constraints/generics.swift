@@ -161,10 +161,7 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      // FIXME(diagnostics): Diagnostic regressed here from `cannot convert value of type 'UInt' to expected argument type 'Int'`.
-      // Once argument-to-parameter mismatch diagnostics are moved to the new diagnostic framework, we'll be able to restore
-      // original contextual conversion failure diagnostic here. Note that this only happens in Swift 4 mode.
-      elems.deinitialize(count: self.value)  // expected-error {{ambiguous reference to member 'deinitialize(count:)'}}
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }
@@ -818,4 +815,17 @@ func test_correct_identification_of_requirement_source() {
   // expected-error@-1 {{generic struct 'X' requires that 'Int' conform to 'P'}}
   _ = X(A(), 17)
   // expected-error@-1 {{initializer 'init(_:_:)' requires that 'Int' conform to 'P'}}
+}
+
+struct SR11435<T> {
+  subscript<U : P & Hashable>(x x: U) -> U { x } // expected-note {{where 'U' = 'Int'}}
+}
+
+extension SR11435 where T : P { // expected-note {{where 'T' = 'Int'}}
+  var foo: Int { 0 }
+}
+
+func test_identification_of_key_path_component_callees() {
+  _ = \SR11435<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
+  _ = \SR11435<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
 }

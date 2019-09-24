@@ -23,6 +23,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
@@ -36,84 +37,6 @@
 namespace swift {
 
 class AliasAnalysis;
-
-/// This is the worklist management logic for SILCombine.
-class SILCombineWorklist {
-  llvm::SmallVector<SILInstruction *, 256> Worklist;
-  llvm::DenseMap<SILInstruction *, unsigned> WorklistMap;
-
-  void operator=(const SILCombineWorklist &RHS) = delete;
-  SILCombineWorklist(const SILCombineWorklist &Worklist) = delete;
-public:
-  SILCombineWorklist() {}
-
-  /// Returns true if the worklist is empty.
-  bool isEmpty() const { return Worklist.empty(); }
-
-  /// Add the specified instruction to the worklist if it isn't already in it.
-  void add(SILInstruction *I);
-
-  /// If the given ValueBase is a SILInstruction add it to the worklist.
-  void addValue(ValueBase *V) {
-    if (auto *I = V->getDefiningInstruction())
-      add(I);
-  }
-
-  /// Add the given list of instructions in reverse order to the worklist. This
-  /// routine assumes that the worklist is empty and the given list has no
-  /// duplicates.
-  void addInitialGroup(ArrayRef<SILInstruction *> List);
-
-  // If I is in the worklist, remove it.
-  void remove(SILInstruction *I) {
-    auto It = WorklistMap.find(I);
-    if (It == WorklistMap.end())
-      return; // Not in worklist.
-
-    // Don't bother moving everything down, just null out the slot. We will
-    // check before we process any instruction if it is null.
-    Worklist[It->second] = nullptr;
-    WorklistMap.erase(It);
-  }
-
-  /// Remove the top element from the worklist.
-  SILInstruction *removeOne() {
-    SILInstruction *I = Worklist.pop_back_val();
-    WorklistMap.erase(I);
-    return I;
-  }
-
-  /// When an instruction has been simplified, add all of its users to the
-  /// worklist, since additional simplifications of its users may have been
-  /// exposed.
-  void addUsersToWorklist(ValueBase *I) {
-    for (auto UI : I->getUses())
-      add(UI->getUser());
-  }
-
-  void addUsersToWorklist(SILValue value) {
-    for (auto *use : value->getUses())
-      add(use->getUser());
-  }
-
-  /// When an instruction has been simplified, add all of its users to the
-  /// worklist, since additional simplifications of its users may have been
-  /// exposed.
-  void addUsersOfAllResultsToWorklist(SILInstruction *I) {
-    for (auto result : I->getResults()) {
-      addUsersToWorklist(result);
-    }
-  }
-
-  /// Check that the worklist is empty and nuke the backing store for the map if
-  /// it is large.
-  void zap() {
-    assert(WorklistMap.empty() && "Worklist empty, but the map is not?");
-
-    // Do an explicit clear, this shrinks the map if needed.
-    WorklistMap.clear();
-  }
-};
 
 /// This is a class which maintains the state of the combiner and simplifies
 /// many operations such as removing/adding instructions and syncing them with
@@ -134,7 +57,7 @@ class SILCombiner :
   ClassHierarchyAnalysis *CHA;
 
   /// Worklist containing all of the instructions primed for simplification.
-  SILCombineWorklist Worklist;
+  SmallSILInstructionWorklist<256> Worklist;
 
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
@@ -156,7 +79,7 @@ public:
               AliasAnalysis *AA, DominanceAnalysis *DA,
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
-      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
+      : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist("SC"), MadeChange(false),
         RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
         CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
                 /* ReplaceValueUsesAction */
@@ -174,27 +97,36 @@ public:
 
   void clear() {
     Iteration = 0;
-    Worklist.zap();
+    Worklist.resetChecked();
     MadeChange = false;
   }
 
   // Insert the instruction New before instruction Old in Old's parent BB. Add
   // New to the worklist.
-  SILInstruction *insertNewInstBefore(SILInstruction *New, SILInstruction &Old);
+  SILInstruction *insertNewInstBefore(SILInstruction *New,
+                                      SILInstruction &Old) {
+    return Worklist.insertNewInstBefore(New, Old);
+  }
 
   // This method is to be used when an instruction is found to be dead,
   // replaceable with another preexisting expression. Here we add all uses of I
   // to the worklist, replace all uses of I with the new value, then return I,
   // so that the combiner will know that I was modified.
-  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V);
+  void replaceInstUsesWith(SingleValueInstruction &I, ValueBase *V) {
+    return Worklist.replaceInstUsesWith(I, V);
+  }
 
   // This method is to be used when a value is found to be dead,
   // replaceable with another preexisting expression. Here we add all
   // uses of oldValue to the worklist, replace all uses of oldValue
   // with newValue.
-  void replaceValueUsesWith(SILValue oldValue, SILValue newValue);
+  void replaceValueUsesWith(SILValue oldValue, SILValue newValue) {
+    Worklist.replaceValueUsesWith(oldValue, newValue);
+  }
 
-  void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI);
+  void replaceInstUsesPairwiseWith(SILInstruction *oldI, SILInstruction *newI) {
+    Worklist.replaceInstUsesPairwiseWith(oldI, newI);
+  }
 
   // Some instructions can never be "trivially dead" due to side effects or
   // producing a void value. In those cases, since we cannot rely on
@@ -204,7 +136,12 @@ public:
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true);
+                                        bool AddOperandsToWorklist = true) {
+    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
+    MadeChange = true;
+    // Dummy return, so the caller doesn't need to explicitly return nullptr.
+    return nullptr;
+  }
 
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         bool AddOperandsToWorklist = true) {

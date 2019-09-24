@@ -1223,13 +1223,6 @@
       ]
     },
     {
-      key.kind: source.lang.swift.decl.function.method.instance,
-      key.name: "meth()",
-      key.usr: <usr>,
-      key.line: 134,
-      key.column: 8
-    },
-    {
       key.kind: source.lang.swift.decl.class,
       key.name: "CC4",
       key.usr: <usr>,

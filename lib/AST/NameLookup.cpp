@@ -193,6 +193,27 @@ static void recordShadowedDeclsAfterSignatureMatch(
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
     auto name = firstDecl->getBaseName();
+
+    auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+      for (auto path : paths) {
+        if (ModuleDecl::matchesAccessPath(path, name))
+          return false;
+      }
+
+      return true;
+    };
+
+    auto isScopedImport = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
+      for (auto path : paths) {
+        if (path.empty())
+          continue;
+        if (ModuleDecl::matchesAccessPath(path, name))
+          return true;
+      }
+
+      return false;
+    };
+
     for (unsigned secondIdx : range(firstIdx + 1, decls.size())) {
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
@@ -206,22 +227,28 @@ static void recordShadowedDeclsAfterSignatureMatch(
       if (firstModule != secondModule &&
           firstDecl->getDeclContext()->isModuleScopeContext() &&
           secondDecl->getDeclContext()->isModuleScopeContext()) {
-        // First, scoped imports shadow unscoped imports.
-        bool firstScoped = imports.isScopedImport(firstModule, name, dc);
-        bool secondScoped = imports.isScopedImport(secondModule, name, dc);
-        if (!firstScoped && secondScoped) {
+        auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
+          firstModule, secondModule, dc);
+        auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
+          secondModule, firstModule, dc);
+
+        // Check if one module shadows the other.
+        if (isShadowed(firstPaths)) {
           shadowed.insert(firstDecl);
           break;
-        } else if (firstScoped && !secondScoped) {
+        } else if (isShadowed(secondPaths)) {
           shadowed.insert(secondDecl);
           continue;
         }
 
-        // Now check if one module shadows the other.
-        if (imports.isShadowedBy(firstModule, secondModule, name, dc)) {
+        // We might be in a situation where neither module shadows the
+        // other, but one declaration is visible via a scoped import.
+        bool firstScoped = isScopedImport(firstPaths);
+        bool secondScoped = isScopedImport(secondPaths);
+        if (!firstScoped && secondScoped) {
           shadowed.insert(firstDecl);
           break;
-        } else if (imports.isShadowedBy(secondModule, firstModule, name, dc)) {
+        } else if (firstScoped && !secondScoped) {
           shadowed.insert(secondDecl);
           continue;
         }
@@ -278,10 +305,16 @@ static void recordShadowedDeclsAfterSignatureMatch(
       if (firstModule != secondModule &&
           !firstDecl->getDeclContext()->isModuleScopeContext() &&
           !secondDecl->getDeclContext()->isModuleScopeContext()) {
-        if (imports.isShadowedBy(firstModule, secondModule, dc)) {
+        auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
+          firstModule, secondModule, dc);
+        auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
+          secondModule, firstModule, dc);
+
+        // Check if one module shadows the other.
+        if (isShadowed(firstPaths)) {
           shadowed.insert(firstDecl);
           break;
-        } else if (imports.isShadowedBy(secondModule, firstModule, dc)) {
+        } else if (isShadowed(secondPaths)) {
           shadowed.insert(secondDecl);
           continue;
         }
@@ -918,32 +951,38 @@ void MemberLookupTable::updateLookupTable(NominalTypeDecl *nominal) {
 }
 
 void NominalTypeDecl::addedMember(Decl *member) {
+  auto *vd = dyn_cast<ValueDecl>(member);
+  if (!vd)
+    return;
+
   // If we have a lookup table, add the new member to it.
-  if (LookupTable.getPointer()) {
-    LookupTable.getPointer()->addMember(member);
+  auto *lookup = LookupTable.getPointer();
+  if (lookup && isLookupTablePopulated()) {
+    if (hasLazyMembers()) {
+      // If we have lazy members, only add the new member to the lookup
+      // table if we already have another member with the same name.
+      // The presence of a lookup table entry indicates that the
+      // nominal as well as all extensions have already been searched.
+      if (lookup->find(vd->getBaseName()) == lookup->end())
+        return;
+    }
+
+    lookup->addMember(vd);
   }
 }
 
-void NominalTypeDecl::addedExtension(ExtensionDecl * ext) {
+void NominalTypeDecl::addedExtension(ExtensionDecl *ext) {
   if (hasLazyMembers())
     setLookupTablePopulated(false);
 }
 
 void ExtensionDecl::addedMember(Decl *member) {
+  // If this extension has already been bound to a nominal, add the new member
+  // to the nominal's lookup table.
   if (NextExtension.getInt()) {
     auto nominal = getExtendedNominal();
-    if (!nominal)
-      return;
-
-    if (nominal->LookupTable.getPointer() &&
-        nominal->isLookupTablePopulated()) {
-      // Make sure we have the complete list of extensions.
-      // FIXME: This is completely unnecessary. We want to determine whether
-      // our own extension has already been included in the lookup table.
-      (void)nominal->getExtensions();
-
-      nominal->LookupTable.getPointer()->addMember(member);
-    }
+    if (nominal)
+      nominal->addedMember(member);
   }
 }
 
@@ -1002,9 +1041,6 @@ void ExtensionDecl::addedMember(Decl *member) {
 // If the IDC list is later populated and/or an extension is added _after_
 // MemberLookupTable is constructed (and possibly has entries in it),
 // MemberLookupTable is purged and reconstructed from IDC's list.
-//
-// In all lookup routines, the 'ignoreNewExtensions' flag means that
-// lookup should only use the set of extensions already observed.
 
 static bool
 populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
@@ -1036,10 +1072,10 @@ populateLookupTableEntryFromLazyIDCLoader(ASTContext &ctx,
   }
 }
 
-static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
+static void populateLookupTableEntryFromCurrentMembers(
     ASTContext &ctx, MemberLookupTable &LookupTable, DeclName name,
     IterableDeclContext *IDC) {
-  for (auto m : IDC->getCurrentMembersWithoutLoading()) {
+  for (auto m : IDC->getMembers()) {
     if (auto v = dyn_cast<ValueDecl>(m)) {
       if (v->getFullName().matchesRef(name.getBaseName())) {
         LookupTable.addMember(m);
@@ -1048,27 +1084,22 @@ static void populateLookupTableEntryFromCurrentMembersWithoutLoading(
   }
 }
 
-static bool
+static void
 populateLookupTableEntryFromExtensions(ASTContext &ctx,
                                        MemberLookupTable &table,
                                        NominalTypeDecl *nominal,
-                                       DeclName name,
-                                       bool ignoreNewExtensions) {
-  if (!ignoreNewExtensions) {
-    for (auto e : nominal->getExtensions()) {
-      if (e->wasDeserialized() || e->hasClangNode()) {
-        assert(!e->hasUnparsedMembers());
-        if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
-                                                      name, e)) {
-          return true;
-        }
-      } else {
-        populateLookupTableEntryFromCurrentMembersWithoutLoading(ctx, table,
-                                                                 name, e);
+                                       DeclName name) {
+  for (auto e : nominal->getExtensions()) {
+    if (e->wasDeserialized() || e->hasClangNode()) {
+      assert(!e->hasUnparsedMembers());
+      if (populateLookupTableEntryFromLazyIDCLoader(ctx, table,
+                                                    name, e)) {
+        populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
       }
+    } else {
+      populateLookupTableEntryFromCurrentMembers(ctx, table, name, e);
     }
   }
-  return false;
 }
 
 bool NominalTypeDecl::isLookupTablePopulated() const {
@@ -1079,7 +1110,7 @@ void NominalTypeDecl::setLookupTablePopulated(bool value) {
   LookupTable.setInt(value);
 }
 
-void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
+void NominalTypeDecl::prepareLookupTable() {
   // If we haven't allocated the lookup table yet, do so now.
   if (!LookupTable.getPointer()) {
     auto &ctx = getASTContext();
@@ -1101,12 +1132,11 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
       for (auto entry : *LookupTable.getPointer()) {
         baseNamesPresent.insert(entry.getFirst().getBaseName());
       }
-      
+
       for (auto baseName : baseNamesPresent) {
         populateLookupTableEntryFromExtensions(getASTContext(),
                                                *LookupTable.getPointer(),
-                                               this, baseName,
-                                               ignoreNewExtensions);
+                                               this, baseName);
       }
     }
 
@@ -1117,21 +1147,9 @@ void NominalTypeDecl::prepareLookupTable(bool ignoreNewExtensions) {
       setLookupTablePopulated(true);
       LookupTable.getPointer()->addMembers(getMembers());
     }
-    if (!ignoreNewExtensions) {
-      LookupTable.getPointer()->updateLookupTable(this);
-    }
+    LookupTable.getPointer()->updateLookupTable(this);
   }
 }
-
-void NominalTypeDecl::makeMemberVisible(ValueDecl *member) {
-  if (!LookupTable.getPointer()) {
-    auto &ctx = getASTContext();
-    LookupTable.setPointer(new (ctx) MemberLookupTable(ctx));
-  }
-  
-  LookupTable.getPointer()->addMember(member);
-}
-
 
 static TinyPtrVector<ValueDecl *>
 maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
@@ -1148,6 +1166,7 @@ maybeFilterOutAttrImplements(TinyPtrVector<ValueDecl *> decls,
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
+      (void)A;
       assert(A && A->getMemberName().matchesRef(name));
     }
   }
@@ -1167,9 +1186,6 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
   bool useNamedLazyMemberLoading = (ctx.LangOpts.NamedLazyMemberLoading &&
                                     hasLazyMembers());
 
-  bool ignoreNewExtensions =
-      flags.contains(LookupDirectFlags::IgnoreNewExtensions);
-
   bool includeAttrImplements =
       flags.contains(LookupDirectFlags::IncludeAttrImplements);
 
@@ -1181,7 +1197,7 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     useNamedLazyMemberLoading = false;
 
   LLVM_DEBUG(llvm::dbgs() << getNameStr() << ".lookupDirect("
-             << name << ", " << ignoreNewExtensions << ")"
+             << name << ")"
         << ", isLookupTablePopulated()=" << isLookupTablePopulated()
         << ", hasLazyMembers()=" << hasLazyMembers()
         << ", useNamedLazyMemberLoading=" << useNamedLazyMemberLoading
@@ -1217,23 +1233,13 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
 
       // Make sure we have the complete list of members (in this nominal and in
       // all extensions).
-      if (!ignoreNewExtensions) {
-        for (auto E : getExtensions())
-          (void)E->getMembers();
-      }
-    } else {
-      // We still have to parse any unparsed extensions.
-      if (!ignoreNewExtensions) {
-        for (auto *e : getExtensions()) {
-          if (e->getParentSourceFile() != nullptr)
-            e->loadAllMembers();
-        }
-      }
+      for (auto E : getExtensions())
+        (void)E->getMembers();
     }
 
     // Next, in all cases, prepare the lookup table for use, possibly
     // repopulating it from the IDC if the IDC member list has just grown.
-    prepareLookupTable(ignoreNewExtensions);
+    prepareLookupTable();
 
     // Look for a declaration with this name.
     auto known = LookupTable.getPointer()->find(name);
@@ -1254,10 +1260,10 @@ TinyPtrVector<ValueDecl *> NominalTypeDecl::lookupDirect(
     // false, and we fall back to loading all members during the retry.
     auto &Table = *LookupTable.getPointer();
     if (populateLookupTableEntryFromLazyIDCLoader(ctx, Table,
-                                                  name, this) ||
-        populateLookupTableEntryFromExtensions(ctx, Table, this, name,
-                                               ignoreNewExtensions)) {
+                                                  name, this)) {
       useNamedLazyMemberLoading = false;
+    } else {
+      populateLookupTableEntryFromExtensions(ctx, Table, this, name);
     }
   }
 
@@ -2058,7 +2064,7 @@ DirectlyReferencedTypeDecls InheritedDeclsReferencedRequest::evaluate(
     unsigned index) const {
 
   // Prefer syntactic information when we have it.
-  TypeLoc &typeLoc = getTypeLoc(decl, index);
+  TypeLoc &typeLoc = getInheritedTypeLocAtIndex(decl, index);
   if (auto typeRepr = typeLoc.getTypeRepr()) {
     // Figure out the context in which name lookup will occur.
     DeclContext *dc;
@@ -2151,18 +2157,14 @@ SuperclassDeclRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<NominalTypeDecl *>
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
                                  ExtensionDecl *ext) const {
-  DirectlyReferencedTypeDecls referenced;
-  ASTContext &ctx = ext->getASTContext();
+  auto typeRepr = ext->getExtendedTypeRepr();
+  if (!typeRepr)
+    // We must've seen 'extension { ... }' during parsing.
+    return nullptr;
 
-  // Prefer syntactic information when we have it.
-  if (auto typeRepr = ext->getExtendedTypeRepr()) {
-    referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext);
-  } else if (auto type = ext->getExtendedType()) {
-    // Fall back to semantic types.
-    // FIXME: In the long run, we shouldn't need this. Non-syntactic results
-    // should be cached.
-    referenced = directReferencesForType(type);
-  }
+  ASTContext &ctx = ext->getASTContext();
+  DirectlyReferencedTypeDecls referenced =
+    directReferencesForTypeRepr(evaluator, ctx, typeRepr, ext->getParent());
 
   // Resolve those type declarations to nominal type declarations.
   SmallVector<ModuleDecl *, 2> modulesFound;
@@ -2170,7 +2172,10 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   auto nominalTypes
     = resolveTypeDeclsToNominal(evaluator, ctx, referenced, modulesFound,
                                 anyObject);
-  return nominalTypes.empty() ? nullptr : nominalTypes.front();
+
+  // If there is more than 1 element, we will emit a warning or an error
+  // elsewhere, so don't handle that case here.
+  return nominalTypes.empty() ? nullptr : nominalTypes[0];
 }
 
 llvm::Expected<NominalTypeDecl *>

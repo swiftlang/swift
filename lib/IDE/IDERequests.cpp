@@ -38,7 +38,7 @@ namespace swift {
 
 // Define request evaluation functions for each of the IDE requests.
 static AbstractRequestFunction *ideRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
 reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/IDE/IDERequestIDZone.def"
 #undef SWIFT_REQUEST

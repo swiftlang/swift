@@ -321,7 +321,7 @@ DefaultAndMaxAccessLevelRequest::cacheResult(
 
 // Define request evaluation functions for each of the access requests.
 static AbstractRequestFunction *accessRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)         \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/AccessTypeIDZone.def"
 #undef SWIFT_REQUEST

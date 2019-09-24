@@ -15,11 +15,14 @@ This repository covers the compiler and standard libraries. Please visit the [do
 
 ## Building Swift for TensorFlow
 
-These instructions give the most direct path to a working development environment for Swift for TensorFlow.
+**Note:** Building from source is necessary only if you want to modify the source
+code or build with a custom version of TensorFlow.
 
-**Note:** Building from source is necessary only if you want to modify the source code or build with a custom version of TensorFlow.
-
-To build from source you will need 2 GB of disk space for the source code and over 20 GB of disk space for the build artifacts. A clean build can take multiple hours, but incremental builds will finish much faster.
+These instructions give the most direct path to a working Swift for TensorFlow development
+environment. To build from source you will need about 2 GB of disk space for the
+source code and up to 70 GB of disk space for the build artifacts with full
+debugging. Depending on your machine, a clean build can take a few minutes to
+several hours. Naturally, incremental builds are much faster.
 
 ### System Requirements
 

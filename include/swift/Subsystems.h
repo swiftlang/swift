@@ -43,7 +43,6 @@ namespace swift {
   class CodeCompletionCallbacksFactory;
   class Decl;
   class DeclContext;
-  class DelayedParsingCallbacks;
   class DiagnosticConsumer;
   class DiagnosticEngine;
   class Evaluator;
@@ -69,6 +68,10 @@ namespace swift {
   struct TypeLoc;
   class UnifiedStatsReporter;
   enum class SourceFileKind;
+
+  namespace Lowering {
+    class TypeConverter;
+  }
 
   /// Used to optionally maintain SIL parsing context for the parser.
   ///
@@ -114,14 +117,10 @@ namespace swift {
   /// \param PersistentState if non-null the same PersistentState object can
   /// be used to resume parsing or parse delayed function bodies.
   ///
-  /// \param DelayedParseCB if non-null enables delayed parsing for function
-  /// bodies.
-  ///
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFile(SourceFile &SF, unsigned BufferID, bool *Done,
                            SILParserState *SIL = nullptr,
                            PersistentParserState *PersistentState = nullptr,
-                           DelayedParsingCallbacks *DelayedParseCB = nullptr,
                            bool DelayBodyParsing = true);
 
   /// Parse a single buffer into the given source file, until the full source
@@ -129,8 +128,7 @@ namespace swift {
   ///
   /// \return true if the parser found code with side effects.
   bool parseIntoSourceFileFull(SourceFile &SF, unsigned BufferID,
-                             PersistentParserState *PersistentState = nullptr,
-                             DelayedParsingCallbacks *DelayedParseCB = nullptr,
+                               PersistentParserState *PersistentState = nullptr,
                                bool DelayBodyParsing = true);
 
   /// Finish the parsing by going over the nodes that were delayed
@@ -260,11 +258,13 @@ namespace swift {
   /// The module must contain source files. The optimizer will assume that the
   /// SIL of all files in the module is present in the SILModule.
   std::unique_ptr<SILModule>
-  performSILGeneration(ModuleDecl *M, SILOptions &options);
+  performSILGeneration(ModuleDecl *M, Lowering::TypeConverter &TC,
+                       SILOptions &options);
 
   /// Turn a source file into SIL IR.
   std::unique_ptr<SILModule>
-  performSILGeneration(FileUnit &SF, SILOptions &options);
+  performSILGeneration(FileUnit &SF, Lowering::TypeConverter &TC,
+                       SILOptions &options);
 
   using ModuleOrSourceFile = PointerUnion<ModuleDecl *, SourceFile *>;
 

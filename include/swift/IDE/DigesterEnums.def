@@ -152,6 +152,7 @@ KEY_STRING(IntrotvOS, intro_tvOS)
 KEY_STRING(IntrowatchOS, intro_watchOS)
 KEY_STRING(Introswift, intro_swift)
 KEY_STRING(ObjCName, objc_name)
+KEY_STRING(InitKind, init_kind)
 
 KEY_STRING_ARR(SuperclassNames, superclassNames)
 KEY_STRING_ARR(ToolArgs, tool_arguments)

@@ -11,18 +11,6 @@ namespace fs = llvm::sys::fs;
 namespace path = llvm::sys::path;
 
 namespace {
-static StringRef getAttrName(DeclAttrKind Kind) {
-  switch (Kind) {
-#define DECL_ATTR(NAME, CLASS, ...)                                           \
-  case DAK_##CLASS:                                                           \
-      return DeclAttribute::isDeclModifier(DAK_##CLASS) ? #NAME : "@"#NAME;
-#include "swift/AST/Attr.def"
-  case DAK_Count:
-    llvm_unreachable("unrecognized attribute kind.");
-  }
-  llvm_unreachable("covered switch");
-}
-
 static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   PrintOptions Opts;
   Opts.SynthesizeSugarOnTypes = true;
@@ -33,7 +21,6 @@ static PrintOptions getTypePrintOpts(CheckerOptions CheckerOpts) {
   }
   return Opts;
 }
-
 } // End of anonymous namespace.
 
 struct swift::ide::api::SDKNodeInitInfo {
@@ -63,20 +50,7 @@ struct swift::ide::api::SDKNodeInitInfo {
   SDKNode* createSDKNode(SDKNodeKind Kind);
 };
 
-SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {
-#define ADD(NAME) BreakingAttrs.push_back({DeclAttrKind::DAK_##NAME, \
-      getAttrName(DeclAttrKind::DAK_##NAME)});
-  // Add attributes that both break ABI and API.
-  ADD(Final)
-  if (checkingABI()) {
-    // Add ABI-breaking-specific attributes.
-    ADD(ObjC)
-    ADD(FixedLayout)
-    ADD(Frozen)
-    ADD(Dynamic)
-  }
-#undef ADD
-}
+SDKContext::SDKContext(CheckerOptions Opts): Diags(SourceMgr), Opts(Opts) {}
 
 void SDKNodeRoot::registerDescendant(SDKNode *D) {
   // Operator doesn't have usr
@@ -158,7 +132,7 @@ SDKNodeDeclFunction::SDKNodeDeclFunction(SDKNodeInitInfo Info):
   FuncSelfKind(Info.FuncSelfKind) {}
 
 SDKNodeDeclConstructor::SDKNodeDeclConstructor(SDKNodeInitInfo Info):
-  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor) {}
+  SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclConstructor), InitKind(Info.InitKind) {}
 
 SDKNodeDeclAccessor::SDKNodeDeclAccessor(SDKNodeInitInfo Info):
   SDKNodeDeclAbstractFunc(Info, SDKNodeKind::DeclAccessor),
@@ -389,13 +363,15 @@ StringRef SDKNodeType::getTypeRoleDescription() const {
   case SDKNodeKind::TypeWitness:
     return "type witness type";
   }
+  llvm_unreachable("Unhandled SDKNodeKind in switch");
 }
 
 SDKNode *SDKNodeRoot::getInstance(SDKContext &Ctx) {
   SDKNodeInitInfo Info(Ctx);
   Info.Name = Ctx.buffer("TopLevel");
   Info.PrintedName = Ctx.buffer("TopLevel");
-  Info.ToolArgs = Ctx.getOpts().ToolArgs;
+  llvm::transform(Ctx.getOpts().ToolArgs, std::back_inserter(Info.ToolArgs),
+                  [&](std::string s) { return Ctx.buffer(s); });
   Info.JsonFormatVer = DIGESTER_JSON_VERSION;
   return Info.createSDKNode(SDKNodeKind::Root);
 }
@@ -1296,6 +1272,30 @@ static std::vector<DeclAttrKind> collectDeclAttributes(Decl *D) {
   return Results;
 }
 
+CtorInitializerKind SDKNodeDeclConstructor::getInitKind() const {
+#define CASE(KIND) if (InitKind == #KIND) return CtorInitializerKind::KIND;
+  CASE(Designated)
+  CASE(Convenience)
+  CASE(ConvenienceFactory)
+  CASE(Factory)
+#undef CASE
+  llvm_unreachable("unhandled init kind");
+}
+
+StringRef SDKContext::getInitKind(Decl *D) {
+  if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
+    switch(CD->getInitKind()) {
+#define CASE(KIND) case CtorInitializerKind::KIND: return #KIND;
+    CASE(Designated)
+    CASE(Convenience)
+    CASE(ConvenienceFactory)
+    CASE(Factory)
+#undef CASE
+    }
+  }
+  return StringRef();
+}
+
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       Ctx(Ctx), DKind(D->getKind()),
       Location(calculateLocation(Ctx, D)),
@@ -1310,6 +1310,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
       ObjCName(Ctx.getObjcName(D)),
+      InitKind(Ctx.getInitKind(D)),
       IsImplicit(D->isImplicit()),
       IsDeprecated(D->getAttrs().getDeprecated(D->getASTContext())),
       IsABIPlaceholder(isABIPlaceholderRecursive(D)),
@@ -1939,6 +1940,11 @@ void SDKNodeDeclAbstractFunc::jsonize(json::Output &out) {
 void SDKNodeDeclFunction::jsonize(json::Output &out) {
   SDKNodeDeclAbstractFunc::jsonize(out);
   output(out, KeyKind::KK_funcSelfKind, FuncSelfKind);
+}
+
+void SDKNodeDeclConstructor::jsonize(json::Output &out) {
+  SDKNodeDeclAbstractFunc::jsonize(out);
+  output(out, KeyKind::KK_init_kind, InitKind);
 }
 
 void SDKNodeDeclType::jsonize(json::Output &out) {

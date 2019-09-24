@@ -253,8 +253,7 @@ static ValueDecl *deriveMathOperator(DerivedConformance &derived,
     return deriveBodyMathOperator(funcDecl, op);
   };
   operatorDecl->setBodySynthesizer(bodySynthesizer, (void *) op);
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    operatorDecl->setGenericEnvironment(env);
+  operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->computeType();
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   operatorDecl->setValidationToChecked();

@@ -15,12 +15,29 @@
 //
 //===----------------------------------------------------------------------===//
 
-SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest)
-SWIFT_REQUEST(NameLookup, ExtendedNominalRequest)
-SWIFT_REQUEST(NameLookup, GetDestructorRequest)
-SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest)
-SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest)
-SWIFT_REQUEST(NameLookup, SuperclassDeclRequest)
-SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest)
-SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest)
-
+SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
+              NominalTypeDecl *(CustomAttr *, DeclContext *), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
+              NominalTypeDecl *(ExtensionDecl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, GenericParamListRequest,
+              GenericParamList *(GenericContext *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, GetDestructorRequest, DestructorDecl *(ClassDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, InheritedDeclsReferencedRequest,
+              DirectlyReferencedTypeDecls(
+                  llvm::PointerUnion<TypeDecl *, ExtensionDecl *>, unsigned),
+              Uncached, HasNearestLocation)
+SWIFT_REQUEST(NameLookup, SelfBoundsFromWhereClauseRequest,
+              SelfBounds(llvm::PointerUnion<TypeDecl *, ExtensionDecl *>),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, SuperclassDeclRequest, ClassDecl *(NominalTypeDecl *),
+              SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, TypeDeclsFromWhereClauseRequest,
+              DirectlyReferencedTypeDecls(ExtensionDecl *), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(NameLookup, UnderlyingTypeDeclsReferencedRequest,
+              DirectlyReferencedTypeDecls(TypeAliasDecl *), Uncached,
+              NoLocationInfo)

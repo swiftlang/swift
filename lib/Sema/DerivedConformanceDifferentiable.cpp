@@ -343,8 +343,7 @@ static ValueDecl *deriveDifferentiable_method(
   funcDecl->setImplicit();
   funcDecl->setBodySynthesizer(bodySynthesizer.Fn, bodySynthesizer.Context);
 
-  if (auto *env = parentDC->getGenericEnvironmentOfContext())
-    funcDecl->setGenericEnvironment(env);
+  funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   funcDecl->setValidationToChecked();
@@ -704,8 +703,7 @@ static void addAssociatedTypeAliasDecl(Identifier name,
       TypeAliasDecl(SourceLoc(), SourceLoc(), name, SourceLoc(), {}, sourceDC);
   aliasDecl->setUnderlyingType(target->getDeclaredInterfaceType());
   aliasDecl->setImplicit();
-  if (auto env = sourceDC->getGenericEnvironmentOfContext())
-    aliasDecl->setGenericEnvironment(env);
+  aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   aliasDecl->setValidationToChecked();

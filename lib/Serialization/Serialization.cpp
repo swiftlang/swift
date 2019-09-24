@@ -529,14 +529,9 @@ LocalDeclContextID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
 
 GenericSignatureID
 Serializer::addGenericSignatureRef(const GenericSignature *sig) {
-  return GenericSignaturesToSerialize.addRef(sig);
-}
-
-GenericSignatureID
-Serializer::addGenericEnvironmentRef(const GenericEnvironment *env) {
-  if (!env)
+  if (!sig)
     return 0;
-  return addGenericSignatureRef(env->getGenericSignature());
+  return GenericSignaturesToSerialize.addRef(sig);
 }
 
 SubstitutionMapID
@@ -724,11 +719,11 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(input_block, SEARCH_PATH);
   BLOCK_RECORD(input_block, FILE_DEPENDENCY);
   BLOCK_RECORD(input_block, DEPENDENCY_DIRECTORY);
-  BLOCK_RECORD(input_block, PARSEABLE_INTERFACE_PATH);
+  BLOCK_RECORD(input_block, MODULE_INTERFACE_PATH);
 
   BLOCK(DECLS_AND_TYPES_BLOCK);
 #define RECORD(X) BLOCK_RECORD(decls_block, X);
-#include "swift/Serialization/DeclTypeRecordNodes.def"
+#include "DeclTypeRecordNodes.def"
 
   BLOCK(IDENTIFIER_DATA_BLOCK);
   BLOCK_RECORD(identifier_block, IDENTIFIER_DATA);
@@ -950,7 +945,7 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
   input_block::SearchPathLayout SearchPath(Out);
   input_block::FileDependencyLayout FileDependency(Out);
   input_block::DependencyDirectoryLayout DependencyDirectory(Out);
-  input_block::ParseableInterfaceLayout ParseableInterface(Out);
+  input_block::ModuleInterfaceLayout ModuleInterface(Out);
 
   if (options.SerializeOptionsForDebugging) {
     const SearchPathOptions &searchPathOpts = M->getASTContext().SearchPathOpts;
@@ -983,8 +978,8 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
                         llvm::sys::path::filename(dep.getPath()));
   }
 
-  if (!options.ParseableInterface.empty())
-    ParseableInterface.emit(ScratchRecord, options.ParseableInterface);
+  if (!options.ModuleInterface.empty())
+    ModuleInterface.emit(ScratchRecord, options.ModuleInterface);
 
   ModuleDecl::ImportFilter allImportFilter;
   allImportFilter |= ModuleDecl::ImportFilterKind::Public;
@@ -2211,25 +2206,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
 
     case DAK_Available: {
-#define LIST_VER_TUPLE_PIECES(X)\
-    X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
-#define DEF_VER_TUPLE_PIECES(X, X_Expr)\
-    unsigned X##_Major = 0, X##_Minor = 0, X##_Subminor = 0,\
-             X##_HasMinor = 0, X##_HasSubminor = 0;\
-    const auto &X##_Val = X_Expr;\
-    if (X##_Val.hasValue()) {\
-      const auto &Y = X##_Val.getValue();\
-      X##_Major = Y.getMajor();\
-      X##_Minor = Y.getMinor().getValueOr(0);\
-      X##_Subminor = Y.getSubminor().getValueOr(0);\
-      X##_HasMinor = Y.getMinor().hasValue();\
-      X##_HasSubminor = Y.getSubminor().hasValue();\
-    }
-
       auto *theAttr = cast<AvailableAttr>(DA);
-      DEF_VER_TUPLE_PIECES(Introduced, theAttr->Introduced)
-      DEF_VER_TUPLE_PIECES(Deprecated, theAttr->Deprecated)
-      DEF_VER_TUPLE_PIECES(Obsoleted, theAttr->Obsoleted)
+      ENCODE_VER_TUPLE(Introduced, theAttr->Introduced)
+      ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
+      ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
@@ -2249,8 +2229,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->Rename.size(),
           blob);
       return;
-#undef LIST_VER_TUPLE_PIECES
-#undef DEF_VER_TUPLE_PIECES
     }
 
     case DAK_ObjC: {
@@ -2658,7 +2636,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     using namespace decls_block;
     // Only serialize the text for an inlinable function body if we're emitting
     // a partial module. It's not needed in the final module file, but it's
-    // needed in partial modules so you can emit a parseable interface after
+    // needed in partial modules so you can emit a module interface after
     // merging them.
     if (!S.SF) return;
 
@@ -2709,8 +2687,8 @@ public:
     verifyAttrSerializable(extension);
 
     auto contextID = S.addDeclContextRef(extension->getDeclContext());
-    Type baseTy = extension->getExtendedType();
-    assert(!baseTy->hasArchetype());
+    Type extendedType = extension->getExtendedType();
+    assert(!extendedType->hasArchetype());
 
     // FIXME: Use the canonical type here in order to minimize circularity
     // issues at deserialization time. A known problematic case here is
@@ -2720,12 +2698,7 @@ public:
     //
     // We could limit this to only the problematic cases, but it seems like a
     // simpler user model to just always desugar extension types.
-    baseTy = baseTy->getCanonicalType();
-
-    // Make sure the base type has registered itself as a provider of generic
-    // parameters.
-    auto baseNominal = baseTy->getAnyNominal();
-    (void)S.addDeclRef(baseNominal);
+    extendedType = extendedType->getCanonicalType();
 
     auto conformances = extension->getLocalConformances(
                           ConformanceLookupKind::All, nullptr);
@@ -2738,7 +2711,8 @@ public:
     size_t numInherited = inheritedAndDependencyTypes.size();
 
     llvm::SmallSetVector<Type, 4> dependencies;
-    collectDependenciesFromType(dependencies, baseTy, /*excluding*/nullptr);
+    collectDependenciesFromType(
+      dependencies, extendedType, /*excluding*/nullptr);
     for (Requirement req : extension->getGenericRequirements()) {
       collectDependenciesFromRequirement(dependencies, req,
                                          /*excluding*/nullptr);
@@ -2747,20 +2721,22 @@ public:
       inheritedAndDependencyTypes.push_back(S.addTypeRef(dependencyTy));
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[ExtensionLayout::Code];
+    auto extendedNominal = extension->getExtendedNominal();
     ExtensionLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                S.addTypeRef(baseTy),
+                                S.addTypeRef(extendedType),
+                                S.addDeclRef(extendedNominal),
                                 contextID.getOpaqueValue(),
                                 extension->isImplicit(),
-                                S.addGenericEnvironmentRef(
-                                           extension->getGenericEnvironment()),
+                                S.addGenericSignatureRef(
+                                           extension->getGenericSignature()),
                                 conformances.size(),
                                 numInherited,
                                 inheritedAndDependencyTypes);
 
     bool isClassExtension = false;
-    if (baseNominal) {
-      isClassExtension = isa<ClassDecl>(baseNominal) ||
-                         isa<ProtocolDecl>(baseNominal);
+    if (extendedNominal) {
+      isClassExtension = isa<ClassDecl>(extendedNominal) ||
+                         isa<ProtocolDecl>(extendedNominal);
     }
 
     // Extensions of nested generic types have multiple generic parameter
@@ -2913,8 +2889,8 @@ public:
                                 S.addTypeRef(underlying),
                                 /*no longer used*/TypeID(),
                                 typeAlias->isImplicit(),
-                                S.addGenericEnvironmentRef(
-                                             typeAlias->getGenericEnvironment()),
+                                S.addGenericSignatureRef(
+                                             typeAlias->getGenericSignature()),
                                 rawAccessLevel,
                                 dependencyIDs);
     writeGenericParams(typeAlias->getGenericParams());
@@ -2984,8 +2960,8 @@ public:
                              contextID.getOpaqueValue(),
                              theStruct->isImplicit(),
                              theStruct->isObjC(),
-                             S.addGenericEnvironmentRef(
-                                            theStruct->getGenericEnvironment()),
+                             S.addGenericSignatureRef(
+                                            theStruct->getGenericSignature()),
                              rawAccessLevel,
                              conformances.size(),
                              theStruct->getInherited().size(),
@@ -3041,8 +3017,8 @@ public:
                             contextID.getOpaqueValue(),
                             theEnum->isImplicit(),
                             theEnum->isObjC(),
-                            S.addGenericEnvironmentRef(
-                                             theEnum->getGenericEnvironment()),
+                            S.addGenericSignatureRef(
+                                             theEnum->getGenericSignature()),
                             S.addTypeRef(theEnum->getRawType()),
                             rawAccessLevel,
                             conformances.size(),
@@ -3101,8 +3077,8 @@ public:
                             theClass->isImplicit(),
                             theClass->isObjC(),
                             inheritsSuperclassInitializers,
-                            S.addGenericEnvironmentRef(
-                                             theClass->getGenericEnvironment()),
+                            S.addGenericSignatureRef(
+                                             theClass->getGenericSignature()),
                             S.addTypeRef(theClass->getSuperclass()),
                             rawAccessLevel,
                             conformances.size(),
@@ -3156,7 +3132,6 @@ public:
                                rawAccessLevel, proto->getInherited().size(),
                                inheritedAndDependencyTypes);
 
-    const_cast<ProtocolDecl*>(proto)->createGenericParamsIfMissing();
     writeGenericParams(proto->getGenericParams());
     S.writeGenericRequirements(
       proto->getRequirementSignature(), S.DeclTypeAbbrCodes);
@@ -3299,8 +3274,8 @@ public:
                              getStableSelfAccessKind(fn->getSelfAccessKind())),
                            fn->hasForcedStaticDispatch(),
                            fn->hasThrows(),
-                           S.addGenericEnvironmentRef(
-                                                  fn->getGenericEnvironment()),
+                           S.addGenericSignatureRef(
+                                                  fn->getGenericSignature()),
                            S.addTypeRef(fn->getResultInterfaceType()),
                            fn->isImplicitlyUnwrappedOptional(),
                            S.addDeclRef(fn->getOperatorDecl()),
@@ -3334,7 +3309,7 @@ public:
     auto interfaceTypeID =
       S.addTypeRef(opaqueDecl->getUnderlyingInterfaceType());
 
-    auto genericEnvID = S.addGenericEnvironmentRef(opaqueDecl->getGenericEnvironment());
+    auto genericSigID = S.addGenericSignatureRef(opaqueDecl->getGenericSignature());
 
     SubstitutionMapID underlyingTypeID = 0;
     if (auto underlying = opaqueDecl->getUnderlyingTypeSubstitutions())
@@ -3343,7 +3318,7 @@ public:
     unsigned abbrCode = S.DeclTypeAbbrCodes[OpaqueTypeLayout::Code];
     OpaqueTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                  contextID.getOpaqueValue(), namingDeclID,
-                                 interfaceSigID, interfaceTypeID, genericEnvID,
+                                 interfaceSigID, interfaceTypeID, genericSigID,
                                  underlyingTypeID);
     writeGenericParams(opaqueDecl->getGenericParams());
   }
@@ -3387,8 +3362,8 @@ public:
                                                   fn->getSelfAccessKind())),
                                fn->hasForcedStaticDispatch(),
                                fn->hasThrows(),
-                               S.addGenericEnvironmentRef(
-                                                  fn->getGenericEnvironment()),
+                               S.addGenericSignatureRef(
+                                                  fn->getGenericSignature()),
                                S.addTypeRef(fn->getResultInterfaceType()),
                                fn->isImplicitlyUnwrappedOptional(),
                                S.addDeclRef(fn->getOverriddenDecl()),
@@ -3497,8 +3472,8 @@ public:
                                 accessors.WriteImpl,
                                 accessors.ReadWriteImpl,
                                 accessors.Decls.size(),
-                                S.addGenericEnvironmentRef(
-                                            subscript->getGenericEnvironment()),
+                                S.addGenericSignatureRef(
+                                            subscript->getGenericSignature()),
                                 S.addTypeRef(subscript->getElementInterfaceType()),
                                 subscript->isImplicitlyUnwrappedOptional(),
                                 S.addDeclRef(subscript->getOverriddenDecl()),
@@ -3547,8 +3522,8 @@ public:
                                   ctor->hasThrows(),
                                   getStableCtorInitializerKind(
                                     ctor->getInitKind()),
-                                  S.addGenericEnvironmentRef(
-                                                 ctor->getGenericEnvironment()),
+                                  S.addGenericSignatureRef(
+                                                 ctor->getGenericSignature()),
                                   S.addDeclRef(ctor->getOverriddenDecl()),
                                   rawAccessLevel,
                                   ctor->needsNewVTableEntry(),
@@ -3576,8 +3551,8 @@ public:
                                  contextID.getOpaqueValue(),
                                  dtor->isImplicit(),
                                  dtor->isObjC(),
-                                 S.addGenericEnvironmentRef(
-                                                dtor->getGenericEnvironment()));
+                                 S.addGenericSignatureRef(
+                                                dtor->getGenericSignature()));
     writeInlinableBodyTextIfNeeded(dtor);
   }
 
@@ -3757,8 +3732,7 @@ static TypeAliasDecl *findTypeAliasForBuiltin(ASTContext &Ctx, Type T) {
   StringRef TypeName = FullName.substr(8);
 
   SmallVector<ValueDecl*, 4> CurModuleResults;
-  Ctx.TheBuiltinModule->lookupValue(ModuleDecl::AccessPathTy(),
-                                    Ctx.getIdentifier(TypeName),
+  Ctx.TheBuiltinModule->lookupValue(Ctx.getIdentifier(TypeName),
                                     NLKind::QualifiedLookup,
                                     CurModuleResults);
   assert(CurModuleResults.size() == 1);
@@ -3901,15 +3875,15 @@ public:
 
   void visitPrimaryArchetypeType(const PrimaryArchetypeType *archetypeTy) {
     using namespace decls_block;
-    auto env = archetypeTy->getGenericEnvironment();
+    auto sig = archetypeTy->getGenericEnvironment()->getGenericSignature();
 
-    GenericSignatureID envID = S.addGenericEnvironmentRef(env);
+    GenericSignatureID sigID = S.addGenericSignatureRef(sig);
     auto interfaceType = archetypeTy->getInterfaceType()
       ->castTo<GenericTypeParamType>();
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[PrimaryArchetypeTypeLayout::Code];
     PrimaryArchetypeTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                           envID,
+                                           sigID,
                                            interfaceType->getDepth(),
                                            interfaceType->getIndex());
   }

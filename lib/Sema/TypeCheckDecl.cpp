@@ -485,8 +485,7 @@ static void checkInheritanceClause(
 /// Check the inheritance clauses generic parameters along with any
 /// requirements stored within the generic parameter list.
 static void checkGenericParams(GenericParamList *genericParams,
-                               DeclContext *owningDC,
-                               TypeChecker &tc) {
+                               DeclContext *owningDC, TypeChecker &tc) {
   if (!genericParams)
     return;
 
@@ -496,12 +495,9 @@ static void checkGenericParams(GenericParamList *genericParams,
   }
 
   // Force visitation of each of the requirements here.
-  RequirementRequest::visitRequirements(WhereClauseOwner(owningDC,
-                                                         genericParams),
-                                        TypeResolutionStage::Interface,
-                                        [](Requirement, RequirementRepr *) {
-                                          return false;
-                                        });
+  WhereClauseOwner(owningDC, genericParams)
+      .visitRequirements(TypeResolutionStage::Interface,
+                         [](Requirement, RequirementRepr *) { return false; });
 }
 
 /// Retrieve the set of protocols the given protocol inherits.
@@ -620,10 +616,11 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
     genericParams->setDepth(i);
   }
 
-  return checkGenericEnvironment(nestedList.back(), DC,
-                                 /*parentSig=*/nullptr,
-                                 /*allowConcreteGenericParams=*/true,
-                                 /*ext=*/nullptr);
+  auto *sig = TypeChecker::checkGenericSignature(
+             nestedList.back(), DC,
+             /*parentSig=*/nullptr,
+             /*allowConcreteGenericParams=*/true);
+  return (sig ? sig->getGenericEnvironment() : nullptr);
 }
 
 /// Check whether \c current is a redeclaration.
@@ -665,7 +662,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     }
   } else {
     // Look within a module context.
-    currentFile->getParentModule()->lookupValue({ }, current->getBaseName(),
+    currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
                                                 otherDefinitions);
     if (tracker)
@@ -1325,7 +1322,6 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
   GenericSignatureBuilder builder(proto->getASTContext());
 
   // Add all of the generic parameters.
-  proto->createGenericParamsIfMissing();
   for (auto gp : *proto->getGenericParams())
     builder.addGenericParameter(gp);
 
@@ -1840,7 +1836,8 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (tc.validateType(typeLoc, TypeResolution::forInterface(DC), options))
+  if (TypeChecker::validateType(tc.Context, typeLoc,
+                                TypeResolution::forInterface(DC), options))
     return nullptr;
 
   return typeLoc.getType()->getAnyNominal();
@@ -2011,7 +2008,8 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
 /// to ensure that they don't introduce additional 'Self' requirements.
 static void checkProtocolSelfRequirements(ProtocolDecl *proto,
                                           TypeDecl *source) {
-  RequirementRequest::visitRequirements(source, TypeResolutionStage::Interface,
+  WhereClauseOwner(source).visitRequirements(
+      TypeResolutionStage::Interface,
       [&](const Requirement &req, RequirementRepr *reqRepr) {
         switch (req.getKind()) {
         case RequirementKind::Conformance:
@@ -2334,7 +2332,7 @@ public:
         // Static/class declarations require an initializer unless in a
         // protocol.
         if (var->isStatic() && !isa<ProtocolDecl>(DC)) {
-          // ...but don't enforce this for SIL or parseable interface files.
+          // ...but don't enforce this for SIL or module interface files.
           switch (DC->getParentSourceFile()->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
@@ -2756,6 +2754,9 @@ public:
     // we're doing here.
     CD->walkSuperclasses(
       [&](ClassDecl *superclass) {
+        if (!superclass->getParentSourceFile())
+          return TypeWalker::Action::Stop;
+
         for (auto *member : superclass->getMembers()) {
           if (auto *vd = dyn_cast<ValueDecl>(member)) {
             if (vd->isPotentiallyOverridable()) {
@@ -2968,7 +2969,7 @@ public:
         return false;
     }
 
-    // Declarations in SIL and parseable interface files don't require
+    // Declarations in SIL and module interface files don't require
     // definitions.
     if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
       switch (sourceFile->Kind) {
@@ -3049,29 +3050,88 @@ public:
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    // Produce any diagnostics for the extended type.
+    auto extType = ED->getExtendedType();
+
+    auto nominal = ED->getExtendedNominal();
+    if (nominal == nullptr) {
+      const bool wasAlreadyInvalid = ED->isInvalid();
+      ED->setInvalid();
+      if (extType && !extType->hasError() && extType->getAnyNominal()) {
+        // If we've got here, then we have some kind of extension of a prima
+        // fascie non-nominal type.  This can come up when we're projecting
+        // typealiases out of bound generic types.
+        //
+        // struct Array<T> { typealias Indices = Range<Int> }
+        // extension Array.Indices.Bound {}
+        //
+        // Offer to rewrite it to the underlying nominal type.
+        auto canExtType = extType->getCanonicalType();
+        ED->diagnose(diag::invalid_nominal_extension, extType, canExtType)
+          .highlight(ED->getExtendedTypeRepr()->getSourceRange());
+        ED->diagnose(diag::invalid_nominal_extension_rewrite, canExtType)
+          .fixItReplace(ED->getExtendedTypeRepr()->getSourceRange(),
+                        canExtType->getString());
+      } else if (!wasAlreadyInvalid) {
+        // If nothing else applies, fall back to a generic diagnostic.
+        ED->diagnose(diag::non_nominal_extension, extType);
+      }
+      return;
+    }
+
     TC.validateExtension(ED);
+
+    extType = ED->getExtendedType();
+    if (extType && !extType->hasError()) {
+      // The first condition catches syntactic forms like
+      //     protocol A & B { ... } // may be protocols or typealiases
+      // The second condition also looks through typealiases and catches
+      //    typealias T = P1 & P2 // P2 is a refined protocol of P1
+      //    extension T { ... }
+      // However, it is trickier to catch cases like
+      //    typealias T = P2 & P1 // P2 is a refined protocol of P1
+      //    extension T { ... }
+      // so we don't do that here.
+      auto extTypeRepr = ED->getExtendedTypeRepr();
+      auto *extTypeNominal = extType->getAnyNominal();
+      bool firstNominalIsNotMostSpecific =
+        extTypeNominal && extTypeNominal != nominal;
+      if (isa<CompositionTypeRepr>(extTypeRepr)
+          || firstNominalIsNotMostSpecific) {
+        auto firstNominalType = nominal->getDeclaredType();
+        auto diag = ED->diagnose(diag::composition_in_extended_type,
+                                 firstNominalType);
+        diag.highlight(extTypeRepr->getSourceRange());
+        if (firstNominalIsNotMostSpecific) {
+          diag.flush();
+          Type mostSpecificProtocol = extTypeNominal->getDeclaredType();
+          ED->diagnose(diag::composition_in_extended_type_alternative,
+                       mostSpecificProtocol)
+            .fixItReplace(extTypeRepr->getSourceRange(),
+                          mostSpecificProtocol->getString());
+        } else {
+          diag.fixItReplace(extTypeRepr->getSourceRange(),
+                            firstNominalType->getString());
+        }
+      }
+    }
 
     checkInheritanceClause(ED);
 
-    if (auto nominal = ED->getExtendedNominal()) {
-      TC.validateDecl(nominal);
+    // Check the raw values of an enum, since we might synthesize
+    // RawRepresentable while checking conformances on this extension.
+    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
+      if (enumDecl->hasRawType())
+        checkEnumRawValues(TC, enumDecl);
+    }
 
-      // Check the raw values of an enum, since we might synthesize
-      // RawRepresentable while checking conformances on this extension.
-      if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-        if (enumDecl->hasRawType())
-          checkEnumRawValues(TC, enumDecl);
-      }
-
-      // Only generic and protocol types are permitted to have
-      // trailing where clauses.
-      if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-        if (!ED->getGenericParams() &&
-            !ED->isInvalid()) {
-          ED->diagnose(diag::extension_nongeneric_trailing_where,
-                       nominal->getFullName())
+    // Only generic and protocol types are permitted to have
+    // trailing where clauses.
+    if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
+      if (!ED->getGenericParams() && !ED->isInvalid()) {
+        ED->diagnose(diag::extension_nongeneric_trailing_where,
+                     nominal->getFullName())
           .highlight(trailingWhereClause->getSourceRange());
-        }
       }
     }
 
@@ -3418,8 +3478,9 @@ static void validateTypealiasType(TypeChecker &tc, TypeAliasDecl *typeAlias) {
     return;
   }
 
-  if (tc.validateType(typeAlias->getUnderlyingTypeLoc(),
-                    TypeResolution::forInterface(typeAlias, &tc), options)) {
+  if (TypeChecker::validateType(tc.Context, typeAlias->getUnderlyingTypeLoc(),
+                                TypeResolution::forInterface(typeAlias, &tc),
+                                options)) {
     typeAlias->setInvalid();
     typeAlias->getUnderlyingTypeLoc().setInvalidType(tc.Context);
   }
@@ -3772,7 +3833,9 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     for (auto member : proto->getMembers()) {
       if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(member)) {
         if (!aliasDecl->isGeneric()) {
-          aliasDecl->setGenericEnvironment(proto->getGenericEnvironment());
+          // FIXME: Force creation of the protocol's generic environment now.
+          (void) proto->getGenericEnvironment();
+          aliasDecl->setGenericSignature(proto->getGenericSignature());
 
           // The generic environment didn't exist until now, we may have
           // unresolved types we will need to deal with, and need to record the
@@ -4144,8 +4207,10 @@ void TypeChecker::validateDeclForNameLookup(ValueDecl *D) {
              TypeResolverContext::TypeAliasDecl));
           auto &underlyingTL = typealias->getUnderlyingTypeLoc();
           if (underlyingTL.isNull() ||
-              validateType(underlyingTL,
-                           TypeResolution::forStructural(typealias), options)) {
+              TypeChecker::validateType(Context,
+                                        underlyingTL,
+                                        TypeResolution::forStructural(typealias),
+                                        options)) {
             typealias->setInvalid();
             underlyingTL.setInvalidType(Context);
           }
@@ -4297,7 +4362,7 @@ static Type formExtensionInterfaceType(
                          TypeChecker &tc, ExtensionDecl *ext,
                          Type type,
                          GenericParamList *genericParams,
-                         SmallVectorImpl<std::pair<Type, Type>> &sameTypeReqs,
+                         SmallVectorImpl<Requirement> &sameTypeReqs,
                          bool &mustInferRequirements) {
   if (type->is<ErrorType>())
     return type;
@@ -4346,8 +4411,8 @@ static Type formExtensionInterfaceType(
       genericArgs.push_back(gpType);
 
       if (currentBoundType) {
-        sameTypeReqs.push_back({gpType,
-                                currentBoundType->getGenericArgs()[gpIndex]});
+        sameTypeReqs.emplace_back(RequirementKind::SameType, gpType,
+                                  currentBoundType->getGenericArgs()[gpIndex]);
       }
     }
 
@@ -4371,47 +4436,53 @@ static Type formExtensionInterfaceType(
   return resultType;
 }
 
+/// Retrieve the generic parameter depth of the extended type.
+static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
+  auto nominal = ext->getSelfNominalTypeDecl();
+  if (!nominal) return static_cast<unsigned>(-1);
+
+  auto sig = nominal->getGenericSignatureOfContext();
+  if (!sig) return static_cast<unsigned>(-1);
+
+  return sig->getGenericParams().back()->getDepth();
+}
+
 /// Check the generic parameters of an extension, recursively handling all of
 /// the parameter lists within the extension.
-static GenericEnvironment *
-checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext, Type type,
+static GenericSignature *
+checkExtensionGenericParams(TypeChecker &tc, ExtensionDecl *ext,
                             GenericParamList *genericParams) {
   assert(!ext->getGenericEnvironment());
 
   // Form the interface type of the extension.
   bool mustInferRequirements = false;
-  SmallVector<std::pair<Type, Type>, 4> sameTypeReqs;
+  SmallVector<Requirement, 2> sameTypeReqs;
   Type extInterfaceType =
-    formExtensionInterfaceType(tc, ext, type, genericParams, sameTypeReqs,
+    formExtensionInterfaceType(tc, ext, ext->getExtendedType(),
+                               genericParams, sameTypeReqs,
                                mustInferRequirements);
 
-  // Local function used to infer requirements from the extended type.
-  auto inferExtendedTypeReqs = [&](GenericSignatureBuilder &builder) {
-    auto source =
-      GenericSignatureBuilder::FloatingRequirementSource::forInferred(nullptr);
-
-    builder.inferRequirements(*ext->getModuleContext(),
-                              extInterfaceType,
-                              nullptr,
-                              source);
-
-    for (const auto &sameTypeReq : sameTypeReqs) {
-      builder.addRequirement(
-        Requirement(RequirementKind::SameType, sameTypeReq.first,
-                    sameTypeReq.second),
-        source, ext->getModuleContext());
-    }
+  assert(genericParams && "Missing generic parameters?");
+  
+  auto cannotReuseNominalSignature = [&]() -> bool {
+    const auto finalDepth = genericParams->getParams().back()->getDepth();
+    return mustInferRequirements
+        || !sameTypeReqs.empty()
+        || ext->getTrailingWhereClause()
+        || (getExtendedTypeGenericDepth(ext) != finalDepth);
   };
+  
+  // Re-use the signature of the type being extended by default.
+  if (cannotReuseNominalSignature()) {
+    return TypeChecker::checkGenericSignature(
+        genericParams, ext,
+        /*parent signature*/ nullptr,
+        /*allowConcreteGenericParams=*/true,
+        sameTypeReqs,
+        {TypeLoc{nullptr, extInterfaceType}});
+  }
 
-  // Validate the generic type signature.
-  auto *env = tc.checkGenericEnvironment(genericParams,
-                                         ext->getDeclContext(), nullptr,
-                                         /*allowConcreteGenericParams=*/true,
-                                         ext, inferExtendedTypeReqs,
-                                         (mustInferRequirements ||
-                                            !sameTypeReqs.empty()));
-
-  return env;
+  return ext->getSelfNominalTypeDecl()->getGenericSignatureOfContext();
 }
 
 static bool isNonGenericTypeAliasType(Type type) {
@@ -4491,25 +4562,13 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
 
   DeclValidationRAII IBV(ext);
 
-  auto extendedType = evaluateOrDefault(Context.evaluator,
-                                        ExtendedTypeRequest{ext},
-                                        ErrorType::get(ext->getASTContext()));
-
   if (auto *nominal = ext->getExtendedNominal()) {
-    // If this extension was not already bound, it means it is either in an
-    // inactive conditional compilation block, or otherwise (incorrectly)
-    // nested inside of some other declaration. Make sure the generic
-    // parameter list of the extension exists to maintain invariants.
-    if (!ext->alreadyBoundToNominal())
-      ext->createGenericParamsIfMissing(nominal);
-
     // Validate the nominal type declaration being extended.
     validateDecl(nominal);
 
     if (auto *genericParams = ext->getGenericParams()) {
-      GenericEnvironment *env =
-        checkExtensionGenericParams(*this, ext, extendedType, genericParams);
-      ext->setGenericEnvironment(env);
+      auto *sig = checkExtensionGenericParams(*this, ext, genericParams);
+      ext->setGenericSignature(sig);
     }
   }
 }
@@ -4748,7 +4807,7 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
 
 void TypeChecker::maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *SF = classDecl->getParentSourceFile()) {
-    // Allow classes without initializers in SIL and parseable interface files.
+    // Allow classes without initializers in SIL and module interface files.
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:

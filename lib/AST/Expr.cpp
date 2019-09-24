@@ -1772,6 +1772,11 @@ Expr *CallExpr::getDirectCallee() const {
       continue;
     }
 
+    if (auto ctorCall = dyn_cast<ConstructorRefCallExpr>(fn)) {
+      fn = ctorCall->getFn();
+      continue;
+    }
+
     return fn;
   }
 }

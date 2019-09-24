@@ -13,6 +13,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -66,22 +67,29 @@ void swift::simple_display(llvm::raw_ostream &out, Type type) {
     out << "null";
 }
 
+void swift::simple_display(llvm::raw_ostream &out, const TypeRepr *TyR) {
+  if (TyR)
+    TyR->print(out);
+  else
+    out << "null";
+}
+
+void swift::simple_display(llvm::raw_ostream &out, const TypeLoc source) {
+  out << "(";
+  simple_display(out, source.getType());
+  out << ", ";
+  simple_display(out, source.getTypeRepr());
+  out << ")";
+}
+
 //----------------------------------------------------------------------------//
 // Inherited type computation.
 //----------------------------------------------------------------------------//
 
-TypeLoc &InheritedTypeRequest::getTypeLoc(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
-}
-
 SourceLoc InheritedTypeRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   return typeLoc.getLoc();
 }
 
@@ -91,7 +99,8 @@ bool InheritedTypeRequest::isCached() const {
 
 Optional<Type> InheritedTypeRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   if (typeLoc.wasValidated())
     return typeLoc.getType();
 
@@ -100,7 +109,8 @@ Optional<Type> InheritedTypeRequest::getCachedResult() const {
 
 void InheritedTypeRequest::cacheResult(Type value) const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   typeLoc.setType(value);
 }
 
@@ -358,13 +368,12 @@ SourceLoc RequirementRequest::getNearestLoc() const {
   return owner.getLoc();
 }
 
-MutableArrayRef<RequirementRepr>
-RequirementRequest::getRequirements(WhereClauseOwner owner) {
-  if (auto genericParams = owner.source.dyn_cast<GenericParamList *>()) {
+MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
+  if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
   }
 
-  if (auto attr = owner.source.dyn_cast<SpecializeAttr *>()) {
+  if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
     
@@ -372,13 +381,14 @@ RequirementRequest::getRequirements(WhereClauseOwner owner) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (auto attr = owner.source.dyn_cast<DifferentiableAttr *>()) {
+  if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
     if (auto whereClause = attr->getWhereClause())
       return whereClause->getRequirements();
     return {};
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
-  auto decl = owner.source.dyn_cast<Decl *>();
+  auto decl = source.dyn_cast<Decl *>();
   if (!decl)
     return { };
 
@@ -402,14 +412,15 @@ RequirementRequest::getRequirements(WhereClauseOwner owner) {
   return { };
 }
 
-bool RequirementRequest::visitRequirements(
-      WhereClauseOwner owner, TypeResolutionStage stage,
-      llvm::function_ref<bool(Requirement, RequirementRepr*)> callback) {
-  auto &evaluator = owner.dc->getASTContext().evaluator;
-  auto requirements = getRequirements(owner);
+bool WhereClauseOwner::visitRequirements(
+    TypeResolutionStage stage,
+    llvm::function_ref<bool(Requirement, RequirementRepr *)> callback)
+    const && {
+  auto &evaluator = dc->getASTContext().evaluator;
+  auto requirements = getRequirements();
   for (unsigned index : indices(requirements)) {
     // Resolve to a requirement.
-    auto req = evaluator(RequirementRequest{owner, index, stage});
+    auto req = evaluator(RequirementRequest{*this, index, stage});
     if (req) {
       // Invoke the callback. If it returns true, we're done.
       if (callback(*req, &requirements[index]))
@@ -418,10 +429,10 @@ bool RequirementRequest::visitRequirements(
       continue;
     }
 
-    llvm::handleAllErrors(req.takeError(),
-      [](const CyclicalRequestError<RequirementRequest> &E) {
-        // cycle detected
-      });
+    llvm::handleAllErrors(
+        req.takeError(), [](const CyclicalRequestError<RequirementRequest> &E) {
+          // cycle detected
+        });
   }
 
   return false;
@@ -430,7 +441,7 @@ bool RequirementRequest::visitRequirements(
 RequirementRepr &RequirementRequest::getRequirement() const {
   auto owner = std::get<0>(getStorage());
   auto index = std::get<1>(getStorage());
-  return getRequirements(owner)[index];
+  return owner.getRequirements()[index];
 }
 
 bool RequirementRequest::isCached() const {
@@ -504,49 +515,20 @@ void swift::simple_display(llvm::raw_ostream &out,
 // DefaultTypeRequest caching.
 //----------------------------------------------------------------------------//
 
-SourceFile *DefaultTypeRequest::getSourceFile() const {
-  return getDeclContext()->getParentSourceFile();
-}
-
-Type &DefaultTypeRequest::getCache() const {
-  return getDeclContext()->getASTContext().getDefaultTypeRequestCache(
-      getSourceFile(), getKnownProtocolKind());
-}
-
 Optional<Type> DefaultTypeRequest::getCachedResult() const {
-  auto const &cachedType = getCache();
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  const auto &cachedType = DC->getASTContext().getDefaultTypeRequestCache(
+      DC->getParentSourceFile(), knownProtocolKind);
   return cachedType ? Optional<Type>(cachedType) : None;
 }
 
-void DefaultTypeRequest::cacheResult(Type value) const { getCache() = value; }
-
-const char *
-DefaultTypeRequest::getTypeName(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-
-  // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return typeName;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return nullptr;
-  }
-}
-
-bool DefaultTypeRequest::getPerformLocalLookup(const KnownProtocolKind knownProtocolKind) {
-  switch (knownProtocolKind) {
-      
-    // clang-format off
-    # define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName, performLocalLookup) \
-      case KnownProtocolKind::Id: return performLocalLookup;
-    # include "swift/AST/KnownProtocols.def"
-    # undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-    //clang-format on
-      
-    default: return false;
-  }
+void DefaultTypeRequest::cacheResult(Type value) const {
+  auto *DC = std::get<1>(getStorage());
+  auto knownProtocolKind = std::get<0>(getStorage());
+  auto &cacheEntry = DC->getASTContext().getDefaultTypeRequestCache(
+                         DC->getParentSourceFile(), knownProtocolKind);
+  cacheEntry = value;
 }
 
 bool PropertyWrapperTypeInfoRequest::isCached() const {

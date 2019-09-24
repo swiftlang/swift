@@ -767,20 +767,16 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     return nullptr;
   }
 
-  if (!EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
-    // Inlining of generics is not allowed unless it is an @inline(__always)
-    // or transparent function.
-    if (Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
-      return nullptr;
-  }
-
   // We cannot inline function with layout constraints on its generic types
   // if the corresponding substitution type does not have the same constraints.
   // The reason for this restriction is that we'd need to be able to express
   // in SIL something like casting a value of generic type T into a value of
   // generic type T: _LayoutConstraint, which is impossible currently.
-  if (EnableSILInliningOfGenerics && AI.hasSubstitutions()) {
-    if (!isCallerAndCalleeLayoutConstraintsCompatible(AI))
+  if (AI.hasSubstitutions()) {
+    if (!isCallerAndCalleeLayoutConstraintsCompatible(AI) &&
+        // TODO: revisit why we can make an exception for inline-always
+        // functions. Some tests depend on it.
+        Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
       return nullptr;
   }
 

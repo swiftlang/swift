@@ -29,6 +29,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
@@ -5423,7 +5424,7 @@ AccessorBaseArgPreparer::AccessorBaseArgPreparer(SILGenFunction &SGF,
 
 ArgumentSource AccessorBaseArgPreparer::prepare() {
   // If the base is a boxed existential, we will open it later.
-  if (baseLoweredType.getPreferredExistentialRepresentation(SGF.SGM.M) ==
+  if (baseLoweredType.getPreferredExistentialRepresentation() ==
       ExistentialRepresentation::Boxed) {
     assert(!baseLoweredType.isAddress() &&
            "boxed existential should not be an address");

@@ -124,6 +124,9 @@ def disable_target_os_checking :
   
 def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
   HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
+
+def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
+  HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;
   
 def warn_if_astscope_lookup : Flag<["-"], "warn-if-astscope-lookup">,
   HelpText<"Print a warning if ASTScope lookup is used">;

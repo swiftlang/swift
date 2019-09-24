@@ -74,27 +74,25 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
   }
 
   case BodyKind::Unparsed: {
-    // FIXME: It should be fine to delay body parsing of local functions, so
-    // the DelayBodyParsing should go away entirely
     // FIXME: How do we configure code completion?
     SourceFile &sf = *afd->getDeclContext()->getParentSourceFile();
     SourceManager &sourceMgr = sf.getASTContext().SourceMgr;
     unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
     Parser parser(bufferID, sf, static_cast<SILParserTUStateBase *>(nullptr),
-                  nullptr, nullptr, /*DelayBodyParsing=*/false);
+                  nullptr, nullptr);
     parser.SyntaxContext->setDiscard();
     auto body = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
     return body;
   }
   }
-
+  llvm_unreachable("Unhandled BodyKind in switch");
 }
 
 
 // Define request evaluation functions for each of the type checker requests.
 static AbstractRequestFunction *parseRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/ParseTypeIDZone.def"
 #undef SWIFT_REQUEST

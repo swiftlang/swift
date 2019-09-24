@@ -474,7 +474,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   ++lookupCounter;
   stopForDebuggingIfStartingTargetLookup(false);
 #endif
-  SharedTimer timer("UnqualifiedLookupFactory performUnqualifiedLookup");
+  FrontendStatsTracer StatsTracer(Ctx.Stats, "performUnqualifedLookup",
+                                  DC->getParentSourceFile());
 
   const Optional<bool> initialIsCascadingUse = getInitialIsCascadingUse();
 
@@ -535,9 +536,10 @@ bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookup() const {
 
 bool UnqualifiedLookupFactory::useASTScopesForExperimentalLookupIfEnabled()
     const {
-  return Loc.isValid() && DC->getParentSourceFile() &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::REPL &&
-         DC->getParentSourceFile()->Kind != SourceFileKind::SIL;
+  if (!Loc.isValid())
+    return false;
+  const auto *const SF = DC->getParentSourceFile();
+  return SF && SF->isSuitableForASTScopes();
 }
 
 #pragma mark context-based lookup definitions

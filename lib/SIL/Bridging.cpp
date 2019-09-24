@@ -20,8 +20,9 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleLoader.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -211,7 +212,7 @@ Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
   }
 
   auto foreignRepresentation =
-    t->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, M.TheSwiftModule);
+    t->getForeignRepresentableIn(ForeignLanguage::ObjectiveC, &M);
   switch (foreignRepresentation.first) {
   case ForeignRepresentableKind::None:
   case ForeignRepresentableKind::Trivial:

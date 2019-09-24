@@ -1,0 +1,30 @@
+module A { header "A.h" }
+module B { header "B.h" }
+module C { header "C.h" }
+module D { header "D.h" }
+module E { header "E.h" }
+module F { header "F.h" }
+module G { header "G.h" }
+module H { header "H.h" }
+module I { header "I.h" }
+module J { header "J.h" }
+module K { header "K.h" }
+module L { header "L.h" }
+module M { header "M.h" }
+module N { header "N.h" }
+module O { header "O.h" }
+module P { header "P.h" }
+module Q { header "Q.h" }
+module R { header "R.h" }
+module S { header "S.h" }
+module T { header "T.h" }
+module U { header "U.h" }
+module V { header "V.h" }
+module W { header "W.h" }
+module X { header "X.h" }
+module Y { header "Y.h" }
+module Z { header "Z.h" }
+
+module CoincidentalNameCollision {
+  header "CoincidentalNameCollision.h"
+}

@@ -10,7 +10,7 @@
 // always give us some difference.
 
 // Generate .swiftinterface file for module cake
-// RUN: %target-swift-frontend -typecheck -emit-parseable-module-interface-path %t.mod1/cake.swiftinterface %S/Inputs/cake_baseline/cake.swift -I %S/Inputs/APINotesLeft %clang-importer-sdk-nosource -parse-as-library -enable-library-evolution -disable-objc-attr-requires-foundation-module -module-cache-path %t.module-cache
+// RUN: %target-swift-frontend -typecheck -emit-module-interface-path %t.mod1/cake.swiftinterface %S/Inputs/cake_baseline/cake.swift -I %S/Inputs/APINotesLeft %clang-importer-sdk-nosource -parse-as-library -enable-library-evolution -disable-objc-attr-requires-foundation-module -module-cache-path %t.module-cache
 
 // Generate .swiftmodule file for module cake
 // RUN: %target-swift-frontend -emit-module -o %t.mod1/cake.swiftmodule %S/Inputs/cake_baseline/cake.swift -I %S/Inputs/APINotesLeft %clang-importer-sdk-nosource -parse-as-library  -disable-objc-attr-requires-foundation-module -module-cache-path %t.module-cache

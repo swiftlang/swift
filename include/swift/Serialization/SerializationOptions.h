@@ -33,7 +33,7 @@ namespace swift {
     StringRef GroupInfoPath;
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
-    StringRef ParseableInterface;
+    StringRef ModuleInterface;
     ArrayRef<std::string> ExtraClangOptions;
 
     /// Describes a single-file dependency for this module, along with the

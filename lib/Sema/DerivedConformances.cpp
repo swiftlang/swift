@@ -226,6 +226,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
       });
     }
     return results.empty() ? nullptr : results.front();
+    // SWIFT_ENABLE_TENSORFLOW END
   };
 
   // Properties.
@@ -526,8 +527,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
+  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
   getterDecl->copyFormalAccessFrom(property);
@@ -575,8 +575,7 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
     setterDecl->getAttrs().add(new (C) FinalAttr(/*Implicit*/ true));
 
   // Compute the interface type of the setter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    setterDecl->setGenericEnvironment(env);
+  setterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   setterDecl->computeType();
   setterDecl->copyFormalAccessFrom(property);
   setterDecl->setValidationToChecked();
