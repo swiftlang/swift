@@ -227,7 +227,7 @@ func interpolated_string(_ x: Int, y: String) -> String {
   
   // CHECK: string_literal utf8 "The ", loc "{{.*}}":[[@LINE-5]]:10
   // CHECK: function_ref @$ss26DefaultStringInterpolationV13appendLiteralyySSF
-  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-7]]:11
+  // CHECK-NEXT: apply{{.*}}, loc "{{.*}}":[[@LINE-7]]:10
   
   // CHECK: store %0 to{{.*}}, loc "{{.*}}":[[@LINE-9]]:17
   // CHECK: function_ref @$ss26DefaultStringInterpolationV06appendC0yyxs06CustomB11ConvertibleRzlF

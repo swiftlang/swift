@@ -1729,7 +1729,7 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 ParserStatus Parser::
 parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                     Token EntireTok,
-                    VarDecl *InterpolationVar,
+                    SmallVectorImpl<OpaqueValueExpr *> &InterpolationVarRefs,
                     /* remaining parameters are outputs: */
                     SmallVectorImpl<ASTNode> &Stmts,
                     unsigned &LiteralCapacity,
@@ -1743,9 +1743,8 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   DeclName appendInterpolation(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
-    auto InterpolationVarRef =
-      new (Context) DeclRefExpr(InterpolationVar,
-                                DeclNameLoc(Segment.Loc), /*implicit=*/true);
+    auto InterpolationVarRef = new (Context) OpaqueValueExpr(Loc, Type());
+    InterpolationVarRefs.push_back(InterpolationVarRef);
 
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
@@ -1995,27 +1994,17 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     SmallVector<ASTNode, 4> Stmts;
 
     // Make the variable which will contain our temporary value.
-    auto InterpolationVar =
-      new (Context) VarDecl(/*IsStatic=*/false, VarDecl::Introducer::Var,
-                            /*IsCaptureList=*/false, /*NameLoc=*/SourceLoc(),
-                            Context.Id_dollarInterpolation, CurDeclContext);
-    InterpolationVar->setImplicit(true);
-    InterpolationVar->setHasNonPatternBindingInit(true);
-    InterpolationVar->setUserAccessible(false);
-    addToScope(InterpolationVar);
-    setLocalDiscriminator(InterpolationVar);
-    
-    Stmts.push_back(InterpolationVar);
+    SmallVector<OpaqueValueExpr *, 5> TemporaryUses;
 
     // Collect all string segments.
     SyntaxParsingContext SegmentsCtx(SyntaxContext,
                                      SyntaxKind::StringLiteralSegments);
-    Status = parseStringSegments(Segments, EntireTok, InterpolationVar, 
+    Status = parseStringSegments(Segments, EntireTok, TemporaryUses,
                                  Stmts, LiteralCapacity, InterpolationCount);
 
     auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
                                   /*implicit=*/true);
-    AppendingExpr = new (Context) TapExpr(nullptr, Body);
+    AppendingExpr = TapExpr::create(Context, nullptr, TemporaryUses, Body);
   }
 
   if (HasCustomDelimiter) {

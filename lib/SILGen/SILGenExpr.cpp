@@ -2384,17 +2384,17 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   RValue interpolation;
   {
     TapExpr *ETap = E->getAppendingExpr();
+
     // Inlined from TapExpr:
     // TODO: This is only necessary because constant evaluation requires that
     // the box for the var gets defined before the initializer happens.
-    auto Var = ETap->getVar();
     auto VarType = ETap->getType()->getCanonicalType();
 
     Scope outerScope(SGF, CleanupLocation(ETap));
 
     // Initialize the var with our SubExpr.
-    auto VarInit =
-        SGF.emitInitializationForVarDecl(Var, /*forceImmutable=*/false);
+    auto VarInit = SGF.emitTemporary(SILLocation(E),
+                                     SGF.getTypeLowering(VarType));
     {
       // Modified from TapExpr to evaluate the SubExpr directly rather than
       // indirectly through the OpaqueValue system.
@@ -2418,14 +2418,19 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
       }
     }
 
+    auto VarAddress = VarInit->getManagedAddress();
+    SmallVector<std::unique_ptr<SILGenFunction::OpaqueValueRAII>, 5> opaqueValues;
+
+    for (auto use : ETap->getUses())
+      opaqueValues.push_back(std::unique_ptr<SILGenFunction::OpaqueValueRAII>(
+          new SILGenFunction::OpaqueValueRAII(SGF, use, VarAddress)));
+
     // Emit the body and let it mutate the var if it chooses.
     SGF.emitStmt(ETap->getBody());
 
     // Retrieve and return the var, making it +1 so it survives the scope.
-    auto result = SGF.emitRValueForDecl(SILLocation(ETap), Var, VarType,
-                                        AccessSemantics::Ordinary, SGFContext());
-    result = std::move(result).ensurePlusOne(SGF, SILLocation(ETap));
-    interpolation = outerScope.popPreservingValue(std::move(result));
+    interpolation = outerScope.popPreservingValue(
+        RValue(SGF, ETap, VarAddress).ensurePlusOne(SGF, ETap));
   }
 
   PreparedArguments resultInitArgs;
@@ -5358,29 +5363,27 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 }
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
-  // This implementation is not very robust; if TapExpr were to ever become
-  // user-accessible (as some sort of "with" statement), it should probably
-  // permit a full pattern binding, saving the unused parts and "re-structuring"
-  // them to return the modified value.
-
-  auto Var = E->getVar();
   auto VarType = E->getType()->getCanonicalType();
 
   Scope outerScope(SGF, CleanupLocation(E));
 
   // Initialize the var with our SubExpr.
-  auto VarInit =
-    SGF.emitInitializationForVarDecl(Var, /*forceImmutable=*/false);
+  auto VarInit = SGF.emitTemporary(SILLocation(E),
+                                   SGF.getTypeLowering(VarType));
   SGF.emitExprInto(E->getSubExpr(), VarInit.get(), SILLocation(E));
+
+  auto VarAddress = VarInit->getManagedAddress();
+  SmallVector<std::unique_ptr<SILGenFunction::OpaqueValueRAII>, 5> opaqueValues;
+
+  for (auto use : E->getUses())
+    opaqueValues.push_back(std::unique_ptr<SILGenFunction::OpaqueValueRAII>(
+        new SILGenFunction::OpaqueValueRAII(SGF, use, VarAddress)));
 
   // Emit the body and let it mutate the var if it chooses.
   SGF.emitStmt(E->getBody());
 
-  // Retrieve and return the var, making it +1 so it survives the scope.
-  auto result = SGF.emitRValueForDecl(SILLocation(E), Var, 
-                                      VarType, AccessSemantics::Ordinary, C);
-  result = std::move(result).ensurePlusOne(SGF, SILLocation(E));
-  return outerScope.popPreservingValue(std::move(result));
+  return outerScope.popPreservingValue(
+      RValue(SGF, E, VarAddress).ensurePlusOne(SGF, E));
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

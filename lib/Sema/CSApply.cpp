@@ -4638,9 +4638,10 @@ namespace {
 
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
+      auto lvalueType = LValueType::get(type->mapTypeOutOfContext());
 
-      E->getVar()->setType(type);
-      E->getVar()->setInterfaceType(type->mapTypeOutOfContext());
+      for (auto use : E->getUses())
+        use->setType(lvalueType);
 
       cs.setType(E, type);
       E->setType(type);

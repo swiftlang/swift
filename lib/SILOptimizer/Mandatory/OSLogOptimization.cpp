@@ -661,7 +661,6 @@ static void constantFold(SILInstruction *start,
 static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   auto oslogInitCallSite = FullApplySite(oslogInit);
   SILFunction *callee = oslogInitCallSite.getCalleeFunction();
-  auto &astContext = oslogInit->getFunction()->getASTContext();
 
   // The initializer must return the OSLogMessage instance directly.
   assert(oslogInitCallSite.getNumArguments() >= 1 &&
@@ -690,10 +689,6 @@ static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
 
     auto *allocStackInst = dyn_cast<AllocStackInst>(loadInst->getOperand());
     if (!allocStackInst)
-      return nullptr;
-
-    Optional<SILDebugVariable> varInfo = allocStackInst->getVarInfo();
-    if (!varInfo && varInfo->Name != astContext.Id_dollarInterpolation.str())
       return nullptr;
 
     startInst = allocStackInst;
