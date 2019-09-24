@@ -3551,9 +3551,10 @@ void TypeAliasDecl::computeType() {
 }
 
 Type TypeAliasDecl::getUnderlyingType() const {
-  return evaluateOrDefault(getASTContext().evaluator,
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
            UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
-           Type());
+           ErrorType::get(ctx));
 }
       
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
@@ -3583,10 +3584,11 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type TypeAliasDecl::getStructuralType() const {
-  auto &context = getASTContext();
+  auto &ctx = getASTContext();
   return evaluateOrDefault(
-      context.evaluator,
-      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)}, Type());
+      ctx.evaluator,
+      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+      ErrorType::get(ctx));
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
