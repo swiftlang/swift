@@ -847,6 +847,11 @@ public:
         CS.getConstraintLocator(argLoc),
         TVO_CanBindToInOut | TVO_CanBindToLValue | TVO_CanBindToNoEscape);
 
+    CS.recordHole(argType);
+    CS.addUnsolvedConstraint(Constraint::create(
+        CS, ConstraintKind::Defaultable, argType, CS.getASTContext().TheAnyType,
+        CS.getConstraintLocator(argLoc)));
+
     Arguments.push_back(param.withType(argType));
     ++NumSynthesizedArgs;
 
