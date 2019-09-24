@@ -2070,6 +2070,7 @@ OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
 
 bool OpaqueValueExpr::canBelongTo(Expr *putativeOwner) {
   return isa<InterpolatedStringLiteralExpr>(putativeOwner) ||
+         isa<TapExpr>(putativeOwner) ||
          isa<MakeTemporarilyEscapableExpr>(putativeOwner) ||
          isa<OpenExistentialExpr>(putativeOwner) ||
          isa<OpenExistentialExpr>(putativeOwner) ||
@@ -2091,6 +2092,9 @@ bool OpaqueValueExpr::belongsTo(Expr *putativeOwner) const {
   if (!canBelongTo(putativeOwner))
     return false;
 
+  if (auto tap = dyn_cast<TapExpr>(putativeOwner)) {
+    return llvm::count(tap->getUses(), this) != 0;
+  }
   if (auto interpolated =
           dyn_cast<InterpolatedStringLiteralExpr>(putativeOwner)) {
     return interpolated->getInterpolationExpr() == this;
@@ -2290,18 +2294,21 @@ void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
   }
 }
 
-TapExpr::TapExpr(Expr * SubExpr, BraceStmt *Body)
-    : Expr(ExprKind::Tap, /*Implicit=*/true),
-      SubExpr(SubExpr), Body(Body) {
-  if (Body) {
-    assert(Body->getNumElements() > 0 &&
-         Body->getElement(0).isDecl(DeclKind::Var) &&
-         "First element of Body should be a variable to init with the subExpr");
-  }
+TapExpr::TapExpr(Expr *SubExpr, ArrayRef<OpaqueValueExpr *> Uses,
+                 BraceStmt *Body)
+  : Expr(ExprKind::Tap, /*Implicit=*/true),
+    SubExpr(SubExpr), NumUses(Uses.size()), Body(Body) {
+  std::uninitialized_copy(Uses.begin(), Uses.end(),
+                          const_cast<OpaqueValueExpr**>(getUsesPtr()));
 }
 
-VarDecl * TapExpr::getVar() const {
-  return dyn_cast<VarDecl>(Body->getElement(0).dyn_cast<Decl *>());
+TapExpr *TapExpr::create(ASTContext &ctx, Expr *SubExpr,
+                         ArrayRef<OpaqueValueExpr *> Uses,
+                         BraceStmt *Body) {
+  size_t size = totalSizeToAlloc<OpaqueValueExpr *>(Uses.size());
+
+  void *memory = ctx.Allocate(size, alignof(TapExpr));
+  return new (memory) TapExpr(SubExpr, Uses, Body);
 }
 
 SourceLoc TapExpr::getEndLoc() const {

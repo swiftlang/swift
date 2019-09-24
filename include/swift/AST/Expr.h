@@ -911,19 +911,31 @@ public:
 ///
 /// (The design here could be a bit cleaner, particularly where the VarDecl
 /// is concerned.)
-class TapExpr : public Expr {
+class TapExpr final : public Expr,
+  private llvm::TrailingObjects<TapExpr, OpaqueValueExpr *> {
+  using TrailingObjects = llvm::TrailingObjects<TapExpr, OpaqueValueExpr *>;
+    friend TrailingObjects;
+
   Expr *SubExpr;
+  unsigned NumUses;
   BraceStmt *Body;
 
+  TapExpr(Expr *SubExpr, ArrayRef<OpaqueValueExpr *> Uses, BraceStmt *Body);
+
+  OpaqueValueExpr * const *getUsesPtr() const {
+    return getTrailingObjects<OpaqueValueExpr *>();
+  }
+
 public:
-  TapExpr(Expr *SubExpr, BraceStmt *Body);
+  static TapExpr *create(ASTContext &C, Expr *SubExpr,
+                         ArrayRef<OpaqueValueExpr *> Uses, BraceStmt *Body);
 
   Expr * getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr * se) { SubExpr = se; }
 
-  /// The variable which will be accessed and possibly modified by
-  /// the \c Body. This is the first \c ASTNode in the \c Body.
-  VarDecl * getVar() const;
+  ArrayRef<OpaqueValueExpr *> getUses() const {
+    return ArrayRef<OpaqueValueExpr *>(getUsesPtr(), NumUses);
+  }
 
   BraceStmt * getBody() const { return Body; }
   void setBody(BraceStmt * b) { Body = b; }
