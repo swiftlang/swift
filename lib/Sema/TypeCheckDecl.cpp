@@ -2587,6 +2587,8 @@ public:
 
     checkAccessControl(TC, ED);
 
+    TC.checkPatternBindingCaptures(ED);
+
     if (ED->hasRawType() && !ED->isObjC()) {
       // ObjC enums have already had their raw values checked, but pure Swift
       // enums haven't.

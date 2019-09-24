@@ -79,6 +79,7 @@ ATTRIBUTE_NODES = [
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
+         omit_when_empty=True,
          element='Syntax', element_name='Attribute',
          element_choices=[
              'Attribute',
