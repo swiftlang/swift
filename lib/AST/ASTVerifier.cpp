@@ -2195,7 +2195,8 @@ public:
     void verifyParsed(OpaqueValueExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OpaqueValueExpr", E);
 
-      if (!OpaqueValues.insert(E).second) {
+      bool wasReused = !OpaqueValues.insert(E).second;
+      if (wasReused && !E->canBeReused()) {
         Out << "Multiple references to unique OpaqueValueExpr\n";
         abort();
       }

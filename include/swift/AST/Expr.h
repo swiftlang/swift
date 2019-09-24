@@ -364,8 +364,9 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(OpaqueValueExpr, Expr, 1,
+  SWIFT_INLINE_BITFIELD_FULL(OpaqueValueExpr, Expr, 1+1,
     : NumPadBits,
+    CanBeReused : 1,
     CanBeCaptured : 1
   );
 
@@ -3864,9 +3865,10 @@ class OpaqueValueExpr : public Expr {
 
 public:
   explicit OpaqueValueExpr(SourceRange Range, Type Ty,
-                           bool canBeCaptured = false)
+                           bool canBeCaptured = false, bool canBeReused = false)
       : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
     Bits.OpaqueValueExpr.CanBeCaptured = canBeCaptured;
+    Bits.OpaqueValueExpr.CanBeReused = canBeReused;
   }
 
   /// Whether the opaque value can be captured by a closure. Most opaque values
@@ -3874,6 +3876,12 @@ public:
   /// introduced between them.
   bool canBeCaptured() const {
     return Bits.OpaqueValueExpr.CanBeCaptured;
+  }
+
+  /// Whether the opaque value can only appear in one location in the AST or in
+  /// several.
+  bool canBeReused() const {
+    return Bits.OpaqueValueExpr.CanBeReused;
   }
 
   /// Returns \c true if \c this was introduced to the AST by \c putativeOwner.
