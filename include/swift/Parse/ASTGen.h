@@ -97,6 +97,8 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::ImplicitlyUnwrappedOptionalTypeSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::CodeCompletionTypeSyntax &Type,
+                     const SourceLoc Loc);
   TypeRepr *generate(const syntax::UnknownTypeSyntax &Type,
                      const SourceLoc Loc);
 
