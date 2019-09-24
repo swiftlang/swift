@@ -99,11 +99,6 @@ namespace {
 
       /// The source type is any other pointer type.
       OtherPointer,
-
-      /// The source type created a new Swift type, using swift_newtype, of an
-      /// original underlying CFPointer. This distinction is necessary to
-      /// trigger audit-checking.
-      SwiftNewtypeFromCFPointer,
     };
 
     ImportHintKind Kind;
@@ -141,7 +136,6 @@ namespace {
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
     case ImportHint::OtherPointer:
-    case ImportHint::SwiftNewtypeFromCFPointer:
     case ImportHint::VAList:
       return true;
     }
@@ -652,10 +646,6 @@ namespace {
       Type mappedType = decl->getDeclaredInterfaceType();
 
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
-        if (isCFTypeDecl(type->getDecl())) {
-          return {mappedType, ImportHint::SwiftNewtypeFromCFPointer};
-        }
-
         auto underlying = Visit(type->getDecl()->getUnderlyingType());
         switch (underlying.Hint) {
         case ImportHint::None:
@@ -665,7 +655,6 @@ namespace {
         case ImportHint::ObjCPointer:
         case ImportHint::CFunctionPointer:
         case ImportHint::OtherPointer:
-        case ImportHint::SwiftNewtypeFromCFPointer:
         case ImportHint::VAList:
           return {mappedType, underlying.Hint};
 
@@ -1368,17 +1357,11 @@ static ImportedType adjustTypeForConcreteImport(
   case ImportHint::CFPointer:
     // Wrap CF pointers up as unmanaged types, unless this is an audited
     // context.
-    if (!isCFAudited(importKind))
-      importedType = getUnmanagedType(impl, importedType);
-    break;
-
-  case ImportHint::SwiftNewtypeFromCFPointer:
-    // For types we import as new types in Swift, if the use is CF un-audited,
-    // then we have to force it to be unmanaged
     if (!isCFAudited(importKind)) {
-      auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
-      if (underlyingType)
-        importedType = getUnmanagedType(impl, underlyingType);
+      Type underlyingType = importedType->getSwiftNewtypeUnderlyingType();
+      if (!underlyingType)
+        underlyingType = importedType;
+      importedType = getUnmanagedType(impl, underlyingType);
     }
     break;
 
