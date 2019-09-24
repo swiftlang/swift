@@ -200,8 +200,12 @@ class Verifier : public ASTWalker {
   /// The stack of optional evaluations active at this point.
   SmallVector<OptionalEvaluationExpr *, 4> OptionalEvaluations;
 
-  /// The set of opaque value expressions active at this point.
-  llvm::DenseMap<OpaqueValueExpr *, unsigned> OpaqueValues;
+  /// The stack of potentially \c OpaqueValueExpr -owning ancestor nodes at this
+  /// point.
+  SmallVector<ASTNode, 4> OpaqueValueOwners;
+
+  /// The set of opaque value expressions that have ever been seen.
+  llvm::DenseSet<OpaqueValueExpr *> OpaqueValues;
 
   /// The set of opened existential archetypes that are currently
   /// active.
@@ -438,10 +442,25 @@ public:
     }
 
     // Default cases for whether we should verify within the given subtree.
-    bool shouldVerify(Expr *E) { return true; }
-    bool shouldVerify(Stmt *S) { return true; }
+    bool shouldVerify(Expr *E) {
+      if (OpaqueValueExpr::canBelongTo(E))
+        OpaqueValueOwners.push_back(E);
+      return true;
+    }
+
+    bool shouldVerify(Stmt *S) {
+      if (OpaqueValueExpr::canBelongTo(S))
+        OpaqueValueOwners.push_back(S);
+      return true;
+    }
+
     bool shouldVerify(Pattern *S) { return true; }
-    bool shouldVerify(Decl *S) { return true; }
+
+    bool shouldVerify(Decl *D) {
+      if (OpaqueValueExpr::canBelongTo(D))
+        OpaqueValueOwners.push_back(D);
+      return true;
+    }
 
     bool shouldVerify(TypeAliasDecl *typealias) {
       if (!shouldVerify(cast<GenericTypeDecl>(typealias)))
@@ -500,10 +519,25 @@ public:
     }
 
     // Default cases for cleaning up as we exit a node.
-    void cleanup(Expr *E) { }
-    void cleanup(Stmt *S) { }
+    void cleanup(Expr *E) {
+      if (OpaqueValueExpr::canBelongTo(E)) {
+        assert(OpaqueValueOwners.back().dyn_cast<Expr*>() == E);
+        OpaqueValueOwners.pop_back();
+      }
+    }
+    void cleanup(Stmt *S) {
+      if (OpaqueValueExpr::canBelongTo(S)) {
+        assert(OpaqueValueOwners.back().dyn_cast<Stmt*>() == S);
+        OpaqueValueOwners.pop_back();
+      }
+    }
     void cleanup(Pattern *P) { }
-    void cleanup(Decl *D) { }
+    void cleanup(Decl *D) {
+      if (OpaqueValueExpr::canBelongTo(D)) {
+        assert(OpaqueValueOwners.back().dyn_cast<Decl*>() == D);
+        OpaqueValueOwners.pop_back();
+      }
+    }
     
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
@@ -784,7 +818,6 @@ public:
         return true;
 
       assert(!OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues[S->getElementExpr()] = 0;
       return true;
     }
 
@@ -795,7 +828,6 @@ public:
         return;
 
       assert(OpaqueValues.count(S->getElementExpr()));
-      OpaqueValues.erase(S->getElementExpr());
     }
 
     bool shouldVerify(InterpolatedStringLiteralExpr *expr) {
@@ -806,7 +838,6 @@ public:
         return true;
 
       assert(!OpaqueValues.count(expr->getInterpolationExpr()));
-      OpaqueValues[expr->getInterpolationExpr()] = 0;
       return true;
     }
 
@@ -817,7 +848,6 @@ public:
         return;
 
       assert(OpaqueValues.count(expr->getInterpolationExpr()));
-      OpaqueValues.erase(expr->getInterpolationExpr());
     }
 
     bool shouldVerify(OpenExistentialExpr *expr) {
@@ -830,7 +860,6 @@ public:
         return true;
 
       assert(!OpaqueValues.count(expr->getOpaqueValue()));
-      OpaqueValues[expr->getOpaqueValue()] = 0;
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==0);
       OpenedExistentialArchetypes.insert(expr->getOpenedArchetype());
       return true;
@@ -845,7 +874,6 @@ public:
         return;
 
       assert(OpaqueValues.count(expr->getOpaqueValue()));
-      OpaqueValues.erase(expr->getOpaqueValue());
       assert(OpenedExistentialArchetypes.count(expr->getOpenedArchetype())==1);
       OpenedExistentialArchetypes.erase(expr->getOpenedArchetype());
     }
@@ -855,7 +883,6 @@ public:
         return false;
       
       assert(!OpaqueValues.count(expr->getOpaqueValue()));
-      OpaqueValues[expr->getOpaqueValue()] = 0;
       return true;
     }
     
@@ -863,7 +890,6 @@ public:
       cleanup(cast<Expr>(expr));
 
       assert(OpaqueValues.count(expr->getOpaqueValue()));
-      OpaqueValues.erase(expr->getOpaqueValue());
     }
 
     // Register the OVEs in a DestructureTupleExpr.
@@ -871,10 +897,8 @@ public:
       if (!shouldVerify(cast<ImplicitConversionExpr>(expr)))
         return false;
 
-      for (auto *opaqueElt : expr->getDestructuredElements()) {
+      for (auto *opaqueElt : expr->getDestructuredElements())
         assert(!OpaqueValues.count(opaqueElt));
-        OpaqueValues[opaqueElt] = 0;
-      }
 
       return true;
     }
@@ -882,10 +906,8 @@ public:
     void cleanup(DestructureTupleExpr *expr) {
       cleanup(cast<ImplicitConversionExpr>(expr));
 
-      for (auto *opaqueElt : expr->getDestructuredElements()) {
+      for (auto *opaqueElt : expr->getDestructuredElements())
         assert(OpaqueValues.count(opaqueElt));
-        OpaqueValues.erase(opaqueElt);
-      }
     }
 
     // Keep a stack of the currently-live optional evaluations.
@@ -909,18 +931,18 @@ public:
         return false;
 
       if (auto keyConversion = expr->getKeyConversion())
-        OpaqueValues[keyConversion.OrigValue] = 0;
+        assert(!OpaqueValues.count(keyConversion.OrigValue));
       if (auto valueConversion = expr->getValueConversion())
-        OpaqueValues[valueConversion.OrigValue] = 0;
+        assert(!OpaqueValues.count(valueConversion.OrigValue));
       return true;
     }
     void cleanup(CollectionUpcastConversionExpr *expr) {
       cleanup(cast<ImplicitConversionExpr>(expr));
 
       if (auto keyConversion = expr->getKeyConversion())
-        OpaqueValues.erase(keyConversion.OrigValue);
+        assert(OpaqueValues.count(keyConversion.OrigValue));
       if (auto valueConversion = expr->getValueConversion())
-        OpaqueValues.erase(valueConversion.OrigValue);
+        assert(OpaqueValues.count(valueConversion.OrigValue));
     }
 
     /// Canonicalize the given DeclContext pointer, in terms of
@@ -2147,22 +2169,50 @@ public:
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(OpaqueValueExpr *E) {
+    void verifyParsed(OpaqueValueExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying OpaqueValueExpr", E);
 
-      if (!OpaqueValues.count(E)) {
-        Out << "OpaqueValueExpr not introduced at this point in AST\n";
-        abort();
-      }
-
-      ++OpaqueValues[E];
-
-      // Make sure opaque values are uniquely-referenced.
-      if (OpaqueValues[E] > 1) {
+      if (!OpaqueValues.insert(E).second) {
         Out << "Multiple references to unique OpaqueValueExpr\n";
         abort();
       }
-      verifyCheckedBase(E);
+
+      SmallVector<ASTNode, 1> owners;
+      llvm::copy_if(OpaqueValueOwners, std::back_inserter(owners),
+                    [&](ASTNode node) {
+        if (auto expr = node.dyn_cast<Expr *>()) {
+          return E->belongsTo(expr);
+        }
+        if (auto decl = node.dyn_cast<Decl *>()) {
+          return E->belongsTo(decl);
+        }
+        if (auto stmt = node.dyn_cast<Stmt *>()) {
+          return E->belongsTo(stmt);
+        }
+        return false;
+      });
+
+      if (owners.size() == 0) {
+        Out << "OpaqueValueExpr does not belong to any of its parent nodes; candidates:";
+        for (auto owner : OpaqueValueOwners) {
+          Out << "\n* ";
+          owner.dump(Out, 2);
+        }
+        Out << "\n";
+        abort();
+      }
+
+      if (owners.size() > 1) {
+        Out << "OpaqueValueExpr belongs to more than one parent node:";
+        for (auto owner : owners) {
+          Out << "\n* ";
+          owner.dump(Out, 2);
+        }
+        Out << "\n";
+        abort();
+      }
+
+      verifyParsedBase(E);
     }
     
     void verifyChecked(MakeTemporarilyEscapableExpr *E) {

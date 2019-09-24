@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Decl.h" // FIXME: Bad dependency
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
@@ -2065,6 +2066,77 @@ OpenedArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   while (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
   return type->castTo<OpenedArchetypeType>();
+}
+
+bool OpaqueValueExpr::canBelongTo(Expr *putativeOwner) {
+  return isa<InterpolatedStringLiteralExpr>(putativeOwner) ||
+         isa<MakeTemporarilyEscapableExpr>(putativeOwner) ||
+         isa<OpenExistentialExpr>(putativeOwner) ||
+         isa<OpenExistentialExpr>(putativeOwner) ||
+         isa<DestructureTupleExpr>(putativeOwner) ||
+         isa<CollectionUpcastConversionExpr>(putativeOwner);
+}
+
+bool OpaqueValueExpr::canBelongTo(Stmt *putativeOwner) {
+  return isa<ForEachStmt>(putativeOwner);
+}
+
+bool OpaqueValueExpr::canBelongTo(Decl *putativeOwner) {
+  return isa<VarDecl>(putativeOwner);
+}
+
+bool OpaqueValueExpr::belongsTo(Expr *putativeOwner) const {
+  // Do this first because (a) it's the common case and (b) it lets us use
+  // llvm_unreachable() to check consistency.
+  if (!canBelongTo(putativeOwner))
+    return false;
+
+  if (auto interpolated =
+          dyn_cast<InterpolatedStringLiteralExpr>(putativeOwner)) {
+    return interpolated->getInterpolationExpr() == this;
+  }
+  if (auto escapable = dyn_cast<MakeTemporarilyEscapableExpr>(putativeOwner)) {
+    return escapable->getOpaqueValue() == this;
+  }
+  if (auto openExistential = dyn_cast<OpenExistentialExpr>(putativeOwner)) {
+    return openExistential->getOpaqueValue() == this;
+  }
+  if (auto destructure = dyn_cast<DestructureTupleExpr>(putativeOwner)) {
+    return llvm::count(destructure->getDestructuredElements(), this);
+  }
+  if (auto upcast = dyn_cast<CollectionUpcastConversionExpr>(putativeOwner)) {
+    return upcast->getKeyConversion().OrigValue == this ||
+           upcast->getValueConversion().OrigValue == this;
+  }
+
+  llvm_unreachable("inconsistent with OpaqueValueExpr::canBelongTo()");
+}
+
+bool OpaqueValueExpr::belongsTo(Stmt *putativeOwner) const {
+  // Do this first because (a) it's the common case and (b) it lets us use
+  // llvm_unreachable() to check consistency.
+  if (!canBelongTo(putativeOwner))
+    return false;
+
+  if (auto forEach = dyn_cast<ForEachStmt>(putativeOwner)) {
+    return forEach->getElementExpr() == this;
+  }
+
+  llvm_unreachable("inconsistent with OpaqueValueExpr::canBelongTo()");
+}
+
+bool OpaqueValueExpr::belongsTo(Decl *putativeOwner) const {
+  // Do this first because (a) it's the common case and (b) it lets us use
+  // llvm_unreachable() to check consistency.
+  if (!canBelongTo(putativeOwner))
+    return false;
+
+  if (auto var = dyn_cast<VarDecl>(putativeOwner)) {
+    if (var->hasAttachedPropertyWrapper()) {
+      return var->getPropertyWrapperBackingPropertyInfo().underlyingValue == this;
+    }
+  }
+  return false;
 }
 
 KeyPathExpr::KeyPathExpr(ASTContext &C, SourceLoc keywordLoc,
