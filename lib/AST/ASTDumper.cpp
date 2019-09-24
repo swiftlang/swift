@@ -2805,15 +2805,15 @@ public:
 
   void visitTapExpr(TapExpr *E) {
     printCommon(E, "tap_expr");
-    for (auto use : E->getUses()) {
-      printRecLabeled(use, "use");
-      OS << '\n';
-    }
 
-    printRec(E->getSubExpr());
     OS << '\n';
+    printRec(E->getTemporaryRef());
+
+    OS << '\n';
+    printRec(E->getSubExpr());
 
     if (auto Ty = GetTypeOfExpr(E)) {
+      OS << '\n';
       printRec(E->getBody(), Ty->getASTContext());
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';

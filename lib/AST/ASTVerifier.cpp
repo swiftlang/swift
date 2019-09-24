@@ -861,16 +861,14 @@ public:
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
 
-      for (auto use : expr->getUses())
-        assert(!OpaqueValues.count(use));
+      assert(!OpaqueValues.count(expr->getTemporaryRef()));
       return true;
     }
 
     void cleanup(TapExpr *expr) {
       cleanup(cast<Expr>(expr));
 
-      for (auto use : expr->getUses())
-        assert(OpaqueValues.count(use));
+      assert(OpaqueValues.count(expr->getTemporaryRef()));
     }
 
     bool shouldVerify(OpenExistentialExpr *expr) {

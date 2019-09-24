@@ -1729,7 +1729,7 @@ createStringLiteralExprFromSegment(ASTContext &Ctx,
 ParserStatus Parser::
 parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                     Token EntireTok,
-                    SmallVectorImpl<OpaqueValueExpr *> &InterpolationVarRefs,
+                    OpaqueValueExpr *InterpolationVarRef,
                     /* remaining parameters are outputs: */
                     SmallVectorImpl<ASTNode> &Stmts,
                     unsigned &LiteralCapacity,
@@ -1743,9 +1743,6 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
   DeclName appendInterpolation(Context.Id_appendInterpolation);
 
   for (auto Segment : Segments) {
-    auto InterpolationVarRef = new (Context) OpaqueValueExpr(Loc, Type());
-    InterpolationVarRefs.push_back(InterpolationVarRef);
-
     switch (Segment.Kind) {
     case Lexer::StringSegment::Literal: {
 
@@ -1839,7 +1836,7 @@ parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
           UnresolvedDotExpr(InterpolationVarRef,
                             /*dotloc=*/BackSlashLoc, appendInterpolation,
                             /*nameloc=*/DeclNameLoc(Segment.Loc),
-                            /*Implicit=*/true);
+                            /*Implicit=*/false);
       auto S = parseExprCallSuffix(makeParserResult(callee), true);
 
       // If we stopped parsing the expression before the expression segment is
@@ -1994,17 +1991,20 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
     SmallVector<ASTNode, 4> Stmts;
 
     // Make the variable which will contain our temporary value.
-    SmallVector<OpaqueValueExpr *, 5> TemporaryUses;
+    OpaqueValueExpr *TemporaryRef =
+        new (Context) OpaqueValueExpr(SourceLoc(), Type(),
+                                      /*canBeCaptured=*/false,
+                                      /*canBeReused=*/true);
 
     // Collect all string segments.
     SyntaxParsingContext SegmentsCtx(SyntaxContext,
                                      SyntaxKind::StringLiteralSegments);
-    Status = parseStringSegments(Segments, EntireTok, TemporaryUses,
+    Status = parseStringSegments(Segments, EntireTok, TemporaryRef,
                                  Stmts, LiteralCapacity, InterpolationCount);
 
     auto Body = BraceStmt::create(Context, Loc, Stmts, /*endLoc=*/Loc,
                                   /*implicit=*/true);
-    AppendingExpr = TapExpr::create(Context, nullptr, TemporaryUses, Body);
+    AppendingExpr = TapExpr::create(Context, nullptr, TemporaryRef, Body);
   }
 
   if (HasCustomDelimiter) {

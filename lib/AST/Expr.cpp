@@ -2093,7 +2093,7 @@ bool OpaqueValueExpr::belongsTo(Expr *putativeOwner) const {
     return false;
 
   if (auto tap = dyn_cast<TapExpr>(putativeOwner)) {
-    return llvm::count(tap->getUses(), this) != 0;
+    return tap->getTemporaryRef() == this;
   }
   if (auto interpolated =
           dyn_cast<InterpolatedStringLiteralExpr>(putativeOwner)) {
@@ -2294,21 +2294,15 @@ void InterpolatedStringLiteralExpr::forEachSegment(ASTContext &Ctx,
   }
 }
 
-TapExpr::TapExpr(Expr *SubExpr, ArrayRef<OpaqueValueExpr *> Uses,
+TapExpr::TapExpr(Expr *SubExpr, OpaqueValueExpr *TemporaryRef,
                  BraceStmt *Body)
   : Expr(ExprKind::Tap, /*Implicit=*/true),
-    SubExpr(SubExpr), NumUses(Uses.size()), Body(Body) {
-  std::uninitialized_copy(Uses.begin(), Uses.end(),
-                          const_cast<OpaqueValueExpr**>(getUsesPtr()));
-}
+    SubExpr(SubExpr), TemporaryRef(TemporaryRef), Body(Body) { }
 
 TapExpr *TapExpr::create(ASTContext &ctx, Expr *SubExpr,
-                         ArrayRef<OpaqueValueExpr *> Uses,
+                         OpaqueValueExpr *TemporaryRef,
                          BraceStmt *Body) {
-  size_t size = totalSizeToAlloc<OpaqueValueExpr *>(Uses.size());
-
-  void *memory = ctx.Allocate(size, alignof(TapExpr));
-  return new (memory) TapExpr(SubExpr, Uses, Body);
+  return new (ctx) TapExpr(SubExpr, TemporaryRef, Body);
 }
 
 SourceLoc TapExpr::getEndLoc() const {

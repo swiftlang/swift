@@ -2419,11 +2419,9 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
     }
 
     auto VarAddress = VarInit->getManagedAddress();
-    SmallVector<std::unique_ptr<SILGenFunction::OpaqueValueRAII>, 5> opaqueValues;
 
-    for (auto use : ETap->getUses())
-      opaqueValues.push_back(std::unique_ptr<SILGenFunction::OpaqueValueRAII>(
-          new SILGenFunction::OpaqueValueRAII(SGF, use, VarAddress)));
+    SILGenFunction::OpaqueValueRAII temporaryRef(SGF, ETap->getTemporaryRef(),
+                                                 VarAddress);
 
     // Emit the body and let it mutate the var if it chooses.
     SGF.emitStmt(ETap->getBody());
@@ -5373,11 +5371,8 @@ RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
   SGF.emitExprInto(E->getSubExpr(), VarInit.get(), SILLocation(E));
 
   auto VarAddress = VarInit->getManagedAddress();
-  SmallVector<std::unique_ptr<SILGenFunction::OpaqueValueRAII>, 5> opaqueValues;
-
-  for (auto use : E->getUses())
-    opaqueValues.push_back(std::unique_ptr<SILGenFunction::OpaqueValueRAII>(
-        new SILGenFunction::OpaqueValueRAII(SGF, use, VarAddress)));
+  SILGenFunction::OpaqueValueRAII temporaryRef(SGF, E->getTemporaryRef(),
+                                               VarAddress);
 
   // Emit the body and let it mutate the var if it chooses.
   SGF.emitStmt(E->getBody());
