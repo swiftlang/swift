@@ -273,6 +273,8 @@ func bar(x: Int) -> (Int, Float) {
 
 // CHECK: <object-literal>#colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)</object-literal>
 #colorLiteral(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0)
+// CHECK: test(<object-literal>#imageLiteral(resourceName: "test")</object-literal>, test: <int>0</int>)
+test(#imageLiteral(resourceName: "test"), test: 0)
 
 class GenC<T1,T2> {}
 
