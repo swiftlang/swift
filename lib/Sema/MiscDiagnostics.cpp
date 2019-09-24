@@ -2760,7 +2760,8 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     return { false, E };
   }
 
-  assert(AllExprsSeen.insert(E).second && "duplicate traversal");
+  if (!isa<OpaqueValueExpr>(E) || !cast<OpaqueValueExpr>(E)->canBeReused())
+    assert(AllExprsSeen.insert(E).second && "duplicate traversal");
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
