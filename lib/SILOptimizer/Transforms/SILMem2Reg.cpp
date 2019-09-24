@@ -299,9 +299,15 @@ promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
   assert(DVAI->getOperand()->getType().isLoadable(*DVAI->getFunction()) &&
          "Unexpected promotion of address-only type!");
   assert(Value && "Expected valid value");
+  // Avoid inserting the same debug_value twice.
+  for (Operand *Use : Value->getUses())
+    if (auto *DVI = dyn_cast<DebugValueInst>(Use->getUser()))
+      if (*DVI->getVarInfo() == *DVAI->getVarInfo())
+        return;
   B.setInsertionPoint(DVAI);
   B.setCurrentDebugScope(DVAI->getDebugScope());
   B.createDebugValue(DVAI->getLoc(), Value, *DVAI->getVarInfo());
+
   DVAI->eraseFromParent();
 }
 

@@ -4055,6 +4055,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   if (!Decl)
     return;
 
+  assert(i->getVarInfo() && "alloc_stack without debug info");
+
   Type Desugared = Decl->getType()->getDesugaredType();
   if (Desugared->getClassOrBoundGenericClass() ||
       Desugared->getStructOrBoundGenericStruct())
@@ -4214,6 +4216,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   if (!Decl)
     return;
+
+  assert(i->getVarInfo() && "alloc_box without debug info");
+  
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
