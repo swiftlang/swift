@@ -21,7 +21,7 @@
 #include "swift/Syntax/SyntaxVisitor.h"
 #include "swift/Basic/Defer.h"
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if is_visitable(node):
 void swift::syntax::SyntaxVisitor::visit(${node.name} node) {
   visitChildren(node);
@@ -36,7 +36,7 @@ void swift::syntax::SyntaxVisitor::visit(Syntax node) {
   case SyntaxKind::Token:
     visit(node.castTo<TokenSyntax>());
     return;
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if is_visitable(node):
   case SyntaxKind::${node.syntax_kind}:
     visit(node.castTo<${node.name}>());

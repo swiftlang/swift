@@ -32,7 +32,7 @@ namespace syntax {
 struct SyntaxVisitor {
   virtual ~SyntaxVisitor() {}
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if is_visitable(node):
   virtual void visit(${node.name} node);
 %   end
