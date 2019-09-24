@@ -3565,6 +3565,7 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
 }
 
 bool MissingArgumentsFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
   auto *locator = getLocator();
   auto path = locator->getPath();
 
@@ -3572,6 +3573,11 @@ bool MissingArgumentsFailure::diagnoseAsError() {
       !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
         path.back().getKind() == ConstraintLocator::ContextualType ||
         path.back().getKind() == ConstraintLocator::ApplyArgument))
+    return false;
+
+  // If this is a misplaced `missng argument` situation, it would be
+  // diagnosed by invalid conversion fix.
+  if (isMisplacedMissingArgument(cs, locator))
     return false;
 
   auto *anchor = getAnchor();
@@ -3899,6 +3905,68 @@ bool MissingArgumentsFailure::isPropertyWrapperInitialization() const {
 
   auto *NTD = resolveType(instanceTy)->getAnyNominal();
   return NTD && NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
+}
+
+bool MissingArgumentsFailure::isMisplacedMissingArgument(
+    ConstraintSystem &cs, ConstraintLocator *locator) {
+  auto *calleeLocator = cs.getCalleeLocator(locator);
+  auto overloadChoice = cs.findSelectedOverloadFor(calleeLocator);
+  if (!overloadChoice)
+    return false;
+
+  auto *fnType =
+      cs.simplifyType(overloadChoice->ImpliedType)->getAs<FunctionType>();
+  if (!(fnType && fnType->getNumParams() == 2))
+    return false;
+
+  auto *anchor = locator->getAnchor();
+
+  auto hasFixFor = [&](FixKind kind, ConstraintLocator *locator) -> bool {
+    auto fix = llvm::find_if(cs.getFixes(), [&](const ConstraintFix *fix) {
+      return fix->getLocator() == locator;
+    });
+
+    if (fix == cs.getFixes().end())
+      return false;
+
+    return (*fix)->getKind() == kind;
+  };
+
+  auto *callLocator =
+      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument);
+
+  auto argFlags = fnType->getParams()[0].getParameterFlags();
+  auto *argLoc = cs.getConstraintLocator(
+      callLocator, LocatorPathElt::ApplyArgToParam(0, 0, argFlags));
+
+  if (!(hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) &&
+        hasFixFor(FixKind::AddMissingArguments, callLocator)))
+    return false;
+
+  Expr *argExpr = nullptr;
+  if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    argExpr = call->getArg();
+  } else if (auto *subscript = dyn_cast<SubscriptExpr>(anchor)) {
+    argExpr = subscript->getIndex();
+  } else {
+    return false;
+  }
+
+  Expr *argument = nullptr;
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    argument = PE->getSubExpr();
+  } else {
+    auto *tuple = cast<TupleExpr>(argExpr);
+    if (tuple->getNumElements() != 1)
+      return false;
+    argument = tuple->getElement(0);
+  }
+
+  auto argType = cs.simplifyType(cs.getType(argument));
+  auto paramType = fnType->getParams()[1].getPlainType();
+
+  auto &TC = cs.getTypeChecker();
+  return TC.isConvertibleTo(argType, paramType, cs.DC);
 }
 
 bool ClosureParamDestructuringFailure::diagnoseAsError() {
@@ -4845,6 +4913,9 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsError() {
+  if (diagnoseMisplacedMissingArgument())
+    return true;
+
   if (diagnoseConversionToBool())
     return true;
 
@@ -5072,6 +5143,33 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
                  describeGenericType(paramDecl, true));
 
   return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
+    return false;
+
+  auto info = *getFunctionArgApplyInfo(locator);
+
+  auto *argType = cs.createTypeVariable(
+      cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
+      /*flags=*/0);
+
+  // Assign new type variable to a type of a parameter.
+  auto *fnType = info.getFnType();
+  const auto &param = fnType->getParams()[0];
+  cs.assignFixedType(argType, param.getOldType());
+
+  auto *anchor = getRawAnchor();
+
+  MissingArgumentsFailure failure(
+      getParentExpr(), cs, {param.withType(argType)},
+      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
+
+  return failure.diagnoseSingleMissingArgument();
 }
 
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(

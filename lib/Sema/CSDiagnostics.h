@@ -1197,9 +1197,9 @@ public:
 
   bool diagnoseAsError() override;
 
-private:
   bool diagnoseSingleMissingArgument() const;
 
+private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(ClosureExpr *closure);
@@ -1212,6 +1212,21 @@ private:
   /// an implicit call to a property wrapper initializer e.g.
   /// `@Foo(answer: 42) var question = "ultimate question"`
   bool isPropertyWrapperInitialization() const;
+
+public:
+  /// Due to the fact that `matchCallArgument` can't and
+  /// doesn't take types into consideration while matching
+  /// arguments to parameters, for cases where both arguments
+  /// are un-labeled, it's impossible to say which one is missing:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// In this case first argument is missing, but we end up with
+  /// two fixes - argument mismatch (for #1) and missing argument
+  /// (for #2), which is incorrect so it has to be handled specially.
+  static bool isMisplacedMissingArgument(ConstraintSystem &cs,
+                                         ConstraintLocator *locator);
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
@@ -1648,6 +1663,16 @@ public:
   bool diagnoseUseOfReferenceEqualityOperator() const;
 
 protected:
+
+  /// Situations like this:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// Are currently impossible to fix correctly,
+  /// so we have to attend to that in diagnostics.
+  bool diagnoseMisplacedMissingArgument() const;
+
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 
   ValueDecl *getDecl() const {
