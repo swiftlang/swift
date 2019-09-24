@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
+// RUN: %target-swift-frontend -emit-sil -verify -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
 // RUN: %target-swift-frontend -emit-sil -verify -Xllvm -sil-print-after=differentiation -o /dev/null 2>&1 %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 // TODO: Add FileCheck tests.
@@ -19,15 +19,15 @@ func cond(_ x: Float) -> Float {
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb0__PB__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb1__PB__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb1__Pred__src_0_wrt_0 { get set }
-// CHECK-DATA-STRUCTURES:   @_hasStorage var pullback_0: (Float) -> (Float, Float) { get set }
+// CHECK-DATA-STRUCTURES:   var predecessor: _AD__cond_bb1__Pred__src_0_wrt_0
+// CHECK-DATA-STRUCTURES:   var pullback_0: (Float) -> (Float, Float)
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb2__PB__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb2__Pred__src_0_wrt_0 { get set }
-// CHECK-DATA-STRUCTURES:   @_hasStorage var pullback_1: (Float) -> (Float, Float) { get set }
+// CHECK-DATA-STRUCTURES:   var predecessor: _AD__cond_bb2__Pred__src_0_wrt_0
+// CHECK-DATA-STRUCTURES:   var pullback_1: (Float) -> (Float, Float)
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: struct _AD__cond_bb3__PB__src_0_wrt_0 {
-// CHECK-DATA-STRUCTURES:   @_hasStorage var predecessor: _AD__cond_bb3__Pred__src_0_wrt_0 { get set }
+// CHECK-DATA-STRUCTURES:   var predecessor: _AD__cond_bb3__Pred__src_0_wrt_0
 // CHECK-DATA-STRUCTURES: }
 // CHECK-DATA-STRUCTURES: enum _AD__cond_bb0__Pred__src_0_wrt_0 {
 // CHECK-DATA-STRUCTURES: }

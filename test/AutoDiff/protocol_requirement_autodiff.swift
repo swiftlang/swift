@@ -106,8 +106,8 @@ func derivatives<F: FunctionsOfX>(at x: Float, in: F.Type)
 
 ProtocolRequirementAutodiffTests.test("constructor, accessor, subscript") {
   expectEqual(
-    derivatives(at: 2.0, in: TestFunctionsOfX.self),
-    (1.0, 4.0, 5.0, 5.0))
+    (1.0, 4.0, 5.0, 5.0),
+    derivatives(at: 2.0, in: TestFunctionsOfX.self))
 }
 
 // MARK: - Test witness method SIL type computation.

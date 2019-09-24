@@ -914,7 +914,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   }
 
   /// Creates a type-erased derivative from the given derivative.
-  @differentiable(vjp: _vjpInit(_:))
+  @differentiable(jvp: _jvpInit(_:), vjp: _vjpInit(_:))
   public init<T>(_ base: T) where T : Differentiable, T.TangentVector == T {
     self._box = _ConcreteDerivativeBox<T>(base)
   }
@@ -925,6 +925,14 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
     where T : Differentiable, T.TangentVector == T
   {
     return (AnyDerivative(base), { v in v.base as! T.TangentVector })
+  }
+
+  @usableFromInline internal static func _jvpInit<T>(
+    _ base: T
+  ) -> (AnyDerivative, (T.TangentVector) -> AnyDerivative)
+    where T : Differentiable, T.TangentVector == T
+  {
+    return (AnyDerivative(base), { dbase in AnyDerivative(dbase) })
   }
 
   public typealias TangentVector = AnyDerivative
@@ -963,6 +971,14 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
     return (lhs + rhs, { v in (v, v) })
   }
 
+  @differentiating(+)
+  @usableFromInline internal static func _jvpAdd(
+    lhs: AnyDerivative, rhs: AnyDerivative
+    ) -> (value: AnyDerivative,
+    differential: (AnyDerivative, AnyDerivative) -> (AnyDerivative)) {
+      return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
+  }
+
   public static func - (
     lhs: AnyDerivative, rhs: AnyDerivative
   ) -> AnyDerivative {
@@ -975,6 +991,14 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   ) -> (value: AnyDerivative,
         pullback: (AnyDerivative) -> (AnyDerivative, AnyDerivative)) {
     return (lhs - rhs, { v in (v, .zero - v) })
+  }
+
+  @differentiating(-)
+  @usableFromInline internal static func _jvpSubtract(
+    lhs: AnyDerivative, rhs: AnyDerivative
+  ) -> (value: AnyDerivative,
+        differential: (AnyDerivative, AnyDerivative) -> AnyDerivative) {
+    return (lhs - rhs, { (dlhs, drhs) in dlhs - drhs })
   }
 
   // `Differentiable` requirements.
