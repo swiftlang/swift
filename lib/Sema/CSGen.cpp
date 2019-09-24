@@ -2475,7 +2475,6 @@ namespace {
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type checked");
       return expr->getType();
     }
 
@@ -3337,11 +3336,6 @@ namespace {
           if (value != OpenExistentials.end()) {
             expr = value->second;
             continue;
-          } else {
-            assert((eraseOpenExistentialsOnly || OVE->isPlaceholder()) &&
-                   "Didn't see this OVE in a containing OpenExistentialExpr?");
-            // NOTE: In 'eraseOpenExistentialsOnly' mode, ASTWalker may walk
-            // into other kind of expressions holding OVE.
           }
         }
 

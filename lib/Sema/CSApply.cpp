@@ -3003,7 +3003,7 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      assert(expr->isPlaceholder() && "Already type-checked");
+      simplifyExprType(expr);
       return expr;
     }
 

@@ -568,7 +568,7 @@ public:
 
     // Capture a placeholder opaque value.
     if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(E)) {
-      if (opaqueValue->isPlaceholder()) {
+      if (opaqueValue->canBeCaptured()) {
         assert(!OpaqueValue || OpaqueValue == opaqueValue);
         OpaqueValue = opaqueValue;
         return { true, E };

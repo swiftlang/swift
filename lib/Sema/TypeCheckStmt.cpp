@@ -802,6 +802,7 @@ public:
 
       // TODO: test/DebugInfo/iteration.swift requires this extra info to
       // be around.
+      // FIXME: The debug info here might not actually be accurate.
       auto nextResultType =
           OptionalType::get(conformance->getTypeWitnessByName(
                                 sequenceType, TC.Context.Id_Element));
