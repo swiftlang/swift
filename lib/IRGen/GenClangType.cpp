@@ -709,9 +709,8 @@ clang::CanQualType GenClangType::visitBuiltinFloatType(
 
 clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(
   CanBuiltinUnknownObjectType type) {
-  auto &clangCtx = getClangASTContext();
-  auto ptrTy = clangCtx.getObjCObjectPointerType(clangCtx.VoidTy);
-  return clangCtx.getCanonicalType(ptrTy);
+  // Builtin.UnknownObject == AnyObject, so it is also translated to 'id'.
+  return getClangIdType(getClangASTContext());
 }
 
 clang::CanQualType GenClangType::visitArchetypeType(CanArchetypeType type) {
