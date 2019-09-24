@@ -116,7 +116,7 @@ static ConstructorDecl *findInitialValueInit(
         continue;
       }
 
-      if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      if (param->isDefaultArgument())
         continue;
 
       // Forget we had a match.
