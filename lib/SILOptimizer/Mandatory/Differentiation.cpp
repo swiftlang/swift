@@ -1470,6 +1470,7 @@ static void collectMinimalIndicesForFunctionCall(
     for (auto *use : ai->getUses())
       if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
         directResults[tei->getFieldNo()] = tei;
+  }
   // Add differentiation indices based on activity analysis.
   unsigned dirResIdx = 0;
   unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
