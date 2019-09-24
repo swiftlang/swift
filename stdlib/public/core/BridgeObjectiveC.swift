@@ -85,10 +85,7 @@ public protocol _ObjectiveCBridgeable {
 
 #if _runtime(_ObjC)
 
-@available(macOS, introduced: 9999, deprecated)
-@available(iOS, introduced: 9999, deprecated)
-@available(watchOS, introduced: 9999, deprecated)
-@available(tvOS, introduced: 9999, deprecated)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
 @available(*, deprecated)
 @_cdecl("_SwiftCreateBridgedArray")
 @usableFromInline
@@ -98,6 +95,19 @@ internal func _SwiftCreateBridgedArray(
 ) -> Unmanaged<AnyObject> {
   let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
   let bridged = Array(bufPtr)._bridgeToObjectiveCImpl()
+  return Unmanaged<AnyObject>.passRetained(bridged)
+}
+
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedMutableArray")
+@usableFromInline
+internal func _SwiftCreateBridgedMutableArray(
+  values: UnsafePointer<AnyObject>,
+  numValues: Int
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = _SwiftNSMutableArray(Array(bufPtr))
   return Unmanaged<AnyObject>.passRetained(bridged)
 }
 
