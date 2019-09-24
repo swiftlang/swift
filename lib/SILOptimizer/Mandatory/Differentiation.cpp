@@ -497,30 +497,14 @@ private:
 
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
-    // SWIFT_ENABLE_TENSORFLOW_MERGE
-    // Test failures (AutoDiff) related to code here:
-    //   Concrete type metadata cannot have generic parameters
-    //   UNREACHABLE executed at swift/lib/IRGen/GenMeta.cpp:3493!
-    // https://github.com/apple/swift/commit/d4bb9a5cfe3ee995bf6015a75ecea6ba0c5a2a0b
     GenericParamList *genericParams = nullptr;
     if (genericSig)
-      genericParams =
-          cloneGenericParameters(astCtx, moduleDecl, genericSig);
+      genericParams = cloneGenericParameters(astCtx, &file, genericSig);
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
         /*EnumLoc*/ loc, /*Name*/ enumId, /*NameLoc*/ loc, /*Inherited*/ {},
         /*GenericParams*/ genericParams, /*DC*/ &file);
-    if (genericSig) {
-/*
-      auto *genericParams =
-          cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
-      branchingTraceDecl->setGenericParams(genericParams);
-*/
-      for (auto *genericParam : *genericParams) {
-        genericParam->setDeclContext(branchingTraceDecl);
-      }
+    if (genericSig)
       branchingTraceDecl->setGenericSignature(genericSig);
-    }
-    // SWIFT_ENABLE_TENSORFLOW_MERGE END
     branchingTraceDecl->setBraces(loc);
     computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
     branchingTraceDecl->computeType();
@@ -584,7 +568,6 @@ private:
     assert(originalBB->getParent() == original);
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
-    auto *moduleDecl = original->getModule().getSwiftModule();
     auto &file = getDeclarationFileUnit();
 
     std::string structName;
@@ -605,26 +588,15 @@ private:
 
     auto structId = astCtx.getIdentifier(structName);
     SourceLoc loc = original->getLocation().getSourceLoc();
-    // SWIFT_ENABLE_TENSORFLOW_MERGE
-    // Test failures (AutoDiff) related to code here:
-    //   Concrete type metadata cannot have generic parameters
-    //   UNREACHABLE executed at swift/lib/IRGen/GenMeta.cpp:3493!
     GenericParamList *genericParams = nullptr;
     if (genericSig)
-      genericParams =
-          cloneGenericParameters(astCtx, moduleDecl, genericSig);
+      genericParams = cloneGenericParameters(astCtx, &file, genericSig);
     auto *linearMapStruct = new (astCtx) StructDecl(
-        /*StructLoc*/ loc, /*Name*/ structId, /*NameLoc*/ loc, /*Inherited*/ {},
-        /*GenericParams*/ /*set later*/ nullptr, /*DC*/ &file);
-    if (genericSig) {
-/*
-      auto *genericParams =
-          cloneGenericParameters(astCtx, linearMapStruct, genericSig);
-      linearMapStruct->setGenericParams(genericParams);
-*/
+        /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
+        /*Inherited*/ {}, /*GenericParams*/ genericParams,
+        /*DC*/ &file);
+    if (genericSig)
       linearMapStruct->setGenericSignature(genericSig);
-    }
-    // SWIFT_ENABLE_TENSORFLOW_MERGE END
     linearMapStruct->setBraces(loc);
     computeAccessLevel(
         linearMapStruct, original->getEffectiveSymbolLinkage());
