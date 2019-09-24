@@ -17,6 +17,10 @@
 
 // REQUIRES: executable_test
 
+// TODO: Re-enable this when optimization is enabled.
+//
+// REQUIRES: swift_test_mode_optimize_none
+
 import Swift
 import StdlibUnittest
 import mysimd
