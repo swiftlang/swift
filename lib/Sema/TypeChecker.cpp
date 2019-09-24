@@ -68,8 +68,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasInterfaceType()) {
-    validateDecl(protocol);
+  if (protocol && !protocol->getInterfaceType()) {
     if (protocol->isInvalid())
       return nullptr;
   }
@@ -614,15 +613,15 @@ void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-
+  (void)createTypeChecker(Ctx);
   if (auto ext = dyn_cast<ExtensionDecl>(D)) {
     if (auto *nominal = ext->getExtendedNominal()) {
-      // Validate the nominal type declaration being extended.
-      TC.validateDecl(nominal);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)nominal->getInterfaceType();
     }
   } else {
-    TC.validateDecl(cast<ValueDecl>(D));
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)cast<ValueDecl>(D)->getInterfaceType();
   }
 }
 

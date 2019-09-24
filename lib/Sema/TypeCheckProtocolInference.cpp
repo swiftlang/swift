@@ -447,8 +447,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     }
 
     // Validate the requirement.
-    tc.validateDecl(req);
-    if (req->isInvalid() || !req->hasInterfaceType())
+    if (!req->getInterfaceType() || req->isInvalid())
       continue;
 
     // Check whether any of the associated types we care about are
@@ -493,10 +492,10 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasInterfaceType())
-    tc.validateDecl(witness);
+  if (!witness->getInterfaceType())
+    return Type();
 
-  if (witness->isInvalid() || !witness->hasInterfaceType())
+  if (witness->isInvalid())
     return Type();
 
   if (!witness->getDeclContext()->isTypeContext()) {
@@ -765,7 +764,6 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
-  tc.validateDecl(assocType);
   if (assocType->hasDefaultDefinitionType())
     return assocType;
 
@@ -2031,10 +2029,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
-  if (!requirement->hasInterfaceType())
-    TC.validateDecl(requirement);
-
-  if (requirement->isInvalid() || !requirement->hasInterfaceType()) {
+  if (!requirement->getInterfaceType() || requirement->isInvalid()) {
     Conformance->setInvalid();
     return;
   }

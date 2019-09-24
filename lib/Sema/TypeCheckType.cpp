@@ -223,10 +223,7 @@ Type TypeResolution::resolveDependentMemberType(
   // or it's a typealias declared in protocol or protocol extension.
   // Substitute the base type into it.
   auto concrete = ref->getBoundDecl();
-  auto lazyResolver = ctx.getLazyResolver();
-  if (lazyResolver)
-    lazyResolver->resolveDeclSignature(concrete);
-  if (!concrete->hasInterfaceType()) {
+  if (!concrete->getInterfaceType()) {
     ctx.Diags.diagnose(ref->getIdLoc(), diag::recursive_decl_reference,
                        concrete->getDescriptiveKind(), concrete->getName());
     concrete->diagnose(diag::kind_declared_here,
@@ -411,7 +408,8 @@ static Type getPointerType(TypeChecker &tc, SourceLoc loc, Type pointeeType,
     return Type();
   }
 
-  tc.validateDecl(pointerDecl);
+  // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+  (void)pointerDecl->getInterfaceType();
   if (pointerDecl->isInvalid())
     return Type();
 
@@ -984,7 +982,6 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
 
   ASTContext &ctx = typeDecl->getASTContext();
   auto &diags = ctx.Diags;
-  auto lazyResolver = ctx.getLazyResolver();
 
   // Hack: Don't validate nested typealiases if we only need the structural
   // type.
@@ -999,12 +996,8 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
   if ((!options.is(TypeResolverContext::ExtensionBinding) ||
        !isa<NominalTypeDecl>(typeDecl)) &&
       !prevalidatingAlias(typeDecl, resolution)) {
-    // Validate the declaration.
-    if (lazyResolver && !typeDecl->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(typeDecl);
-
     // If we were not able to validate recursively, bail out.
-    if (!typeDecl->hasInterfaceType()) {
+    if (!typeDecl->getInterfaceType()) {
       diags.diagnose(loc, diag::recursive_decl_reference,
                      typeDecl->getDescriptiveKind(), typeDecl->getName());
       typeDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
@@ -3086,10 +3079,6 @@ Type TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
 
   if (auto dictTy = TypeChecker::getDictionaryType(repr->getBrackets().Start,
                                                    keyTy, valueTy)) {
-    // Check the requirements on the generic arguments.
-    if (auto lazyResolver = Context.getLazyResolver())
-      lazyResolver->resolveDeclSignature(dictDecl);
-
     auto unboundTy = dictDecl->getDeclaredType()->castTo<UnboundGenericType>();
 
     Type args[] = {keyTy, valueTy};

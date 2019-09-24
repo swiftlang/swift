@@ -650,8 +650,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
-  TC.validateDecl(TD);
-
+  
+  // FIXME: Make isInvalid ask for the interface type.
+  (void)TD->getInterfaceType();
+  
   if (TD->isInvalid())
     return Type();
 
