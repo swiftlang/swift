@@ -99,13 +99,13 @@ struct InitialValueTypeMismatch<Value> {
 }
 
 @propertyWrapper
-struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
-  var wrappedValue: Value? = nil
+struct MultipleInitialValues<Value> {
+  var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 }
 

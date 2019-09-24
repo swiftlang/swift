@@ -564,11 +564,6 @@ void swift::simple_display(
     out << propertyWrapper.valueVar->printRef();
   else
     out << "null";
-  out << ", ";
-  if (propertyWrapper.wrappedValueInit)
-    out << propertyWrapper.wrappedValueInit->printRef();
-  else
-    out << "null";
   out << " }";
 }
 

@@ -388,8 +388,8 @@ struct Wrapper2<T> {
     }
   }
 
-  init(wrappedValue initialValue: T) {
-    print("  .. secondInit \(initialValue)")
+  init(before: Int = -10, wrappedValue initialValue: T, after: String = "end") {
+    print("  .. secondInit \(before), \(initialValue), \(after)")
     self.wrappedValue = initialValue
   }
 }
@@ -407,7 +407,7 @@ func testComposed() {
   print("\n## Composed")
   _ = HasComposed()
 
-  // CHECK-NEXT: .. secondInit 17
+  // CHECK-NEXT: .. secondInit -10, 17, end
   // CHECK-NEXT: .. init Wrapper2<Int>(wrappedValue: 17)
 }
 

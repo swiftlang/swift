@@ -81,88 +81,121 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
 /// Determine whether we have a suitable wrapped-value initializer within
 /// a property wrapper type.
-static ConstructorDecl *findInitialValueInit(ASTContext &ctx,
-                                             NominalTypeDecl *nominal,
-                                             VarDecl *valueVar,
-                                             Identifier argumentLabel) {
-  SmallVector<ConstructorDecl *, 2> initialValueInitializers;
-  DeclName initName(ctx, DeclBaseName::createConstructor(), {argumentLabel});
-  SmallVector<ValueDecl *, 2> decls;
-  nominal->lookupQualified(nominal, initName, NL_QualifiedDefault, decls);
-  for (const auto &decl : decls) {
-    auto init = dyn_cast<ConstructorDecl>(decl);
-    if (!init || init->getDeclContext() != nominal)
-      continue;
-
-    initialValueInitializers.push_back(init);
-  }
-
-  switch (initialValueInitializers.size()) {
-  case 0:
-    return nullptr;
-
-  case 1:
-    break;
-
-  default:
-    // Diagnose ambiguous initializers.
-    nominal->diagnose(diag::property_wrapper_ambiguous_initial_value_init,
-                      nominal->getDeclaredType());
-    for (auto init : initialValueInitializers) {
-      init->diagnose(diag::kind_declname_declared_here,
-                     init->getDescriptiveKind(), init->getFullName());
-    }
-    return nullptr;
-  }
-
-  // The initializer must be as accessible as the nominal type.
-  auto init = initialValueInitializers.front();
-  if (init->getFormalAccess() < nominal->getFormalAccess()) {
-    init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
-                     init->getFormalAccess(), init->getDescriptiveKind(),
-                     init->getFullName(), nominal->getDeclaredType(),
-                     nominal->getFormalAccess());
-    return nullptr;
-  }
-
+static ConstructorDecl *findInitialValueInit(
+    ASTContext &ctx,
+    NominalTypeDecl *nominal,
+    VarDecl *valueVar,
+    Identifier argumentLabel) {
   // Retrieve the type of the 'value' property.
   Type valueVarType = valueVar->getValueInterfaceType();
 
-  // Retrieve the parameter type of the initializer.
-  Type paramType;
-  if (auto *curriedInitType =
-          init->getInterfaceType()->getAs<AnyFunctionType>()) {
-    if (auto *initType =
-          curriedInitType->getResult()->getAs<AnyFunctionType>()) {
-      if (initType->getParams().size() == 1) {
-        const auto &param = initType->getParams()[0];
-        if (!param.isInOut() && !param.isVariadic()) {
-          paramType = param.getPlainType();
-          if (param.isAutoClosure()) {
-            if (auto *fnType = paramType->getAs<FunctionType>())
-              paramType = fnType->getResult();
-          }
-        }
+  enum class NonViableReason {
+    Failable,
+    ParameterTypeMismatch,
+    Inaccessible,
+  };
+  SmallVector<std::tuple<ConstructorDecl*, NonViableReason, Type>, 2> nonviable;
+  SmallVector<ConstructorDecl *, 2> initialValueInitializers;
+
+  SmallVector<ValueDecl *, 2> decls;
+  nominal->lookupQualified(nominal, DeclBaseName::createConstructor(),
+                           NL_QualifiedDefault, decls);
+  for (const auto &decl : decls) {
+    auto init = dyn_cast<ConstructorDecl>(decl);
+    if (!init || init->getDeclContext() != nominal || init->getGenericParams())
+      continue;
+
+    // Check whether every parameter meets one of the following criteria:
+    //   (1) The parameter has a default argument, or
+    //   (2) The parameter has the given argument label.
+    ParamDecl *wrappedValueParam = nullptr;
+    for (auto param : *init->getParameters()) {
+      // Recognize the first parameter with the requested argument label.
+      if (param->getArgumentName() == argumentLabel && !wrappedValueParam) {
+        wrappedValueParam = param;
+        continue;
+      }
+
+      if (param->getDefaultArgumentKind() != DefaultArgumentKind::None)
+        continue;
+
+      // Forget we had a match.
+      wrappedValueParam = nullptr;
+      break;
+    }
+
+    if (!wrappedValueParam)
+      continue;
+
+    // Failable initializers cannot be used.
+    if (init->isFailable()) {
+      nonviable.push_back(
+          std::make_tuple(init, NonViableReason::Failable, Type()));
+      continue;
+    }
+
+    // Check accessibility.
+    if (init->getFormalAccess() < nominal->getFormalAccess()) {
+      nonviable.push_back(
+          std::make_tuple(init, NonViableReason::Inaccessible, Type()));
+      continue;
+    }
+
+    Type paramType;
+    if (!wrappedValueParam->isInOut() && !wrappedValueParam->isVariadic()) {
+      paramType = wrappedValueParam->getInterfaceType();
+      if (wrappedValueParam->isAutoClosure()) {
+        if (auto *fnType = paramType->getAs<FunctionType>())
+          paramType = fnType->getResult();
+      }
+    }
+    
+    if (!paramType)
+      continue;
+
+    // The parameter type must be the same as the type of `valueVar` or an
+    // autoclosure thereof.
+    if (!paramType->isEqual(valueVarType)) {
+      nonviable.push_back(
+          std::make_tuple(init, NonViableReason::ParameterTypeMismatch,
+                          paramType));
+      continue;
+    }
+
+    // Check the type
+    initialValueInitializers.push_back(init);
+  }
+
+  // If we found some nonviable candidates but no viable ones, complain.
+  if (initialValueInitializers.empty() && !nonviable.empty()) {
+    for (const auto &candidate : nonviable) {
+      auto init = std::get<0>(candidate);
+      auto reason = std::get<1>(candidate);
+      auto paramType = std::get<2>(candidate);
+      switch (reason) {
+      case NonViableReason::Failable:
+        init->diagnose(diag::property_wrapper_failable_init,
+                       init->getFullName());
+        break;
+
+      case NonViableReason::Inaccessible:
+        init->diagnose(diag::property_wrapper_type_requirement_not_accessible,
+                       init->getFormalAccess(), init->getDescriptiveKind(),
+                       init->getFullName(), nominal->getDeclaredType(),
+                       nominal->getFormalAccess());
+        break;
+
+      case NonViableReason::ParameterTypeMismatch:
+        init->diagnose(diag::property_wrapper_wrong_initial_value_init,
+                       init->getFullName(), paramType, valueVarType);
+        valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
+        break;
       }
     }
   }
 
-  // The parameter type must be the same as the type of `valueVar` or an
-  // autoclosure thereof.
-  if (!paramType->isEqual(valueVarType)) {
-    init->diagnose(diag::property_wrapper_wrong_initial_value_init, initName,
-                   paramType, valueVarType);
-    valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
-    return nullptr;
-  }
-
-  // The initializer must not be failable.
-  if (init->isFailable()) {
-    init->diagnose(diag::property_wrapper_failable_init, initName);
-    return nullptr;
-  }
-
-  return init;
+  return initialValueInitializers.empty() ? nullptr
+                                          : initialValueInitializers.front();
 }
 
 /// Determine whether we have a suitable init() within a property
@@ -302,22 +335,23 @@ PropertyWrapperTypeInfoRequest::evaluate(
   
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
-  result.wrappedValueInit =
-      findInitialValueInit(ctx, nominal, valueVar, ctx.Id_wrappedValue);
+  if (findInitialValueInit(ctx, nominal, valueVar, ctx.Id_wrappedValue))
+    result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
+  else if (auto init = findInitialValueInit(
+               ctx, nominal, valueVar, ctx.Id_initialValue)) {
+    result.wrappedValueInit = PropertyWrapperTypeInfo::HasInitialValueInit;
 
-  if (!result.wrappedValueInit) {
-    // Look for the older name init(initialValue:).
-    result.wrappedValueInit =
-      findInitialValueInit(ctx, nominal, valueVar, ctx.Id_initialValue);
-    if (result.wrappedValueInit &&
-        result.wrappedValueInit->getLoc().isValid()) {
-      auto diag = result.wrappedValueInit->diagnose(
-          diag::property_wrapper_init_initialValue);
-      auto param = result.wrappedValueInit->getParameters()->get(0);
-      if (param->getArgumentNameLoc().isValid())
-        diag.fixItReplace(param->getArgumentNameLoc(), "wrappedValue");
-      else
-        diag.fixItInsert(param->getLoc(), "wrappedValue ");
+    if (init->getLoc().isValid()) {
+      auto diag = init->diagnose(diag::property_wrapper_init_initialValue);
+      for (auto param : *init->getParameters()) {
+        if (param->getArgumentName() == ctx.Id_initialValue) {
+          if (param->getArgumentNameLoc().isValid())
+            diag.fixItReplace(param->getArgumentNameLoc(), "wrappedValue");
+          else
+            diag.fixItInsert(param->getLoc(), "wrappedValue ");
+          break;
+        }
+      }
     }
   }
 
@@ -647,12 +681,18 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
     // call `init(wrappedValue:)` directly.
     auto attr = wrapperAttrs[i];
     if (!attr->getArg() || ignoreAttributeArgs) {
-      Identifier argName = ctx.Id_wrappedValue;
-      if (auto init
-              = var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
-        argName = init->getFullName().getArgumentNames()[0];
+      Identifier argName;
+      switch (var->getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit) {
+      case PropertyWrapperTypeInfo::HasInitialValueInit:
+        argName = ctx.Id_initialValue;
+        break;
+
+      case PropertyWrapperTypeInfo::HasWrappedValueInit:
+      case PropertyWrapperTypeInfo::NoWrappedValueInit:
+        argName = ctx.Id_wrappedValue;
+        break;
       }
-      
+
       auto endLoc = initializer->getEndLoc();
       if (endLoc.isInvalid() && startLoc.isValid())
         endLoc = wrapperAttrs[i]->getTypeLoc().getSourceRange().End;
