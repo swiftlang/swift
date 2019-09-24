@@ -1578,20 +1578,17 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // differentiate logic" and update comment.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
-
-#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
-if (isa<TYPE>(inst) && hasActiveOperands) \
-  return true;
-
 #define CHECK_INST_TYPE_ACTIVE_DEST(TYPE) \
-if (auto *castInst = dyn_cast<TYPE>(inst)) { \
-  return activityInfo.isActive(castInst->getDest(), indices); \
-}
-
+    if (auto *castInst = dyn_cast<TYPE>(inst)) \
+      return activityInfo.isActive(castInst->getDest(), indices);
     CHECK_INST_TYPE_ACTIVE_DEST(StoreInst)
     CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrowInst)
     CHECK_INST_TYPE_ACTIVE_DEST(CopyAddrInst)
+#undef CHECK_INST_TYPE_ACTIVE_DEST
     if ((isa<AllocationInst>(inst) && hasActiveResults))
+      return true;
+#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
+    if (isa<TYPE>(inst) && hasActiveOperands) \
       return true;
     CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCountingInst)
     CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccessInst)
@@ -1601,9 +1598,7 @@ if (auto *castInst = dyn_cast<TYPE>(inst)) { \
     CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValueInst)
     CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddrInst)
     break;
-
 #undef CHECK_INST_TYPE_ACTIVE_OPERANDS
-#undef CHECK_INST_TYPE_ACTIVE_DEST
   }
   case AutoDiffLinearMapKind::Pullback: {
     if (inst->mayHaveSideEffects() && hasActiveOperands)
@@ -1611,7 +1606,6 @@ if (auto *castInst = dyn_cast<TYPE>(inst)) { \
     break;
   }
   }
-
   return false;
 }
 
