@@ -465,11 +465,6 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   auto &tc = derived.TC;
 
-  // Validate the enum and its raw type.
-  // FIXME(InterfaceTypeRequest): Remove this.
-  (void)enumDecl->getInterfaceType();
-
-  // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
   if (!rawType)
     return false;

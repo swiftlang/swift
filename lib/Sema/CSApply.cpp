@@ -1740,9 +1740,6 @@ namespace {
         return nullptr;
       }
 
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)fn->getInterfaceType();
-      
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
@@ -1921,14 +1918,12 @@ namespace {
       auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
 
       if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->hasInterfaceType() ||
+          !maxFloatTypeDecl->getInterfaceType() ||
           !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
       }
 
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)maxFloatTypeDecl->getInterfaceType();
       auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
@@ -4118,8 +4113,6 @@ namespace {
       assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)method->getInterfaceType();
       if (!method->isObjC()) {
         // If the method declaration lies in a protocol and we're providing
         // a default implementation of the method through a protocol extension

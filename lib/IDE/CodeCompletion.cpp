@@ -868,7 +868,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
-  if (!VD || !VD->hasInterfaceType())
+  if (!VD || !VD->getInterfaceType())
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -2431,7 +2431,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (!AFD || !AFD->hasInterfaceType() ||
+    if (!AFD || !AFD->getInterfaceType() ||
         !AFD->getInterfaceType()->is<AnyFunctionType>()) {
       // Probably, calling closure type expression.
       foundFunction(AFT);
@@ -2792,8 +2792,7 @@ public:
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
-    if (TAD->hasInterfaceType()) {
-      auto underlyingType = TAD->getUnderlyingType();
+    if (auto underlyingType = TAD->getUnderlyingType()) {
       if (underlyingType->hasError()) {
         Type parentType;
         if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -3143,9 +3142,6 @@ public:
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)D->getInterfaceType();
-    
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
@@ -3154,8 +3150,6 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
-        // FIXME(InterfaceTypeRequest): Remove this.
-        (void)Ele->getInterfaceType();
         addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                           /*HasTypeContext=*/true);
       }
@@ -4328,9 +4322,6 @@ public:
         // A 'class' member with an initial value cannot be overriden either.
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
-
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)D->getInterfaceType();
 
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
