@@ -1466,6 +1466,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
         // name, not a binding, because it is the start of an enum pattern or
         // call pattern.
         peekToken().isNot(tok::period, tok::period_prefix, tok::l_paren)) {
+      DeferringContextRAII Deferring(*SyntaxContext);
       Identifier name;
       SourceLoc loc = consumeIdentifier(&name, /*allowDollarIdentifier=*/true);
       auto introducer = (InVarOrLetPattern != IVOLP_InVar
@@ -1474,10 +1475,10 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
       auto pattern = createBindingFromPattern(loc, name, introducer);
       if (SyntaxContext->isEnabled()) {
         ParsedPatternSyntax PatternNode =
-            ParsedSyntaxRecorder::deferIdentifierPattern(
+            ParsedSyntaxRecorder::makeIdentifierPattern(
                                     SyntaxContext->popToken(), *SyntaxContext);
         ParsedExprSyntax ExprNode =
-            ParsedSyntaxRecorder::deferUnresolvedPatternExpr(std::move(PatternNode),
+            ParsedSyntaxRecorder::makeUnresolvedPatternExpr(std::move(PatternNode),
                                                              *SyntaxContext);
         SyntaxContext->addSyntax(std::move(ExprNode));
       }
