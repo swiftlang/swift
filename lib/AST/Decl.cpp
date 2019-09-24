@@ -3248,13 +3248,10 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   }
 
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
-    return interfaceType;
+  if (!interfaceType)
+    return ErrorType::get(getASTContext());
 
-  if (isa<ModuleDecl>(this))
-    return interfaceType;
-
-  return interfaceType->castTo<MetatypeType>()->getInstanceType();
+  return interfaceType->getMetatypeInstanceType();
 }
 
 int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {

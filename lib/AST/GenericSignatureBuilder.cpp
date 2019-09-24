@@ -3811,8 +3811,6 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
   auto type = getStructuralType(concreteDecl, /*keepSugar=*/true);
-  if (!type)
-    return Type();
 
   SubstitutionMap subMap;
   if (proto) {
@@ -4209,10 +4207,7 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
     Type firstType = getStructuralType(first, /*keepSugar=*/false);
-    if (!firstType) return;
-
     Type secondType = getStructuralType(second, /*keepSugar=*/false);
-    if (!secondType) return;
 
     auto inferredSameTypeSource =
       FloatingRequirementSource::viaProtocolRequirement(
