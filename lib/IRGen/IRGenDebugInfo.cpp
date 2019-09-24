@@ -168,8 +168,7 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               ValueDecl *VarDecl, StringRef Name,
-                               unsigned ArgNo = 0,
+                               ValueDecl *VarDecl, SILDebugVariable VarInfo,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
@@ -2145,7 +2144,7 @@ void IRGenDebugInfoImpl::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name, unsigned ArgNo,
+    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
   assert(DS && "variable has no scope");
 
@@ -2165,7 +2164,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
-  if (ArgNo > 0) {
+  if (VarInfo.ArgNo > 0) {
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
   }
@@ -2173,11 +2172,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   llvm::DIFile *Unit = getFile(Scope);
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   assert(DITy && "could not determine debug type of variable");
+  if (VarInfo.Constant)
+    DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
   unsigned Line = Loc.Line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!Line || (ArgNo > 0 && Name == IGM.Context.Id_self.str()))
+  if (!Line || (VarInfo.ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
@@ -2188,10 +2189,11 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   bool Optimized = false;
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var =
-      (ArgNo > 0) ? DBuilder.createParameterVariable(
-                        Scope, Name, ArgNo, Unit, Line, DITy, Optimized, Flags)
-                  : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
-                                                Optimized, Flags);
+      (VarInfo.ArgNo > 0)
+          ? DBuilder.createParameterVariable(Scope, VarInfo.Name, VarInfo.ArgNo,
+                                             Unit, Line, DITy, Optimized, Flags)
+          : DBuilder.createAutoVariable(Scope, VarInfo.Name, Unit, Line, DITy,
+                                        Optimized, Flags);
 
   // Running variables for the current/previous piece.
   bool IsPiece = Storage.size() > 1;
@@ -2275,8 +2277,14 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  llvm::DIType *Ty = getOrCreateType(DbgTy);
-  if (Ty->isArtificial() || Ty == InternalType || !Loc)
+  llvm::DIType *DITy = getOrCreateType(DbgTy);
+  VarDecl *VD = nullptr;
+  if (Loc)
+    VD = dyn_cast_or_null<VarDecl>(Loc->getAsASTNode<Decl>());
+  if (!VD || VD->isLet())
+    DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
+
+  if (DITy->isArtificial() || DITy == InternalType || !Loc)
     // FIXME: Really these should be marked as artificial, but LLVM
     // currently has no support for flags to be put on global
     // variables. In the mean time, elide these variables, they
@@ -2284,7 +2292,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     return;
 
   if (InFixedBuffer)
-    Ty = createFixedValueBufferStruct(Ty);
+    DITy = createFixedValueBufferStruct(DITy);
 
   auto L = getStartLocation(Loc);
   auto File = getOrCreateFile(L.Filename);
@@ -2294,7 +2302,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (!Var)
     Expr = DBuilder.createConstantValueExpression(0);
   auto *GV = DBuilder.createGlobalVariableExpression(
-      MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
+      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
@@ -2320,7 +2328,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          nullptr, OS.str().str(), 0,
+                          nullptr, {OS.str().str(), 0, false},
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -2419,11 +2427,10 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name,
-    unsigned ArgNo, IndirectionKind Indirection,
-      ArtificialKind Artificial) {
+    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
+    IndirectionKind Indirection, ArtificialKind Artificial) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarDecl, Name, ArgNo, Indirection, Artificial);
+      Builder, Storage, Ty, DS, VarDecl, VarInfo, Indirection, Artificial);
 }
 
 void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
