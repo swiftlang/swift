@@ -311,10 +311,12 @@ function(_compile_swift_files
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
       set(specific_module_private_dir "${specific_module_dir}/Private")
+      set(source_info_file "${specific_module_private_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
     else()
       set(specific_module_dir)
       set(specific_module_private_dir)
+      set(source_info_file "${module_base}.swiftsourceinfo")
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -324,6 +326,8 @@ function(_compile_swift_files
     set(sib_file "${module_base}.Onone.sib")
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
+    list(APPEND swift_module_flags
+         "-emit-module-source-info-path" "${source_info_file}")
 
     if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")

@@ -2545,7 +2545,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const JobAction *JA,
       (isa<CompileJobAction>(JA) || isa<MergeModuleJobAction>(JA))) {
     chooseSwiftModuleDocOutputPath(C, OutputMap, workingDirectory, Output.get());
     choosePrivateOutputFilePath(C, OutputMap, workingDirectory, Output.get(),
-                                file_types::TY_SwiftSourceInfoFile);
+                                file_types::TY_SwiftSourceInfoFile,
+                                options::OPT_emit_module_source_info_path);
   }
 
   if (C.getArgs().hasArg(options::OPT_emit_module_interface,
@@ -2793,9 +2794,17 @@ void Driver::choosePrivateOutputFilePath(Compilation &C,
                                          const TypeToPathMap *OutputMap,
                                          StringRef workingDirectory,
                                          CommandOutput *Output,
-                                         file_types::ID fileID) const {
+                                         file_types::ID fileID,
+                                         Optional<options::ID> optId) const {
   if (hasExistingAdditionalOutput(*Output, fileID))
     return;
+  // Honor driver option for this path if it's given
+  if (optId.hasValue()) {
+    if (const Arg *A = C.getArgs().getLastArg(*optId)) {
+      Output->setAdditionalOutputForType(fileID, StringRef(A->getValue()));
+      return;
+    }
+  }
 
   StringRef OFMOutputPath;
   if (OutputMap) {
