@@ -7690,7 +7690,7 @@ llvm::Expected<GenericSignature *>
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
         GenericSignature *parentSig,
-        SmallVector<GenericParamList *, 2> gpLists,
+        GenericParamList *gpl,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
@@ -7700,6 +7700,19 @@ InferredGenericSignatureRequest::evaluate(
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   builder.addGenericSignature(parentSig);
+
+  // Type check the generic parameters, treating all generic type
+  // parameters as dependent, unresolved.
+  SmallVector<GenericParamList *, 2> gpLists;
+  if (gpl->getOuterParameters() && !parentSig) {
+    for (auto *outerParams = gpl;
+         outerParams != nullptr;
+         outerParams = outerParams->getOuterParameters()) {
+      gpLists.push_back(outerParams);
+    }
+  } else {
+    gpLists.push_back(gpl);
+  }
 
   // The generic parameter lists MUST appear from innermost to outermost.
   // We walk them backwards to order outer requirements before
