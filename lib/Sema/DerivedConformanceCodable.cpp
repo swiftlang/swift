@@ -118,13 +118,9 @@ static CodableConformanceType varConformsToCodable(TypeChecker &tc,
   //              //    hasn't yet been evaluated
   // }
   //
-  // Validate the decl eagerly.
-  if (!varDecl->hasInterfaceType())
-    tc.validateDecl(varDecl);
-
   // If the var decl didn't validate, it may still not have a type; confirm it
   // has a type before ensuring the type conforms to Codable.
-  if (!varDecl->hasInterfaceType())
+  if (!varDecl->getInterfaceType())
     return TypeNotValidated;
 
   bool isIUO = varDecl->isImplicitlyUnwrappedOptional();
@@ -271,9 +267,6 @@ static CodingKeysValidity hasValidCodingKeysEnum(DerivedConformance &derived) {
                 derived.getProtocolType());
     return CodingKeysValidity(/*hasType=*/true, /*isValid=*/false);
   }
-
-  // If the decl hasn't been validated yet, do so.
-  tc.validateDecl(codingKeysTypeDecl);
 
   // CodingKeys may be a typealias. If so, follow the alias to its canonical
   // type.

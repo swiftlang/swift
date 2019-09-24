@@ -4701,7 +4701,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     auto decl = candidate.getDecl();
     
     // If the result is invalid, skip it.
-    TC.validateDecl(decl);
+    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+    (void)decl->getInterfaceType();
     if (decl->isInvalid()) {
       result.markErrorAlreadyDiagnosed();
       return;
@@ -5075,7 +5076,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       auto *cand = entry.getValueDecl();
 
       // If the result is invalid, skip it.
-      TC.validateDecl(cand);
+      // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+      (void)cand->getInterfaceType();
       if (cand->isInvalid()) {
         result.markErrorAlreadyDiagnosed();
         return result;
@@ -7005,7 +7007,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Record the 'dynamicallyCall` method overload set.
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
-    TC.validateDecl(candidate);
+    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+    (void)candidate->getInterfaceType();
     if (candidate->isInvalid()) continue;
     choices.push_back(
       OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));

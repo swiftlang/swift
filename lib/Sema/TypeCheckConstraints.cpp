@@ -440,11 +440,8 @@ static bool findNonMembers(TypeChecker &TC,
     if (!isValid(D))
       return false;
 
-    if (!D->hasInterfaceType())
-      TC.validateDecl(D);
-
     // FIXME: Circularity hack.
-    if (!D->hasInterfaceType()) {
+    if (!D->getInterfaceType()) {
       AllDeclRefs = false;
       continue;
     }
@@ -4430,11 +4427,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                              ConformanceCheckFlags::InExpression)) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
-          if (!nsError->hasInterfaceType()) {
-            auto resolver = Context.getLazyResolver();
-            assert(resolver);
-            resolver->resolveDeclSignature(nsError);
-          }
           Type NSErrorTy = nsError->getDeclaredInterfaceType();
           if (isSubtypeOf(fromType, NSErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to

@@ -697,9 +697,10 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
     // Validate the declaration but only if it came from a different context.
     if (other->getDeclContext() != current->getDeclContext())
-      tc.validateDecl(other);
+      (void)other->getInterfaceType();
 
     // Skip invalid or not yet seen declarations.
+    // FIXME(InterfaceTypeRequest): Delete this.
     if (other->isInvalid() || !other->hasInterfaceType())
       continue;
 
@@ -1123,10 +1124,7 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      if (!valueMember->hasInterfaceType())
-        if (auto *resolver = decl->getASTContext().getLazyResolver())
-          resolver->resolveDeclSignature(valueMember);
-
+      (void)valueMember->getInterfaceType();
       if (!decl->isAvailableInExistential(valueMember))
         return false;
     }
@@ -1495,8 +1493,8 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       continue;
 
     // Make sure the element is checked out before we poke at it.
-    TC.validateDecl(elt);
-    
+    // FIXME: Make isInvalid work with interface types
+    (void)elt->getInterfaceType();
     if (elt->isInvalid())
       continue;
 
@@ -2407,7 +2405,7 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    TC.validateDecl(SD);
+    (void)SD->getInterfaceType();
 
     // Force creation of the generic signature.
     (void)SD->getGenericSignature();
@@ -2457,8 +2455,8 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    (void)TAD->getInterfaceType();
 
-    TC.validateDecl(TAD);
     TC.checkDeclAttributes(TAD);
 
     // Force the generic signature to be computed in case it emits diagnostics.
@@ -2471,7 +2469,7 @@ public:
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    TC.validateDecl(OTD);
+    (void)OTD->getInterfaceType();
     TC.checkDeclAttributes(OTD);
     
     // Force the generic signature to be computed in case it emits diagnostics.
@@ -2481,7 +2479,7 @@ public:
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    TC.validateDecl(AT);
+    (void)AT->getInterfaceType();
     TC.checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
@@ -2569,7 +2567,7 @@ public:
 
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
-    TC.validateDecl(ED);
+    (void)ED->getInterfaceType();
     checkGenericParams(ED->getGenericParams(), ED, TC);
 
     {
@@ -2604,7 +2602,7 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    TC.validateDecl(SD);
+    (void)SD->getInterfaceType();
     checkGenericParams(SD->getGenericParams(), SD, TC);
 
     // Force lowering of stored properties.
@@ -2725,7 +2723,7 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     checkUnsupportedNestedType(CD);
 
-    TC.validateDecl(CD);
+    (void)CD->getInterfaceType();
     // Force creation of the generic signature.
     (void)CD->getGenericSignature();
     checkGenericParams(CD->getGenericParams(), CD, TC);
@@ -2880,8 +2878,8 @@ public:
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
 
-    TC.validateDecl(PD);
-    if (!PD->hasInterfaceType())
+    // FIXME: Circularity?
+    if (!PD->getInterfaceType())
       return;
 
     auto *SF = PD->getParentSourceFile();
@@ -2995,7 +2993,7 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    TC.validateDecl(FD);
+    (void)FD->getInterfaceType();
 
     if (!FD->isInvalid()) {
       checkGenericParams(FD->getGenericParams(), FD, TC);
@@ -3044,7 +3042,7 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    TC.validateDecl(EED);
+    (void)EED->getInterfaceType();
 
     TC.checkDeclAttributes(EED);
 
@@ -3087,7 +3085,7 @@ public:
     }
 
     // Validate the nominal type declaration being extended.
-    TC.validateDecl(nominal);
+    (void)nominal->getInterfaceType();
     // Don't bother computing the generic signature if the extended nominal
     // type didn't pass validation so we don't crash.
     if (!nominal->isInvalid())
@@ -3181,7 +3179,7 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    TC.validateDecl(CD);
+    (void)CD->getInterfaceType();
 
     // Compute these requests in case they emit diagnostics.
     (void) CD->getInitKind();
@@ -3304,7 +3302,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    TC.validateDecl(DD);
+    (void)DD->getInterfaceType();
 
     TC.checkDeclAttributes(DD);
 
@@ -3758,8 +3756,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // Validate the context.
   auto dc = D->getDeclContext();
   if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    validateDecl(nominal);
-    if (!nominal->hasInterfaceType())
+    if (!nominal->getInterfaceType())
       return;
   } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
     // If we're currently validating, or have already validated this extension,
@@ -3769,7 +3766,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
       if (auto *nominal = ext->getExtendedNominal()) {
         // Validate the nominal type declaration being extended.
-        validateDecl(nominal);
+        // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+        (void)nominal->getInterfaceType();
         
         // Eagerly validate the generic signature of the extension.
         if (!nominal->isInvalid())
@@ -3939,8 +3937,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Bail out if we're in a recursive validation situation.
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
       auto *storage = accessor->getStorage();
-      validateDecl(storage);
-      if (!storage->hasInterfaceType())
+      if (!storage->getInterfaceType())
         return;
     }
 

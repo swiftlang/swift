@@ -333,8 +333,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 static bool canSynthesizeCodingKey(DerivedConformance &derived) {
   auto enumDecl = cast<EnumDecl>(derived.Nominal);
   // Validate the enum and its raw type.
-  derived.TC.validateDecl(enumDecl);
-
+  
   // If the enum has a raw type (optional), it must be String or Int.
   Type rawType = enumDecl->getRawType();
   if (rawType) {

@@ -52,7 +52,7 @@ extension CC : Prot {
   var extV : Int { return 0 }
 }
 
-class SubCC : CC, Prot {}
+class SubCC : CC {}
 
 var globV2: SubCC
 

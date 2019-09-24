@@ -4305,8 +4305,6 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
 
     // Handle property references.
     if (auto var = dyn_cast<VarDecl>(found)) {
-      TC.validateDecl(var);
-
       // Resolve this component to the variable we found.
       auto varRef = ConcreteDeclRef(var);
       auto resolved =
