@@ -1475,7 +1475,7 @@ public:
 
   ParserStatus parseStringSegments(SmallVectorImpl<Lexer::StringSegment> &Segments,
                                    Token EntireTok,
-                                   SmallVectorImpl<OpaqueValueExpr *> &Refs,
+                                   OpaqueValueExpr *TemporaryRef,
                                    SmallVectorImpl<ASTNode> &Stmts,
                                    unsigned &LiteralCapacity,
                                    unsigned &InterpolationCount);

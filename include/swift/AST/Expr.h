@@ -904,38 +904,33 @@ public:
 /// Runs a series of statements which use or modify \c SubExpr
 /// before it is given to the rest of the expression.
 ///
-/// \c Body should begin with a \c VarDecl; this defines the variable
-/// \c TapExpr will initialize at the beginning and read a result
-/// from at the end. \c TapExpr creates a separate scope, then
-/// assigns the result of \c SubExpr to the variable and runs \c Body
-/// in it, returning the value of the variable after the \c Body runs.
+/// \c TapExpr performs the following steps:
 ///
-/// (The design here could be a bit cleaner, particularly where the VarDecl
-/// is concerned.)
-class TapExpr final : public Expr,
-  private llvm::TrailingObjects<TapExpr, OpaqueValueExpr *> {
-  using TrailingObjects = llvm::TrailingObjects<TapExpr, OpaqueValueExpr *>;
-    friend TrailingObjects;
-
+/// 1. Evaluates \c SubExpr and assigns the result to an anonymous temporary
+///    value.
+/// 2. Executes the statements in \c Body, replacing \c TemporaryRef with lvalue
+///    accesses to the temporary value.
+/// 3. Returns the temporary value.
+///
+/// The expression typechecks to exactly the same type as \c SubExpr does; the
+/// \c Body is typechecked afterwards with uses of \c TemporaryRef given the
+/// lvalue version of the type of \c SubExpr.
+class TapExpr final : public Expr {
   Expr *SubExpr;
-  unsigned NumUses;
+  OpaqueValueExpr *TemporaryRef;
   BraceStmt *Body;
 
-  TapExpr(Expr *SubExpr, ArrayRef<OpaqueValueExpr *> Uses, BraceStmt *Body);
-
-  OpaqueValueExpr * const *getUsesPtr() const {
-    return getTrailingObjects<OpaqueValueExpr *>();
-  }
+  TapExpr(Expr *SubExpr, OpaqueValueExpr *TemporaryRef, BraceStmt *Body);
 
 public:
   static TapExpr *create(ASTContext &C, Expr *SubExpr,
-                         ArrayRef<OpaqueValueExpr *> Uses, BraceStmt *Body);
+                         OpaqueValueExpr *TemporaryRef, BraceStmt *Body);
 
   Expr * getSubExpr() const { return SubExpr; }
   void setSubExpr(Expr * se) { SubExpr = se; }
 
-  ArrayRef<OpaqueValueExpr *> getUses() const {
-    return ArrayRef<OpaqueValueExpr *>(getUsesPtr(), NumUses);
+  OpaqueValueExpr *getTemporaryRef() const {
+    return TemporaryRef;
   }
 
   BraceStmt * getBody() const { return Body; }
