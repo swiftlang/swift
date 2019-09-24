@@ -132,11 +132,8 @@ public:
 
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
-  llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of parsed decls with opaque return types that have not yet
-  /// been validated.
-  llvm::DenseSet<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
-
+  llvm::StringMap<OpaqueTypeDecl *> OpaqueReturnTypesByName;
+  
   /// A set of special declaration attributes which require the
   /// Foundation module to be imported to work. If the foundation
   /// module is still not imported by the time type checking is
@@ -430,14 +427,9 @@ public:
   void setSyntaxRoot(syntax::SourceFileSyntax &&Root);
   bool hasSyntaxRoot() const;
 
-  OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
-                                         LazyResolver *resolver) override;
+  OpaqueTypeDecl *lookupOpaqueResultTypeByName(StringRef MangledName) override;
 
-  void addUnvalidatedDeclWithOpaqueResultType(ValueDecl *vd) {
-    UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
-  }
-
-  void markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd);
+  void registerDeclWithOpaqueResultType(ValueDecl *vd);
 
 private:
 

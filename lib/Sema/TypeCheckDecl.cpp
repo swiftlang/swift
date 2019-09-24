@@ -3922,7 +3922,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     if (VD->getOpaqueResultTypeDecl()) {
       if (auto SF = VD->getInnermostDeclContext()->getParentSourceFile()) {
-        SF->markDeclWithOpaqueResultTypeAsValidated(VD);
+        SF->registerDeclWithOpaqueResultType(VD);
       }
     }
 
@@ -4071,7 +4071,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // Mark the opaque result type as validated, if there is one.
     if (FD->getOpaqueResultTypeDecl()) {
       if (auto sf = FD->getDeclContext()->getParentSourceFile()) {
-        sf->markDeclWithOpaqueResultTypeAsValidated(FD);
+        sf->registerDeclWithOpaqueResultType(FD);
       }
     }
     
@@ -4116,7 +4116,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     if (SD->getOpaqueResultTypeDecl()) {
       if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
-        SF->markDeclWithOpaqueResultTypeAsValidated(SD);
+        SF->registerDeclWithOpaqueResultType(SD);
       }
     }
 

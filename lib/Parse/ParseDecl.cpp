@@ -5033,7 +5033,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       setLocalDiscriminator(VD);
       Decls.push_back(VD);
       if (hasOpaqueReturnTy && sf) {
-        sf->addUnvalidatedDeclWithOpaqueResultType(VD);
+        sf->registerDeclWithOpaqueResultType(VD);
       }
     });
 
@@ -5350,7 +5350,7 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   // Let the source file track the opaque return type mapping, if any.
   if (FuncRetTy && isa<OpaqueReturnTypeRepr>(FuncRetTy)) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
-      sf->addUnvalidatedDeclWithOpaqueResultType(FD);
+      sf->registerDeclWithOpaqueResultType(FD);
     }
   }
   
@@ -6225,7 +6225,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
   // Let the source file track the opaque return type mapping, if any.
   if (ElementTy.get() && isa<OpaqueReturnTypeRepr>(ElementTy.get())) {
     if (auto sf = CurDeclContext->getParentSourceFile()) {
-      sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
+      sf->registerDeclWithOpaqueResultType(Subscript);
     }
   }
 

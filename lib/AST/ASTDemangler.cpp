@@ -261,9 +261,8 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     if (!parentModule)
       return Type();
 
-    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName,
-                                                           Resolver);
-    if (!opaqueDecl)
+    auto opaqueDecl = parentModule->lookupOpaqueResultTypeByName(mangledName);
+    if (!opaqueDecl || !opaqueDecl->getInterfaceType())
       return Type();
     // TODO: multiple opaque types
     assert(ordinal == 0 && "not implemented");
