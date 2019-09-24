@@ -86,6 +86,10 @@ def tbd_compatibility_version
 def tbd_compatibility_version_EQ : Joined<["-"], "tbd-compatibility-version=">,
   Alias<tbd_compatibility_version>;
 
+def tbd_is_installapi: Flag<["-"], "tbd-is-installapi">,
+  HelpText<"If the TBD file should indicate it's being generated during "
+           "InstallAPI">;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
