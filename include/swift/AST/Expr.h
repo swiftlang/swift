@@ -3864,6 +3864,48 @@ public:
     return Bits.OpaqueValueExpr.CanBeCaptured;
   }
 
+  /// Returns \c true if \c this was introduced to the AST by \c putativeOwner.
+  /// It is invalid for an \c OpaqueValueExpr to have zero or more than one
+  /// ancestor nodes.
+  ///
+  /// \invariant \c belongsTo(E) never returns \c true if \c canBelongTo(E)
+  /// returns false.
+  bool belongsTo(Expr *putativeOwner) const;
+
+  /// Returns \c true if \c this was introduced to the AST by \c putativeOwner.
+  /// It is invalid for an \c OpaqueValueExpr to have zero or more than one
+  /// ancestor nodes.
+  ///
+  /// \invariant \c belongsTo(E) never returns \c true if \c canBelongTo(E)
+  /// returns false.
+  bool belongsTo(Stmt *putativeOwner) const;
+
+  /// Returns \c true if \c this was introduced to the AST by \c putativeOwner.
+  /// It is invalid for an \c OpaqueValueExpr to have zero or more than one
+  /// ancestor nodes.
+  ///
+  /// \invariant \c belongsTo(E) never returns \c true if \c canBelongTo(E)
+  /// returns false.
+  bool belongsTo(Decl *putativeOwner) const;
+
+  /// Returns \c true if \c putativeOwner can own an \c OpaqueValueExpr. That
+  /// is, if \c canBelongTo() returns \c false, \c belongsTo() will always
+  /// return \c false when passed this node and there is never any need to check
+  /// it.
+  static bool canBelongTo(Expr *putativeOwner);
+
+  /// Returns \c true if \c putativeOwner can own an \c OpaqueValueExpr. That
+  /// is, if \c canBelongTo() returns \c false, \c belongsTo() will always
+  /// return \c false when passed this node and there is never any need to check
+  /// it.
+  static bool canBelongTo(Stmt *putativeOwner);
+
+  /// Returns \c true if \c putativeOwner can own an \c OpaqueValueExpr. That
+  /// is, if \c canBelongTo() returns \c false, \c belongsTo() will always
+  /// return \c false when passed this node and there is never any need to check
+  /// it.
+  static bool canBelongTo(Decl *putativeOwner);
+
   SourceRange getSourceRange() const { return Range; }
 
   static bool classof(const Expr *E) {
