@@ -95,6 +95,8 @@ public:
   uint64_t resolveRelativeAddressData() const {
     int32_t offset;
     memcpy(&offset, LocalBuffer, sizeof(int32_t));
+    if (offset == 0)
+      return 0;
     return Address + (int64_t)offset;
   }
   
