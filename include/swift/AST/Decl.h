@@ -1677,7 +1677,11 @@ class ExtensionDecl final : public GenericContext, public Decl,
   TypeRepr *ExtendedTypeRepr;
 
   /// The nominal type being extended.
-  NominalTypeDecl *ExtendedNominal = nullptr;
+  ///
+  /// The bit indicates whether binding has been attempted. The pointer can be
+  /// null if either no binding was attempted or if binding could not find  the
+  /// extended nominal.
+  llvm::PointerIntPair<NominalTypeDecl *, 1, bool> ExtendedNominal;
 
   MutableArrayRef<TypeLoc> Inherited;
 
@@ -1736,6 +1740,12 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
+  bool hasBeenBound() const { return ExtendedNominal.getInt(); }
+
+  void setExtendedNominal(NominalTypeDecl *n) {
+    ExtendedNominal.setPointerAndInt(n, true);
+  }
+
   /// Retrieve the type being extended.
   ///
   /// Only use this entry point when the complete type, as spelled in the source,
@@ -1744,7 +1754,20 @@ public:
   Type getExtendedType() const;
 
   /// Retrieve the nominal type declaration that is being extended.
+  /// Will  trip an assertion if the declaration has not already been computed.
+  /// In order to fail fast when type checking work is attempted
+  /// before extension binding has taken place.
+
   NominalTypeDecl *getExtendedNominal() const;
+
+  /// Compute the nominal type declaration that is being extended.
+  NominalTypeDecl *computeExtendedNominal() const;
+
+  /// \c hasBeenBound means nothing if this extension can never been bound
+  /// because it is not at the top level.
+  bool canNeverBeBound() const;
+
+  bool hasValidParent() const;
 
   /// Determine whether this extension has already been bound to a nominal
   /// type declaration.
