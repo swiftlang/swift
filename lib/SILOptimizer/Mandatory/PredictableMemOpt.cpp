@@ -759,6 +759,10 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
   if (!B.hasOwnership())
     return svi;
 
+  assert((isa<LoadBorrowInst>(svi) || isa<LoadInst>(svi)) &&
+         "Expected to have a /real/ load here since we assume that we have a "
+         "unary operand instruction");
+
   SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
   SmallVector<SILBasicBlock *, 8> leakingBlocks;
   bool foundLoop = false;
@@ -781,7 +785,9 @@ AvailableValueAggregator::addMissingDestroysForCopiedValues(
     // no further work to do.
     auto errorKind = ownership::ErrorBehaviorKind::ReturnFalse;
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
-    auto error = checker.checkValue(cvi, {svi}, {}, errorKind, &leakingBlocks);
+    auto error = checker.checkValue(
+        cvi, {BranchPropagatedUser(&svi->getAllOperands()[0])}, {}, errorKind,
+        &leakingBlocks);
     if (!error.getFoundError())
       continue;
 

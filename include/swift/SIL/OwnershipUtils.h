@@ -310,14 +310,13 @@ struct BorrowScopeIntroducingValue {
   /// called with a scope that is not local.
   ///
   /// The intention is that this method can be used instead of
-  /// BorrowScopeIntroducingValue::getLocalScopeEndingInstructions() to avoid
+  /// BorrowScopeIntroducingValue::getLocalScopeEndingUses() to avoid
   /// introducing an intermediate array when one needs to transform the
   /// instructions before storing them.
   ///
   /// NOTE: To determine if a scope is a local scope, call
   /// BorrowScopeIntoducingValue::isLocalScope().
-  void visitLocalScopeEndingInstructions(
-      function_ref<void(SILInstruction *)> visitor) const;
+  void visitLocalScopeEndingUses(function_ref<void(Operand *)> visitor) const;
 
   bool isLocalScope() const { return kind.isLocalScope(); }
 

@@ -93,11 +93,11 @@ class SILValueOwnershipChecker {
 
   /// The list of lifetime ending users that we found. Only valid if check is
   /// successful.
-  SmallVector<BranchPropagatedUser, 16> lifetimeEndingUsers;
+  SmallVector<Operand *, 16> lifetimeEndingUsers;
 
   /// The list of non lifetime ending users that we found. Only valid if check
   /// is successful.
-  SmallVector<BranchPropagatedUser, 16> regularUsers;
+  SmallVector<Operand *, 16> regularUsers;
 
   /// The list of implicit non lifetime ending users that we found. This
   /// consists of instructions like end_borrow that end a scoped lifetime. We
@@ -105,7 +105,7 @@ class SILValueOwnershipChecker {
   /// destroyed while that sub-scope is valid.
   ///
   /// TODO: Rename to SubBorrowScopeUsers?
-  SmallVector<BranchPropagatedUser, 4> implicitRegularUsers;
+  SmallVector<Operand *, 4> implicitRegularUsers;
 
   /// The set of blocks that we have visited.
   SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks;
@@ -133,12 +133,15 @@ public:
     if (!result.getValue())
       return false;
 
+    SmallVector<BranchPropagatedUser, 32> allLifetimeEndingUsers;
+    llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
     SmallVector<BranchPropagatedUser, 32> allRegularUsers;
     llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
     llvm::copy(implicitRegularUsers, std::back_inserter(allRegularUsers));
+
     LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
     auto linearLifetimeResult = checker.checkValue(
-        value, lifetimeEndingUsers, allRegularUsers, errorBehavior);
+        value, allLifetimeEndingUsers, allRegularUsers, errorBehavior);
     result = !linearLifetimeResult.getFoundError();
 
     return result.getValue();
@@ -146,9 +149,9 @@ public:
 
 private:
   bool checkUses();
-  bool gatherUsers(SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers,
-                   SmallVectorImpl<BranchPropagatedUser> &regularUsers,
-                   SmallVectorImpl<BranchPropagatedUser> &implicitRegularUsers);
+  bool gatherUsers(SmallVectorImpl<Operand *> &lifetimeEndingUsers,
+                   SmallVectorImpl<Operand *> &regularUsers,
+                   SmallVectorImpl<Operand *> &implicitRegularUsers);
 
   bool checkValueWithoutLifetimeEndingUses();
 
@@ -157,10 +160,10 @@ private:
 
   bool isGuaranteedFunctionArgWithLifetimeEndingUses(
       SILFunctionArgument *arg,
-      const SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers) const;
+      const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
   bool isSubobjectProjectionWithLifetimeEndingUses(
       SILValue value,
-      const SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers) const;
+      const SmallVectorImpl<Operand *> &lifetimeEndingUsers) const;
 
   /// Depending on our initialization, either return false or call Func and
   /// throw an error.
@@ -181,9 +184,9 @@ private:
 } // end anonymous namespace
 
 bool SILValueOwnershipChecker::gatherUsers(
-    SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers,
-    SmallVectorImpl<BranchPropagatedUser> &nonLifetimeEndingUsers,
-    SmallVectorImpl<BranchPropagatedUser> &implicitRegularUsers) {
+    SmallVectorImpl<Operand *> &lifetimeEndingUsers,
+    SmallVectorImpl<Operand *> &nonLifetimeEndingUsers,
+    SmallVectorImpl<Operand *> &implicitRegularUsers) {
 
   // See if Value is guaranteed. If we are guaranteed and not forwarding, then
   // we need to look through subobject uses for more uses. Otherwise, if we are
@@ -198,19 +201,7 @@ bool SILValueOwnershipChecker::gatherUsers(
 
   // Then gather up our initial list of users.
   SmallVector<Operand *, 8> users;
-  std::copy(value->use_begin(), value->use_end(), std::back_inserter(users));
-
-  auto addCondBranchToList = [](SmallVectorImpl<BranchPropagatedUser> &list,
-                                CondBranchInst *cbi, unsigned operandIndex) {
-    if (cbi->isConditionOperandIndex(operandIndex)) {
-      list.emplace_back(cbi);
-      return;
-    }
-
-    bool isTrueOperand = cbi->isTrueOperandIndex(operandIndex);
-    list.emplace_back(cbi, isTrueOperand ? CondBranchInst::TrueIdx
-                                         : CondBranchInst::FalseIdx);
-  };
+  llvm::copy(value->getUses(), std::back_inserter(users));
 
   bool foundError = false;
   while (!users.empty()) {
@@ -267,19 +258,10 @@ bool SILValueOwnershipChecker::gatherUsers(
         opOwnershipKindMap.getLifetimeConstraint(ownershipKind);
     if (lifetimeConstraint == UseLifetimeConstraint::MustBeInvalidated) {
       LLVM_DEBUG(llvm::dbgs() << "        Lifetime Ending User: " << *user);
-      if (auto *cbi = dyn_cast<CondBranchInst>(user)) {
-        addCondBranchToList(lifetimeEndingUsers, cbi, op->getOperandNumber());
-      } else {
-        lifetimeEndingUsers.emplace_back(user);
-      }
+      lifetimeEndingUsers.push_back(op);
     } else {
       LLVM_DEBUG(llvm::dbgs() << "        Regular User: " << *user);
-      if (auto *cbi = dyn_cast<CondBranchInst>(user)) {
-        addCondBranchToList(nonLifetimeEndingUsers, cbi,
-                            op->getOperandNumber());
-      } else {
-        nonLifetimeEndingUsers.emplace_back(user);
-      }
+      nonLifetimeEndingUsers.push_back(op);
     }
 
     // If our base value is not guaranteed, we do not to try to visit
@@ -296,12 +278,14 @@ bool SILValueOwnershipChecker::gatherUsers(
         // For correctness reasons we use indices to make sure that we can
         // append to NonLifetimeEndingUsers without needing to deal with
         // iterator invalidation.
-        SmallVector<SILInstruction *, 4> endBorrowInsts;
         for (unsigned i : indices(nonLifetimeEndingUsers)) {
           if (auto *bbi = dyn_cast<BeginBorrowInst>(
-                  nonLifetimeEndingUsers[i].getInst())) {
-            llvm::copy(bbi->getEndBorrows(),
-                       std::back_inserter(implicitRegularUsers));
+                  nonLifetimeEndingUsers[i]->getUser())) {
+            for (auto *use : bbi->getUses()) {
+              if (isa<EndBorrowInst>(use->getUser())) {
+                implicitRegularUsers.push_back(use);
+              }
+            }
           }
         }
       }
@@ -381,8 +365,8 @@ bool SILValueOwnershipChecker::gatherUsers(
         // them to ensure that all of BBArg's uses are completely
         // enclosed within the end_borrow of this argument.
         for (auto *op : succArg->getUses()) {
-          if (auto *ebi = dyn_cast<EndBorrowInst>(op->getUser())) {
-            implicitRegularUsers.push_back(ebi);
+          if (isa<EndBorrowInst>(op->getUser())) {
+            implicitRegularUsers.push_back(op);
           }
         }
       }
@@ -493,8 +477,7 @@ bool SILValueOwnershipChecker::checkValueWithoutLifetimeEndingUses() {
 
 bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
     SILFunctionArgument *arg,
-    const llvm::SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers)
-    const {
+    const llvm::SmallVectorImpl<Operand *> &lifetimeEndingUsers) const {
   if (arg->getOwnershipKind() != ValueOwnershipKind::Guaranteed)
     return true;
 
@@ -502,8 +485,8 @@ bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
     llvm::errs() << "    Function: '" << arg->getFunction()->getName() << "'\n"
                  << "    Guaranteed function parameter with life ending uses!\n"
                  << "    Value: " << *arg;
-    for (const auto &user : lifetimeEndingUsers) {
-      llvm::errs() << "    Lifetime Ending User: " << *user;
+    for (const auto *use : lifetimeEndingUsers) {
+      llvm::errs() << "    Lifetime Ending User: " << *use->getUser();
     }
     llvm::errs() << '\n';
   });
@@ -511,15 +494,14 @@ bool SILValueOwnershipChecker::isGuaranteedFunctionArgWithLifetimeEndingUses(
 
 bool SILValueOwnershipChecker::isSubobjectProjectionWithLifetimeEndingUses(
     SILValue value,
-    const llvm::SmallVectorImpl<BranchPropagatedUser> &lifetimeEndingUsers)
-    const {
+    const llvm::SmallVectorImpl<Operand *> &lifetimeEndingUsers) const {
   return handleError([&] {
     llvm::errs() << "    Function: '" << value->getFunction()->getName()
                  << "'\n"
                  << "    Subobject projection with life ending uses!\n"
                  << "    Value: " << *value;
-    for (const auto &user : lifetimeEndingUsers) {
-      llvm::errs() << "    Lifetime Ending User: " << *user;
+    for (const auto *use : lifetimeEndingUsers) {
+      llvm::errs() << "    Lifetime Ending User: " << *use->getUser();
     }
     llvm::errs() << '\n';
   });
