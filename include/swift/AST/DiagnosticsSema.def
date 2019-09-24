@@ -71,55 +71,59 @@ NOTE(opaque_return_type_declared_here,none,
 // MARK: Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(ambiguous_member_overload_set,none,
-      "ambiguous reference to member %0", (DeclName))
-ERROR(ambiguous_reference_to_decl,none,
-      "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
-ERROR(no_overloads_match_exactly_in_call,none,
-      "no exact matches in call to %0 %1",
-      (DescriptiveDeclKind, DeclName))
-ERROR(no_overloads_match_exactly_in_call_no_labels,none,
-      "no exact matches in call to %0 %1",
-      (DescriptiveDeclKind, DeclBaseName))
-ERROR(no_overloads_match_exactly_in_call_special,none,
-      "no exact matches in call to %0",
-      (DescriptiveDeclKind))
+PUBLICERROR(AmbiguousMemberRef,ambiguous_member_overload_set,none,
+            "ambiguous reference to member %0", (DeclName))
+PUBLICERROR(AmbiguousDeclarationRef,ambiguous_reference_to_decl,none,
+            "ambiguous reference to %0 %1", (DescriptiveDeclKind, DeclName))
+PUBLICERROR(NoMatchingOverloads,no_overloads_match_exactly_in_call,none,
+            "no exact matches in call to %0 %1",
+            (DescriptiveDeclKind, DeclName))
+PUBLICERROR(NoMatchingOverloads,no_overloads_match_exactly_in_call_no_labels,none,
+            "no exact matches in call to %0 %1",
+            (DescriptiveDeclKind, DeclBaseName))
+PUBLICERROR(NoMatchingOverloads,no_overloads_match_exactly_in_call_special,none,
+            "no exact matches in call to %0",
+            (DescriptiveDeclKind))
 
-ERROR(ambiguous_subscript,none,
-      "ambiguous subscript with base type %0 and index type %1",
-      (Type, Type))
-ERROR(could_not_find_value_subscript,none,
-      "value of type %0 has no subscripts",
-      (Type))
+PUBLICERROR(AmbiguousSubscript,ambiguous_subscript,none,
+            "ambiguous subscript with base type %0 and index type %1",
+            (Type, Type))
+PUBLICERROR(NoSubscripts,could_not_find_value_subscript,none,
+            "value of type %0 has no subscripts",
+            (Type))
 
-ERROR(could_not_find_tuple_member,none,
-      "value of tuple type %0 has no member %1", (Type, DeclName))
+PUBLICERROR(NoTupleMember,could_not_find_tuple_member,none,
+            "value of tuple type %0 has no member %1", (Type, DeclName))
 
-ERROR(could_not_find_value_member,none,
-      "value of type %0 has no member %1", (Type, DeclName))
-ERROR(could_not_find_value_member_corrected,none,
-      "value of type %0 has no member %1; did you mean %2?",
-      (Type, DeclName, DeclName))
-ERROR(could_not_find_value_dynamic_member_corrected,none,
-      "value of type %0 has no dynamic member %2 using key path from root type %1; did you mean %3?",
-      (Type, Type, DeclName, DeclName))
-ERROR(could_not_find_value_dynamic_member,none,
-      "value of type %0 has no dynamic member %2 using key path from root type %1",
-      (Type, Type, DeclName))
+PUBLICERROR(NoValueMember,could_not_find_value_member,none,
+            "value of type %0 has no member %1", (Type, DeclName))
+PUBLICERROR(NoValueMember,could_not_find_value_member_corrected,none,
+            "value of type %0 has no member %1; did you mean %2?",
+            (Type, DeclName, DeclName))
+PUBLICERROR(NoDynamicMember,could_not_find_value_dynamic_member_corrected,none,
+            "value of type %0 has no dynamic member %2 using key path from root"
+            " type %1; did you mean %3?",
+            (Type, Type, DeclName, DeclName))
+PUBLICERROR(NoDynamicMember,could_not_find_value_dynamic_member,none,
+            "value of type %0 has no dynamic member %2 using key path from root"
+            " type %1",
+            (Type, Type, DeclName))
 
-ERROR(could_not_find_type_member,none,
-      "type %0 has no member %1", (Type, DeclName))
-ERROR(could_not_find_type_member_corrected,none,
-      "type %0 has no member %1; did you mean %2?",
-      (Type, DeclName, DeclName))
+PUBLICERROR(NoTypeMember,could_not_find_type_member,none,
+            "type %0 has no member %1", (Type, DeclName))
+PUBLICERROR(NoTypeMember,could_not_find_type_member_corrected,none,
+            "type %0 has no member %1; did you mean %2?",
+            (Type, DeclName, DeclName))
 
-ERROR(could_not_find_subscript_member_did_you_mean,none,
-      "value of type %0 has no property or method named 'subscript'; "
-      "did you mean to use the subscript operator?",
-      (Type))
+PUBLICERROR(NoMemberNamedSubscript,could_not_find_subscript_member_did_you_mean,
+            none,
+            "value of type %0 has no property or method named 'subscript'; "
+            "did you mean to use the subscript operator?",
+            (Type))
 
-ERROR(could_not_find_enum_case,none,
-      "enum type %0 has no case %1; did you mean %2", (Type, DeclName, DeclName))
+PUBLICERROR(NoEnumCase,could_not_find_enum_case,none,
+            "enum type %0 has no case %1; did you mean %2",
+            (Type, DeclName, DeclName))
 
 NOTE(did_you_mean_raw_type,none,
      "did you mean to specify a raw type on the enum declaration?", ())
@@ -127,60 +131,64 @@ NOTE(did_you_mean_raw_type,none,
 NOTE(any_as_anyobject_fixit, none,
      "cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members", ())
 
-ERROR(expected_argument_in_contextual_member,none,
-      "member %0 expects argument of type %1", (DeclName, Type))
-ERROR(expected_parens_in_contextual_member,none,
-      "member %0 is a function; did you mean to call it?", (DeclName))
+PUBLICERROR(MemberExpectedArgs,expected_argument_in_contextual_member,none,
+            "member %0 expects argument of type %1", (DeclName, Type))
+PUBLICERROR(MemberIsFunction,expected_parens_in_contextual_member,none,
+            "member %0 is a function; did you mean to call it?", (DeclName))
 
-ERROR(expected_result_in_contextual_member,none,
-      "member %0 in %2 produces result of type %1, but context expects %2",
-      (DeclName, Type, Type))
+PUBLICERROR(UnexpectedResultType,expected_result_in_contextual_member,none,
+            "member %0 in %2 produces result of type %1, but context expects"
+            " %2",
+            (DeclName, Type, Type))
 
-ERROR(unexpected_arguments_in_enum_case,none,
-      "enum case %0 has no associated values", (DeclName))
-ERROR(unexpected_arguments_in_contextual_member,none,
-      "%0 %1 is not a function", (DescriptiveDeclKind, DeclName))
+PUBLICERROR(UnexpectedCaseArgs,unexpected_arguments_in_enum_case,none,
+            "enum case %0 has no associated values", (DeclName))
+PUBLICERROR(NotAFunction,unexpected_arguments_in_contextual_member,none,
+            "%0 %1 is not a function", (DescriptiveDeclKind, DeclName))
 
-ERROR(could_not_use_value_member,none,
-      "member %1 cannot be used on value of type %0", (Type, DeclName))
-ERROR(could_not_use_type_member,none,
-      "member %1 cannot be used on type %0", (Type, DeclName))
+PUBLICERROR(DisallowedValueMember,could_not_use_value_member,none,
+            "member %1 cannot be used on value of type %0", (Type, DeclName))
+PUBLICERROR(DisallowedTypeMember,could_not_use_type_member,none,
+            "member %1 cannot be used on type %0", (Type, DeclName))
 
-ERROR(could_not_use_type_member_on_instance,none,
-      "static member %1 cannot be used on instance of type %0",
-      (Type, DeclName))
-ERROR(could_not_use_enum_element_on_instance,none,
-      "enum case %0 cannot be used as an instance member",
-      (DeclName))
-ERROR(could_not_use_type_member_on_protocol_metatype,none,
-      "static member %1 cannot be used on protocol metatype %0",
-      (Type, DeclName))
-ERROR(could_not_use_instance_member_on_type,none,
-      "instance member %1"
-      "%select{| of type %2}3 cannot be used on"
-      "%select{| instance of nested}3 type %0",
-      (Type, DeclName, Type, bool))
-ERROR(could_not_use_member_on_existential,none,
-      "member %1 cannot be used on value of protocol type %0; use a generic"
-      " constraint instead",
-      (Type, DeclName))
+PUBLICERROR(DisallowedStaticMember,could_not_use_type_member_on_instance,none,
+            "static member %1 cannot be used on instance of type %0",
+            (Type, DeclName))
+PUBLICERROR(EnumCaseOnInstance,could_not_use_enum_element_on_instance,none,
+            "enum case %0 cannot be used as an instance member",
+            (DeclName))
+PUBLICERROR(DisallowedStaticMember,
+            could_not_use_type_member_on_protocol_metatype,none,
+            "static member %1 cannot be used on protocol metatype %0",
+            (Type, DeclName))
+PUBLICERROR(DisallowedInstanceMember,could_not_use_instance_member_on_type,none,
+            "instance member %1"
+            "%select{| of type %2}3 cannot be used on"
+            "%select{| instance of nested}3 type %0",
+            (Type, DeclName, Type, bool))
+PUBLICERROR(DisallowedProtocolMember,could_not_use_member_on_existential,none,
+            "member %1 cannot be used on value of protocol type %0; use a "
+            "generic constraint instead",
+            (Type, DeclName))
 FIXIT(replace_with_type,"%0",(Type))
 FIXIT(insert_type_qualification,"%0.",(Type))
 
-ERROR(candidate_inaccessible,none,
-      "%0 is inaccessible due to "
-      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
-      (DeclName, AccessLevel))
+PUBLICERROR(InaccessibleDeclaration,candidate_inaccessible,none,
+            "%0 is inaccessible due to "
+            "'%select{private|fileprivate|internal|%error|%error}1' protection "
+            "level",
+            (DeclName, AccessLevel))
 
 NOTE(note_candidate_inaccessible,none,
      "%0 is inaccessible due to "
      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
      (DeclName, AccessLevel))
 
-ERROR(init_candidate_inaccessible,none,
-      "%0 initializer is inaccessible due to "
-      "'%select{private|fileprivate|internal|%error|%error}1' protection level",
-      (Type, AccessLevel))
+PUBLICERROR(InaccessibleDeclaration,init_candidate_inaccessible,none,
+            "%0 initializer is inaccessible due to "
+            "'%select{private|fileprivate|internal|%error|%error}1' protection "
+            "level",
+            (Type, AccessLevel))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
