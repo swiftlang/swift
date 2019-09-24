@@ -366,8 +366,9 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
-    IsPlaceholder : 1
+  SWIFT_INLINE_BITFIELD_FULL(OpaqueValueExpr, Expr, 1,
+    : NumPadBits,
+    CanBeCaptured : 1
   );
 
   } Bits;
@@ -3853,15 +3854,17 @@ class OpaqueValueExpr : public Expr {
 
 public:
   explicit OpaqueValueExpr(SourceRange Range, Type Ty,
-                           bool isPlaceholder = false)
+                           bool canBeCaptured = false)
       : Expr(ExprKind::OpaqueValue, /*Implicit=*/true, Ty), Range(Range) {
-    Bits.OpaqueValueExpr.IsPlaceholder = isPlaceholder;
+    Bits.OpaqueValueExpr.CanBeCaptured = canBeCaptured;
   }
 
-  /// Whether this opaque value expression represents a placeholder that
-  /// is injected before type checking to act as a placeholder for some
-  /// value to be specified later.
-  bool isPlaceholder() const { return Bits.OpaqueValueExpr.IsPlaceholder; }
+  /// Whether the opaque value can be captured by a closure. Most opaque values
+  /// are positioned relative to their owner such that a closure cannot be
+  /// introduced between them.
+  bool canBeCaptured() const {
+    return Bits.OpaqueValueExpr.CanBeCaptured;
+  }
 
   SourceRange getSourceRange() const { return Range; }
 
