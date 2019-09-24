@@ -1217,7 +1217,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
-  TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
 
@@ -1351,8 +1350,8 @@ public:
 
   void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
-  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithDot() override;
+  void completeTypeIdentifierWithoutDot() override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -4600,22 +4599,13 @@ void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
-    IdentTypeRepr *ITR) {
-  if (!ITR) {
-    completeTypeSimpleBeginning();
-    return;
-  }
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot() {
   Kind = CompletionKind::TypeIdentifierWithDot;
-  ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
-    IdentTypeRepr *ITR) {
-  assert(ITR);
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot() {
   Kind = CompletionKind::TypeIdentifierWithoutDot;
-  ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
 

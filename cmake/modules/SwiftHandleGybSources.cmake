@@ -118,6 +118,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AttributeNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/AvailabilityNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/CommonNodes.py"
+      "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/CompletionOnlyNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/DeclNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/ExprNodes.py"
       "${SWIFT_SOURCE_DIR}/utils/gyb_syntax_support/GenericNodes.py"
