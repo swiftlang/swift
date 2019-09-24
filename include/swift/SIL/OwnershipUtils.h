@@ -205,6 +205,7 @@ struct BorrowScopeOperandKind {
 
   enum Kind : UnderlyingKindTy {
     BeginBorrow = UnderlyingKindTy(SILInstructionKind::BeginBorrowInst),
+    BeginApply = UnderlyingKindTy(SILInstructionKind::BeginApplyInst),
   };
 
   Kind value;
@@ -220,6 +221,8 @@ struct BorrowScopeOperandKind {
       return None;
     case SILInstructionKind::BeginBorrowInst:
       return BorrowScopeOperandKind(BeginBorrow);
+    case SILInstructionKind::BeginApplyInst:
+      return BorrowScopeOperandKind(BeginApply);
     }
   }
 
@@ -255,6 +258,13 @@ struct BorrowScopeOperand {
         }
       }
       return;
+    case BorrowScopeOperandKind::BeginApply: {
+      auto *user = cast<BeginApplyInst>(op->getUser());
+      for (auto *use : user->getTokenResult()->getUses()) {
+        func(use);
+      }
+      return;
+    }
     }
     llvm_unreachable("Covered switch isn't covered");
   }
