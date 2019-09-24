@@ -458,6 +458,9 @@ public:
     bool shouldVerify(Decl *S) { return true; }
 
     bool shouldVerify(TypeAliasDecl *typealias) {
+      if (!shouldVerify(cast<GenericTypeDecl>(typealias)))
+        return false;
+
       // Don't verify type aliases formed by the debugger; they violate some
       // AST invariants involving archetypes.
       if (typealias->isDebuggerAlias()) return false;
@@ -487,6 +490,9 @@ public:
     // FIXME: This is a bit of a hack; we should be able to check the
     // invariants of a parsed body as well.
     bool shouldVerify(AbstractFunctionDecl *afd) {
+      if (!shouldVerify(cast<ValueDecl>(afd)))
+        return false;
+
       switch (afd->getBodyKind()) {
       case AbstractFunctionDecl::BodyKind::None:
       case AbstractFunctionDecl::BodyKind::TypeChecked:
@@ -736,6 +742,7 @@ public:
       return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(fn));\
     }                                                           \
     void cleanup(NODE *fn) {                                    \
+      cleanup(cast<ASTNodeBase<NODE*>::BaseTy>(fn));            \
       popFunction(fn);                                          \
     }
 #define TYPE_LIKE(NODE)                                         \
@@ -748,6 +755,7 @@ public:
       return shouldVerify(cast<ASTNodeBase<NODE*>::BaseTy>(dc));\
     }                                                           \
     void cleanup(NODE *dc) {                                    \
+      cleanup(cast<ASTNodeBase<NODE*>::BaseTy>(dc));            \
       popScope(dc);                                             \
     }
 
@@ -770,6 +778,7 @@ public:
     }
 
     void cleanup(BraceStmt *BS) {
+      cleanup(cast<Stmt>(BS));
       InImplicitBraceStmt.pop_back();
       popScope(BS);
     }
@@ -787,6 +796,8 @@ public:
     }
 
     void cleanup(ForEachStmt *S) {
+      cleanup(cast<LabeledStmt>(S));
+
       if (!S->getElementExpr())
         return;
 
@@ -807,6 +818,8 @@ public:
     }
 
     void cleanup(InterpolatedStringLiteralExpr *expr) {
+      cleanup(cast<LiteralExpr>(expr));
+
       if (!expr->getInterpolationExpr())
         return;
 
@@ -831,6 +844,8 @@ public:
     }
 
     void cleanup(OpenExistentialExpr *expr) {
+      cleanup(cast<Expr>(expr));
+
       // In rare instances we clear the opaque value because we no
       // longer have a subexpression that references it.
       if (!expr->getOpaqueValue())
@@ -852,13 +867,15 @@ public:
     }
     
     void cleanup(MakeTemporarilyEscapableExpr *expr) {
+      cleanup(cast<Expr>(expr));
+
       assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
     }
 
     // Register the OVEs in a DestructureTupleExpr.
     bool shouldVerify(DestructureTupleExpr *expr) {
-      if (!shouldVerify(cast<Expr>(expr)))
+      if (!shouldVerify(cast<ImplicitConversionExpr>(expr)))
         return false;
 
       for (auto *opaqueElt : expr->getDestructuredElements()) {
@@ -870,6 +887,8 @@ public:
     }
 
     void cleanup(DestructureTupleExpr *expr) {
+      cleanup(cast<ImplicitConversionExpr>(expr));
+
       for (auto *opaqueElt : expr->getDestructuredElements()) {
         assert(OpaqueValues.count(opaqueElt));
         OpaqueValues.erase(opaqueElt);
@@ -885,6 +904,8 @@ public:
       return true;
     }
     void cleanup(OptionalEvaluationExpr *expr) {
+      cleanup(cast<Expr>(expr));
+
       assert(OptionalEvaluations.back() == expr);
       OptionalEvaluations.pop_back();
     }
@@ -901,6 +922,8 @@ public:
       return true;
     }
     void cleanup(CollectionUpcastConversionExpr *expr) {
+      cleanup(cast<ImplicitConversionExpr>(expr));
+
       if (auto keyConversion = expr->getKeyConversion())
         OpaqueValues.erase(keyConversion.OrigValue);
       if (auto valueConversion = expr->getValueConversion())
