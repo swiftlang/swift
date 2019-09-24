@@ -132,8 +132,6 @@ class CMake(object):
         define("CMAKE_CXX_COMPILER:PATH", toolchain.cxx)
         define("CMAKE_LIBTOOL:PATH", toolchain.libtool)
 
-        define("LLVM_TEMPORARILY_ALLOW_OLD_TOOLCHAIN", "ON")
-
         if args.cmake_generator == 'Xcode':
             define("CMAKE_CONFIGURATION_TYPES",
                    "Debug;Release;MinSizeRel;RelWithDebInfo")
