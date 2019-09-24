@@ -913,7 +913,8 @@ ToolChain::constructInvocation(const MergeModuleJobAction &job,
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::TY_SwiftModuleDocFile, "-emit-module-doc-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
-                   file_types::TY_SwiftSourceInfoFile, "-emit-module-source-info-path");
+                   file_types::TY_SwiftSourceInfoFile,
+                   "-emit-module-source-info-path");
   addOutputsOfType(Arguments, context.Output, context.Args,
                    file_types::ID::TY_SwiftModuleInterfaceFile,
                    "-emit-module-interface-path");

@@ -24,7 +24,6 @@
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Driver/Util.h"
-#include "swift/Option/Options.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
@@ -355,12 +354,10 @@ private:
                                       StringRef workingDirectory,
                                       CommandOutput *Output) const;
 
-  void choosePrivateOutputFilePath(Compilation &C,
-                                   const TypeToPathMap *OutputMap,
-                                   StringRef workingDirectory,
-                                   CommandOutput *Output,
-                                   file_types::ID fileID,
-                                   Optional<options::ID> DriverOptForPath = llvm::None) const;
+  void chooseSwiftSourceInfoOutputPath(Compilation &C,
+                                       const TypeToPathMap *OutputMap,
+                                       StringRef workingDirectory,
+                                       CommandOutput *Output) const;
 
   void chooseModuleInterfacePath(Compilation &C, const JobAction *JA,
                                  StringRef workingDirectory,
