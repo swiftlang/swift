@@ -2496,7 +2496,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                 # Only set the extra arguments if they're not empty.
                 if [[ -z "${results_targets[@]}" ]]; then
-                    DOTEST_ARGS="${DOTEST_ARGS};-E;\"${DOTEST_EXTRA}\""
+                    DOTEST_ARGS="${DOTEST_ARGS};-E;\\\"${DOTEST_EXTRA}\\\""
                 fi
 
                 cmake_options=(
