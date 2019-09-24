@@ -1740,7 +1740,8 @@ namespace {
         return nullptr;
       }
 
-      tc.validateDecl(fn);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)fn->getInterfaceType();
       
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
@@ -1926,7 +1927,8 @@ namespace {
         return nullptr;
       }
 
-      tc.validateDecl(maxFloatTypeDecl);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)maxFloatTypeDecl->getInterfaceType();
       auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
@@ -4116,7 +4118,8 @@ namespace {
       assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
-      tc.validateDecl(method);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)method->getInterfaceType();
       if (!method->isObjC()) {
         // If the method declaration lies in a protocol and we're providing
         // a default implementation of the method through a protocol extension

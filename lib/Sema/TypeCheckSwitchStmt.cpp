@@ -774,15 +774,9 @@ namespace {
           auto children = E->getAllElements();
           std::transform(children.begin(), children.end(),
                          std::back_inserter(arr), [&](EnumElementDecl *eed) {
-            // We need the interface type of this enum case but it may
-            // not have been computed.
-            if (!eed->hasInterfaceType()) {
-              TC.validateDecl(eed);
-            }
-
-            // If there's still no interface type after validation then there's
+            // If there's still no interface type then there's
             // not much else we can do here.
-            if (!eed->hasInterfaceType()) {
+            if (!eed->getInterfaceType()) {
               return Space();
             }
 
@@ -1429,7 +1423,8 @@ namespace {
       }
       case PatternKind::EnumElement: {
         auto *VP = cast<EnumElementPattern>(item);
-        TC.validateDecl(item->getType()->getEnumOrBoundGenericEnum());
+        // FIXME(InterfaceTypeRequest): Remove this.
+        (void)item->getType()->getEnumOrBoundGenericEnum()->getInterfaceType();
         
         auto *SP = VP->getSubPattern();
         if (!SP) {

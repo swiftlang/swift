@@ -466,7 +466,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
   auto &tc = derived.TC;
 
   // Validate the enum and its raw type.
-  tc.validateDecl(enumDecl);
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)enumDecl->getInterfaceType();
 
   // It must have a valid raw type.
   Type rawType = enumDecl->getRawType();
@@ -504,7 +505,8 @@ static bool canSynthesizeRawRepresentable(DerivedConformance &derived) {
     if (elt->hasAssociatedValues())
       return false;
 
-    tc.validateDecl(elt);
+    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+    (void)elt->getInterfaceType();
     if (elt->isInvalid()) {
       return false;
     }

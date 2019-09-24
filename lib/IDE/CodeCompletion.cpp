@@ -2046,8 +2046,8 @@ public:
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
-    assert(VD->hasInterfaceType());
     Type T = VD->getInterfaceType();
+    assert(!T.isNull());
 
     if (ExprType) {
       Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
@@ -2984,10 +2984,9 @@ public:
 
     if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
       return;
-
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
+    
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)D->getInterfaceType();
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
@@ -3144,9 +3143,9 @@ public:
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)D->getInterfaceType();
+    
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
@@ -3155,8 +3154,8 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
-        if (!Ele->hasInterfaceType())
-          D->getASTContext().getLazyResolver()->resolveDeclSignature(Ele);
+        // FIXME(InterfaceTypeRequest): Remove this.
+        (void)Ele->getInterfaceType();
         addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                           /*HasTypeContext=*/true);
       }
@@ -4330,8 +4329,8 @@ public:
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
 
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)D->getInterfaceType();
 
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||

@@ -1267,10 +1267,6 @@ namespace {
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
-        // FIXME: Remove this once getInterfaceType() is a request.
-        if (!field->hasInterfaceType())
-          TC.Context.getLazyResolver()->resolveDeclSignature(field);
-
         auto substFieldType =
           field->getInterfaceType().subst(subMap)->getCanonicalType();
 
@@ -1313,11 +1309,7 @@ namespace {
           properties.setNonTrivial();
           continue;
         }
-
-        // FIXME: Remove this once getInterfaceType() is a request.
-        if (!elt->hasInterfaceType())
-          TC.Context.getLazyResolver()->resolveDeclSignature(elt);
-
+        
         auto substEltType =
           elt->getArgumentInterfaceType().subst(subMap)->getCanonicalType();
         
@@ -1895,11 +1887,6 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
 
 CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
-
-  if (vd && !vd->hasInterfaceType()) {
-    Context.getLazyResolver()->resolveDeclSignature(vd);
-  }
-
   switch (c.kind) {
   case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
@@ -2612,11 +2599,6 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(SILType enumType,
   assert(elt->isIndirect() || elt->getParentEnum()->isIndirect());
 
   auto &C = M.getASTContext();
-
-  // FIXME: Remove this once getInterfaceType() is a request.
-  if (!elt->hasInterfaceType())
-    Context.getLazyResolver()->resolveDeclSignature(elt);
-
   auto boxSignature = getCanonicalSignatureOrNull(
       enumDecl->getGenericSignature());
 
@@ -2687,9 +2669,6 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
 
       if (elt->isIndirect())
         continue;
-
-      if (!elt->hasInterfaceType())
-        TC.Context.getLazyResolver()->resolveDeclSignature(elt);
 
       // Although one might assume enums have a fields count of 1
       // Which holds true for current uses of this code

@@ -2143,7 +2143,8 @@ TypeCheckFunctionBodyUntilRequest::evaluate(Evaluator &evaluator,
   if (tc.DebugTimeFunctionBodies || tc.WarnLongFunctionBodies)
     timer.emplace(AFD, tc.DebugTimeFunctionBodies, tc.WarnLongFunctionBodies);
 
-  tc.validateDecl(AFD);
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)AFD->getInterfaceType();
   tc.checkDefaultArguments(AFD->getParameters(), AFD);
 
   BraceStmt *body = AFD->getBody();

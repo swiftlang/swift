@@ -1463,7 +1463,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
   if (!type) {
-    decl->getASTContext().getLazyResolver()->resolveDeclSignature(decl);
     type = decl->getInterfaceType();
     if (!type) {
       return Type();
