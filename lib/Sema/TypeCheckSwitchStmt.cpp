@@ -1423,9 +1423,6 @@ namespace {
       }
       case PatternKind::EnumElement: {
         auto *VP = cast<EnumElementPattern>(item);
-        // FIXME(InterfaceTypeRequest): Remove this.
-        (void)item->getType()->getEnumOrBoundGenericEnum()->getInterfaceType();
-        
         auto *SP = VP->getSubPattern();
         if (!SP) {
           // If there's no sub-pattern then there's no further recursive
