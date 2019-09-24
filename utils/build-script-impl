@@ -2495,8 +2495,8 @@ for host in "${ALL_HOSTS[@]}"; do
                 DOTEST_ARGS="--build-dir;${lldb_build_dir}/lldb-test-build.noindex;${LLDB_TEST_CATEGORIES};-t"
 
                 # Only set the extra arguments if they're not empty.
-                if [[ -z "${results_targets[@]}" ]]; then
-                    DOTEST_ARGS="${DOTEST_ARGS};-E;\\\"${DOTEST_EXTRA}\\\""
+                if [[ -n "${DOTEST_EXTRA}" ]]; then
+                    DOTEST_ARGS="${DOTEST_ARGS};-E;${DOTEST_EXTRA}"
                 fi
 
                 cmake_options=(
