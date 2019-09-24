@@ -311,15 +311,14 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
         addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
     }
 
-  }
-
-  // Wrapped non-static member properties may have a backing initializer.
-  if (auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo()) {
-    if (wrapperInfo.initializeFromOriginal && !VD->isStatic()) {
-      addSymbol(
-          SILDeclRef(VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+    // Wrapped non-static member properties may have a backing initializer.
+    if (auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.initializeFromOriginal && !VD->isStatic()) {
+        addSymbol(
+            SILDeclRef(VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+      }
     }
-  };
+  }
 
   visitAbstractStorageDecl(VD);
 }
