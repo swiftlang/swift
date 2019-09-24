@@ -67,15 +67,15 @@ public class C<R> {
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 4)
     g((r, s))
-    // IR: dbg.value
-    // IR: dbg.value({{.*}}, metadata ![[GI_T:[0-9]+]]
+    // Note to maintainers: the relative order of the constant dbg.values here
+    // seem to flip back and forth.
     // IR: dbg.value({{.*}}, metadata ![[GI_U:[0-9]+]]
+    // IR: dbg.value({{.*}}, metadata ![[GI_T:[0-9]+]]
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 5)
     g(Int(0))
-    // IR: dbg.value
-    // IR: dbg.value({{.*}}, metadata ![[GB_T:[0-9]+]]
     // IR: dbg.value({{.*}}, metadata ![[GB_U:[0-9]+]]
+    // IR: dbg.value({{.*}}, metadata ![[GB_T:[0-9]+]]
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 6)
     g(false)
