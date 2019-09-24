@@ -119,7 +119,29 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
   auto Context = ContextRef->nativeContext;
   
-  Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
+  // The `offset` fields must be zero.
+  if (Info.field.offset != 0
+      || Info.associated_types.offset != 0
+      || Info.builtin_types.offset != 0
+      || Info.capture.offset != 0
+      || Info.type_references.offset != 0
+      || Info.reflection_strings.offset != 0) {
+    fprintf(stderr, "reserved field in swift_reflection_info_t is not zero\n");
+    abort();
+  }
+  
+  ReflectionInfo ContextInfo{
+    {Info.field.section.Begin, Info.field.section.End},
+    {Info.associated_types.section.Begin, Info.associated_types.section.End},
+    {Info.builtin_types.section.Begin, Info.builtin_types.section.End},
+    {Info.capture.section.Begin, Info.capture.section.End},
+    {Info.type_references.section.Begin, Info.type_references.section.End},
+    {Info.reflection_strings.section.Begin, Info.reflection_strings.section.End},
+    Info.LocalStartAddress,
+    Info.RemoteStartAddress
+  };
+  
+  Context->addReflectionInfo(ContextInfo);
 }
 
 int

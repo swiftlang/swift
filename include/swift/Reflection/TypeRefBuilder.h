@@ -80,35 +80,12 @@ using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
 struct ReflectionInfo {
-  struct {
-    FieldSection Metadata;
-    uint64_t SectionOffset;
-  } Field;
-
-  struct {
-    AssociatedTypeSection Metadata;
-    uint64_t SectionOffset;
-  } AssociatedType;
-
-  struct {
-    BuiltinTypeSection Metadata;
-    uint64_t SectionOffset;
-  } Builtin;
-
-  struct {
-    CaptureSection Metadata;
-    uint64_t SectionOffset;
-  } Capture;
-
-  struct {
-    GenericSection Metadata;
-    uint64_t SectionOffset;
-  } TypeReference;
-
-  struct {
-    GenericSection Metadata;
-    uint64_t SectionOffset;
-  } ReflectionString;
+  FieldSection Field;
+  AssociatedTypeSection AssociatedType;
+  BuiltinTypeSection Builtin;
+  CaptureSection Capture;
+  GenericSection TypeReference;
+  GenericSection ReflectionString;
 
   uint64_t LocalStartAddress;
   uint64_t RemoteStartAddress;
@@ -580,8 +557,7 @@ public:
   const CaptureDescriptor *getCaptureDescriptor(uint64_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
-  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD,
-                                           uint64_t Offset);
+  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD);
 
   ///
   /// Dumping typerefs, field declarations, associated types
