@@ -61,6 +61,12 @@ struct IntStruct {
      }
      wrapped = 27
   }
+
+  // Check that we don't crash if the function has unrelated generic parameters.
+  // SR-11484
+  mutating func setit<V>(_ v: V) {
+    wrapped = 5
+  }
 }
 
 final class IntClass {
@@ -142,8 +148,13 @@ func testIntStruct() {
 
   // CHECK-NEXT:   .. init 42
   // CHECK-NEXT:   .. set 27
-  let t1 = IntStruct()
+  var t1 = IntStruct()
   // CHECK-NEXT: 27
+  print(t1.wrapped)
+
+  // CHECK-NEXT:   .. set 5
+  t1.setit(false)
+  // CHECK-NEXT: 5
   print(t1.wrapped)
 
   // CHECK-NEXT:   .. init 42
