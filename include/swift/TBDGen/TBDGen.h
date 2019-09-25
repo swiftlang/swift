@@ -24,9 +24,6 @@ namespace swift {
 class FileUnit;
 class ModuleDecl;
 
-/// The current ABI version of Swift, as tapi labels it.
-const uint8_t TAPI_SWIFT_ABI_VERSION = 5;
-
 /// Options for controlling the exact set of symbols included in the TBD
 /// output.
 struct TBDGenOptions {

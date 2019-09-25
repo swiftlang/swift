@@ -1600,7 +1600,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                     OptionalityOfReturn);
 }
 
-ImportedType ClangImporter::Implementation::importFunctionType(
+ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     DeclContext *dc, const clang::FunctionDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool isFromSystemModule, DeclName name, ParameterList *&parameterList) {
@@ -1892,7 +1892,7 @@ static Type mapGenericArgs(const DeclContext *fromDC,
   return type.subst(subs);
 }
 
-ImportedType ClangImporter::Implementation::importMethodType(
+ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCMethodDecl *clangDecl,
     ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
     bool isFromSystemModule, ParameterList **bodyParams,
@@ -2186,7 +2186,7 @@ ImportedType ClangImporter::Implementation::importMethodType(
           importedType.isImplicitlyUnwrapped()};
 }
 
-ImportedType ClangImporter::Implementation::importAccessorMethodType(
+ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCPropertyDecl *property,
     const clang::ObjCMethodDecl *clangDecl, bool isFromSystemModule,
     ImportedName functionName, swift::ParameterList **params) {
@@ -2205,7 +2205,7 @@ ImportedType ClangImporter::Implementation::importAccessorMethodType(
 
   // The member was defined in 'origDC', but is being imported into 'dc'.
   // 'dc' must be a subclass or a type conforming to protocol.
-  // FIXME: Duplicated from importMethodType.
+  // FIXME: Duplicated from importMethodParamsAndReturnType.
   DeclContext *origDC = importDeclContextOf(property,
                                             property->getDeclContext());
   assert(origDC);
