@@ -4788,8 +4788,8 @@ void swift::serializeToBuffers(
       return false;
     });
     if (moduleSourceInfoBuffer)
-      *moduleSourceInfoBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
-        std::move(buf), options.SourceInfoOutputPath);
+      *moduleSourceInfoBuffer = std::make_unique<llvm::SmallVectorMemoryBuffer>(
+          std::move(buf), options.SourceInfoOutputPath);
   }
 }
 
