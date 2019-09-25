@@ -437,17 +437,41 @@ struct SR_11477_W {
   }
 }
 
+@propertyWrapper
+ struct SR_11477_W1 {
+   let name: String
+
+   init() {
+     self.name = "Init"
+   }
+
+   init(name: String = "DefaultParamInit") {
+     self.name = name
+   }
+
+   var wrappedValue: Int {
+     get { return 0 }
+   }
+ }
+
 struct SR_11477_C {
   @SR_11477_W var property: Int
+  @SR_11477_W1 var property1: Int
+
   init() {}
   func foo() { print(_property.name) }
+  func foo1() { print(_property1.name) }
 }
 
 func testWrapperInitWithDefaultArg() {
+  // CHECK: ## InitWithDefaultArg
+  print("\n## InitWithDefaultArg")
   let use = SR_11477_C()
   
   use.foo()
-  // CHECK: DefaultParamInit
+  use.foo1()
+  // CHECK-NEXT: DefaultParamInit
+  // CHECK-NEXT: Init
 }
 
 testIntStruct()
