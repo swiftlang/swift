@@ -1822,18 +1822,21 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 
 class DifferentiableActivityCollection {
 public:
-  SmallDenseMap<GenericSignature *, DifferentiableActivityInfo> activityInfoMap;
+  SmallDenseMap<std::pair<GenericSignature *, AutoDiffAssociatedFunctionKind>,
+                DifferentiableActivityInfo>
+      activityInfoMap;
   SILFunction &function;
   DominanceInfo *domInfo;
   PostDominanceInfo *postDomInfo;
 
   DifferentiableActivityInfo &getActivityInfo(
       GenericSignature *assocGenSig, AutoDiffAssociatedFunctionKind kind) {
-    auto activityInfoLookup = activityInfoMap.find(assocGenSig);
+    auto activityInfoLookup = activityInfoMap.find({assocGenSig, kind});
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
+    DifferentiableActivityInfo activityInfo(*this, assocGenSig, kind);
     auto insertion = activityInfoMap.insert(
-        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig, kind)});
+        {{assocGenSig, kind}, activityInfo});
     return insertion.first->getSecond();
   }
 

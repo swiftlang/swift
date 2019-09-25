@@ -709,10 +709,30 @@ public:
 
 namespace llvm {
 
+using swift::AutoDiffAssociatedFunctionKind;
 using swift::SILAutoDiffIndices;
 using swift::OptionSet;
 
 template<typename T> struct DenseMapInfo;
+
+template<> struct DenseMapInfo<AutoDiffAssociatedFunctionKind> {
+  static AutoDiffAssociatedFunctionKind getEmptyKey() {
+    return AutoDiffAssociatedFunctionKind::innerty(DenseMapInfo<char>::getEmptyKey());
+  }
+
+  static AutoDiffAssociatedFunctionKind getTombstoneKey() {
+    return AutoDiffAssociatedFunctionKind::innerty(DenseMapInfo<char>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffAssociatedFunctionKind &Val) {
+    return DenseMapInfo<char>::getHashValue(Val.rawValue);
+  }
+
+  static bool isEqual(const AutoDiffAssociatedFunctionKind &LHS,
+                      const AutoDiffAssociatedFunctionKind &RHS) {
+    return LHS == RHS;
+  }
+};
 
 template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
