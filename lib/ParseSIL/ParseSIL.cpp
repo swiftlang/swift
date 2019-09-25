@@ -1518,6 +1518,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
       } else if (!ParseState && Id.str() == "propertyinit") {
         Kind = SILDeclRef::Kind::StoredPropertyInitializer;
         ParseState = 1;
+      } else if (!ParseState && Id.str() == "backinginit") {
+        Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
+        ParseState = 1;
       } else if (Id.str() == "foreign") {
         IsObjC = true;
         break;

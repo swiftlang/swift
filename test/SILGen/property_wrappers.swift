@@ -97,7 +97,7 @@ func forceHasMemberwiseInit() {
 // CHECK-NOT: return
 // CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV2_y33_{{.*}}23WrapperWithInitialValueVyxGvpfi : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> () -> @out τ_0_0
 // CHECK-NOT: return
-// CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+// CHECK: function_ref @$s17property_wrappers17HasMemberwiseInitV1yxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@in τ_0_0) -> @out WrapperWithInitialValue<τ_0_0>
 
 // Initialization of z
 // CHECK-NOT: return
@@ -229,8 +229,9 @@ struct UseLazy<T: DefaultInit> {
   @Lazy var wibble = [1, 2, 3]
 
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers7UseLazyV3foo3bar6wibbleACyxGSi_xSaySiGtcfC : $@convention(method) <T where T : DefaultInit> (Int, @in T, @owned Array<Int>, @thin UseLazy<T>.Type) -> @out UseLazy<T>
-  // CHECK: function_ref @$s17property_wrappers7UseLazyV4_foo33_{{.*}}AA0D0OySiGvpfiSiycfu_ : $@convention(thin) (@owned Int) -> Int
-  // CHECK: function_ref @$s17property_wrappers4LazyO12wrappedValueACyxGxyXA_tcfC : $@convention(method) <τ_0_0> (@owned @callee_guaranteed () -> @out τ_0_0, @thin Lazy<τ_0_0>.Type) -> @out Lazy<τ_0_0>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3fooSivpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (Int) -> @owned Lazy<Int>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV3barxvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@in τ_0_0) -> @out Lazy<τ_0_0>
+  // CHECK: function_ref @$s17property_wrappers7UseLazyV6wibbleSaySiGvpfP : $@convention(thin) <τ_0_0 where τ_0_0 : DefaultInit> (@owned Array<Int>) -> @owned Lazy<Array<Int>>
 }
 
 struct X { }
@@ -325,9 +326,8 @@ struct CompositionMembers {
   // CHECK: %0 = string_literal utf8 "Hello"
 
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers18CompositionMembersV2p12p2ACSiSg_SSSgtcfC : $@convention(method) (Optional<Int>, @owned Optional<String>, @thin CompositionMembers.Type) -> @owned CompositionMembers
-  // CHECK: function_ref @$s17property_wrappers8WrapperCV12wrappedValueACyxGxSg_tcfC
-  // CHECK: function_ref @$s17property_wrappers8WrapperBV12wrappedValueACyxGx_tcfC
-  // CHECK: function_ref @$s17property_wrappers8WrapperAV12wrappedValueACyxGx_tcfC
+  // CHECK: s17property_wrappers18CompositionMembersV3_p233_{{.*}}8WrapperAVyAA0N1BVyAA0N1CVySSGGGvpfi
+
 }
 
 func testComposition() {
@@ -388,7 +388,7 @@ struct ObservingTest {
 struct WithTuples {
 	// CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers10WithTuplesVACycfC : $@convention(method) (@thin WithTuples.Type) -> WithTuples {
 	// CHECK: function_ref @$s17property_wrappers10WithTuplesV10_fractions33_F728088E0028E14D18C6A10CF68512E8LLAA07WrapperC12InitialValueVySd_S2dtGvpfi : $@convention(thin) () -> (Double, Double, Double)
-	// CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfC : $@convention(method) <τ_0_0> (@in τ_0_0, @thin WrapperWithInitialValue<τ_0_0>.Type) -> @out WrapperWithInitialValue<τ_0_0>
+	// CHECK: function_ref @$s17property_wrappers10WithTuplesV9fractionsSd_S2dtvpfP : $@convention(thin) (Double, Double, Double) -> WrapperWithInitialValue<(Double, Double, Double)>
   @WrapperWithInitialValue var fractions = (1.3, 0.7, 0.3)
 
 	static func getDefault() -> WithTuples {
@@ -453,10 +453,45 @@ public class TestClass<T> {
   @WrapperWithInitialValue var value: T
 
   // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers9TestClassC5value8protocolACyxGx_qd__tcAA0C8ProtocolRd__lufc
-  // CHECK: metatype $@thin WrapperWithInitialValue<T>.Type
-  // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfCTc
+  // CHECK: [[BACKING_INIT:%.*]] = function_ref @$s17property_wrappers9TestClassC5valuexvpfP : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out WrapperWithInitialValue<τ_0_0>
+  // CHECK-NEXT: partial_apply [callee_guaranteed] [[BACKING_INIT]]<T>()
   init<U: TestProtocol>(value: T, protocol: U) {
     self.value = value
+  }
+}
+
+// Composition with wrappedValue initializers that have default values.
+@propertyWrapper
+struct Outer<Value> {
+  var wrappedValue: Value
+
+  init(a: Int = 17, wrappedValue: Value, s: String = "hello") {
+    self.wrappedValue = wrappedValue
+  }
+}
+
+
+@propertyWrapper
+struct Inner<Value> {
+  var wrappedValue: Value
+
+  init(wrappedValue: @autoclosure @escaping () -> Value, d: Double = 3.14159) {
+    self.wrappedValue = wrappedValue()
+  }
+}
+
+struct ComposedInit {
+  @Outer @Inner var value: Int
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers12ComposedInitV5valueSivpfP : $@convention(thin) (Int) -> Outer<Inner<Int>> {
+  // CHECK: function_ref @$s17property_wrappers12ComposedInitV6_value33_F728088E0028E14D18C6A10CF68512E8LLAA5OuterVyAA5InnerVySiGGvpfiSiycfu_
+  // CHECK: function_ref @$s17property_wrappers5InnerV12wrappedValue1dACyxGxyXA_SdtcfcfA0_
+  // CHECK: function_ref @$s17property_wrappers5InnerV12wrappedValue1dACyxGxyXA_SdtcfC
+  // CHECK: function_ref @$s17property_wrappers5OuterV1a12wrappedValue1sACyxGSi_xSStcfcfA_
+  // CHECK: function_ref @$s17property_wrappers5OuterV1a12wrappedValue1sACyxGSi_xSStcfcfA1_
+  // CHECK: function_ref @$s17property_wrappers5OuterV1a12wrappedValue1sACyxGSi_xSStcfC
+  init() {
+    self.value = 17
   }
 }
 

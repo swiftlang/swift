@@ -313,6 +313,13 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
     limit = Limit::NeverPublic;
   }
 
+  // The property wrapper backing initializer is never public for resilient
+  // properties.
+  if (kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
+    if (cast<VarDecl>(d)->isResilient())
+      limit = Limit::NeverPublic;
+  }
+
   // Stored property initializers get the linkage of their containing type.
   if (isStoredPropertyInitializer()) {
     // Three cases:
@@ -788,6 +795,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     assert(!isCurried);
     return mangler.mangleInitializerEntity(cast<VarDecl>(getDecl()), SKind);
+
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    assert(!isCurried);
+    return mangler.mangleBackingInitializerEntity(cast<VarDecl>(getDecl()),
+                                                  SKind);
   }
 
   llvm_unreachable("bad entity kind!");
