@@ -41,6 +41,12 @@ using FunctionParam = swift::Demangle::FunctionParam<BuiltType>;
 template <typename BuilderType>
 using TypeDecoder = swift::Demangle::TypeDecoder<BuilderType>;
 
+/// The kind of mangled name to read.
+enum class MangledNameKind {
+  Type,
+  Symbol,
+};
+
 /// A pointer to the local buffer of an object that also remembers the
 /// address at which it was stored remotely.
 template <typename T>
@@ -285,6 +291,75 @@ public:
     TypeCache.clear();
     MetadataCache.clear();
     ContextDescriptorCache.clear();
+  }
+
+  /// Demangle a mangled name that was read from the given remote address.
+  Demangle::NodePointer demangle(RemoteRef<char> mangledName,
+                                 MangledNameKind kind,
+                                 Demangler &dem,
+                                 bool useOpaqueTypeSymbolicReferences = false) {
+    // Symbolic reference resolver for the demangle operation below.
+    auto symbolicReferenceResolver = [&](SymbolicReferenceKind kind,
+                                         Directness directness,
+                                         int32_t offset,
+                                         const void *base) ->
+        swift::Demangle::NodePointer {
+      // Resolve the reference to a remote address.
+      auto offsetInMangledName =
+            (const char *)base - mangledName.getLocalBuffer();
+      auto remoteAddress =
+        mangledName.getAddressData() + offsetInMangledName + offset;
+
+      if (directness == Directness::Indirect) {
+        if (auto indirectAddress = readPointerValue(remoteAddress)) {
+          remoteAddress = *indirectAddress;
+        } else {
+          return nullptr;
+        }
+      }
+
+      switch (kind) {
+      case Demangle::SymbolicReferenceKind::Context: {
+          auto context = readContextDescriptor(remoteAddress);
+          if (!context)
+            return nullptr;
+          // Try to preserve a reference to an OpaqueTypeDescriptor
+          // symbolically, since we'd like to read out and resolve the type ref
+          // to the underlying type if available.
+          if (useOpaqueTypeSymbolicReferences
+              && context->getKind() == ContextDescriptorKind::OpaqueType) {
+            return dem.createNode(
+                              Node::Kind::OpaqueTypeDescriptorSymbolicReference,
+                              context.getAddressData());
+          }
+            
+          return buildContextMangling(context, dem);
+      }
+      case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
+        // The symbolic reference points at a resolver function, but we can't
+        // execute code in the target process to resolve it from here.
+        return nullptr;
+      }
+      }
+
+      return nullptr;
+    };
+    
+    auto mangledNameStr =
+      Demangle::makeSymbolicMangledNameStringRef(mangledName.getLocalBuffer());
+
+    swift::Demangle::NodePointer result;
+    switch (kind) {
+    case MangledNameKind::Type:
+      result = dem.demangleType(mangledNameStr, symbolicReferenceResolver);
+      break;
+
+    case MangledNameKind::Symbol:
+      result = dem.demangleSymbol(mangledNameStr, symbolicReferenceResolver);
+      break;
+    }
+
+    return result;
   }
 
   /// Given a demangle tree, attempt to turn it into a type.
@@ -1630,12 +1705,6 @@ private:
     return name;
   }
 
-  /// The kind of mangled name to read.
-  enum class MangledNameKind {
-    Type,
-    Symbol,
-  };
-
   /// Clone the given demangle node into the demangler \c dem.
   static Demangle::NodePointer cloneDemangleNode(Demangle::NodePointer node,
                                                  Demangler &dem) {
@@ -1655,7 +1724,7 @@ private:
     }
     return newNode;
   }
-
+  
   /// Read a mangled name at the given remote address and return the
   /// demangle tree.
   Demangle::NodePointer readMangledName(RemoteAddress address,
@@ -1709,55 +1778,9 @@ private:
       break;
     }
 
-    // Symbolic reference resolver for the demangle operation below.
-    auto symbolicReferenceResolver = [&](SymbolicReferenceKind kind,
-                                         Directness directness,
-                                         int32_t offset,
-                                         const void *base) ->
-        swift::Demangle::NodePointer {
-      // Resolve the reference to a remote address.
-      auto offsetInMangledName = (const char *)base - mangledName.data();
-      auto remoteAddress =
-        address.getAddressData() + offsetInMangledName + offset;
-
-      if (directness == Directness::Indirect) {
-        if (auto indirectAddress = readPointerValue(remoteAddress)) {
-          remoteAddress = *indirectAddress;
-        } else {
-          return nullptr;
-        }
-      }
-
-      switch (kind) {
-      case Demangle::SymbolicReferenceKind::Context: {
-        Demangler innerDemangler;
-        auto result = readDemanglingForContextDescriptor(
-          remoteAddress, innerDemangler);
-
-        return cloneDemangleNode(result, dem);
-      }
-      case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
-        // The symbolic reference points at a resolver function, but we can't
-        // execute code in the target process to resolve it from here.
-        return nullptr;
-      }
-      }
-
-      return nullptr;
-    };
-
-    swift::Demangle::NodePointer result;
-    switch (kind) {
-    case MangledNameKind::Type:
-      result = dem.demangleType(mangledName, symbolicReferenceResolver);
-      break;
-
-    case MangledNameKind::Symbol:
-      result = dem.demangleSymbol(mangledName, symbolicReferenceResolver);
-      break;
-    }
-
-    return result;
+    return demangle(RemoteRef<char>(address.getAddressData(),
+                                    mangledName.data()),
+                    kind, dem);
   }
 
   /// Read and demangle the name of an anonymous context.
