@@ -129,6 +129,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   SerializationOptions serializationOpts;
   serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
+  serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath.c_str();
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
