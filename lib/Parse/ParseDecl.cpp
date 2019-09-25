@@ -3468,7 +3468,8 @@ void Parser::diagnoseConsecutiveIDs(StringRef First, SourceLoc FirstLoc,
 
   diagnose(Tok, diag::repeated_identifier, DeclKindName);
   auto Second = Tok.getText();
-  auto SecondLoc = consumeToken();
+  auto SecondLoc = Tok.getLoc();
+  ignoreToken();
 
   SourceRange FixRange(FirstLoc, SecondLoc);
   // Provide two fix-its: a direct concatenation of the two identifiers
