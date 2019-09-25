@@ -220,8 +220,6 @@ enum class SpecialMethodKind {
   NSDictionarySubscriptGetter
 };
 
-#define SWIFT_NATIVE_ANNOTATION_STRING "__swift native"
-
 #define SWIFT_PROTOCOL_SUFFIX "Protocol"
 #define SWIFT_CFTYPE_SUFFIX "Ref"
 
