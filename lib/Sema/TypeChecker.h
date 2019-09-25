@@ -782,8 +782,6 @@ public:
                                              DeclContext *DC);
 
   void validateDecl(ValueDecl *D);
-  void validateDecl(OperatorDecl *decl);
-  void validateDecl(PrecedenceGroupDecl *decl);
 
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
@@ -1635,11 +1633,12 @@ public:
 
   /// Given an expression that's known to be an infix operator,
   /// look up its precedence group.
-  PrecedenceGroupDecl *
+  static PrecedenceGroupDecl *
   lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
 
-  PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
-                                             SourceLoc nameLoc);
+  static PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc,
+                                                    Identifier name,
+                                                    SourceLoc nameLoc);
 
   /// Given an pre-folded expression, find LHS from the expression if a binary
   /// operator \c name appended to the expression.

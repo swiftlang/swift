@@ -19,6 +19,7 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/Basic/Statistic.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -271,6 +272,56 @@ public:
   bool isCached() const { return true; }
   Optional<GenericParamList *> getCachedResult() const;
   void cacheResult(GenericParamList *value) const;
+};
+
+struct PrecedenceGroupDescriptor {
+  DeclContext *dc;
+  Identifier ident;
+  SourceLoc nameLoc;
+
+  SourceLoc getLoc() const;
+
+  friend llvm::hash_code hash_value(const PrecedenceGroupDescriptor &owner) {
+    return hash_combine(llvm::hash_value(owner.dc),
+                        llvm::hash_value(owner.ident.getAsOpaquePointer()),
+                        llvm::hash_value(owner.nameLoc.getOpaquePointerValue()));
+  }
+
+  friend bool operator==(const PrecedenceGroupDescriptor &lhs,
+                         const PrecedenceGroupDescriptor &rhs) {
+    return lhs.dc == rhs.dc &&
+           lhs.ident == rhs.ident &&
+           lhs.nameLoc == rhs.nameLoc;
+  }
+
+  friend bool operator!=(const PrecedenceGroupDescriptor &lhs,
+                         const PrecedenceGroupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, const PrecedenceGroupDescriptor &d);
+
+class LookupPrecedenceGroupRequest
+    : public SimpleRequest<LookupPrecedenceGroupRequest,
+                           PrecedenceGroupDecl *(PrecedenceGroupDescriptor),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, PrecedenceGroupDescriptor descriptor) const;
+
+public:
+  // Source location
+  SourceLoc getNearestLoc() const;
+                               
+  // Separate caching.
+  bool isCached() const { return true; }
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

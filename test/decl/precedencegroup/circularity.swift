@@ -14,20 +14,20 @@ precedencegroup B { // expected-note {{precedence group declared here}}
 }
 
 precedencegroup C0 {
-  higherThan: C1
+  higherThan: C1 // expected-error {{cycle in higherThan relation: C0 -> C1 -> C0}}
 }
 precedencegroup C1 {
-  higherThan: C0 // expected-error {{cycle in higherThan relation: C1 -> C0 -> C1}}
+  higherThan: C0
 }
 
 precedencegroup D0 {
-  higherThan: D1
+  higherThan: D1 // expected-error {{cycle in higherThan relation: D0 -> D1 -> D2 -> D0}}
 }
 precedencegroup D1 {
   higherThan: D2
 }
 precedencegroup D2 {
-  higherThan: D0 // expected-error {{cycle in higherThan relation: D2 -> D0 -> D1 -> D2}}
+  higherThan: D0
 }
 
 precedencegroup E0 {

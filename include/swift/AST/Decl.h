@@ -6909,7 +6909,6 @@ public:
 /// \endcode
 class InfixOperatorDecl : public OperatorDecl {
   SourceLoc ColonLoc;
-  PrecedenceGroupDecl *PrecedenceGroup = nullptr;
 
 public:
   InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
@@ -6919,14 +6918,6 @@ public:
       : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
                      identifiers, identifierLocs),
         ColonLoc(colonLoc) {}
-
-  InfixOperatorDecl(DeclContext *DC, SourceLoc operatorLoc, Identifier name,
-                    SourceLoc nameLoc, SourceLoc colonLoc,
-                    PrecedenceGroupDecl *precedenceGroup,
-                    ArrayRef<NominalTypeDecl *> designatedNominalTypes)
-      : OperatorDecl(DeclKind::InfixOperator, DC, operatorLoc, name, nameLoc,
-                     designatedNominalTypes),
-        ColonLoc(colonLoc), PrecedenceGroup(precedenceGroup) {}
 
   SourceLoc getEndLoc() const {
     auto identifierLocs = getIdentifierLocs();
@@ -6942,10 +6933,7 @@ public:
 
   SourceLoc getColonLoc() const { return ColonLoc; }
 
-  PrecedenceGroupDecl *getPrecedenceGroup() const { return PrecedenceGroup; }
-  void setPrecedenceGroup(PrecedenceGroupDecl *PGD) {
-    PrecedenceGroup = PGD;
-  }
+  PrecedenceGroupDecl *getPrecedenceGroup() const;
 
   /// True if this decl's attributes conflict with those declared by another
   /// operator.
