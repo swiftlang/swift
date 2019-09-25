@@ -1010,6 +1010,8 @@ public:
 
   /// Check the default arguments that occur within this value decl.
   void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
+  /// Check the raw value expression in this enum element.
+  void checkRawValueExpr(EnumDecl *parent, EnumElementDecl *Elt);
 
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
