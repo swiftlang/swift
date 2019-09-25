@@ -380,6 +380,38 @@ func testDefaultNilOptIntStruct() {
   // CHECK-NEXT:   .. init nil
 }
 
+@propertyWrapper
+struct Wrapper2<T> {
+  var wrappedValue: T {
+    didSet {
+      print("  .. secondSet \(wrappedValue)")
+    }
+  }
+
+  init(before: Int = -10, wrappedValue initialValue: T, after: String = "end") {
+    print("  .. secondInit \(before), \(initialValue), \(after)")
+    self.wrappedValue = initialValue
+  }
+}
+
+struct HasComposed {
+  @Wrapper @Wrapper2 var x: Int
+
+  init() {
+    self.x = 17
+  }
+}
+
+func testComposed() {
+  // CHECK: ## Composed
+  print("\n## Composed")
+  _ = HasComposed()
+
+  // CHECK-NEXT: .. secondInit -10, 17, end
+  // CHECK-NEXT: .. init Wrapper2<Int>(wrappedValue: 17)
+}
+
+
 testIntStruct()
 testIntClass()
 testRefStruct()
@@ -387,3 +419,4 @@ testGenericClass()
 testDefaultInit()
 testOptIntStruct()
 testDefaultNilOptIntStruct()
+testComposed()

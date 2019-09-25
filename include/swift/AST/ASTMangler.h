@@ -124,6 +124,8 @@ public:
                                           SymbolKind SKind);
 
   std::string mangleInitializerEntity(const VarDecl *var, SymbolKind SKind);
+  std::string mangleBackingInitializerEntity(const VarDecl *var,
+                                             SymbolKind SKind);
 
   std::string mangleNominalType(const NominalTypeDecl *decl);
 
@@ -311,6 +313,7 @@ protected:
   void appendDefaultArgumentEntity(const DeclContext *ctx, unsigned index);
 
   void appendInitializerEntity(const VarDecl *var);
+  void appendBackingInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
                                  GenericSignature *&genericSig,

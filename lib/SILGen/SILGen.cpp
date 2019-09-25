@@ -1140,6 +1140,23 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   });
 }
 
+void SILGenModule::
+emitPropertyWrapperBackingInitializer(VarDecl *var) {
+  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+  emitOrDelayFunction(*this, constant, [this, constant, var](SILFunction *f) {
+    preEmitFunction(constant, var, f, var);
+    PrettyStackTraceSILFunction X(
+        "silgen emitPropertyWrapperBackingInitializer", f);
+    f->createProfiler(var, constant, ForDefinition);
+    auto varDC = var->getInnermostDeclContext();
+    auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
+    assert(wrapperInfo.initializeFromOriginal);
+    SILGenFunction SGF(*this, *f, varDC);
+    SGF.emitGeneratorFunction(constant, wrapperInfo.initializeFromOriginal);
+    postEmitFunction(constant, f);
+  });
+}
+
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
                                                  PatternBindingDecl *binding,
                                                      unsigned pbdEntry) {
