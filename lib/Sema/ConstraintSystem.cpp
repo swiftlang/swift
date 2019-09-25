@@ -622,7 +622,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
 Type ConstraintSystem::openUnboundGenericType(
     Type type, ConstraintLocatorBuilder locator) {
-  assert(!type->hasTypeParameter());
+  assert(!type->getCanonicalType()->hasTypeParameter());
 
   checkNestedTypeConstraints(*this, type, locator);
 
