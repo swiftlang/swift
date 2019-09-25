@@ -1630,13 +1630,10 @@ static bool diagnoseAvailability(IdentTypeRepr *IdType,
     DeclAvailabilityFlag::ContinueOnPotentialUnavailability;
   if (AllowPotentiallyUnavailableProtocol)
     flags |= DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
-  ASTContext &ctx = DC->getASTContext();
   auto componentRange = IdType->getComponentRange();
   for (auto comp : componentRange) {
     if (auto *typeDecl = comp->getBoundDecl()) {
-      assert(ctx.getLazyResolver() && "Must have a type checker!");
-      TypeChecker &tc = static_cast<TypeChecker &>(*ctx.getLazyResolver());
-      if (diagnoseDeclAvailability(typeDecl, tc, DC, comp->getIdLoc(), flags)) {
+      if (diagnoseDeclAvailability(typeDecl, DC, comp->getIdLoc(), flags)) {
         return true;
       }
     }
