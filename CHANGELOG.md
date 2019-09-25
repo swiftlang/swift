@@ -81,7 +81,7 @@ Swift Next
       mutableSelf.someProperty = newValue // Okay
     }
   }
-```
+  ```
 
 * [SE-0253][]:
 
