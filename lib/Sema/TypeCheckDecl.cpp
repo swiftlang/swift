@@ -46,6 +46,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
@@ -1613,15 +1614,15 @@ swift::findNonImplicitRequiredInit(const ConstructorDecl *CD) {
   return CD;
 }
 
-
 /// For building the higher-than component of the diagnostic path,
 /// we use the visited set, which we've embellished with information
 /// about how we reached a particular node.  This is reasonable because
 /// we need to maintain the set anyway.
-static void buildHigherThanPath(PrecedenceGroupDecl *last,
-                          const llvm::DenseMap<PrecedenceGroupDecl *,
-                                        PrecedenceGroupDecl *> &visitedFrom,
-                          raw_ostream &out) {
+static void buildHigherThanPath(
+    PrecedenceGroupDecl *last,
+    const llvm::DenseMap<PrecedenceGroupDecl *, PrecedenceGroupDecl *>
+        &visitedFrom,
+    raw_ostream &out) {
   auto it = visitedFrom.find(last);
   assert(it != visitedFrom.end());
   auto from = it->second;
@@ -1634,8 +1635,7 @@ static void buildHigherThanPath(PrecedenceGroupDecl *last,
 /// For building the lower-than component of the diagnostic path,
 /// we just do a depth-first search to find a path.
 static bool buildLowerThanPath(PrecedenceGroupDecl *start,
-                               PrecedenceGroupDecl *target,
-                               raw_ostream &out) {
+                               PrecedenceGroupDecl *target, raw_ostream &out) {
   if (start == target) {
     out << start->getName();
     return true;
@@ -1654,20 +1654,21 @@ static bool buildLowerThanPath(PrecedenceGroupDecl *start,
   return false;
 }
 
-static void checkPrecedenceCircularity(TypeChecker &TC,
+static void checkPrecedenceCircularity(DiagnosticEngine &D,
                                        PrecedenceGroupDecl *PGD) {
   // Don't diagnose if this group is already marked invalid.
-  if (PGD->isInvalid()) return;
+  if (PGD->isInvalid())
+    return;
 
   // The cycle doesn't necessarily go through this specific group,
   // so we need a proper visited set to avoid infinite loops.  We
   // also record a back-reference so that we can easily reconstruct
   // the cycle.
-  llvm::DenseMap<PrecedenceGroupDecl*, PrecedenceGroupDecl*> visitedFrom;
-  SmallVector<PrecedenceGroupDecl*, 4> stack;
+  llvm::DenseMap<PrecedenceGroupDecl *, PrecedenceGroupDecl *> visitedFrom;
+  SmallVector<PrecedenceGroupDecl *, 4> stack;
 
   // Fill out the targets set.
-  llvm::SmallPtrSet<PrecedenceGroupDecl*, 4> targets;
+  llvm::SmallPtrSet<PrecedenceGroupDecl *, 4> targets;
   stack.push_back(PGD);
   do {
     auto cur = stack.pop_back_val();
@@ -1681,7 +1682,8 @@ static void checkPrecedenceCircularity(TypeChecker &TC,
     targets.insert(cur);
 
     for (auto &rel : cur->getLowerThan()) {
-      if (!rel.Group) continue;
+      if (!rel.Group)
+        continue;
 
       // We can't have cycles in the lower-than relationship
       // because it has to point outside of the module.
@@ -1704,7 +1706,8 @@ static void checkPrecedenceCircularity(TypeChecker &TC,
     }
 
     for (auto &rel : cur->getHigherThan()) {
-      if (!rel.Group) continue;
+      if (!rel.Group)
+        continue;
 
       // Check whether we've reached a target declaration.
       if (!targets.count(rel.Group)) {
@@ -1730,54 +1733,35 @@ static void checkPrecedenceCircularity(TypeChecker &TC,
         // Build the lowerThan portion of the path (rel.Group -> PGD).
         buildLowerThanPath(PGD, rel.Group, str);
       }
-      
-      TC.diagnose(PGD->getHigherThanLoc(), diag::precedence_group_cycle, path);
+
+      D.diagnose(PGD->getHigherThanLoc(), diag::precedence_group_cycle, path);
       PGD->setInvalid();
       return;
     }
   } while (!stack.empty());
 }
 
-/// Do a primitive lookup for the given precedence group.  This does
-/// not validate the precedence group or diagnose if the lookup fails
-/// (other than via ambiguity); for that, use
-/// TypeChecker::lookupPrecedenceGroup.
-///
-/// Pass an invalid source location to suppress diagnostics.
-static PrecedenceGroupDecl *
-lookupPrecedenceGroupPrimitive(DeclContext *dc, Identifier name,
-                               SourceLoc nameLoc) {
-  if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    return sf->lookupPrecedenceGroup(name, cascading, nameLoc);
-  } else {
-    return dc->getParentModule()->lookupPrecedenceGroup(name, nameLoc);
-  }
-}
-
-void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
-  checkDeclAttributes(PGD);
-
+static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
+  assert(PGD && "Cannot validate a null precedence group!");
   if (PGD->isInvalid() || PGD->hasValidationStarted())
     return;
   DeclValidationRAII IBV(PGD);
 
-  bool isInvalid = false;
-
+  auto &Diags = PGD->getASTContext().Diags;
+  
   // Validate the higherThan relationships.
   bool addedHigherThan = false;
   for (auto &rel : PGD->getMutableHigherThan()) {
     if (rel.Group) continue;
 
-    auto group = lookupPrecedenceGroupPrimitive(PGD->getDeclContext(),
-                                                rel.Name, rel.NameLoc);
+    auto group = TypeChecker::lookupPrecedenceGroup(PGD->getDeclContext(),
+                                                    rel.Name, rel.NameLoc);
     if (group) {
       rel.Group = group;
-      validateDecl(group);
       addedHigherThan = true;
     } else if (!PGD->isInvalid()) {
-      diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      isInvalid = true;
+      Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+      PGD->setInvalid();
     }
   }
 
@@ -1786,56 +1770,51 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
     if (rel.Group) continue;
 
     auto dc = PGD->getDeclContext();
-    auto group = lookupPrecedenceGroupPrimitive(dc, rel.Name, rel.NameLoc);
+    auto group = TypeChecker::lookupPrecedenceGroup(dc, rel.Name, rel.NameLoc);
     if (group) {
-      if (group->getDeclContext()->getParentModule()
-            == dc->getParentModule()) {
+      if (group->getDeclContext()->getParentModule() == dc->getParentModule()) {
         if (!PGD->isInvalid()) {
-          diagnose(rel.NameLoc, diag::precedence_group_lower_within_module);
-          diagnose(group->getNameLoc(), diag::kind_declared_here,
-                   DescriptiveDeclKind::PrecedenceGroup);
-          isInvalid = true;
+          Diags.diagnose(rel.NameLoc,
+                         diag::precedence_group_lower_within_module);
+          Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
+                         DescriptiveDeclKind::PrecedenceGroup);
+          PGD->setInvalid();
         }
       } else {
         rel.Group = group;
-        validateDecl(group);
       }
     } else if (!PGD->isInvalid()) {
-      diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      isInvalid = true;
+      Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+      PGD->setInvalid();
     }
   }
-
+  
   // Check for circularity.
   if (addedHigherThan) {
-    checkPrecedenceCircularity(*this, PGD);
+    checkPrecedenceCircularity(Diags, PGD);
   }
-
-  if (isInvalid) PGD->setInvalid();
 }
 
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         Identifier name,
                                                         SourceLoc nameLoc) {
-  auto group = lookupPrecedenceGroupPrimitive(dc, name, nameLoc);
-  if (group) {
-    validateDecl(group);
-  } else if (nameLoc.isValid()) {
-    // FIXME: avoid diagnosing this multiple times per source file.
-    diagnose(nameLoc, diag::unknown_precedence_group, name);
-  }
+  auto *group = evaluateOrDefault(
+      dc->getASTContext().evaluator,
+      LookupPrecedenceGroupRequest({dc, name, nameLoc}), nullptr);
+  if (group)
+    validatePrecedenceGroup(group);
   return group;
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
-    DeclContext *DC, SourceLoc loc, Identifier ident, TypeChecker &tc,
+    DeclContext *DC, SourceLoc loc, Identifier ident, ASTContext &Ctx,
     TypeResolutionFlags flags = TypeResolutionFlags(0)) {
-  auto *TyR = new (tc.Context) SimpleIdentTypeRepr(loc, ident);
+  auto *TyR = new (Ctx) SimpleIdentTypeRepr(loc, ident);
   TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (TypeChecker::validateType(tc.Context, typeLoc,
+  if (TypeChecker::validateType(Ctx, typeLoc,
                                 TypeResolution::forInterface(DC), options))
     return nullptr;
 
@@ -1845,7 +1824,7 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 static bool checkDesignatedTypes(OperatorDecl *OD,
                                  ArrayRef<Identifier> identifiers,
                                  ArrayRef<SourceLoc> identifierLocs,
-                                 TypeChecker &TC) {
+                                 ASTContext &ctx) {
   assert(identifiers.size() == identifierLocs.size());
 
   SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
@@ -1853,7 +1832,7 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
 
   for (auto index : indices(identifiers)) {
     auto *decl = resolveSingleNominalTypeDecl(DC, identifierLocs[index],
-                                              identifiers[index], TC);
+                                              identifiers[index], ctx);
 
     if (!decl)
       return true;
@@ -1861,7 +1840,6 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
     designatedNominalTypes.push_back(decl);
   }
 
-  auto &ctx = TC.Context;
   OD->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
   return false;
 }
@@ -1871,85 +1849,70 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
 /// This establishes key invariants, such as an InfixOperatorDecl's
 /// reference to its precedence group and the transitive validity of that
 /// group.
-void TypeChecker::validateDecl(OperatorDecl *OD) {
-  checkDeclAttributes(OD);
-
-  auto IOD = dyn_cast<InfixOperatorDecl>(OD);
-
+llvm::Expected<PrecedenceGroupDecl *>
+OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
+                                         InfixOperatorDecl *IOD) const {
   auto enableOperatorDesignatedTypes =
-      getLangOpts().EnableOperatorDesignatedTypes;
+      IOD->getASTContext().LangOpts.EnableOperatorDesignatedTypes;
 
-  // Pre- or post-fix operator?
-  if (!IOD) {
-    auto nominalTypes = OD->getDesignatedNominalTypes();
-    if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-      auto identifiers = OD->getIdentifiers();
-      auto identifierLocs = OD->getIdentifierLocs();
-      if (checkDesignatedTypes(OD, identifiers, identifierLocs, *this))
-        OD->setInvalid();
-    }
-    return;
-  }
+  auto &Diags = IOD->getASTContext().Diags;
+  PrecedenceGroupDecl *group = nullptr;
 
-  if (!IOD->getPrecedenceGroup()) {
-    PrecedenceGroupDecl *group = nullptr;
+  auto identifiers = IOD->getIdentifiers();
+  auto identifierLocs = IOD->getIdentifierLocs();
 
-    auto identifiers = IOD->getIdentifiers();
-    auto identifierLocs = IOD->getIdentifierLocs();
-
-    if (!identifiers.empty()) {
-      group = lookupPrecedenceGroupPrimitive(IOD->getDeclContext(),
-                                             identifiers[0], identifierLocs[0]);
-      if (group) {
-        identifiers = identifiers.slice(1);
-        identifierLocs = identifierLocs.slice(1);
-      } else {
-        // If we're either not allowing types, or we are allowing them
-        // and this identifier is not a type, emit an error as if it's
-        // a precedence group.
-        auto *DC = OD->getDeclContext();
-        if (!(enableOperatorDesignatedTypes &&
-              resolveSingleNominalTypeDecl(
-                  DC, identifierLocs[0], identifiers[0], *this,
-                  TypeResolutionFlags::SilenceErrors))) {
-          diagnose(identifierLocs[0], diag::unknown_precedence_group,
-                   identifiers[0]);
-          identifiers = identifiers.slice(1);
-          identifierLocs = identifierLocs.slice(1);
-        }
-      }
-    }
-
-    if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
-      assert(!group);
-      diagnose(identifierLocs[0], diag::unknown_precedence_group,
-               identifiers[0]);
-      identifiers = identifiers.slice(1);
-      identifierLocs = identifierLocs.slice(1);
-      assert(identifiers.empty() && identifierLocs.empty());
-    }
-
-    if (!group) {
-      group = lookupPrecedenceGroupPrimitive(
-          IOD->getDeclContext(), Context.Id_DefaultPrecedence, SourceLoc());
-    }
+  if (!identifiers.empty()) {
+    group = TypeChecker::lookupPrecedenceGroup(
+        IOD->getDeclContext(), identifiers[0], identifierLocs[0]);
 
     if (group) {
-      validateDecl(group);
-      IOD->setPrecedenceGroup(group);
+      identifiers = identifiers.slice(1);
+      identifierLocs = identifierLocs.slice(1);
     } else {
-      diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-               Context.Id_DefaultPrecedence);
-    }
-
-    auto nominalTypes = IOD->getDesignatedNominalTypes();
-    if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-      if (checkDesignatedTypes(IOD, identifiers, identifierLocs, *this)) {
-        IOD->setInvalid();
-        return;
+      // If we're either not allowing types, or we are allowing them
+      // and this identifier is not a type, emit an error as if it's
+      // a precedence group.
+      auto *DC = IOD->getDeclContext();
+      if (!(enableOperatorDesignatedTypes &&
+            resolveSingleNominalTypeDecl(DC, identifierLocs[0], identifiers[0],
+                                         IOD->getASTContext(),
+                                         TypeResolutionFlags::SilenceErrors))) {
+        Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
+                       identifiers[0]);
+        identifiers = identifiers.slice(1);
+        identifierLocs = identifierLocs.slice(1);
       }
     }
   }
+
+  if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
+    assert(!group);
+    Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
+                   identifiers[0]);
+    identifiers = identifiers.slice(1);
+    identifierLocs = identifierLocs.slice(1);
+    assert(identifiers.empty() && identifierLocs.empty());
+  }
+
+  if (!group) {
+    group = TypeChecker::lookupPrecedenceGroup(
+        IOD->getDeclContext(), IOD->getASTContext().Id_DefaultPrecedence,
+        SourceLoc());
+  }
+
+  if (!group) {
+    Diags.diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
+                   IOD->getASTContext().Id_DefaultPrecedence);
+  }
+
+  auto nominalTypes = IOD->getDesignatedNominalTypes();
+  if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
+    if (checkDesignatedTypes(IOD, identifiers, identifierLocs,
+                             IOD->getASTContext())) {
+      IOD->setInvalid();
+    }
+  }
+  return group;
 }
 
 llvm::Expected<SelfAccessKind>
@@ -2114,12 +2077,26 @@ public:
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
-    TC.validateDecl(OD);
+    TC.checkDeclAttributes(OD);
+    auto &Ctx = OD->getASTContext();
+    if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
+      (void)IOD->getPrecedenceGroup();
+    } else {
+      auto nominalTypes = OD->getDesignatedNominalTypes();
+      if (nominalTypes.empty() && Ctx.LangOpts.EnableOperatorDesignatedTypes) {
+        auto identifiers = OD->getIdentifiers();
+        auto identifierLocs = OD->getIdentifierLocs();
+        if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
+          OD->setInvalid();
+      }
+      return;
+    }
     checkAccessControl(TC, OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
-    TC.validateDecl(PGD);
+    TC.checkDeclAttributes(PGD);
+    validatePrecedenceGroup(PGD);
     checkAccessControl(TC, PGD);
   }
 

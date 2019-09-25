@@ -7471,6 +7471,28 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          lowerThan.size() * sizeof(Relation));
 }
 
+llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
+  auto *dc = descriptor.dc;
+  PrecedenceGroupDecl *group = nullptr;
+  if (auto sf = dc->getParentSourceFile()) {
+    bool cascading = dc->isCascadingContextForLookup(false);
+    group = sf->lookupPrecedenceGroup(descriptor.ident, cascading,
+                                      descriptor.nameLoc);
+  } else {
+    group = dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
+                                                         descriptor.nameLoc);
+  }
+  return group;
+}
+
+PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      OperatorPrecedenceGroupRequest{const_cast<InfixOperatorDecl *>(this)},
+      nullptr);
+}
+
 bool FuncDecl::isDeferBody() const {
   return getName() == getASTContext().getIdentifier("$defer");
 }

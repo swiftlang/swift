@@ -3324,9 +3324,12 @@ public:
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), SourceLoc(),
-        cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
-        ctx.AllocateCopy(designatedNominalTypes));
-
+        ArrayRef<Identifier>{}, ArrayRef<SourceLoc>{});
+    result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
+    ctx.evaluator.cacheOutput(
+        OperatorPrecedenceGroupRequest{result},
+        std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
+    
     declOrOffset = result;
     return result;
   }
