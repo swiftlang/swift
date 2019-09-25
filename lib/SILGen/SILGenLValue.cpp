@@ -1431,8 +1431,6 @@ namespace {
         // Create the allocating setter function. It captures the base address.
         auto setterInfo = SGF.getConstantInfo(setter);
         SILValue setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
-        auto setterSubs = SGF.getFunction().getForwardingSubstitutionMap();
-
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
         SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
 
@@ -1446,7 +1444,7 @@ namespace {
 
         PartialApplyInst *setterPAI =
           SGF.B.createPartialApply(loc, setterFRef,
-                                   setterSubs, { capturedBase },
+                                   Substitutions, { capturedBase },
                                    ParameterConvention::Direct_Guaranteed);
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 
