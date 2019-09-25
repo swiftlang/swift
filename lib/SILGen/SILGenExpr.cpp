@@ -2378,6 +2378,26 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
   return RValue(SGF, e, refType, result);
 }
 
+static RValue
+emitInterpolationBuilderInit(RValueEmitter &RVE,
+                             InterpolatedStringLiteralExpr *E, SGFContext C) {
+  SILGenFunction &SGF = RVE.SGF;
+
+  PreparedArguments builderInitArgs;
+  RValue literalCapacity =
+      RVE.visit(E->getLiteralCapacityExpr(), SGFContext());
+  RValue interpolationCount =
+      RVE.visit(E->getInterpolationCountExpr(), SGFContext());
+  builderInitArgs.emplace(
+      {AnyFunctionType::Param(literalCapacity.getType()),
+       AnyFunctionType::Param(interpolationCount.getType())});
+  builderInitArgs.add(E, std::move(literalCapacity));
+  builderInitArgs.add(E, std::move(interpolationCount));
+
+  return SGF.emitApplyAllocatingInitializer(
+      E, E->getBuilderInit(), std::move(builderInitArgs), Type(), C);
+}
+
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
@@ -2395,31 +2415,18 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
     // Initialize the var with our SubExpr.
     auto VarInit = SGF.emitTemporary(SILLocation(E),
                                      SGF.getTypeLowering(VarType));
-    {
-      // Modified from TapExpr to evaluate the SubExpr directly rather than
-      // indirectly through the OpaqueValue system.
-      PreparedArguments builderInitArgs;
-      RValue literalCapacity = visit(E->getLiteralCapacityExpr(), SGFContext());
-      RValue interpolationCount =
-          visit(E->getInterpolationCountExpr(), SGFContext());
-      builderInitArgs.emplace(
-          {AnyFunctionType::Param(literalCapacity.getType()),
-           AnyFunctionType::Param(interpolationCount.getType())});
-      builderInitArgs.add(E, std::move(literalCapacity));
-      builderInitArgs.add(E, std::move(interpolationCount));
-      RValue subexpr_result = SGF.emitApplyAllocatingInitializer(
-          E, E->getBuilderInit(), std::move(builderInitArgs), Type(),
-          SGFContext(VarInit.get()));
-      if (!subexpr_result.isInContext()) {
-        ArgumentSource(
-            SILLocation(E),
-            std::move(subexpr_result).ensurePlusOne(SGF, SILLocation(E)))
-            .forwardInto(SGF, VarInit.get());
-      }
-    }
+
+    // Modified from TapExpr to evaluate the SubExpr directly rather than
+    // indirectly through the OpaqueValue system.
+    RValue builderInit =
+        emitInterpolationBuilderInit(*this, E, SGFContext());
+
+    if (!builderInit.isInContext())
+      std::move(builderInit)
+        .ensurePlusOne(SGF, SILLocation(E))
+        .forwardInto(SGF, SILLocation(E), VarInit.get());
 
     auto VarAddress = VarInit->getManagedAddress();
-
     SILGenFunction::OpaqueValueRAII temporaryRef(SGF, ETap->getTemporaryRef(),
                                                  VarAddress);
 
