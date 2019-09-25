@@ -22,6 +22,7 @@
 #include "swift/Basic/Dwarf.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/RuntimeFnWrappersGen.h"
 #include "swift/Runtime/Config.h"
@@ -1353,6 +1354,10 @@ IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
     return getGenModule(dc);
 
   return getPrimaryIGM();
+}
+
+uint32_t swift::irgen::getSwiftABIVersion() {
+  return IRGenModule::swiftVersion;
 }
 
 llvm::Triple IRGenerator::getEffectiveClangTriple() {
