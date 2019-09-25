@@ -1597,6 +1597,7 @@ if (auto *castInst = dyn_cast<TYPE>(inst)) { \
     CHECK_INST_TYPE_ACTIVE_DEST(StoreInst)
     CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrowInst)
     CHECK_INST_TYPE_ACTIVE_DEST(CopyAddrInst)
+    CHECK_INST_TYPE_ACTIVE_DEST(UnconditionalCheckedCastAddrInst)
     if ((isa<AllocationInst>(inst) && hasActiveResults))
       return true;
     CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCountingInst)
@@ -4660,6 +4661,24 @@ public:
 
     diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
                                cai->isInitializationOfDest());
+  }
+
+  /// Handle `unconditional_checked_cast_addr` instruction.
+  ///   Original: unconditional_checked_cast_addr $X in x to $Y in y
+  ///    Tangent: unconditional_checked_cast_addr $X.Tan in tan[x]
+  ///                                          to $Y.Tan in tan[y]
+  CLONE_AND_EMIT_TANGENT(UnconditionalCheckedCastAddr, uccai) {
+    auto diffBuilder = getDifferentialBuilder();
+    auto loc = uccai->getLoc();
+    auto *bb = uccai->getParent();
+    auto &tanSrc = getTangentBuffer(bb, uccai->getSrc());
+    auto tanDest = getTangentBuffer(bb, uccai->getDest());
+    if (errorOccurred)
+      return;
+
+    diffBuilder.createUnconditionalCheckedCastAddr(
+        loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
+        tanDest->getType().getASTType());
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
