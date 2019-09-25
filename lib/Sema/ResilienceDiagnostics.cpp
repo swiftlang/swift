@@ -143,6 +143,8 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                               TreatUsableFromInlineAsPublic).isPublic())
     return false;
 
+  auto &Context = DC->getASTContext();
+
   // Dynamic declarations were mistakenly not checked in Swift 4.2.
   // Do enforce the restriction even in pre-Swift-5 modes if the module we're
   // building is resilient, though.
@@ -194,18 +196,19 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
   if (downgradeToWarning == DowngradeToWarning::Yes)
     diagID = diag::resilience_decl_unavailable_warn;
 
-  diagnose(loc, diagID,
+  Context.Diags.diagnose(
+           loc, diagID,
            D->getDescriptiveKind(), diagName,
            D->getFormalAccessScope().accessLevelForDiagnostics(),
            static_cast<unsigned>(Kind),
            isAccessor);
 
   if (TreatUsableFromInlineAsPublic) {
-    diagnose(D, diag::resilience_decl_declared_here,
-             D->getDescriptiveKind(), diagName, isAccessor);
+    Context.Diags.diagnose(D, diag::resilience_decl_declared_here,
+                           D->getDescriptiveKind(), diagName, isAccessor);
   } else {
-    diagnose(D, diag::resilience_decl_declared_here_public,
-             D->getDescriptiveKind(), diagName, isAccessor);
+    Context.Diags.diagnose(D, diag::resilience_decl_declared_here_public,
+                           D->getDescriptiveKind(), diagName, isAccessor);
   }
 
   return (downgradeToWarning == DowngradeToWarning::No);
