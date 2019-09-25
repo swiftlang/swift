@@ -1716,7 +1716,7 @@ func rdar48443263() {
 
   func bar(_ s1: S1, _ s2: S2, _ fn: () -> Void) {
     foo(s1, fn) // Ok because s.V is Void
-    foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'}}
+    foo(s2, fn) // expected-error {{cannot convert value of type '() -> Void' to expected argument type '(S2.V) -> Void' (aka '(Int) -> ()')}}
   }
 }
 
