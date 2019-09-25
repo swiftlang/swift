@@ -832,7 +832,7 @@ void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
 }
 
 //----------------------------------------------------------------------------//
-// GenericSignatureRequest computation.
+// InferredGenericSignatureRequest computation.
 //----------------------------------------------------------------------------//
 
 void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {

@@ -33,6 +33,7 @@ class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
 class GenericParamList;
+class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
 class RequirementRepr;
@@ -1207,6 +1208,25 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+};
+
+class OperatorPrecedenceGroupRequest
+    : public SimpleRequest<OperatorPrecedenceGroupRequest,
+                           PrecedenceGroupDecl *(InfixOperatorDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, InfixOperatorDecl *PGD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
