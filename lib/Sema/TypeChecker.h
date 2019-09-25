@@ -782,8 +782,6 @@ public:
                                              DeclContext *DC);
 
   void validateDecl(ValueDecl *D);
-  void validateDecl(OperatorDecl *decl);
-  void validateDecl(PrecedenceGroupDecl *decl);
 
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
