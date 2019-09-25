@@ -1730,7 +1730,7 @@ struct TestConcrete1 {
 // Two initializers that can default initialize the wrapper //
 
 @propertyWrapper
-struct SR_11477_W1 { // Okay, because we'll pick the best one here
+struct SR_11477_W1 { // Okay
   let name: String
 
   init() {
@@ -1749,12 +1749,14 @@ struct SR_11477_W1 { // Okay, because we'll pick the best one here
 // Two initializers with default arguments that can default initialize the wrapper //
 
 @propertyWrapper
-struct SR_11477_W2 { // expected-error {{property wrapper type 'SR_11477_W2' has multiple default-value initializers}}
+struct SR_11477_W2 { // Okay
   let name: String
 
-  init(anotherName: String = "DefaultParamInit") {} // expected-note {{initializer 'init(anotherName:)' declared here}}
+  init(anotherName: String = "DefaultParamInit1") {
+    self.name = anotherName
+  }
 
-  init(name: String = "DefaultParamInit") { // expected-note {{initializer 'init(name:)' declared here}}
+  init(name: String = "DefaultParamInit2") {
     self.name = name
   }
 
