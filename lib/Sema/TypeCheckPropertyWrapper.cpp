@@ -125,34 +125,28 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
       continue;
 
     ParamDecl *argumentParam = nullptr;
-    bool allArgsDefault = true;
+    bool hasExtraneousParam = false;
     // Check whether every parameter meets one of the following criteria:
     //   (1) The parameter has a default argument, or
     //   (2) The parameter has the given argument label.
     for (auto param : *init->getParameters()) {
       // Recognize the first parameter with the requested argument label.
-      if (param->getArgumentName() == argumentLabel && !argumentParam) {
+      if (!argumentLabel.empty() && param->getArgumentName() == argumentLabel &&
+          !argumentParam) {
         argumentParam = param;
         continue;
       }
 
-      if (param->isDefaultArgument()) {
-        allArgsDefault &= true;
+      if (param->isDefaultArgument())
         continue;
-      } else {
-        // Forget we had a match.
-        allArgsDefault = false;
-        argumentParam = nullptr;
-        break;
-      }
+
+      // Skip this init as the param doesn't meet the above criteria
+      hasExtraneousParam = true;
+      break;
     }
 
-    if (initKind != PropertyWrapperInitKind::Default && !argumentParam)
+    if (hasExtraneousParam)
       continue;
-
-    if (initKind == PropertyWrapperInitKind::Default && !allArgsDefault) {
-      continue;
-    }
 
     // Failable initializers cannot be used.
     if (init->isFailable()) {
