@@ -310,9 +310,13 @@ function(_compile_swift_files
     set(module_base "${module_dir}/${SWIFTFILE_MODULE_NAME}")
     if(SWIFTFILE_SDK IN_LIST SWIFT_APPLE_PLATFORMS)
       set(specific_module_dir "${module_base}.swiftmodule")
+      set(specific_module_private_dir "${specific_module_dir}/Private")
+      set(source_info_file "${specific_module_private_dir}/${SWIFTFILE_ARCHITECTURE}.swiftsourceinfo")
       set(module_base "${module_base}.swiftmodule/${SWIFTFILE_ARCHITECTURE}")
     else()
       set(specific_module_dir)
+      set(specific_module_private_dir)
+      set(source_info_file "${module_base}.swiftsourceinfo")
     endif()
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
@@ -322,6 +326,8 @@ function(_compile_swift_files
     set(sib_file "${module_base}.Onone.sib")
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
+    list(APPEND swift_module_flags
+         "-emit-module-source-info-path" "${source_info_file}")
 
     if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
@@ -349,7 +355,8 @@ function(_compile_swift_files
     swift_install_in_component(DIRECTORY "${specific_module_dir}"
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                               OPTIONAL)
+                               OPTIONAL
+                               PATTERN "Private" EXCLUDE)
   else()
     swift_install_in_component(FILES ${module_outputs}
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
@@ -490,6 +497,7 @@ function(_compile_swift_files
         COMMAND
           "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir}
           ${specific_module_dir}
+          ${specific_module_private_dir}
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
