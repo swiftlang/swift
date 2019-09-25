@@ -482,6 +482,31 @@ extension String {
   }
 }
 
+@available(macOS, introduced: 9999, deprecated)
+@available(iOS, introduced: 9999, deprecated)
+@available(watchOS, introduced: 9999, deprecated)
+@available(tvOS, introduced: 9999, deprecated)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedString")
+@usableFromInline
+internal func _SwiftCreateBridgedString(
+  bytes: UnsafePointer<UInt8>,
+  length: Int,
+  encoding: _swift_shims_CFStringEncoding
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: bytes, count: length)
+  let str:String
+  switch encoding {
+  case kCFStringEncodingUTF8:
+    str = String(decoding: bufPtr, as: Unicode.UTF8.self)
+  case kCFStringEncodingASCII:
+    str = String(decoding: bufPtr, as: Unicode.ASCII.self)
+  default:
+    fatalError("Unsupported encoding in shim")
+  }
+  return Unmanaged<AnyObject>.passRetained(str._bridgeToObjectiveCImpl())
+}
+
 // At runtime, this class is derived from `__SwiftNativeNSStringBase`,
 // which is derived from `NSString`.
 //
