@@ -1004,23 +1004,12 @@ public:
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                             IterableDeclContext *IDC);
 
-  ParsedSyntaxResult<ParsedTypeInheritanceClauseSyntax>
-  parseTypeInheritanceClauseSyntax(bool allowClassRequirement,
-                                   bool allowAnyObject);
-
-  ParsedSyntaxResult<ParsedDeclSyntax>
-  parseDeclAssociatedTypeSyntax(ParseDeclOptions flags,
-                                Optional<ParsedAttributeListSyntax> attrs,
-                                Optional<ParsedModifierListSyntax> modifiers);
-
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
-                                            DeclAttributes &Attributes,
-                                            SourceLoc leadingLoc);
+                                            DeclAttributes &Attributes);
 
   ParserResult<TypeDecl> parseDeclAssociatedType(ParseDeclOptions Flags,
-                                                 DeclAttributes &Attributes,
-                                                 SourceLoc leadingLoc);
-
+                                                 DeclAttributes &Attributes);
+  
   /// Parse a #if ... #endif directive.
   /// Delegate callback function to parse elements in the blocks.
   ParserResult<IfConfigDecl> parseIfConfig(
@@ -1102,7 +1091,7 @@ public:
   
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
-  ParserStatus parseInheritance(MutableArrayRef<TypeLoc> &Inherited,
+  ParserStatus parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
                                 bool allowClassRequirement,
                                 bool allowAnyObject);
   ParserStatus parseDeclItem(bool &PreviousHadSemi,
