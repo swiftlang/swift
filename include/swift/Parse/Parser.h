@@ -1082,24 +1082,13 @@ public:
   /// an error parsing.
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
-
   bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                               SourceLoc &SpecifierLoc,
-                              TypeAttributes &Attributes) {
-    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
-        (Tok.is(tok::identifier) &&
-         (Tok.getRawText().equals("__shared") ||
-          Tok.getRawText().equals("__owned"))))
-      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
-    return false;
-  }
-  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
-                                     SourceLoc &SpecifierLoc,
-                                     TypeAttributes &Attributes);
-  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
-                          bool justChecking = false);
-  
-  
+                              TypeAttributes &Attributes);
+  ParserStatus parseTypeAttributeListSyntax(Optional<ParsedTokenSyntax> &specifier,
+                                            Optional<ParsedAttributeListSyntax> &attrs);
+  ParsedSyntaxResult<ParsedAttributeSyntax> parseTypeAttributeSyntax();
+
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(MutableArrayRef<TypeLoc> &Inherited,
@@ -1206,11 +1195,8 @@ public:
   ParserStatus
   parseGenericArgumentsAST(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
                            SourceLoc &LAngleLoc, SourceLoc &RAngleLoc);
-  TypeASTResult parseSILBoxType(GenericParamList *generics,
-                                const TypeAttributes &attrs,
-                                Optional<Scope> &GenericsScope);
-  TypeASTResult parseTypeSimpleOrCompositionAST(Diag<> MessageID,
-                                                bool HandleCodeCompletion);
+  TypeResult parseSILBoxTypeSyntax(
+      Optional<ParsedGenericParameterClauseListSyntax> genericParams);
   TypeASTResult parseAnyTypeAST();
 
   ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
@@ -1240,7 +1226,10 @@ public:
   TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
                                  ParamDecl::Specifier Specifier,
                                  SourceLoc SpecifierLoc);
-
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&ty,
+                             Optional<ParsedTokenSyntax> specifier,
+                             Optional<ParsedAttributeListSyntax> attrs);
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 

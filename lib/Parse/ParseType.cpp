@@ -62,6 +62,31 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   return ty;
 }
 
+/// Apply specifier and attributes to the parsed type.
+ParsedSyntaxResult<ParsedTypeSyntax>
+Parser::applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&ty,
+                                   Optional<ParsedTokenSyntax> specifier,
+                                   Optional<ParsedAttributeListSyntax> attrs) {
+  if (!attrs && !specifier)
+    return std::move(ty);
+
+  if (ty.isNull()) {
+    SmallVector<ParsedSyntax, 2> junk;
+    if (specifier)
+      junk.emplace_back(std::move(*specifier));
+    if (attrs)
+      junk.emplace_back(std::move(*attrs));
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeUnknownType(junk, *SyntaxContext),
+        ty.getStatus());
+  }
+
+  return makeParsedResult(
+      ParsedSyntaxRecorder::makeAttributedType(
+          std::move(specifier), std::move(attrs), ty.get(), *SyntaxContext),
+      ty.getStatus());
+}
+
 /// Parse layout constraint for 'where' clause in '@_specialize' attribute
 /// and in SIL.
 ///
@@ -188,7 +213,8 @@ Parser::TypeResult Parser::parseTypeSimple(Diag<> MessageID,
       auto token = consumeTokenSyntax();
       ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeUnknownType(
           {&token, 1}, *SyntaxContext);
-      return makeParsedError(std::move(ty));
+      // Return success result because we recovered.
+      return makeParsedResult(std::move(ty));
     }
 
     checkForInputIncomplete();
@@ -229,277 +255,238 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeSyntax() {
   return parseTypeSyntax(diag::expected_type);
 }
 
-ParsedSyntaxResult<ParsedTypeSyntax>
-Parser::parseTypeSyntax(Diag<> messageID, bool HandleCodeCompletion,
-                        bool IsSILFuncDecl) {
-  SyntaxParsingContext ctxt(SyntaxContext);
-  ctxt.setTransparent();
-
-  auto loc = Tok.getLoc();
-  auto tyR = parseType(messageID, HandleCodeCompletion, IsSILFuncDecl);
-  if (auto ty = SyntaxContext->popIf<ParsedTypeSyntax>()) {
-    Generator.addType(tyR.getPtrOrNull(), loc);
-    return makeParsedResult(std::move(*ty), tyR.getStatus());
-  }
-  return tyR.getStatus();
-}
-
 Parser::TypeASTResult Parser::parseType() {
   return parseType(diag::expected_type);
 }
 
-Parser::TypeASTResult Parser::parseSILBoxType(GenericParamList *generics,
-                                              const TypeAttributes &attrs,
-                                              Optional<Scope> &GenericsScope) {
-  auto LBraceLoc = consumeToken(tok::l_brace);
+ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseSILBoxTypeSyntax(
+    Optional<ParsedGenericParameterClauseListSyntax> generics) {
+  ParsedSILBoxTypeSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
 
-  SmallVector<SILBoxTypeRepr::Field, 4> Fields;
+  if (generics)
+    builder.useGenericParameterClauses(std::move(*generics));
+
+  // Parse '{'.
+  builder.useLeftBrace(consumeTokenSyntax(tok::l_brace));
+
+  // Parse comma separated field list.
   if (!Tok.is(tok::r_brace)) {
-    for (;;) {
-      bool Mutable;
-      if (Tok.is(tok::kw_var)) {
-        Mutable = true;
-      } else if (Tok.is(tok::kw_let)) {
-        Mutable = false;
-      } else {
+    bool hasNext = true;
+    do {
+      ParsedSILBoxTypeFieldSyntaxBuilder fieldBuilder(*SyntaxContext);
+
+      // Parse 'let' or 'var'.
+      if (!Tok.isAny(tok::kw_var, tok::kw_let)) {
         diagnose(Tok, diag::sil_box_expected_var_or_let);
-        return makeParserError();
+        break;
       }
-      SourceLoc VarOrLetLoc = consumeToken();
+      fieldBuilder.useSpecifier(consumeTokenSyntax());
 
-      auto fieldTy = parseType();
-      if (!fieldTy.getPtrOrNull())
-        return makeParserError();
-      Fields.push_back({VarOrLetLoc, Mutable, fieldTy.get()});
+      // Parse the type.
+      auto ty = parseTypeSyntax();
+      status |= ty.getStatus();
+      if (!ty.isNull())
+        fieldBuilder.useType(ty.get());
+      else
+        fieldBuilder.useType(
+            ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
 
-      if (consumeIf(tok::comma))
-        continue;
+      // Parse ','.
+      hasNext = (status.isSuccess() && Tok.is(tok::comma));
+      if (hasNext)
+        fieldBuilder.useTrailingComma(consumeTokenSyntax());
 
-      break;
-    }
+      builder.addFieldsMember(fieldBuilder.build());
+    } while (hasNext);
   }
 
+  // Parse '}'.
   if (!Tok.is(tok::r_brace)) {
     diagnose(Tok, diag::sil_box_expected_r_brace);
-    return makeParserError();
+    return makeParsedError(builder.build());
+  }
+  builder.useRightBrace(consumeTokenSyntax(tok::r_brace));
+
+  // Parse the generic argument.
+  if (startsWithLess(Tok)) {
+    auto genericArgs = parseGenericArgumentClauseSyntax();
+    status |= genericArgs.getStatus();
+    if (!genericArgs.isNull())
+      builder.useGenericArgumentClause(genericArgs.get());
   }
 
-  auto RBraceLoc = consumeToken(tok::r_brace);
-
-  // The generic arguments are taken from the enclosing scope. Pop the
-  // box layout's scope now.
-  GenericsScope.reset();
-
-  SourceLoc LAngleLoc, RAngleLoc;
-  SmallVector<TypeRepr*, 4> Args;
-  if (Tok.isContextualPunctuator("<")) {
-    LAngleLoc = consumeToken();
-    for (;;) {
-      auto argTy = parseType();
-      if (!argTy.getPtrOrNull())
-        return makeParserError();
-      Args.push_back(argTy.get());
-      if (consumeIf(tok::comma))
-        continue;
-      break;
-    }
-    if (!Tok.isContextualPunctuator(">")) {
-      diagnose(Tok, diag::sil_box_expected_r_angle);
-      return makeParserError();
-    }
-
-    RAngleLoc = consumeToken();
-  }
-
-  auto SILType = SILBoxTypeRepr::create(Context, generics, LBraceLoc, Fields,
-                                        RBraceLoc, LAngleLoc, Args, RAngleLoc);
-
-  auto AttributedType = applyAttributeToType(
-      SILType, attrs, ParamDecl::Specifier::Owned, SourceLoc());
-
-  return makeParserResult(AttributedType);
+  return makeParsedResult(builder.build());
 }
 
 /// parseType
 ///   type:
 ///     attribute-list type-composition
 ///     attribute-list type-function
+///     attribute-list sil-generic-function-type
+///     sil-box-type
 ///
 ///   type-function:
-///     type-composition 'throws'? '->' type
+///     '(' tuple-type-element-list ')' 'throws'? '->' type
 ///
-Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
-                                        bool HandleCodeCompletion,
-                                        bool IsSILFuncDecl) {
-  // Start a context for creating type syntax.
-  SyntaxParsingContext TypeParsingContext(SyntaxContext,
-                                          SyntaxContextKind::Type);
-  auto TypeLoc = Tok.getLoc();
+///   sil-generic-function-type:
+///     generic-parameter-clause-list type-function
+Parser::TypeResult Parser::parseTypeSyntax(Diag<> MessageID,
+                                           bool HandleCodeCompletion,
+                                           bool IsSILFuncDecl) {
+  ParserStatus status;
 
   // Parse attributes.
-  ParamDecl::Specifier specifier;
-  SourceLoc specifierLoc;
-  TypeAttributes attrs;
-  parseTypeAttributeList(specifier, specifierLoc, attrs);
-
-  Optional<Scope> GenericsScope;
+  Optional<ParsedTokenSyntax> specifier;
+  Optional<ParsedAttributeListSyntax> attrs;
+  if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+      (Tok.is(tok::identifier) && (Tok.getRawText().equals("__shared") ||
+                                   Tok.getRawText().equals("__owned"))))
+    status |= parseTypeAttributeListSyntax(specifier, attrs);
 
   // Parse generic parameters in SIL mode.
-  GenericParamList *generics = nullptr;
-  if (isInSILMode()) {
-    // If this is part of a sil function decl, generic parameters are visible in
-    // the function body; otherwise, they are visible when parsing the type.
-    if (!IsSILFuncDecl)
-      GenericsScope.emplace(this, ScopeKind::Generics);
-    generics = parseSILGenericParams().getPtrOrNull();
-  }
+  Optional<ParsedGenericParameterClauseListSyntax> genericParams;
+  SourceLoc genericParamsLoc = Tok.getLoc();
+  if (isInSILMode())
+    (void)parseSILGenericParamsSyntax(genericParams);
 
   // In SIL mode, parse box types { ... }.
   if (isInSILMode() && Tok.is(tok::l_brace)) {
-    auto SILBoxType = parseSILBoxType(generics, attrs, GenericsScope);
-    Generator.addType(SILBoxType.getPtrOrNull(), TypeLoc);
-    return SILBoxType;
+    auto ty = parseSILBoxTypeSyntax(std::move(genericParams));
+    return applyAttributeToTypeSyntax(std::move(ty), std::move(specifier),
+                                      std::move(attrs));
   }
 
-  auto RealTypeLoc = leadingTriviaLoc();
+  auto startLoc = Tok.getLoc();
+  // Parse the type.
+  auto ty = parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
+  status |= ty.getStatus();
+  auto endLoc = PreviousLoc;
 
-  ParserResult<TypeRepr> ty =
-    parseTypeSimpleOrCompositionAST(MessageID, HandleCodeCompletion);
-  if (ty.hasCodeCompletion())
-    return makeParserCodeCompletionResult<TypeRepr>();
-  if (ty.isNull())
-    return nullptr;
-  auto tyR = ty.get();
-
-  // Parse a throws specifier.
   // Don't consume 'throws', if the next token is not '->', so we can emit a
   // more useful diagnostic when parsing a function decl.
-  Optional<ParsedTokenSyntax> Throws;
+  bool canBeFunctionTy =
+      Tok.is(tok::arrow) ||
+      (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
+       peekToken().is(tok::arrow));
+
+  // If the first type has an error, or this is not a function type, return the
+  // first result.
+  if (ty.isNull() || !canBeFunctionTy) {
+    // Diagnose generic parameter for non-function types.
+    if (!genericParams && !specifier && !attrs)
+      return ty;
+
+    if (genericParams) {
+      SmallVector<ParsedSyntax, 2> junk;
+      diagnose(genericParamsLoc, diag::generic_non_function);
+      junk.push_back(std::move(*genericParams));
+      if (!ty.isNull())
+        junk.emplace_back(ty.get());
+      ty = makeParsedResult(
+          ParsedSyntaxRecorder::makeUnknownType(junk, *SyntaxContext),
+          status);
+    }
+
+    return applyAttributeToTypeSyntax(std::move(ty), std::move(specifier),
+                                      std::move(attrs));
+  }
+
+  // Parse a throws specifier.
+  Optional<ParsedTokenSyntax> throws;
   if (Tok.isAny(tok::kw_throws, tok::kw_rethrows, tok::kw_throw) &&
       peekToken().is(tok::arrow)) {
     if (Tok.isNot(tok::kw_throws)) {
       // 'rethrows' is only allowed on function declarations for now.
       // 'throw' is probably a typo for 'throws'.
-      Diag<> DiagID = Tok.is(tok::kw_rethrows) ?
-        diag::rethrowing_function_type : diag::throw_in_function_type;
-      diagnose(Tok.getLoc(), DiagID)
-        .fixItReplace(Tok.getLoc(), "throws");
-    }
-
-    Throws = consumeTokenSyntax();
-  }
-
-  if (Tok.is(tok::arrow)) {
-    auto InputNode(std::move(SyntaxContext->popIf<ParsedTypeSyntax>().getValue()));
-    // Handle type-function if we have an arrow.
-    auto ArrowLoc = Tok.getLoc();
-    auto Arrow = consumeTokenSyntax();
-    if (Tok.is(tok::kw_throws)) {
-      Diag<> DiagID = diag::throws_in_wrong_position;
-      diagnose(Tok.getLoc(), DiagID)
-          .fixItInsert(ArrowLoc, "throws ")
-          .fixItRemove(Tok.getLoc());
+      Diag<> DiagID = Tok.is(tok::kw_rethrows) ? diag::rethrowing_function_type
+                                               : diag::throw_in_function_type;
+      diagnose(Tok.getLoc(), DiagID).fixItReplace(Tok.getLoc(), "throws");
       ignoreToken();
-    }
-    ParserResult<TypeRepr> SecondHalf =
-        parseType(diag::expected_type_function_result);
-    auto SecondTy = SyntaxContext->popIf<ParsedTypeSyntax>();
-    if (SecondHalf.isParseError()) {
-      SyntaxContext->addSyntax(std::move(InputNode));
-      if (Throws)
-        SyntaxContext->addSyntax(std::move(*Throws));
-      SyntaxContext->addSyntax(std::move(Arrow));
-      if (SecondTy)
-        SyntaxContext->addSyntax(std::move(*SecondTy));
-      if (SecondHalf.hasCodeCompletion())
-        return makeParserCodeCompletionResult<TypeRepr>();
-      return makeParserErrorResult<TypeRepr>();
-    }
-
-    ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
-    bool isVoid = false;
-    if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
-      // Decompose TupleTypeSyntax and repack into FunctionType.
-      auto LeftParen = TupleTypeNode->getDeferredLeftParen();
-      auto Arguments = TupleTypeNode->getDeferredElements();
-      auto RightParen = TupleTypeNode->getDeferredRightParen();
-      Builder
-        .useLeftParen(std::move(LeftParen))
-        .useArguments(std::move(Arguments))
-        .useRightParen(std::move(RightParen));
     } else {
-      // FIXME(syntaxparse): Extract 'Void' text from recoreded node.
-      if (const auto Void = dyn_cast<SimpleIdentTypeRepr>(tyR))
-        isVoid =  (Void->getIdentifier().str() == "Void");
-
-      if (isVoid) {
-        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
-          .fixItReplace(tyR->getStartLoc(), "()");
-      } else {
-        diagnose(tyR->getStartLoc(), diag::function_type_no_parens)
-          .highlight(tyR->getSourceRange())
-          .fixItInsert(tyR->getStartLoc(), "(")
-          .fixItInsertAfter(tyR->getEndLoc(), ")");
-      }
-      Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
-          std::move(InputNode), /*TrailingComma=*/None, *SyntaxContext));
+      throws = consumeTokenSyntax();
     }
-
-    if (Throws)
-      Builder.useThrowsOrRethrowsKeyword(std::move(*Throws));
-    Builder.useArrow(std::move(Arrow));
-    Builder.useReturnType(std::move(*SecondTy));
-
-    SyntaxContext->addSyntax(Builder.build());
-
-    auto FunctionType = SyntaxContext->topNode<FunctionTypeSyntax>();
-    tyR = Generator.generate(FunctionType, RealTypeLoc);
-
-    if (generics || isVoid) {
-      auto FunctionTypeAST = cast<FunctionTypeRepr>(tyR);
-
-      // TODO(syntaxparse): Represent 'Void -> ()' in libSyntax?
-      auto argsTyR = FunctionTypeAST->getArgsTypeRepr();
-      if (isVoid)
-        argsTyR = TupleTypeRepr::createEmpty(Context, tyR->getSourceRange());
-
-      // TODO(syntaxparse): Represent SIL generic type in libSyntax.
-      tyR = new (Context) FunctionTypeRepr(
-          generics, argsTyR, FunctionTypeAST->getThrowsLoc(),
-          FunctionTypeAST->getArrowLoc(), FunctionTypeAST->getResultTypeRepr());
-    }
-  } else if (generics) {
-    // Only function types may be generic.
-    auto brackets = generics->getSourceRange();
-    diagnose(brackets.Start, diag::generic_non_function);
-    GenericsScope.reset();
-
-    // Forget any generic parameters we saw in the type.
-    class EraseTypeParamWalker : public ASTWalker {
-    public:
-      bool walkToTypeReprPre(TypeRepr *T) override {
-        if (auto ident = dyn_cast<ComponentIdentTypeRepr>(T)) {
-          if (auto decl = ident->getBoundDecl()) {
-            if (auto genericParam = dyn_cast<GenericTypeParamDecl>(decl))
-              ident->overwriteIdentifier(genericParam->getName());
-          }
-        }
-        return true;
-      }
-
-    } walker;
-
-    if (tyR)
-      tyR->walk(walker);
   }
-  if (specifierLoc.isValid() || !attrs.empty())
-    SyntaxContext->setCreateSyntax(SyntaxKind::AttributedType);
 
-  auto attributedType = applyAttributeToType(tyR, attrs, specifier, specifierLoc);
+  auto arrowLoc = Tok.getLoc();
+  auto arrow = consumeTokenSyntax(tok::arrow);
+  if (Tok.is(tok::kw_throws)) {
+    Diag<> DiagID = diag::throws_in_wrong_position;
+    diagnose(Tok.getLoc(), DiagID)
+        .fixItInsert(arrowLoc, "throws ")
+        .fixItRemove(Tok.getLoc());
+    ignoreToken();
+  }
 
-  Generator.addType(attributedType, TypeLoc);
+  auto input = ty.get();
+  auto result = parseTypeSyntax(diag::expected_type_function_result);
+  status |= result.getStatus();
 
-  return makeParserResult(attributedType);
+  ParsedFunctionTypeSyntaxBuilder builder(*SyntaxContext);
+  if (auto tuple = input.getAs<ParsedTupleTypeSyntax>()) {
+    assert(tuple->getRaw().isDeferredLayout());
+    builder.useLeftParen(tuple->getDeferredLeftParen());
+    builder.useArguments(tuple->getDeferredElements());
+    builder.useRightParen(tuple->getDeferredRightParen());
+  } else {
+    builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
+        std::move(input), /*TrailingComma=*/None, *SyntaxContext));
+
+    // Diagnose only if the result type is successfully parsed, to reduce the
+    // noisy diagnostics.
+    if (result.isSuccess()) {
+      auto charRange = Lexer::getCharSourceRangeFromSourceRange(
+          SourceMgr, {startLoc, endLoc});
+      auto diag = diagnose(startLoc, diag::function_type_no_parens);
+      if (SourceMgr.extractText(charRange) == "Void") {
+        diag.fixItReplace(startLoc, "()");
+      } else {
+        diag.highlight(SourceRange(startLoc, endLoc));
+        diag.fixItInsert(startLoc, "(");
+        diag.fixItInsertAfter(endLoc, ")");
+      }
+    }
+  }
+
+  if (throws)
+    builder.useThrowsOrRethrowsKeyword(std::move(*throws));
+  builder.useArrow(std::move(arrow));
+  if (!result.isNull())
+    builder.useReturnType(result.get());
+  else
+    builder.useReturnType(
+        ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+
+  ParsedFunctionTypeSyntax funcTy = builder.build();
+
+  // Apply generic parameters if exists in SIL mode.
+  if (genericParams) {
+    auto silTy = ParsedSyntaxRecorder::makeSILFunctionType(
+        std::move(*genericParams), std::move(funcTy), *SyntaxContext);
+    return applyAttributeToTypeSyntax(
+        makeParsedResult(std::move(silTy), status), std::move(specifier),
+        std::move(attrs));
+  }
+
+  return applyAttributeToTypeSyntax(makeParsedResult(std::move(funcTy), status),
+                                    std::move(specifier), std::move(attrs));
+}
+
+ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
+                                         bool HandleCodeCompletion,
+                                         bool IsSILFuncDecl) {
+  auto leadingLoc = leadingTriviaLoc();
+  auto result = parseTypeSyntax(MessageID, HandleCodeCompletion, IsSILFuncDecl);
+  auto status = result.getStatus();
+  if (result.isNull())
+    return status;
+
+  SyntaxContext->addSyntax(result.get());
+  auto syntax = SyntaxContext->topNode<TypeSyntax>();
+  auto tyR = Generator.generate(syntax, leadingLoc, IsSILFuncDecl);
+  if (!tyR)
+    status.setIsParseError();
+  return makeParserResult(status, tyR);
 }
 
 Parser::TypeASTResult Parser::parseDeclResultType(Diag<> MessageID) {
@@ -747,22 +734,6 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
   }
 
   return result;
-}
-
-Parser::TypeASTResult
-Parser::parseTypeSimpleOrCompositionAST(Diag<> MessageID,
-                                        bool HandleCodeCompletion) {
-  auto Loc = leadingTriviaLoc();
-
-  auto Result =
-      parseTypeSimpleOrComposition(MessageID, HandleCodeCompletion);
-  if (!Result.isNull()) {
-    SyntaxContext->addSyntax(Result.get());
-    auto ty = SyntaxContext->topNode<TypeSyntax>();
-    return makeParserResult(Result.getStatus(), Generator.generate(ty, Loc));
-  } else {
-    return Result.getStatus();
-  }
 }
 
 /// parseTypeSimpleOrComposition
@@ -1104,7 +1075,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
     // Parse the type annotation.
     auto TypeLoc = Tok.getLoc();
     auto ty = parseTypeSyntax(diag::expected_type);
-    if (ty.hasCodeCompletion() || ty.isNull()) {
+    if (ty.isError()) {
       std::move(LocalJunk.begin(), LocalJunk.end(), std::back_inserter(Junk));
       if (!ty.isNull())
         Junk.push_back(ty.get());
@@ -1278,11 +1249,16 @@ Parser::TypeResult Parser::parseTypeArray(ParsedTypeSyntax Base,
   }
 
   ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
-  builder.useElementType(std::move(Base));
-  if (RSquare)
-    builder.useRightSquareBracket(std::move(*RSquare));
+  ParserStatus status;
 
-  return makeParsedError(builder.build());
+  builder.useElementType(std::move(Base));
+  if (RSquare) {
+    builder.useRightSquareBracket(std::move(*RSquare));
+  } else {
+    status.setIsParseError();
+  }
+
+  return makeParsedResult(builder.build(), status);
 }
 
 /// Parse a collection type.

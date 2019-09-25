@@ -103,7 +103,8 @@ public:
   //===--------------------------------------------------------------------===//
   // Types.
 
-  TypeRepr *generate(const syntax::TypeSyntax &Type, const SourceLoc Loc);
+  TypeRepr *generate(const syntax::TypeSyntax &Type, const SourceLoc Loc,
+                     bool IsSILFuncDecl = false);
   TypeRepr *generate(const syntax::SomeTypeSyntax &Type, const SourceLoc Loc);
   TypeRepr *generate(const syntax::CompositionTypeSyntax &Type,
                      const SourceLoc Loc);
@@ -127,10 +128,18 @@ public:
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::ClassRestrictionTypeSyntax &Type,
                      const SourceLoc Loc);
+  TypeRepr *generate(const syntax::SILBoxTypeSyntax &Type, const SourceLoc Loc,
+                     bool IsSILFuncDecl);
+  TypeRepr *generate(const syntax::SILFunctionTypeSyntax &Type,
+                     const SourceLoc Loc, bool IsSILFuncDecl);
   TypeRepr *generate(const syntax::CodeCompletionTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::UnknownTypeSyntax &Type,
                      const SourceLoc Loc);
+
+  TypeAttributes
+  generateTypeAttributes(const syntax::AttributeListSyntax &syntax,
+                         const SourceLoc Loc);
 
 private:
   TupleTypeRepr *
