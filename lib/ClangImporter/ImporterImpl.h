@@ -1038,11 +1038,13 @@ public:
   ///   to system APIs.
   /// \param name The name of the function.
   /// \param[out] parameterList The parameters visible inside the function body.
-  ImportedType importFunctionType(DeclContext *dc,
-                                  const clang::FunctionDecl *clangDecl,
-                                  ArrayRef<const clang::ParmVarDecl *> params,
-                                  bool isVariadic, bool isFromSystemModule,
-                                  DeclName name, ParameterList *&parameterList);
+  ImportedType
+  importFunctionParamsAndReturnType(DeclContext *dc,
+                                    const clang::FunctionDecl *clangDecl,
+                                    ArrayRef<const clang::ParmVarDecl *> params,
+                                    bool isVariadic, bool isFromSystemModule,
+                                    DeclName name,
+                                    ParameterList *&parameterList);
 
   /// Import the given function return type.
   ///
@@ -1093,7 +1095,7 @@ public:
   /// the return type of this method.
   ///
   /// Note that this is not appropriate to use for property accessor methods.
-  /// Use #importAccessorMethodType instead.
+  /// Use #importAccessorParamsAndReturnType instead.
   ///
   /// \param dc The context the method is being imported into.
   /// \param clangDecl The underlying declaration.
@@ -1104,20 +1106,22 @@ public:
   ///   to system APIs.
   /// \param[out] bodyParams The patterns visible inside the function body.
   /// \param importedName How to import the name of the method.
-  /// \param[out] errorConvention Whether and how the method throws NSErrors.
+  /// \param[out] errorConv Whether and how the method throws NSErrors.
   /// \param kind Controls whether we're building a type for a method that
   ///   needs special handling.
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
   ImportedType
-  importMethodType(const DeclContext *dc,
-                   const clang::ObjCMethodDecl *clangDecl,
-                   ArrayRef<const clang::ParmVarDecl *> params, bool isVariadic,
-                   bool isFromSystemModule, ParameterList **bodyParams,
-                   importer::ImportedName importedName,
-                   Optional<ForeignErrorConvention> &errorConvention,
-                   SpecialMethodKind kind);
+  importMethodParamsAndReturnType(const DeclContext *dc,
+                                  const clang::ObjCMethodDecl *clangDecl,
+                                  ArrayRef<const clang::ParmVarDecl *> params,
+                                  bool isVariadic,
+                                  bool isFromSystemModule,
+                                  ParameterList **bodyParams,
+                                  importer::ImportedName importedName,
+                                  Optional<ForeignErrorConvention> &errorConv,
+                                  SpecialMethodKind kind);
 
   /// Import the type of an Objective-C method that will be imported as an
   /// accessor for \p property.
@@ -1137,12 +1141,13 @@ public:
   ///
   /// \returns the imported result type, or null if the type cannot be
   /// imported.
-  ImportedType importAccessorMethodType(const DeclContext *dc,
-                                        const clang::ObjCPropertyDecl *property,
-                                        const clang::ObjCMethodDecl *clangDecl,
-                                        bool isFromSystemModule,
-                                        importer::ImportedName importedName,
-                                        ParameterList **params);
+  ImportedType
+  importAccessorParamsAndReturnType(const DeclContext *dc,
+                                    const clang::ObjCPropertyDecl *property,
+                                    const clang::ObjCMethodDecl *clangDecl,
+                                    bool isFromSystemModule,
+                                    importer::ImportedName importedName,
+                                    ParameterList **params);
 
   /// Determine whether the given typedef-name is "special", meaning
   /// that it has performed some non-trivial mapping of its underlying type
