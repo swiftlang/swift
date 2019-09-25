@@ -2692,7 +2692,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
 
   SyntaxParsingContext DeclParsingContext(SyntaxContext,
                                           SyntaxContextKind::Decl);
-  SourceLoc leadingLoc = leadingTriviaLoc();
 
   // Note that we're parsing a declaration.
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
@@ -2709,13 +2708,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
   SourceLoc StaticLoc;
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   parseDeclModifierList(Attributes, StaticLoc, StaticSpelling);
-
-  if (!Attributes.isEmpty()) {
-    auto startLoc = Attributes.getStartLoc();
-    if (startLoc.isInvalid())
-      startLoc = Tok.getLoc();
-    Generator.addDeclAttributes(Attributes, startLoc);
-  }
 
   // We emit diagnostics for 'try let ...' in parseDeclVar().
   SourceLoc tryLoc;
@@ -2768,11 +2760,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
   }
   case tok::kw_typealias:
     DeclParsingContext.setCreateSyntax(SyntaxKind::TypealiasDecl);
-    DeclResult = parseDeclTypeAlias(Flags, Attributes, leadingLoc);
+    DeclResult = parseDeclTypeAlias(Flags, Attributes);
     MayNeedOverrideCompletion = true;
     break;
   case tok::kw_associatedtype:
-    DeclResult = parseDeclAssociatedType(Flags, Attributes, leadingLoc);
+    DeclParsingContext.setCreateSyntax(SyntaxKind::AssociatedtypeDecl);
+    DeclResult = parseDeclAssociatedType(Flags, Attributes);
     break;
   case tok::kw_enum:
     DeclParsingContext.setCreateSyntax(SyntaxKind::EnumDecl);
@@ -3311,107 +3304,100 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
 ///     'class'
 ///     type-identifier
 /// \endverbatim
+ParserStatus Parser::parseInheritance(SmallVectorImpl<TypeLoc> &Inherited,
+                                      bool allowClassRequirement,
+                                      bool allowAnyObject) {
+  SyntaxParsingContext InheritanceContext(SyntaxContext,
+                                          SyntaxKind::TypeInheritanceClause);
 
-ParsedSyntaxResult<ParsedTypeInheritanceClauseSyntax>
-Parser::parseTypeInheritanceClauseSyntax(bool allowClassRequirement,
-                                         bool allowAnyObject) {
-  ParsedTypeInheritanceClauseSyntaxBuilder builder(*SyntaxContext);
-  ParserStatus status;
+  Scope S(this, ScopeKind::InheritanceClause);
+  consumeToken(tok::colon);
 
-  builder.useColon(consumeTokenSyntax(tok::colon));
+  SyntaxParsingContext TypeListContext(SyntaxContext,
+                                       SyntaxKind::InheritedTypeList);
+  SourceLoc classRequirementLoc;
 
-  SourceLoc startLoc = Tok.getLoc();
-  SourceLoc classRequirementLoc, prevCommaLoc;
-  bool hasNext = true;
+  ParserStatus Status;
+  SourceLoc prevComma;
+  bool HasNextType;
   do {
-    ParsedInheritedTypeSyntaxBuilder elemBuilder(*SyntaxContext);
-
+    SyntaxParsingContext TypeContext(SyntaxContext, SyntaxKind::InheritedType);
+    SWIFT_DEFER {
+      // Check for a ',', which indicates that there are more protocols coming.
+      HasNextType = consumeIf(tok::comma, prevComma);
+    };
     // Parse the 'class' keyword for a class requirement.
     if (Tok.is(tok::kw_class)) {
-      auto classLoc = Tok.getLoc();
-      auto classTok = consumeTokenSyntax(tok::kw_class);
-      auto restriction = ParsedSyntaxRecorder::makeClassRestrictionType(
-          std::move(classTok), *SyntaxContext);
-      elemBuilder.useTypeName(std::move(restriction));
-
+      SyntaxParsingContext ClassTypeContext(SyntaxContext,
+                                            SyntaxKind::ClassRestrictionType);
+      // If we aren't allowed to have a class requirement here, complain.
+      auto classLoc = consumeToken();
       if (!allowClassRequirement) {
-        // If we aren't allowed to have a class requirement here, complain.
         diagnose(classLoc, diag::unexpected_class_constraint);
 
-        // Note that it makes no sense to suggest fixing 'struct S : class' to
-        // 'struct S : AnyObject' for example; in that case we just complain
-        // about 'class' being invalid here.
+        // Note that it makes no sense to suggest fixing
+        // 'struct S : class' to 'struct S : AnyObject' for
+        // example; in that case we just complain about
+        // 'class' being invalid here.
         if (allowAnyObject) {
           diagnose(classLoc, diag::suggest_anyobject)
-              .fixItReplace(classLoc, "AnyObject");
+            .fixItReplace(classLoc, "AnyObject");
         }
+        continue;
+      }
 
-      } else if (classRequirementLoc.isValid()) {
-        // If we already saw a class requirement, complain.
-        diagnose(Tok.getLoc(), diag::redundant_class_requirement)
+      // If we already saw a class requirement, complain.
+      if (classRequirementLoc.isValid()) {
+        diagnose(classLoc, diag::redundant_class_requirement)
           .highlight(classRequirementLoc)
-          .fixItRemove(SourceRange(prevCommaLoc, classLoc));
+          .fixItRemove(SourceRange(prevComma, classLoc));
+        continue;
+      }
 
-      } else if (prevCommaLoc.isValid()) {
-        // If the class requirement was not the first requirement, complain.
+      // If the class requirement was not the first requirement, complain.
+      if (!Inherited.empty()) {
+        SourceLoc properLoc = Inherited[0].getSourceRange().Start;
         diagnose(classLoc, diag::late_class_requirement)
-          .fixItInsert(startLoc, "class, ")
-          .fixItRemove(SourceRange(prevCommaLoc, classLoc));
+          .fixItInsert(properLoc, "class, ")
+          .fixItRemove(SourceRange(prevComma, classLoc));
       }
 
       // Record the location of the 'class' keyword.
-      if (!classRequirementLoc.isValid())
-        classRequirementLoc = classLoc;
-    } else {
-      // Parse inherited type.
-      auto inheritedType = parseTypeSyntax();
-      status |= inheritedType.getStatus();
-      if (!inheritedType.isNull())
-        elemBuilder.useTypeName(inheritedType.get());
-      else
-        elemBuilder.useTypeName(
-            ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
+      classRequirementLoc = classLoc;
+
+      // Add 'AnyObject' to the inherited list.
+      Inherited.push_back(
+        new (Context) SimpleIdentTypeRepr(classLoc,
+                                          Context.getIdentifier("AnyObject")));
+      continue;
     }
 
-    // Parse ','.
-    if (Tok.is(tok::comma)) {
-      prevCommaLoc = Tok.getLoc();
-      elemBuilder.useTrailingComma(consumeTokenSyntax(tok::comma));
-    } else {
-      hasNext = false;
-    }
+    auto ParsedTypeResult = parseType();
+    Status |= ParsedTypeResult;
 
-    builder.addInheritedTypeCollectionMember(elemBuilder.build());
-  } while (hasNext);
+    // Record the type if its a single type.
+    if (ParsedTypeResult.isNonNull())
+      Inherited.push_back(ParsedTypeResult.get());
+  } while (HasNextType);
 
-  return makeParsedResult(builder.build(), status);
+  return Status;
 }
 
-ParserStatus Parser::parseInheritance(MutableArrayRef<TypeLoc> &Inherited,
-                                      bool allowClassRequirement,
-                                      bool allowAnyObject) {
-  auto leadingLoc = leadingTriviaLoc();
-  auto parsed = parseTypeInheritanceClauseSyntax(allowClassRequirement,
-                                                 allowAnyObject);
-  SyntaxContext->addSyntax(parsed.get());
-  auto clause = SyntaxContext->topNode<TypeInheritanceClauseSyntax>();
-  Inherited = Generator.generate(clause, leadingLoc, allowClassRequirement);
-  return parsed.getStatus();
-}
-
-static ParsedSyntaxResult<ParsedTokenSyntax>
-parseIdentifierDeclNameSyntax(Parser &P, StringRef DeclKindName,
-                              llvm::function_ref<bool(const Token &)> canRecover) {
+static ParserStatus
+parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
+                        StringRef DeclKindName,
+                        llvm::function_ref<bool(const Token &)> canRecover) {
   if (P.Tok.is(tok::identifier)) {
-    auto text = P.Tok.getText();
-    auto loc = P.Tok.getLoc();
+    Loc = P.consumeIdentifier(&Result);
 
-    auto tok = P.consumeIdentifierSyntax();
+    // We parsed an identifier for the declaration. If we see another
+    // identifier, it might've been a single identifier that got broken by a
+    // space or newline accidentally.
     if (P.Tok.isIdentifierOrUnderscore() && !P.Tok.isContextualDeclKeyword())
-      P.diagnoseConsecutiveIDs(text, loc, DeclKindName);
+      P.diagnoseConsecutiveIDs(Result.str(), Loc, DeclKindName);
 
     // Return success anyway
-    return makeParsedResult(std::move(tok));
+    return makeParserSuccess();
   }
 
   P.checkForInputIncomplete();
@@ -3425,8 +3411,12 @@ parseIdentifierDeclNameSyntax(Parser &P, StringRef DeclKindName,
     // Pretend this works as an identifier, which shouldn't be observable since
     // actual uses of it will hit random other errors, e.g. `1()` won't be
     // callable.
-    P.Tok.setKind(tok::identifier);
-    return makeParsedResult(P.consumeTokenSyntax());
+    Result = P.Context.getIdentifier(P.Tok.getText());
+    Loc = P.Tok.getLoc();
+    P.consumeToken();
+
+    // We recovered, so this is a success.
+    return makeParserSuccess();
   }
 
   if (P.Tok.isKeyword()) {
@@ -3436,28 +3426,20 @@ parseIdentifierDeclNameSyntax(Parser &P, StringRef DeclKindName,
 
     // Recover if the next token is one of the expected tokens.
     if (canRecover(P.peekToken())) {
-      P.Tok.setKind(tok::identifier);
-      return makeParsedResult(P.consumeTokenSyntax());
+      llvm::SmallString<32> Name(P.Tok.getText());
+      // Append an invalid character so that nothing can resolve to this name.
+      Name += "#";
+      Result = P.Context.getIdentifier(Name.str());
+      Loc = P.Tok.getLoc();
+      P.consumeToken();
+      // Return success because we recovered.
+      return makeParserSuccess();
     }
     return makeParserError();
   }
 
   P.diagnose(P.Tok, diag::expected_identifier_in_decl, DeclKindName);
   return makeParserError();
-}
-
-static ParserStatus
-parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &Loc,
-                        StringRef DeclKindName,
-                        llvm::function_ref<bool(const Token &)> canRecover) {
-  auto leadingLoc = P.leadingTriviaLoc();
-  auto parsed = parseIdentifierDeclNameSyntax(P, DeclKindName, canRecover);
-  if (!parsed.isNull()) {
-    P.SyntaxContext->addSyntax(parsed.get());
-    auto syntax = P.SyntaxContext->topNode<TokenSyntax>();
-    Loc = P.Generator.generateIdentifierDeclName(syntax, leadingLoc, Result);
-  }
-  return parsed.getStatus();
 }
 
 /// Add a fix-it to remove the space in consecutive identifiers.
@@ -3668,7 +3650,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   status |= extendedType;
 
   // Parse optional inheritance clause.
-  MutableArrayRef<TypeLoc> Inherited;
+  SmallVector<TypeLoc, 2> Inherited;
   if (Tok.is(tok::colon))
     status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
@@ -3695,7 +3677,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
                                              extendedType.getPtrOrNull(),
-                                             Inherited,
+                                             Context.AllocateCopy(Inherited),
                                              CurDeclContext,
                                              trailingWhereClause);
   ext->getAttrs() = Attributes;
@@ -3965,9 +3947,8 @@ ParserStatus Parser::parseLineDirective(bool isLine) {
 ///   decl-typealias:
 ///     'typealias' identifier generic-params? '=' type requirement-clause?
 /// \endverbatim
-ParserResult<TypeDecl>
-Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
-                           DeclAttributes &Attributes, SourceLoc leadingLoc) {
+ParserResult<TypeDecl> Parser::
+parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   ParserPosition startPosition = getParserPosition();
   llvm::Optional<SyntaxParsingContext> TmpCtxt;
   TmpCtxt.emplace(SyntaxContext);
@@ -3986,7 +3967,7 @@ Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
     TmpCtxt->setTransparent();
     return nullptr;
   }
-
+    
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
   Optional<Scope> GenericsScope;
@@ -4015,7 +3996,7 @@ Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
     // If we're in a protocol and don't see an '=' this looks like leftover Swift 2
     // code intending to be an associatedtype.
     backtrackToPosition(startPosition);
-    return parseDeclAssociatedType(Flags, Attributes, leadingLoc);
+    return parseDeclAssociatedType(Flags, Attributes);
   }
   TmpCtxt->setTransparent();
   TmpCtxt.reset();
@@ -4074,116 +4055,95 @@ Parser::parseDeclTypeAlias(Parser::ParseDeclOptions Flags,
 
 /// Parse an associatedtype decl.
 ///
+/// \verbatim
 ///   decl-associatedtype:
-///     'associatedtype' identifier type-inheritance-clause?
-///         ('=' type)? where-clause?
-ParsedSyntaxResult<ParsedDeclSyntax>
-Parser::parseDeclAssociatedTypeSyntax(ParseDeclOptions flags,
-                                      Optional<ParsedAttributeListSyntax> attrs,
-                                      Optional<ParsedModifierListSyntax> modifiers) {
-  ParsedAssociatedtypeDeclSyntaxBuilder builder(*SyntaxContext);
-  ParserStatus status;
+///     'associatedtype' identifier inheritance? ('=' type)? where-clause?
+/// \endverbatim
 
-  if (attrs)
-    builder.useAttributes(std::move(*attrs));
-  if (modifiers)
-    builder.useModifiers(std::move(*modifiers));
-
-  // Parse 'associatedtype' keyword.
-  // Look for 'typealias' here and diagnose a fixit because parseDeclTypeAlias
-  // can ask us to fix up leftover Swift 2 code intending to be an
-  // associatedtype.
-  auto keywordLoc = Tok.getLoc();
+ParserResult<TypeDecl> Parser::parseDeclAssociatedType(Parser::ParseDeclOptions Flags,
+                                                       DeclAttributes &Attributes) {
+  SourceLoc AssociatedTypeLoc;
+  ParserStatus Status;
+  Identifier Id;
+  SourceLoc IdLoc;
+  
+  // Look for 'typealias' here and diagnose a fixit because parseDeclTypeAlias can
+  // ask us to fix up leftover Swift 2 code intending to be an associatedtype.
   if (Tok.is(tok::kw_typealias)) {
-    diagnose(Tok.getLoc(), diag::typealias_inside_protocol_without_type)
-        .fixItReplace(Tok.getLoc(), "associatedtype");
-    ignoreToken(tok::kw_typealias);
+    AssociatedTypeLoc = consumeToken(tok::kw_typealias);
+    diagnose(AssociatedTypeLoc, diag::typealias_inside_protocol_without_type)
+        .fixItReplace(AssociatedTypeLoc, "associatedtype");
   } else {
-    builder.useAssociatedtypeKeyword(
-        consumeTokenSyntax(tok::kw_associatedtype));
+    AssociatedTypeLoc = consumeToken(tok::kw_associatedtype);
   }
 
-  // Parse the name.
-  auto name = parseIdentifierDeclNameSyntax(
-      *this, "associatedtype",
-      [&](const Token &next) { return next.isAny(tok::colon, tok::equal); });
-  if (name.isNull())
-    return makeParsedResult(builder.build(), name.getStatus());
-  assert(name.isSuccess());
-  builder.useIdentifier(name.get());
-
-  // Diagnose generic parameters.
+  Status = parseIdentifierDeclName(
+      *this, Id, IdLoc, "associatedtype",
+      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
+  if (Status.isError())
+    return nullptr;
+  
+  DebuggerContextChange DCC(*this, Id, DeclKind::AssociatedType);
+  
+  // Reject generic parameters with a specific error.
   if (startsWithLess(Tok)) {
-    auto loc = Tok.getLoc();
-    ignoreToken();
-    if (ignoreUntilGreaterInTypeList())
-      ignoreToken();
+    // Introduce a throwaway scope to capture the generic parameters. We
+    // don't want them visible anywhere!
+    Scope S(this, ScopeKind::Generics);
 
-    diagnose(loc, diag::associated_type_generic_parameter_list)
-        .fixItRemove({loc, PreviousLoc});
+    if (auto genericParams = parseGenericParameters().getPtrOrNull()) {
+      diagnose(genericParams->getLAngleLoc(),
+               diag::associated_type_generic_parameter_list)
+      .fixItRemove(genericParams->getSourceRange());
+    }
   }
-
+  
   // Parse optional inheritance clause.
-  if (Tok.is(tok::colon)) {
-    auto inheritance = parseTypeInheritanceClauseSyntax(
-        /*allowClassRequirement=*/false, /*allowAnyObject=*/true);
-    status |= inheritance.getStatus();
-    if (!inheritance.isNull())
-      builder.useInheritanceClause(inheritance.get());
-  }
-
-  // Parse optional default type.
+  // FIXME: Allow class requirements here.
+  SmallVector<TypeLoc, 2> Inherited;
+  if (Tok.is(tok::colon))
+    Status |= parseInheritance(Inherited,
+                               /*allowClassRequirement=*/false,
+                               /*allowAnyObject=*/true);
+  
+  ParserResult<TypeRepr> UnderlyingTy;
   if (Tok.is(tok::equal)) {
-    ParsedTypeInitializerClauseSyntaxBuilder initBuilder(*SyntaxContext);
-    initBuilder.useEqual(consumeTokenSyntax(tok::equal));
-
-    // Parse type.
-    auto type = parseTypeSyntax(diag::expected_type_in_associatedtype);
-    status |= type.getStatus();
-    if (!type.isNull())
-      initBuilder.useValue(type.get());
-    else
-      initBuilder.useValue(
-          ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext));
-
-    builder.useInitializer(initBuilder.build());
+    SyntaxParsingContext InitContext(SyntaxContext,
+                                     SyntaxKind::TypeInitializerClause);
+    consumeToken(tok::equal);
+    UnderlyingTy = parseType(diag::expected_type_in_associatedtype);
+    Status |= UnderlyingTy;
+    if (UnderlyingTy.isNull())
+      return Status;
   }
 
-  // Parse optional 'where' clause.
+  TrailingWhereClause *TrailingWhere = nullptr;
+  // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
-    bool firstTypeInComplete = false;
-    auto where = parseGenericWhereClauseSyntax(firstTypeInComplete);
-    status |= where.getStatus();
-    if (!where.isNull())
-      builder.useGenericWhereClause(where.get());
+    auto whereStatus = parseProtocolOrAssociatedTypeWhereClause(
+        TrailingWhere, /*isProtocol=*/false);
+    Status |= whereStatus;
+    if (whereStatus.hasCodeCompletion() && !CodeCompletion) {
+      // Trigger delayed parsing, no need to continue.
+      return whereStatus;
+    }
   }
 
-  // Diagnose if it's not in protocol decl.
-  // TODO: Move this to ASTGen.
-  if (!flags.contains(PD_InProtocol)) {
-    diagnose(keywordLoc, diag::associatedtype_outside_protocol)
-        .fixItReplace(keywordLoc, "typealias");
-    status.setIsParseError();
+  if (!Flags.contains(PD_InProtocol)) {
+    diagnose(AssociatedTypeLoc, diag::associatedtype_outside_protocol)
+        .fixItReplace(AssociatedTypeLoc, "typealias");
+    Status.setIsParseError();
+    return Status;
   }
 
-  return makeParsedResult(builder.build(), status);
-}
-
-ParserResult<TypeDecl>
-Parser::parseDeclAssociatedType(Parser::ParseDeclOptions Flags,
-                                DeclAttributes &Attributes,
-                                SourceLoc leadingLoc) {
-  auto modifiers = SyntaxContext->popIf<ParsedModifierListSyntax>();
-  auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
-
-  auto parsed = parseDeclAssociatedTypeSyntax(Flags, std::move(attrs),
-                                              std::move(modifiers));
-  assert(!parsed.isNull());
-
-  SyntaxContext->addSyntax(parsed.get());
-  auto syntax = SyntaxContext->topNode<AssociatedtypeDeclSyntax>();
-  auto result = Generator.generate(syntax, leadingLoc);
-  return makeParserResult(parsed.getStatus(), result);
+  auto assocType = new (Context)
+      AssociatedTypeDecl(CurDeclContext, AssociatedTypeLoc, Id, IdLoc,
+                         UnderlyingTy.getPtrOrNull(), TrailingWhere);
+  assocType->getAttrs() = Attributes;
+  if (!Inherited.empty())
+    assocType->setInherited(Context.AllocateCopy(Inherited));
+  addToScope(assocType);
+  return makeParserResult(Status, assocType);
 }
 
 /// This function creates an accessor function (with no body) for a computed
@@ -5614,11 +5574,11 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   // Parse optional inheritance clause within the context of the enum.
   if (Tok.is(tok::colon)) {
-    MutableArrayRef<TypeLoc> Inherited;
+    SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
                                /*allowAnyObject=*/false);
-    ED->setInherited(Inherited);
+    ED->setInherited(Context.AllocateCopy(Inherited));
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -5900,11 +5860,11 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 
   // Parse optional inheritance clause within the context of the struct.
   if (Tok.is(tok::colon)) {
-    MutableArrayRef<TypeLoc> Inherited;
+    SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
                                /*allowAnyObject=*/false);
-    SD->setInherited(Inherited);
+    SD->setInherited(Context.AllocateCopy(Inherited));
   }
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
@@ -5993,11 +5953,11 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   // Parse optional inheritance clause within the context of the class.
   if (Tok.is(tok::colon)) {
-    MutableArrayRef<TypeLoc> Inherited;
+    SmallVector<TypeLoc, 2> Inherited;
     Status |= parseInheritance(Inherited,
                                /*allowClassRequirement=*/false,
                                /*allowAnyObject=*/false);
-    CD->setInherited(Inherited);
+    CD->setInherited(Context.AllocateCopy(Inherited));
   
   // Parse python style inheritance clause and replace parentheses with a colon
   } else if (Tok.is(tok::l_paren)) {
@@ -6099,7 +6059,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   DebuggerContextChange DCC (*this);
   
   // Parse optional inheritance clause.
-  MutableArrayRef<TypeLoc> InheritedProtocols;
+  SmallVector<TypeLoc, 4> InheritedProtocols;
   SourceLoc colonLoc;
   if (Tok.is(tok::colon)) {
     colonLoc = Tok.getLoc();
@@ -6119,7 +6079,7 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   ProtocolDecl *Proto = new (Context)
       ProtocolDecl(CurDeclContext, ProtocolLoc, NameLoc, ProtocolName,
-                   InheritedProtocols, TrailingWhere);
+                   Context.AllocateCopy(InheritedProtocols), TrailingWhere);
   // No need to setLocalDiscriminator: protocols can't appear in local contexts.
 
   Proto->getAttrs() = Attributes;

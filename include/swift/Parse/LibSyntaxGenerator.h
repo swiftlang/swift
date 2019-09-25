@@ -38,7 +38,7 @@ public:
     assert(Node.isDeferredToken());
 
     auto Kind = Node.getTokenKind();
-    auto Range = Node.getDeferredTokenRange();
+    auto Range = Node.getDeferredTokenRangeWithTrivia();
     auto LeadingTriviaPieces = Node.getDeferredLeadingTriviaPieces();
     auto TrailingTriviaPieces = Node.getDeferredTrailingTriviaPieces();
 
