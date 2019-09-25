@@ -5482,7 +5482,8 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
   return !getAttachedPropertyWrappers().empty();
 }
 
-/// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+/// Whether all of the attached property wrappers have an init(wrappedValue:)
+/// initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)

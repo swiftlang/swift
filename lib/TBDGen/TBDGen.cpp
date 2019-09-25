@@ -21,6 +21,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
@@ -307,6 +308,14 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
 
       if (VD->isLazilyInitializedGlobal())
         addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
+    }
+
+    // Wrapped non-static member properties may have a backing initializer.
+    if (auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.initializeFromOriginal && !VD->isStatic()) {
+        addSymbol(
+            SILDeclRef(VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+      }
     }
   }
 

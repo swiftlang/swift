@@ -398,6 +398,7 @@ private:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
+    case Node::Kind::PropertyWrapperBackingInitializer:
     case Node::Kind::KeyPathGetterThunkHelper:
     case Node::Kind::KeyPathSetterThunkHelper:
     case Node::Kind::KeyPathEqualsThunkHelper:
@@ -1125,6 +1126,10 @@ NodePointer NodePrinter::print(NodePointer Node, bool asPrefixContext) {
   case Node::Kind::Initializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "variable initialization expression");
+  case Node::Kind::PropertyWrapperBackingInitializer:
+    return printEntity(
+         Node, asPrefixContext, TypePrinting::NoType,
+         /*hasName*/false, "property wrapper backing initializer");
   case Node::Kind::DefaultArgumentInitializer:
     return printEntity(Node, asPrefixContext, TypePrinting::NoType,
                        /*hasName*/false, "default argument ",
@@ -2447,7 +2452,8 @@ printEntity(NodePointer Entity, bool asPrefixContext, TypePrinting TypePr,
   if (!asPrefixContext && PostfixContext) {
     // Print any left over context which couldn't be printed in prefix form.
     if (Entity->getKind() == Node::Kind::DefaultArgumentInitializer ||
-        Entity->getKind() == Node::Kind::Initializer) {
+        Entity->getKind() == Node::Kind::Initializer ||
+        Entity->getKind() == Node::Kind::PropertyWrapperBackingInitializer) {
       Printer << " of ";
     } else {
       Printer << " in ";

@@ -547,4 +547,3 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
 
   return ArgNo;
 }
-

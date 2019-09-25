@@ -99,33 +99,24 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &SGF,
 }
 
 /// If the field has a property wrapper for which we will need to call the
-/// wrapper type's init(wrapperValue:), set up that evaluation and call the
-/// \c body with the expression to form the property wrapper instance from
-/// the initial value type.
-///
-/// \returns true if this was such a wrapper, \c false otherwise.
-static bool maybeEmitPropertyWrapperInitFromValue(
+/// wrapper type's init(wrappedValue:, ...), call the function that performs
+/// that initialization and return the result. Otherwise, return \c arg.
+static RValue maybeEmitPropertyWrapperInitFromValue(
     SILGenFunction &SGF,
     SILLocation loc,
     VarDecl *field,
-    RValue &&arg,
-    llvm::function_ref<void(Expr *)> body) {
+    RValue &&arg) {
   auto originalProperty = field->getOriginalWrappedProperty();
   if (!originalProperty ||
       !originalProperty->isPropertyMemberwiseInitializedWithWrappedType())
-    return false;
+    return std::move(arg);
 
   auto wrapperInfo = originalProperty->getPropertyWrapperBackingPropertyInfo();
   if (!wrapperInfo || !wrapperInfo.initializeFromOriginal)
-    return false;
+    return std::move(arg);
 
-  SILGenFunction::OpaqueValueRAII opaqueValue(
-      SGF,
-      wrapperInfo.underlyingValue,
-      std::move(arg).getAsSingleValue(SGF, loc));
-
-  body(wrapperInfo.initializeFromOriginal);
-  return true;
+  return SGF.emitApplyOfPropertyWrapperBackingInitializer(loc, originalProperty,
+                                                          std::move(arg));
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
@@ -183,13 +174,8 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
                "number of args does not match number of fields");
         (void)eltEnd;
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
-        if (!maybeEmitPropertyWrapperInitFromValue(
-              SGF, Loc, field, std::move(*elti),
-              [&](Expr *expr) {
-                SGF.emitExprInto(expr, init.get());
-              })) {
-          std::move(*elti).forwardInto(SGF, Loc, init.get());
-        }
+        maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, std::move(*elti))
+          .forwardInto(SGF, Loc, init.get());
         ++elti;
       } else {
 #ifndef NDEBUG
@@ -221,14 +207,9 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
-      if (!maybeEmitPropertyWrapperInitFromValue(
-            SGF, Loc, field, std::move(*elti),
-            [&](Expr *expr) {
-              v = SGF.emitRValue(expr)
-                .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
-            })) {
-        v = std::move(*elti).forwardAsSingleStorageValue(SGF, fieldTy, Loc);
-      }
+      v = maybeEmitPropertyWrapperInitFromValue(
+          SGF, Loc, field, std::move(*elti))
+        .forwardAsSingleStorageValue(SGF, fieldTy, Loc);
       ++elti;
     } else {
       // Otherwise, use its initializer.
@@ -982,11 +963,8 @@ void SILGenFunction::emitMemberInitializers(DeclContext *dc,
           auto originalVar = singleVar->getOriginalWrappedProperty();
           if (originalVar &&
               originalVar->isPropertyWrapperInitializedWithInitialValue()) {
-            (void)maybeEmitPropertyWrapperInitFromValue(
-                *this, init, singleVar, std::move(result),
-                [&](Expr *expr) {
-                  result = emitRValue(expr);
-                });
+            result = maybeEmitPropertyWrapperInitFromValue(
+                *this, init, singleVar, std::move(result));
           }
         }
 

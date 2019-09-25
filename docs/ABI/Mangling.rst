@@ -290,6 +290,7 @@ Entities
   entity-spec ::= type 'fu' INDEX            // implicit anonymous closure
   entity-spec ::= 'fA' INDEX                 // default argument N+1 generator
   entity-spec ::= 'fi'                       // non-local variable initializer
+  entity-spec ::= 'fP'                       // property wrapper backing initializer
   entity-spec ::= 'fD'                       // deallocating destructor; untyped
   entity-spec ::= 'fd'                       // non-deallocating destructor; untyped
   entity-spec ::= 'fE'                       // ivar destroyer; untyped

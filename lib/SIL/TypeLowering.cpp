@@ -1807,6 +1807,27 @@ static CanAnyFunctionType getStoredPropertyInitializerInterfaceType(
                                  {}, resultTy);
 }
 
+/// Get the type of a property wrapper backing initializer,
+/// (property-type) -> backing-type.
+static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
+                                                     TypeConverter &TC,
+                                                     VarDecl *VD) {
+  CanType resultType =
+      VD->getPropertyWrapperBackingPropertyType()->getCanonicalType();
+
+  auto *DC = VD->getInnermostDeclContext();
+  CanType inputType =
+    VD->getParentPattern()->getType()->mapTypeOutOfContext()
+          ->getCanonicalType();
+
+  auto sig = DC->getGenericSignatureOfContext();
+
+  AnyFunctionType::Param param(
+      inputType, Identifier(),
+      ParameterTypeFlags().withValueOwnership(ValueOwnership::Owned));
+  return CanAnyFunctionType::get(getCanonicalSignatureOrNull(sig), {param},
+                                 resultType);
+}
 /// Get the type of a destructor function.
 static CanAnyFunctionType getDestructorInterfaceType(DestructorDecl *dd,
                                                      bool isDeallocating,
@@ -1941,6 +1962,9 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     return getDefaultArgGeneratorInterfaceType(c);
   case SILDeclRef::Kind::StoredPropertyInitializer:
     return getStoredPropertyInitializerInterfaceType(cast<VarDecl>(vd));
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return getPropertyWrapperBackingInitializerInterfaceType(*this,
+                                                             cast<VarDecl>(vd));
   case SILDeclRef::Kind::IVarInitializer:
     return getIVarInitDestroyerInterfaceType(cast<ClassDecl>(vd),
                                              c.isForeign, false);
@@ -1979,6 +2003,7 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     return vd->getDeclContext()->getGenericSignatureOfContext();
   }
 
