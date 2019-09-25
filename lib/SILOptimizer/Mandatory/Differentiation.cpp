@@ -1581,32 +1581,29 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // differentiate logic" and update comment.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
-
-#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
-if (isa<TYPE>(inst) && hasActiveOperands) \
-  return true;
-
-#define CHECK_INST_TYPE_ACTIVE_DEST(TYPE) \
-if (auto *castInst = dyn_cast<TYPE>(inst)) { \
-  return activityInfo.isActive(castInst->getDest(), indices); \
-}
-
-    CHECK_INST_TYPE_ACTIVE_DEST(StoreInst)
-    CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrowInst)
-    CHECK_INST_TYPE_ACTIVE_DEST(CopyAddrInst)
+#define CHECK_INST_TYPE_ACTIVE_DEST(INST) \
+    if (auto *castInst = dyn_cast<INST##Inst>(inst)) \
+      return activityInfo.isActive(castInst->getDest(), indices);
+    CHECK_INST_TYPE_ACTIVE_DEST(Store)
+    CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
+    CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
+    CHECK_INST_TYPE_ACTIVE_DEST(UnconditionalCheckedCastAddr)
+#undef CHECK_INST_TYPE_ACTIVE_DEST
     if ((isa<AllocationInst>(inst) && hasActiveResults))
       return true;
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCountingInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccessInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrowInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DeallocationInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(CopyValueInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValueInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddrInst)
-    break;
 
+#define CHECK_INST_TYPE_ACTIVE_OPERANDS(INST) \
+    if (isa<INST##Inst>(inst) && hasActiveOperands) \
+      return true;
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCounting)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccess)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrow)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(Deallocation)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(CopyValue)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValue)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddr)
+    break;
 #undef CHECK_INST_TYPE_ACTIVE_OPERANDS
-#undef CHECK_INST_TYPE_ACTIVE_DEST
   }
   case AutoDiffLinearMapKind::Pullback: {
     if (inst->mayHaveSideEffects() && hasActiveOperands)
@@ -4658,6 +4655,24 @@ public:
 
     diffBuilder.createCopyAddr(loc, tanSrc, tanDest, cai->isTakeOfSrc(),
                                cai->isInitializationOfDest());
+  }
+
+  /// Handle `unconditional_checked_cast_addr` instruction.
+  ///   Original: unconditional_checked_cast_addr $X in x to $Y in y
+  ///    Tangent: unconditional_checked_cast_addr $X.Tan in tan[x]
+  ///                                          to $Y.Tan in tan[y]
+  CLONE_AND_EMIT_TANGENT(UnconditionalCheckedCastAddr, uccai) {
+    auto diffBuilder = getDifferentialBuilder();
+    auto loc = uccai->getLoc();
+    auto *bb = uccai->getParent();
+    auto &tanSrc = getTangentBuffer(bb, uccai->getSrc());
+    auto tanDest = getTangentBuffer(bb, uccai->getDest());
+    if (errorOccurred)
+      return;
+
+    diffBuilder.createUnconditionalCheckedCastAddr(
+        loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
+        tanDest->getType().getASTType());
   }
 
   /// Handle `begin_access` instruction (and do differentiability checks).
