@@ -585,12 +585,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
     auto *sig = GenericSignature::get({self}, {req});
 
-    // The requirement signature is created lazily by
-    // ProtocolDecl::getRequirementSignature().
-    // The generic signature and environment is created lazily by
-    // GenericContext::getGenericSignature(), so there is nothing we
-    // need to do.
-
     // Debugging of the generic signature builder and generic signature
     // generation.
     if (GC->getASTContext().LangOpts.DebugGenericSignatures) {
