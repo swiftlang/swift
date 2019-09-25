@@ -102,6 +102,14 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
+
+#ifndef NDEBUG
+  // Add a verification pass to check our work when skipping non-inlinable
+  // function bodies.
+  if (Options.SkipNonInlinableFunctionBodies)
+    P.addNonInlinableFunctionSkippingChecker();
+#endif
+
   if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
     P.addDestroyHoisting();

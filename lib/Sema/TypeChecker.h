@@ -616,6 +616,10 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
+  /// Indicate that the type checker should skip type-checking non-inlinable
+  /// function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
+
   /// Closure expressions whose bodies have already been prechecked as
   /// part of trying to apply a function builder.
   llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
@@ -705,6 +709,14 @@ public:
   /// considering a switch statement "too complex".
   void setSwitchCheckingInvocationThreshold(unsigned invocationCount) {
     SwitchCheckingInvocationThreshold = invocationCount;
+  }
+
+  void setSkipNonInlinableBodies(bool skip) {
+    SkipNonInlinableFunctionBodies = skip;
+  }
+
+  bool canSkipNonInlinableBodies() const {
+    return SkipNonInlinableFunctionBodies;
   }
 
   bool getInImmediateMode() {

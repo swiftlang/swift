@@ -254,6 +254,10 @@ def stats_output_dir: Separate<["-"], "stats-output-dir">,
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
+def experimental_skip_non_inlinable_function_bodies:
+  Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Skip type-checking and SIL generation for non-inlinable function bodies">;
 def profile_stats_events: Flag<["-"], "profile-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Profile changes to stats in -stats-output-dir">;

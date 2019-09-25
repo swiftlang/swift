@@ -5689,7 +5689,8 @@ public:
   /// Note that a true return value does not imply that the body was actually
   /// parsed.
   bool hasBody() const {
-    return getBodyKind() != BodyKind::None;
+    return getBodyKind() != BodyKind::None &&
+           getBodyKind() != BodyKind::Skipped;
   }
 
   /// Returns true if the text of this function's body can be retrieved either
@@ -5716,7 +5717,14 @@ public:
   /// Note that the body was skipped for this function.  Function body
   /// cannot be attached after this call.
   void setBodySkipped(SourceRange bodyRange) {
-    assert(getBodyKind() == BodyKind::None);
+    // FIXME: Remove 'Parsed' from this once we can delay parsing function
+    //        bodies. Right now -experimental-skip-non-inlinable-function-bodies
+    //        requires being able to change the state from Parsed to Skipped,
+    //        because we're still eagerly parsing function bodies.
+    assert(getBodyKind() == BodyKind::None ||
+           getBodyKind() == BodyKind::Unparsed ||
+           getBodyKind() == BodyKind::Parsed);
+    assert(bodyRange.isValid());
     BodyRange = bodyRange;
     setBodyKind(BodyKind::Skipped);
   }
@@ -5724,6 +5732,7 @@ public:
   /// Note that parsing for the body was delayed.
   void setBodyDelayed(SourceRange bodyRange) {
     assert(getBodyKind() == BodyKind::None);
+    assert(bodyRange.isValid());
     BodyRange = bodyRange;
     setBodyKind(BodyKind::Unparsed);
   }
@@ -5767,6 +5776,10 @@ public:
 
   bool isBodyTypeChecked() const {
     return getBodyKind() == BodyKind::TypeChecked;
+  }
+
+  bool isBodySkipped() const {
+    return getBodyKind() == BodyKind::Skipped;
   }
 
   bool isMemberwiseInitializer() const {

@@ -3017,6 +3017,23 @@ public:
     return true;
   }
 
+
+  bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
+    // Make sure we're in the mode that's skipping function bodies.
+    if (!TC.canSkipNonInlinableBodies())
+      return false;
+
+    // Make sure there even _is_ a body that we can skip.
+    if (!AFD->getBodySourceRange().isValid())
+      return false;
+
+    // If we're gonna serialize the body, we can't skip it.
+    if (AFD->getResilienceExpansion() == ResilienceExpansion::Minimal)
+      return false;
+
+    return true;
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     (void)FD->getInterfaceType();
 
@@ -3049,6 +3066,8 @@ public:
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(FD);
+    } else if (shouldSkipBodyTypechecking(FD)) {
+      FD->setBodySkipped(FD->getBodySourceRange());
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
@@ -3327,6 +3346,8 @@ public:
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(CD);
+    } else if (shouldSkipBodyTypechecking(CD)) {
+      CD->setBodySkipped(CD->getBodySourceRange());
     } else {
       TC.definedFunctions.push_back(CD);
     }
@@ -3342,6 +3363,8 @@ public:
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(DD);
+    } else if (shouldSkipBodyTypechecking(DD)) {
+      DD->setBodySkipped(DD->getBodySourceRange());
     } else {
       TC.definedFunctions.push_back(DD);
     }
