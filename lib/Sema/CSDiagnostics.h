@@ -1193,7 +1193,9 @@ public:
                           ArrayRef<Param> synthesizedArgs,
                           ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator),
-        SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {}
+        SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
+    assert(!SynthesizedArgs.empty() && "No missing arguments?!");
+  }
 
   bool diagnoseAsError() override;
 
@@ -1212,6 +1214,16 @@ private:
   /// an implicit call to a property wrapper initializer e.g.
   /// `@Foo(answer: 42) var question = "ultimate question"`
   bool isPropertyWrapperInitialization() const;
+
+  /// Gather informatioin associated with expression that represents
+  /// a call - function, arguments, # of arguments and whether it has
+  /// a trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(Expr *anchor) const;
+
+  /// Transform given argument into format suitable for a fix-it
+  /// text e.g. `[<label>:]? <#<type#>`
+  void forFixIt(llvm::raw_svector_ostream &out,
+                const AnyFunctionType::Param &argument) const;
 
 public:
   /// Due to the fact that `matchCallArgument` can't and

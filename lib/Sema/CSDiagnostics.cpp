@@ -3623,17 +3623,75 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (diagnoseInvalidTupleDestructuring())
     return true;
 
-  if (diagnoseSingleMissingArgument())
-    return true;
+  if (SynthesizedArgs.size() == 1)
+    return diagnoseSingleMissingArgument();
 
-  return false;
+  // At this point we know that this is a situation when
+  // there are multiple arguments missing, so let's produce
+  // a diagnostic which lists all of them and a fix-it
+  // to add arguments at appropriate positions.
+
+  SmallString<32> diagnostic;
+  llvm::raw_svector_ostream arguments(diagnostic);
+
+  interleave(
+      SynthesizedArgs,
+      [&](const AnyFunctionType::Param &arg) {
+        if (arg.hasLabel()) {
+          arguments << "'" << arg.getLabel().str() << "'";
+        } else {
+          auto *typeVar = arg.getPlainType()->castTo<TypeVariableType>();
+          auto *locator = typeVar->getImpl().getLocator();
+          auto paramIdx = locator->findLast<LocatorPathElt::ApplyArgToParam>()
+                              ->getParamIdx();
+
+          arguments << "#" << (paramIdx + 1);
+        }
+      },
+      [&] { arguments << ", "; });
+
+  auto diag = emitDiagnostic(anchor->getLoc(), diag::missing_arguments_in_call,
+                             arguments.str());
+
+  Expr *fnExpr = nullptr;
+  Expr *argExpr = nullptr;
+  unsigned numArguments = 0;
+  bool hasTrailingClosure = false;
+
+  std::tie(fnExpr, argExpr, numArguments, hasTrailingClosure) =
+      getCallInfo(getRawAnchor());
+
+  // TODO(diagnostics): We should be able to suggest this fix-it
+  // unconditionally.
+  if (argExpr && numArguments == 0) {
+    SmallString<32> scratch;
+    llvm::raw_svector_ostream fixIt(scratch);
+    interleave(
+        SynthesizedArgs,
+        [&](const AnyFunctionType::Param &arg) { forFixIt(fixIt, arg); },
+        [&] { fixIt << ", "; });
+
+    auto *tuple = cast<TupleExpr>(argExpr);
+    diag.fixItInsertAfter(tuple->getLParenLoc(), fixIt.str());
+  }
+
+  diag.flush();
+
+  if (auto selectedOverload = getChoiceFor(locator)) {
+    if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
+    }
+  }
+
+  return true;
 }
 
 bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   auto &ctx = getASTContext();
 
   auto *anchor = getRawAnchor();
-  if (!(isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor)))
+  if (!(isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor) ||
+        isa<UnresolvedMemberExpr>(anchor)))
     return false;
 
   if (SynthesizedArgs.size() != 1)
@@ -3652,37 +3710,21 @@ bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
   if (position != 0)
     insertText << ", ";
 
-  if (!label.empty())
-    insertText << label.str() << ": ";
+  forFixIt(insertText, argument);
 
-  // Explode inout type.
-  if (argument.isInOut())
-    insertText << "&";
-
-  auto resolvedType = resolveType(argType);
-  // @autoclosure; the type should be the result type.
-  if (argument.isAutoClosure())
-    resolvedType = resolvedType->castTo<FunctionType>()->getResult();
-
-  insertText << "<#" << resolvedType << "#>";
-
-  unsigned insertableEndIdx = 0;
   Expr *fnExpr = nullptr;
   Expr *argExpr = nullptr;
-  if (auto *callExpr = dyn_cast<CallExpr>(anchor)) {
-    fnExpr = callExpr->getFn();
-    argExpr = callExpr->getArg();
-    insertableEndIdx = callExpr->getNumArguments();
-    if (callExpr->hasTrailingClosure())
-      insertableEndIdx -= 1;
-  } else {
-    auto *SE = cast<SubscriptExpr>(anchor);
-    fnExpr = SE;
-    argExpr = SE->getIndex();
-    insertableEndIdx = SE->getNumArguments();
-    if (SE->hasTrailingClosure())
-      insertableEndIdx -= 1;
-  }
+  unsigned insertableEndIdx = 0;
+  bool hasTrailingClosure = false;
+
+  std::tie(fnExpr, argExpr, insertableEndIdx, hasTrailingClosure) =
+      getCallInfo(anchor);
+
+  if (!argExpr)
+    return false;
+
+  if (hasTrailingClosure)
+    insertableEndIdx -= 1;
 
   if (position == 0 && insertableEndIdx != 0)
     insertText << ", ";
@@ -3967,6 +4009,40 @@ bool MissingArgumentsFailure::isMisplacedMissingArgument(
 
   auto &TC = cs.getTypeChecker();
   return TC.isConvertibleTo(argType, paramType, cs.DC);
+}
+
+std::tuple<Expr *, Expr *, unsigned, bool>
+MissingArgumentsFailure::getCallInfo(Expr *anchor) const {
+  if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    return std::make_tuple(call->getFn(), call->getArg(),
+                           call->getNumArguments(), call->hasTrailingClosure());
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    return std::make_tuple(UME, UME->getArgument(), UME->getNumArguments(),
+                           UME->hasTrailingClosure());
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
+                           SE->hasTrailingClosure());
+  }
+
+  return std::make_tuple(nullptr, nullptr, 0, false);
+}
+
+void MissingArgumentsFailure::forFixIt(
+    llvm::raw_svector_ostream &out,
+    const AnyFunctionType::Param &argument) const {
+  if (argument.hasLabel())
+    out << argument.getLabel().str() << ": ";
+
+  // Explode inout type.
+  if (argument.isInOut())
+    out << "&";
+
+  auto resolvedType = resolveType(argument.getPlainType());
+  // @autoclosure; the type should be the result type.
+  if (argument.isAutoClosure())
+    resolvedType = resolvedType->castTo<FunctionType>()->getResult();
+
+  out << "<#" << resolvedType << "#>";
 }
 
 bool ClosureParamDestructuringFailure::diagnoseAsError() {
