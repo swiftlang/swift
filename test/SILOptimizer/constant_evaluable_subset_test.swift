@@ -350,6 +350,19 @@ func interpretDivideByZero() -> Int {
   return testDivideByZero(127, 0)
 }
 
+// CHECK-LABEL: @testDividingFullWidthByZero
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testDividingFullWidthByZero(_ x: Int, _ y: Int, _ z: UInt) -> Int {
+  return x.dividingFullWidth((y, z)).1
+} // CHECK: note: {{.*}}: Division by zero
+  // CHECK: note: operation performed during this call traps
+
+@_semantics("test_driver")
+func interpretDividingFullWidthByZero() -> Int {
+  return testDividingFullWidthByZero(0, 1, 1)
+}
+
 // CHECK-LABEL: @testDivideOverflow
 // CHECK: error: not constant evaluable
 @_semantics("constant_evaluable")
@@ -362,6 +375,20 @@ func testDivideOverflow(_ x: Int8, _ y: Int8) -> Int8 {
 @_semantics("test_driver")
 func interpretDivideOverflow() -> Int8 {
   return testDivideOverflow(-128, -1)
+}
+
+// CHECK-LABEL: @testDistance
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testDistance(_ x: UInt, _ y: UInt) -> Int {
+  return x.distance(to: y)
+    // CHECK: note: {{.*}}: Distance is not representable in Int
+    // CHECK: note: operation performed during this call traps
+}
+
+@_semantics("test_driver")
+func interpretDistanceTest() -> Int {
+  return testDistance(0, UInt.max)
 }
 
 // CHECK-LABEL: @testInOut
