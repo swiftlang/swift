@@ -891,20 +891,23 @@ namespace {
           unsigned typeParamCount = imported->getGenericParams()->size();
           auto typeArgs = type->getObjectType()->getTypeArgs();
           assert(typeArgs.empty() || typeArgs.size() == typeParamCount);
-          llvm::SmallVector<Type, 2> importedTypeArgs;
-          for (unsigned i = 0; i < typeParamCount; i++) {
-            Type importedTypeArg;
-            auto typeParam = imported->getGenericParams()->getParams()[i];
-            if (!typeArgs.empty()) {
-              auto subresult = Visit(typeArgs[i]);
-              if (!subresult) {
+          SmallVector<Type, 2> importedTypeArgs;
+          importedTypeArgs.reserve(typeParamCount);
+          if (!typeArgs.empty()) {
+            for (auto typeArg : typeArgs) {
+              Type importedTypeArg = Visit(typeArg).AbstractType;
+              if (!importedTypeArg)
                 return nullptr;
+              importedTypeArgs.push_back(importedTypeArg);
+            }
+          } else {
+            for (auto typeParam : imported->getGenericParams()->getParams()) {
+              if (typeParam->getSuperclass() &&
+                  typeParam->getConformingProtocols().empty()) {
+                importedTypeArgs.push_back(typeParam->getSuperclass());
+                continue;
               }
-              importedTypeArg = subresult.AbstractType;
-            } else if (typeParam->getSuperclass() &&
-                       typeParam->getConformingProtocols().empty()) {
-              importedTypeArg = typeParam->getSuperclass();
-            } else {
+
               SmallVector<Type, 4> memberTypes;
 
               if (auto superclassType = typeParam->getSuperclass())
@@ -917,11 +920,11 @@ namespace {
               if (memberTypes.empty())
                 hasExplicitAnyObject = true;
 
-              importedTypeArg = ProtocolCompositionType::get(
+              Type importedTypeArg = ProtocolCompositionType::get(
                   Impl.SwiftContext, memberTypes,
                   hasExplicitAnyObject);
+              importedTypeArgs.push_back(importedTypeArg);
             }
-            importedTypeArgs.push_back(importedTypeArg);
           }
           assert(importedTypeArgs.size() == typeParamCount);
           importedType = BoundGenericClassType::get(
