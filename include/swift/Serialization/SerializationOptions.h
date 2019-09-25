@@ -29,6 +29,7 @@ namespace swift {
 
     const char *OutputPath = nullptr;
     const char *DocOutputPath = nullptr;
+    const char *SourceInfoOutputPath = nullptr;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;
