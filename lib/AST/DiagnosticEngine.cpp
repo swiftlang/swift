@@ -398,7 +398,7 @@ static bool shouldShowAKA(Type type, StringRef typeName) {
     return false;
 
   // Don't show generic type parameters.
-  if (type->hasTypeParameter())
+  if (type->getCanonicalType()->hasTypeParameter())
     return false;
 
   // Only show 'aka' if there's a typealias involved; other kinds of sugar

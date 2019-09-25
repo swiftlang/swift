@@ -358,8 +358,6 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 }
 
 bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
-  auto memberType = typeDecl->getDeclaredInterfaceType();
-
   // We don't allow lookups of a non-generic typealias of an unbound
   // generic type, because we have no way to model such a type in the
   // AST.
@@ -370,28 +368,38 @@ bool TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl) {
   //
   // FIXME: Could lift this restriction once we have sugared
   // "member types".
-  if (type->is<UnboundGenericType>() &&
-      isa<TypeAliasDecl>(typeDecl) &&
-      cast<TypeAliasDecl>(typeDecl)->getGenericParams() == nullptr &&
-      memberType->hasTypeParameter()) {
-    return true;
-  }
+  if (type->is<UnboundGenericType>()) {
+    // Generic typealiases can be accessed with an unbound generic
+    // base, since we represent the member type as an unbound generic
+    // type.
+    //
+    // Non-generic type aliases can only be accessed if the
+    // underlying type is not dependent.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (!aliasDecl->isGeneric() &&
+          aliasDecl->getUnderlyingType()->getCanonicalType()
+            ->hasTypeParameter()) {
+        return true;
+      }
+    }
 
-  if (type->is<UnboundGenericType>() &&
-      isa<AssociatedTypeDecl>(typeDecl)) {
-    return true;
+    if (isa<AssociatedTypeDecl>(typeDecl))
+      return true;
   }
 
   if (type->isExistentialType() &&
       typeDecl->getDeclContext()->getSelfProtocolDecl()) {
-    // TODO: Temporarily allow typealias and associated type lookup on
-    //       existential type iff it doesn't have any type parameters.
-    if (isa<TypeAliasDecl>(typeDecl) || isa<AssociatedTypeDecl>(typeDecl))
-      return memberType->hasTypeParameter();
-
-    // Don't allow lookups of nested types of an existential type,
-    // because there is no way to represent such types.
-    return true;
+    // Allow typealias member access on existential types if the underlying
+    // type does not have any type parameters.
+    if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+      if (aliasDecl->getUnderlyingType()->getCanonicalType()
+          ->hasTypeParameter())
+        return true;
+    } else {
+      // Don't allow lookups of other nested types of an existential type,
+      // because there is no way to represent such types.
+      return true;
+    }
   }
 
   return false;
@@ -454,11 +462,12 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
       // FIXME: This is a hack, we should be able to remove this entire 'if'
       // statement once we learn how to deal with the circularity here.
-      if (isa<TypeAliasDecl>(typeDecl) &&
-          isa<ProtocolDecl>(typeDecl->getDeclContext())) {
-        if (!type->is<ArchetypeType>() &&
+      if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
+        if (isa<ProtocolDecl>(aliasDecl->getDeclContext()) &&
+            !type->is<ArchetypeType>() &&
             !type->isTypeParameter() &&
-            memberType->hasTypeParameter() &&
+            aliasDecl->getUnderlyingType()->getCanonicalType()
+              ->hasTypeParameter() &&
             !options.contains(NameLookupFlags::PerformConformanceCheck)) {
           continue;
         }

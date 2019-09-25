@@ -54,7 +54,7 @@ SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature *(ModuleDecl *, GenericSignature *,
-                                 SmallVector<GenericParamList *, 2>,
+                                 GenericParamList *,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)

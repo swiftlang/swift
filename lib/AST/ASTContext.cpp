@@ -2177,18 +2177,11 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   // Compute the recursive properties.
   //
   auto properties = underlying->getRecursiveProperties();
-  auto storedProperties = properties;
-  if (parent) {
+  if (parent)
     properties |= parent->getRecursiveProperties();
-    if (parent->hasTypeVariable())
-      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
-  }
 
-  for (auto substGP : substitutions.getReplacementTypes()) {
+  for (auto substGP : substitutions.getReplacementTypes())
     properties |= substGP->getRecursiveProperties();
-    if (substGP->hasTypeVariable())
-      storedProperties |= RecursiveTypeProperties::HasTypeVariable;
-  }
 
   // Figure out which arena this type will go into.
   auto &ctx = underlying->getASTContext();
@@ -2210,7 +2203,7 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
                                                       genericSig ? 1 : 0);
   auto mem = ctx.Allocate(size, alignof(TypeAliasType), arena);
   auto result = new (mem) TypeAliasType(typealias, parent, substitutions,
-                                        underlying, storedProperties);
+                                        underlying, properties);
   types.InsertNode(result, insertPos);
   return result;
 }

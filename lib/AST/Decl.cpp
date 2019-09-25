@@ -3545,7 +3545,7 @@ void TypeAliasDecl::computeType() {
   Type parent;
   auto parentDC = getDeclContext();
   if (parentDC->isTypeContext())
-    parent = parentDC->getDeclaredInterfaceType();
+    parent = parentDC->getSelfInterfaceType();
   auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
   setInterfaceType(MetatypeType::get(sugaredType, ctx));
 }

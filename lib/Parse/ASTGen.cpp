@@ -12,7 +12,9 @@
 
 #include "swift/Parse/ASTGen.h"
 
+#include "DebuggerContextChange.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 
 using namespace swift;
@@ -20,6 +22,132 @@ using namespace swift::syntax;
 
 SourceLoc ASTGen::generate(const TokenSyntax &Tok, const SourceLoc Loc) {
   return advanceLocBegin(Loc, Tok);
+}
+
+SourceLoc ASTGen::generateIdentifierDeclName(const syntax::TokenSyntax &Tok,
+                                             const SourceLoc Loc,
+                                             Identifier &Id) {
+  StringRef text;
+  if (Tok.getText() == "Any")
+    // Special handle 'Any' because we don't want to accidantaly declare 'Any'
+    // type in any way.
+    text = "#Any";
+  else
+    text = Tok.getIdentifierText();
+
+  Id = Context.getIdentifier(text);
+  return advanceLocBegin(Loc, Tok);
+}
+
+Decl *ASTGen::generate(const DeclSyntax &D, const SourceLoc Loc) {
+  Decl *DeclAST = nullptr;
+
+  if (auto associatedTypeDecl = D.getAs<AssociatedtypeDeclSyntax>()) {
+    DeclAST = generate(*associatedTypeDecl, Loc);
+  } else {
+    llvm_unreachable("unsupported decl kind");
+  }
+
+  return DeclAST;
+}
+
+DeclAttributes
+ASTGen::generateDeclAttributes(const DeclSyntax &D,
+                               const Optional<AttributeListSyntax> &attrs,
+                               const Optional<ModifierListSyntax> &modifiers,
+                               SourceLoc Loc, bool includeComments) {
+  SourceLoc attrsLoc;
+  if (attrs) {
+    attrsLoc = advanceLocBegin(Loc, *attrs->getFirstToken());
+  } else if (modifiers) {
+    attrsLoc = advanceLocBegin(Loc, *modifiers->getFirstToken());
+  } else {
+    // We might have comment attributes.
+    attrsLoc = advanceLocBegin(Loc, *D.getFirstToken());
+  }
+  if (hasDeclAttributes(attrsLoc))
+    return getDeclAttributes(attrsLoc);
+  return DeclAttributes();
+}
+
+MutableArrayRef<TypeLoc>
+ASTGen::generate(const TypeInheritanceClauseSyntax &clause, SourceLoc Loc,
+                 bool allowClassRequirement) {
+  SmallVector<TypeLoc, 2> inherited;
+
+  bool hasClass = false;
+  for (const auto elem : clause.getInheritedTypeCollection()) {
+    const auto &tySyntax = elem.getTypeName();
+    if (tySyntax.is<ClassRestrictionTypeSyntax>()) {
+      // Accept 'class' only if it's allowed and it's the first one.
+      if (!allowClassRequirement || hasClass)
+        continue;
+      hasClass = true;
+    }
+    if (auto ty = generate(tySyntax, Loc))
+      inherited.emplace_back(ty);
+  }
+
+  return Context.AllocateCopy(inherited);
+}
+
+TypeDecl *ASTGen::generate(const AssociatedtypeDeclSyntax &D,
+                           const SourceLoc Loc) {
+  if (!isa<ProtocolDecl>(P.CurDeclContext)) {
+    // This is already diagnosed in Parser.
+    return nullptr;
+  }
+
+  auto idToken = D.getIdentifier();
+  if (idToken.isMissing())
+    return nullptr;
+
+  auto keywordLoc = advanceLocBegin(Loc, D.getAssociatedtypeKeyword());
+  auto name = Context.getIdentifier(idToken.getIdentifierText());
+  auto nameLoc = advanceLocBegin(Loc, idToken);
+
+  DeclAttributes attrs =
+      generateDeclAttributes(D, D.getAttributes(), D.getModifiers(), Loc, true);
+
+  DebuggerContextChange DCC(P, name, DeclKind::AssociatedType);
+
+  ArrayRef<TypeLoc> inherited;
+  if (const auto inheritanceClause = D.getInheritanceClause())
+    inherited =
+        generate(*inheritanceClause, Loc, /*allowClassRequirement=*/true);
+
+  TypeRepr *defaultTy = nullptr;
+  if (const auto init = D.getInitializer())
+    defaultTy = generate(init->getValue(), Loc);
+
+  TrailingWhereClause *trailingWhere = nullptr;
+  if (auto whereClause = D.getGenericWhereClause())
+    trailingWhere = generate(*whereClause, Loc);
+
+  auto assocType = new (Context)
+      AssociatedTypeDecl(P.CurDeclContext, keywordLoc, name, nameLoc, defaultTy,
+                         trailingWhere);
+  assocType->getAttrs() = attrs;
+  if (!inherited.empty())
+    assocType->setInherited(Context.AllocateCopy(inherited));
+  addToScope(assocType);
+  return assocType;
+}
+
+TrailingWhereClause *ASTGen::generate(const GenericWhereClauseSyntax &syntax,
+                                      const SourceLoc Loc) {
+  SourceLoc whereLoc = advanceLocBegin(Loc, syntax.getWhereKeyword());
+
+  SmallVector<RequirementRepr, 4> requirements;
+  requirements.reserve(syntax.getRequirementList().size());
+  for (auto elem : syntax.getRequirementList()) {
+    if (auto req = generate(elem, Loc))
+      requirements.push_back(*req);
+  }
+
+  if (requirements.empty())
+    return nullptr;
+  return TrailingWhereClause::create(Context, whereLoc, requirements);
 }
 
 Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,
@@ -123,6 +251,10 @@ TypeRepr *ASTGen::generate(const TypeSyntax &Type, const SourceLoc Loc) {
     TypeAST = generate(*Unwrapped, Loc);
   else if (auto Attributed = Type.getAs<AttributedTypeSyntax>())
     TypeAST = generate(*Attributed, Loc);
+  else if (auto ClassRestriction = Type.getAs<ClassRestrictionTypeSyntax>())
+    TypeAST = generate(*ClassRestriction, Loc);
+  else if (auto CompletionTy = Type.getAs<CodeCompletionTypeSyntax>())
+    TypeAST = generate(*CompletionTy, Loc);
   else if (auto Unknown = Type.getAs<UnknownTypeSyntax>())
     TypeAST = generate(*Unknown, Loc);
 
@@ -381,11 +513,6 @@ TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,
     auto AnyLoc = advanceLocBegin(Loc, Type.getName());
     return CompositionTypeRepr::createEmptyComposition(Context, AnyLoc);
   }
-  if (Type.getName().getText() == "class") {
-    auto classLoc = advanceLocBegin(Loc, Type.getName());
-    return new (Context)
-        SimpleIdentTypeRepr(classLoc, Context.getIdentifier("AnyObject"));
-  }
 
   return generateSimpleOrMemberIdentifier(Type, Loc);
 }
@@ -445,34 +572,51 @@ TypeRepr *ASTGen::generate(const ImplicitlyUnwrappedOptionalTypeSyntax &Type,
       ImplicitlyUnwrappedOptionalTypeRepr(WrappedType, ExclamationLoc);
 }
 
+TypeRepr *
+ASTGen::generate(const ClassRestrictionTypeSyntax &Type, const SourceLoc Loc) {
+  auto classLoc = advanceLocBegin(Loc, Type);
+  return new (Context)
+      SimpleIdentTypeRepr(classLoc, Context.getIdentifier("AnyObject"));
+}
+
+TypeRepr *ASTGen::generate(const CodeCompletionTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto base = Type.getBase();
+  if (!base)
+    return nullptr;
+
+  TypeRepr *parsedTyR = generate(*base, Loc);
+  if (parsedTyR) {
+    if (P.CodeCompletion)
+      P.CodeCompletion->setParsedTypeLoc(parsedTyR);
+  }
+  return parsedTyR;
+}
+
 TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
   auto ChildrenCount = Type.getNumChildren();
 
   // Recover from old-style protocol composition:
   //   `protocol` `<` protocols `>`
   if (ChildrenCount >= 2) {
-    auto Protocol = Type.getChild(0)->getAs<TokenSyntax>();
+    auto keyword = Type.getChild(0)->getAs<TokenSyntax>();
 
-    if (Protocol && Protocol->getText() == "protocol") {
+    if (keyword && keyword->getText() == "protocol") {
+      auto keywordLoc = advanceLocBegin(Loc, *keyword);
       auto LAngle = Type.getChild(1);
-
-      SmallVector<TypeSyntax, 4> Protocols;
-      for (unsigned i = 2; i < Type.getNumChildren(); i++)
-        if (auto PType = Type.getChild(i)->getAs<TypeSyntax>())
-          Protocols.push_back(*PType);
-
       auto RAngle = Type.getChild(ChildrenCount - 1);
 
-      auto ProtocolLoc = advanceLocBegin(Loc, *Protocol);
       auto LAngleLoc = advanceLocBegin(Loc, *LAngle);
       auto RAngleLoc = advanceLocBegin(Loc, *RAngle);
 
-      SmallVector<TypeRepr *, 4> ProtocolTypes;
-      for (auto &&P : llvm::reverse(Protocols))
-        ProtocolTypes.push_back(generate(P, Loc));
-      std::reverse(std::begin(ProtocolTypes), std::end(ProtocolTypes));
+      SmallVector<TypeRepr *, 4> protocols;
+      for (unsigned i = 2; i < Type.getNumChildren(); i++) {
+        if (auto elem = Type.getChild(i)->getAs<TypeSyntax>())
+          if (auto proto = generate(*elem, Loc))
+            protocols.push_back(proto);
+      }
 
-      return CompositionTypeRepr::create(Context, ProtocolTypes, ProtocolLoc,
+      return CompositionTypeRepr::create(Context, protocols, keywordLoc,
                                          {LAngleLoc, RAngleLoc});
     }
   }
@@ -576,7 +720,7 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
 
     if (auto inherited = elem.getInheritedType()) {
       if (auto ty = generate(*inherited, Loc)) {
-        SmallVector<TypeLoc, 1> constraints = {generate(*inherited, Loc)};
+        SmallVector<TypeLoc, 1> constraints = {ty};
         param->setInherited(Context.AllocateCopy(constraints));
       }
     }

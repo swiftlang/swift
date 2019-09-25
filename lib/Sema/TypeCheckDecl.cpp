@@ -2587,6 +2587,8 @@ public:
 
     checkAccessControl(TC, ED);
 
+    TC.checkPatternBindingCaptures(ED);
+
     if (ED->hasRawType() && !ED->isObjC()) {
       // ObjC enums have already had their raw values checked, but pure Swift
       // enums haven't.
@@ -3086,10 +3088,7 @@ public:
 
     // Validate the nominal type declaration being extended.
     (void)nominal->getInterfaceType();
-    // Don't bother computing the generic signature if the extended nominal
-    // type didn't pass validation so we don't crash.
-    if (!nominal->isInvalid())
-      (void)ED->getGenericSignature();
+    (void)ED->getGenericSignature();
     ED->setValidationToChecked();
 
     if (extType && !extType->hasError()) {
@@ -3770,8 +3769,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         (void)nominal->getInterfaceType();
         
         // Eagerly validate the generic signature of the extension.
-        if (!nominal->isInvalid())
-          (void)ext->getGenericSignature();
+        (void)ext->getGenericSignature();
       }
     }
     if (ext->getValidationState() == Decl::ValidationState::Checking)

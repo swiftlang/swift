@@ -28,20 +28,20 @@ namespace swift {
 % # Emit the non-collection classes first, then emit the collection classes
 % # that reference these classes.
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if not node.is_syntax_collection():
 class Parsed${node.name};
 %   end
 % end
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if node.is_syntax_collection():
 using Parsed${node.name} =
   ParsedSyntaxCollection<syntax::SyntaxKind::${node.syntax_kind}>;
 %   end
 % end
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if not node.is_syntax_collection():
 %     qualifier = "" if node.is_base() else "final"
 %     for line in dedented_lines(node.description):

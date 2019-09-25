@@ -328,13 +328,13 @@ getFieldAt(const Metadata *base, unsigned index) {
   const FieldDescriptor &descriptor = *fields;
   auto &field = descriptor.getFields()[index];
   // Bounds are always valid as the offset is constant.
-  auto name = field.getFieldName(0, 0, std::numeric_limits<uintptr_t>::max());
+  auto name = field.getFieldName(0, std::numeric_limits<uintptr_t>::max());
 
   // Enum cases don't always have types.
   if (!field.hasMangledTypeName())
     return {name, FieldType().withIndirect(field.isIndirectCase())};
 
-  auto typeName = field.getMangledTypeName(0);
+  auto typeName = field.getMangledTypeName();
 
   SubstGenericParametersFromMetadata substitutions(base);
   auto typeInfo = swift_getTypeByMangledName(MetadataState::Complete,

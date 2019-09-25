@@ -2,6 +2,8 @@
 
 func markUsed<T>(_ t: T) {}
 
+// CHECK-DAG: ![[INTTYPE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Int", {{.*}})
+
 public class DWARF {
 // CHECK-DAG: ![[BASE:.*]] = !DICompositeType({{.*}}identifier: "$ss6UInt32VD"
 // CHECK-DAG: ![[DIEOFFSET:.*]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$s9typealias5DWARFC9DIEOffsetaD",{{.*}} line: [[@LINE+1]], baseType: ![[BASE]])
@@ -108,3 +110,20 @@ extension Ox where T == Int {
 }
 
 var v: Ox<Int>.Plow = 0
+
+public protocol Up {
+  associatedtype A : Down
+}
+
+public protocol Down {
+  associatedtype A
+}
+
+public typealias DependentAlias<T : Up> = T.A.A
+
+extension Up where A.A == Int {
+  public func foo() {
+    // CHECK-DAG: !DILocalVariable(name: "gg",{{.*}} type: ![[INTTYPE]]
+    var gg: DependentAlias<Self> = 123
+  }
+}

@@ -609,7 +609,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
-  file.setInstallAPI();
+  file.setInstallAPI(opts.IsInstallAPI);
 
   auto getPlatformKind =
       [](const llvm::Triple &Target) -> llvm::MachO::PlatformKind {

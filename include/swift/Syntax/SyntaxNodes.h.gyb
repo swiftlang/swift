@@ -32,13 +32,13 @@ namespace syntax {
 % # Emit the non-collection classes first, then emit the collection classes
 % # that reference these classes.
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if not node.is_syntax_collection():
 class ${node.name};
 %   end
 % end
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if node.is_syntax_collection():
 using ${node.name} =
   SyntaxCollection<SyntaxKind::${node.syntax_kind},
@@ -46,7 +46,7 @@ using ${node.name} =
 %   end
 % end
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if not node.is_syntax_collection():
 %     qualifier = "" if node.is_base() else "final"
 %     for line in dedented_lines(node.description):

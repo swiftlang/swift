@@ -2,7 +2,7 @@
   from gyb_syntax_support import *
   from gyb_syntax_support.kinds import SYNTAX_BASE_KINDS
   grouped_nodes = { kind: [] for kind in SYNTAX_BASE_KINDS }
-  for node in SYNTAX_NODES + SILONLY_NODES:
+  for node in SYNTAX_NODES + PARSEONLY_NODES:
     grouped_nodes[node.base_kind].append(node)
   # -*- mode: C++ -*-
   # Ignore the following admonition; it applies to the resulting .h file only
@@ -93,7 +93,7 @@ struct WrapperTypeTraits<syntax::SyntaxKind> {
     case syntax::SyntaxKind::${node.syntax_kind}: 
       return ${SYNTAX_NODE_SERIALIZATION_CODES[node.syntax_kind]};
 % end
-% for node in SILONLY_NODES:
+% for node in PARSEONLY_NODES:
     case syntax::SyntaxKind::${node.syntax_kind}:
 % end
       llvm_unreachable("unserializable syntax kind");
@@ -124,7 +124,7 @@ struct ScalarReferenceTraits<syntax::SyntaxKind> {
       case syntax::SyntaxKind::${node.syntax_kind}:
         return "\"${node.syntax_kind}\"";
 % end
-% for node in SILONLY_NODES:
+% for node in PARSEONLY_NODES:
       case syntax::SyntaxKind::${node.syntax_kind}:
 % end
         llvm_unreachable("unserializable syntax kind");

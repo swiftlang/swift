@@ -1072,6 +1072,11 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
       }
 
       Type type = self->typeWitnesses.begin(assocType)->first;
+
+      // FIXME: Get rid of this hack.
+      if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer()))
+        type = aliasTy->getSinglyDesugaredType();
+
       return type->mapTypeOutOfContext().getPointer();
     };
   return options;

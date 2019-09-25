@@ -940,6 +940,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
     Opts.InstallName = A->getValue();
   }
 
+  Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
+
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     if (auto vers = version::Version::parseVersionString(
           A->getValue(), SourceLoc(), &Diags)) {

@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Syntax/SyntaxNodes.h"
 #include "llvm/ADT/DenseMap.h"
@@ -42,6 +43,30 @@ public:
   ASTGen(ASTContext &Context, Parser &P) : Context(Context), P(P) {}
 
   SourceLoc generate(const syntax::TokenSyntax &Tok, const SourceLoc Loc);
+
+  SourceLoc generateIdentifierDeclName(const syntax::TokenSyntax &Tok,
+                                       const SourceLoc, Identifier &Identifier);
+
+public:
+  //===--------------------------------------------------------------------===//
+  // Decls.
+
+  Decl *generate(const syntax::DeclSyntax &Decl, const SourceLoc Loc);
+  TypeDecl *generate(const syntax::AssociatedtypeDeclSyntax &Decl,
+                     const SourceLoc Loc);
+
+  TrailingWhereClause *generate(const syntax::GenericWhereClauseSyntax &syntax,
+                                const SourceLoc Loc);
+  MutableArrayRef<TypeLoc>
+  generate(const syntax::TypeInheritanceClauseSyntax &syntax,
+           const SourceLoc Loc, bool allowClassRequirement);
+
+private:
+  DeclAttributes
+  generateDeclAttributes(const syntax::DeclSyntax &D,
+                         const Optional<syntax::AttributeListSyntax> &attrs,
+                         const Optional<syntax::ModifierListSyntax> &modifiers,
+                         SourceLoc Loc, bool includeComments);
 
 public:
   //===--------------------------------------------------------------------===//
@@ -96,6 +121,10 @@ public:
   TypeRepr *generate(const syntax::OptionalTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::ImplicitlyUnwrappedOptionalTypeSyntax &Type,
+                     const SourceLoc Loc);
+  TypeRepr *generate(const syntax::ClassRestrictionTypeSyntax &Type,
+                     const SourceLoc Loc);
+  TypeRepr *generate(const syntax::CodeCompletionTypeSyntax &Type,
                      const SourceLoc Loc);
   TypeRepr *generate(const syntax::UnknownTypeSyntax &Type,
                      const SourceLoc Loc);
