@@ -2,8 +2,6 @@
 // SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-799): Re-enable RUN line after SR-11336 is fixed.
 // UN: %target-swift-frontend -enable-experimental-static-assert -enable-ownership-stripping-after-serialization -emit-sil %s -verify
-
-// REQUIRES: optimized_stdlib
 // REQUIRES: asserts
 
 //===----------------------------------------------------------------------===//
@@ -41,7 +39,6 @@ func loops1(a: Int) -> Int {
 
 func loops2(a: Int) -> Int {
   var x = 42
-  // expected-note @+1 {{operation not supported by the evaluator}}
   for i in 0 ... a {
     x += i
   }

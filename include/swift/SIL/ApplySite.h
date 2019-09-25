@@ -130,8 +130,13 @@ public:
     llvm_unreachable("covered switch");                                        \
   } while (0)
 
+  /// Return the callee operand as a value.
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
+
   /// Return the callee operand.
-  SILValue getCallee() const { FOREACH_IMPL_RETURN(getCallee()); }
+  const Operand *getCalleeOperand() const {
+    FOREACH_IMPL_RETURN(getCalleeOperand());
+  }
 
   /// Return the callee value by looking through function conversions until we
   /// find a function_ref, partial_apply, or unrecognized callee value.

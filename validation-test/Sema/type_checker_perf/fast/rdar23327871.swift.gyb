@@ -1,7 +1,6 @@
 // SWIFT_ENABLE_TENSORFLOW
 // UNSUPPORTED: macosx
 // RUN: %scale-test --begin 8 --end 16 --step 1 --select NumLeafScopes %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 
 let i = 1

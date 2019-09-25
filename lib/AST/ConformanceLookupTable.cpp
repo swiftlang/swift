@@ -21,6 +21,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -793,16 +794,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
   DeclContext *conformingDC = getConformingContext(nominal, entry);
   if (!conformingDC)
     return nullptr;
-
-  // Everything about this conformance is nailed down, so we can now ensure that
-  // the extension is fully resolved.
-  if (auto resolver = nominal->getASTContext().getLazyResolver()) {
-    if (auto ED = dyn_cast<ExtensionDecl>(conformingDC)) {
-      resolver->resolveExtension(ED);
-    } else {
-      resolver->resolveDeclSignature(cast<NominalTypeDecl>(conformingDC));
-    }
-  }
 
   auto *conformingNominal = conformingDC->getSelfNominalTypeDecl();
 

@@ -74,7 +74,7 @@ extension OSLogInterpolation {
   /// This function must be constant evaluable and all its arguments
   /// must be known at compile time.
   @inlinable
-  @_semantics("oslog.interpolation.getFormatSpecifier")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getStringFormatSpecifier(_ isPrivate: Bool) -> String {
@@ -102,7 +102,7 @@ extension OSLogArguments {
 @inlinable
 @_optimize(none)
 @_effects(readonly)
-@_semantics("oslog.string.sizeForEncoding")
+@_semantics("constant_evaluable")
 internal func sizeForEncoding() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }

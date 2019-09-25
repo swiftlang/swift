@@ -15,6 +15,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"

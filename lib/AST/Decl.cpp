@@ -38,6 +38,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ResilienceExpansion.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
@@ -855,22 +856,19 @@ GenericParamList *GenericContext::getGenericParams() const {
                                const_cast<GenericContext *>(this)}, nullptr);
 }
 
+bool GenericContext::hasComputedGenericSignature() const {
+  return GenericSigAndBit.getInt();
+}
+      
+bool GenericContext::isComputingGenericSignature() const {
+  return getASTContext().evaluator.hasActiveRequest(
+                 GenericSignatureRequest{const_cast<GenericContext*>(this)});
+}
+
 GenericSignature *GenericContext::getGenericSignature() const {
-  if (GenericSig)
-    return GenericSig;
-
-  // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
-  // it.
-  if (auto PD = dyn_cast<ProtocolDecl>(this)) {
-    auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
-    auto req =
-        Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    const_cast<GenericContext *>(this)->GenericSig
-      = GenericSignature::get({self}, {req});
-    return GenericSig;
-  }
-
-  return nullptr;
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GenericSignatureRequest{const_cast<GenericContext *>(this)}, nullptr);
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
@@ -881,8 +879,9 @@ GenericEnvironment *GenericContext::getGenericEnvironment() const {
 }
 
 void GenericContext::setGenericSignature(GenericSignature *genericSig) {
-  assert(GenericSig == nullptr && "Generic signature cannot be changed");
-  this->GenericSig = genericSig;
+  assert(!GenericSigAndBit.getPointer() && "Generic signature cannot be changed");
+  getASTContext().evaluator.cacheOutput(GenericSignatureRequest{this},
+                                        std::move(genericSig));
 }
 
 SourceRange GenericContext::getGenericTrailingWhereClauseSourceRange() const {
@@ -2698,7 +2697,13 @@ bool ValueDecl::hasInterfaceType() const {
 }
 
 Type ValueDecl::getInterfaceType() const {
-  assert(hasInterfaceType() && "No interface type was set");
+  if (!hasInterfaceType()) {
+    // Our clients that don't register the lazy resolver are relying on the
+    // fact that they can't pull an interface type out to avoid doing work.
+    // This is a necessary evil until we can wean them off.
+    if (auto resolver = getASTContext().getLazyResolver())
+      resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
+  }
   return TypeAndAccess.getPointer();
 }
 
@@ -2719,14 +2724,6 @@ void ValueDecl::setInterfaceType(Type type) {
   }
 
   TypeAndAccess.setPointer(type);
-}
-
-bool ValueDecl::hasValidSignature() const {
-  if (!hasInterfaceType())
-    return false;
-  // FIXME -- The build blows up if the correct code is used:
-  // return getValidationState() > ValidationState::CheckingWithValidSignature;
-  return getValidationState() != ValidationState::Checking;
 }
 
 Optional<ObjCSelector> ValueDecl::getObjCRuntimeName(
@@ -3250,7 +3247,7 @@ Type TypeDecl::getDeclaredInterfaceType() const {
         selfTy, const_cast<AssociatedTypeDecl *>(ATD));
   }
 
-  Type interfaceType = hasInterfaceType() ? getInterfaceType() : nullptr;
+  Type interfaceType = getInterfaceType();
   if (interfaceType.isNull() || interfaceType->is<ErrorType>())
     return interfaceType;
 
@@ -3607,34 +3604,42 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
-void TypeAliasDecl::setUnderlyingType(Type underlying) {
-  setValidationToChecked();
+void TypeAliasDecl::computeType() {
+  assert(!hasInterfaceType());
+      
+  // Set the interface type of this declaration.
+  ASTContext &ctx = getASTContext();
 
+  auto *genericSig = getGenericSignature();
+  SubstitutionMap subs;
+  if (genericSig)
+    subs = genericSig->getIdentitySubstitutionMap();
+
+  Type parent;
+  auto parentDC = getDeclContext();
+  if (parentDC->isTypeContext())
+    parent = parentDC->getDeclaredInterfaceType();
+  auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
+  setInterfaceType(MetatypeType::get(sugaredType, ctx));
+}
+
+Type TypeAliasDecl::getUnderlyingType() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+           UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
+           Type());
+}
+      
+void TypeAliasDecl::setUnderlyingType(Type underlying) {
   // lldb creates global typealiases containing archetypes
   // sometimes...
   if (underlying->hasArchetype() && isGenericContext())
     underlying = underlying->mapTypeOutOfContext();
-  UnderlyingTy.setType(underlying);
-
-  // FIXME -- if we already have an interface type, we're changing the
-  // underlying type. See the comment in the ProtocolDecl case of
-  // validateDecl().
-  if (!hasInterfaceType()) {
-    // Set the interface type of this declaration.
-    ASTContext &ctx = getASTContext();
-
-    auto *genericSig = getGenericSignature();
-    SubstitutionMap subs;
-    if (genericSig)
-      subs = genericSig->getIdentitySubstitutionMap();
-
-    Type parent;
-    auto parentDC = getDeclContext();
-    if (parentDC->isTypeContext())
-      parent = parentDC->getDeclaredInterfaceType();
-    auto sugaredType = TypeAliasType::get(this, parent, subs, underlying);
-    setInterfaceType(MetatypeType::get(sugaredType, ctx));
-  }
+  getASTContext().evaluator.cacheOutput(
+          StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+          std::move(underlying));
+  getASTContext().evaluator.cacheOutput(
+          UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
+          std::move(underlying));
 }
 
 UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
@@ -3651,12 +3656,10 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type TypeAliasDecl::getStructuralType() const {
-  assert(!getGenericParams());
-  
   auto &context = getASTContext();
-  return evaluateOrDefault(context.evaluator,
-                           StructuralTypeRequest { const_cast<TypeAliasDecl *>(this) },
-                           Type());
+  return evaluateOrDefault(
+      context.evaluator,
+      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)}, Type());
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -5716,12 +5719,18 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
-      // Do not suggest the fix it in implicit getters
+      // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
+
+        auto accessorDC = AD->getDeclContext();
+        // Do not suggest the fix-it if `Self` is a class type.
+        if (accessorDC->isTypeContext() && !accessorDC->hasValueSemantics()) {
+          return;
+        }
       }
-                   
+
       auto &d = getASTContext().Diags;
       d.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
                  isa<AccessorDecl>(FD))
@@ -5941,6 +5950,11 @@ CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
   assert(DefaultValueAndFlags.getPointer());
   DefaultValueAndFlags.getPointer()->InitContext = initContext;
+}
+
+void ParamDecl::setDefaultArgumentCaptureInfo(const CaptureInfo &captures) {
+  assert(DefaultValueAndFlags.getPointer());
+  DefaultValueAndFlags.getPointer()->Captures = captures;
 }
 
 /// Return nullptr if there is no property wrapper
@@ -6236,6 +6250,10 @@ void SubscriptDecl::computeType() {
 
   // Record the interface type.
   setInterfaceType(funcTy);
+      
+  // Make sure that there are no unresolved dependent types in the
+  // generic signature.
+  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6614,17 +6632,6 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   if (decl->isEffectiveLinkageMoreVisibleThan(base))
     return true;
 
-  // FIXME: Remove this once getInterfaceType() has been request-ified.
-  if (!decl->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(decl));
-  }
-
-  if (!base->hasInterfaceType()) {
-    ctx.getLazyResolver()->resolveDeclSignature(
-      const_cast<AbstractFunctionDecl *>(base));
-  }
-
   // If the method overrides something, we only need a new entry if the
   // override has a more general AST type. However an abstraction
   // change is OK; we don't want to add a whole new vtable entry just
@@ -6830,6 +6837,10 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   // Compute the type of the 'self' parameter if we're created one already.
   if (hasSelf)
     computeSelfDeclType();
+      
+  // Make sure that there are no unresolved dependent types in the
+  // generic signature.
+  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {

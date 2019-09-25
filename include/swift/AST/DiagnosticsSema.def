@@ -384,6 +384,15 @@ NOTE(candidate_has_invalid_argument_at_position,none,
      "candidate expects value of type %0 at position #%1",
      (Type, unsigned))
 
+ERROR(cannot_convert_array_to_variadic,none,
+      "cannot pass array of type %0 as variadic arguments of type %1",
+      (Type,Type))
+NOTE(candidate_would_match_array_to_variadic,none,
+     "candidate would match if array elements were passed as"
+     " variadic arguments of type %0", (Type))
+NOTE(suggest_pass_elements_directly,none,
+     "remove brackets to pass array elements directly", ())
+
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
       (Type, StringRef, Type, StringRef))
@@ -395,6 +404,12 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+
+ERROR(cannot_convert_condition_value,none,
+      "cannot convert value of type %0 to expected condition type %1",
+      (Type, Type))
+ERROR(cannot_convert_condition_value_nil,none,
+      "'nil' is not compatible with expected condition type %0", (Type))
 
 ERROR(cannot_yield_rvalue_by_reference_same_type,none,
       "cannot yield immutable value of type %0 as an inout yield", (Type))
@@ -1672,10 +1687,19 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(type_cannot_conform, none,
+      "%select{|value of protocol }0type %1 cannot conform to %2; "
+      "only struct/enum/class types can conform to protocols",
+      (bool, Type, Type))
+NOTE(required_by_opaque_return,none,
+    "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
+NOTE(required_by_decl,none,
+     "required by %0 %1 where %2 = %3",
+     (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(required_by_decl_ref,none,
+     "required by referencing %0 %1 on %2 where %3 = %4",
+     (DescriptiveDeclKind, DeclName, Type, Type, Type))
 
-ERROR(protocol_does_not_conform_objc,none,
-      "protocol type %0 cannot conform to %1 because only concrete "
-      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",
@@ -2683,6 +2707,8 @@ ERROR(dynamic_self_invalid_method,none,
       "covariant 'Self' can only appear at the top level of method result type", ())
 ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
+ERROR(dynamic_self_default_arg,none,
+      "covariant 'Self' type cannot be referenced from a default argument expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes

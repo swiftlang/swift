@@ -198,7 +198,7 @@ BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
                descriptor->Stride,
                descriptor->NumExtraInhabitants,
                descriptor->isBitwiseTakable()),
-      Name(descriptor->getMangledTypeName(0)) {}
+      Name(descriptor->getMangledTypeName()) {}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {

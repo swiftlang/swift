@@ -1,0 +1,136 @@
+// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+//
+// Test SimplifyCFG's handling of address-type phis. In other words, makes sure it doesn't create them at all!
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {
+  @_hasStorage @_hasInitialValue var field: Int { get set }
+  @objc deinit
+    init()
+}
+
+sil @getC : $@convention(thin) () -> C
+
+// Test that jump threading sinks a ref_element_addr, generating a
+// non-address phi for its operand.
+//
+// The retain on separate paths followed by a merged release, and
+// target block with a conditional branch are necessary just to get
+// jump threading to kick in.
+//
+// CHECK-LABEL: sil @testJumpThreadRefEltLoop : $@convention(thin) () -> () {
+// CHECK: bb0
+// CHECK:   function_ref @getC : $@convention(thin) () -> C
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   [[C1:%.*]] = apply %0() : $@convention(thin) () -> C
+// CHECK:   strong_retain [[C1]] : $C
+// CHECK:   strong_release [[C1]] : $C
+// CHECK:   br bb3([[C1]] : $C)
+// CHECK: bb2:
+// CHECK:   [[C2:%.*]] = apply %0() : $@convention(thin) () -> C
+// CHECK:   strong_retain [[C2]] : $C
+// CHECK:   strong_release [[C2]] : $C
+// CHECK:   br bb3([[C2]] : $C)
+// CHECK: bb3([[PHI:%.*]] : $C):
+// CHECK:   [[ADR:%.*]] = ref_element_addr [[PHI]] : $C, #C.field
+// CHECK:   begin_access [read] [dynamic] [[ADR]] : $*Int
+// CHECK:   load
+// CHECK:   end_access
+// CHECK-LABEL: } // end sil function 'testJumpThreadRefEltLoop'
+sil @testJumpThreadRefEltLoop : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @getC : $@convention(thin) () -> C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %c1 = apply %f() : $@convention(thin) ()->C
+  strong_retain %c1 : $C
+  br bb3(%c1 : $C)
+
+bb2:
+  %c2 = apply %f() : $@convention(thin) ()->C
+  strong_retain %c2 : $C
+  br bb3(%c2 : $C)
+
+bb3(%arg : $C):
+  strong_release %arg : $C
+  %18 = ref_element_addr %arg : $C, #C.field
+  br bb4
+
+bb4:
+  %19 = begin_access [read] [dynamic] %18 : $*Int
+  %20 = load %19 : $*Int
+  end_access %19 : $*Int
+  cond_br undef, bb4, bb5
+
+bb5:
+  %z = tuple ()
+  return %z : $()
+}
+
+// Test that jump threading sinks a
+// ref_tail_addr->index_addr->struct_element_addr chain and generates
+// a phi for the index_addr's index operand.
+//
+// The retain on separate paths followed by a merged release, and
+// target block with a conditional branch are necessary just to get
+// jump threading to kick in.
+//
+// CHECK-LABEL: sil @testJumpThreadIndex : $@convention(thin) (__ContiguousArrayStorageBase, Builtin.Int64) -> Builtin.Int32 {
+// CHECK: bb0(%0 : $__ContiguousArrayStorageBase, %1 : $Builtin.Int64):
+// CHECK:   cond_br undef, bb1, bb2
+// CHECK: bb1:
+// CHECK:   apply
+// CHECK:   strong_retain
+// CHECK:   strong_release
+// CHECK:   [[IDX1:%.*]] = builtin "truncOrBitCast_Int64_Word"(%1 : $Builtin.Int64) : $Builtin.Word
+// CHECK:   br bb3([[IDX1]] : $Builtin.Word)
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK:   strong_retain
+// CHECK:   strong_release
+// CHECK:   [[IDX2:%.*]] = builtin "truncOrBitCast_Int64_Word"(%1 : $Builtin.Int64) : $Builtin.Word
+// CHECK:   br bb3([[IDX2]] : $Builtin.Word)
+// CHECK: bb3([[PHI:%.*]] : $Builtin.Word):
+// CHECK:   [[TAIL:%.*]] = ref_tail_addr %0 : $__ContiguousArrayStorageBase, $Int32
+// CHECK:   [[ELT:%.*]] = index_addr [[TAIL]] : $*Int32, %14 : $Builtin.Word
+// CHECK:   [[ADR:%.*]] = struct_element_addr [[ELT]] : $*Int32, #Int32._value
+// CHECK:   load [[ADR]] : $*Builtin.Int32
+// CHECK:   cond_br undef, bb4, bb5
+// CHECK-LABEL: } // end sil function 'testJumpThreadIndex'
+sil @testJumpThreadIndex : $@convention(thin) (__ContiguousArrayStorageBase, Builtin.Int64) -> Builtin.Int32 {
+bb0(%0 : $__ContiguousArrayStorageBase, %1 : $Builtin.Int64):
+  %f = function_ref @getC : $@convention(thin) () -> C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %c1 = apply %f() : $@convention(thin) ()->C
+  strong_retain %c1 : $C
+  br bb3(%c1 : $C)
+
+bb2:
+  %c2 = apply %f() : $@convention(thin) ()->C
+  strong_retain %c2 : $C
+  br bb3(%c2 : $C)
+
+bb3(%arg : $C):
+  strong_release %arg : $C
+  %tail = ref_tail_addr %0 : $__ContiguousArrayStorageBase, $Int32
+  %idx = builtin "truncOrBitCast_Int64_Word"(%1 : $Builtin.Int64) : $Builtin.Word
+  %elt = index_addr %tail : $*Int32, %idx : $Builtin.Word
+  %adr = struct_element_addr %elt : $*Int32, #Int32._value
+  br bb4
+
+bb4:
+  %val = load %adr : $*Builtin.Int32
+  cond_br undef, bb4, bb5
+
+bb5:
+  return %val : $Builtin.Int32
+}

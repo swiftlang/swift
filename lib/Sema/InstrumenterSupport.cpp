@@ -17,6 +17,7 @@
 
 #include "InstrumenterSupport.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Demangling/Punycode.h"
 #include "llvm/Support/Path.h"
 

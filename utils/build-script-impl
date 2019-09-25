@@ -2972,6 +2972,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="${SWIFTC_BIN}"
+                    -DCMAKE_Swift_COMPILER:PATH="${SWIFTC_BIN}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
                     -DCMAKE_INSTALL_LIBDIR:PATH="lib"
 
@@ -3609,6 +3610,10 @@ for host in "${ALL_HOSTS[@]}"; do
                   continue
                 ;;
                 *)
+                  cmake_options=(
+                    ${cmake_options[@]}
+                    -DCMAKE_Swift_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+                  )
                   results_targets=( "test" )
                   executable_target=""
                 ;;

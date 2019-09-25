@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -212,7 +213,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      ctx.getLazyResolver()->resolveDeclSignature(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
       if (var->getAttrs().hasAttribute<LazyAttr>()) {
@@ -545,9 +545,6 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
 
   auto *superclassCtor = (ConstructorDecl *) context;
 
-  if (!superclassCtor->hasValidSignature())
-    ctx.getLazyResolver()->resolveDeclSignature(superclassCtor);
-
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
   auto *superRef = buildSelfReference(selfDecl, SelfAccessorKind::Super,
@@ -861,9 +858,7 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
       if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
         continue;
 
-      if (!var->hasValidSignature())
-        ctx.getLazyResolver()->resolveDeclSignature(var);
-      if (!var->hasValidSignature())
+      if (!var->getInterfaceType())
         return;
     }
   }
@@ -928,9 +923,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->hasValidSignature())
-          ctx.getLazyResolver()->resolveDeclSignature(ctor);
-        if (!ctor->hasValidSignature())
+        if (!ctor->getInterfaceType())
           return;
       }
     }
@@ -1083,11 +1076,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
       auto kind = canInheritInitializers
                     ? DesignatedInitKind::Chaining
                     : DesignatedInitKind::Stub;
-
-      // We have a designated initializer. Create an override of it.
-      // FIXME: Validation makes sure we get a generic signature here.
-      if (!decl->hasValidSignature())
-        ctx.getLazyResolver()->resolveDeclSignature(decl);
 
       if (auto ctor = createDesignatedInitOverride(
                         decl, superclassCtor, kind, ctx)) {

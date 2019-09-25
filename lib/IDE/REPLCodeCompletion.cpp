@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Parser.h"

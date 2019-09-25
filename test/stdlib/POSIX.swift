@@ -69,7 +69,7 @@ POSIXTests.test("sem_open success") {
   let sem = sem_open(semaphoreName, O_CREAT, 0o777, 1)
   expectNotEqual(SEM_FAILED, sem)
 
-  let res = sem_close(sem)
+  let res = sem_close(sem!)
   expectEqual(0, res)
 
   let res2 = sem_unlink(semaphoreName)
@@ -83,7 +83,7 @@ POSIXTests.test("sem_open O_EXCL success") {
   let sem = sem_open(semaphoreName, O_CREAT | O_EXCL, 0o777, 1)
   expectNotEqual(SEM_FAILED, sem)
 
-  let res = sem_close(sem)
+  let res = sem_close(sem!)
   expectEqual(0, res)
 
   let res2 = sem_unlink(semaphoreName)
@@ -102,7 +102,7 @@ POSIXTests.test("sem_open existing") {
   // difficult.
   expectNotEqual(SEM_FAILED, sem2)
 
-  let res = sem_close(sem)
+  let res = sem_close(sem!)
   expectEqual(0, res)
 
   let res2 = sem_unlink(semaphoreName)
@@ -120,7 +120,7 @@ POSIXTests.test("sem_open existing O_EXCL fail") {
   expectEqual(SEM_FAILED, sem2)
   expectEqual(EEXIST, errno)
 
-  let res = sem_close(sem)
+  let res = sem_close(sem!)
   expectEqual(0, res)
 
   let res2 = sem_unlink(semaphoreName)

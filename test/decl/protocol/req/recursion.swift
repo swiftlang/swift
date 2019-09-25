@@ -43,7 +43,7 @@ public protocol P {
   associatedtype T
 }
 
-public struct S<A: P> where A.T == S<A> {
+public struct S<A: P> where A.T == S<A> { // expected-error {{circular reference}}
 // expected-note@-1 {{type declared here}}
 // expected-error@-2 {{generic struct 'S' references itself}}
   func f(a: A.T) {
@@ -71,7 +71,7 @@ protocol PI {
   associatedtype T : I
 }
 
-struct SI<A: PI> : I where A : I, A.T == SI<A> {
+struct SI<A: PI> : I where A : I, A.T == SI<A> { // expected-error {{circular reference}}
 // expected-note@-1 {{type declared here}}
 // expected-error@-2 {{generic struct 'SI' references itself}}
   func ggg<T : I>(t: T.Type) -> T {

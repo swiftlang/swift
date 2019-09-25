@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Parse/ParsedSyntax.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -163,8 +164,9 @@ const SyntaxParsingContext *SyntaxParsingContext::getRoot() const {
   return Curr;
 }
 
-ParsedTokenSyntax &&SyntaxParsingContext::popToken() {
-  return std::move(popIf<ParsedTokenSyntax>().getValue());
+ParsedTokenSyntax SyntaxParsingContext::popToken() {
+  auto tok = popIf<ParsedTokenSyntax>();
+  return std::move(tok.getValue());
 }
 
 /// Add Token with Trivia to the parts.

@@ -388,12 +388,15 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
     if (conformance->isAbstract()) {
       // FIXME: Rip this out once we can get a concrete conformance from
       // an archetype.
-      auto *M = proto->getParentModule();
       auto substType = type.subst(*this);
+      if (substType->hasError())
+        return ProtocolConformanceRef(proto);
+
       if ((!substType->is<ArchetypeType>() ||
            substType->castTo<ArchetypeType>()->getSuperclass()) &&
           !substType->isTypeParameter() &&
           !substType->isExistentialType()) {
+        auto *M = proto->getParentModule();
         return M->lookupConformance(substType, proto);
       }
 
@@ -483,27 +486,9 @@ SubstitutionMap
 SubstitutionMap::getProtocolSubstitutions(ProtocolDecl *protocol,
                                           Type selfType,
                                           ProtocolConformanceRef conformance) {
-  auto protocolSelfType = protocol->getSelfInterfaceType();
-
-  return get(
-    protocol->getGenericSignature(),
-    [&](SubstitutableType *type) -> Type {
-      if (type->isEqual(protocolSelfType))
-        return selfType;
-
-      // This will need to change if we ever support protocols
-      // inside generic types.
-      return Type();
-    },
-    [&](CanType origType, Type replacementType, ProtocolDecl *protoType)
-      -> Optional<ProtocolConformanceRef> {
-      if (origType->isEqual(protocolSelfType) && protoType == protocol)
-        return conformance;
-
-      // This will need to change if we ever support protocols
-      // inside generic types.
-      return None;
-    });
+  return get(protocol->getGenericSignature(),
+             llvm::makeArrayRef<Type>(selfType),
+             llvm::makeArrayRef<ProtocolConformanceRef>(conformance));
 }
 
 SubstitutionMap

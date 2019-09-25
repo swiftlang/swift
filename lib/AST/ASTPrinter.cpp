@@ -22,6 +22,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -2276,7 +2277,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
       printGenericDeclGenericParams(decl);
     });
   bool ShouldPrint = true;
-  Type Ty = decl->getUnderlyingTypeLoc().getType();
+  Type Ty = decl->getUnderlyingType();
 
   // If the underlying type is private, don't print it.
   if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
@@ -2294,7 +2295,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     // preserving sugar.
     llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
                                                 decl->getGenericEnvironment());
-    printTypeLoc(decl->getUnderlyingTypeLoc());
+    printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printGenericDeclGenericRequirements(decl);
   }
 }

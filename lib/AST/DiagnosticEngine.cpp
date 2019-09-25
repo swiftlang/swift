@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrintOptions.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Config.h"
@@ -379,7 +380,7 @@ static bool isInterestingTypealias(Type type) {
   // Compatibility aliases are only interesting insofar as their underlying
   // types are interesting.
   if (aliasDecl->isCompatibilityAlias()) {
-    auto underlyingTy = aliasDecl->getUnderlyingTypeLoc().getType();
+    auto underlyingTy = aliasDecl->getUnderlyingType();
     return isInterestingTypealias(underlyingTy);
   }
 

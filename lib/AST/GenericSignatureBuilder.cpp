@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
@@ -3785,10 +3786,14 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
 
 static Type getStructuralType(TypeDecl *typeDecl) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    if (auto resolved = typealias->getUnderlyingTypeLoc().getType())
-      return resolved;
-
-    return typealias->getStructuralType();
+    // When we're computing requirement signatures, the structural type
+    // suffices.  Otherwise we'll potentially try to validate incomplete
+    // requirements.
+    auto *proto = dyn_cast_or_null<ProtocolDecl>(
+        typealias->getDeclContext()->getAsDecl());
+    if (proto && proto->isComputingRequirementSignature())
+      return typealias->getStructuralType();
+    return typealias->getUnderlyingType();
   }
 
   return typeDecl->getDeclaredInterfaceType();
@@ -4196,11 +4201,10 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
       out << start;
       out << type->getFullName() << " == ";
       if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
-        if (auto underlyingTypeRepr =
-              typealias->getUnderlyingTypeLoc().getTypeRepr())
+        if (auto underlyingTypeRepr = typealias->getUnderlyingTypeRepr())
           underlyingTypeRepr->print(out);
         else
-          typealias->getUnderlyingTypeLoc().getType().print(out);
+          typealias->getUnderlyingType().print(out);
       } else {
         type->print(out);
       }
@@ -5313,6 +5317,12 @@ public:
     auto decl = ty->getAnyNominal();
     if (!decl) return Action::Continue;
 
+    // FIXME: The GSB and the request evaluator both detect a cycle here if we
+    // force a recursive generic signature.  We should look into moving cycle
+    // detection into the generic signature request(s) - see rdar://55263708
+    if (!decl->hasComputedGenericSignature())
+      return Action::Continue;
+    
     auto genericSig = decl->getGenericSignature();
     if (!genericSig)
       return Action::Continue;

@@ -2685,7 +2685,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
       auto alias = dyn_cast<TypeAliasDecl>(importedDecl);
       if (!alias || !alias->isCompatibilityAlias()) continue;
 
-      auto aliasedTy = alias->getUnderlyingTypeLoc().getType();
+      auto aliasedTy = alias->getUnderlyingType();
       ext = nullptr;
       importedDecl = nullptr;
 

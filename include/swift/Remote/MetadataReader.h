@@ -43,13 +43,10 @@ using TypeDecoder = swift::Demangle::TypeDecoder<BuilderType>;
 
 /// A pointer to the local buffer of an object that also remembers the
 /// address at which it was stored remotely.
-template <typename Runtime, typename T>
+template <typename T>
 class RemoteRef {
-public:
-  using StoredPointer = typename Runtime::StoredPointer;
-
 private:
-  StoredPointer Address;
+  uint64_t Address;
   const T *LocalBuffer;
 
 public:
@@ -57,13 +54,14 @@ public:
   RemoteRef(std::nullptr_t _)
     : Address(0), LocalBuffer(nullptr) {}
 
+  template<typename StoredPointer>
   explicit RemoteRef(StoredPointer address, const T *localBuffer)
-    : Address(address), LocalBuffer(localBuffer) {}
+    : Address((uint64_t)address), LocalBuffer(localBuffer) {}
 
-  StoredPointer getAddress() const {
+  uint64_t getAddressData() const {
     return Address;
   }
-
+  
   const T *getLocalBuffer() const {
     return LocalBuffer;
   }
@@ -75,6 +73,36 @@ public:
   const T *operator->() const {
     assert(LocalBuffer);
     return LocalBuffer;
+  }
+  
+  bool operator==(RemoteRef<T> other) const {
+    return Address == other.Address;
+  }
+  
+  bool operator!=(RemoteRef<T> other) const {
+    return !operator==(other);
+  }
+  
+  /// Project a reference for a field. The field must be projected from the same
+  /// LocalBuffer pointer as this RemoteRef.
+  template<typename U>
+  RemoteRef<U> getField(U &field) const {
+    auto offset = (intptr_t)&field - (intptr_t)LocalBuffer;
+    return RemoteRef<U>((uint64_t)(Address + (int64_t)offset), &field);
+  }
+  
+  /// Resolve the remote address of a relative offset stored at the remote address.
+  uint64_t resolveRelativeAddressData() const {
+    int32_t offset;
+    memcpy(&offset, LocalBuffer, sizeof(int32_t));
+    if (offset == 0)
+      return 0;
+    return Address + (int64_t)offset;
+  }
+  
+  template<typename U>
+  uint64_t resolveRelativeFieldData(U &field) const {
+    return getField(field).resolveRelativeAddressData();
   }
 };
 
@@ -127,8 +155,7 @@ private:
   /// A cache of built types, keyed by the address of the type.
   std::unordered_map<StoredPointer, BuiltType> TypeCache;
 
-  using MetadataRef =
-    RemoteRef<Runtime, TargetMetadata<Runtime>>;
+  using MetadataRef = RemoteRef<TargetMetadata<Runtime>>;
   using OwnedMetadataRef =
     std::unique_ptr<const TargetMetadata<Runtime>, delete_with_free>;
 
@@ -136,8 +163,7 @@ private:
   std::unordered_map<StoredPointer, OwnedMetadataRef>
     MetadataCache;
 
-  using ContextDescriptorRef =
-    RemoteRef<Runtime, TargetContextDescriptor<Runtime>>;
+  using ContextDescriptorRef = RemoteRef<TargetContextDescriptor<Runtime>>;
   using OwnedContextDescriptorRef =
     std::unique_ptr<const TargetContextDescriptor<Runtime>,
                     delete_with_free>;
@@ -1068,14 +1094,13 @@ public:
       return ClassMetadataBounds::forSwiftRootClass();
 
     auto rawSuperclass =
-      resolveNullableRelativeField(subclassRef,
-                                   subclass->getResilientSuperclass());
+      resolveRelativeField(subclassRef, subclass->getResilientSuperclass());
     if (!rawSuperclass) {
       return ClassMetadataBounds::forSwiftRootClass();
     }
 
     return forTypeReference<ClassMetadataBounds>(
-      subclass->getResilientSuperclassReferenceKind(), *rawSuperclass,
+      subclass->getResilientSuperclassReferenceKind(), rawSuperclass,
       [&](ContextDescriptorRef superclass)
             -> Optional<ClassMetadataBounds> {
         if (!isa<TargetClassDescriptor<Runtime>>(superclass))
@@ -1166,7 +1191,7 @@ public:
       return None;
 
     auto addressOfGenericArgAddress =
-      (Meta.getAddress() +
+      (getAddress(Meta) +
        *offsetToGenericArgs * sizeof(StoredPointer) +
        index * sizeof(StoredPointer));
 
@@ -1238,31 +1263,6 @@ public:
 
 protected:
   template<typename Offset>
-  StoredPointer resolveRelativeOffset(StoredPointer targetAddress) {
-    Offset relative;
-    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
-      return 0;
-    using SignedOffset = typename std::make_signed<Offset>::type;
-    using SignedPointer = typename std::make_signed<StoredPointer>::type;
-    auto signext = (SignedPointer)(SignedOffset)relative;
-    return targetAddress + signext;
-  }
-
-  template<typename Offset>
-  Optional<StoredPointer>
-  resolveNullableRelativeOffset(StoredPointer targetAddress) {
-    Offset relative;
-    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
-      return None;
-    if (relative == 0)
-      return 0;
-    using SignedOffset = typename std::make_signed<Offset>::type;
-    using SignedPointer = typename std::make_signed<StoredPointer>::type;
-    auto signext = (SignedPointer)(SignedOffset)relative;
-    return targetAddress + signext;
-  }
-
-  template<typename Offset>
   Optional<StoredPointer>
   resolveNullableRelativeIndirectableOffset(StoredPointer targetAddress) {
     Offset relative;
@@ -1290,31 +1290,44 @@ protected:
     return resultAddress;
   }
 
-  template<typename Base, typename Field>
-  StoredPointer resolveRelativeField(
-                            RemoteRef<Runtime, Base> base, const Field &field) {
-    // Map the offset from within our local buffer to the remote address.
-    auto distance = (intptr_t)&field - (intptr_t)base.getLocalBuffer();
-    return resolveRelativeOffset<int32_t>(base.getAddress() + distance);
+  template<typename Base>
+  StoredPointer getAddress(RemoteRef<Base> base) {
+    return (StoredPointer)base.getAddressData();
   }
   
   template<typename Base, typename Field>
-  Optional<StoredPointer> resolveNullableRelativeField(
-                            RemoteRef<Runtime, Base> base, const Field &field) {
-    // Map the offset from within our local buffer to the remote address.
-    auto distance = (intptr_t)&field - (intptr_t)base.getLocalBuffer();
-
-    return resolveNullableRelativeOffset<int32_t>(base.getAddress() + distance);
+  StoredPointer resolveRelativeField(
+                            RemoteRef<Base> base, const Field &field) {
+    return (StoredPointer)base.resolveRelativeFieldData(field);
   }
-
+  
   template<typename Base, typename Field>
-  Optional<StoredPointer> resolveNullableRelativeIndirectableField(
-                            RemoteRef<Runtime, Base> base, const Field &field) {
-    // Map the offset from within our local buffer to the remote address.
-    auto distance = (intptr_t)&field - (intptr_t)base.getLocalBuffer();
+  Optional<StoredPointer> resolveRelativeIndirectableField(
+                            RemoteRef<Base> base, const Field &field) {
+    auto fieldRef = base.getField(field);
+    int32_t offset;
+    memcpy(&offset, fieldRef.getLocalBuffer(), sizeof(int32_t));
     
-    return resolveNullableRelativeIndirectableOffset<int32_t>(
-                                                  base.getAddress() + distance);
+    if (offset == 0)
+      return 0;
+    bool indirect = offset & 1;
+    offset &= ~1u;
+    
+    using SignedPointer = typename std::make_signed<StoredPointer>::type;
+    
+    StoredPointer resultAddress = getAddress(fieldRef) + (SignedPointer)offset;
+    
+    // Low bit set in the offset indicates that the offset leads to the absolute
+    // address in memory.
+    if (indirect) {
+      if (!Reader->readBytes(RemoteAddress(resultAddress),
+                             (uint8_t *)&resultAddress,
+                             sizeof(StoredPointer))) {
+        return None;
+      }
+    }
+    
+    return resultAddress;
   }
 
   /// Given a pointer to an Objective-C class, try to read its class name.
@@ -1521,8 +1534,7 @@ private:
   /// Returns None if there was an error reading the parent descriptor.
   Optional<ContextDescriptorRef>
   readParentContextDescriptor(ContextDescriptorRef base) {
-    auto parentAddress =
-                  resolveNullableRelativeIndirectableField(base, base->Parent);
+    auto parentAddress = resolveRelativeIndirectableField(base, base->Parent);
     if (!parentAddress)
       return None;
     if (!*parentAddress)
@@ -1838,7 +1850,7 @@ private:
       const RelativeTargetProtocolDescriptorPointer<Runtime> &protocol) {
     // Map the offset from within our local buffer to the remote address.
     auto distance = (intptr_t)&protocol - (intptr_t)descriptor.getLocalBuffer();
-    StoredPointer targetAddress(descriptor.getAddress() + distance);
+    StoredPointer targetAddress(getAddress(descriptor) + distance);
 
     // Read the relative offset.
     int32_t relative;
@@ -2071,7 +2083,7 @@ private:
             // address.
             auto distance =
               (intptr_t)&req.Layout - (intptr_t)descriptor.getLocalBuffer();
-            StoredPointer targetAddress(descriptor.getAddress() + distance);
+            StoredPointer targetAddress(getAddress(descriptor) + distance);
 
             GenericRequirementLayoutKind kind;
             if (!Reader->readBytes(RemoteAddress(targetAddress),
@@ -2106,7 +2118,7 @@ private:
       // Use the remote address to identify the anonymous context.
       char addressBuf[18];
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
-               (uint64_t)descriptor.getAddress());
+               (uint64_t)descriptor.getAddressData());
       auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
       addressStr.append(addressBuf, dem);
@@ -2269,7 +2281,7 @@ private:
     if (!offsetToGenericArgs)
       return {};
 
-    auto genericArgsAddr = metadata.getAddress()
+    auto genericArgsAddr = getAddress(metadata)
       + sizeof(StoredPointer) * *offsetToGenericArgs;
 
     std::vector<BuiltType> builtSubsts;
@@ -2326,9 +2338,8 @@ private:
 
     // If we've skipped an artificial subclasses, check the cache at
     // the superclass.  (This also protects against recursion.)
-    if (skipArtificialSubclasses &&
-        metadata.getAddress() != origMetadata.getAddress()) {
-      auto it = TypeCache.find(metadata.getAddress());
+    if (skipArtificialSubclasses && metadata != origMetadata) {
+      auto it = TypeCache.find(getAddress(metadata));
       if (it != TypeCache.end())
         return it->second;
     }
@@ -2358,13 +2369,12 @@ private:
     if (!nominal)
       return BuiltType();
     
-    TypeCache[metadata.getAddress()] = nominal;
+    TypeCache[getAddress(metadata)] = nominal;
 
     // If we've skipped an artificial subclass, remove the
     // recursion-protection entry we made for it.
-    if (skipArtificialSubclasses &&
-        metadata.getAddress() != origMetadata.getAddress()) {
-      TypeCache.erase(origMetadata.getAddress());
+    if (skipArtificialSubclasses && metadata != origMetadata) {
+      TypeCache.erase(getAddress(origMetadata));
     }
 
     return nominal;
@@ -2377,7 +2387,8 @@ private:
       return readNominalTypeFromMetadata(origMetadata, skipArtificialSubclasses);
 
     std::string className;
-    if (!readObjCClassName(origMetadata.getAddress(), className))
+    auto origMetadataPtr = getAddress(origMetadata);
+    if (!readObjCClassName(origMetadataPtr, className))
       return BuiltType();
 
     BuiltType BuiltObjCClass = Builder.createObjCClassType(std::move(className));
@@ -2390,7 +2401,7 @@ private:
                                             skipArtificialSubclasses);
     }
 
-    TypeCache[origMetadata.getAddress()] = BuiltObjCClass;
+    TypeCache[origMetadataPtr] = BuiltObjCClass;
     return BuiltObjCClass;
   }
 
@@ -2583,11 +2594,11 @@ private:
 } // end namespace swift
 
 namespace llvm {
-  template<typename Runtime, typename T>
-  struct simplify_type<swift::remote::RemoteRef<Runtime, T>> {
+  template<typename T>
+  struct simplify_type<swift::remote::RemoteRef<T>> {
     using SimpleType = const T *;
     static SimpleType
-    getSimplifiedValue(swift::remote::RemoteRef<Runtime, T> value) {
+    getSimplifiedValue(swift::remote::RemoteRef<T> value) {
       return value.getLocalBuffer();
     }
   };

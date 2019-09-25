@@ -23,6 +23,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Defer.h"
@@ -867,7 +868,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
-  if (!VD || !VD->hasInterfaceType())
+  if (!VD || !VD->getInterfaceType())
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
@@ -1213,11 +1214,9 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
   CodeCompletionExpr *CodeCompleteTokenExpr = nullptr;
-  AssignExpr *AssignmentExpr;
   CompletionKind Kind = CompletionKind::None;
   Expr *ParsedExpr = nullptr;
   SourceLoc DotLoc;
-  TypeLoc ParsedTypeLoc;
   DeclContext *CurDeclContext = nullptr;
   DeclAttrKind AttrKind;
 
@@ -1351,8 +1350,8 @@ public:
 
   void completeTypeDeclResultBeginning() override;
   void completeTypeSimpleBeginning() override;
-  void completeTypeIdentifierWithDot(IdentTypeRepr *ITR) override;
-  void completeTypeIdentifierWithoutDot(IdentTypeRepr *ITR) override;
+  void completeTypeIdentifierWithDot() override;
+  void completeTypeIdentifierWithoutDot() override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -1367,7 +1366,6 @@ public:
   void completeImportDecl(std::vector<std::pair<Identifier, SourceLoc>> &Path) override;
   void completeUnresolvedMember(CodeCompletionExpr *E,
                                 SourceLoc DotLoc) override;
-  void completeAssignmentRHS(AssignExpr *E) override;
   void completeCallArg(CodeCompletionExpr *E, bool isFirst) override;
   void completeReturnStmt(CodeCompletionExpr *E) override;
   void completeYieldStmt(CodeCompletionExpr *E,
@@ -2047,8 +2045,8 @@ public:
     auto *GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
-    assert(VD->hasValidSignature());
     Type T = VD->getInterfaceType();
+    assert(!T.isNull());
 
     if (ExprType) {
       Type ContextTy = VD->getDeclContext()->getDeclaredInterfaceType();
@@ -2136,7 +2134,7 @@ public:
     addValueBaseName(Builder, Name);
     setClangDeclKeywords(VD, Pairs, Builder);
 
-    if (!VD->hasValidSignature())
+    if (!VD->hasInterfaceType())
       return;
 
     // Add a type annotation.
@@ -2432,7 +2430,7 @@ public:
         addTypeAnnotation(Builder, AFT->getResult());
     };
 
-    if (!AFD || !AFD->hasInterfaceType() ||
+    if (!AFD || !AFD->getInterfaceType() ||
         !AFD->getInterfaceType()->is<AnyFunctionType>()) {
       // Probably, calling closure type expression.
       foundFunction(AFT);
@@ -2799,8 +2797,7 @@ public:
     setClangDeclKeywords(TAD, Pairs, Builder);
     addLeadingDot(Builder);
     Builder.addTextChunk(TAD->getName().str());
-    if (TAD->hasInterfaceType()) {
-      auto underlyingType = TAD->getUnderlyingTypeLoc().getType();
+    if (auto underlyingType = TAD->getUnderlyingType()) {
       if (underlyingType->hasError()) {
         Type parentType;
         if (auto nominal = TAD->getDeclContext()->getSelfNominalTypeDecl()) {
@@ -2991,10 +2988,9 @@ public:
 
     if (IsSwiftKeyPathExpr && !SwiftKeyPathFilter(D, Reason))
       return;
-
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
+    
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)D->getInterfaceType();
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
@@ -3151,9 +3147,6 @@ public:
 
   bool handleEnumElement(ValueDecl *D, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo) {
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
     if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
       addEnumElementRef(EED, Reason, dynamicLookupInfo,
                         /*HasTypeContext=*/true);
@@ -3162,8 +3155,6 @@ public:
       llvm::DenseSet<EnumElementDecl *> Elements;
       ED->getAllElements(Elements);
       for (auto *Ele : Elements) {
-        if (!Ele->hasInterfaceType())
-          D->getASTContext().getLazyResolver()->resolveDeclSignature(Ele);
         addEnumElementRef(Ele, Reason, dynamicLookupInfo,
                           /*HasTypeContext=*/true);
       }
@@ -4337,9 +4328,6 @@ public:
         (D->isStatic() && D->getAttrs().hasAttribute<HasInitialValueAttr>()))
       return;
 
-    if (!D->hasInterfaceType())
-      D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-
     bool hasIntroducer = hasFuncIntroducer ||
                          hasVarIntroducer ||
                          hasTypealiasIntroducer;
@@ -4617,22 +4605,13 @@ void CodeCompletionCallbacksImpl::completeInPrecedenceGroup(SyntaxKind SK) {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot(
-    IdentTypeRepr *ITR) {
-  if (!ITR) {
-    completeTypeSimpleBeginning();
-    return;
-  }
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithDot() {
   Kind = CompletionKind::TypeIdentifierWithDot;
-  ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot(
-    IdentTypeRepr *ITR) {
-  assert(ITR);
+void CodeCompletionCallbacksImpl::completeTypeIdentifierWithoutDot() {
   Kind = CompletionKind::TypeIdentifierWithoutDot;
-  ParsedTypeLoc = TypeLoc(ITR);
   CurDeclContext = P.CurDeclContext;
 }
 
@@ -4675,13 +4654,6 @@ void CodeCompletionCallbacksImpl::completeUnresolvedMember(CodeCompletionExpr *E
   CurDeclContext = P.CurDeclContext;
   CodeCompleteTokenExpr = E;
   this->DotLoc = DotLoc;
-}
-
-void CodeCompletionCallbacksImpl::completeAssignmentRHS(AssignExpr *E) {
-  AssignmentExpr = E;
-  ParsedExpr = E->getDest();
-  CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::AssignmentRHS;
 }
 
 void CodeCompletionCallbacksImpl::completeCallArg(CodeCompletionExpr *E,
@@ -4912,7 +4884,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     addDeclKeywords(Sink);
     addStmtKeywords(Sink, MaybeFuncBody);
     LLVM_FALLTHROUGH;
-  case CompletionKind::AssignmentRHS:
   case CompletionKind::ReturnStmtExpr:
   case CompletionKind::YieldStmtExpr:
   case CompletionKind::PostfixExprBeginning:
@@ -5377,14 +5348,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
     Lookup.setExpectedTypes(ContextInfo.getPossibleTypes(),
                             ContextInfo.isSingleExpressionBody());
     Lookup.getUnresolvedMemberCompletions(ContextInfo.getPossibleTypes());
-    break;
-  }
-  case CompletionKind::AssignmentRHS : {
-    SourceLoc Loc = P.Context.SourceMgr.getCodeCompletionLoc();
-    if (auto destType = ParsedExpr->getType())
-      Lookup.setExpectedTypes(destType->getRValueType(),
-                              /*isSingleExpressionBody*/ false);
-    Lookup.getValueCompletionsInDeclContext(Loc, DefaultFilter);
     break;
   }
   case CompletionKind::CallArg : {

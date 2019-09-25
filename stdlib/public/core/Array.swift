@@ -1971,7 +1971,8 @@ extension Array.DifferentiableView : EuclideanDifferentiable
   }
 }
 
-extension Array.DifferentiableView : Equatable where Element : Equatable {
+extension Array.DifferentiableView : Equatable
+  where Element : Differentiable & Equatable {
   public static func == (
     lhs: Array.DifferentiableView,
     rhs: Array.DifferentiableView
@@ -1980,13 +1981,15 @@ extension Array.DifferentiableView : Equatable where Element : Equatable {
   }
 }
 
-extension Array.DifferentiableView : ExpressibleByArrayLiteral {
+extension Array.DifferentiableView : ExpressibleByArrayLiteral
+  where Element : Differentiable {
   public init(arrayLiteral elements: Element...) {
     self.init(elements)
   }
 }
 
-extension Array.DifferentiableView : CustomStringConvertible {
+extension Array.DifferentiableView : CustomStringConvertible
+  where Element : Differentiable {
   public var description: String {
     return base.description
   }
@@ -1997,7 +2000,7 @@ extension Array.DifferentiableView : CustomStringConvertible {
 /// Note that `Array.DifferentiableView([])` is the zero in the product spaces
 /// of all counts.
 extension Array.DifferentiableView : AdditiveArithmetic
-  where Element : AdditiveArithmetic {
+  where Element : AdditiveArithmetic & Differentiable {
 
   public static var zero: Array.DifferentiableView {
     return Array.DifferentiableView([])

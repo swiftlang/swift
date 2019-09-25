@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
@@ -433,8 +434,6 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   if (decls.size() < 2)
     return;
 
-  auto typeResolver = decls[0]->getASTContext().getLazyResolver();
-
   // Categorize all of the declarations based on their overload signatures.
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
   llvm::SmallVector<CanType, 2> collisionTypes;
@@ -462,19 +461,16 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     CanType signature;
 
     if (!isa<TypeDecl>(decl)) {
-      // We need an interface type here.
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
-
       // If the decl is currently being validated, this is likely a recursive
       // reference and we'll want to skip ahead so as to avoid having its type
       // attempt to desugar itself.
-      if (!decl->hasValidSignature())
+      auto ifaceType = decl->getInterfaceType();
+      if (!ifaceType)
         continue;
 
       // FIXME: the canonical type makes a poor signature, because we don't
       // canonicalize away default arguments.
-      signature = decl->getInterfaceType()->getCanonicalType();
+      signature = ifaceType->getCanonicalType();
 
       // FIXME: The type of a variable or subscript doesn't include
       // enough context to distinguish entities from different
@@ -1813,7 +1809,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
         // TypeRepr version: Builtin.AnyObject
-        if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+        if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
             auto components = compound->getComponents();
             if (components.size() == 2 &&
@@ -1825,9 +1821,10 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         }
 
         // Type version: an empty class-bound existential.
-        if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
-          if (type->isAnyObject())
-            anyObject = true;
+        if (typealias->hasInterfaceType()) {
+          if (auto type = typealias->getUnderlyingType())
+            if (type->isAnyObject())
+              anyObject = true;
         }
       }
 
@@ -2091,7 +2088,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
     Evaluator &evaluator,
     TypeAliasDecl *typealias) const {
   // Prefer syntactic information when we have it.
-  if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+  if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
     return directReferencesForTypeRepr(evaluator, typealias->getASTContext(),
                                        typeRepr, typealias);
   }
@@ -2099,7 +2096,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
   // Fall back to semantic types.
   // FIXME: In the long run, we shouldn't need this. Non-syntactic results
   // should be cached.
-  if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
+  if (auto type = typealias->getUnderlyingType()) {
     return directReferencesForType(type);
   }
 

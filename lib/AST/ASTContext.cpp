@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -36,6 +37,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -98,9 +100,10 @@ using AssociativityCacheType =
                  Associativity>;
 
 #define FOR_KNOWN_FOUNDATION_TYPES(MACRO) \
-  MACRO(NSError) \
-  MACRO(NSNumber) \
-  MACRO(NSValue)
+  MACRO(NSCopying, ProtocolDecl) \
+  MACRO(NSError, ClassDecl) \
+  MACRO(NSNumber, ClassDecl) \
+  MACRO(NSValue, ClassDecl)
 
 struct OverrideSignatureKey {
   GenericSignature *baseMethodSig;
@@ -232,9 +235,9 @@ struct ASTContext::Implementation {
   /// The declaration of ObjectiveC.ObjCBool.
   StructDecl *ObjCBoolDecl = nullptr;
 
-#define CACHE_FOUNDATION_DECL(NAME) \
+#define CACHE_FOUNDATION_DECL(NAME, DECLTYPE) \
   /** The declaration of Foundation.NAME. */ \
-  ClassDecl *NAME##Decl = nullptr;
+  DECLTYPE *NAME##Decl = nullptr;
 FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
 #undef CACHE_FOUNDATION_DECL
 
@@ -1021,18 +1024,18 @@ StructDecl *ASTContext::getObjCBoolDecl() const {
   return getImpl().ObjCBoolDecl;
 }
 
-#define GET_FOUNDATION_DECL(NAME) \
-ClassDecl *ASTContext::get##NAME##Decl() const { \
+#define GET_FOUNDATION_DECL(NAME, DECLTYPE) \
+DECLTYPE *ASTContext::get##NAME##Decl() const { \
   if (!getImpl().NAME##Decl) { \
     if (ModuleDecl *M = getLoadedModule(Id_Foundation)) { \
       /* Note: lookupQualified() will search both the Foundation module \
        * and the Clang Foundation module it imports. */ \
       SmallVector<ValueDecl *, 1> decls; \
       M->lookupQualified(M, getIdentifier(#NAME), NL_OnlyTypes, decls); \
-      if (decls.size() == 1 && isa<ClassDecl>(decls[0])) { \
-        auto classDecl = cast<ClassDecl>(decls[0]); \
-        if (classDecl->getGenericParams() == nullptr) { \
-          getImpl().NAME##Decl = classDecl; \
+      if (decls.size() == 1 && isa<DECLTYPE>(decls[0])) { \
+        auto decl = cast<DECLTYPE>(decls[0]); \
+        if (isa<ProtocolDecl>(decl) || decl->getGenericParams() == nullptr) { \
+          getImpl().NAME##Decl = decl; \
         } \
       } \
     } \
@@ -1102,8 +1105,8 @@ static FuncDecl *findLibraryIntrinsic(const ASTContext &ctx,
   ctx.lookupInSwiftModule(name, results);
   if (results.size() == 1) {
     if (auto FD = dyn_cast<FuncDecl>(results.front())) {
-      if (auto *resolver = ctx.getLazyResolver())
-        resolver->resolveDeclSignature(FD);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)FD->getInterfaceType();
       return FD;
     }
   }
@@ -1166,9 +1169,6 @@ lookupOperatorFunc(const ASTContext &ctx, StringRef oper, Type contextType,
       auto contextTy = fnDecl->getDeclContext()->getDeclaredInterfaceType();
       if (!contextTy->isEqual(contextType)) continue;
     }
-
-    if (auto resolver = ctx.getLazyResolver())
-      resolver->resolveDeclSignature(fnDecl);
 
     auto *funcTy = getIntrinsicCandidateType(fnDecl, /*allowTypeMembers=*/true);
     if (!funcTy)
@@ -4160,8 +4160,6 @@ static NominalTypeDecl *findUnderlyingTypeInModule(ASTContext &ctx,
 
     // Look through typealiases.
     if (auto typealias = dyn_cast<TypeAliasDecl>(result)) {
-      if (auto resolver = ctx.getLazyResolver())
-        resolver->resolveDeclSignature(typealias);
       return typealias->getDeclaredInterfaceType()->getAnyNominal();
     }
   }

@@ -18,6 +18,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
@@ -3403,7 +3404,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILType, 4> operandTypes;
     {
       Scope genericsScope(&P, ScopeKind::Generics);
-      generics = P.maybeParseGenericParams().getPtrOrNull();
+      generics = P.parseSILGenericParams().getPtrOrNull();
       patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
       
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
@@ -6040,7 +6041,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   GenericEnvironment *patternEnv;
   Scope toplevelScope(&P, ScopeKind::TopLevel);
   Scope genericsScope(&P, ScopeKind::Generics);
-  generics = P.maybeParseGenericParams().getPtrOrNull();
+  generics = P.parseSILGenericParams().getPtrOrNull();
   patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
   
   if (patternEnv) {
@@ -6354,7 +6355,7 @@ Optional<ProtocolConformanceRef> SILParser::parseProtocolConformance(
   // Make sure we don't leave it uninitialized in the caller
   genericEnv = nullptr;
 
-  auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
+  auto *genericParams = P.parseSILGenericParams().getPtrOrNull();
   if (genericParams) {
     genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
   }
