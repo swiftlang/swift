@@ -145,6 +145,8 @@ Swift Next
 Swift 5.1
 ---------
 
+### 2019-09-20 (Xcode 11.0)
+
 * [SR-8974][]:
 
   Duplicate tuple element labels are no longer allowed, because it leads
