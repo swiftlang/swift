@@ -1962,6 +1962,8 @@ public:
     PrintWithColorRAII(OS, LiteralValueColor) << " result_init=";
     E->getResultInit().dump(PrintWithColorRAII(OS, LiteralValueColor).getOS());
     OS << "\n";
+    printRec(E->getInterpolationExpr());
+    OS << "\n";
     printRec(E->getAppendingExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }

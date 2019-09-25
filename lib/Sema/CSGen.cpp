@@ -3318,6 +3318,8 @@ namespace {
         // Hacky, this behaves just like an OpenedExistential in that it changes
         // the expr tree.
         if (auto ISLE = dyn_cast<InterpolatedStringLiteralExpr>(expr)) {
+          ISLE->setInterpolationExpr(nullptr);
+
           if (auto subExpr = ISLE->getAppendingExpr()->getSubExpr()) {
             if (auto opaqueValue = dyn_cast<OpaqueValueExpr>(subExpr)) {
               ISLE->getAppendingExpr()->setSubExpr(nullptr);
