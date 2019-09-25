@@ -7342,7 +7342,7 @@ bool swift::exprNeedsParensInsideFollowingOperator(
     TypeChecker &TC, DeclContext *DC, Expr *expr,
     PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
-    auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
+    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
 
     return TC.Context.associateInfixOperators(exprPG, followingPG)
@@ -7376,7 +7376,8 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
       return false;
 
   if (parent->isInfixOperator()) {
-    auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
+    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
+                                                                       parent);
     if (!parentPG) return true;
 
     // If the index is 0, this is on the LHS of the parent.
@@ -7395,10 +7396,10 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
                                                      DeclContext *DC,
                                                      Expr *expr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
+  auto asPG = TypeChecker::lookupPrecedenceGroup(
+      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
+  if (!asPG)
+    return true;
   return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
 }
 
@@ -7406,9 +7407,8 @@ bool swift::exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
                                                     DeclContext *DC,
                                                     Expr *expr,
                                                     Expr *rootExpr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
-                             SourceLoc());
+  auto asPG = TypeChecker::lookupPrecedenceGroup(
+      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
   if (!asPG) return true;
   return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }

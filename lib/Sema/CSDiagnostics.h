@@ -794,7 +794,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -805,7 +805,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
