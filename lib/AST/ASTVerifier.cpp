@@ -837,7 +837,11 @@ public:
       if (!expr->getInterpolationExpr())
         return true;
 
-      assert(!OpaqueValues.count(expr->getInterpolationExpr()));
+      // This OpaqueValueExpr is introduced after type checking, so it might not
+      // exist, but if it does, we want to check it.
+      if (auto ove = expr->getInterpolationExpr())
+        assert(!OpaqueValues.count(ove));
+
       return true;
     }
 
@@ -847,7 +851,10 @@ public:
       if (!expr->getInterpolationExpr())
         return;
 
-      assert(OpaqueValues.count(expr->getInterpolationExpr()));
+      // This OpaqueValueExpr is introduced after type checking, so it might not
+      // exist, but if it does, we want to check it.
+      if (auto ove = expr->getInterpolationExpr())
+        assert(OpaqueValues.count(ove));
     }
 
     bool shouldVerify(TapExpr *expr) {
