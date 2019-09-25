@@ -22,6 +22,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -608,7 +609,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
   file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
   file.setTwoLevelNamespace();
-  file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
+  file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
 
   auto getPlatformKind =
