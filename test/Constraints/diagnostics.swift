@@ -146,7 +146,7 @@ func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{cannot convert value of type 'Int' to expected argument type 'String'}}
 
 @available(*, unavailable, message: "call the 'map()' method on the sequence")
-public func myMap<C : Collection, T>( // expected-note {{'myMap' has been explicitly marked unavailable here}}
+public func myMap<C : Collection, T>( // expected-note {{in call to function 'myMap'}}
   _ source: C, _ transform: (C.Iterator.Element) -> T
 ) -> [T] {
   fatalError("unavailable function can't be called")
@@ -159,7 +159,7 @@ public func myMap<T, U>(_ x: T?, _ f: (T) -> U) -> U? {
 
 // <rdar://problem/20142523>
 func rdar20142523() {
-  myMap(0..<10, { x in // expected-error{{'myMap' is unavailable: call the 'map()' method on the sequence}}
+  myMap(0..<10, { x in // expected-error{{generic parameter 'T' could not be inferred}}
     ()
     return x
   })
@@ -549,10 +549,12 @@ func r21974772(_ y : Int) {
 // <rdar://problem/22020088> QoI: missing member diagnostic on optional gives worse error message than existential/bound generic/etc
 protocol r22020088P {}
 
-func r22020088Foo<T>(_ t: T) {}
+func r22020088Foo<T>(_ t: T) {} // expected-note {{in call to function 'r22020088Foo'}}
 
 func r22020088bar(_ p: r22020088P?) {
-  r22020088Foo(p.fdafs)  // expected-error {{value of type 'r22020088P?' has no member 'fdafs'}}
+  r22020088Foo(p.fdafs)
+  // expected-error@-1 {{value of type 'r22020088P?' has no member 'fdafs'}}
+  // expected-error@-2 {{generic parameter 'T' could not be inferred}}
 }
 
 // <rdar://problem/22288575> QoI: poor diagnostic involving closure, bad parameter label, and mismatch return type

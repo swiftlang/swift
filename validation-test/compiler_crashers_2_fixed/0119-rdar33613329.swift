@@ -44,4 +44,5 @@ struct X { var y: Int = 0 }
 var x = X()
 x ~> \X.y ≈> { a in a += 1; return 3 }
 // expected-error@-1 {{generic parameter 'R' could not be inferred}}
-// FIXME: Used to be better: "cannot convert call result type 'M<WritableKeyPath<X, Int>, _>' to expected type 'WritableKeyPath<_, _>'"
+// expected-error@-2 {{cannot convert value of type 'M<WritableKeyPath<X, Int>, Any>' to expected argument type 'WritableKeyPath<Root, Value>'}}
+// FIXME: in 'M<WritableKeyPath<X, Int>, Any>', Any comes from a hole

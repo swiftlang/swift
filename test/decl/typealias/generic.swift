@@ -69,6 +69,8 @@ typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
 // expected-note@-2 {{'T2' declared as parameter to type 'E'}}
 
 typealias F<T1, T2> = (T1) -> T2
+// expected-note@-1 {{'T1' declared as parameter to type 'F'}}
+// expected-note@-2 {{'T2' declared as parameter to type 'F'}}
 
 // Type alias of type alias.
 typealias G<S1, S2> = A<S1, S2>
@@ -94,8 +96,9 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
-// TODO QoI: Cannot infer T1/T2.
-let _ : F = { a in a }  // expected-error {{type of expression is ambiguous without more context}}
+let _ : F = { a in a }
+// expected-error@-1 {{generic parameter 'T1' could not be inferred}}
+// expected-error@-2 {{generic parameter 'T2' could not be inferred}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)

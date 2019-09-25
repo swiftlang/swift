@@ -207,13 +207,27 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Gather the constraints affected by a change to this type variable.
-  auto inactiveConstraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::AllMentions,
-      [](Constraint *constraint) { return !constraint->isActive(); });
+  bool shouldPropagateHoles = shouldAttemptFixes() && isHole(typeVar);
+  for (auto *constraint : CG.gatherConstraints(typeVar,
+      ConstraintGraph::GatheringKind::AllMentions)) {
+    // Add any constraints that aren't already active to the worklist.
+    if (!constraint->isActive())
+      activateConstraint(constraint);
 
-  // Add any constraints that aren't already active to the worklist.
-  for (auto *constraint : inactiveConstraints)
-    activateConstraint(constraint);
+    // If this type variable is a hole in the constraint system, propagate
+    // this information and mark adjacent type variables as potential holes.
+    //
+    // Consider this example:
+    //
+    // func foo<T: BinaryInteger>(_: T) {}
+    // foo(.bar) <- Since `.bar` can't be inferred due to lack of info about its
+    //              base type, it's member type is going to get defaulted to
+    //              `Any` which has to be propaged to type variable associated
+    //              with `T` and vice versa.
+    if (shouldPropagateHoles)
+      for (auto *typeVar : constraint->getTypeVariables())
+        recordHole(typeVar);
+  }
 }
 
 /// Retrieve a dynamic result signature for the given declaration.

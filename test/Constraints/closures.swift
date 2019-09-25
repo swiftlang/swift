@@ -176,7 +176,9 @@ func SR3671() {
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
 func r22162441(_ lines: [String]) {
   _ = lines.map { line in line.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   _ = lines.map { $0.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
 
@@ -249,10 +251,10 @@ var _: (Int,Int) -> Int = {$0+$1+$2}  // expected-error {{contextual closure typ
 // Crash when re-typechecking bodies of non-single expression closures
 
 struct CC {}
-func callCC<U>(_ f: (CC) -> U) -> () {}
+func callCC<U>(_ f: (CC) -> U) -> () {} // expected-note {{in call to function 'callCC'}}
 
 func typeCheckMultiStmtClosureCrash() {
-  callCC { // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{11-11= () -> Int in }}
+  callCC { // expected-error {{generic parameter 'U' could not be inferred}}
     _ = $0
     return 1
   }
@@ -313,7 +315,7 @@ struct Thing {
   init?() {}
 }
 // This throws a compiler error
-let things = Thing().map { thing in  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{34-34=-> Thing }}
+let things = Thing().map { thing in  // expected-error {{generic parameter 'U' could not be inferred}}
   // Commenting out this makes it compile
   _ = thing
   return thing
@@ -360,7 +362,7 @@ func someGeneric19997471<T>(_ x: T) {
 
 
 // <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
-[0].map {  // expected-error {{unable to infer complex closure return type; add explicit type to disambiguate}} {{5-5=-> Int }}
+[0].map {  // expected-error {{generic parameter 'T' could not be inferred}}
   _ in
   let r =  (1,2).0
   return r
@@ -497,7 +499,9 @@ struct S_3520 {
   var number1: Int
 }
 func sr3520_set_via_closure<S, T>(_ closure: (inout S, T) -> ()) {} // expected-note {{in call to function 'sr3520_set_via_closure'}}
-sr3520_set_via_closure({ $0.number1 = $1 }) // expected-error {{generic parameter 'S' could not be inferred}}
+sr3520_set_via_closure({ $0.number1 = $1 })
+// expected-error@-1 {{generic parameter 'S' could not be inferred}}
+// expected-error@-2 {{generic parameter 'T' could not be inferred}}
 
 // SR-3073: UnresolvedDotExpr in single expression closure
 

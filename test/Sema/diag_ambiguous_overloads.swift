@@ -89,11 +89,12 @@ struct sr7440_ITunesGenre {
   let name: String
 }
 class sr7440_Genre {
-  static func fetch<B: BinaryInteger>(genreID: B, name: String) {}
+  static func fetch<B: BinaryInteger>(genreID: B, name: String) {} // expected-note {{in call to function 'fetch(genreID:name:)'}}
   static func fetch(_ iTunesGenre: sr7440_ITunesGenre) -> sr7440_Genre {
     return sr7440_Genre.fetch(genreID: iTunesGenre.genreID, name: iTunesGenre.name)
 // expected-error@-1 {{value of type 'sr7440_ITunesGenre' has no member 'genreID'; did you mean 'genre'?}}
 // expected-error@-2 {{cannot convert return expression of type '()' to return type 'sr7440_Genre'}}
+// expected-error@-3 {{generic parameter 'B' could not be inferred}}
   }
 }
 

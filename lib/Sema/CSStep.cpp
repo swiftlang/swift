@@ -347,35 +347,29 @@ StepResult ComponentStep::take(bool prevFailed) {
     if (!CS.shouldAttemptFixes())
       return finalize(/*isSuccess=*/false);
 
-    // Let's see if all of the free type variables are associated with
-    // generic parameters and if so, let's default them to `Any` and continue
-    // solving so we can properly diagnose the problem later by suggesting
-    // to explictly specify them.
+    // Defaults the type of a hole to Any.
+    auto defaultHoleType = [&](TypeVariableType *typeVar,
+                               ConstraintLocator *locator) {
+      CS.assignFixedType(typeVar, CS.getASTContext().TheAnyType);
+      CS.DefaultedConstraints.push_back(locator);
+    };
 
+    // Let's record holes for all of the free type variables that represent
+    // generic paramters and continue solving.
     llvm::SmallDenseMap<ConstraintLocator *,
                         llvm::SmallVector<GenericTypeParamType *, 4>>
         defaultableGenericParams;
 
     for (auto *typeVar : CS.getTypeVariables()) {
-      if (typeVar->getImpl().hasRepresentativeOrFixed())
+      auto *locator = typeVar->getImpl().getLocator();
+      auto *anchor = locator->getAnchor();
+
+      if (typeVar->getImpl().hasRepresentativeOrFixed() ||
+          !(anchor && locator->isForGenericParameter()))
         continue;
 
-      // If this free type variable is not a generic parameter
-      // we are done.
-      auto *locator = typeVar->getImpl().getLocator();
-
-      auto *anchor = locator->getAnchor();
-      if (!(anchor && locator->isForGenericParameter()))
-        return finalize(/*isSuccess=*/false);
-
-      // Increment the score for every missing generic argument
-      // to make ranking of the solutions with different number
-      // of generic arguments easier.
-      CS.increaseScore(ScoreKind::SK_Fix);
-      // Default argument to `Any`.
-      CS.assignFixedType(typeVar, CS.getASTContext().TheAnyType);
-      // Note that this generic argument has been given a default value.
-      CS.DefaultedConstraints.push_back(locator);
+      CS.recordHole(typeVar);
+      defaultHoleType(typeVar, locator);
 
       auto path = locator->getPath();
       // Let's drop `generic parameter '...'` part of the locator to
@@ -391,9 +385,19 @@ StepResult ComponentStep::take(bool prevFailed) {
       auto &missingParams = missing.second;
       auto *fix =
           ExplicitlySpecifyGenericArguments::create(CS, missingParams, locator);
-      if (CS.recordFix(fix))
+      if (CS.recordFix(fix, /*impact=*/missingParams.size()))
         return finalize(/*isSuccess=*/false);
     }
+
+    // Assign default types for all remaining holes.
+    for (auto *typeVar : CS.getTypeVariables())
+      if (!typeVar->getImpl().hasRepresentativeOrFixed() && CS.isHole(typeVar)) {
+        defaultHoleType(typeVar, typeVar->getImpl().getLocator());
+        CS.increaseScore(SK_Fix);
+      }
+
+    if (CS.simplify() || CS.hasFreeTypeVariables())
+      return finalize(/*isSuccess*/false);
   }
 
   // If this solution is worse than the best solution we've seen so far,

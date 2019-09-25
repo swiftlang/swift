@@ -7979,11 +7979,7 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
 
 void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
   assert(typeVar);
-  auto *locator = typeVar->getImpl().getLocator();
-  if (Holes.insert(locator)) {
-    addConstraint(ConstraintKind::Defaultable, typeVar,
-                  getASTContext().TheAnyType, locator);
-  }
+  Holes.insert(typeVar->getImpl().getLocator());
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
@@ -8077,9 +8073,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
           newTupleTypes.push_back(smallerElt);
       } else {
         if (largerElt.getType()->isTypeVariableOrMember())
-          addConstraint(ConstraintKind::Defaultable, largerElt.getType(),
-                        getASTContext().TheAnyType,
-                        getConstraintLocator(locator));
+          recordHole(largerElt.getType()->getAs<TypeVariableType>());
       }
     }
     auto matchingType =

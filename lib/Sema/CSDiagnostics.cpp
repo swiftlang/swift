@@ -4732,7 +4732,8 @@ bool MissingGenericArgumentsFailure::diagnoseParameter(
   if (locator->isForContextualType() &&
       llvm::count_if(cs.DefaultedConstraints,
                      [&GP](const ConstraintLocator *locator) {
-                       return locator->getGenericParameter() == GP;
+                       return (locator->isForGenericParameter() &&
+                               locator->getGenericParameter() == GP);
                      }) > 1) {
     return false;
   }
