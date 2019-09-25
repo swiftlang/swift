@@ -4696,9 +4696,6 @@ namespace {
           /*TrailingWhere=*/nullptr);
       result->computeType();
 
-      // FIXME: Kind of awkward that we have to do this here
-      result->getGenericParams()->getParams()[0]->setDepth(0);
-
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
       if (declaredNative)
