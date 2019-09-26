@@ -3730,8 +3730,9 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
 
   // If self ordering is not necessary and linear map types are unchanged,
   // return the `apply` instruction.
-  auto linearMapFnType =
-      cast<SILFunctionType>(assocFnRefType->getResults().back().getType());
+  auto linearMapFnType = cast<SILFunctionType>(
+      thunk->mapTypeIntoContext(assocFnRefType->getResults().back().getType())
+          ->getCanonicalType());
   auto targetLinearMapFnType = thunk->mapTypeIntoContext(
       origAssocFnType->getResults().back().getSILStorageType())
           .castTo<SILFunctionType>();
@@ -3740,11 +3741,11 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
     return thunk;
   }
 
+  // Otherwise, apply reabstraction/self reordering thunk to linear map.
   SmallVector<SILValue, 8> directResults;
   extractAllElements(apply, loc, thunkSGF.B, directResults);
   auto linearMap = ManagedValue::forBorrowedObjectRValue(directResults.back());
-
-  // Otherwise, apply reabstraction/self reordering thunk to linear map.
+  assert(linearMap.getType().castTo<SILFunctionType>() == linearMapFnType);
   auto linearMapKind = assocFnKind.getLinearMapKind();
   linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
       linearMap, linearMapKind, linearMapFnType, targetLinearMapFnType,
