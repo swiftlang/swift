@@ -154,7 +154,6 @@ EXPECTED_DEFAULTS = {
     'llbuild_assertions': True,
     'lldb_assertions': True,
     'lldb_build_variant': 'Debug',
-    'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
     'llvm_build_variant': 'Debug',
     'llvm_max_parallel_lto_link_jobs':
@@ -355,10 +354,6 @@ EXPECTED_OPTIONS = [
               dest='libdispatch_build_variant', value='Debug'),
     SetOption('--debug-libicu', dest='libicu_build_variant', value='Debug'),
     SetOption('--debug-lldb', dest='lldb_build_variant', value='Debug'),
-    SetOption('--lldb-build-with-xcode', dest='lldb_build_with_xcode',
-              value='1'),
-    SetOption('--lldb-build-with-cmake', dest='lldb_build_with_xcode',
-              value='0'),
     SetOption('--debug-llvm', dest='llvm_build_variant', value='Debug'),
     SetOption('--debug-swift', dest='swift_build_variant', value='Debug'),
     SetOption('--debug-swift-stdlib',
