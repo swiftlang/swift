@@ -220,5 +220,5 @@ func testIntermediateCoercions() {
   func iuoReturning() -> Int! {}
   _ = (iuoReturning as () -> Int?)()
   _ = (iuoReturning as Magic)()
-  _ = (iuoReturning as () -> Int)() // expected-error {{'() -> Int?' is not convertible to '() -> Int'; did you mean to use 'as!' to force downcast?}}
+  _ = (iuoReturning as () -> Int)() // expected-error {{cannot convert value of type '() -> Int?' to type '() -> Int' in coercion}}
 }
