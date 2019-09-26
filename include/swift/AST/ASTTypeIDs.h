@@ -21,6 +21,8 @@
 #include "swift/Basic/TypeID.h"
 namespace swift {
 
+class AbstractFunctionDecl;
+class BraceStmt;
 class CustomAttr;
 class Decl;
 class GenericParamList;
