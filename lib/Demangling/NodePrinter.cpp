@@ -90,7 +90,7 @@ static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
         };
         printer << "\\x" << Hexdigit[c >> 4] << Hexdigit[c & 0xF];
       } else {
-        printer << c;
+        printer << (char)c;
       }
       break;
     }
