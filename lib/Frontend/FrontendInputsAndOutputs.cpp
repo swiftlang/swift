@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrimarySpecificPaths.h"
+#include "swift/Basic/Range.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Option/Options.h"
 #include "swift/Parse/Lexer.h"

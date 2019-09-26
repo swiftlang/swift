@@ -20,6 +20,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"

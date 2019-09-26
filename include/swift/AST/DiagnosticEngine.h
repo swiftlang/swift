@@ -18,15 +18,16 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICENGINE_H
 #define SWIFT_BASIC_DIAGNOSTICENGINE_H
 
-#include "swift/AST/Attr.h"
 #include "swift/AST/TypeLoc.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Allocator.h"
+#include "llvm/Support/VersionTuple.h"
 
 namespace swift {
   class Decl;
+  class DeclAttribute;
   class DiagnosticEngine;
   class SourceManager;
   class ValueDecl;

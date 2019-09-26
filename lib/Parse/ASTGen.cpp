@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ASTGen.h"
+#include "swift/AST/TypeRepr.h"
+#include "swift/Basic/SourceManager.h"
 
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"

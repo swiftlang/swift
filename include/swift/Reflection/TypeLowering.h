@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Support/Casting.h"
+#include "swift/Remote/MetadataReader.h"
 
 #include <iostream>
 #include <memory>
@@ -30,6 +31,7 @@ namespace reflection {
 
 using llvm::cast;
 using llvm::dyn_cast;
+using remote::RemoteRef;
 
 class TypeRef;
 class TypeRefBuilder;
@@ -147,7 +149,8 @@ class BuiltinTypeInfo : public TypeInfo {
   std::string Name;
 
 public:
-  explicit BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor);
+  explicit BuiltinTypeInfo(TypeRefBuilder &builder,
+                           RemoteRef<BuiltinTypeDescriptor> descriptor);
 
   const std::string &getMangledTypeName() const {
     return Name;
@@ -280,7 +283,7 @@ private:
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>
-  const TypeInfoTy *makeTypeInfo(Args... args) {
+  const TypeInfoTy *makeTypeInfo(Args &&... args) {
     auto TI = new TypeInfoTy(::std::forward<Args>(args)...);
     Pool.push_back(std::unique_ptr<const TypeInfo>(TI));
     return TI;

@@ -32,50 +32,152 @@
 namespace swift {
 namespace reflection {
 
+using remote::RemoteRef;
+
 template <typename Runtime> class ReflectionContext;
 
 template <typename Iterator>
 class ReflectionSection {
   using const_iterator = Iterator;
-  const void * Begin;
-  const void * End;
+  RemoteRef<void> Start;
+  uint64_t Size;
 
 public:
-  ReflectionSection(const void * Begin,
-                    const void * End)
-  : Begin(Begin), End(End) {}
+  ReflectionSection(RemoteRef<void> Start, uint64_t Size)
+    : Start(Start), Size(Size) {}
 
-  ReflectionSection(uint64_t Begin, uint64_t End)
-  : Begin(reinterpret_cast<const void *>(Begin)),
-    End(reinterpret_cast<const void *>(End)) {}
+  RemoteRef<void> startAddress() const {
+    return Start;
+  }
 
-  void *startAddress() {
-    return const_cast<void *>(Begin);
-  }
-  const void *startAddress() const {
-    return Begin;
-  }
-  
-  const void *endAddress() const {
-    return End;
+  RemoteRef<void> endAddress() const {
+    return Start.atByteOffset(Size);
   }
 
   const_iterator begin() const {
-    return const_iterator(Begin, End);
+    return const_iterator(Start, Size);
   }
 
   const_iterator end() const {
-    return const_iterator(End, End);
+    return const_iterator(endAddress(), 0);
   }
 
   size_t size() const {
-    return (const char *)End - (const char *)Begin;
+    return Size;
   }
 };
 
+template<typename Self, typename Descriptor>
+class ReflectionSectionIteratorBase
+  : public std::iterator<std::forward_iterator_tag, Descriptor> {
+protected:
+  Self &asImpl() {
+    return *static_cast<Self *>(this);
+  }
+public:
+  RemoteRef<void> Cur;
+  uint64_t Size;
+    
+  ReflectionSectionIteratorBase(RemoteRef<void> Cur, uint64_t Size)
+    : Cur(Cur), Size(Size) {
+    if (Size != 0 && Self::getCurrentRecordSize(this->operator*()) > Size) {
+      fputs("reflection section too small!\n", stderr);
+      abort();
+    }
+  }
+
+  RemoteRef<Descriptor> operator*() const {
+    assert(Size > 0);
+    return RemoteRef<Descriptor>(Cur.getAddressData(),
+                                 (const Descriptor*)Cur.getLocalBuffer());
+  }
+
+  Self &operator++() {
+    auto CurRecord = this->operator*();
+    auto CurSize = Self::getCurrentRecordSize(CurRecord);
+    Cur = Cur.atByteOffset(CurSize);
+    Size -= CurSize;
+    
+    if (Size > 0) {
+      auto NextRecord = this->operator*();
+      auto NextSize = Self::getCurrentRecordSize(NextRecord);
+      if (NextSize > Size) {
+        fputs("reflection section too small!\n", stderr);
+        abort();
+      }
+    }
+
+    return asImpl();
+  }
+
+  bool operator==(const Self &other) const {
+    return Cur == other.Cur && Size == other.Size;
+  }
+
+  bool operator!=(const Self &other) const {
+    return !(*this == other);
+  }
+};
+
+class FieldDescriptorIterator
+  : public ReflectionSectionIteratorBase<FieldDescriptorIterator,
+                                         FieldDescriptor>
+{
+public:
+  FieldDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<FieldDescriptor> FR) {
+    return sizeof(FieldDescriptor) + FR->NumFields * FR->FieldRecordSize;
+  }
+};
 using FieldSection = ReflectionSection<FieldDescriptorIterator>;
+
+class AssociatedTypeIterator
+  : public ReflectionSectionIteratorBase<AssociatedTypeIterator,
+                                         AssociatedTypeDescriptor>
+{
+public:
+  AssociatedTypeIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<AssociatedTypeDescriptor> ATR){
+    return sizeof(AssociatedTypeDescriptor)
+      + ATR->NumAssociatedTypes * ATR->AssociatedTypeRecordSize;
+  }
+};
 using AssociatedTypeSection = ReflectionSection<AssociatedTypeIterator>;
+
+class BuiltinTypeDescriptorIterator
+  : public ReflectionSectionIteratorBase<BuiltinTypeDescriptorIterator,
+                                         BuiltinTypeDescriptor> {
+public:
+  BuiltinTypeDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<BuiltinTypeDescriptor> ATR){
+    return sizeof(BuiltinTypeDescriptor);
+  }
+};
 using BuiltinTypeSection = ReflectionSection<BuiltinTypeDescriptorIterator>;
+
+class CaptureDescriptorIterator
+  : public ReflectionSectionIteratorBase<CaptureDescriptorIterator,
+                                         CaptureDescriptor> {
+public:
+  CaptureDescriptorIterator(RemoteRef<void> Cur, uint64_t Size)
+    : ReflectionSectionIteratorBase(Cur, Size)
+  {}
+
+  static uint64_t getCurrentRecordSize(RemoteRef<CaptureDescriptor> CR){
+    return sizeof(CaptureDescriptor)
+      + CR->NumCaptureTypes * sizeof(CaptureTypeRecord)
+      + CR->NumMetadataSources * sizeof(MetadataSourceRecord);
+  }
+};
 using CaptureSection = ReflectionSection<CaptureDescriptorIterator>;
 using GenericSection = ReflectionSection<const void *>;
 
@@ -157,9 +259,7 @@ private:
                      TypeRefID::Hash, TypeRefID::Equal> AssociatedTypeCache;
 
   /// Cache for field info lookups.
-  std::unordered_map<std::string,
-                     std::pair<const FieldDescriptor *, const ReflectionInfo *>>
-                     FieldTypeInfoCache;
+  std::unordered_map<std::string, RemoteRef<FieldDescriptor>> FieldTypeInfoCache;
 
   TypeConverter TC;
   MetadataSourceBuilder MSB;
@@ -459,21 +559,48 @@ private:
   std::vector<ReflectionInfo> ReflectionInfos;
   
   uint64_t getRemoteAddrOfTypeRefPointer(const void *pointer);
-
+  
   std::function<auto (SymbolicReferenceKind kind,
                       Directness directness,
                       int32_t offset, const void *base) -> Demangle::Node *>
     SymbolicReferenceResolver;
   
-  std::string normalizeReflectionName(StringRef name);
-  bool reflectionNameMatches(StringRef reflectionName,
+  std::string normalizeReflectionName(RemoteRef<char> name);
+  bool reflectionNameMatches(RemoteRef<char> reflectionName,
                              StringRef searchName);
-  
-  Demangle::Node *demangleTypeRef(StringRef mangledName) {
-    return Dem.demangleType(mangledName, SymbolicReferenceResolver);
+
+public:
+  template<typename Record, typename Field>
+  RemoteRef<char> readTypeRef(RemoteRef<Record> record,
+                              const Field &field) {
+    uint64_t remoteAddr = record.resolveRelativeFieldData(field);
+    // TODO: This assumes the remote and local buffer addresses are contiguous,
+    // which should not be a guarantee that MemoryReaders need to maintain.
+    // Ultimately this should use the MemoryReader to read the string.
+    auto localAddr = (uint64_t)(uintptr_t)record.getLocalBuffer()
+      + (int64_t)(remoteAddr - record.getAddressData());
+    
+    // Skip the mangling prefix, if any.
+    auto localPtr = (const char *)localAddr;
+    if (localPtr[0] == '$' && localPtr[1] == 's') {
+      remoteAddr += 2;
+      localPtr += 2;
+    }
+    
+    return RemoteRef<char>(remoteAddr, localPtr);
   }
   
-public:
+  StringRef getTypeRefString(RemoteRef<char> record) {
+    return Demangle::makeSymbolicMangledNameStringRef(record.getLocalBuffer());
+  }
+  
+  Demangle::Node *demangleTypeRef(RemoteRef<char> string) {
+    // TODO: Use the remote addr in the RemoteRef to resolve and read from
+    // remote addresses in the resolver function.
+    return Dem.demangleType(getTypeRefString(string),
+                            SymbolicReferenceResolver);
+  }
+  
   template<typename Runtime>
   void setMetadataReader(
                       remote::MetadataReader<Runtime, TypeRefBuilder> &reader) {
@@ -541,29 +668,29 @@ public:
   lookupSuperclass(const TypeRef *TR);
 
   /// Load unsubstituted field types for a nominal type.
-  std::pair<const FieldDescriptor *, const ReflectionInfo *>
+  RemoteRef<FieldDescriptor>
   getFieldTypeInfo(const TypeRef *TR);
 
   /// Get the parsed and substituted field types for a nominal type.
   bool getFieldTypeRefs(const TypeRef *TR,
-           const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD,
-           std::vector<FieldTypeInfo> &Fields);
+                        RemoteRef<FieldDescriptor> FD,
+                        std::vector<FieldTypeInfo> &Fields);
 
   /// Get the primitive type lowering for a builtin type.
-  const BuiltinTypeDescriptor *getBuiltinTypeInfo(const TypeRef *TR);
+  RemoteRef<BuiltinTypeDescriptor> getBuiltinTypeInfo(const TypeRef *TR);
 
   /// Get the raw capture descriptor for a remote capture descriptor
   /// address.
-  const CaptureDescriptor *getCaptureDescriptor(uint64_t RemoteAddress);
+  RemoteRef<CaptureDescriptor> getCaptureDescriptor(uint64_t RemoteAddress);
 
   /// Get the unsubstituted capture types for a closure context.
-  ClosureContextInfo getClosureContextInfo(const CaptureDescriptor &CD);
+  ClosureContextInfo getClosureContextInfo(RemoteRef<CaptureDescriptor> CD);
 
   ///
   /// Dumping typerefs, field declarations, associated types
   ///
 
-  void dumpTypeRef(llvm::StringRef MangledName,
+  void dumpTypeRef(RemoteRef<char> mangledName,
                    std::ostream &OS, bool printTypeName = false);
   void dumpFieldSection(std::ostream &OS);
   void dumpAssociatedTypeSection(std::ostream &OS);
