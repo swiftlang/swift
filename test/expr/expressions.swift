@@ -858,10 +858,10 @@ _ = _.foo // expected-error {{type of expression is ambiguous without more conte
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
-    func f(_ x: Int, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
+    func f(_ x: Bool, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
     func g<T>(_ x: T, _ y: T, _ z: String = "") {} // expected-note 2 {{'g' declared here}}
 
-    f(1) // expected-error{{missing argument for parameter #2 in call}}
+    f(false) // expected-error{{missing argument for parameter #2 in call}}
     g(1) // expected-error{{missing argument for parameter #2 in call}}
     func h() -> Int { return 1 }
     f(h() == 1) // expected-error{{missing argument for parameter #2 in call}}

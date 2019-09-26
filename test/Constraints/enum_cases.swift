@@ -54,7 +54,7 @@ bar_1(E.tuple) // Ok - it's going to be ((x: Int, y: Int))
 
 bar_2(G_E<String>.foo) // Ok
 bar_2(G_E<Int>.bar) // Ok
-bar_2(G_E<Int>.two) // expected-error {{cannot convert value of type '(Int, Int) -> G_E<Int>' to expected argument type '(_) -> G_E<_>'}}
+bar_2(G_E<Int>.two) // expected-error {{cannot convert value of type '(Int, Int) -> G_E<Int>' to expected argument type '(Int) -> G_E<Int>'}}
 bar_2(G_E<Int>.tuple) // expected-error {{cannot convert value of type '((x: Int, y: Int)) -> G_E<Int>' to expected argument type '(_) -> G_E<_>'}}
 bar_3(G_E<Int>.tuple) // Ok
 

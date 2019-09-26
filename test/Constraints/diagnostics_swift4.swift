@@ -34,7 +34,7 @@ enum R31898542<T> {
 }
 
 func foo() -> R31898542<()> {
-  return .success() // expected-error {{missing argument for parameter #1 in call}} {{19-19=<#T#>}}
+  return .success() // expected-error {{missing argument for parameter #1 in call}} {{19-19=<#()#>}}
 }
 
 // rdar://problem/31973368 - Cannot convert value of type '(K, V) -> ()' to expected argument type '((key: _, value: _)) -> Void'
