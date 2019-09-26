@@ -1663,9 +1663,9 @@ void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
 /// perhaps accidentally, and (2) allows the verifier to assert that
 /// all calls have been checked.
 void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
-  if (auto init = elt->getTypeCheckedRawValueExpr()) {
+  if (auto *rawValue = elt->getRawValueExpr()) {
     CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
-    init->walk(checker);
+    rawValue->walk(checker);
   }
 }
 

@@ -6329,9 +6329,7 @@ class EnumElementDecl : public DeclContext, public ValueDecl {
   
   /// The raw value literal for the enum element, or null.
   LiteralExpr *RawValueExpr;
-  /// The type-checked raw value expression.
-  Expr *TypeCheckedRawValueExpr = nullptr;
-  
+
 public:
   EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
                   ParameterList *Params,
@@ -6364,13 +6362,6 @@ public:
   bool hasRawValueExpr() const { return RawValueExpr; }
   LiteralExpr *getRawValueExpr() const { return RawValueExpr; }
   void setRawValueExpr(LiteralExpr *e) { RawValueExpr = e; }
-  
-  Expr *getTypeCheckedRawValueExpr() const {
-    return TypeCheckedRawValueExpr;
-  }
-  void setTypeCheckedRawValueExpr(Expr *e) {
-    TypeCheckedRawValueExpr = e;
-  }
 
   /// Return the containing EnumDecl.
   EnumDecl *getParentEnum() const {
