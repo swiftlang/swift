@@ -237,18 +237,13 @@ public:
         ReflStrMdSec.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uint64_t>(SectBuf.get());
-    auto RemoteStartAddress = static_cast<uint64_t>(RangeStart);
-
     ReflectionInfo info = {
         {FieldMdSec.first, FieldMdSec.second},
         {AssocTySec.first, AssocTySec.second},
         {BuiltinTySec.first, BuiltinTySec.second},
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        LocalStartAddress,
-        RemoteStartAddress};
+        {ReflStrMdSec.first, ReflStrMdSec.second}};
 
     this->addReflectionInfo(info);
 
@@ -346,19 +341,13 @@ public:
         ReflStrMdSec.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uintptr_t>(DOSHdrBuf.get());
-    auto RemoteStartAddress =
-        static_cast<uintptr_t>(ImageStart.getAddressData());
-
     ReflectionInfo Info = {
         {FieldMdSec.first, FieldMdSec.second},
         {AssocTySec.first, AssocTySec.second},
         {BuiltinTySec.first, BuiltinTySec.second},
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        LocalStartAddress,
-        RemoteStartAddress};
+        {ReflStrMdSec.first, ReflStrMdSec.second}};
     this->addReflectionInfo(Info);
     return true;
   }
@@ -466,19 +455,13 @@ public:
         ReflStrMdSec.first == nullptr)
       return false;
 
-    auto LocalStartAddress = reinterpret_cast<uint64_t>(Buf.get());
-    auto RemoteStartAddress =
-        static_cast<uint64_t>(ImageStart.getAddressData());
-
     ReflectionInfo info = {
         {FieldMdSec.first, FieldMdSec.second},
         {AssocTySec.first, AssocTySec.second},
         {BuiltinTySec.first, BuiltinTySec.second},
         {CaptureSec.first, CaptureSec.second},
         {TypeRefMdSec.first, TypeRefMdSec.second},
-        {ReflStrMdSec.first, ReflStrMdSec.second},
-        LocalStartAddress,
-        RemoteStartAddress};
+        {ReflStrMdSec.first, ReflStrMdSec.second}};
 
     this->addReflectionInfo(info);
 
