@@ -996,6 +996,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                         -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                         -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+                        -DCMAKE_INSTALL_LIBDIR=lib
                         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                         -DCMAKE_LINKER=${CMAKE_LINKER}
                         -DCMAKE_RANLIB=${CMAKE_RANLIB}
