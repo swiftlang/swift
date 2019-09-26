@@ -2476,13 +2476,17 @@ namespace {
                                          memberName,
                                          defaultMemberLookupOptions);
 
-          // Filter out any functions or instance members
+          // Filter out any functions, instance members or enum cases with
+          // associated values.
           results.filter([](const LookupResultEntry entry, bool isOuter) {
             if (auto member = entry.getValueDecl()) {
               if (isa<FuncDecl>(member))
                 return false;
               if (member->isInstanceMember())
                 return false;
+              if (auto EED = dyn_cast<EnumElementDecl>(member)) {
+                return !EED->hasAssociatedValues();
+              }
             }
 
             return true;
@@ -2493,19 +2497,12 @@ namespace {
           }
           
           if (auto member = results.front().getValueDecl()) {
-            // If we have something like 'static let none = 1', then ignore.
+            // If this is a variable whose type does not match the base type
+            // of the target then ignore it.
             if (auto VD = dyn_cast<VarDecl>(member)) {
-              if (!VD->getInterfaceType()->isEqual(
-                      baseTyNominalDecl->getDeclaredInterfaceType()))
+              auto baseType = DSCE->getType()->lookThroughAllOptionalTypes();
+              if (!VD->getInterfaceType()->isEqual(baseType))
                 return;
-            }
-
-            // Return if the member is an enum case w/ assoc values, as we only
-            // care (for now) about cases with no assoc values (like none)
-            if (auto EED = dyn_cast<EnumElementDecl>(member)) {
-              if (EED->hasAssociatedValues()) {
-                return;
-              }
             }
             
             // Emit a diagnostic with some fixits

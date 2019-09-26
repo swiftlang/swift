@@ -497,3 +497,29 @@ let _: EnumWithStaticNone4? = .none // expected-warning {{assuming you mean 'Opt
 
 let _: EnumWithStaticFuncNone1? = .none // Okay
 let _: EnumWithStaticFuncNone2? = .none // Okay
+
+/// Make sure we diagnose generic ones as well including conditional ones ///
+
+enum GenericEnumWithStaticNone<T> {
+  case a
+  static var none: GenericEnumWithStaticNone<Int> { .a }
+}
+
+let _: GenericEnumWithStaticNone<Int>? = .none // expected-warning {{assuming you mean 'Optional<GenericEnumWithStaticNone<Int>>.none'; did you mean 'GenericEnumWithStaticNone<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{42-42=Optional}}
+// expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}}{{42-42=GenericEnumWithStaticNone<Int>}}
+let _: GenericEnumWithStaticNone<String>? = .none // Okay
+let _: GenericEnumWithStaticNone? = .none // Okay
+
+enum GenericEnumWithoutNone<T> {
+  case a
+}
+
+extension GenericEnumWithoutNone where T == Int {
+  static var none: GenericEnumWithoutNone<Int> { .a }
+}
+
+let _: GenericEnumWithoutNone<Int>? = .none // expected-warning {{assuming you mean 'Optional<GenericEnumWithoutNone<Int>>.none'; did you mean 'GenericEnumWithoutNone<Int>.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{39-39=Optional}}
+// expected-note@-2 {{use 'GenericEnumWithoutNone<Int>.none' instead}}{{39-39=GenericEnumWithoutNone<Int>}}
+let _: GenericEnumWithoutNone<String>? = .none // Okay
