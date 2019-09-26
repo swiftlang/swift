@@ -24,6 +24,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
