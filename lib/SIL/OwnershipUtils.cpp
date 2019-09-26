@@ -81,22 +81,22 @@ bool swift::isOwnershipForwardingInst(SILInstruction *i) {
 //                             Borrow Introducers
 //===----------------------------------------------------------------------===//
 
-void BorrowScopeIntroducerKind::print(llvm::raw_ostream &os) const {
+void BorrowScopeIntroducingValueKind::print(llvm::raw_ostream &os) const {
   switch (value) {
-  case BorrowScopeIntroducerKind::SILFunctionArgument:
+  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     os << "SILFunctionArgument";
     return;
-  case BorrowScopeIntroducerKind::BeginBorrow:
+  case BorrowScopeIntroducingValueKind::BeginBorrow:
     os << "BeginBorrowInst";
     return;
-  case BorrowScopeIntroducerKind::LoadBorrow:
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
     os << "LoadBorrowInst";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
 
-void BorrowScopeIntroducerKind::dump() const {
+void BorrowScopeIntroducingValueKind::dump() const {
 #ifndef NDEBUG
   print(llvm::dbgs());
 #endif
@@ -107,13 +107,13 @@ void BorrowScopeIntroducingValue::getLocalScopeEndingInstructions(
   assert(isLocalScope() && "Should only call this given a local scope");
 
   switch (kind) {
-  case BorrowScopeIntroducerKind::SILFunctionArgument:
+  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducerKind::BeginBorrow:
+  case BorrowScopeIntroducingValueKind::BeginBorrow:
     llvm::copy(cast<BeginBorrowInst>(value)->getEndBorrows(),
                std::back_inserter(scopeEndingInsts));
     return;
-  case BorrowScopeIntroducerKind::LoadBorrow:
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
     llvm::copy(cast<LoadBorrowInst>(value)->getEndBorrows(),
                std::back_inserter(scopeEndingInsts));
     return;
@@ -125,17 +125,17 @@ void BorrowScopeIntroducingValue::visitLocalScopeEndingUses(
     function_ref<void(Operand *)> visitor) const {
   assert(isLocalScope() && "Should only call this given a local scope");
   switch (kind) {
-  case BorrowScopeIntroducerKind::SILFunctionArgument:
+  case BorrowScopeIntroducingValueKind::SILFunctionArgument:
     llvm_unreachable("Should only call this with a local scope");
-  case BorrowScopeIntroducerKind::BeginBorrow:
-    for (auto *use : cast<BeginBorrowInst>(value)->getUses()) {
+  case BorrowScopeIntroducingValueKind::BeginBorrow:
+    for (auto *use : value->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
         visitor(use);
       }
     }
     return;
-  case BorrowScopeIntroducerKind::LoadBorrow:
-    for (auto *use : cast<LoadBorrowInst>(value)->getUses()) {
+  case BorrowScopeIntroducingValueKind::LoadBorrow:
+    for (auto *use : value->getUses()) {
       if (isa<EndBorrowInst>(use->getUser())) {
         visitor(use);
       }
@@ -182,7 +182,7 @@ bool swift::getUnderlyingBorrowIntroducingValues(
 }
 
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
-                                     BorrowScopeIntroducerKind kind) {
+                                     BorrowScopeIntroducingValueKind kind) {
   kind.print(os);
   return os;
 }
