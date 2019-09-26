@@ -3746,6 +3746,9 @@ This instruction has the same semantics as ``copy_value`` except that its input
 is a trivial ``@sil_unmanaged`` type that doesn't require ref counting. This is
 intended to be used semantically as a "conversion" like instruction from
 ``unmanaged`` to ``strong`` and thus should never be removed by the optimizer.
+Since the returned value is a strong owned value, this instruction semantically
+should be treated as performing a strong copy of the underlying value as if by
+the value's type lowering.
 
 copy_value
 ``````````
