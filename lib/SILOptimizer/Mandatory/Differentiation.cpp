@@ -120,6 +120,20 @@ static DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
   return result;
 }
 
+/// Given an `apply` instruction, apply the given callback to each of its
+/// direct results. If the `apply` instruction has a single `destructure_tuple`
+/// user, apply the callback to the results of the `destructure_tuple` user.
+static void forEachApplyDirectResult(
+    ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback) {
+  if (!ai->getType().is<TupleType>()) {
+    resultCallback(ai);
+    return;
+  }
+  if (auto *dti = getSingleDestructureTupleUser(ai))
+    for (auto result : dti->getResults())
+      resultCallback(result);
+}
+
 /// Given a function, gather all of its formal results (both direct and
 /// indirect) in an order defined by its result type. Note that "formal results"
 /// refer to result values in the body of the function, not at call sites.
@@ -163,18 +177,15 @@ collectAllDirectResultsInTypeOrder(SILFunction &function,
 
 /// Given a function call site, gather all of its actual results (both direct
 /// and indirect) in an order defined by its result type.
-template <typename IndResRange>
 static void collectAllActualResultsInTypeOrder(
     ApplyInst *ai, ArrayRef<SILValue> extractedDirectResults,
-    IndResRange &&indirectResults, SmallVectorImpl<SILValue> &results) {
-  auto callee = ai->getCallee();
-  SILFunctionConventions calleeConvs(
-      callee->getType().castTo<SILFunctionType>(), ai->getModule());
+    SmallVectorImpl<SILValue> &results) {
+  auto calleeConvs = ai->getSubstCalleeConv();
   unsigned indResIdx = 0, dirResIdx = 0;
   for (auto &resInfo : calleeConvs.getResults()) {
     results.push_back(resInfo.isFormalDirect()
                           ? extractedDirectResults[dirResIdx++]
-                          : indirectResults[indResIdx++]);
+                          : ai->getIndirectSILResults()[indResIdx++]);
   }
 }
 
@@ -1352,12 +1363,6 @@ using Activity = OptionSet<ActivityFlags>;
 /// indices.
 class DifferentiableActivityInfo {
 private:
-  // TODO(TF-800): Temporarily store `AutoDiffAssociatedFunctionKind` because
-  // special logic for `apply` result does not work for reverse-mode.
-
-  // with us handling `apply` instructions differently.
-  AutoDiffAssociatedFunctionKind kind;
-
   DifferentiableActivityCollection &parent;
   GenericSignature *assocGenSig = nullptr;
 
@@ -1392,8 +1397,7 @@ private:
 
 public:
   explicit DifferentiableActivityInfo(
-      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig,
-      AutoDiffAssociatedFunctionKind kind);
+      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
@@ -1420,24 +1424,20 @@ static bool isDifferentiationParameter(SILArgument *argument,
   return false;
 }
 
-/// For a nested function call that has results active on the differentiation
-/// path, compute the set of minimal indices for differentiating this function
-/// as required by the data flow.
+/// For an `apply` instruction with active results, compute:
+/// - The results of the `apply` instruction, in type order.
+/// - The set of minimal parameter and result indices for differentiating the
+///   `apply` instruction.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, SmallVectorImpl<SILValue> &results,
-    const SILAutoDiffIndices &parentIndices,
+    ApplyInst *ai, const SILAutoDiffIndices &parentIndices,
     const DifferentiableActivityInfo &activityInfo,
-    SmallVectorImpl<unsigned> &paramIndices,
+    SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
-  // Make sure the function call has active results.
-  assert(llvm::any_of(results, [&](SILValue result) {
-    return activityInfo.isActive(result, parentIndices);
-  }));
-  auto fnTy = ai->getCallee()->getType().castTo<SILFunctionType>();
-  SILFunctionConventions convs(fnTy, ai->getModule());
-  auto arguments = ai->getArgumentOperands();
-  // Parameter indices are indices (in the type signature) of parameter
+  auto calleeFnTy = ai->getSubstCalleeType();
+  auto calleeConvs = ai->getSubstCalleeConv();
+  // Parameter indices are indices (in the callee type signature) of parameter
   // arguments that are varied or are arguments.
+  // Record all parameter indices in type order.
   unsigned currentParamIdx = 0;
   for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
     if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
@@ -1446,52 +1446,39 @@ static void collectMinimalIndicesForFunctionCall(
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
-  // Result indices are indices (in the type signature) of results that are
-  // useful.
-  //
-  // If the function returns only one result, then we just see if that is
-  // useful.
-  if (fnTy->getNumDirectFormalResults() == 1) {
-    if (activityInfo.isUseful(ai, parentIndices.source))
-      resultIndices.push_back(0);
-    return;
-  }
-  // If the function returns more than 1 results, the return type is a tuple. We
-  // need to find all `tuple_extract`s on that tuple, and determine if each
-  // found extracted element is useful.
-  // Collect direct results being retrieved using `tuple_extract`.
-  SILInstructionResultArray directResults;
-#ifndef NDEBUG
-  bool foundDestructure = false;
-#endif
-  for (auto *use : ai->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-#ifndef NDEBUG
-      assert(!foundDestructure &&
-             "Found multiple destructure_tuple's on apply's result");
-      foundDestructure = true;
-#endif
-      directResults = dti->getResults();
-    }
-  }
-  // Add differentiation indices based on activity analysis.
+  // Result indices are indices (in the callee type signature) of results that
+  // are useful.
+  SmallVector<SILValue, 8> directResults;
+  forEachApplyDirectResult(ai, [&](SILValue directResult) {
+    directResults.push_back(directResult);
+  });
+  auto indirectResults = ai->getIndirectSILResults();
+  // Record all results and result indices in type order.
+  results.reserve(calleeFnTy->getNumResults());
   unsigned dirResIdx = 0;
-  unsigned indResIdx = convs.getSILArgIndexOfFirstIndirectResult();
-  for (auto &resAndIdx : enumerate(convs.getResults())) {
+  unsigned indResIdx = calleeConvs.getSILArgIndexOfFirstIndirectResult();
+  for (auto &resAndIdx : enumerate(calleeConvs.getResults())) {
     auto &res = resAndIdx.value();
     unsigned idx = resAndIdx.index();
     if (res.isFormalDirect()) {
+      results.push_back(directResults[dirResIdx]);
       if (auto dirRes = directResults[dirResIdx])
         if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
           resultIndices.push_back(idx);
       ++dirResIdx;
     } else {
-      if (activityInfo.isUseful(arguments[indResIdx].get(),
+      results.push_back(indirectResults[indResIdx]);
+      if (activityInfo.isUseful(indirectResults[indResIdx],
                                 parentIndices.source))
         resultIndices.push_back(idx);
       ++indResIdx;
     }
   }
+  // Make sure the function call has active results.
+  assert(results.size() == calleeFnTy->getNumResults());
+  assert(llvm::any_of(results, [&](SILValue result) {
+    return activityInfo.isActive(result, parentIndices);
+  }));
 }
 
 LinearMapInfo::LinearMapInfo(ADContext &context,
@@ -1519,42 +1506,30 @@ LinearMapInfo::LinearMapInfo(ADContext &context,
 bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   // Function applications with an inout argument should be differentiated.
   auto paramInfos = ai->getSubstCalleeConv().getParameters();
-  auto paramArgs = ai->getArgumentsWithoutIndirectResults();
+  auto arguments = ai->getArgumentsWithoutIndirectResults();
   for (auto i : swift::indices(paramInfos))
     if (paramInfos[i].isIndirectInOut() &&
-        activityInfo.isActive(paramArgs[i], indices))
+        activityInfo.isActive(arguments[i], indices))
       return true;
 
-  // TODO(TF-800): Investigate why `apply` result special logic does not work
-  // for reverse-mode.
-  if (kind == AutoDiffLinearMapKind::Differential) {
-    for (auto use : ai->getUses()) {
-      if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-        for (auto result : dti->getResults()) {
-          if (activityInfo.isActive(result, indices))
-            return true;
-        }
-      }
-    }
-  }
-
-  bool hasActiveDirectResults = activityInfo.isActive(ai, indices);
+  bool hasActiveDirectResults = false;
+  forEachApplyDirectResult(ai, [&](SILValue directResult) {
+    hasActiveDirectResults |= activityInfo.isActive(directResult, indices);
+  });
   bool hasActiveIndirectResults = llvm::any_of(ai->getIndirectSILResults(),
       [&](SILValue result) { return activityInfo.isActive(result, indices); });
   bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
 
-  // TODO: Perform pattern matching to make sure there's at least one `store` to
-  // the array's buffer that is active.
+  // TODO: Pattern match to make sure there is at least one `store` to the
+  // array's active buffer.
   if (isArrayLiteralIntrinsic(ai) && hasActiveResults)
     return true;
 
-  bool hasActiveParamArguments = llvm::any_of(paramArgs,
+  bool hasActiveArguments = llvm::any_of(arguments,
       [&](SILValue arg) { return activityInfo.isActive(arg, indices); });
-  return hasActiveResults && hasActiveParamArguments;
+  return hasActiveResults && hasActiveArguments;
 }
 
-// TODO(TF-800): Investigate why reverse-mode requires special "should
-// differentiate logic" and update comment.
 /// Returns a flag indicating whether the instruction should be differentiated,
 /// given the differentiation indices of the instruction's parent function.
 /// Whether the instruction should be differentiated is determined sequentially
@@ -1577,8 +1552,6 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   if (hasActiveOperands && hasActiveResults)
     return true;
 
-  // TODO(TF-800): Investigate why reverse-mode requires special "should
-  // differentiate logic" and update comment.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
 #define CHECK_INST_TYPE_ACTIVE_DEST(INST) \
@@ -1620,25 +1593,11 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
 void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
-  // TODO(TF-800): Investigate why `apply` result special logic does not work
-  // for reverse-mode.
-  // If differential, handle `apply` result specially.
-  // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
-  // results of the `destructure_tuple` user to `allResults` instead of adding
-  // the `apply` result itself.
-  bool isDifferentialAndFoundDestructureTupleUser = false;
-  if (kind == AutoDiffLinearMapKind::Differential) {
-    if (auto *dti = getSingleDestructureTupleUser(ai)) {
-      isDifferentialAndFoundDestructureTupleUser = true;
-      for (auto result : dti->getResults())
-        allResults.push_back(result);
-    }
-  }
-  // Otherwise, add `apply` result to `allResults`.
-  if (!isDifferentialAndFoundDestructureTupleUser)
-    allResults.push_back(ai);
-  allResults.append(ai->getIndirectSILResults().begin(),
-                    ai->getIndirectSILResults().end());
+  SmallVector<unsigned, 8> activeParamIndices;
+  SmallVector<unsigned, 8> activeResultIndices;
+  collectMinimalIndicesForFunctionCall(
+      ai, indices, activityInfo, allResults, activeParamIndices,
+      activeResultIndices);
 
   // Check if there are any active results or arguments. If not, skip
   // this instruction.
@@ -1652,13 +1611,6 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   });
   if (!hasActiveResults || !hasActiveArguments)
     return;
-
-
-  SmallVector<unsigned, 8> activeParamIndices;
-  SmallVector<unsigned, 8> activeResultIndices;
-  collectMinimalIndicesForFunctionCall(
-      ai, allResults, indices, activityInfo, activeParamIndices,
-      activeResultIndices);
 
   // Compute differentiation result index.
   auto source = activeResultIndices.front();
@@ -1830,7 +1782,7 @@ public:
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
     auto insertion = activityInfoMap.insert(
-        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig, kind)});
+        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig)});
     return insertion.first->getSecond();
   }
 
@@ -1863,9 +1815,8 @@ DifferentiableActivityCollection::DifferentiableActivityCollection(
     : function(f), domInfo(di), postDomInfo(pdi) {}
 
 DifferentiableActivityInfo::DifferentiableActivityInfo(
-    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig,
-    AutoDiffAssociatedFunctionKind kind)
-    : kind(kind), parent(parent), assocGenSig(assocGenSig) {
+    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig)
+    : parent(parent), assocGenSig(assocGenSig) {
   analyze(parent.domInfo, parent.postDomInfo);
 }
 
@@ -1904,30 +1855,18 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       for (auto i : indices(inputValues)) {
         // Handle `apply`.
         if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
+          // If callee is non-varying, skip.
           if (isWithoutDerivative(ai->getCallee()))
             continue;
+          // If any argument is varied, set all direct and indirect results as
+          // varied.
           for (auto arg : ai->getArgumentsWithoutIndirectResults()) {
             if (isVaried(arg, i)) {
               for (auto indRes : ai->getIndirectSILResults())
                 setVaried(indRes, i);
-              // TODO(TF-800): Investigate why `apply` result special logic
-              // does not work for reverse-mode.
-              // If differential, handle `apply` result specially.
-              // If JVP, handle `apply` result specially.
-              // If `apply` result is tuple-typed with a `destructure_tuple`
-              // user, mark the results of the `destructure_tuple` user as
-              // varied instead of marking the `apply` result itself.
-              bool isJVPAndFoundDestructureTupleUser = false;
-              if (kind == swift::AutoDiffAssociatedFunctionKind::JVP) {
-                if (auto *dti = getSingleDestructureTupleUser(ai)) {
-                  for (auto result : dti->getResults())
-                    setVaried(result, i);
-                  isJVPAndFoundDestructureTupleUser = true;
-                }
-              }
-              // Otherwise, mark the `apply` result as varied.
-              if (!isJVPAndFoundDestructureTupleUser)
-                setVaried(ai, i);
+              forEachApplyDirectResult(ai, [&](SILValue directResult) {
+                setVaried(directResult, i);
+              });
             }
           }
         }
@@ -2372,43 +2311,22 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
 // Code emission utilities
 //===----------------------------------------------------------------------===//
 
-/// Given a value, collect all `tuple_extract` users in `result` if value is a
-/// tuple. Otherwise, add the value directly to `result`.
-static void collectAllExtractedElements(SILValue val,
-                                        SmallVectorImpl<SILValue> &result) {
-  auto tupleType = val->getType().getAs<TupleType>();
+/// Given a value, extracts all elements to `results` from this value if it has
+/// a tuple type. Otherwise, add this value directly to `results`.
+static void extractAllElements(SILValue value, SILBuilder &builder,
+                               SmallVectorImpl<SILValue> &results) {
+  auto tupleType = value->getType().getAs<TupleType>();
   if (!tupleType) {
-    result.push_back(val);
+    results.push_back(value);
     return;
   }
-  result.reserve(tupleType->getNumElements());
-  bool visitedDTI = false;
-  for (auto *use : val->getUses()) {
-    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-      assert(!visitedDTI && "More than one 'destructure_tuple'!?");
-      visitedDTI = true;
-      result.append(dti->getResults().begin(), dti->getResults().end());
-    }
+  if (builder.hasOwnership()) {
+    auto *dti = builder.createDestructureTuple(value.getLoc(), value);
+    results.append(dti->getResults().begin(), dti->getResults().end());
+    return;
   }
-  assert(result.size() == tupleType->getNumElements());
-}
-
-/// Given a value, extracts all elements to `result` from this value if it's a
-/// tuple. Otherwise, add this value directly to `result`.
-static void extractAllElements(SILValue val, SILBuilder &builder,
-                               SmallVectorImpl<SILValue> &result) {
-  if (auto tupleType = val->getType().getAs<TupleType>()) {
-    if (builder.hasOwnership()) {
-      auto elts =
-          builder.createDestructureTuple(val.getLoc(), val)->getResults();
-      result.append(elts.begin(), elts.end());
-    } else {
-      for (auto i : range(tupleType->getNumElements()))
-        result.push_back(builder.createTupleExtract(val.getLoc(), val, i));
-    }
-  } else {
-    result.push_back(val);
-  }
+  for (auto i : range(tupleType->getNumElements()))
+    results.push_back(builder.createTupleExtract(value.getLoc(), value, i));
 }
 
 /// Given a range of elements, joins these into a single value. If there's
@@ -3742,23 +3660,13 @@ public:
 
     LLVM_DEBUG(getADDebugStream() << "VJP-transforming:\n" << *ai << '\n');
 
-    // Get the parameter indices required for differentiating this function.
+    // Get the minimal parameter and result indices required for differentiating
+    // this `apply`.
     SmallVector<SILValue, 4> allResults;
-    // Only append the results from the `destruct_tuple` instruction which are
-    // active, we don't consider the result of the original apply if it's a
-    // tuple.
-    if (auto *dti = getSingleDestructureTupleUser(ai)) {
-      for (auto result : dti->getResults())
-        allResults.push_back(result);
-    } else {
-      allResults.push_back(ai);
-    }
-    allResults.append(ai->getIndirectSILResults().begin(),
-                      ai->getIndirectSILResults().end());
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
-                                         activityInfo, activeParamIndices,
+    collectMinimalIndicesForFunctionCall(ai, getIndices(), activityInfo,
+                                         allResults, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
     assert(!activeResultIndices.empty() && "Result indices cannot be empty");
@@ -5052,20 +4960,23 @@ public:
            "Expected differential to return one result");
 
     // Get the original results of the `apply` instructions.
-    SmallVector<SILValue, 8> origDirResults;
-    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origDirectResults;
+    forEachApplyDirectResult(ai, [&](SILValue directResult) {
+      origDirectResults.push_back(directResult);
+    });
     SmallVector<SILValue, 8> origAllResults;
-    collectAllActualResultsInTypeOrder(
-        ai, origDirResults, ai->getIndirectSILResults(), origAllResults);
+    collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
     auto origResult = origAllResults[actualIndices.source];
 
     // Get the differential results of the `apply` instructions.
-    SmallVector<SILValue, 8> differentialDirResults;
-    collectAllExtractedElements(differentialCall, differentialDirResults);
+    SmallVector<SILValue, 8> differentialDirectResults;
+    forEachApplyDirectResult(differentialCall, [&](SILValue directResult) {
+      differentialDirectResults.push_back(directResult);
+    });
     SmallVector<SILValue, 8> differentialAllResults;
-    collectAllActualResultsInTypeOrder(
-        differentialCall, differentialDirResults,
-        differentialCall->getIndirectSILResults(), differentialAllResults);
+    collectAllActualResultsInTypeOrder(differentialCall,
+                                       differentialDirectResults,
+                                       differentialAllResults);
     auto differentialResult = differentialAllResults.front();
 
     // Add tangent for original result.
@@ -5449,25 +5360,13 @@ public:
 
     LLVM_DEBUG(getADDebugStream() << "JVP-transforming:\n" << *ai << '\n');
 
-    // Get the parameter indices required for differentiating this function.
+    // Get the minimal parameter and result indices required for differentiating
+    // this `apply`.
     SmallVector<SILValue, 4> allResults;
-    // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
-    // results of the `destructure_tuple` user to `allResults` instead of adding
-    // the `apply` result itself.
-    // Otherwise, add `apply` result to `allResults`.
-    if (auto *dti = getSingleDestructureTupleUser(ai)) {
-      for (auto result : dti->getResults())
-        allResults.push_back(result);
-    } else {
-      allResults.push_back(ai);
-    }
-
-    allResults.append(ai->getIndirectSILResults().begin(),
-                      ai->getIndirectSILResults().end());
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, allResults, getIndices(),
-                                         activityInfo, activeParamIndices,
+    collectMinimalIndicesForFunctionCall(ai, getIndices(), activityInfo,
+                                         allResults, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
     assert(!activeResultIndices.empty() && "Result indices cannot be empty");
@@ -6797,7 +6696,7 @@ public:
     SILValue fnRef;
     CanGenericSignature genericSig;
     for (auto use : ai->getUses()) {
-      auto dti = dyn_cast<DestructureTupleInst>(use->getUser());
+      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
       if (!dti) continue;
       // The first tuple field of the return value is the `Array`.
       adjointArray = getAdjointValue(ai->getParent(), dti->getResult(0))
@@ -6817,11 +6716,11 @@ public:
     }
     assert(adjointArray && "Array does not have adjoint value");
     assert(genericSig && "No generic signature");
-    assert(fnRef && "cannot create function_ref");
-    // Two loops because the tuple_extract instructions can be reached in
+    assert(fnRef && "Could not create `function_ref`");
+    // Two loops because the `tuple_extract` instructions can be reached in
     // either order.
     for (auto use : ai->getUses()) {
-      auto dti = dyn_cast<DestructureTupleInst>(use->getUser());
+      auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
       if (!dti) continue;
       // The second tuple field is the `RawPointer`.
       for (auto use : dti->getResult(1)->getUses()) {
@@ -6897,12 +6796,12 @@ public:
 
     // Get the original result of the `apply` instruction.
     SmallVector<SILValue, 8> args;
-    SmallVector<SILValue, 8> origDirResults;
-    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origDirectResults;
+    forEachApplyDirectResult(ai, [&](SILValue directResult) {
+      origDirectResults.push_back(directResult);
+    });
     SmallVector<SILValue, 8> origAllResults;
-    collectAllActualResultsInTypeOrder(
-        ai, origDirResults, ai->getIndirectSILResults(),
-        origAllResults);
+    collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
     assert(applyInfo.indices.source < origAllResults.size());
     auto origResult = origAllResults[applyInfo.indices.source];
     assert(origResult);
@@ -6959,16 +6858,9 @@ public:
     extractAllElements(pullbackCall, builder, dirResults);
     // Get all results in type-defined order.
     SmallVector<SILValue, 8> allResults;
-    collectAllActualResultsInTypeOrder(
-        pullbackCall, dirResults, pullbackCall->getIndirectSILResults(),
-        allResults);
+    collectAllActualResultsInTypeOrder(pullbackCall, dirResults, allResults);
     LLVM_DEBUG({
       auto &s = getADDebugStream();
-      s << "All direct results of the nested pullback call:\n";
-      llvm::for_each(dirResults, [&](SILValue v) { s << v; });
-      s << "All indirect results of the nested pullback call:\n";
-      llvm::for_each(pullbackCall->getIndirectSILResults(),
-                     [&](SILValue v) { s << v; });
       s << "All results of the nested pullback call:\n";
       llvm::for_each(allResults, [&](SILValue v) { s << v; });
     });
@@ -8344,9 +8236,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   SmallVector<SILValue, 8> pullbackDirectResults;
   extractAllElements(ai, builder, pullbackDirectResults);
   SmallVector<SILValue, 8> allResults;
-  collectAllActualResultsInTypeOrder(
-      ai, pullbackDirectResults,
-      ai->getIndirectSILResults(), allResults);
+  collectAllActualResultsInTypeOrder(ai, pullbackDirectResults, allResults);
 
   SmallVector<SILValue, 8> results;
   for (unsigned i : actualIndices.parameters->getIndices()) {
