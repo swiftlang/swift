@@ -455,7 +455,45 @@ enum EnumWithStaticNone2 {
   static let none = EnumWithStaticNone2.a
 }
 
+enum EnumWithStaticNone3 {
+  case a
+  static let none = EnumWithStaticNone3.a
+  var none: EnumWithStaticNone3 { return .a }
+}
+
+enum EnumWithStaticNone4 {
+  case a
+  var none: EnumWithStaticNone4 { return .a }
+  static let none = EnumWithStaticNone4.a
+}
+
+enum EnumWithStaticFuncNone1 {
+  case a
+  static func none() -> Int { return 1 }
+}
+
+enum EnumWithStaticFuncNone2 {
+  case a
+  static func none() -> EnumWithStaticFuncNone2 { return .a }
+}
+
+/// Make sure we don't diagnose 'static let none = 1', but do diagnose 'static let none = TheEnum.anotherCase' ///
+
 let _: EnumWithStaticNone1? = .none // Okay
 let _: EnumWithStaticNone2? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone2>.none'; did you mean 'EnumWithStaticNone2.none' instead?}}
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
 // expected-note@-2 {{use 'EnumWithStaticNone2.none' instead}}{{31-31=EnumWithStaticNone2}}
+
+/// Make sure we diagnose if we have both static and instance 'none' member regardless of source order ///
+
+let _: EnumWithStaticNone3? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone3>.none'; did you mean 'EnumWithStaticNone3.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
+// expected-note@-2 {{use 'EnumWithStaticNone3.none' instead}}{{31-31=EnumWithStaticNone3}}
+let _: EnumWithStaticNone4? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone4>.none'; did you mean 'EnumWithStaticNone4.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
+// expected-note@-2 {{use 'EnumWithStaticNone4.none' instead}}{{31-31=EnumWithStaticNone4}}
+
+/// Make sure we don't diagnose 'static func none -> T' ///
+
+let _: EnumWithStaticFuncNone1? = .none // Okay
+let _: EnumWithStaticFuncNone2? = .none // Okay

@@ -2475,19 +2475,24 @@ namespace {
                                          baseTyUnwrapped,
                                          memberName,
                                          defaultMemberLookupOptions);
-          
-          // Lookup didn't find anything, so return
+
+          // Filter out any functions or instance members
+          results.filter([](const LookupResultEntry entry, bool isOuter) {
+            if (auto member = entry.getValueDecl()) {
+              if (isa<FuncDecl>(member))
+                return false;
+              if (member->isInstanceMember())
+                return false;
+            }
+
+            return true;
+          });
+
           if (results.empty()) {
             return;
           }
           
           if (auto member = results.front().getValueDecl()) {
-            // Lookup returned a member that is an instance member,
-            // so return
-            if (member->isInstanceMember()) {
-              return;
-            }
-
             // If we have something like 'static let none = 1', then ignore.
             if (auto VD = dyn_cast<VarDecl>(member)) {
               if (!VD->getInterfaceType()->isEqual(
