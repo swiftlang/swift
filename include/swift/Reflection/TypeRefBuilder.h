@@ -65,6 +65,21 @@ public:
   size_t size() const {
     return Size;
   }
+  
+  bool containsRemoteAddress(uint64_t remoteAddr,
+                             uint64_t size) const {
+    return Start.getAddressData() <= remoteAddr
+      && remoteAddr + size <= Start.getAddressData() + Size;
+  }
+  
+  template<typename U>
+  RemoteRef<U> getRemoteRef(uint64_t remoteAddr) const {
+    assert(containsRemoteAddress(remoteAddr, sizeof(U)));
+    auto localAddr = (uint64_t)(uintptr_t)Start.getLocalBuffer()
+      + (remoteAddr - Start.getAddressData());
+    
+    return RemoteRef<U>(remoteAddr, (const U*)localAddr);
+  }
 };
 
 template<typename Self, typename Descriptor>
@@ -239,17 +254,12 @@ public:
   using BuiltTypeDecl = Optional<std::string>;
   using BuiltProtocolDecl = Optional<std::pair<std::string, bool /*isObjC*/>>;
 
-  TypeRefBuilder();
-
   TypeRefBuilder(const TypeRefBuilder &other) = delete;
   TypeRefBuilder &operator=(const TypeRefBuilder &other) = delete;
 
 private:
   Demangle::Demangler Dem;
 
-  std::function<const TypeRef* (const void*, unsigned)>
-    OpaqueUnderlyingTypeReader;
-  
   /// Makes sure dynamically allocated TypeRefs stick around for the life of
   /// this TypeRefBuilder and are automatically released.
   std::vector<std::unique_ptr<const TypeRef>> TypeRefPool;
@@ -555,106 +565,66 @@ public:
     return ReflectionInfos;
   }
 
+public:
+  enum ForTesting_t { ForTesting };
+  
+  // Only for testing. A TypeRefBuilder built this way will not be able to
+  // decode records in remote memory.
+  explicit TypeRefBuilder(ForTesting_t) : TC(*this) {}
+
 private:
   std::vector<ReflectionInfo> ReflectionInfos;
-  
-  uint64_t getRemoteAddrOfTypeRefPointer(const void *pointer);
-  
-  std::function<auto (SymbolicReferenceKind kind,
-                      Directness directness,
-                      int32_t offset, const void *base) -> Demangle::Node *>
-    SymbolicReferenceResolver;
-  
+    
   std::string normalizeReflectionName(RemoteRef<char> name);
   bool reflectionNameMatches(RemoteRef<char> reflectionName,
                              StringRef searchName);
 
 public:
+  RemoteRef<char> readTypeRef(uint64_t remoteAddr);
+  
   template<typename Record, typename Field>
   RemoteRef<char> readTypeRef(RemoteRef<Record> record,
                               const Field &field) {
     uint64_t remoteAddr = record.resolveRelativeFieldData(field);
-    // TODO: This assumes the remote and local buffer addresses are contiguous,
-    // which should not be a guarantee that MemoryReaders need to maintain.
-    // Ultimately this should use the MemoryReader to read the string.
-    auto localAddr = (uint64_t)(uintptr_t)record.getLocalBuffer()
-      + (int64_t)(remoteAddr - record.getAddressData());
     
-    // Skip the mangling prefix, if any.
-    auto localPtr = (const char *)localAddr;
-    if (localPtr[0] == '$' && localPtr[1] == 's') {
-      remoteAddr += 2;
-      localPtr += 2;
-    }
-    
-    return RemoteRef<char>(remoteAddr, localPtr);
+    return readTypeRef(remoteAddr);
   }
-  
+
   StringRef getTypeRefString(RemoteRef<char> record) {
     return Demangle::makeSymbolicMangledNameStringRef(record.getLocalBuffer());
   }
   
-  Demangle::Node *demangleTypeRef(RemoteRef<char> string) {
-    // TODO: Use the remote addr in the RemoteRef to resolve and read from
-    // remote addresses in the resolver function.
-    return Dem.demangleType(getTypeRefString(string),
-                            SymbolicReferenceResolver);
-  }
+private:
+  // These fields are captured from the MetadataReader template passed into the
+  // TypeRefBuilder struct, to isolate its template-ness from the rest of
+  // TypeRefBuilder.
+  unsigned PointerSize;
+  std::function<Demangle::Node * (RemoteRef<char>)>
+    TypeRefDemangler;
+  std::function<const TypeRef* (const void*, unsigned)>
+    OpaqueUnderlyingTypeReader;
   
+public:
   template<typename Runtime>
-  void setMetadataReader(
-                      remote::MetadataReader<Runtime, TypeRefBuilder> &reader) {
-    // Have the TypeRefBuilder demangle symbolic references by reading their
-    // demangling out of the referenced context descriptors in the target
-    // process.
-    SymbolicReferenceResolver =
-    [this, &reader](SymbolicReferenceKind kind,
-                    Directness directness,
-                    int32_t offset, const void *base) -> Demangle::Node * {
-      // Resolve the reference to a remote address.
-      auto remoteAddress = getRemoteAddrOfTypeRefPointer(base);
-      if (remoteAddress == 0)
-        return nullptr;
-      
-      auto address = remoteAddress + offset;
-      if (directness == Directness::Indirect) {
-        if (auto indirectAddress = reader.readPointerValue(address)) {
-          address = *indirectAddress;
-        } else {
-          return nullptr;
-        }
-      }
-      
-      switch (kind) {
-      case Demangle::SymbolicReferenceKind::Context: {
-        auto context = reader.readContextDescriptor(address);
-        if (!context)
-          return nullptr;
-        // Try to preserve a reference to an OpaqueTypeDescriptor symbolically,
-        // since we'd like to read out and resolve the type ref to the
-        // underlying type if available.
-        if (context->getKind() == ContextDescriptorKind::OpaqueType) {
-          return Dem.createNode(
-                            Node::Kind::OpaqueTypeDescriptorSymbolicReference,
-                            context.getAddressData());
-        }
-          
-        return reader.buildContextMangling(context, Dem);
-      }
-      case Demangle::SymbolicReferenceKind::AccessorFunctionReference:
-        // The symbolic reference points at a resolver function, but we can't
-        // execute code in the target process to resolve it from here.
-        return nullptr;
-      }
-      
-      return nullptr;
-    };
-    
-    OpaqueUnderlyingTypeReader =
-    [&reader](const void *descriptor, unsigned ordinal) -> const TypeRef* {
-      auto context = (typename Runtime::StoredPointer)descriptor;
-      return reader.readUnderlyingTypeForOpaqueTypeDescriptor(context, ordinal);
-    };
+  TypeRefBuilder(remote::MetadataReader<Runtime, TypeRefBuilder> &reader)
+    : TC(*this),
+      PointerSize(sizeof(typename Runtime::StoredPointer)),
+      TypeRefDemangler(
+      [this, &reader](RemoteRef<char> string) -> Demangle::Node * {
+        return reader.demangle(string,
+                               remote::MangledNameKind::Type,
+                               Dem, /*useOpaqueTypeSymbolicReferences*/ true);
+      }),
+      OpaqueUnderlyingTypeReader(
+      [&reader](const void *descriptor, unsigned ordinal) -> const TypeRef* {
+        auto context = (typename Runtime::StoredPointer)descriptor;
+        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(context,
+                                                                ordinal);
+      })
+  {}
+
+  Demangle::Node *demangleTypeRef(RemoteRef<char> string) {
+    return TypeRefDemangler(string);
   }
 
   TypeConverter &getTypeConverter() { return TC; }

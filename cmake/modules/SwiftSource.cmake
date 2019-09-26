@@ -326,8 +326,6 @@ function(_compile_swift_files
     set(sib_file "${module_base}.Onone.sib")
     set(sibopt_file "${module_base}.O.sib")
     set(sibgen_file "${module_base}.sibgen")
-    list(APPEND swift_module_flags
-         "-emit-module-source-info-path" "${source_info_file}")
 
     if(SWIFT_ENABLE_MODULE_INTERFACES)
       set(interface_file "${module_base}.swiftinterface")
@@ -501,6 +499,7 @@ function(_compile_swift_files
         COMMAND
           "${PYTHON_EXECUTABLE}" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
+          "-emit-module-source-info-path" "${source_info_file}"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
