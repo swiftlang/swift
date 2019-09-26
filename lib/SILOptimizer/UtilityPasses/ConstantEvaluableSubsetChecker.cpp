@@ -74,10 +74,6 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       if (isa<ReturnInst>(inst))
         break;
 
-      assert(!previousEvaluationHadFatalError &&
-             "cannot continue evaluation of test driver as previous call "
-             "resulted in non-skippable evaluation error.");
-
       auto *applyInst = dyn_cast<ApplyInst>(inst);
       SILFunction *callee = nullptr;
       if (applyInst) {
@@ -89,6 +85,16 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
 
       if (!applyInst || !callee ||
           !callee->hasSemanticsAttr(constantEvaluableSemanticsAttr)) {
+
+        // Ignore these instructions if we had a fatal error already.
+        if (previousEvaluationHadFatalError) {
+          if (isa<TermInst>(inst)) {
+            assert(false && "non-constant control flow in the test driver");
+          }
+          ++currI;
+          continue;
+        }
+
         std::tie(nextInstOpt, errorVal) =
             stepEvaluator.tryEvaluateOrElseMakeEffectsNonConstant(currI);
         if (!nextInstOpt) {
@@ -99,6 +105,10 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
         currI = nextInstOpt.getValue();
         continue;
       }
+
+      assert(!previousEvaluationHadFatalError &&
+             "cannot continue evaluation of test driver as previous call "
+             "resulted in non-skippable evaluation error.");
 
       // Here, a function annotated as "constant_evaluable" is called.
       llvm::errs() << "@" << demangleSymbolName(callee->getName()) << "\n";
