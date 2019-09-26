@@ -193,6 +193,8 @@ static void recordShadowedDeclsAfterSignatureMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
+    bool firstTopLevel = firstDecl->getDeclContext()->isModuleScopeContext();
+
     auto name = firstDecl->getBaseName();
 
     auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
@@ -219,6 +221,29 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
+      bool secondTopLevel = secondDecl->getDeclContext()->isModuleScopeContext();
+
+      // For member types, we skip most of the below rules. Instead, we allow
+      // member types defined in a subclass to shadow member types defined in
+      // a superclass.
+      if (isa<TypeDecl>(firstDecl) &&
+          isa<TypeDecl>(secondDecl) &&
+          !firstTopLevel &&
+          !secondTopLevel) {
+        auto *firstClass = firstDecl->getDeclContext()->getSelfClassDecl();
+        auto *secondClass = secondDecl->getDeclContext()->getSelfClassDecl();
+        if (firstClass && secondClass && firstClass != secondClass) {
+          if (firstClass->isSuperclassOf(secondClass)) {
+            shadowed.insert(firstDecl);
+            continue;
+          } else if (secondClass->isSuperclassOf(firstClass)) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
+        continue;
+      }
 
       // Top-level type declarations in a module shadow other declarations
       // visible through the module's imports.
@@ -226,8 +251,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // [Backward compatibility] Note that members of types have the same
       // shadowing check, but we do it after dropping unavailable members.
       if (firstModule != secondModule &&
-          firstDecl->getDeclContext()->isModuleScopeContext() &&
-          secondDecl->getDeclContext()->isModuleScopeContext()) {
+          firstTopLevel && secondTopLevel) {
         auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
           firstModule, secondModule, dc);
         auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
@@ -304,8 +328,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // shadowing check is performed after unavailable candidates have
       // already been dropped.
       if (firstModule != secondModule &&
-          !firstDecl->getDeclContext()->isModuleScopeContext() &&
-          !secondDecl->getDeclContext()->isModuleScopeContext()) {
+          !firstTopLevel && !secondTopLevel) {
         auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
           firstModule, secondModule, dc);
         auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
@@ -478,9 +501,6 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       // type. This is layering a partial fix upon a total hack.
       if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
         signature = asd->getOverloadSignatureType();
-    } else if (decl->getDeclContext()->isTypeContext()) {
-      // Do not apply shadowing rules for member types.
-      continue;
     }
 
     // Record this declaration based on its signature.
