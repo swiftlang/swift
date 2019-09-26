@@ -1433,7 +1433,6 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
 
 static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   Type rawTy = ED->getRawType();
-
   if (!rawTy) {
     return;
   }
@@ -1490,8 +1489,10 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
 
   for (auto elt : ED->getAllElements()) {
     // Skip if the raw value expr has already been checked.
-    if (elt->getTypeCheckedRawValueExpr())
+    if (elt->hasRawValueExpr() && elt->getRawValueExpr()->getType()) {
+      prevValue = elt->getRawValueExpr();
       continue;
+    }
 
     // Make sure the element is checked out before we poke at it.
     // FIXME: Make isInvalid work with interface types
@@ -1509,15 +1510,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       continue;
     }
     
-    // Check the raw value expr, if we have one.
-    if (auto *rawValue = elt->getRawValueExpr()) {
-      Expr *typeCheckedExpr = rawValue;
-      auto resultTy = TC.typeCheckExpression(typeCheckedExpr, ED,
-                                             TypeLoc::withoutLoc(rawTy),
-                                             CTP_EnumCaseRawValue);
-      if (resultTy) {
-        elt->setTypeCheckedRawValueExpr(typeCheckedExpr);
-      }
+    if (elt->hasRawValueExpr()) {
       lastExplicitValueElt = elt;
     } else {
       // If the enum element has no explicit raw value, try to
@@ -1529,43 +1522,20 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
         break;
       }
       elt->setRawValueExpr(nextValue);
-      Expr *typeChecked = nextValue;
-      auto resultTy = TC.typeCheckExpression(
-          typeChecked, ED, TypeLoc::withoutLoc(rawTy), CTP_EnumCaseRawValue);
-      if (resultTy)
-        elt->setTypeCheckedRawValueExpr(typeChecked);
     }
     prevValue = elt->getRawValueExpr();
     assert(prevValue && "continued without setting raw value of enum case");
 
     // If we didn't find a valid initializer (maybe the initial value was
     // incompatible with the raw value type) mark the entry as being erroneous.
-    if (!elt->getTypeCheckedRawValueExpr()) {
+    TC.checkRawValueExpr(ED, elt);
+    if (!prevValue->getType() || prevValue->getType()->hasError()) {
       elt->setInvalid();
       continue;
     }
 
-    TC.checkEnumElementErrorHandling(elt);
-
-    // Find the type checked version of the LiteralExpr used for the raw value.
-    // this is unfortunate, but is needed because we're digging into the
-    // literals to get information about them, instead of accepting general
-    // expressions.
-    LiteralExpr *rawValue = elt->getRawValueExpr();
-    if (!rawValue->getType()) {
-      elt->getTypeCheckedRawValueExpr()->forEachChildExpr([&](Expr *E)->Expr* {
-        if (E->getKind() == rawValue->getKind())
-          rawValue = cast<LiteralExpr>(E);
-        return E;
-      });
-      elt->setRawValueExpr(rawValue);
-    }
-
-    prevValue = rawValue;
-    assert(prevValue && "continued without setting raw value of enum case");
-
     // Check that the raw value is unique.
-    RawValueKey key(rawValue);
+    RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
 
     auto insertIterPair = uniqueRawValues.insert({key, source});
@@ -3030,6 +3000,13 @@ public:
       TC.checkDefaultArguments(PL, EED);
     }
 
+    // Yell if our parent doesn't have a raw type but we have a raw value.
+    if (!EED->getParentEnum()->hasRawType() && EED->hasRawValueExpr()) {
+      TC.diagnose(EED->getRawValueExpr()->getLoc(),
+                  diag::enum_raw_value_without_raw_type);
+      EED->setInvalid();
+    }
+    
     checkAccessControl(TC, EED);
   }
 
@@ -4110,22 +4087,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                                                     EED->getParentEnum(),
                                                     ED->getGenericSignature()),
                              TypeResolverContext::EnumElementDecl);
-    }
-
-    // If we have a raw value, make sure there's a raw type as well.
-    if (auto *rawValue = EED->getRawValueExpr()) {
-      if (!ED->hasRawType()) {
-        diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
-        // Recover by setting the raw type as this element's type.
-        Expr *typeCheckedExpr = rawValue;
-        if (!typeCheckExpression(typeCheckedExpr, ED)) {
-          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
-          checkEnumElementErrorHandling(EED);
-        }
-      } else {
-        // Wait until the second pass, when all the raw value expressions
-        // can be checked together.
-      }
     }
 
     // Now that we have an argument type we can set the element's declared

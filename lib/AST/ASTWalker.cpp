@@ -415,15 +415,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visit(PL);
     }
 
-    // The getRawValueExpr should remain the untouched original LiteralExpr for
-    // serialization and validation purposes. We only traverse the type-checked
-    // form, unless we haven't populated it yet.
-    if (auto *rawValueExpr = ED->getTypeCheckedRawValueExpr()) {
-      if (auto newRawValueExpr = doIt(rawValueExpr))
-        ED->setTypeCheckedRawValueExpr(newRawValueExpr);
-      else
-        return true;
-    } else if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
+    if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
       Expr *newRawExpr = doIt(rawLiteralExpr);
       if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
         ED->setRawValueExpr(newRawLiteralExpr);
