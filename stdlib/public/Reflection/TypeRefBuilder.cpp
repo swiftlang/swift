@@ -26,29 +26,57 @@
 using namespace swift;
 using namespace reflection;
 
-// TODO: This should be subsumed by readTypeRef.
-uint64_t
-TypeRefBuilder::getRemoteAddrOfTypeRefPointer(const void *pointer) {
-  // Find what type ref section the pointer resides in, if any.
-  const ReflectionInfo *containingInfo = nullptr;
+RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
+  // The remote address should point into one of the TypeRef or
+  // ReflectionString references we already read out of the images.
+  RemoteRef<char> foundTypeRef;
+  RemoteRef<void> limitAddress;
   for (auto &info : ReflectionInfos) {
-    auto start = (uint64_t)info.TypeReference.startAddress().getLocalBuffer();
-    auto size = (uint64_t)info.TypeReference.size();
-    if (start <= (uint64_t)pointer && (uint64_t)pointer < start + size) {
-       containingInfo = &info;
-       break;
+    if (info.TypeReference.containsRemoteAddress(remoteAddr, 1)) {
+      foundTypeRef = info.TypeReference.getRemoteRef<char>(remoteAddr);
+      limitAddress = info.TypeReference.endAddress();
+      goto found_type_ref;
+    }
+    if (info.ReflectionString.containsRemoteAddress(remoteAddr, 1)) {
+      foundTypeRef = info.ReflectionString.getRemoteRef<char>(remoteAddr);
+      limitAddress = info.ReflectionString.endAddress();
+      goto found_type_ref;
+    }
+  }
+  // TODO: Try using MetadataReader to read the string here?
+  fputs("invalid type ref pointer\n", stderr);
+  abort();
+
+found_type_ref:
+  // Make sure there's a valid mangled string within the bounds of the
+  // section.
+  for (auto i = foundTypeRef;
+       i.getAddressData() < limitAddress.getAddressData(); ) {
+    auto c = *i.getLocalBuffer();
+    if (c == '\0')
+      goto valid_type_ref;
+      
+    if (c >= '\1' && c <= '\x17')
+      i = i.atByteOffset(4);
+    else if (c >= '\x18' && c <= '\x1F') {
+      i = i.atByteOffset(PointerSize);
+    } else {
+      i = i.atByteOffset(1);
     }
   }
   
-  if (!containingInfo)
-    return 0;
-
-  return (uint64_t)pointer
-    + containingInfo->RemoteStartAddress
-    - containingInfo->LocalStartAddress;
+  fputs("unterminated type ref\n", stderr);
+  abort();
+  
+valid_type_ref:
+  // Look past the $s prefix if the string has one.
+  auto localStr = foundTypeRef.getLocalBuffer();
+  if (localStr[0] == '$' && localStr[1] == 's') {
+    foundTypeRef = foundTypeRef.atByteOffset(2);
+  }
+  
+  return foundTypeRef;
 }
-
-TypeRefBuilder::TypeRefBuilder() : TC(*this) {}
 
 /// Load and normalize a mangled name so it can be matched with string equality.
 std::string

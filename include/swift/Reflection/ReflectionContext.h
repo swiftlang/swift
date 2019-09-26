@@ -107,9 +107,8 @@ public:
   using typename super::StoredPointer;
 
   explicit ReflectionContext(std::shared_ptr<MemoryReader> reader)
-    : super(std::move(reader)) {
-    getBuilder().setMetadataReader(*this);
-  }
+    : super(std::move(reader), *this)
+  {}
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
