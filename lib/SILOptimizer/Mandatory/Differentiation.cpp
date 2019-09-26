@@ -1460,13 +1460,16 @@ static void collectMinimalIndicesForFunctionCall(
   // need to find all `tuple_extract`s on that tuple, and determine if each
   // found extracted element is useful.
   // Collect direct results being retrieved using `tuple_extract`.
-  SmallVector<SILValue, 8> directResults(convs.getNumDirectSILResults());
+  SmallVector<SILValue, 8> directResults;
   if (auto *dti = getSingleDestructureTupleUser(ai)) {
+    directResults.reserve(convs.getNumDirectSILResults());
     directResults.append(dti->getResults().begin(), dti->getResults().end());
-  } else {
-    for (auto *use : ai->getUses())
+  } else if (ai->getType().is<TupleType>()) {
+    directResults.resize(convs.getNumDirectSILResults());
+    for (auto *use : ai->getUses()) {
       if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
         directResults[tei->getFieldNo()] = tei;
+    }
   }
   // Add differentiation indices based on activity analysis.
   unsigned dirResIdx = 0;
@@ -1519,18 +1522,11 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
         activityInfo.isActive(paramArgs[i], indices))
       return true;
 
-  // TODO(TF-800): Investigate why `apply` result special logic does not work
-  // for reverse-mode.
-  if (kind == AutoDiffLinearMapKind::Differential) {
-    for (auto use : ai->getUses()) {
-      if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser())) {
-        for (auto result : dti->getResults()) {
-          if (activityInfo.isActive(result, indices))
-            return true;
-        }
-      }
-    }
-  }
+  for (auto use : ai->getUses())
+    if (auto *dti = dyn_cast<DestructureTupleInst>(use->getUser()))
+      for (auto result : dti->getResults())
+        if (activityInfo.isActive(result, indices))
+          return true;
 
   bool hasActiveDirectResults = activityInfo.isActive(ai, indices);
   bool hasActiveIndirectResults = llvm::any_of(ai->getIndirectSILResults(),
@@ -1613,23 +1609,17 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
 void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
-  // TODO(TF-800): Investigate why `apply` result special logic does not work
-  // for reverse-mode.
-  // If differential, handle `apply` result specially.
   // If `apply` result is tuple-typed with a `destructure_tuple` user, add the
   // results of the `destructure_tuple` user to `allResults` instead of adding
   // the `apply` result itself.
-  bool isDifferentialAndFoundDestructureTupleUser = false;
-  if (kind == AutoDiffLinearMapKind::Differential) {
-    if (auto *dti = getSingleDestructureTupleUser(ai)) {
-      isDifferentialAndFoundDestructureTupleUser = true;
-      for (auto result : dti->getResults())
-        allResults.push_back(result);
-    }
+  if (auto *dti = getSingleDestructureTupleUser(ai)) {
+    for (auto result : dti->getResults())
+      allResults.push_back(result);
   }
   // Otherwise, add `apply` result to `allResults`.
-  if (!isDifferentialAndFoundDestructureTupleUser)
+  else {
     allResults.push_back(ai);
+  }
   allResults.append(ai->getIndirectSILResults().begin(),
                     ai->getIndirectSILResults().end());
 
@@ -1902,24 +1892,12 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (isVaried(arg, i)) {
               for (auto indRes : ai->getIndirectSILResults())
                 setVaried(indRes, i);
-              // TODO(TF-800): Investigate why `apply` result special logic
-              // does not work for reverse-mode.
-              // If differential, handle `apply` result specially.
-              // If JVP, handle `apply` result specially.
-              // If `apply` result is tuple-typed with a `destructure_tuple`
-              // user, mark the results of the `destructure_tuple` user as
-              // varied instead of marking the `apply` result itself.
-              bool isJVPAndFoundDestructureTupleUser = false;
-              if (kind == swift::AutoDiffAssociatedFunctionKind::JVP) {
-                if (auto *dti = getSingleDestructureTupleUser(ai)) {
-                  for (auto result : dti->getResults())
-                    setVaried(result, i);
-                  isJVPAndFoundDestructureTupleUser = true;
-                }
-              }
-              // Otherwise, mark the `apply` result as varied.
-              if (!isJVPAndFoundDestructureTupleUser)
+              if (auto *dti = getSingleDestructureTupleUser(ai)) {
+                for (auto result : dti->getResults())
+                  setVaried(result, i);
+              } else {
                 setVaried(ai, i);
+              }
             }
           }
         }
@@ -4916,7 +4894,7 @@ public:
       // If the argument is active, pass its tangent buffer as a differential
       // argument.
       if (activityInfo.isActive(origArg, getIndices())) {
-        auto tanParam = getTangentBuffer(ai->getParent(), origArg);
+        auto tanParam = getTangentBuffer(bb, origArg);
         diffArgs.push_back(tanParam);
         if (errorOccurred)
           return;
