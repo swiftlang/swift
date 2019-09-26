@@ -830,3 +830,9 @@ func test_identification_of_key_path_component_callees() {
   _ = \SR11435<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
   _ = \SR11435<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
 }
+
+func sr_11491(_ value: [String]) {
+  var arr: Set<String> = []
+  arr.insert(value)
+  // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
+}
