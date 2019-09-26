@@ -120,31 +120,18 @@ static DestructureTupleInst *getSingleDestructureTupleUser(SILValue value) {
   return result;
 }
 
-/// Given a value:
-/// - If it is not tuple-typed, add the value to `results`.
-/// - If it is tuple-typed and has a single `destructure_tuple` user, collect
-///   all `destructure_tuple` results in `results`.
-/// - If it is tuple-typed and does not have a single `destructure_tuple` user,
-///   collect all `tuple_extract` users in `results`. Only extracted elements
-///   are collected; non-extracted elements are initialized in `results` as
-///   `SILValue()`.
-static void collectAllExtractedElements(SILValue value,
-                                        SmallVectorImpl<SILValue> &results) {
-  auto tupleType = value->getType().getAs<TupleType>();
-  if (!tupleType) {
-    results.push_back(value);
+/// Given an `apply` instruction, apply the given callback to each of its
+/// direct results. If the `apply` instruction has a single `destructure_tuple`
+/// user, apply the callback to the results of the `destructure_tuple` user.
+static void forEachApplyDirectResult(
+    ApplyInst *ai, llvm::function_ref<void(SILValue)> resultCallback) {
+  if (!ai->getType().is<TupleType>()) {
+    resultCallback(ai);
     return;
   }
-  if (auto *dti = getSingleDestructureTupleUser(value)) {
-    results.reserve(tupleType->getNumElements());
-    results.append(dti->getResults().begin(), dti->getResults().end());
-  } else {
-    results.resize(tupleType->getNumElements());
-    for (auto *use : value->getUses())
-      if (auto *tei = dyn_cast<TupleExtractInst>(use->getUser()))
-        results[tei->getFieldNo()] = tei;
-  }
-  assert(results.size() == tupleType->getNumElements());
+  if (auto *dti = getSingleDestructureTupleUser(ai))
+    for (auto result : dti->getResults())
+      resultCallback(result);
 }
 
 /// Given a function, gather all of its formal results (both direct and
@@ -1462,7 +1449,9 @@ static void collectMinimalIndicesForFunctionCall(
   // Result indices are indices (in the callee type signature) of results that
   // are useful.
   SmallVector<SILValue, 8> directResults;
-  collectAllExtractedElements(ai, directResults);
+  forEachApplyDirectResult(ai, [&](SILValue directResult) {
+    directResults.push_back(directResult);
+  });
   auto indirectResults = ai->getIndirectSILResults();
   // Record all results and result indices in type order.
   results.reserve(calleeFnTy->getNumResults());
@@ -1523,10 +1512,10 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
         activityInfo.isActive(arguments[i], indices))
       return true;
 
-  SmallVector<SILValue, 8> directResults;
-  collectAllExtractedElements(ai, directResults);
-  bool hasActiveDirectResults = llvm::any_of(directResults,
-      [&](SILValue result) { return activityInfo.isActive(result, indices); });
+  bool hasActiveDirectResults = false;
+  forEachApplyDirectResult(ai, [&](SILValue directResult) {
+    hasActiveDirectResults |= activityInfo.isActive(directResult, indices);
+  });
   bool hasActiveIndirectResults = llvm::any_of(ai->getIndirectSILResults(),
       [&](SILValue result) { return activityInfo.isActive(result, indices); });
   bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
@@ -1875,10 +1864,9 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
             if (isVaried(arg, i)) {
               for (auto indRes : ai->getIndirectSILResults())
                 setVaried(indRes, i);
-              SmallVector<SILValue, 4> directResults;
-              collectAllExtractedElements(ai, directResults);
-              for (auto dirRes : directResults)
-                setVaried(dirRes, i);
+              forEachApplyDirectResult(ai, [&](SILValue directResult) {
+                setVaried(directResult, i);
+              });
             }
           }
         }
@@ -4972,17 +4960,22 @@ public:
            "Expected differential to return one result");
 
     // Get the original results of the `apply` instructions.
-    SmallVector<SILValue, 8> origDirResults;
-    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origDirectResults;
+    forEachApplyDirectResult(ai, [&](SILValue directResult) {
+      origDirectResults.push_back(directResult);
+    });
     SmallVector<SILValue, 8> origAllResults;
-    collectAllActualResultsInTypeOrder(ai, origDirResults, origAllResults);
+    collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
     auto origResult = origAllResults[actualIndices.source];
 
     // Get the differential results of the `apply` instructions.
-    SmallVector<SILValue, 8> differentialDirResults;
-    collectAllExtractedElements(differentialCall, differentialDirResults);
+    SmallVector<SILValue, 8> differentialDirectResults;
+    forEachApplyDirectResult(differentialCall, [&](SILValue directResult) {
+      differentialDirectResults.push_back(directResult);
+    });
     SmallVector<SILValue, 8> differentialAllResults;
-    collectAllActualResultsInTypeOrder(differentialCall, differentialDirResults,
+    collectAllActualResultsInTypeOrder(differentialCall,
+                                       differentialDirectResults,
                                        differentialAllResults);
     auto differentialResult = differentialAllResults.front();
 
@@ -6803,10 +6796,12 @@ public:
 
     // Get the original result of the `apply` instruction.
     SmallVector<SILValue, 8> args;
-    SmallVector<SILValue, 8> origDirResults;
-    collectAllExtractedElements(ai, origDirResults);
+    SmallVector<SILValue, 8> origDirectResults;
+    forEachApplyDirectResult(ai, [&](SILValue directResult) {
+      origDirectResults.push_back(directResult);
+    });
     SmallVector<SILValue, 8> origAllResults;
-    collectAllActualResultsInTypeOrder(ai, origDirResults, origAllResults);
+    collectAllActualResultsInTypeOrder(ai, origDirectResults, origAllResults);
     assert(applyInfo.indices.source < origAllResults.size());
     auto origResult = origAllResults[applyInfo.indices.source];
     assert(origResult);
