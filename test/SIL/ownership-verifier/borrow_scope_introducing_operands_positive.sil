@@ -7,15 +7,6 @@
 
 import Builtin
 
-sil [ossa] @destroy_value_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = begin_borrow %0 : $Builtin.NativeObject
-  end_borrow %1 : $Builtin.NativeObject
-  destroy_value %0 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 sil [ossa] @coroutine_callee : $@yield_once (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   yield (), resume bb1, unwind bb2
@@ -26,6 +17,15 @@ bb1:
 
 bb2:
   unwind
+}
+
+sil [ossa] @destroy_value_before_end_borrow : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %9999 = tuple()
+  return %9999 : $()
 }
 
 sil [ossa] @destroy_value_before_end_borrow_coroutine : $@convention(thin) (@owned Builtin.NativeObject) -> () {
@@ -87,6 +87,84 @@ bb1:
 
 bb2:
   end_apply %token
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @end_parent_scope_before_end_borrow_coroutine : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_apply %token
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @end_parent_scope_before_end_borrow_coroutine_1a : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  end_apply %token
+  br bb1
+
+bb1:
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @end_parent_scope_before_end_borrow_coroutine_2 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  abort_apply %token
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @end_parent_scope_before_end_borrow_coroutine_2b : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  abort_apply %token
+  br bb1
+
+bb1:
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @positive_end_parent_scope_before_end_borrow_coroutine_3 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = begin_borrow %0 : $Builtin.NativeObject
+  %coro = function_ref @coroutine_callee : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %token = begin_apply %coro(%1) : $@yield_once @convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  abort_apply %token
+  end_borrow %1 : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  br bb3
+
+bb2:
+  end_apply %token
+  end_borrow %1 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   br bb3
 
