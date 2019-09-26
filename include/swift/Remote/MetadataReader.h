@@ -787,7 +787,7 @@ public:
       baseSize = sizeof(TargetAnonymousContextDescriptor<Runtime>);
       if (AnonymousContextDescriptorFlags(flags.getKindSpecificFlags())
             .hasMangledName()) {
-        baseSize += sizeof(TargetMangledContextName<Runtime>);
+        metadataInitSize = sizeof(TargetMangledContextName<Runtime>);
       }
       break;
     case ContextDescriptorKind::Class:
