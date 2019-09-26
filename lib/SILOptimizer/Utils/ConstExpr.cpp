@@ -1630,6 +1630,36 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
                           injectEnumInst->getOperand());
   }
 
+  if (auto *papply = dyn_cast<PartialApplyInst>(inst)) {
+    SILValue calleeOperand = papply->getOperand(0);
+    SymbolicValue calleeValue = getConstantValue(calleeOperand);
+    if (!calleeValue.isConstant())
+      return calleeValue;
+    if (calleeValue.getKind() != SymbolicValue::Function) {
+      return getUnknown(evaluator, (SILInstruction *)papply,
+                        UnknownReason::InvalidOperandValue);
+    }
+
+    SILFunction *target = calleeValue.getFunctionValue();
+    assert(target != nullptr);
+
+    // Arguments to this partial-apply instruction are the captures of the
+    // closure.
+    SmallVector<SymbolicClosureArgument, 4> captures;
+    for (SILValue argument : papply->getArguments()) {
+      SymbolicValue argumentValue = getConstantValue(argument);
+      if (!argumentValue.isConstant()) {
+        captures.push_back({ argument, None });
+        continue;
+      }
+      captures.push_back({ argument, argumentValue });
+    }
+    auto closureVal = SymbolicValue::makeClosure(target, captures,
+                                                 evaluator.getAllocator());
+    setValue(papply, closureVal);
+    return None;
+  }
+
   // If the instruction produces a result, try computing it, and fail if the
   // computation fails.
   if (auto *singleValueInst = dyn_cast<SingleValueInstruction>(inst)) {
@@ -1934,6 +1964,8 @@ ConstExprStepEvaluator::skipByMakingEffectsNonConstant(
            constKind == SymbolicValue::Aggregate ||
            constKind == SymbolicValue::Enum ||
            constKind == SymbolicValue::EnumWithPayload ||
+           constKind == SymbolicValue::Array ||
+           constKind == SymbolicValue::Closure ||
            constKind == SymbolicValue::UninitMemory);
 
     if (constKind != SymbolicValue::Address) {
