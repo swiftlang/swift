@@ -206,7 +206,7 @@ public:
                                                RangeEnd - RangeStart);
 
     auto findMachOSectionByName = [&](std::string Name)
-        -> std::pair<const char *, const char *> {
+        -> std::pair<RemoteRef<void>, uint64_t> {
       for (unsigned I = 0; I < NumSect; ++I) {
         auto S = reinterpret_cast<typename T::Section *>(
             SectionsBuf + (I * sizeof(typename T::Section)));
@@ -216,10 +216,11 @@ public:
         auto SectBufData = reinterpret_cast<const char *>(SectBuf.get());
         auto LocalSectStart =
             reinterpret_cast<const char *>(SectBufData + RemoteSecStart - RangeStart);
-        auto LocalSectEnd = reinterpret_cast<const char *>(LocalSectStart + S->size);
-        return {LocalSectStart, LocalSectEnd};
+        
+        auto StartRef = RemoteRef<void>(RemoteSecStart, LocalSectStart);
+        return {StartRef, S->size};
       }
-      return {nullptr, nullptr};
+      return {nullptr, 0};
     };
 
     auto FieldMdSec = findMachOSectionByName("__swift5_fieldmd");
@@ -298,7 +299,7 @@ public:
         sizeof(llvm::object::coff_section) * COFFFileHdr->NumberOfSections);
 
     auto findCOFFSectionByName = [&](llvm::StringRef Name)
-        -> std::pair<const char *, const char *> {
+        -> std::pair<RemoteRef<void>, uint64_t> {
       for (size_t i = 0; i < COFFFileHdr->NumberOfSections; ++i) {
         const llvm::object::coff_section *COFFSec =
             reinterpret_cast<const llvm::object::coff_section *>(
@@ -313,34 +314,30 @@ public:
         auto Addr = ImageStart.getAddressData() + COFFSec->VirtualAddress;
         auto Buf = this->getReader().readBytes(RemoteAddress(Addr),
                                                COFFSec->VirtualSize);
-        const char *Begin = reinterpret_cast<const char *>(Buf.get());
-        const char *End = Begin + COFFSec->VirtualSize;
+        auto BufStart = Buf.get();
         savedBuffers.push_back(std::move(Buf));
 
+        auto Begin = RemoteRef<void>(Addr, BufStart);
+        auto Size = COFFSec->VirtualSize;
+        
         // FIXME: This code needs to be cleaned up and updated
         // to make it work for 32 bit platforms.
         if (SectionName != ".sw5cptr" && SectionName != ".sw5bltn") {
-          Begin += 8;
-          End -= 8;
+          Begin = Begin.atByteOffset(8);
+          Size -= 16;
         }
 
-        return {Begin, End};
+        return {Begin, Size};
       }
-      return {nullptr, nullptr};
+      return {nullptr, 0};
     };
 
-    std::pair<const char *, const char *> CaptureSec =
-        findCOFFSectionByName(".sw5cptr");
-    std::pair<const char *, const char *> TypeRefMdSec =
-        findCOFFSectionByName(".sw5tyrf");
-    std::pair<const char *, const char *> FieldMdSec =
-        findCOFFSectionByName(".sw5flmd");
-    std::pair<const char *, const char *> AssocTySec =
-        findCOFFSectionByName(".sw5asty");
-    std::pair<const char *, const char *> BuiltinTySec =
-        findCOFFSectionByName(".sw5bltn");
-    std::pair<const char *, const char *> ReflStrMdSec =
-        findCOFFSectionByName(".sw5rfst");
+    auto CaptureSec = findCOFFSectionByName(".sw5cptr");
+    auto TypeRefMdSec = findCOFFSectionByName(".sw5tyrf");
+    auto FieldMdSec = findCOFFSectionByName(".sw5flmd");
+    auto AssocTySec = findCOFFSectionByName(".sw5asty");
+    auto BuiltinTySec = findCOFFSectionByName(".sw5bltn");
+    auto ReflStrMdSec = findCOFFSectionByName(".sw5rfst");
 
     if (FieldMdSec.first == nullptr &&
         AssocTySec.first == nullptr &&
@@ -434,7 +431,7 @@ public:
     auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
 
     auto findELFSectionByName = [&](std::string Name)
-        -> std::pair<const char *, const char *> {
+        -> std::pair<RemoteRef<void>, uint64_t> {
       // Now for all the sections, find their name.
       for (const typename T::Section *Hdr : SecHdrVec) {
         uint32_t Offset = Hdr->sh_name;
@@ -445,10 +442,12 @@ public:
             RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
         auto SecSize = Hdr->sh_size;
         auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
-        auto SecContents = reinterpret_cast<const char *>(SecBuf.get());
-        return {SecContents, SecContents + SecSize};
+        auto SecContents = RemoteRef<void>(SecStart.getAddressData(),
+                                           SecBuf.get());
+        savedBuffers.push_back(std::move(SecBuf));
+        return {SecContents, SecSize};
       }
-      return {nullptr, nullptr};
+      return {nullptr, 0};
     };
 
     auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
@@ -634,11 +633,11 @@ public:
       //
       // Non-generic SIL boxes share metadata among types with compatible
       // layout, but we need some way to get an outgoing pointer map for them.
-      auto *CD = getBuilder().getCaptureDescriptor(*CDAddr);
+      auto CD = getBuilder().getCaptureDescriptor(*CDAddr);
       if (CD == nullptr)
         return nullptr;
 
-      auto Info = getBuilder().getClosureContextInfo(*CD);
+      auto Info = getBuilder().getClosureContextInfo(CD);
 
       return getClosureContextInfo(ObjectAddress, Info);
     }
