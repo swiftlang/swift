@@ -894,12 +894,6 @@ namespace {
         continue;
       }
 
-      // Coercions can be used for disambiguation.
-      if (auto coerce = dyn_cast<CoerceExpr>(callee)) {
-        callee = coerce->getSubExpr();
-        continue;
-      }
-
       // We're done.
       break;
     }
