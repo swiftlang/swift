@@ -122,44 +122,72 @@ static bool needToRelocate(SectionRef S) {
 
 
 class Image {
-  std::vector<char> Memory;
+  const ObjectFile *O;
+  uint64_t VASize;
+
+  struct RelocatedRegion {
+    uint64_t Start, Size;
+    const char *Base;
+  };
+
+  std::vector<RelocatedRegion> RelocatedRegions;
 
 public:
-  explicit Image(const ObjectFile *O) {
-    uint64_t VASize = O->getData().size();
-    for (SectionRef S : O->sections()) {
-      if (auto SectionAddr = getSectionAddress(S))
-        VASize = std::max(VASize, SectionAddr + S.getSize());
-    }
-    Memory.resize(VASize);
-    std::memcpy(&Memory[0], O->getData().data(), O->getData().size());
-
+  explicit Image(const ObjectFile *O) : O(O), VASize(O->getData().size()) {
     for (SectionRef S : O->sections()) {
       if (!needToRelocate(S))
         continue;
       StringRef Content;
+      auto SectionAddr = getSectionAddress(S);
+      if (SectionAddr)
+        VASize = std::max(VASize, SectionAddr + S.getSize());
+
       if (auto EC = S.getContents(Content))
         reportError(EC);
-      std::memcpy(&Memory[getSectionAddress(S)], Content.data(),
-                  Content.size());
+
+      auto PhysOffset = (uintptr_t)Content.data() - (uintptr_t)O->getData().data();
+      
+      if (PhysOffset == SectionAddr) {
+        continue;
+      }
+
+      RelocatedRegions.push_back(RelocatedRegion{
+        SectionAddr,
+        Content.size(),
+        Content.data()});
     }
   }
 
   RemoteAddress getStartAddress() const {
-    return RemoteAddress((uintptr_t)Memory.data());
+    return RemoteAddress((uintptr_t)O->getData().data());
   }
 
   bool isAddressValid(RemoteAddress Addr, uint64_t Size) const {
-    return (uintptr_t)Memory.data() <= Addr.getAddressData() &&
-           Addr.getAddressData() + Size <=
-               (uintptr_t)Memory.data() + Memory.size();
+    auto start = getStartAddress().getAddressData();
+    return start <= Addr.getAddressData()
+      && Addr.getAddressData() + Size <= start + VASize;
   }
 
   ReadBytesResult readBytes(RemoteAddress Addr, uint64_t Size) {
     if (!isAddressValid(Addr, Size))
       return ReadBytesResult(nullptr, [](const void *) {});
-    return ReadBytesResult((const void *)(Addr.getAddressData()),
-                           [](const void *) {});
+    
+    auto addrValue = Addr.getAddressData();
+    auto base = O->getData().data();
+    auto offset = addrValue - (uint64_t)base;
+    for (auto &region : RelocatedRegions) {
+      if (region.Start <= offset && offset < region.Start + region.Size) {
+        // Read shouldn't need to straddle section boundaries.
+        if (offset + Size > region.Start + region.Size)
+          return ReadBytesResult(nullptr, [](const void *) {});
+
+        offset -= region.Start;
+        base = region.Base;
+        break;
+      }
+    }
+    
+    return ReadBytesResult(base + offset, [](const void *) {});
   }
 };
 
