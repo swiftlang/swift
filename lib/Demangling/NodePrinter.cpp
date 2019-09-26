@@ -79,12 +79,11 @@ static DemanglerPrinter &operator<<(DemanglerPrinter &printer,
     case '\n': printer << "\\n"; break;
     case '\r': printer << "\\r"; break;
     case '"': printer << "\\\""; break;
-    case '\'': printer << '\''; break; // no need to escape these
     case '\0': printer << "\\0"; break;
     default:
-      auto c = static_cast<char>(C);
-      // Other ASCII control characters should get escaped.
-      if (c < 0x20 || c == 0x7F) {
+      auto c = static_cast<unsigned char>(C);
+      // Other control or high-bit characters should get escaped.
+      if (c < 0x20 || c >= 0x7F) {
         static const char Hexdigit[] = {
           '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
           'A', 'B', 'C', 'D', 'E', 'F'
