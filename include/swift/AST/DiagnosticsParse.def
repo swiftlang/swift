@@ -36,6 +36,10 @@
   DIAG(NOTE,ID,Options,Text,Signature)
 #endif
 
+#ifndef FIXIT
+#  define FIXIT(ID, Text, Signature)
+#endif
+
 //==============================================================================
 // MARK: Lexing and Parsing diagnostics
 //==============================================================================
@@ -639,6 +643,8 @@ ERROR(expected_sil_function_type, none,
       "sil function expected to have SIL function type", ())
 ERROR(sil_dynamically_replaced_func_not_found,none,
       "dynamically replaced function not found %0", (Identifier))
+ERROR(sil_availability_expected_version,none,
+      "expected version number in 'available' attribute", ())
 
 // SIL Stage
 ERROR(expected_sil_stage_name, none,
@@ -1762,4 +1768,5 @@ ERROR(sil_const_expected_fn_sub_conv,PointsToFirstBadToken,
 # undef NOTE
 # undef WARNING
 # undef ERROR
+# undef FIXIT
 #endif

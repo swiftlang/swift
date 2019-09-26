@@ -24,35 +24,41 @@
 
 import TestsUtils
 
-var count: Int = 0
-
 //
 // Helper functionality
 //
 
 @inline(never) func count_unicodeScalars(_ s: String.UnicodeScalarView) {
+  var count = 0
   for _ in s {
     count += 1
   }
+  blackHole(count)
 }
 @inline(never) func count_characters(_ s: String) {
+  var count = 0
   for _ in s {
     count += 1
   }
+  blackHole(count)
 }
 @inline(never) func count_unicodeScalars_rev(
   _ s: ReversedCollection<String.UnicodeScalarView>
 ) {
+  var count = 0
   for _ in s {
     count += 1
   }
+  blackHole(count)
 }
 @inline(never) func count_characters_rev(
   _ s: ReversedCollection<String>
 ) {
+  var count = 0
   for _ in s {
     count += 1
   }
+  blackHole(count)
 }
 
 //
@@ -152,6 +158,7 @@ let ${Name}Characters = Array(${Name})
 
 @inline(never)
 public func run_CharIteration_${Name}_unicodeScalars(_ N: Int) {
+  var count = 0
   for _ in 1...unicodeScalarsMultiplier*N {
     for c in ${Name}Characters {
       for u in c.unicodeScalars {
@@ -159,10 +166,12 @@ public func run_CharIteration_${Name}_unicodeScalars(_ N: Int) {
       }
     }
   }
+  blackHole(count)
 }
 
 @inline(never)
 public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ N: Int) {
+  var count = 0
   for _ in 1...unicodeScalarsMultiplier*N {
     for c in ${Name}Characters {
       for u in c.unicodeScalars.reversed() {
@@ -170,10 +179,12 @@ public func run_CharIteration_${Name}_unicodeScalars_Backwards(_ N: Int) {
       }
     }
   }
+  blackHole(count)
 }
 
 @inline(never)
 public func run_CharIndexing_${Name}_unicodeScalars(_ N: Int) {
+  var count = 0
   for _ in 1...unicodeScalarsMultiplier*N {
     for c in ${Name}Characters {
       let s = c.unicodeScalars
@@ -182,10 +193,12 @@ public func run_CharIndexing_${Name}_unicodeScalars(_ N: Int) {
       }
     }
   }
+  blackHole(count)
 }
 
 @inline(never)
 public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ N: Int) {
+  var count = 0
   for _ in 1...unicodeScalarsMultiplier*N {
     for c in ${Name}Characters {
       let s = c.unicodeScalars
@@ -194,6 +207,7 @@ public func run_CharIndexing_${Name}_unicodeScalars_Backwards(_ N: Int) {
       }
     }
   }
+  blackHole(count)
 }
 
 

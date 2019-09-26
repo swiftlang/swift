@@ -10,10 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Serialization/ModuleFile.h"
+#include "ModuleFile.h"
+#include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "DocFormat.h"
-#include "swift/Serialization/ModuleFormat.h"
+#include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -25,7 +26,6 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Range.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Serialization/BCReadingExtras.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Chrono.h"
@@ -922,7 +922,7 @@ bool ModuleFile::readIndexBlock(llvm::BitstreamCursor &cursor) {
         break;
       case index_block::GENERIC_SIGNATURE_OFFSETS:
         assert(blobData.empty());
-        allocateBuffer(GenericSignaturesAndEnvironments, scratch);
+        allocateBuffer(GenericSignatures, scratch);
         break;
       case index_block::SUBSTITUTION_MAP_OFFSETS:
         assert(blobData.empty());
@@ -1339,7 +1339,7 @@ ModuleFile::ModuleFile(
           SearchPaths.push_back({blobData, isFramework, isSystem});
           break;
         }
-        case input_block::PARSEABLE_INTERFACE_PATH: {
+        case input_block::MODULE_INTERFACE_PATH: {
           ModuleInterfacePath = blobData;
           break;
         }
@@ -2344,7 +2344,7 @@ bool SerializedASTFile::hasEntryPoint() const {
 bool SerializedASTFile::getAllGenericSignatures(
                        SmallVectorImpl<GenericSignature*> &genericSignatures) {
   genericSignatures.clear();
-  for (unsigned index : indices(File.GenericSignaturesAndEnvironments)) {
+  for (unsigned index : indices(File.GenericSignatures)) {
     if (auto genericSig = File.getGenericSignature(index + 1))
       genericSignatures.push_back(genericSig);
   }

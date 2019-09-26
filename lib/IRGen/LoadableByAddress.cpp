@@ -37,7 +37,7 @@ using namespace swift;
 using namespace swift::irgen;
 
 static GenericEnvironment *getGenericEnvironment(CanSILFunctionType loweredTy) {
-  return loweredTy->getGenericSignature().getGenericEnvironment();
+  return loweredTy->getGenericSignature()->getGenericEnvironment();
 }
 
 class LargeSILTypeMapper {

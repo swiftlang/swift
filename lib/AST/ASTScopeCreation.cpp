@@ -93,6 +93,26 @@ static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
 
+/// For Debugging
+template <typename T>
+bool doesRangeableRangeMatch(const T *x, const SourceManager &SM,
+                             unsigned start, unsigned end,
+                             StringRef file = "") {
+  auto const r = getRangeableSourceRange(x);
+  if (r.isInvalid())
+    return false;
+  if (start && SM.getLineNumber(r.Start) != start)
+    return false;
+  if (end && SM.getLineNumber(r.End) != end)
+    return false;
+  if (file.empty())
+    return true;
+  const auto buf = SM.findBufferContainingLoc(r.Start);
+  return SM.getIdentifierForBuffer(buf).endswith(file);
+}
+
+#pragma mark end of rangeable
+
 static std::vector<ASTNode> asNodeVector(DeclRange dr) {
   std::vector<ASTNode> nodes;
   llvm::transform(dr, std::back_inserter(nodes),
@@ -166,8 +186,26 @@ class ScopeCreator final {
   ASTContext &ctx;
 
 public:
+  /// Because type checking can mutate the AST, eagerly build the tree, then
+  /// freeze it
+  enum class Temperature {
+    Warm,     // Can be lazy
+    Freezing, // Should expand everything eagerly
+    Frozen    // No more changes, except when Decls are added to the source file
+  };
+
+private:
+  /// Because type checking can mutate the AST, eagerly build the tree, then
+  /// freeze it
+  Temperature temperature = Temperature::Warm;
+
+public:
   ASTSourceFileScope *const sourceFileScope;
   ASTContext &getASTContext() const { return ctx; }
+  bool getIsFrozen() const { return temperature == Temperature::Frozen; }
+  bool getIsFreezing() const { return temperature == Temperature::Freezing; }
+  void beFreezing() { temperature = Temperature::Freezing; }
+  void beFrozen() { temperature = Temperature::Frozen; }
 
   /// The AST can have duplicate nodes, and we don't want to create scopes for
   /// those.
@@ -366,7 +404,7 @@ public:
             parent, vd);
     });
   }
-  // HERE
+
 public:
   /// Create the matryoshka nested generic param scopes (if any)
   /// that are subscopes of the receiver. Return
@@ -607,7 +645,9 @@ public:
     return !n.isDecl(DeclKind::Var);
   }
 
-  bool shouldBeLazy() const { return ctx.LangOpts.LazyASTScopes; }
+  bool shouldBeLazy() const {
+    return !getIsFreezing() && ctx.LangOpts.LazyASTScopes;
+  }
 
 public:
   /// For debugging. Return true if scope tree contains all the decl contexts in
@@ -617,9 +657,11 @@ public:
     auto allDeclContexts = findLocalizableDeclContextsInAST();
     llvm::DenseMap<const DeclContext *, const ASTScopeImpl *> bogusDCs;
     bool rebuilt = false;
-    sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
-      rebuilt |= scope->reexpandIfObsolete(*this);
-    });
+    if (!getIsFrozen()) {
+      sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
+        rebuilt |= scope->reexpandIfObsolete(*this);
+      });
+    }
     sourceFileScope->postOrderDo([&](ASTScopeImpl *scope) {
       if (auto *dc = scope->getDeclContext().getPtrOrNull()) {
         auto iter = allDeclContexts.find(dc);
@@ -699,10 +741,22 @@ public:
 
 ASTScope::ASTScope(SourceFile *SF) : impl(createScopeTree(SF)) {}
 
+void ASTScope::buildScopeTreeEagerly() {
+  impl->buildScopeTreeEagerly();
+}
+
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
   scopeCreator->sourceFileScope->addNewDeclsToScopeTree();
   return scopeCreator->sourceFileScope;
+}
+
+void ASTSourceFileScope::buildScopeTreeEagerly() {
+  scopeCreator->beFreezing();
+  // Eagerly expand any decls already in the tree.
+  preOrderDo([&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
+  addNewDeclsToScopeTree();
+  scopeCreator->beFrozen();
 }
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
@@ -805,6 +859,7 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
   VISIT_AND_CREATE_WHOLE_PORTION(StructDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(ClassDecl, NominalTypeScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(ProtocolDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(EnumDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(TypeAliasDecl, TypeAliasScope)
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
@@ -815,13 +870,6 @@ public:
   NullablePtr<ASTScopeImpl> visitAccessorDecl(AccessorDecl *ad, ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
     return visitAbstractFunctionDecl(ad, p, scopeCreator);
-  }
-
-  NullablePtr<ASTScopeImpl> visitProtocolDecl(ProtocolDecl *e, ASTScopeImpl *p,
-                                              ScopeCreator &scopeCreator) {
-    e->createGenericParamsIfMissing();
-    return scopeCreator.ifUniqueConstructWithPortionExpandAndInsert<
-        NominalTypeScope, GenericTypeOrExtensionWholePortion>(p, e);
   }
 
 #pragma mark simple creation with deferred nodes
@@ -1012,6 +1060,9 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
   assert(!child->getParent() && "child should not already have parent");
   child->parent = this;
   clearCachedSourceRangesOfMeAndAncestors();
+  // It's possible that some callees do lookups back into the tree.
+  // So make sure childrenCountWhenLastExpanded is up to date.
+  setChildrenCountWhenLastExpanded();
 }
 
 void ASTScopeImpl::removeChildren() {
@@ -1037,8 +1088,7 @@ ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
            insertionPointForDeferredExpansion().get() == insertionPoint);
   }
   beCurrent();
-  setChildrenCountWhenLastExpanded();
-  assert(checkSourceRangeAfterExpansion());
+  assert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()));
   return insertionPoint;
 }
 
@@ -1179,6 +1229,7 @@ ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
     return {ccPatternUseScope,
             "Succeeding code must be in scope of conditional variables"};
   }
+  llvm_unreachable("Unhandled StmtConditionKind in switch");
 }
 
 AnnotatedInsertionPoint
@@ -1449,25 +1500,30 @@ void AttachedPropertyWrapperScope::
 
 ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
     GenericTypeOrExtensionScope *scope, ScopeCreator &scopeCreator) const {
+  // Get now in case recursion emancipates scope
+  auto *const ip = scope->getParent().get();
+  
   // Prevent circular request bugs caused by illegal input and
   // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
   // rdar://53972776
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
-    return scope->getParent().get();
+    return ip;
 
   auto *deepestScope = scopeCreator.addNestedGenericParamScopesToTree(
       scope->getDecl(), scope->getGenericContext()->getGenericParams(), scope);
   if (scope->getGenericContext()->getTrailingWhereClause())
     scope->createTrailingWhereClauseScope(deepestScope, scopeCreator);
   scope->createBodyScope(deepestScope, scopeCreator);
-  return scope->getParent().get();
+  return ip;
 }
 
 ASTScopeImpl *
 IterableTypeBodyPortion::expandScope(GenericTypeOrExtensionScope *scope,
                                      ScopeCreator &scopeCreator) const {
+  // Get it now in case of recursion and this one gets emancipated
+  auto *const ip = scope->getParent().get();
   scope->expandBody(scopeCreator);
-  return scope->getParent().get();
+  return ip;
 }
 
 ASTScopeImpl *GenericTypeOrExtensionWherePortion::expandScope(
@@ -1671,7 +1727,9 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 #pragma mark - reexpandIfObsolete
 
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (isCurrent())
+  if (scopeCreator.getIsFrozen() ||
+      (isCurrent() &&
+          !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup))
     return false;
   reexpand(scopeCreator);
   return true;
@@ -1733,6 +1791,11 @@ NullablePtr<ASTScopeImpl> ASTScopeImpl::insertionPointForDeferredExpansion() {
 }
 
 NullablePtr<ASTScopeImpl>
+AbstractFunctionBodyScope::insertionPointForDeferredExpansion() {
+  return getParent().get();
+}
+
+NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
 }
@@ -1783,20 +1846,29 @@ bool TopLevelCodeScope::isCurrent() const {
   return bodyWhenLastExpanded == decl->getBody();
 }
 
+// Try to avoid the work of counting
+static const bool assumeVarsDoNotGetAdded = true;
+
+static unsigned countVars(const PatternBindingEntry &entry) {
+  unsigned varCount = 0;
+  entry.getPattern()->forEachVariable([&](VarDecl *) { ++varCount; });
+  return varCount;
+}
+
 void PatternEntryDeclScope::beCurrent() {
   initWhenLastExpanded = getPatternEntry().getOriginalInit();
-  unsigned varCount = 0;
-  getPatternEntry().getPattern()->forEachVariable(
-      [&](VarDecl *) { ++varCount; });
-  varCountWhenLastExpanded = varCount;
+  if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded)
+    return;
+  varCountWhenLastExpanded = countVars(getPatternEntry());
 }
 bool PatternEntryDeclScope::isCurrent() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
     return false;
-  unsigned varCount = 0;
-  getPatternEntry().getPattern()->forEachVariable(
-      [&](VarDecl *) { ++varCount; });
-  return varCount == varCountWhenLastExpanded;
+  if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
+    assert(varCountWhenLastExpanded == countVars(getPatternEntry()));
+    return true;
+  }
+  return countVars(getPatternEntry()) == varCountWhenLastExpanded;
 }
 
 void WholeClosureScope::beCurrent() {

@@ -62,7 +62,7 @@ namespace api {
 ///
 /// When the json format changes in a way that requires version-specific handling, this number should be incremented.
 /// This ensures we could have backward compatibility so that version changes in the format won't stop the checker from working.
-const uint8_t DIGESTER_JSON_VERSION = 5; // Populate ObjC, Dynamic and Final to attribute list
+const uint8_t DIGESTER_JSON_VERSION = 6; // Add initkind for constructors
 const uint8_t DIGESTER_JSON_DEFAULT_VERSION = 0; // Use this version number for files before we have a version number in json.
 
 class SDKNode;
@@ -156,7 +156,7 @@ struct CheckerOptions {
   bool SkipOSCheck;
   bool Migrator;
   StringRef LocationFilter;
-  std::vector<StringRef> ToolArgs;
+  std::vector<std::string> ToolArgs;
 };
 
 class SDKContext {
@@ -218,6 +218,7 @@ public:
   StringRef getPlatformIntroVersion(Decl *D, PlatformKind Kind);
   StringRef getLanguageIntroVersion(Decl *D);
   StringRef getObjcName(Decl *D);
+  StringRef getInitKind(Decl *D);
   bool isEqual(const SDKNode &Left, const SDKNode &Right);
   bool checkingABI() const { return Opts.ABI; }
   AccessLevel getAccessLevel(const ValueDecl *VD) const;
@@ -677,9 +678,12 @@ public:
 };
 
 class SDKNodeDeclConstructor: public SDKNodeDeclAbstractFunc {
+  StringRef InitKind;
 public:
   SDKNodeDeclConstructor(SDKNodeInitInfo Info);
   static bool classof(const SDKNode *N);
+  CtorInitializerKind getInitKind() const;
+  void jsonize(json::Output &Out) override;
 };
 
 class SDKNodeDeclAccessor: public SDKNodeDeclAbstractFunc {

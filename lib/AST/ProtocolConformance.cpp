@@ -162,14 +162,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
 
   // Find the named requirement.
   ProtocolDecl *proto = getRequirement();
-  AssociatedTypeDecl *assocType = nullptr;
-  auto members = proto->lookupDirect(name,
-                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
-  for (auto member : members) {
-    assocType = dyn_cast<AssociatedTypeDecl>(member);
-    if (assocType)
-      break;
-  }
+  auto *assocType = proto->getAssociatedType(name);
 
   // FIXME: Shouldn't this be a hard error?
   if (!assocType)
@@ -183,16 +176,7 @@ ConcreteDeclRef
 ProtocolConformanceRef::getWitnessByName(Type type, DeclName name) const {
   // Find the named requirement.
   auto *proto = getRequirement();
-  auto results =
-    proto->lookupDirect(name,
-                      NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions);
-
-  ValueDecl *requirement = nullptr;
-  for (auto *result : results) {
-    if (isa<ProtocolDecl>(result->getDeclContext()))
-      requirement = result;
-  }
-
+  auto *requirement = proto->getSingleRequirement(name);
   if (requirement == nullptr)
     return ConcreteDeclRef();
 
@@ -416,25 +400,24 @@ SourceLoc RootProtocolConformance::getLoc() const {
 }
 
 bool
-RootProtocolConformance::isWeakImported(ModuleDecl *fromModule,
-                                        AvailabilityContext fromContext) const {
+RootProtocolConformance::isWeakImported(ModuleDecl *fromModule) const {
   auto *dc = getDeclContext();
   if (dc->getParentModule() == fromModule)
     return false;
 
   // If the protocol is weak imported, so are any conformances to it.
-  if (getProtocol()->isWeakImported(fromModule, fromContext))
+  if (getProtocol()->isWeakImported(fromModule))
     return true;
 
   // If the conforming type is weak imported, so are any of its conformances.
   if (auto *nominal = getType()->getAnyNominal())
-    if (nominal->isWeakImported(fromModule, fromContext))
+    if (nominal->isWeakImported(fromModule))
       return true;
 
   // If the conformance is declared in an extension with the @_weakLinked
   // attribute, it is weak imported.
   if (auto *ext = dyn_cast<ExtensionDecl>(dc))
-    if (ext->isWeakImported(fromModule, fromContext))
+    if (ext->isWeakImported(fromModule))
       return true;
 
   return false;

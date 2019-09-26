@@ -25,7 +25,8 @@ bool compileSwiftModule(CompilerInstance &CI,
   if (CI.getDiags().hadAnyError())
     return true;
 
-  auto SILMod = performSILGeneration(CI.getMainModule(), CI.getSILOptions());
+  auto SILMod = performSILGeneration(CI.getMainModule(), CI.getSILTypes(),
+                                     CI.getSILOptions());
   if (!SILMod)
     return true;
 

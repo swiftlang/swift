@@ -51,6 +51,7 @@ static StringRef getPlatformConditionName(PlatformConditionKind Kind) {
   case PlatformConditionKind::LABEL: return IDENTIFIER;
 #include "swift/AST/PlatformConditionKinds.def"
   }
+  llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
 /// Extract source text of the expression.

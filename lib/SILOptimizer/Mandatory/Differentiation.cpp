@@ -512,8 +512,8 @@ private:
                                      CanGenericSignature genericSig,
                                      SILLoopInfo *loopInfo) {
     assert(originalBB->getParent() == original);
-    auto *moduleDecl = original->getModule().getSwiftModule();
     auto &astCtx = original->getASTContext();
+    auto *moduleDecl = original->getModule().getSwiftModule();
     auto &file = getDeclarationFileUnit();
     // Create a branching trace enum.
     std::string enumName;
@@ -533,20 +533,17 @@ private:
     }
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
+    GenericParamList *genericParams = nullptr;
+    if (genericSig)
+      genericParams = cloneGenericParameters(astCtx, &file, genericSig);
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
-        /*EnumLoc*/ SourceLoc(), /*Name*/ enumId, /*NameLoc*/ SourceLoc(),
-        /*Inherited*/ {}, /*GenericParams*/ /*set later*/ nullptr,
-        /*DC*/ &file);
+        /*EnumLoc*/ SourceLoc(), /*Name*/ enumId, /*NameLoc*/ loc,
+        /*Inherited*/ {}, /*GenericParams*/ genericParams, /*DC*/ &file);
     // Note: must mark enum as implicit to satisfy assertion in
     // `Parser::parseDeclListDelayed`.
     branchingTraceDecl->setImplicit();
-    if (genericSig) {
-      auto *genericParams =
-          cloneGenericParameters(astCtx, branchingTraceDecl, genericSig);
-      branchingTraceDecl->setGenericParams(genericParams);
-      branchingTraceDecl->setGenericEnvironment(
-          genericSig->createGenericEnvironment());
-    }
+    if (genericSig)
+      branchingTraceDecl->setGenericSignature(genericSig);
     computeAccessLevel(branchingTraceDecl,
                        original->getEffectiveSymbolLinkage());
     branchingTraceDecl->computeType();
@@ -595,6 +592,7 @@ private:
   StructDecl *
   createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
                         CanGenericSignature genericSig) {
+    assert(originalBB->getParent() == original);
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
     auto &file = getDeclarationFileUnit();
@@ -614,21 +612,19 @@ private:
       break;
     }
     auto structId = astCtx.getIdentifier(structName);
+    GenericParamList *genericParams = nullptr;
+    if (genericSig)
+      genericParams = cloneGenericParameters(astCtx, &file, genericSig);
     auto *linearMapStruct = new (astCtx) StructDecl(
         /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
-        /*Inherited*/ {}, /*GenericParams*/ /*set later*/ nullptr,
-        /*DC*/ &file);
+        /*Inherited*/ {}, /*GenericParams*/ genericParams, /*DC*/ &file);
     // Note: must mark struct as implicit to satisfy assertion in
     // `Parser::parseDeclListDelayed`.
     linearMapStruct->setImplicit();
-    if (genericSig) {
-      auto *genericParams =
-          cloneGenericParameters(astCtx, linearMapStruct, genericSig);
-      linearMapStruct->setGenericParams(genericParams);
-      linearMapStruct->setGenericEnvironment(
-          genericSig->createGenericEnvironment());
-    }
-    computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
+    if (genericSig)
+      linearMapStruct->setGenericSignature(genericSig);
+    computeAccessLevel(
+        linearMapStruct, original->getEffectiveSymbolLinkage());
     linearMapStruct->computeType();
     assert(linearMapStruct->hasInterfaceType());
     file.addVisibleDecl(linearMapStruct);
@@ -670,7 +666,8 @@ private:
 
   /// Given an `apply` instruction, conditionally adds its linear map function
   /// to the linear map struct if it is active.
-  void addLinearMapToStruct(ApplyInst *ai, const SILAutoDiffIndices &indices);
+  void addLinearMapToStruct(ADContext &context, ApplyInst *ai,
+                            const SILAutoDiffIndices &indices);
 
   /// Generate linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
@@ -1578,25 +1575,27 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // differentiate logic" and update comment.
   switch (kind) {
   case AutoDiffLinearMapKind::Differential: {
-#define CHECK_INST_TYPE_ACTIVE_DEST(TYPE) \
-    if (auto *castInst = dyn_cast<TYPE>(inst)) \
+#define CHECK_INST_TYPE_ACTIVE_DEST(INST) \
+    if (auto *castInst = dyn_cast<INST##Inst>(inst)) \
       return activityInfo.isActive(castInst->getDest(), indices);
-    CHECK_INST_TYPE_ACTIVE_DEST(StoreInst)
-    CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrowInst)
-    CHECK_INST_TYPE_ACTIVE_DEST(CopyAddrInst)
+    CHECK_INST_TYPE_ACTIVE_DEST(Store)
+    CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
+    CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
+    CHECK_INST_TYPE_ACTIVE_DEST(UnconditionalCheckedCastAddr)
 #undef CHECK_INST_TYPE_ACTIVE_DEST
     if ((isa<AllocationInst>(inst) && hasActiveResults))
       return true;
-#define CHECK_INST_TYPE_ACTIVE_OPERANDS(TYPE) \
-    if (isa<TYPE>(inst) && hasActiveOperands) \
+
+#define CHECK_INST_TYPE_ACTIVE_OPERANDS(INST) \
+    if (isa<INST##Inst>(inst) && hasActiveOperands) \
       return true;
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCountingInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccessInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrowInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DeallocationInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(CopyValueInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValueInst)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddrInst)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCounting)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccess)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrow)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(Deallocation)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(CopyValue)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValue)
+    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddr)
     break;
 #undef CHECK_INST_TYPE_ACTIVE_OPERANDS
   }
@@ -1609,7 +1608,9 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   return false;
 }
 
-void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
+/// Takes an `apply` instruction and adds its linear map function to the
+/// linear map struct if it's active.
+void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
                                          const SILAutoDiffIndices &indices) {
   SmallVector<SILValue, 4> allResults;
   // TODO(TF-800): Investigate why `apply` result special logic does not work
@@ -1694,7 +1695,7 @@ void LinearMapInfo::addLinearMapToStruct(ApplyInst *ai,
   AutoDiffAssociatedFunctionKind assocFnKind(kind);
   auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
       parameters, source, /*differentiationOrder*/ 1, assocFnKind,
-      builder.getModule(),
+      context.getTypeConverter(),
       LookUpConformanceInModule(builder.getModule().getSwiftModule()));
 
   auto assocFnResultTypes =
@@ -1780,7 +1781,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         // Do not add it for array functions since those are already linear
         // and we don't need to add it to the struct.
         if (shouldDifferentiateApplyInst(ai) && !isArrayLiteralIntrinsic(ai))
-          addLinearMapToStruct(ai, indices);
+          addLinearMapToStruct(context, ai, indices);
       }
     }
   }
@@ -2716,7 +2717,7 @@ emitAssociatedFunctionReference(
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         minimalIndices.parameters, minimalIndices.source,
-        /*differentiationOrder*/ 1, kind, builder.getModule(),
+        /*differentiationOrder*/ 1, kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
         kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
@@ -2764,7 +2765,7 @@ emitAssociatedFunctionReference(
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         minimalIndices.parameters, minimalIndices.source,
-        /*differentiationOrder*/ 1, kind, builder.getModule(),
+        /*differentiationOrder*/ 1, kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
         kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
@@ -2871,7 +2872,7 @@ buildThunkSignature(SILFunction *fn,
 
   auto *genericSig = std::move(builder).computeGenericSignature(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
-  genericEnv = genericSig->createGenericEnvironment();
+  genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
       ->castTo<ArchetypeType>();
@@ -3394,9 +3395,8 @@ public:
             original->getName(), AutoDiffLinearMapKind::Pullback,
             indices)).str();
     auto pbGenericSig = getAssociatedFunctionGenericSignature(attr, original);
-    auto *pbGenericEnv = pbGenericSig
-        ? pbGenericSig->createGenericEnvironment()
-        : nullptr;
+    auto *pbGenericEnv =
+        pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
     auto pbType = SILFunctionType::get(
         pbGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), pbParams, {}, adjResults, None,
@@ -4556,6 +4556,24 @@ public:
       destroyedDifferentialLocalAllocations.insert(tanSrc);
   }
 
+  /// Handle `unconditional_checked_cast_addr` instruction.
+  ///   Original: unconditional_checked_cast_addr $X in x to $Y in y
+  ///    Tangent: unconditional_checked_cast_addr $X.Tan in tan[x]
+  ///                                          to $Y.Tan in tan[y]
+  CLONE_AND_EMIT_TANGENT(UnconditionalCheckedCastAddr, uccai) {
+    auto diffBuilder = getDifferentialBuilder();
+    auto loc = uccai->getLoc();
+    auto *bb = uccai->getParent();
+    auto &tanSrc = getTangentBuffer(bb, uccai->getSrc());
+    auto tanDest = getTangentBuffer(bb, uccai->getDest());
+    if (errorOccurred)
+      return;
+
+    diffBuilder.createUnconditionalCheckedCastAddr(
+        loc, tanSrc, tanSrc->getType().getASTType(), tanDest,
+        tanDest->getType().getASTType());
+  }
+
   /// Handle `begin_access` instruction (and do differentiability checks).
   ///   Original: y = begin_access x
   ///    Tangent: tan[y] = begin_access tan[x]
@@ -5232,7 +5250,7 @@ public:
             indices)).str();
     auto diffGenericSig = getAssociatedFunctionGenericSignature(attr, original);
     auto *diffGenericEnv =
-        diffGenericSig ? diffGenericSig->createGenericEnvironment() : nullptr;
+        diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
     auto diffType = SILFunctionType::get(
         diffGenericSig, origTy->getExtInfo(), origTy->getCoroutineKind(),
         origTy->getCalleeConvention(), dfParams, {}, dfResults, None,
@@ -7209,7 +7227,8 @@ ADContext::declareExternalAssociatedFunction(
   auto assocGenSig = getAssociatedFunctionGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
-      module, LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
+      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
   auto *assocFn = fb.createFunction(
@@ -7249,11 +7268,11 @@ static SILFunction *createEmptyVJP(
       module.Types, vjpGenericSig);
 
   auto *vjpGenericEnv = vjpGenericSig
-      ? vjpGenericSig->createGenericEnvironment()
+      ? vjpGenericSig->getGenericEnvironment()
       : nullptr;
   auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      AutoDiffAssociatedFunctionKind::VJP, module,
+      AutoDiffAssociatedFunctionKind::VJP, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -7299,11 +7318,11 @@ static SILFunction *createEmptyJVP(
       module.Types, jvpGenericSig);
 
   auto *jvpGenericEnv = jvpGenericSig
-      ? jvpGenericSig->createGenericEnvironment()
+      ? jvpGenericSig->getGenericEnvironment()
       : nullptr;
   auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      AutoDiffAssociatedFunctionKind::JVP, module,
+      AutoDiffAssociatedFunctionKind::JVP, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
@@ -7726,7 +7745,7 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffAssociatedFunctionType(
       desiredIndices.parameters, desiredIndices.source,
-      /*differentiationOrder*/ 1, kind, module, lookupConformance);
+      /*differentiationOrder*/ 1, kind, module.Types, lookupConformance);
   auto *caller = assocFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType = caller->mapTypeIntoContext(
@@ -7914,7 +7933,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
         if (newThunk->empty()) {
           if (auto newThunkGenSig = thunkType->getGenericSignature())
             newThunk->setGenericEnvironment(
-                newThunkGenSig->createGenericEnvironment());
+                newThunkGenSig->getGenericEnvironment());
           newThunk->setOwnershipEliminated();
           BasicTypeSubstCloner cloner(thunk, newThunk);
           cloner.run();
@@ -8032,7 +8051,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     }
     auto expectedAssocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
         parameterIndices, resultIndex, differentiationOrder,
-        assocFnKind, getModule(),
+        assocFnKind, getTypeConverter(),
         LookUpConformanceInModule(getModule().getSwiftModule()));
     // If `assocFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.

@@ -85,6 +85,11 @@ struct ValueOwnershipKind;
 // SWIFT_ENABLE_TENSORFLOW
 struct SILAutoDiffConfig;
 
+namespace Lowering {
+class TypeConverter;
+} // namespace Lowering
+// SWIFT_ENABLE_TENSORFLOW END
+
 enum class TypeKind : uint8_t {
 #define TYPE(id, parent) id,
 #define LAST_TYPE(id) Last_Type = id,
@@ -4227,7 +4232,7 @@ public:
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
       AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      SILModule &module, LookupConformanceFn lookupConformance,
+      Lowering::TypeConverter &TC, LookupConformanceFn lookupConformance,
       CanGenericSignature associatedFunctionGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
@@ -4388,10 +4393,6 @@ public:
 
   SILLayout *getLayout() const { return Layout; }
   SubstitutionMap getSubstitutions() const { return Substitutions; }
-
-  // In SILType.h:
-  CanType getFieldLoweredType(SILModule &M, unsigned index) const;
-  SILType getFieldType(SILModule &M, unsigned index) const;
 
   // TODO: SILBoxTypes should be explicitly constructed in terms of specific
   // layouts. As a staging mechanism, we expose the old single-boxed-type

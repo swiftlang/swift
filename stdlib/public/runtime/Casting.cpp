@@ -99,10 +99,6 @@ static void _buildNameForMetadata(const Metadata *type,
   // Use the remangler to generate a mangled name from the type metadata.
   
   Demangle::Demangler Dem;
-  // We want to resolve symbolic references to a user-comprehensible
-  // representation of the referenced context.
-  Dem.setSymbolicReferenceResolver(ResolveToDemanglingForContext(Dem));
-  
   auto demangling = _swift_buildDemanglingForMetadata(type, Dem);
   if (demangling == nullptr) {
     result = "<<< invalid type >>>";

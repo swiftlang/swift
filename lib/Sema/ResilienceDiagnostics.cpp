@@ -266,6 +266,7 @@ void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
     GenericTypeFinder(const SourceFile &SF, Callback callback)
         : SF(SF), callback(callback) {}
 
+
     Action visitBoundGenericType(BoundGenericType *ty) override {
       ModuleDecl *useModule = SF.getParentModule();
       SubstitutionMap subs = ty->getContextSubstitutionMap(useModule,

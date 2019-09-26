@@ -128,7 +128,7 @@ class SILDebugInfoGenerator : public SILModuleTransform {
         SILLocation::DebugLoc DL(Ctx.LCS.LineNum, 1, FileNameBuf);
         RegularLocation Loc(DL);
         SILDebugScope *Scope = new (*M) SILDebugScope(Loc, F);
-        F->setDebugScope(Scope);
+        F->setSILDebugScope(Scope);
 
         // Ensure that the function is visible for debugging.
         F->setBare(IsNotBare);
@@ -141,16 +141,24 @@ class SILDebugInfoGenerator : public SILModuleTransform {
       for (SILFunction *F : PrintedFuncs) {
         const SILDebugScope *Scope = F->getDebugScope();
         for (SILBasicBlock &BB : *F) {
-          for (SILInstruction &I : BB) {
-            SILLocation Loc = I.getLoc();
-            SILLocation::DebugLoc DL(Ctx.LineNums[&I], 1, FileNameBuf);
+          for (auto iter = BB.begin(), end = BB.end(); iter != end;) {
+            SILInstruction *I = &*iter;
+            ++iter;
+            if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I)) {
+              // debug_value and debug_value_addr are not needed anymore.
+              // Also, keeping them might trigger a verifier error.
+              I->eraseFromParent();
+              continue;
+            }
+            SILLocation Loc = I->getLoc();
+            SILLocation::DebugLoc DL(Ctx.LineNums[I], 1, FileNameBuf);
             assert(DL.Line && "no line set for instruction");
             if (Loc.is<ReturnLocation>() || Loc.is<ImplicitReturnLocation>()) {
               Loc.setDebugInfoLoc(DL);
-              I.setDebugLocation(SILDebugLocation(Loc, Scope));
+              I->setDebugLocation(SILDebugLocation(Loc, Scope));
             } else {
               RegularLocation RLoc(DL);
-              I.setDebugLocation(SILDebugLocation(RLoc, Scope));
+              I->setDebugLocation(SILDebugLocation(RLoc, Scope));
             }
           }
         }

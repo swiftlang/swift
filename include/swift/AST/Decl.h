@@ -543,7 +543,7 @@ protected:
     NumRequirementsInSignature : 16
   );
 
-  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClassDecl, NominalTypeDecl, 2+1+2+1+7+1+1+1+1+1+1,
     /// The stage of the inheritance circularity check for this class.
     Circularity : 2,
 
@@ -557,7 +557,10 @@ protected:
     HasForcedEmittedMembers : 1,     
 
     HasMissingDesignatedInitializers : 1,
+    ComputedHasMissingDesignatedInitializers : 1,
+
     HasMissingVTableEntries : 1,
+    ComputedHasMissingVTableEntries : 1,
 
     /// Whether instances of this class are incompatible
     /// with weak and unowned references.
@@ -937,9 +940,31 @@ public:
 
   bool isPrivateStdlibDecl(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
-  /// Whether this declaration is weak-imported.
-  bool isWeakImported(ModuleDecl *fromModule,
-                      AvailabilityContext fromContext) const;
+  AvailabilityContext getAvailabilityForLinkage() const;
+
+  /// Whether this declaration or one of its outer contexts has the
+  /// @_weakLinked attribute.
+  bool isAlwaysWeakImported() const;
+
+  /// Whether this declaration is weak-imported from the given module,
+  /// either because of the presence of the @_weakLinked attribute, or
+  /// because of availability.
+  ///
+  /// Note that \p fromModule should either be the "main module" or
+  /// nullptr. (This is because when it is non-null, we query the
+  /// current deployment target, and not the deployment target that
+  /// the module was built with.)
+  ///
+  /// If \p fromModule is the main module, this returns false when the
+  /// declaration is part of the main module, or if the declaration is
+  /// at least as available as the current deployment target.
+  ///
+  /// If \p fromModule is null, we instead return true if the
+  /// declaration is meant to be weak linked with _some_ deployment
+  /// target; that is, the presence of the @_weakLinked attribute or
+  /// any kind of availability is enough, irrespective of the current
+  /// deployment target.
+  bool isWeakImported(ModuleDecl *fromModule) const;
 
   /// Returns true if the nature of this declaration allows overrides.
   /// Note that this does not consider whether it is final or whether
@@ -1425,7 +1450,7 @@ public:
   /// to the given DeclContext.
   GenericParamList *clone(DeclContext *dc) const;
 
-  void print(raw_ostream &OS);
+  void print(raw_ostream &OS) const;
   void dump();
 };
   
@@ -1471,7 +1496,7 @@ public:
 class alignas(8) _GenericContext {
 // Not really public. See GenericContext.
 public:
-  GenericParamList *GenericParams = nullptr;
+  llvm::PointerIntPair<GenericParamList *, 1, bool> GenericParamsAndBit;
 
   /// The trailing where clause.
   ///
@@ -1479,28 +1504,21 @@ public:
   /// moves the trailing where clause into the generic parameter list.
   TrailingWhereClause *TrailingWhere = nullptr;
 
-  /// The generic signature or environment of this declaration.
-  ///
-  /// When this declaration stores only a signature, the generic
-  /// environment will be lazily loaded.
-  mutable llvm::PointerUnion<GenericSignature *, GenericEnvironment *>
-    GenericSigOrEnv;
+  /// The generic signature of this declaration.
+  GenericSignature *GenericSig = nullptr;
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
-  /// Lazily populate the generic environment.
-  GenericEnvironment *getLazyGenericEnvironmentSlow() const;
+  friend class GenericParamListRequest;
 
 protected:
-  GenericContext(DeclContextKind Kind, DeclContext *Parent)
-    : _GenericContext(), DeclContext(Kind, Parent) { }
+  GenericContext(DeclContextKind Kind, DeclContext *Parent,
+                 GenericParamList *Params);
 
 public:
   /// Retrieve the set of parameters to a generic context, or null if
   /// this context is not generic.
-  GenericParamList *getGenericParams() const { return GenericParams; }
-
-  void setGenericParams(GenericParamList *GenericParams);
+  GenericParamList *getGenericParams() const;
 
   /// Determine whether this context has generic parameters
   /// of its own.
@@ -1515,7 +1533,7 @@ public:
   ///   func p()   // isGeneric == false
   /// }
   /// \endcode
-  bool isGeneric() const { return GenericParams != nullptr; }
+  bool isGeneric() const { return getGenericParams() != nullptr; }
 
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
@@ -1539,17 +1557,8 @@ public:
   /// Retrieve the generic requirements.
   ArrayRef<Requirement> getGenericRequirements() const;
 
-  /// Set a lazy generic environment.
-  void setLazyGenericEnvironment(LazyMemberLoader *lazyLoader,
-                                 GenericSignature *genericSig,
-                                 uint64_t genericEnvData);
-
-  /// Whether this generic context has a lazily-created generic environment
-  /// that has not yet been constructed.
-  bool hasLazyGenericEnvironment() const;
-
-  /// Set the generic context of this context.
-  void setGenericEnvironment(GenericEnvironment *genericEnv);
+  /// Set the generic signature of this context.
+  void setGenericSignature(GenericSignature *genericSig);
 
   /// Retrieve the position of any where clause for this context's
   /// generic parameters.
@@ -1761,8 +1770,6 @@ public:
   bool hasValidSignature() const {
     return getValidationState() > ValidationState::CheckingWithValidSignature;
   }
-
-  void createGenericParamsIfMissing(NominalTypeDecl *nominal);
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -3272,7 +3279,7 @@ class NominalTypeDecl : public GenericTypeDecl, public IterableDeclContext {
   llvm::PointerIntPair<MemberLookupTable *, 1, bool> LookupTable;
 
   /// Prepare the lookup table to make it ready for lookups.
-  void prepareLookupTable(bool ignoreNewExtensions);
+  void prepareLookupTable();
 
   /// True if the entries in \c LookupTable are complete--that is, if a
   /// name is present, it contains all members with that name.
@@ -3319,7 +3326,6 @@ protected:
     GenericTypeDecl(K, DC, name, NameLoc, inherited, GenericParams),
     IterableDeclContext(IterableDeclContextKind::NominalTypeDecl)
   {
-    setGenericParams(GenericParams);
     Bits.NominalTypeDecl.AddedImplicitInitializers = false;
     ExtensionGeneration = 0;
     Bits.NominalTypeDecl.HasLazyConformances = false;
@@ -3378,24 +3384,11 @@ public:
   /// Retrieve the set of extensions of this type.
   ExtensionRange getExtensions();
 
-  /// Make a member of this nominal type, or one of its extensions,
-  /// immediately visible in the lookup table.
-  ///
-  /// A member of a nominal type or extension thereof will become
-  /// visible to name lookup as soon as it is added. However, if the
-  /// addition of a member is delayed---for example, because it's
-  /// being introduced in response to name lookup---this method can be
-  /// called to make it immediately visible.
-  void makeMemberVisible(ValueDecl *member);
-
   /// Special-behaviour flags passed to lookupDirect()
   enum class LookupDirectFlags {
-    /// Whether to avoid loading any new extension.
-    /// Used by the module loader to break recursion.
-    IgnoreNewExtensions = 1 << 0,
     /// Whether to include @_implements members.
     /// Used by conformance-checking to find special @_implements members.
-    IncludeAttrImplements = 1 << 1,
+    IncludeAttrImplements = 1 << 0,
   };
 
   /// Find all of the declarations with the given name within this nominal type
@@ -3903,6 +3896,7 @@ public:
   bool hasMissingDesignatedInitializers() const;
 
   void setHasMissingDesignatedInitializers(bool newValue = true) {
+    Bits.ClassDecl.ComputedHasMissingDesignatedInitializers = 1;
     Bits.ClassDecl.HasMissingDesignatedInitializers = newValue;
   }
 
@@ -3913,6 +3907,7 @@ public:
   bool hasMissingVTableEntries() const;
 
   void setHasMissingVTableEntries(bool newValue = true) {
+    Bits.ClassDecl.ComputedHasMissingVTableEntries = 1;
     Bits.ClassDecl.HasMissingVTableEntries = newValue;
   }
 
@@ -4219,6 +4214,14 @@ public:
   /// a protocol having nested types (ObjC protocols).
   llvm::TinyPtrVector<AssociatedTypeDecl *> getAssociatedTypeMembers() const;
 
+  /// Returns a protocol requirement with the given name, or nullptr if the
+  /// name has multiple overloads, or no overloads at all.
+  ValueDecl *getSingleRequirement(DeclName name) const;
+
+  /// Returns an associated type with the given name, or nullptr if one does
+  /// not exist.
+  AssociatedTypeDecl *getAssociatedType(Identifier name) const;
+
   /// Walk this protocol and all of the protocols inherited by this protocol,
   /// transitively, invoking the callback function for each protocol.
   ///
@@ -4361,10 +4364,6 @@ public:
   /// Retrieve the name to use for this protocol when interoperating
   /// with the Objective-C runtime.
   StringRef getObjCRuntimeName(llvm::SmallVectorImpl<char> &buffer) const;
-
-  /// Create the generic parameters of this protocol if the haven't been
-  /// created yet.
-  void createGenericParamsIfMissing();
 
   /// Retrieve the requirements that describe this protocol.
   ///
@@ -5455,7 +5454,7 @@ public:
                 SourceLoc SubscriptLoc, ParameterList *Indices,
                 SourceLoc ArrowLoc, TypeLoc ElementTy, DeclContext *Parent,
                 GenericParamList *GenericParams)
-    : GenericContext(DeclContextKind::SubscriptDecl, Parent),
+    : GenericContext(DeclContextKind::SubscriptDecl, Parent, GenericParams),
       AbstractStorageDecl(DeclKind::Subscript,
                           StaticSpelling != StaticSpellingKind::None,
                           Parent, Name, SubscriptLoc,
@@ -5464,7 +5463,6 @@ public:
       Indices(nullptr), ElementTy(ElementTy) {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
-    setGenericParams(GenericParams);
   }
   
   /// \returns the way 'static'/'class' was spelled in the source.
@@ -5629,11 +5627,10 @@ protected:
                        SourceLoc NameLoc, bool Throws, SourceLoc ThrowsLoc,
                        bool HasImplicitSelfDecl,
                        GenericParamList *GenericParams)
-      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent),
+      : GenericContext(DeclContextKind::AbstractFunctionDecl, Parent, GenericParams),
         ValueDecl(Kind, Parent, Name, NameLoc),
         Body(nullptr), ThrowsLoc(ThrowsLoc) {
     setBodyKind(BodyKind::None);
-    setGenericParams(GenericParams);
     Bits.AbstractFunctionDecl.HasImplicitSelfDecl = HasImplicitSelfDecl;
     Bits.AbstractFunctionDecl.Overridden = false;
     Bits.AbstractFunctionDecl.Throws = Throws;
@@ -7288,6 +7285,19 @@ inline void simple_display(llvm::raw_ostream &out,
                            const NominalTypeDecl *decl) {
   simple_display(out, static_cast<const Decl *>(decl));
 }
+
+/// Display GenericContext.
+///
+/// The template keeps this sorted down in the overload set relative to the
+/// more concrete overloads with Decl pointers thereby breaking a potential ambiguity.
+template <typename T>
+inline typename std::enable_if<std::is_same<T, GenericContext>::value>::type
+simple_display(llvm::raw_ostream &out, const T *GC) {
+  simple_display(out, GC->getAsDecl());
+}
+
+/// Display GenericParamList.
+void simple_display(llvm::raw_ostream &out, const GenericParamList *GPL);
 
 /// Extract the source location from the given declaration.
 SourceLoc extractNearestSourceLoc(const Decl *decl);

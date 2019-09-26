@@ -195,7 +195,7 @@ FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 /// Number of full braced decl list parsed.
 FRONTEND_STATISTIC(Parse, NumIterableDeclContextParsed)
 
-#define SWIFT_REQUEST(ZONE, NAME) FRONTEND_STATISTIC(Parse, NAME)
+#define SWIFT_REQUEST(ZONE, NAME, SIG, CACHE, LocOptions) FRONTEND_STATISTIC(Parse, NAME)
 #include "swift/AST/ParseTypeIDZone.def"
 #undef SWIFT_REQUEST
 
@@ -249,12 +249,6 @@ FRONTEND_STATISTIC(Sema, NumFunctionsTypechecked)
 /// amount of work the GSB does analyzing type signatures.
 FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
 
-/// Number of lazy generic environments registered.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironments)
-
-/// Number of lazy generic environments deserialized.
-FRONTEND_STATISTIC(Sema, NumLazyGenericEnvironmentsLoaded)
-
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
 
@@ -285,7 +279,7 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 /// Number of lookups into a module and its imports.
 
 /// All type check requests go into the Sema area.
-#define SWIFT_REQUEST(ZONE, NAME) FRONTEND_STATISTIC(Sema, NAME)
+#define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(Sema, NAME)
 #include "swift/AST/AccessTypeIDZone.def"
 #include "swift/AST/NameLookupTypeIDZone.def"
 #include "swift/AST/TypeCheckerTypeIDZone.def"

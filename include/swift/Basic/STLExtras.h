@@ -578,6 +578,8 @@ public:
     return *Op(*Current);
   }
 
+  reference operator*() { return *Op(*Current); }
+
   OptionalTransformIterator &operator++() {
     ++Current;
     skipNonMatching();
@@ -611,7 +613,7 @@ makeOptionalTransformIterator(Iterator current, Iterator end,
 
 /// A range filtered and transformed by the optional transform.
 template <typename Range, typename OptionalTransform,
-          typename Iterator = typename Range::iterator>
+          typename Iterator = decltype(std::declval<Range>().begin())>
 class OptionalTransformRange {
 
   Iterator First, Last;

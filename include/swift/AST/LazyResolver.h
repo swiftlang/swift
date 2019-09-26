@@ -85,15 +85,8 @@ public:
   LazyMemberLoader *loader;
 };
 
-/// Context data for generic contexts.
-class LazyGenericContextData : public LazyContextData {
-public:
-  /// The context data used for loading the generic environment.
-  uint64_t genericEnvData = 0;
-};
-
 /// Context data for iterable decl contexts.
-class LazyIterableDeclContextData : public LazyGenericContextData {
+class LazyIterableDeclContextData : public LazyContextData {
 public:
   /// The context data used for loading all of the members of the iterable
   /// context.
@@ -144,10 +137,6 @@ public:
   /// Returns the default definition type for \p ATD.
   virtual Type loadAssociatedTypeDefault(const AssociatedTypeDecl *ATD,
                                          uint64_t contextData) = 0;
-
-  /// Returns the generic environment.
-  virtual GenericEnvironment *loadGenericEnvironment(const DeclContext *decl,
-                                                     uint64_t contextData) = 0;
 
   /// Loads the requirement signature for a protocol.
   virtual void

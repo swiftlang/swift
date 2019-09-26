@@ -284,6 +284,10 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                   hasDynamicLifetime);
 }
 
+SILType AllocBoxInst::getAddressType() const {
+  return getSILBoxFieldType(getBoxType(), getModule().Types, 0).getAddressType();
+}
+
 VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }
@@ -681,7 +685,7 @@ getExtracteeType(SILValue function, Extractee extractee,
   }
   auto resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
         fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-        differentiationOrder, *kindOpt, module,
+        differentiationOrder, *kindOpt, module.Types,
         LookUpConformanceInModule(module.getSwiftModule()));
   return SILType::getPrimitiveObjectType(resultFnTy);
 }

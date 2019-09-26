@@ -164,7 +164,7 @@ TupleTypeRepr *ASTGen::generateTuple(TokenSyntax LParen,
       ElementAST.NameLoc = generate(*Name, Loc);
       ElementAST.Name = Name->getText() == "_"
                             ? Identifier()
-                            : Context.getIdentifier(Name->getText());
+                            : Context.getIdentifier(Name->getIdentifierText());
     }
     if (auto Colon = Element.getColon())
       ElementAST.ColonLoc = generate(*Colon, Loc);
@@ -173,7 +173,7 @@ TupleTypeRepr *ASTGen::generateTuple(TokenSyntax LParen,
       ElementAST.SecondName =
           SecondName->getText() == "_"
               ? Identifier()
-              : Context.getIdentifier(SecondName->getText());
+              : Context.getIdentifier(SecondName->getIdentifierText());
       if (IsFunction) {
         // Form the named parameter type representation.
         ElementAST.UnderscoreLoc = ElementAST.NameLoc;
@@ -224,10 +224,8 @@ TypeRepr *ASTGen::generate(AttributedTypeSyntax Type, SourceLoc &Loc) {
 
       if (AttrKind == TAK_convention) {
         auto Argument = Attr.getArgument()->castTo<TokenSyntax>();
-        auto Begin = advanceLocBegin(Loc, Argument);
-        auto End = advanceLocEnd(Loc, Argument);
-        CharSourceRange Range{Context.SourceMgr, Begin, End};
-        TypeAttrs.convention = Range.str();
+        auto Convention = Context.getIdentifier(Argument.getText());
+        TypeAttrs.convention = Convention.str();
       }
 
       if (AttrKind == TAK_opened) {
@@ -306,7 +304,7 @@ TypeRepr *ASTGen::generate(CompositionTypeSyntax Type, SourceLoc &Loc) {
 
   auto FirstTypeLoc = advanceLocBegin(Loc, FirstElem);
   auto FirstAmpersandLoc = advanceLocBegin(Loc, *FirstElem.getAmpersand());
-  auto LastTypeLoc = advanceLocBegin(Loc, LastElem);
+  auto LastTypeLoc = advanceLocBegin(Loc, *LastElem.getLastToken());
   return CompositionTypeRepr::create(Context, ElemTypes, FirstTypeLoc,
                                      {FirstAmpersandLoc, LastTypeLoc});
 }
@@ -351,7 +349,7 @@ TypeRepr *ASTGen::generateSimpleOrMemberIdentifier(T Type, SourceLoc &Loc) {
 template <typename T>
 ComponentIdentTypeRepr *ASTGen::generateIdentifier(T Type, SourceLoc &Loc) {
   auto IdentifierLoc = advanceLocBegin(Loc, Type.getName());
-  auto Identifier = Context.getIdentifier(Type.getName().getText());
+  auto Identifier = Context.getIdentifier(Type.getName().getIdentifierText());
   if (auto Clause = Type.getGenericArgumentClause()) {
     auto Args = Clause->getArguments();
     if (!Args.empty()) {
@@ -391,10 +389,16 @@ TypeRepr *ASTGen::generate(DictionaryTypeSyntax Type, SourceLoc &Loc) {
 
 TypeRepr *ASTGen::generate(ArrayTypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *ElementType = generate(Type.getElementType(), Loc);
-  auto LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
-  auto RBraceLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  SourceRange Range{LBraceLoc, RBraceLoc};
-  return new (Context) ArrayTypeRepr(ElementType, Range);
+  SourceLoc LBraceLoc, RBraceLoc;
+  if (Type.getLeftSquareBracket().isPresent())
+    LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
+  else
+    LBraceLoc = advanceLocBegin(Loc, Type.getElementType());
+  if (Type.getLeftSquareBracket().isPresent())
+    RBraceLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
+  else
+    RBraceLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  return new (Context) ArrayTypeRepr(ElementType, {LBraceLoc, RBraceLoc});
 }
 
 TypeRepr *ASTGen::generate(MetatypeTypeSyntax Type, SourceLoc &Loc) {
@@ -422,33 +426,6 @@ TypeRepr *ASTGen::generate(ImplicitlyUnwrappedOptionalTypeSyntax Type,
 
 TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
   auto ChildrenCount = Type.getNumChildren();
-
-  // Recover from C-style array type:
-  //   type '[' ']'
-  //   type '[' expr ']'
-  if (ChildrenCount == 3 || ChildrenCount == 4) {
-    auto Element = Type.getChild(0)->getAs<TypeSyntax>();
-    auto LSquare = Type.getChild(1)->getAs<TokenSyntax>();
-    auto Last = Type.getChild(ChildrenCount - 1);
-
-    if (Element && LSquare && LSquare->getTokenKind() == tok::l_square) {
-      auto ElementType = generate(*Element, Loc);
-      auto Begin = advanceLocBegin(Loc, *Element);
-      auto End = advanceLocBegin(Loc, *Last);
-      return new (Context) ArrayTypeRepr(ElementType, {Begin, End});
-    }
-  }
-
-  // Recover from extra `[`:
-  //   type `[`
-  if (ChildrenCount == 2) {
-    auto Element = Type.getChild(0)->getAs<TypeSyntax>();
-    auto LSquare = Type.getChild(1)->getAs<TokenSyntax>();
-
-    if (Element && LSquare && LSquare->getTokenKind() == tok::l_square) {
-      return generate(*Element, Loc);
-    }
-  }
 
   // Recover from old-style protocol composition:
   //   `protocol` `<` protocols `>`
@@ -539,15 +516,6 @@ SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
   return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
 }
 
-SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const TokenSyntax &Token) {
-  return advanceLocAfter(Loc, Token.withTrailingTrivia({}));
-}
-
-SourceLoc ASTGen::advanceLocAfter(const SourceLoc &Loc, const Syntax &Node) {
-  return Loc.getAdvancedLoc(
-      Node.getAbsoluteEndPositionAfterTrailingTrivia().getOffset());
-}
-
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);
 }
@@ -582,7 +550,7 @@ MagicIdentifierLiteralExpr::Kind ASTGen::getMagicIdentifierLiteralKind(tok Kind)
 }
 
 ValueDecl *ASTGen::lookupInScope(DeclName Name) {
-  return Context.LangOpts.EnableASTScopeLookup
+  return Context.LangOpts.EnableASTScopeLookup && Context.LangOpts.DisableParserLookup
              ? nullptr
              : (*ParserState)->getScopeInfo().lookupValueName(Name);
 }

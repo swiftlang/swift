@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
@@ -31,19 +32,11 @@ namespace swift {
 //----------------------------------------------------------------------------//
 // Referenced inherited decls computation.
 //----------------------------------------------------------------------------//
-TypeLoc &InheritedDeclsReferencedRequest::getTypeLoc(
-                        llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
-                        unsigned index) const {
-  // FIXME: Copy-pasted from InheritedTypeRequest. We need to consolidate here.
-  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
-    return typeDecl->getInherited()[index];
-
-  return decl.get<ExtensionDecl *>()->getInherited()[index];
-}
 
 SourceLoc InheritedDeclsReferencedRequest::getNearestLoc() const {
   const auto &storage = getStorage();
-  auto &typeLoc = getTypeLoc(std::get<0>(storage), std::get<1>(storage));
+  auto &typeLoc = getInheritedTypeLocAtIndex(std::get<0>(storage),
+                                             std::get<1>(storage));
   return typeLoc.getLoc();
 }
 
@@ -97,6 +90,7 @@ void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
 //----------------------------------------------------------------------------//
 // Destructor computation.
 //----------------------------------------------------------------------------//
+
 Optional<DestructorDecl *> GetDestructorRequest::getCachedResult() const {
   auto *classDecl = std::get<0>(getStorage());
   auto results = classDecl->lookupDirect(DeclBaseName::createDestructor());
@@ -111,9 +105,31 @@ void GetDestructorRequest::cacheResult(DestructorDecl *value) const {
   classDecl->addMember(value);
 }
 
+//----------------------------------------------------------------------------//
+// GenericParamListRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<GenericParamList *> GenericParamListRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (!decl->GenericParamsAndBit.getInt()) {
+    return None;
+  }
+  return decl->GenericParamsAndBit.getPointer();
+}
+
+void GenericParamListRequest::cacheResult(GenericParamList *params) const {
+  auto *context = std::get<0>(getStorage());
+  if (params) {
+    for (auto param : *params)
+      param->setDeclContext(context);
+  }
+  context->GenericParamsAndBit.setPointerAndInt(params, true);
+}
+
+
 // Define request evaluation functions for each of the name lookup requests.
 static AbstractRequestFunction *nameLookupRequestFunctions[] = {
-#define SWIFT_REQUEST(Zone, Name)                      \
+#define SWIFT_REQUEST(Zone, Name, Sig, Caching, LocOptions)                    \
   reinterpret_cast<AbstractRequestFunction *>(&Name::evaluateRequest),
 #include "swift/AST/NameLookupTypeIDZone.def"
 #undef SWIFT_REQUEST

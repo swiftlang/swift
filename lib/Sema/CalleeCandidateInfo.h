@@ -223,13 +223,7 @@ namespace swift {
     /// arguments, emit a diagnostic indicating any partially matching
     /// overloads.
     void suggestPotentialOverloads(SourceLoc loc, bool isResult = false);
-    
-    
-    /// If the candidate set has been narrowed to a single parameter or single
-    /// archetype that has argument type errors, diagnose that error and
-    /// return true.
-    bool diagnoseGenericParameterErrors(Expr *badArgExpr);
-    
+
     /// Emit a diagnostic and return true if this is an error condition we can
     /// handle uniformly.  This should be called after filtering the candidate
     /// list.

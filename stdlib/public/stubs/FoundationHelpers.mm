@@ -22,29 +22,55 @@
 #import <CoreFoundation/CoreFoundation.h>
 #include "../SwiftShims/CoreFoundationShims.h"
 #import <objc/runtime.h>
+#include "swift/Runtime/Once.h"
+#include <dlfcn.h>
 
 using namespace swift;
 
-__swift_uint8_t
-swift::_swift_stdlib_isNSString(id obj) {
-  //TODO: we can likely get a small perf win by using _NSIsNSString on
-  //sufficiently new OSs
-  return CFGetTypeID((CFTypeRef)obj) == CFStringGetTypeID() ? 1 : 0;
+static CFHashCode(*_CFStringHashCString)(const uint8_t *bytes, CFIndex len);
+static CFHashCode(*_CFStringHashNSString)(id str);
+static CFTypeID(*_CFGetTypeID)(CFTypeRef obj);
+static CFTypeID _CFStringTypeID = 0;
+static swift_once_t initializeBridgingFuncsOnce;
+
+static void _initializeBridgingFunctionsImpl(void *ctxt) {
+  auto getStringTypeID =
+    (CFTypeID(*)(void))
+    dlsym(RTLD_DEFAULT, "CFStringGetTypeID");
+  assert(getStringTypeID);
+  _CFStringTypeID = getStringTypeID();
+  
+  _CFGetTypeID = (CFTypeID(*)(CFTypeRef obj))dlsym(RTLD_DEFAULT, "CFGetTypeID");
+  _CFStringHashNSString = (CFHashCode(*)(id))dlsym(RTLD_DEFAULT,
+                                                   "CFStringHashNSString");
+  _CFStringHashCString = (CFHashCode(*)(const uint8_t *, CFIndex))dlsym(
+                                                   RTLD_DEFAULT,
+                                                   "CFStringHashCString");
 }
 
-extern "C" CFHashCode CFStringHashCString(const uint8_t *bytes, CFIndex len);
-extern "C" CFHashCode CFStringHashNSString(id str);
+static inline void initializeBridgingFunctions() {
+  swift_once(&initializeBridgingFuncsOnce,
+             _initializeBridgingFunctionsImpl,
+             nullptr);
+}
 
+__swift_uint8_t
+swift::_swift_stdlib_isNSString(id obj) {
+  initializeBridgingFunctions();
+  return _CFGetTypeID((CFTypeRef)obj) == _CFStringTypeID ? 1 : 0;
+}
 
 _swift_shims_CFHashCode
 swift::_swift_stdlib_CFStringHashNSString(id _Nonnull obj) {
-  return CFStringHashNSString(obj);
+  initializeBridgingFunctions();
+  return _CFStringHashNSString(obj);
 }
 
 _swift_shims_CFHashCode
 swift::_swift_stdlib_CFStringHashCString(const _swift_shims_UInt8 * _Nonnull bytes,
                                   _swift_shims_CFIndex length) {
-  return CFStringHashCString(bytes, length);
+  initializeBridgingFunctions();
+  return _CFStringHashCString(bytes, length);
 }
 
 const __swift_uint8_t *

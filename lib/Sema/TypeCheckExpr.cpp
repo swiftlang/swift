@@ -663,39 +663,54 @@ static Optional<KnownProtocolKind>
 getKnownProtocolKindIfAny(const ProtocolDecl *protocol) {
   TypeChecker &tc = TypeChecker::createForContext(protocol->getASTContext());
 
-  // clang-format off
-  #define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)            \
-    if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))        \
-      return KnownProtocolKind::Id;
-  #include "swift/AST/KnownProtocols.def"
-  #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
-  // clang-format on
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, _, __, ___)              \
+  if (protocol == tc.getProtocol(SourceLoc(), KnownProtocolKind::Id))          \
+    return KnownProtocolKind::Id;
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 
   return None;
 }
 
 Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   if (auto knownProtocolKindIfAny = getKnownProtocolKindIfAny(protocol)) {
-    Type t = evaluateOrDefault(
+    return evaluateOrDefault(
         Context.evaluator,
         DefaultTypeRequest{knownProtocolKindIfAny.getValue(), dc}, nullptr);
-    return t;
   }
-  return nullptr;
+  return Type();
+}
+
+static std::pair<const char *, bool> lookupDefaultTypeInfoForKnownProtocol(
+    const KnownProtocolKind knownProtocolKind) {
+  switch (knownProtocolKind) {
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(Id, Name, typeName,          \
+                                                  performLocalLookup)          \
+  case KnownProtocolKind::Id:                                                  \
+    return {typeName, performLocalLookup};
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+  default:
+    return {nullptr, false};
+  }
 }
 
 llvm::Expected<Type>
 swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
                                     KnownProtocolKind knownProtocolKind,
                                     const DeclContext *dc) const {
-  const char *const name = getTypeName(knownProtocolKind);
+  const char *name;
+  bool performLocalLookup;
+  std::tie(name, performLocalLookup) =
+      lookupDefaultTypeInfoForKnownProtocol(knownProtocolKind);
   if (!name)
     return nullptr;
 
-  TypeChecker &tc = getTypeChecker();
+  // FIXME: Creating a whole type checker just to do lookup is unnecessary.
+  TypeChecker &tc = TypeChecker::createForContext(dc->getASTContext());
 
   Type type;
-  if (getPerformLocalLookup(knownProtocolKind))
+  if (performLocalLookup)
     type = lookupDefaultLiteralType(tc, dc, name);
 
   if (!type)
@@ -708,10 +723,6 @@ swift::DefaultTypeRequest::evaluate(Evaluator &evaluator,
       type = boundTypeAlias->getSinglyDesugaredType();
   }
   return type;
-}
-
-TypeChecker &DefaultTypeRequest::getTypeChecker() const {
-  return TypeChecker::createForContext(getDeclContext()->getASTContext());
 }
 
 Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {

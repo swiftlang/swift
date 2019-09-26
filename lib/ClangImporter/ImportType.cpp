@@ -819,41 +819,17 @@ namespace {
       return getAdjustedTypeDeclReferenceType(decl);
     }
 
-    /// Retrieve the 'Code' type for a bridged NSError, or nullptr if
-    /// this is not a bridged NSError type.
-    static TypeDecl *getBridgedNSErrorCode(TypeDecl *decl) {
-      auto nominal = dyn_cast<NominalTypeDecl>(decl);
-      if (!nominal) return nullptr;
-
-      const DeclAttributes &allAttrs = decl->getAttrs();
-      for (auto attr : allAttrs.getAttributes<SynthesizedProtocolAttr>()) {
-        if (attr->getProtocolKind() ==
-            KnownProtocolKind::BridgedStoredNSError) {
-          auto &ctx = nominal->getASTContext();
-          auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-          flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-          auto lookup = nominal->lookupDirect(ctx.Id_Code, flags);
-          for (auto found : lookup) {
-            if (auto codeDecl = dyn_cast<TypeDecl>(found))
-              return codeDecl;
-          }
-          llvm_unreachable("couldn't find 'Code' within bridged error type");
-        }
-      }
-
-      return nullptr;
-    }
-
     /// Retrieve the adjusted type of a reference to the given type declaration.
-    Type getAdjustedTypeDeclReferenceType(TypeDecl *type) {
+    Type getAdjustedTypeDeclReferenceType(TypeDecl *decl) {
       // If the imported declaration is a bridged NSError, dig out
       // the Code nested type. References to the enum type from C
       // code need to map to the code type (which is ABI compatible with C),
       // and the bridged error type is used elsewhere.
-      if (auto codeDecl = getBridgedNSErrorCode(type))
-        return Impl.getSugaredTypeReference(codeDecl);
+      if (auto *structDecl = dyn_cast<StructDecl>(decl))
+        if (auto *codeEnum = Impl.lookupErrorCodeEnum(structDecl))
+          return codeEnum->getDeclaredInterfaceType();
 
-      return Impl.getSugaredTypeReference(type);
+      return decl->getDeclaredInterfaceType();
     }
 
     ImportResult VisitEnumType(const clang::EnumType *type) {
@@ -2355,11 +2331,9 @@ Type ClangImporter::Implementation::getNamedSwiftType(ModuleDecl *module,
       // If we have an overlay, look in the overlay. Otherwise, skip
       // the lookup to avoid infinite recursion.
       if (auto module = clangUnit->getOverlayModule())
-        module->lookupValue({ }, identifier,
-                          NLKind::UnqualifiedLookup, results);
+        module->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     } else {
-      file->lookupValue({ }, identifier,
-                        NLKind::UnqualifiedLookup, results);
+      file->lookupValue(identifier, NLKind::UnqualifiedLookup, results);
     }
   }
 
@@ -2400,7 +2374,7 @@ getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
 
   // Look for the type.
   SmallVector<ValueDecl *, 2> results;
-  module->lookupValue({ }, SwiftContext.getIdentifier(name),
+  module->lookupValue(SwiftContext.getIdentifier(name),
                       NLKind::UnqualifiedLookup, results);
   if (results.size() == 1) {
     if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {
@@ -2520,23 +2494,6 @@ static Type getNamedProtocolType(ClangImporter::Implementation &impl,
   }
 
   return Type();
-}
-
-Type ClangImporter::Implementation::getSugaredTypeReference(TypeDecl *type) {
-  // For typealiases, build a sugared type.
-  if (auto typealias = dyn_cast<TypeAliasDecl>(type)) {
-    // If this typealias is nested, retrieve the parent type.
-    Type parentType;
-    if (auto nominal = typealias->getDeclContext()->getSelfNominalTypeDecl()) {
-      if (!nominal->getGenericSignature())
-        parentType = nominal->getDeclaredInterfaceType();
-    }
-
-    return TypeAliasType::get(typealias, parentType, SubstitutionMap(),
-                              typealias->getUnderlyingTypeLoc().getType());
-  }
-
-  return type->getDeclaredInterfaceType();
 }
 
 Type ClangImporter::Implementation::getNSCopyingType() {

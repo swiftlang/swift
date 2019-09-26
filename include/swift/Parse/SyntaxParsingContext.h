@@ -180,14 +180,17 @@ private:
   ArrayRef<ParsedRawSyntaxNode> getParts() const {
     return llvm::makeArrayRef(getStorage()).drop_front(Offset);
   }
+  MutableArrayRef<ParsedRawSyntaxNode> getParts() {
+    return llvm::makeMutableArrayRef(getStorage().data(), getStorage().size()).drop_front(Offset);
+  }
 
   ParsedRawSyntaxNode makeUnknownSyntax(SyntaxKind Kind,
-                                  ArrayRef<ParsedRawSyntaxNode> Parts);
+                                  MutableArrayRef<ParsedRawSyntaxNode> Parts);
   ParsedRawSyntaxNode createSyntaxAs(SyntaxKind Kind,
-                                     ArrayRef<ParsedRawSyntaxNode> Parts,
+                                     MutableArrayRef<ParsedRawSyntaxNode> Parts,
                                      SyntaxNodeCreationKind nodeCreateK);
   Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
-                              ArrayRef<ParsedRawSyntaxNode> Parts);
+                              MutableArrayRef<ParsedRawSyntaxNode> Parts);
 
   ParsedRawSyntaxNode finalizeSourceFile();
 
@@ -277,14 +280,12 @@ public:
 
   /// Returns the topmost Syntax node.
   template <typename SyntaxNode> SyntaxNode topNode() {
-    ParsedRawSyntaxNode TopNode = getStorage().back();
-
+    ParsedRawSyntaxNode &TopNode = getStorage().back();
     if (TopNode.isRecorded()) {
       OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
       return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
     }
-    
-    return getSyntaxCreator().createNode<SyntaxNode>(TopNode);
+    return getSyntaxCreator().createNode<SyntaxNode>(TopNode.copyDeferred());
   }
 
   template <typename SyntaxNode>
@@ -292,11 +293,11 @@ public:
     auto &Storage = getStorage();
     if (Storage.size() <= Offset)
       return llvm::None;
-    auto rawNode = Storage.back();
-    if (!SyntaxNode::kindof(rawNode.getKind()))
+    if (!SyntaxNode::kindof(Storage.back().getKind()))
       return llvm::None;
+    auto rawNode = std::move(Storage.back());
     Storage.pop_back();
-    return SyntaxNode(rawNode);
+    return SyntaxNode(std::move(rawNode));
   }
 
   ParsedTokenSyntax popToken();

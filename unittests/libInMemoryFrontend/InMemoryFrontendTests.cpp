@@ -2,7 +2,6 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
-#include "swift/Serialization/ModuleFile.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"

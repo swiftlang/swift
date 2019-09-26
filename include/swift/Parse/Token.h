@@ -248,17 +248,6 @@ public:
     return CharSourceRange(getLoc(), getLength());
   }
 
-  CharSourceRange getRangeWithoutBackticks() const {
-    SourceLoc TokLoc = getLoc();
-    unsigned TokLength = getLength();
-    if (isEscapedIdentifier()) {
-      // Adjust to account for the backticks.
-      TokLoc = TokLoc.getAdvancedLoc(1);
-      TokLength -= 2;
-    }
-    return CharSourceRange(TokLoc, TokLength);
-  }
-
   bool hasComment() const {
     return CommentLength != 0;
   }

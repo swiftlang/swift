@@ -1490,8 +1490,8 @@ public:
                 "The JVP function must not be @differentiable");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), /*resultIndex*/ 0, order,
-            AutoDiffAssociatedFunctionKind::JVP, F.getModule(),
-            LookUpConformanceInModule(F.getModule().getSwiftModule()));
+            AutoDiffAssociatedFunctionKind::JVP, TC,
+            LookUpConformanceInModule(M));
         requireSameType(SILType::getPrimitiveObjectType(jvpType),
                         SILType::getPrimitiveObjectType(expectedJVPType),
                         "JVP type does not match expected JVP type");
@@ -1501,8 +1501,8 @@ public:
                 "The VJP function must not be @differentiable");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
             adfi->getParameterIndices(), /*resultIndex*/ 0, order,
-            AutoDiffAssociatedFunctionKind::VJP, F.getModule(),
-            LookUpConformanceInModule(F.getModule().getSwiftModule()));
+            AutoDiffAssociatedFunctionKind::VJP, TC,
+            LookUpConformanceInModule(M));
         requireSameType(SILType::getPrimitiveObjectType(vjpType),
                         SILType::getPrimitiveObjectType(expectedVJPType),
                         "VJP type does not match expected VJP type");
@@ -2356,8 +2356,8 @@ public:
             "project_box operand should be a value");
     auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "project_box operand should be a @box type");
-    require(I->getType() == boxTy->getFieldType(F.getModule(),
-                                                I->getFieldIndex()),
+    require(I->getType() == getSILBoxFieldType(boxTy, F.getModule().Types,
+                                               I->getFieldIndex()),
             "project_box result should be address of boxed type");
 
     // If we have a mark_uninitialized as a user, the mark_uninitialized must be
@@ -2377,7 +2377,7 @@ public:
     require(operandType.isObject(),
             "project_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Boxed),
             "project_existential_box operand must be boxed existential");
 
@@ -2642,7 +2642,8 @@ public:
             "result of alloc_box must be an object");
     for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
       verifyOpenedArchetype(AI,
-                   AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
+        getSILBoxFieldLoweredType(AI->getBoxType(), F.getModule().Types,
+                                  field));
     }
 
     // An alloc_box with a mark_uninitialized user can not have any other users.
@@ -3117,7 +3118,7 @@ public:
     SILType operandType = OEI->getOperand()->getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                         ExistentialRepresentation::Opaque),
            "open_existential_addr must be applied to opaque existential");
 
@@ -3148,7 +3149,7 @@ public:
     require(operandType.isObject(),
             "open_existential_ref operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Class),
             "open_existential_ref operand must be class existential");
 
@@ -3170,7 +3171,7 @@ public:
     require(operandType.isObject(),
             "open_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
@@ -3192,7 +3193,7 @@ public:
     require(operandType.isObject(),
             "open_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
@@ -3260,7 +3261,7 @@ public:
     require(!operandType.isAddress(),
             "open_existential_value must not be applied to address");
     require(operandType.canUseExistentialRepresentation(
-                F.getModule(), ExistentialRepresentation::Opaque),
+                ExistentialRepresentation::Opaque),
             "open_existential_value must be applied to opaque existential");
 
     require(!OEI->getType().isAddress(),
@@ -3278,7 +3279,7 @@ public:
     SILType exType = AEBI->getExistentialType();
     require(exType.isObject(),
             "alloc_existential_box #0 result should be a value");
-    require(exType.canUseExistentialRepresentation(F.getModule(),
+    require(exType.canUseExistentialRepresentation(
                                              ExistentialRepresentation::Boxed,
                                              AEBI->getFormalConcreteType()),
             "alloc_existential_box must be used with a boxed existential "
@@ -3294,7 +3295,7 @@ public:
     SILType exType = AEI->getOperand()->getType();
     require(exType.isAddress(),
             "init_existential_addr must be applied to an address");
-    require(exType.canUseExistentialRepresentation(F.getModule(),
+    require(exType.canUseExistentialRepresentation(
                                        ExistentialRepresentation::Opaque,
                                        AEI->getFormalConcreteType()),
             "init_existential_addr must be used with an opaque "
@@ -3353,7 +3354,7 @@ public:
     SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getASTType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
-    require(IEI->getType().canUseExistentialRepresentation(F.getModule(),
+    require(IEI->getType().canUseExistentialRepresentation(
                                      ExistentialRepresentation::Class,
                                      IEI->getFormalConcreteType()),
             "init_existential_ref must be used with a class existential type");
@@ -3385,7 +3386,7 @@ public:
     require(exType.isAddress(),
             "deinit_existential_addr must be applied to an address");
     require(exType.canUseExistentialRepresentation(
-                F.getModule(), ExistentialRepresentation::Opaque),
+                ExistentialRepresentation::Opaque),
             "deinit_existential_addr must be applied to an opaque existential");
   }
 
@@ -3395,7 +3396,7 @@ public:
             "deinit_existential_value must not be applied to an address");
     require(
         exType.canUseExistentialRepresentation(
-            F.getModule(), ExistentialRepresentation::Opaque),
+            ExistentialRepresentation::Opaque),
         "deinit_existential_value must be applied to an opaque existential");
   }
   
@@ -3403,7 +3404,7 @@ public:
     SILType exType = DEBI->getOperand()->getType();
     require(exType.isObject(),
             "dealloc_existential_box must be applied to a value");
-    require(exType.canUseExistentialRepresentation(F.getModule(),
+    require(exType.canUseExistentialRepresentation(
                                        ExistentialRepresentation::Boxed),
             "dealloc_existential_box must be applied to a boxed "
             "existential");

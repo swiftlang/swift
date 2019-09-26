@@ -16,7 +16,9 @@ enum Z {
 
   init() { self = .none }
   init(_ c: UnicodeScalar) { self = .char(c) }
+  // expected-note@-1 2 {{candidate expects value of type 'UnicodeScalar' (aka 'Unicode.Scalar') at position #0}}
   init(_ s: String) { self = .string(s) }
+  // expected-note@-1 2 {{candidate expects value of type 'String' at position #0}}
   init(_ x: Int, _ y: Int) { self = .point(x, y) }
 }
 
@@ -93,11 +95,9 @@ _ = b as! Derived
 //  are special cased in the library.
 Int(i) // expected-warning{{unused}}
 _ = i as Int
-Z(z) // expected-error{{cannot invoke initializer for type 'Z' with an argument list of type '(Z)'}}
-// expected-note @-1 {{overloads for 'Z' exist with these partially matching parameter lists: (String), (UnicodeScalar)}}
+Z(z) // expected-error{{no exact matches in call to initializer}}
 
-Z.init(z)  // expected-error {{cannot invoke 'Z.Type.init' with an argument list of type '(Z)'}}
-// expected-note @-1 {{overloads for 'Z.Type.init' exist with these partially matching parameter lists: (String), (UnicodeScalar)}}
+Z.init(z)  // expected-error {{no exact matches in call to initializer}}
 
 
 _ = z as Z

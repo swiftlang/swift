@@ -448,6 +448,17 @@ getDirectlyInheritedNominalTypeDecls(
 SelfBounds getSelfBoundsFromWhereClause(
     llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl);
 
+/// Retrieve the TypeLoc at the given \c index from among the set of
+/// type declarations that are directly "inherited" by the given declaration.
+inline TypeLoc &
+getInheritedTypeLocAtIndex(llvm::PointerUnion<TypeDecl *, ExtensionDecl *> decl,
+                           unsigned index) {
+  if (auto typeDecl = decl.dyn_cast<TypeDecl *>())
+    return typeDecl->getInherited()[index];
+
+  return decl.get<ExtensionDecl *>()->getInherited()[index];
+}
+
 namespace namelookup {
 
 /// Searches through statements and patterns for local variable declarations.
@@ -580,6 +591,10 @@ class ASTScope {
 
 public:
   ASTScope(SourceFile *);
+
+  /// Cannot be lazy during type-checking because it mutates the AST.
+  /// So build eagerly before type-checking
+  void buildScopeTreeEagerly();
 
   /// \return the scopes traversed
   static llvm::SmallVector<const ast_scope::ASTScopeImpl *, 0>

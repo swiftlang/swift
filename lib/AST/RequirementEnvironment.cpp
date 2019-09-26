@@ -142,7 +142,7 @@ RequirementEnvironment::RequirementEnvironment(
     if (syntheticSignature) {
       syntheticSignature = syntheticSignature->getCanonicalSignature();
       syntheticEnvironment =
-        syntheticSignature->createGenericEnvironment();
+        syntheticSignature->getGenericEnvironment();
     }
 
     return;
@@ -217,5 +217,5 @@ RequirementEnvironment::RequirementEnvironment(
       AbstractGenericSignatureRequest{
         nullptr, std::move(genericParamTypes), std::move(requirements)},
       nullptr);
-  syntheticEnvironment = syntheticSignature->createGenericEnvironment();
+  syntheticEnvironment = syntheticSignature->getGenericEnvironment();
 }

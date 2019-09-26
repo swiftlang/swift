@@ -123,6 +123,25 @@ add_custom_command_target(unused_var
     COMMENT "Symlinking Clang resource headers into ${SWIFTLIB_DIR}/clang")
 add_dependencies(copy_shim_headers symlink_clang_headers)
 
+if(NOT SWIFT_BUILT_STANDALONE)
+  if(TARGET clang-resource-headers) # LLVM > 8
+    set(clang_resource_headers clang-resource-headers)
+  elseif(TARGET clang-headers) # LLVM <= 8
+    set(clang_resource_headers clang-headers)
+  else()
+    message(SEND_ERROR
+      "Unable to determine clang resource headers target in unified build")
+  endif()
+
+  foreach(target
+      symlink_clang_headers
+      clang-builtin-headers
+      clang-resource-dir-symlink
+      clang-builtin-headers-in-clang-resource-dir)
+    add_dependencies(${target} ${clang_resource_headers})
+  endforeach()
+endif()
+
 swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"
                            COMPONENT stdlib)

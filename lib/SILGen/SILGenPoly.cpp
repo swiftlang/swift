@@ -2932,7 +2932,7 @@ buildThunkSignature(SILGenFunction &SGF,
       AbstractGenericSignatureRequest{
         baseGenericSig, { newGenericParam }, { newRequirement }},
       nullptr);
-  genericEnv = genericSig->createGenericEnvironment();
+  genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
     ->castTo<ArchetypeType>();
@@ -3293,7 +3293,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
     auto expectedAssocFnType =
         thunkedOriginalFnType->getAutoDiffAssociatedFunctionType(
             sourceType->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-            /*differentiationOrder*/ 1, kind, SGF.SGM.M,
+            /*differentiationOrder*/ 1, kind, SGF.SGM.Types,
             LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
     auto actualAssocFnType = managedAssocFn.getType().castTo<SILFunctionType>();
     return SGF.getThunkedAutoDiffAssociatedFunction(
@@ -3701,13 +3701,13 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   Lowering::GenericContextScope genericContextScope(
       Types, assocFnType->getGenericSignature());
   auto *thunkGenericEnv = assocFnType->getGenericSignature()
-      ? assocFnType->getGenericSignature()->createGenericEnvironment()
+      ? assocFnType->getGenericSignature()->getGenericEnvironment()
       : nullptr;
 
   auto origFnType = original->getLoweredFunctionType();
   auto origAssocFnType = origFnType->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      assocFnKind, M, LookUpConformanceInModule(M.getSwiftModule()),
+      assocFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
       assocFnType->getGenericSignature());
   assert(!origAssocFnType->getExtInfo().hasContext());
 

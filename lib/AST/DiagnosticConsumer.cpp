@@ -29,6 +29,15 @@ using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() = default;
 
+DiagnosticInfo::FixIt::FixIt(CharSourceRange R, StringRef Str,
+                             ArrayRef<DiagnosticArgument> Args) : Range(R) {
+  // FIXME: Defer text formatting to later in the pipeline.
+  llvm::raw_string_ostream OS(Text);
+  DiagnosticEngine::formatDiagnosticText(OS, Str, Args,
+                                         DiagnosticFormatOptions::
+                                         formatForFixIts());
+}
+
 llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
   return loc.Value;
 }

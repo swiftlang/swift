@@ -71,7 +71,7 @@ public:
     auto kind = *std::get<0>(Index).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
         ParameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
+        IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -161,7 +161,7 @@ public:
     auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
     auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
         parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
-        IGM.getSILModule(), LookUpConformanceInModule(IGM.getSwiftModule()));
+        IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 

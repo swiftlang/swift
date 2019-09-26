@@ -21,17 +21,17 @@ namespace swift {
 class ModuleFile;
 class LazyResolver;
 
-/// Spceifies how to load modules when both a parseable interface and serialized
+/// Spceifies how to load modules when both a module interface and serialized
 /// AST are present, or whether to disallow one format or the other altogether.
 enum class ModuleLoadingMode {
-  PreferParseable,
+  PreferInterface,
   PreferSerialized,
-  OnlyParseable,
+  OnlyInterface,
   OnlySerialized
 };
 
 /// Common functionality shared between \c SerializedModuleLoader and
-/// \c ParseableInterfaceModuleLoader.
+/// \c ModuleInterfaceLoader.
 class SerializedModuleLoaderBase : public ModuleLoader {
   /// A { module, generation # } pair.
   using LoadedModulePair = std::pair<std::unique_ptr<ModuleFile>, unsigned>;
@@ -42,10 +42,8 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
-  ArrayRef<std::string> PreferInterfaceForModules;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
-                             ModuleLoadingMode LoadMode,
-                             ArrayRef<std::string> PreferInterfaceForModules = {});
+                             ModuleLoadingMode LoadMode);
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
@@ -270,8 +268,7 @@ public:
 
   virtual bool isSystemModule() const override;
 
-  virtual void lookupValue(ModuleDecl::AccessPathTy accessPath,
-                           DeclName name, NLKind lookupKind,
+  virtual void lookupValue(DeclName name, NLKind lookupKind,
                            SmallVectorImpl<ValueDecl*> &results) const override;
 
   virtual StringRef

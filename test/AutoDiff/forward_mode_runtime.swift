@@ -1294,4 +1294,13 @@ ForwardModeTests.test("SubsetIndices") {
   expectEqual(4, derivWRTNonDiff { x, y in x + Float(y) })
 }
 
+ForwardModeTests.test("ForceUnwrapping") {
+  func forceUnwrap<T: Differentiable & FloatingPoint>(_ t: T) -> Float where T == T.TangentVector {
+    derivative(at: t, Float(3)) { (x, y) in
+      (x as! Float) * y
+    }
+  }
+  expectEqual(5, forceUnwrap(Float(2)))
+}
+
 runAllTests()
