@@ -278,14 +278,10 @@ bool SILValueOwnershipChecker::gatherUsers(
         // For correctness reasons we use indices to make sure that we can
         // append to NonLifetimeEndingUsers without needing to deal with
         // iterator invalidation.
-        for (unsigned i : indices(nonLifetimeEndingUsers)) {
-          if (auto *bbi = dyn_cast<BeginBorrowInst>(
-                  nonLifetimeEndingUsers[i]->getUser())) {
-            for (auto *use : bbi->getUses()) {
-              if (isa<EndBorrowInst>(use->getUser())) {
-                implicitRegularUsers.push_back(use);
-              }
-            }
+        for (auto *op : nonLifetimeEndingUsers) {
+          if (auto scopedOperand = BorrowScopeOperand::get(op)) {
+            scopedOperand->visitEndScopeInstructions(
+                [&](Operand *op) { implicitRegularUsers.push_back(op); });
           }
         }
       }
