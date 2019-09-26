@@ -847,7 +847,14 @@ public:
   }
   
   void layout() override {
-    addTypeRef(type, CanGenericSignature());
+    if (type->isAnyObject()) {
+      // AnyObject isn't actually a builtin type; we're emitting it as the old
+      // Builtin.UnknownObject type for ABI compatibility.
+      B.addRelativeAddress(
+          IGM.getAddrOfStringForTypeRef("BO", MangledTypeRefRole::Reflection));
+    } else {
+      addTypeRef(type, CanGenericSignature());
+    }
 
     B.addInt32(ti->getFixedSize().getValue());
 
@@ -1251,7 +1258,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
 void IRGenModule::emitBuiltinReflectionMetadata() {
   if (getSwiftModule()->isStdlibModule()) {
     BuiltinTypes.insert(Context.TheNativeObjectType);
-    BuiltinTypes.insert(Context.TheUnknownObjectType);
+    BuiltinTypes.insert(Context.getAnyObjectType());
     BuiltinTypes.insert(Context.TheBridgeObjectType);
     BuiltinTypes.insert(Context.TheRawPointerType);
     BuiltinTypes.insert(Context.TheUnsafeValueBufferType);

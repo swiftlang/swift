@@ -3913,8 +3913,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
   return (objType->mayHaveSuperclass()
           || objType->isClassExistentialType()
           || objType->is<BuiltinNativeObjectType>()
-          || objType->is<BuiltinBridgeObjectType>()
-          || objType->is<BuiltinUnknownObjectType>());
+          || objType->is<BuiltinBridgeObjectType>());
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,

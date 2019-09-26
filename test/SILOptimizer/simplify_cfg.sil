@@ -3163,27 +3163,27 @@ sil @external_g : $@convention(thin) () -> ()
 // CHECK: dynamic_method_br
 // CHECK-NOT: dynamic_method_br
 // CHECK: return
-sil @dont_tail_duplicate_dynamic_method_br : $@convention(thin) (@owned Builtin.UnknownObject, Builtin.Int1) -> () {
-bb0(%x : $Builtin.UnknownObject, %b : $Builtin.Int1):
+sil @dont_tail_duplicate_dynamic_method_br : $@convention(thin) (@owned Builtin.AnyObject, Builtin.Int1) -> () {
+bb0(%x : $Builtin.AnyObject, %b : $Builtin.Int1):
   cond_br %b, bb1, bb2
 
 bb1:
   %f = function_ref @external_f : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
-  strong_retain %x : $Builtin.UnknownObject
-  br bb3(%x : $Builtin.UnknownObject)
+  strong_retain %x : $Builtin.AnyObject
+  br bb3(%x : $Builtin.AnyObject)
 
 bb2:
   %g = function_ref @external_g : $@convention(thin) () -> ()
   apply %g() : $@convention(thin) () -> ()
-  strong_retain %x : $Builtin.UnknownObject
-  br bb3(%x : $Builtin.UnknownObject)
+  strong_retain %x : $Builtin.AnyObject
+  br bb3(%x : $Builtin.AnyObject)
 
-bb3(%y: $Builtin.UnknownObject):
-  strong_release %y : $Builtin.UnknownObject
-  dynamic_method_br %x : $Builtin.UnknownObject, #X.f!1.foreign, bb4, bb5
+bb3(%y: $Builtin.AnyObject):
+  strong_release %y : $Builtin.AnyObject
+  dynamic_method_br %x : $Builtin.AnyObject, #X.f!1.foreign, bb4, bb5
 
-bb4(%m : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+bb4(%m : $@convention(objc_method) (Builtin.AnyObject) -> ()):
   br bb6
 
 bb5:

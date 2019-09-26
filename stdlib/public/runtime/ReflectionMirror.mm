@@ -728,7 +728,7 @@ auto call(OpaqueValue *passedValue, const Metadata *T, const Metadata *passedTyp
 
     case MetadataKind::Opaque: {
 #if SWIFT_OBJC_INTEROP
-      // If this is the Builtin.UnknownObject type, use the dynamic type of the
+      // If this is the AnyObject type, use the dynamic type of the
       // object reference.
       if (type == &METADATA_SYM(BO).base) {
         return callClass();

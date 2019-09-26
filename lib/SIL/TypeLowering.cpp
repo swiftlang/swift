@@ -194,7 +194,6 @@ namespace {
     IMPL(BuiltinRawPointer, Trivial)
     IMPL(BuiltinNativeObject, Reference)
     IMPL(BuiltinBridgeObject, Reference)
-    IMPL(BuiltinUnknownObject, Reference)
     IMPL(BuiltinVector, Trivial)
     IMPL(SILToken, Trivial)
     IMPL(Class, Reference)
@@ -294,7 +293,7 @@ namespace {
           return getConcreteReferenceStorageReferent(bound->getCanonicalType());
         }
 
-        return TC.Context.TheUnknownObjectType;
+        return TC.Context.getAnyObjectType();
       }
 
       return type;
