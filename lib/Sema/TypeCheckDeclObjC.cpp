@@ -1372,6 +1372,11 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
     return false;
   }
 
+  // We need at least one case to have a raw value.
+  if (enumDecl->getAllElements().empty()) {
+    enumDecl->diagnose(diag::empty_enum_raw_type);
+  }
+  
   return true;
 }
 

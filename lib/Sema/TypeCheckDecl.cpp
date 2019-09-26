@@ -1431,6 +1431,41 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
   llvm_unreachable("Unhandled AutomaticEnumValueKind in switch.");
 }
 
+static Optional<AutomaticEnumValueKind>
+computeAutomaticEnumValueKind(TypeChecker &TC, EnumDecl *ED) {
+  Type rawTy = ED->getRawType();
+  assert(rawTy && "Cannot compute value kind without raw type!");
+  
+  if (ED->getGenericEnvironmentOfContext() != nullptr)
+    rawTy = ED->mapTypeIntoContext(rawTy);
+  
+  // Swift enums require that the raw type is convertible from one of the
+  // primitive literal protocols.
+  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
+    ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
+    return TypeChecker::conformsToProtocol(rawTy, proto,
+                                           ED->getDeclContext(), None);
+  };
+  
+  static auto otherLiteralProtocolKinds = {
+    KnownProtocolKind::ExpressibleByFloatLiteral,
+    KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
+    KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
+  };
+  
+  if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+    return AutomaticEnumValueKind::Integer;
+  } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
+    return AutomaticEnumValueKind::String;
+  } else if (std::any_of(otherLiteralProtocolKinds.begin(),
+                         otherLiteralProtocolKinds.end(),
+                         conformsToProtocol)) {
+    return AutomaticEnumValueKind::None;
+  } else {
+    return None;
+  }
+}
+
 static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
@@ -1442,44 +1477,11 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   if (rawTy->hasError())
     return;
 
-  AutomaticEnumValueKind valueKind;
-  // Swift enums require that the raw type is convertible from one of the
-  // primitive literal protocols.
-  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-      ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-      return TypeChecker::conformsToProtocol(rawTy, proto,
-                                             ED->getDeclContext(), None);
-  };
-
-  static auto otherLiteralProtocolKinds = {
-    KnownProtocolKind::ExpressibleByFloatLiteral,
-    KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
-    KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
-  };
-
-  if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-    valueKind = AutomaticEnumValueKind::Integer;
-  } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
-    valueKind = AutomaticEnumValueKind::String;
-  } else if (std::any_of(otherLiteralProtocolKinds.begin(),
-                         otherLiteralProtocolKinds.end(),
-                         conformsToProtocol)) {
-    valueKind = AutomaticEnumValueKind::None;
-  } else {
-    TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                diag::raw_type_not_literal_convertible,
-                rawTy);
-    ED->getInherited().front().setInvalidType(TC.Context);
+  // If we don't have a value kind, the decl checker will provide a diagnostic.
+  auto valueKind = computeAutomaticEnumValueKind(TC, ED);
+  if (!valueKind.hasValue())
     return;
-  }
-
-  // We need at least one case to have a raw value.
-  if (ED->getAllElements().empty()) {
-    TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                diag::empty_enum_raw_type);
-    return;
-  }
-
+  
   // Check the raw values of the cases.
   LiteralExpr *prevValue = nullptr;
   EnumElementDecl *lastExplicitValueElt = nullptr;
@@ -1499,16 +1501,6 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     (void)elt->getInterfaceType();
     if (elt->isInvalid())
       continue;
-
-    // We don't yet support raw values on payload cases.
-    if (elt->hasAssociatedValues()) {
-      TC.diagnose(elt->getLoc(),
-                  diag::enum_with_raw_type_case_with_argument);
-      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                  diag::enum_raw_type_here, rawTy);
-      elt->setInvalid();
-      continue;
-    }
     
     if (elt->hasRawValueExpr()) {
       lastExplicitValueElt = elt;
@@ -1516,7 +1508,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
-      auto nextValue = getAutomaticRawValueExpr(TC, valueKind, elt, prevValue);
+      auto nextValue = getAutomaticRawValueExpr(TC, *valueKind, elt, prevValue);
       if (!nextValue) {
         elt->setInvalid();
         break;
@@ -2611,11 +2603,26 @@ public:
     checkAccessControl(TC, ED);
 
     TC.checkPatternBindingCaptures(ED);
-
-    if (ED->hasRawType() && !ED->isObjC()) {
+    
+    if (auto rawTy = ED->getRawType()) {
+      // The raw type must be one of the blessed literal convertible types.
+      if (!computeAutomaticEnumValueKind(TC, ED)) {
+        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                    diag::raw_type_not_literal_convertible,
+                    rawTy);
+        ED->getInherited().front().setInvalidType(TC.Context);
+      }
+      
+      // We need at least one case to have a raw value.
+      if (ED->getAllElements().empty()) {
+        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                    diag::empty_enum_raw_type);
+      }
+      
       // ObjC enums have already had their raw values checked, but pure Swift
       // enums haven't.
-      checkEnumRawValues(TC, ED);
+      if (!ED->isObjC())
+        checkEnumRawValues(TC, ED);
     }
 
     checkExplicitAvailability(ED);
@@ -3089,6 +3096,7 @@ public:
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
     (void)EED->getInterfaceType();
+    auto *ED = EED->getParentEnum();
 
     TC.checkDeclAttributes(EED);
 
@@ -3097,8 +3105,19 @@ public:
       checkDefaultArguments(TC, PL, EED);
     }
 
+    // We don't yet support raw values on payload cases.
+    if (EED->hasAssociatedValues()) {
+      if (auto rawTy = ED->getRawType()) {
+        TC.diagnose(EED->getLoc(),
+                    diag::enum_with_raw_type_case_with_argument);
+        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                    diag::enum_raw_type_here, rawTy);
+        EED->setInvalid();
+      }
+    }
+
     // Yell if our parent doesn't have a raw type but we have a raw value.
-    if (!EED->getParentEnum()->hasRawType() && EED->hasRawValueExpr()) {
+    if (EED->hasRawValueExpr() && !ED->hasRawType()) {
       TC.diagnose(EED->getRawValueExpr()->getLoc(),
                   diag::enum_raw_value_without_raw_type);
       EED->setInvalid();
