@@ -4,7 +4,7 @@
 // Run the (mandatory) passes on which constant evaluator depends, and test the
 // constant evaluator on the SIL produced after the dependent passes are run.
 //
-// RUN: not %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > /dev/null 2> %t/error-output
+// RUN: not %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > %t/constant_evaluable_subset_test.sil 2> %t/error-output
 //
 // RUN: %FileCheck %s < %t/error-output
 //
@@ -719,4 +719,68 @@ func testIndirectEnum(_ nat: Nat) -> Bool {
 @_semantics("test_driver")
 func interpretIndirectEnum() -> Bool {
   return testIndirectEnum(.succ(.zero))
+}
+
+// CHECK-LABEL: @testEmptyArrayInit
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testEmptyArrayInit() -> [Int] {
+  return Array<Int>()
+}
+
+@_semantics("test_driver")
+func interpretEmptyArrayInit() -> [Int] {
+  return testEmptyArrayInit()
+}
+
+// CHECK-LABEL: @testEmptyArrayLiteral
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testEmptyArrayLiteral() -> [Int] {
+  return []
+}
+
+@_semantics("test_driver")
+func interpretEmptyArrayLiteral() -> [Int] {
+  return testEmptyArrayLiteral()
+}
+
+// CHECK-LABEL: @testArrayLiteral
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayLiteral(_ x: Int, _ y: Int) -> [Int] {
+  return [x, y, 4]
+}
+
+@_semantics("test_driver")
+func interpretArrayLiteral() -> [Int] {
+  return testArrayLiteral(2, 3)
+}
+
+// CHECK-LABEL: @testArrayAppend
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayAppend(_ x: Int) -> [Int] {
+  var a: [Int] = []
+  a.append(x)
+  return a
+}
+
+@_semantics("test_driver")
+func interpretArrayAppend() -> [Int] {
+  return testArrayAppend(25)
+}
+
+// CHECK-LABEL: @testArrayAppendNonEmpty
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayAppendNonEmpty(_ x: String) -> [String] {
+  var a: [String] = ["ls", "cat", "echo", "cd"]
+  a.append(x)
+  return a
+}
+
+@_semantics("test_driver")
+func interpretArrayAppendNonEmpty() -> [String] {
+  return testArrayAppendNonEmpty("mkdir")
 }

@@ -1213,3 +1213,155 @@ sil @interpretAssertionFailure : $@convention(thin) () -> Never {
     // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: error-prefix: message
   unreachable
 }
+
+// Tests for arrays.
+
+// Array.init()
+sil [serialized] [_semantics "array.init.empty"] @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+
+// _allocateUninitializedArray<A>(_:)
+sil [serialized] [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+
+sil @interpretArrayInit : $@convention(thin) () -> @owned Array<Int> {
+bb0:
+  %0 = metatype $@thin Array<Int>.Type
+  // function_ref Array.init()
+  %1 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %2 = apply %1<Int>(%0) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  return %2 : $Array<Int>
+} // CHECK: Returns Array<Int>
+  // CHECK: size: 0 contents []
+
+sil [ossa] @interpretEmptyArrayLiteral : $@convention(thin) () -> @owned Array<String> {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %2 = apply %1<String>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%3, %4) = destructure_tuple %2 : $(Array<String>, Builtin.RawPointer)
+  return %3 : $Array<String>
+} // CHECK: Returns Array<String>
+  // CHECK: size: 0 contents []
+
+sil [ossa] @initializeArrayWithLiterals : $@convention(thin) () -> @owned Array<Int64> {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 11 // element 1
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 12  // element 2
+  %3 = struct $Int64 (%2 : $Builtin.Int64)
+  %4 = integer_literal $Builtin.Int64, 14 // element 3
+  %5 = struct $Int64 (%4 : $Builtin.Int64)
+
+  %6 = integer_literal $Builtin.Word, 3 // array literal size
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %7 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  %8 = apply %7<Int64>(%6) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
+  (%9, %10) = destructure_tuple %8 : $(Array<Int64>, Builtin.RawPointer)
+  %11 = pointer_to_address %10 : $Builtin.RawPointer to [strict] $*Int64
+  store %1 to [trivial] %11 : $*Int64
+  %13 = integer_literal $Builtin.Word, 1 // Index: 1
+  %14 = index_addr %11 : $*Int64, %13 : $Builtin.Word
+  store %3 to [trivial] %14 : $*Int64
+  %16 = integer_literal $Builtin.Word, 2 // Index: 2
+  %17 = index_addr %11 : $*Int64, %16 : $Builtin.Word
+  store %5 to [trivial] %17 : $*Int64
+  return %9 : $Array<Int64>
+}
+
+sil [ossa] @interpretArrayLiteral : $@convention(thin) () -> @owned Array<Int64> {
+bb0:
+  %7 = function_ref @initializeArrayWithLiterals : $@convention(thin) () -> @owned Array<Int64>
+  %8 = apply %7() : $@convention(thin) () -> @owned Array<Int64>
+  return %8 : $Array<Int64>
+} // CHECK: Returns Array<Int64>
+  // CHECK: size: 3
+  // CHECK: agg: 1 elt: int: 11
+  // CHECK: agg: 1 elt: int: 12
+  // CHECK: agg: 1 elt: int: 14
+
+// Array.append(_:)
+sil [serialized] [_semantics "array.append_element"] @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+
+sil [ossa] @interpretArrayAppend : $@convention(thin) () -> @owned Array<Int64> {
+  %0 = integer_literal $Builtin.Int64, 71
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = alloc_stack $Array<Int64>, var, name "a"
+  %3 = metatype $@thin Array<Int64>.Type
+  // function_ref Array.init()
+  %4 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %5 = apply %4<Int64>(%3) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  store %5 to [init] %2 : $*Array<Int64>
+  %10 = alloc_stack $Int64
+  store %1 to [trivial] %10 : $*Int64
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<Int64>(%10, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %10 : $*Int64
+  %18 = load [copy] %2 : $*Array<Int64>
+  destroy_addr %2 : $*Array<Int64>
+  dealloc_stack %2 : $*Array<Int64>
+  return %18 : $Array<Int64>
+} // CHECK: Returns Array<Int64>
+  // CHECK: size: 1
+  // CHECK: agg: 1 elt: int: 71
+
+sil [ossa] @interpretArrayAppendNonEmpty : $@convention(thin) () -> @owned Array<Int64> {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 100
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = alloc_stack $Array<Int64>, var, name "a"
+  %3 = metatype $@thin Array<Int64>.Type
+  %4 = function_ref @initializeArrayWithLiterals : $@convention(thin) () -> @owned Array<Int64>
+  %5 = apply %4() : $@convention(thin) () -> @owned Array<Int64>
+  store %5 to [init] %2 : $*Array<Int64>
+  %10 = alloc_stack $Int64
+  store %1 to [trivial] %10 : $*Int64
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<Int64>(%10, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %10 : $*Int64
+  %18 = load [copy] %2 : $*Array<Int64>
+  destroy_addr %2 : $*Array<Int64>
+  dealloc_stack %2 : $*Array<Int64>
+  return %18 : $Array<Int64>
+} // CHECK: Returns Array<Int64>
+  // CHECK: size: 4
+  // CHECK: agg: 1 elt: int: 11
+  // CHECK: agg: 1 elt: int: 12
+  // CHECK: agg: 1 elt: int: 14
+  // CHECK: agg: 1 elt: int: 100
+
+/// Test appending of a static string to an array. The construction of a static
+/// string is a bit complicated due to the use of instructions like "ptrtoint".
+/// This tests that array append works with such complex constant values as well.
+sil @interpretArrayAppendStaticString : $@convention(thin) () -> @owned Array<StaticString> {
+  %0 = string_literal utf8 "constant" // string to be appended.
+
+  // Initialize an empty array
+  %2 = alloc_stack $Array<StaticString>, var, name "a"
+  %3 = metatype $@thin Array<StaticString>.Type
+  // function_ref Array.init()
+  %4 = function_ref @$sS2ayxGycfC : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  %5 = apply %4<StaticString>(%3) : $@convention(method) <τ_0_0> (@thin Array<τ_0_0>.Type) -> @owned Array<τ_0_0>
+  store %5 to %2 : $*Array<StaticString>
+
+  // Initialize a static string.
+  %6 = integer_literal $Builtin.Word, 8
+  %7 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %8 = integer_literal $Builtin.Int8, 2
+  %9 = struct $StaticString (%7 : $Builtin.Word, %6 : $Builtin.Word, %8 : $Builtin.Int8)
+
+  %10 = alloc_stack $StaticString
+  store %9 to %10 : $*StaticString
+  // function_ref Array.append(_:)
+  %13 = function_ref @$sSa6appendyyxnF : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  %14 = apply %13<StaticString>(%10, %2) : $@convention(method) <τ_0_0> (@in τ_0_0, @inout Array<τ_0_0>) -> ()
+  dealloc_stack %10 : $*StaticString
+  %18 = load %2 : $*Array<StaticString>
+  destroy_addr %2 : $*Array<StaticString>
+  dealloc_stack %2 : $*Array<StaticString>
+  return %18 : $Array<StaticString>
+} // CHECK: Returns Array<StaticString>
+  // CHECK: size: 1
+  // CHECK: string: "constant"
+
