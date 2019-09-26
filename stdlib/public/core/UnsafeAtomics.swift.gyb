@@ -76,14 +76,6 @@ extension MemoryOrdering {
   public static var acquiringAndReleasing: MemoryOrdering {
     MemoryOrdering(_rawValue: 3)
   }
-
-  /// In addition to ensuring the same constraints as `acquiringAndReleasing`,
-  /// this ordering level also establishes a single total modification ordering
-  /// of all atomic operations that have this ordering level.
-  @_transparent // Debug performance
-  public static var sequentiallyConsistent: MemoryOrdering {
-    MemoryOrdering(_rawValue: 4)
-  }
 }
 
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
@@ -113,7 +105,6 @@ extension MemoryOrdering: CustomStringConvertible {
     case .acquiring: return "acquiring"
     case .releasing: return "releasing"
     case .acquiringAndReleasing: return "acquiringAndReleasing"
-    case .sequentiallyConsistent: return "sequentiallyConsistent"
     default: return "MemoryOrdering(\(_rawValue))"
     }
   }
@@ -136,16 +127,14 @@ public struct UnsafeAtomicUInt {
 @available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
 extension UnsafeAtomicUInt {
   @_transparent
-  public func load(
-    ordering: MemoryOrdering = .sequentiallyConsistent
-  ) -> UInt {
+  public func load(ordering: MemoryOrdering = .acquiring) -> UInt {
     return _ptr._atomicLoadWord(ordering: ordering)
   }
 
   @_transparent
   public func store(
     _ desired: UInt,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .releasing
   ) {
     _ptr._atomicStoreWord(desired, ordering: ordering)
   }
@@ -153,7 +142,7 @@ extension UnsafeAtomicUInt {
   @_transparent
   public func exchange(
     _ desired: UInt,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> UInt {
     return _ptr._atomicExchangeWord(desired, ordering: ordering)
   }
@@ -162,7 +151,7 @@ extension UnsafeAtomicUInt {
   public func compareExchange(
     expected: inout UInt,
     desired: UInt,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     return _ptr._atomicCompareExchangeWord(
       expected: &expected,
@@ -175,7 +164,7 @@ extension UnsafeAtomicUInt {
   @discardableResult
   public func fetchThen${name}(
     _ operand: UInt,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> UInt {
     return _ptr._atomicFetchThen${name}Word(operand, ordering: ordering)
   }
@@ -186,7 +175,7 @@ extension UnsafeAtomicUInt {
   @discardableResult
   public func ${lowerName}ThenFetch(
     _ operand: UInt,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> UInt {
     return _ptr._atomic${name}ThenFetchWord(operand, ordering: ordering)
   }
@@ -211,7 +200,7 @@ public struct UnsafeAtomicInt {
 extension UnsafeAtomicInt {
   @_transparent
   public func load(
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiring
   ) -> Int {
     return Int(bitPattern: _ptr._atomicLoadWord(ordering: ordering))
   }
@@ -219,7 +208,7 @@ extension UnsafeAtomicInt {
   @_transparent
   public func store(
     _ desired: Int,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .releasing
   ) {
     _ptr._atomicStoreWord(UInt(bitPattern: desired), ordering: ordering)
   }
@@ -227,7 +216,7 @@ extension UnsafeAtomicInt {
   @_transparent
   public func exchange(
     _ desired: Int,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Int {
     let desiredWord = UInt(bitPattern: desired)
     let result = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
@@ -238,7 +227,7 @@ extension UnsafeAtomicInt {
   public func compareExchange(
     expected: inout Int,
     desired: Int,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     var expectedWord = UInt(bitPattern: expected)
     let success = _ptr._atomicCompareExchangeWord(
@@ -254,7 +243,7 @@ extension UnsafeAtomicInt {
   @discardableResult
   public func fetchThen${name}(
     _ operand: Int,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Int {
     let result = _ptr._atomicFetchThen${name}Word(
       UInt(bitPattern: operand),
@@ -268,7 +257,7 @@ extension UnsafeAtomicInt {
   @discardableResult
   public func ${lowerName}ThenFetch(
     _ operand: Int,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Int {
     let result = _ptr._atomic${name}ThenFetchWord(
       UInt(bitPattern: operand),
@@ -296,7 +285,7 @@ public struct UnsafeAtomicBool {
 extension UnsafeAtomicBool {
   @_transparent
   public func load(
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiring
   ) -> Bool {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     return value != 0
@@ -305,7 +294,7 @@ extension UnsafeAtomicBool {
   @_transparent
   public func store(
     _ desired: Bool,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .releasing
   ) {
     _ptr._atomicStoreWord(desired ? 1 : 0, ordering: ordering)
   }
@@ -313,7 +302,7 @@ extension UnsafeAtomicBool {
   @_transparent
   public func exchange(
     _ desired: Bool,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     let result = _ptr._atomicExchangeWord(desired ? 1 : 0, ordering: ordering)
     return (result != 0)
@@ -323,7 +312,7 @@ extension UnsafeAtomicBool {
   public func compareExchange(
     expected: inout Bool,
     desired: Bool,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     var expectedWord: UInt = desired ? 1 : 0
     let success = _ptr._atomicCompareExchangeWord(
@@ -339,7 +328,7 @@ extension UnsafeAtomicBool {
   @discardableResult
   public func fetchThen${name}(
     _ operand: Bool,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     let result = _ptr._atomicFetchThen${intName}Word(
       operand ? 1 : 0,
@@ -353,7 +342,7 @@ extension UnsafeAtomicBool {
   @discardableResult
   public func ${name.lower()}ThenFetch(
     _ operand: Bool,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     let result = _ptr._atomic${intName}ThenFetchWord(
       operand ? 1 : 0,
@@ -381,7 +370,7 @@ public struct UnsafeAtomicUnmanaged<Instance: AnyObject> {
 extension UnsafeAtomicUnmanaged {
   @_transparent
   public func load(
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiring
   ) -> Unmanaged<Instance>? {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     guard let p = UnsafeRawPointer(bitPattern: value) else { return nil }
@@ -391,7 +380,7 @@ extension UnsafeAtomicUnmanaged {
   @_transparent
   public func store(
     _ desired: Unmanaged<Instance>?,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .releasing
   ) {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
@@ -400,7 +389,7 @@ extension UnsafeAtomicUnmanaged {
   @_transparent
   public func exchange(
     _ desired: Unmanaged<Instance>?,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Unmanaged<Instance>? {
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
     let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
@@ -412,7 +401,7 @@ extension UnsafeAtomicUnmanaged {
   public func compareExchange(
     expected: inout Unmanaged<Instance>?,
     desired: Unmanaged<Instance>?,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     var expectedWord = UInt(bitPattern: expected?.toOpaque())
     let desiredWord = UInt(bitPattern: desired?.toOpaque())
@@ -447,7 +436,7 @@ public struct UnsafeAtomicUnsafeMutablePointer<Pointee> {
 extension UnsafeAtomicUnsafeMutablePointer {
   @_transparent
   public func load(
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiring
   ) -> UnsafeMutablePointer<Pointee>? {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     return UnsafeMutablePointer(bitPattern: value)
@@ -456,7 +445,7 @@ extension UnsafeAtomicUnsafeMutablePointer {
   @_transparent
   public func store(
     _ desired: UnsafeMutablePointer<Pointee>?,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .releasing
   ) {
     let desiredWord = UInt(bitPattern: desired)
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
@@ -465,7 +454,7 @@ extension UnsafeAtomicUnsafeMutablePointer {
   @_transparent
   public func exchange(
     _ desired: UnsafeMutablePointer<Pointee>?,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> UnsafeMutablePointer<Pointee>? {
     let desiredWord = UInt(bitPattern: desired)
     let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
@@ -476,7 +465,7 @@ extension UnsafeAtomicUnsafeMutablePointer {
   public func compareExchange(
     expected: inout UnsafeMutablePointer<Pointee>?,
     desired: UnsafeMutablePointer<Pointee>?,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Bool {
     var expectedWord = UInt(bitPattern: expected)
     let desiredWord = UInt(bitPattern: desired)
@@ -508,7 +497,7 @@ extension UnsafeAtomicInitializableReference {
   @_transparent
   public func initialize(
     to value: __owned Instance,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiringAndReleasing
   ) -> Instance {
     let desired = Unmanaged.passRetained(value)
     let desiredWord = UInt(bitPattern: desired.toOpaque())
@@ -530,7 +519,7 @@ extension UnsafeAtomicInitializableReference {
 
   @_transparent
   public func load(
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering = .acquiring
   ) -> Instance? {
     let value = _ptr._atomicLoadWord(ordering: ordering)
     guard let ptr = UnsafeRawPointer(bitPattern: value) else { return nil }

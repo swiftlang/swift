@@ -11,28 +11,28 @@
 //===----------------------------------------------------------------------===//
 
 %{
-  _allOrderings = [
-    # Swift enum case,         Capitalized API name,    documentation name,        llvm name,   failure name, isLoad, isStore
-    ('relaxed',                'Relaxed',               'relaxed',                 'monotonic', 'monotonic',  True,   True),
-    ('acquiring',              'Acquiring',             'acquiring',               'acquire',   'acquire',    True,   False),
-    ('releasing',              'Releasing',             'releasing',               'release',   'monotonic',  False,  True),
-    ('acquiringAndReleasing',  'AcquiringAndReleasing', 'acquiring-and-releasing', 'acqrel',    'acquire',    False,  False),
-    ('sequentiallyConsistent', '',                      'sequentially consistent', 'seqcst',    'seqcst',     True,   True)
-  ]
-
-  def allOrderings():
-    for (enumOrder, capitalOrder, docOrder, llvmOrder, failureOrder, isLoad, isStore) in _allOrderings:
-      yield (enumOrder, capitalOrder, docOrder, llvmOrder)
+  def rmwOrderings():
+    return [
+      # Swift enum case,         API name,     documentation name,        llvm name,   failure name
+      ('relaxed',                'Relaxed',    'relaxed',                 'monotonic', 'monotonic'),
+      ('acquiring',              'Acquiring',  'acquiring',               'acquire',   'acquire'),
+      ('releasing',              'Releasing',  'releasing',               'release',   'monotonic'),
+      ('acquiringAndReleasing',  '',           'acquiring-and-releasing', 'acqrel',    'acquire'),
+    ]
 
   def loadOrderings():
-    for (enumOrder, capitalOrder, docOrder, llvmOrder, failureOrder, isLoad, isStore) in _allOrderings:
-      if isLoad:
-        yield (enumOrder, capitalOrder, docOrder, llvmOrder)
+    return [
+      # Swift enum case,         API name,    doc name,     llvm name
+      ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
+      ('acquiring',              '',          'acquiring',  'acquire'),
+    ]
 
   def storeOrderings():
-    for (enumOrder, capitalOrder, docOrder, llvmOrder, failureOrder, isLoad, isStore) in _allOrderings:
-      if isStore:
-        yield (enumOrder, capitalOrder, docOrder, llvmOrder)
+    return [
+      # Swift enum case,         API name,    doc name,     llvm name
+      ('relaxed',                'Relaxed',   'relaxed',    'monotonic'),
+      ('releasing',              '',          'releasing',  'release'),
+    ]
 
   integerOperations = [
     #          API name, llvm name,  operator
@@ -47,36 +47,36 @@
 //------------------------------------------------------------------------------
 
 extension UnsafeMutableRawPointer {
-% for (enumOrder, capitalOrder, docOrder, llvmOrder) in loadOrderings():
+% for (enumOrder, apiOrder, docOrder, llvmOrder) in loadOrderings():
   /// Atomically load the pointee with ${docOrder} ordering.
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}LoadWord() -> UInt {
+  func _atomic${apiOrder}LoadWord() -> UInt {
     return UInt(Builtin.atomicload_${llvmOrder}_Word(_rawValue))
   }
 % end
 }
 
 extension UnsafeMutableRawPointer {
-% for enumOrder, capitalOrder, docOrder, llvmOrder in storeOrderings():
+% for enumOrder, apiOrder, docOrder, llvmOrder in storeOrderings():
   /// Atomically store the specified value in the memory referenced by this
   /// pointer, with ${docOrder} ordering.
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}StoreWord(_ desired: UInt) {
+  func _atomic${apiOrder}StoreWord(_ desired: UInt) {
     Builtin.atomicstore_${llvmOrder}_Word(_rawValue, desired._builtinWordValue)
   }
 % end
 }
 
 extension UnsafeMutableRawPointer {
-% for _, capitalOrder, docOrder, llvmOrder in allOrderings():
+% for _, apiOrder, docOrder, llvmOrder, _ in rmwOrderings():
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}ExchangeWord(
+  func _atomic${apiOrder}ExchangeWord(
     _ desired: UInt
   ) -> UInt {
     let oldValue = Builtin.atomicrmw_xchg_${llvmOrder}_Word(
@@ -87,11 +87,11 @@ extension UnsafeMutableRawPointer {
 }
 
 extension UnsafeMutableRawPointer {
-% for _, capitalOrder, docOrder, llvmOrder, failureOrder, _, _ in _allOrderings:
+% for _, apiOrder, docOrder, llvmOrder, failureOrder in rmwOrderings():
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}CompareExchangeWord(
+  func _atomic${apiOrder}CompareExchangeWord(
     expected: inout UInt,
     desired: UInt
   ) -> Bool {
@@ -105,11 +105,11 @@ extension UnsafeMutableRawPointer {
 
 extension UnsafeMutableRawPointer {
 % for (swiftName, builtinName, operator) in integerOperations:
-%   for _, capitalOrder, docOrder, llvmOrder in allOrderings():
+%   for _, apiOrder, docOrder, llvmOrder, _ in rmwOrderings():
   @_alwaysEmitIntoClient
   @_transparent
   public // backdeployment
-  func _atomic${capitalOrder}FetchThen${swiftName}Word(_ operand: UInt) -> UInt {
+  func _atomic${apiOrder}FetchThen${swiftName}Word(_ operand: UInt) -> UInt {
     let value = Builtin.atomicrmw_${builtinName}_${llvmOrder}_Word(
       _rawValue, operand._builtinWordValue)
     return UInt(value)
@@ -128,8 +128,6 @@ extension UnsafeMutableRawPointer {
     case .relaxed:
       return _atomicRelaxedLoadWord()
     case .acquiring:
-      return _atomicAcquiringLoadWord()
-    case .sequentiallyConsistent:
       return _atomicLoadWord()
     case .releasing, .acquiringAndReleasing:
       _preconditionFailure("invalid memory ordering for atomic load")
@@ -150,8 +148,6 @@ extension UnsafeMutableRawPointer {
     case .relaxed:
       _atomicRelaxedStoreWord(desired)
     case .releasing:
-      _atomicReleasingStoreWord(desired)
-    case .sequentiallyConsistent:
       _atomicStoreWord(desired)
     case .acquiring, .acquiringAndReleasing:
       _preconditionFailure("invalid memory ordering for atomic store")
@@ -176,8 +172,6 @@ extension UnsafeMutableRawPointer {
     case .releasing:
       return _atomicReleasingExchangeWord(desired)
     case .acquiringAndReleasing:
-      return _atomicAcquiringAndReleasingExchangeWord(desired)
-    case .sequentiallyConsistent:
       return _atomicExchangeWord(desired)
     default:
       return _atomicExchangeWord(desired)
@@ -207,10 +201,6 @@ extension UnsafeMutableRawPointer {
         expected: &expected,
         desired: desired)
     case .acquiringAndReleasing:
-      return _atomicAcquiringAndReleasingCompareExchangeWord(
-        expected: &expected,
-        desired: desired)
-    case .sequentiallyConsistent:
       return _atomicCompareExchangeWord(
         expected: &expected,
         desired: desired)
@@ -239,8 +229,6 @@ extension UnsafeMutableRawPointer {
     case .releasing:
       return _atomicReleasingFetchThen${swiftName}Word(operand)
     case .acquiringAndReleasing:
-      return _atomicAcquiringAndReleasingFetchThen${swiftName}Word(operand)
-    case .sequentiallyConsistent:
       return _atomicFetchThen${swiftName}Word(operand)
     default:
       return _atomicFetchThen${swiftName}Word(operand)
@@ -257,12 +245,11 @@ extension UnsafeMutableRawPointer {
   @discardableResult
   public func _atomic${swiftName}ThenFetchWord(
     _ operand: UInt,
-    ordering: MemoryOrdering = .sequentiallyConsistent
+    ordering: MemoryOrdering
   ) -> UInt {
     let old = _atomicFetchThen${swiftName}Word(operand, ordering: ordering)
     return old ${op} operand
   }
-
 % end
 }
 

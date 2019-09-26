@@ -45,17 +45,20 @@ public final class _stdlib_AtomicInt {
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenAndWord(UInt(bitPattern: operand))
+    let word = _valuePtr._atomicFetchThenAndWord(
+      UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenOrWord(UInt(bitPattern: operand))
+    let word = _valuePtr._atomicFetchThenOrWord(
+      UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenXorWord(UInt(bitPattern: operand))
+    let word = _valuePtr._atomicFetchThenXorWord(
+      UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
 
@@ -94,9 +97,10 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   desired: Int
 ) -> Bool {
   var expectedWord = UInt(bitPattern: expected.pointee)
-  let success = UnsafeMutableRawPointer(target)._atomicCompareExchangeWord(
-    expected: &expectedWord,
-    desired: UInt(bitPattern: desired))
+  let success = UnsafeMutableRawPointer(target)
+    ._atomicCompareExchangeWord(
+      expected: &expectedWord,
+      desired: UInt(bitPattern: desired))
   expected.pointee = Int(bitPattern: expectedWord)
   return success
 }
@@ -113,7 +117,8 @@ public // Existing uses outside stdlib
 func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>
 ) -> Int {
-  return Int(bitPattern: UnsafeMutableRawPointer(target)._atomicLoadWord())
+  let result = UnsafeMutableRawPointer(target)._atomicLoadWord()
+  return Int(bitPattern: result)
 }
 
 @available(*, deprecated)
