@@ -817,19 +817,6 @@ public:
       : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
         Locator(locator) {}
 
-  ~ArgumentFailureTracker() override {
-    if (NumSynthesizedArgs > 0) {
-      ArrayRef<AnyFunctionType::Param> argRef(Arguments);
-
-      auto *fix =
-          AddMissingArguments::create(CS, argRef.take_back(NumSynthesizedArgs),
-                                      CS.getConstraintLocator(Locator));
-
-      // Not having an argument is the same impact as having a type mismatch.
-      (void)CS.recordFix(fix, /*impact=*/NumSynthesizedArgs * 2);
-    }
-  }
-
   Optional<unsigned> missingArgument(unsigned paramIdx) override {
     if (!CS.shouldAttemptFixes())
       return None;
@@ -911,6 +898,8 @@ public:
     CS.increaseScore(ScoreKind::SK_Fix, numExtraneous);
     return false;
   }
+
+  unsigned getNumSynthesizedArguments() const { return NumSynthesizedArgs; }
 };
 
 // Match the argument of a call to the parameter.
@@ -982,6 +971,19 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
       if (AllowTupleSplatForSingleParameter::attempt(
               cs, argsWithLabels, params, parameterBindings, locator))
+        return cs.getTypeMatchFailure(locator);
+    }
+
+    auto numSynthesizedArgs = listener.getNumSynthesizedArguments();
+    if (numSynthesizedArgs > 0) {
+      ArrayRef<AnyFunctionType::Param> argRef(argsWithLabels);
+
+      auto *fix =
+          AddMissingArguments::create(cs, argRef.take_back(numSynthesizedArgs),
+                                      cs.getConstraintLocator(locator));
+
+      // Not having an argument is the same impact as having a type mismatch.
+      if (cs.recordFix(fix, /*impact=*/numSynthesizedArgs * 2))
         return cs.getTypeMatchFailure(locator);
     }
   }
