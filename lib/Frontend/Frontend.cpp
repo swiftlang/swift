@@ -886,6 +886,9 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   if (options.DebugTimeExpressionTypeChecking) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
   }
+  if (options.SkipNonInlinableFunctionBodies) {
+    TypeCheckOptions |= TypeCheckingFlags::SkipNonInlinableFunctionBodies;
+  }
   return TypeCheckOptions;
 }
 
