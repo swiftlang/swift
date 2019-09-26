@@ -316,7 +316,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->computeType();
 
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(getterDecl);
 
@@ -337,7 +336,6 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationToChecked();
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);
