@@ -100,7 +100,7 @@ func takesSomeClassArchetype<T : SomeClass>(_ t: T) {
 }
 
 // Typo correction of unqualified lookup from generic context.
-struct Generic<T> {
+struct Generic<T> { // expected-note {{'T' declared as parameter to type 'Generic'}}
   func match1() {}
   // expected-note@-1 {{'match1' declared here}}
 
@@ -122,6 +122,7 @@ protocol P {} // expected-error {{invalid redeclaration of 'P'}}
 
 func hasTypo() {
   _ = P.a.a // expected-error {{type 'Generic<Any>' has no member 'a'}}
+  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
 // Typo correction with AnyObject.

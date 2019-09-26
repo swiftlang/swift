@@ -15,18 +15,18 @@ import has_accessibility
 // This deliberately has the wrong import kind.
 import var has_accessibility.zz // expected-error {{variable 'zz' does not exist in module 'has_accessibility'}}
 
-func markUsed<T>(_ t: T) {} // expected-note 3 {{in call to function 'markUsed'}}
+func markUsed<T>(_ t: T) {}
 
 markUsed(has_accessibility.x)
-markUsed(has_accessibility.y) // expected-error {{module 'has_accessibility' has no member named 'y'}} expected-error {{generic parameter 'T' could not be inferred}}
-markUsed(has_accessibility.z) // expected-error {{module 'has_accessibility' has no member named 'z'}} expected-error {{generic parameter 'T' could not be inferred}}
+markUsed(has_accessibility.y) // expected-error {{module 'has_accessibility' has no member named 'y'}}
+markUsed(has_accessibility.z) // expected-error {{module 'has_accessibility' has no member named 'z'}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE: :[[@LINE-3]]:10: error: module 'has_accessibility' has no member named 'z'
 
 markUsed(accessibility.a)
 markUsed(accessibility.b)
-markUsed(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}} expected-error {{generic parameter 'T' could not be inferred}}
+markUsed(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}}
 
 markUsed(x)
 markUsed(y) // expected-error {{use of unresolved identifier 'y'}}

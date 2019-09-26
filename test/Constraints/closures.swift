@@ -176,9 +176,7 @@ func SR3671() {
 // <rdar://problem/22162441> Crash from failing to diagnose nonexistent method access inside closure
 func r22162441(_ lines: [String]) {
   _ = lines.map { line in line.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   _ = lines.map { $0.fooBar() }  // expected-error {{value of type 'String' has no member 'fooBar'}}
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 
 

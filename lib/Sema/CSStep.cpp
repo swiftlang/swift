@@ -338,66 +338,12 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Produce a disjunction step.
     return suspend(
         llvm::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
-  }
-
-  // If there are no disjunctions or type variables to bind
-  // we can't solve this system unless we have free type variables
-  // allowed in the solution.
-  if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
-    if (!CS.shouldAttemptFixes())
-      return finalize(/*isSuccess=*/false);
-
-    // Defaults the type of a hole to Any.
-    auto defaultHoleType = [&](TypeVariableType *typeVar,
-                               ConstraintLocator *locator) {
-      CS.assignFixedType(typeVar, CS.getASTContext().TheAnyType);
-      CS.DefaultedConstraints.push_back(locator);
-    };
-
-    // Let's record holes for all of the free type variables that represent
-    // generic paramters and continue solving.
-    llvm::SmallDenseMap<ConstraintLocator *,
-                        llvm::SmallVector<GenericTypeParamType *, 4>>
-        defaultableGenericParams;
-
-    for (auto *typeVar : CS.getTypeVariables()) {
-      auto *locator = typeVar->getImpl().getLocator();
-      auto *anchor = locator->getAnchor();
-
-      if (typeVar->getImpl().hasRepresentativeOrFixed() ||
-          !(anchor && locator->isForGenericParameter()))
-        continue;
-
-      CS.recordHole(typeVar);
-      defaultHoleType(typeVar, locator);
-
-      auto path = locator->getPath();
-      // Let's drop `generic parameter '...'` part of the locator to
-      // group all of the missing generic parameters related to the
-      // same path together.
-      defaultableGenericParams[CS.getConstraintLocator(anchor,
-                                                       path.drop_back())]
-          .push_back(locator->getGenericParameter());
-    }
-
-    for (const auto &missing : defaultableGenericParams) {
-      auto *locator = missing.first;
-      auto &missingParams = missing.second;
-      auto *fix =
-          ExplicitlySpecifyGenericArguments::create(CS, missingParams, locator);
-      if (CS.recordFix(fix, /*impact=*/missingParams.size()))
-        return finalize(/*isSuccess=*/false);
-    }
-
-    // Assign default types for all remaining holes.
-    for (auto *typeVar : CS.getTypeVariables())
-      if (!typeVar->getImpl().hasRepresentativeOrFixed() && CS.isHole(typeVar)) {
-        defaultHoleType(typeVar, typeVar->getImpl().getLocator());
-        CS.increaseScore(SK_Fix);
-      }
-
-    if (CS.simplify() || CS.hasFreeTypeVariables())
-      return finalize(/*isSuccess*/false);
+  } else if (!CS.solverState->allowsFreeTypeVariables() &&
+             CS.hasFreeTypeVariables()) {
+    // If there are no disjunctions or type variables to bind
+    // we can't solve this system unless we have free type variables
+    // allowed in the solution.
+    return finalize(/*isSuccess=*/false);
   }
 
   // If this solution is worse than the best solution we've seen so far,

@@ -735,6 +735,15 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
                                 constraint->getLocator()});
   }
 
+  // If we don't have any potential bindings, allow generic
+  // parameters and holes to default to `Any`.
+  if (shouldAttemptFixes() && result.Bindings.empty() &&
+      (isHole(typeVar) || result.isGenericParameter())) {
+    result.addPotentialBinding({getASTContext().TheAnyType,
+        AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
+        typeVar->getImpl().getLocator()});
+  }
+
   // Determine if the bindings only constrain the type variable from above with
   // an existential type; such a binding is not very helpful because it's
   // impossible to enumerate the existential type's subtypes.
@@ -979,7 +988,36 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
+    auto *locator = Binding.DefaultableBinding;
+    cs.DefaultedConstraints.push_back(locator);
+
+    if (locator->isForGenericParameter()) {
+      cs.recordHole(TypeVar);
+
+      auto *fix = ExplicitlySpecifyGenericArguments::create(cs,
+          {locator->getGenericParameter()}, locator);
+      if (cs.recordFix(fix))
+        return false;
+    }
+  }
+
+  // If this type variable is a hole in the constraint system, propagate
+  // this information and mark adjacent type variables as potential holes.
+  //
+  // Consider this example:
+  //
+  // func foo<T: BinaryInteger>(_: T) {}
+  // foo(.bar) <- Since `.bar` can't be inferred due to lack of info about its
+  //              base type, it's member type is going to get defaulted to
+  //              `Any` which has to be propaged to type variable associated
+  //              with `T` and vice versa.
+  if (cs.shouldAttemptFixes() && cs.isHole(TypeVar)) {
+    auto &CG = cs.getConstraintGraph();
+    for (auto *constraint : CG.gatherConstraints(
+        TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
+      for (auto *typeVar : constraint->getTypeVariables())
+        cs.recordHole(typeVar);
+    }
   }
 
   return !cs.failedConstraint && !cs.simplify();
