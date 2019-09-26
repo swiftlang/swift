@@ -61,14 +61,16 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
   }
 }
 
+private let NSNotFound: Int = .max
+
 // Implement the APIs required by NSArray 
 extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc internal var count: Int {
     return withUnsafeBufferOfObjects { $0.count }
   }
 
-  @objc(objectAtIndex:)
-  internal func objectAt(_ index: Int) -> AnyObject {
+  @inline(__always)
+  @nonobjc private func _objectAt(_ index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
@@ -76,6 +78,16 @@ extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
         "Array index out of range")
       return objects[index]
     }
+  }
+  
+  @objc(objectAtIndexedSubscript:)
+  dynamic internal func objectAtSubscript(_ index: Int) -> AnyObject {
+    return _objectAt(index)
+  }
+  
+  @objc(objectAtIndex:)
+  dynamic internal func objectAt(_ index: Int) -> AnyObject {
+    return _objectAt(index)
   }
 
   @objc internal func getObjects(
@@ -128,6 +140,172 @@ extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   @objc(copyWithZone:)
   internal func copy(with _: _SwiftNSZone?) -> AnyObject {
     return self
+  }
+}
+
+@_fixed_layout
+@usableFromInline
+@objc internal final class _SwiftNSMutableArray :
+  _SwiftNativeNSMutableArray, _NSArrayCore
+{
+  internal var contents: [AnyObject]
+
+  internal init(_ array: [AnyObject]) {
+    contents = array
+    super.init()
+  }
+  
+  @objc internal var count: Int {
+    return contents.count
+  }
+  
+  @objc(objectAtIndexedSubscript:)
+  dynamic internal func objectAtSubscript(_ index: Int) -> AnyObject {
+    //TODO: exception instead of precondition, once that's possible
+    return contents[index]
+  }
+
+  @objc(objectAtIndex:)
+  dynamic internal func objectAt(_ index: Int) -> AnyObject {
+    //TODO: exception instead of precondition, once that's possible
+    return contents[index]
+  }
+
+  @objc internal func getObjects(
+    _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
+  ) {
+    return contents.withContiguousStorageIfAvailable { objects in
+      //TODO: exceptions instead of preconditions, once that's possible
+
+      _precondition(
+        _isValidArrayIndex(range.location, count: objects.count),
+        "Array index out of range")
+
+      _precondition(
+        _isValidArrayIndex(
+          range.location + range.length, count: objects.count),
+        "Array index out of range")
+
+      if objects.isEmpty { return }
+
+      // These objects are "returned" at +0, so treat them as pointer values to
+      // avoid retains. Copy bytes via a raw pointer to circumvent reference
+      // counting while correctly aliasing with all other pointer types.
+      UnsafeMutableRawPointer(aBuffer).copyMemory(
+        from: objects.baseAddress! + range.location,
+        byteCount: range.length * MemoryLayout<AnyObject>.stride)
+    }!
+  }
+
+  @objc(countByEnumeratingWithState:objects:count:)
+  internal func countByEnumerating(
+    with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
+    objects: UnsafeMutablePointer<AnyObject>?, count: Int
+  ) -> Int {
+    var enumerationState = state.pointee
+
+    if enumerationState.state != 0 {
+      return 0
+    }
+
+    return contents.withContiguousStorageIfAvailable {
+      objects in
+      enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      enumerationState.itemsPtr =
+        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
+      enumerationState.state = 1
+      state.pointee = enumerationState
+      return objects.count
+    }!
+  }
+
+  @objc(copyWithZone:)
+  dynamic internal func copy(with _: _SwiftNSZone?) -> AnyObject {
+    return contents._bridgeToObjectiveCImpl()
+  }
+  
+  @objc(insertObject:atIndex:)
+  dynamic internal func insert(_ anObject: AnyObject, at index: Int) {
+    contents.insert(anObject, at: index)
+  }
+  
+  @objc(removeObjectAtIndex:)
+  dynamic internal func removeObject(at index: Int) {
+    contents.remove(at: index)
+  }
+  
+  @objc(addObject:)
+  dynamic internal func add(_ anObject: AnyObject) {
+    contents.append(anObject)
+  }
+  
+  @objc(removeLastObject)
+  dynamic internal func removeLastObject() {
+    contents.removeLast()
+  }
+  
+  @objc(replaceObjectAtIndex:withObject:)
+  dynamic internal func replaceObject(at index: Int, with anObject: AnyObject) {
+    //enforces bounds, unlike set equivalent, which can append
+    contents[index] = anObject
+  }
+  
+  //Non-core methods overridden for performance
+  
+  @objc(exchangeObjectAtIndex:withObjectAtIndex:)
+  dynamic internal func exchange(at index: Int, with index2: Int) {
+    swap(&contents[index], &contents[index2])
+  }
+  
+  @objc(replaceObjectsInRange:withObjects:count:)
+  dynamic internal func replaceObjects(in range: _SwiftNSRange,
+                               with objects: UnsafePointer<AnyObject>,
+                               count: Int) {
+    let range = range.location ..< range.location + range.length
+    let buf = UnsafeBufferPointer(start: objects, count: count)
+    contents.replaceSubrange(range, with: buf)
+  }
+  
+  @objc(insertObjects:count:atIndex:)
+  dynamic internal func insertObjects(_ objects: UnsafePointer<AnyObject>,
+                              count: Int,
+                              at index: Int) {
+    let buf = UnsafeBufferPointer(start: objects, count: count)
+    contents.insert(contentsOf: buf, at: index)
+  }
+    
+  @objc(indexOfObjectIdenticalTo:)
+  dynamic internal func index(ofObjectIdenticalTo object: AnyObject) -> Int {
+    return contents.firstIndex { $0 === object } ?? NSNotFound
+  }
+  
+  @objc(removeObjectsInRange:)
+  dynamic internal func removeObjects(in range: _SwiftNSRange) {
+    let range = range.location ..< range.location + range.length
+    contents.replaceSubrange(range, with: [])
+  }
+  
+  @objc(removeAllObjects)
+  dynamic internal func removeAllObjects() {
+    contents = []
+  }
+  
+  @objc(setObject:atIndex:)
+  dynamic internal func setObject(_ anObject: AnyObject, at index: Int) {
+    if index == contents.count {
+      contents.append(anObject)
+    } else {
+      contents[index] = anObject
+    }
+  }
+  
+  @objc(setObject:atIndexedSubscript:) dynamic
+  internal func setObjectSubscript(_ anObject: AnyObject, at index: Int) {
+    if index == contents.count {
+      contents.append(anObject)
+    } else {
+      contents[index] = anObject
+    }
   }
 }
 
@@ -292,6 +470,18 @@ internal class __ContiguousArrayStorageBase
     _internalInvariantFailure(
       "Concrete subclasses must implement _getNonVerbatimBridgingBuffer")
   }
+  
+  @objc(mutableCopyWithZone:)
+  dynamic internal func mutableCopy(with _: _SwiftNSZone?) -> AnyObject {
+    let arr = Array<AnyObject>(_ContiguousArrayBuffer(self))
+    return _SwiftNSMutableArray(arr)
+  }
+  
+  @objc(indexOfObjectIdenticalTo:)
+  dynamic internal func index(ofObjectIdenticalTo object: AnyObject) -> Int {
+    let arr = Array<AnyObject>(_ContiguousArrayBuffer(self))
+    return arr.firstIndex { $0 === object } ?? NSNotFound
+  }
 #endif
 
 @inlinable
@@ -306,7 +496,7 @@ internal class __ContiguousArrayStorageBase
     _internalInvariantFailure(
       "Concrete subclasses must implement staticElementType")
   }
-
+  
   @inlinable
   deinit {
     _internalInvariant(
