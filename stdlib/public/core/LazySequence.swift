@@ -20,8 +20,8 @@
 ///
 ///     let doubled = [1, 2, 3].lazy.map { $0 * 2 }
 ///
-/// Each time an element of the lazy sequence `doubled` is accessed, an element
-/// of the underlying array is accessed and transformed by the closure.
+/// Each time an element of the lazy sequence `doubled` is accessed, the 
+/// closure accesses and transforms an element of the underlying array.
 ///
 /// Sequence operations that take closure arguments, such as `map(_:)` and
 /// `filter(_:)`, are normally eager: They use the closure immediately and
@@ -124,7 +124,7 @@
 ///         }
 ///     }
 ///
-/// Don't actually use `map` for this purpose, however, since it creates 
+/// Don't actually use `map` for this purpose, however, because it creates 
 /// and discards the resulting array. Instead, use `reduce` for summing 
 /// operations, or `forEach` or a `for`-`in` loop for operations with side 
 /// effects.
