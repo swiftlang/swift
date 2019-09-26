@@ -12,10 +12,12 @@
 
 %{
   integerOperations = [
-    ('WrappingAdd', 'wrappingAdd', '&+'),
-    ('And', 'and', '&'),
-    ('Or', 'or', '|'),
-    ('Xor', 'xor', '^')
+    #          API name, lowercase name,     operator
+    (     'WrappingAdd', 'wrappingAdd',      '&+'),
+    ('WrappingSubtract', 'wrappingSubtract', '&-'),
+    (             'And', 'and',              '&'),
+    (              'Or', 'or',               '|'),
+    (             'Xor', 'xor',              '^')
   ]
 
   boolOperations = [
@@ -149,6 +151,14 @@ extension UnsafeAtomicUInt {
   }
 
   @_transparent
+  public func exchange(
+    _ desired: UInt,
+    ordering: MemoryOrdering = .sequentiallyConsistent
+  ) -> UInt {
+    return _ptr._atomicExchangeWord(desired, ordering: ordering)
+  }
+
+  @_transparent
   public func compareExchange(
     expected: inout UInt,
     desired: UInt,
@@ -212,6 +222,16 @@ extension UnsafeAtomicInt {
     ordering: MemoryOrdering = .sequentiallyConsistent
   ) {
     _ptr._atomicStoreWord(UInt(bitPattern: desired), ordering: ordering)
+  }
+
+  @_transparent
+  public func exchange(
+    _ desired: Int,
+    ordering: MemoryOrdering = .sequentiallyConsistent
+  ) -> Int {
+    let desiredWord = UInt(bitPattern: desired)
+    let result = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
+    return Int(bitPattern: result)
   }
 
   @_transparent
@@ -288,6 +308,15 @@ extension UnsafeAtomicBool {
     ordering: MemoryOrdering = .sequentiallyConsistent
   ) {
     _ptr._atomicStoreWord(desired ? 1 : 0, ordering: ordering)
+  }
+
+  @_transparent
+  public func exchange(
+    _ desired: Bool,
+    ordering: MemoryOrdering = .sequentiallyConsistent
+  ) -> Bool {
+    let result = _ptr._atomicExchangeWord(desired ? 1 : 0, ordering: ordering)
+    return (result != 0)
   }
 
   @_transparent
@@ -369,6 +398,17 @@ extension UnsafeAtomicUnmanaged {
   }
 
   @_transparent
+  public func exchange(
+    _ desired: Unmanaged<Instance>?,
+    ordering: MemoryOrdering = .sequentiallyConsistent
+  ) -> Unmanaged<Instance>? {
+    let desiredWord = UInt(bitPattern: desired?.toOpaque())
+    let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
+    guard let r = UnsafeRawPointer(bitPattern: resultWord) else { return nil }
+    return Unmanaged.fromOpaque(r)
+  }
+
+  @_transparent
   public func compareExchange(
     expected: inout Unmanaged<Instance>?,
     desired: Unmanaged<Instance>?,
@@ -420,6 +460,16 @@ extension UnsafeAtomicUnsafeMutablePointer {
   ) {
     let desiredWord = UInt(bitPattern: desired)
     _ptr._atomicStoreWord(desiredWord, ordering: ordering)
+  }
+
+  @_transparent
+  public func exchange(
+    _ desired: UnsafeMutablePointer<Pointee>?,
+    ordering: MemoryOrdering = .sequentiallyConsistent
+  ) -> UnsafeMutablePointer<Pointee>? {
+    let desiredWord = UInt(bitPattern: desired)
+    let resultWord = _ptr._atomicExchangeWord(desiredWord, ordering: ordering)
+    return UnsafeMutablePointer(bitPattern: resultWord)
   }
 
   @_transparent
