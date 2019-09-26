@@ -70,6 +70,9 @@ public:
   /// Whether to stop the optimization pipeline after serializing SIL.
   bool StopOptimizationAfterSerialization = false;
 
+  /// Whether to skip emitting non-inlinable function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
+
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
 
