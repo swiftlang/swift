@@ -442,3 +442,20 @@ protocol P {}
 
 enum E : C & P {}
 // expected-error@-1 {{inheritance from class-constrained protocol composition type 'C & P'}}
+
+// SR-11522
+
+enum EnumWithStaticNone1 {
+  case a
+  static let none = 1
+}
+
+enum EnumWithStaticNone2 {
+  case a
+  static let none = EnumWithStaticNone2.a
+}
+
+let _: EnumWithStaticNone1? = .none // Okay
+let _: EnumWithStaticNone2? = .none // expected-warning {{assuming you mean 'Optional<EnumWithStaticNone2>.none'; did you mean 'EnumWithStaticNone2.none' instead?}}
+// expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{31-31=Optional}}
+// expected-note@-2 {{use 'EnumWithStaticNone2.none' instead}}{{31-31=EnumWithStaticNone2}}

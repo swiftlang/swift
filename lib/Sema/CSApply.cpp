@@ -2487,7 +2487,14 @@ namespace {
             if (member->isInstanceMember()) {
               return;
             }
-            
+
+            // If we have something like 'static let none = 1', then ignore.
+            if (auto VD = dyn_cast<VarDecl>(member)) {
+              if (!VD->getInterfaceType()->isEqual(
+                      baseTyNominalDecl->getDeclaredInterfaceType()))
+                return;
+            }
+
             // Return if the member is an enum case w/ assoc values, as we only
             // care (for now) about cases with no assoc values (like none)
             if (auto EED = dyn_cast<EnumElementDecl>(member)) {
