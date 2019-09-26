@@ -763,6 +763,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_sil_merge_partial_modules))
     Opts.MergePartialModules = true;
 
+  if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies))
+    Opts.SkipNonInlinableFunctionBodies = true;
+
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
   Opts.OptMode = OptimizationMode::NoOptimization;

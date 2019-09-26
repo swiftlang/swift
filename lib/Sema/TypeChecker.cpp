@@ -393,6 +393,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
 
+    if (Options.contains(TypeCheckingFlags::SkipNonInlinableFunctionBodies))
+      // Disable this optimization if we're compiling SwiftOnoneSupport, because
+      // we _definitely_ need to look inside every declaration to figure out
+      // what gets prespecialized.
+      if (!SF.getParentModule()->isOnoneSupportModule())
+        TC.setSkipNonInlinableBodies(true);
+
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
     (void) TC.getStdlibModule(&SF);

@@ -4602,8 +4602,15 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     nextFile->getOpaqueReturnTypeDecls(opaqueReturnTypeDecls);
 
     for (auto TD : localTypeDecls) {
+
+      // FIXME: We should delay parsing function bodies so these type decls
+      //        don't even get added to the file.
+      if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+
       hasLocalTypes = true;
       Mangle::ASTMangler Mangler;
+
       std::string MangledName =
           evaluateOrDefault(M->getASTContext().evaluator,
                             MangleLocalTypeDeclRequest { TD },

@@ -1765,6 +1765,82 @@ static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
   }
 }
 
+static Optional<unsigned>
+getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+  ArrayRef<ParamDecl *> params = paramList->getArray();
+  for (unsigned i = 0; i < params.size(); ++i) {
+    if (params[i] == decl) return i;
+  }
+  return None;
+}
+
+static void
+checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
+  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
+    return;
+
+  auto *DC = PD->getInnermostDeclContext();
+  const SourceFile *SF = DC->getParentSourceFile();
+  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+         "explicit inherited default argument outside of a module interface?");
+
+  // The containing decl should be a designated initializer.
+  auto ctor = dyn_cast<ConstructorDecl>(DC);
+  if (!ctor || ctor->isConvenienceInit()) {
+    TC.diagnose(
+        PD, diag::inherited_default_value_not_in_designated_constructor);
+    return;
+  }
+
+  // The decl it overrides should also be a designated initializer.
+  auto overridden = ctor->getOverriddenDecl();
+  if (!overridden || overridden->isConvenienceInit()) {
+    TC.diagnose(
+        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
+    if (overridden)
+      TC.diagnose(overridden, diag::overridden_here);
+    return;
+  }
+
+  // The corresponding parameter should have a default value.
+  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
+  assert(idx && "containing decl does not contain param?");
+  ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
+  if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
+    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
+    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
+  }
+}
+
+/// Check the default arguments that occur within this pattern.
+static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
+                                  ValueDecl *VD) {
+  for (auto *param : *params) {
+    checkInheritedDefaultValueRestrictions(tc, param);
+    if (!param->getDefaultValue() ||
+        !param->hasInterfaceType() ||
+        param->getInterfaceType()->hasError())
+      continue;
+
+    Expr *e = param->getDefaultValue();
+    auto *initContext = param->getDefaultArgumentInitContext();
+
+    auto resultTy =
+        tc.typeCheckParameterDefault(e, initContext, param->getType(),
+                                    /*isAutoClosure=*/param->isAutoClosure());
+
+    if (resultTy) {
+      param->setDefaultValue(e);
+    }
+
+    tc.checkInitializerErrorHandling(initContext, e);
+
+    // Walk the checked initializer and contextualize any closures
+    // we saw there.
+    (void)tc.contextualizeInitializer(initContext, e);
+  }
+}
+
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         Identifier name,
                                                         SourceLoc nameLoc) {
@@ -2384,7 +2460,7 @@ public:
     (void) SD->getImplInfo();
 
     TC.checkParameterAttributes(SD->getIndices());
-    TC.checkDefaultArguments(SD->getIndices(), SD);
+    checkDefaultArguments(TC, SD->getIndices(), SD);
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -2941,6 +3017,23 @@ public:
     return true;
   }
 
+
+  bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
+    // Make sure we're in the mode that's skipping function bodies.
+    if (!TC.canSkipNonInlinableBodies())
+      return false;
+
+    // Make sure there even _is_ a body that we can skip.
+    if (!AFD->getBodySourceRange().isValid())
+      return false;
+
+    // If we're gonna serialize the body, we can't skip it.
+    if (AFD->getResilienceExpansion() == ResilienceExpansion::Minimal)
+      return false;
+
+    return true;
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     (void)FD->getInterfaceType();
 
@@ -2973,6 +3066,8 @@ public:
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(FD);
+    } else if (shouldSkipBodyTypechecking(FD)) {
+      FD->setBodySkipped(FD->getBodySourceRange());
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
@@ -2982,6 +3077,8 @@ public:
 
     if (FD->getDeclContext()->getSelfClassDecl())
       checkDynamicSelfType(FD, FD->getResultInterfaceType());
+
+    checkDefaultArguments(TC, FD->getParameters(), FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -2997,7 +3094,7 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TC.checkParameterAttributes(PL);
-      TC.checkDefaultArguments(PL, EED);
+      checkDefaultArguments(TC, PL, EED);
     }
 
     // Yell if our parent doesn't have a raw type but we have a raw value.
@@ -3249,9 +3346,13 @@ public:
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(CD);
+    } else if (shouldSkipBodyTypechecking(CD)) {
+      CD->setBodySkipped(CD->getBodySourceRange());
     } else {
       TC.definedFunctions.push_back(CD);
     }
+
+    checkDefaultArguments(TC, CD->getParameters(), CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -3262,6 +3363,8 @@ public:
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(DD);
+    } else if (shouldSkipBodyTypechecking(DD)) {
+      DD->setBodySkipped(DD->getBodySourceRange());
     } else {
       TC.definedFunctions.push_back(DD);
     }

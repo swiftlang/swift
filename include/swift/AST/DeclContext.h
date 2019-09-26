@@ -409,6 +409,15 @@ public:
         const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
   }
 
+  /// Returns the innermost context that is an AbstractFunctionDecl whose
+  /// body has been skipped.
+  LLVM_READONLY
+  DeclContext *getInnermostSkippedFunctionContext();
+  const DeclContext *getInnermostSkippedFunctionContext() const {
+    return
+        const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
+  }
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {

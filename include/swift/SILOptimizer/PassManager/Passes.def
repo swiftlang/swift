@@ -311,6 +311,9 @@ PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-block
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
+     "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
+     "skips everything it should")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")

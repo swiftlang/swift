@@ -520,6 +520,41 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   llvm_unreachable("unhandled action");
 }
 
+bool FrontendOptions::doesActionGenerateIR(ActionType action) {
+  switch (action) {
+  case ActionType::NoneAction:
+  case ActionType::Parse:
+  case ActionType::DumpParse:
+  case ActionType::DumpInterfaceHash:
+  case ActionType::DumpAST:
+  case ActionType::EmitSyntax:
+  case ActionType::PrintAST:
+  case ActionType::DumpScopeMaps:
+  case ActionType::DumpTypeRefinementContexts:
+  case ActionType::DumpTypeInfo:
+  case ActionType::CompileModuleFromInterface:
+  case ActionType::Typecheck:
+  case ActionType::ResolveImports:
+  case ActionType::MergeModules:
+  case ActionType::EmitModuleOnly:
+  case ActionType::EmitPCH:
+  case ActionType::EmitSILGen:
+  case ActionType::EmitSIL:
+  case ActionType::EmitSIBGen:
+  case ActionType::EmitSIB:
+  case ActionType::EmitImportedModules:
+    return false;
+  case ActionType::Immediate:
+  case ActionType::REPL:
+  case ActionType::EmitIR:
+  case ActionType::EmitBC:
+  case ActionType::EmitAssembly:
+  case ActionType::EmitObject:
+    return true;
+  }
+  llvm_unreachable("unhandled action");
+}
+
 
 const PrimarySpecificPaths &
 FrontendOptions::getPrimarySpecificPathsForAtMostOnePrimary() const {
