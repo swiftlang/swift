@@ -2912,11 +2912,12 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
-        assert(elt.getArgIdx() == 0);
-
-        anchor = parenExpr->getSubExpr();
-        path = path.slice(1);
-        continue;
+        // This simplication request could be for a synthesized argument.
+        if (elt.getArgIdx() == 0) {
+          anchor = parenExpr->getSubExpr();
+          path = path.slice(1);
+          continue;
+        }
       }
       break;
     }

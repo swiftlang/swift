@@ -1116,6 +1116,8 @@ ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,
       "missing argument for parameter #%0 in call", (unsigned))
+ERROR(missing_arguments_in_call,none,
+      "missing arguments for parameters %0 in call", (StringRef))
 ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,none,
@@ -3493,6 +3495,10 @@ ERROR(single_tuple_parameter_mismatch_normal,none,
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
+ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
+      "%0 %select{%1 |}2expects %3 separate arguments"
+      "%select{|; remove extra parentheses to change tuple into separate arguments}4",
+      (DescriptiveDeclKind, DeclName, bool, unsigned, bool))
 
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
