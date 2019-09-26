@@ -55,6 +55,9 @@ typedef struct swift_reflection_section_pair {
 
 /// Represents the set of Swift reflection sections of an image.
 /// Not all sections may be present.
+///
+/// DEPRECATED. New RemoteMirror clients should use
+/// \c swift_reflection_addImage .
 typedef struct swift_reflection_info {
   swift_reflection_section_pair_t field;
   swift_reflection_section_pair_t associated_types;
