@@ -189,3 +189,4 @@ enum ArrayOfNewEquatable : Array<NotEquatable> { }
 // expected-error@-2{{'ArrayOfNewEquatable' declares raw type 'Array<NotEquatable>', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-3{{RawRepresentable conformance cannot be synthesized because raw type 'Array<NotEquatable>' is not Equatable}}
 // expected-note@-4{{do you want to add protocol stubs?}}
+// expected-error@-5 {{an enum with no cases cannot declare a raw type}}

@@ -51,7 +51,8 @@ protocol Racoon {
   }
 }
 
-enum SillyRawEnum : SillyProtocol.InnerClass {}
+enum SillyRawEnum : SillyProtocol.InnerClass {} // expected-error {{an enum with no cases cannot declare a raw type}}
+// expected-error@-1 {{raw type}}
 
 protocol SillyProtocol {
   class InnerClass<T> {} // expected-error {{type 'InnerClass' cannot be nested in protocol 'SillyProtocol'}}
