@@ -3565,13 +3565,19 @@ bool ImplicitInitOnNonConstMetatypeFailure::diagnoseAsError() {
 }
 
 bool MissingArgumentsFailure::diagnoseAsError() {
+  auto &cs = getConstraintSystem();
   auto *locator = getLocator();
   auto path = locator->getPath();
 
-  // TODO: Currently this is only intended to diagnose contextual failures.
   if (path.empty() ||
       !(path.back().getKind() == ConstraintLocator::ApplyArgToParam ||
-        path.back().getKind() == ConstraintLocator::ContextualType))
+        path.back().getKind() == ConstraintLocator::ContextualType ||
+        path.back().getKind() == ConstraintLocator::ApplyArgument))
+    return false;
+
+  // If this is a misplaced `missng argument` situation, it would be
+  // diagnosed by invalid conversion fix.
+  if (isMisplacedMissingArgument(cs, locator))
     return false;
 
   auto *anchor = getAnchor();
@@ -3581,7 +3587,223 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   if (auto *closure = dyn_cast<ClosureExpr>(anchor))
     return diagnoseClosure(closure);
 
-  return false;
+  // This is a situation where function type is passed as an argument
+  // to a function type parameter and their argument arity is different.
+  //
+  // ```
+  // func foo(_: (Int) -> Void) {}
+  // func bar() {}
+  //
+  // foo(bar) // `() -> Void` vs. `(Int) -> Void`
+  // ```
+  if (locator->isLastElement(ConstraintLocator::ApplyArgToParam)) {
+    auto info = *getFunctionArgApplyInfo(locator);
+
+    auto *argExpr = info.getArgExpr();
+    emitDiagnostic(argExpr->getLoc(), diag::cannot_convert_argument_value,
+                   info.getArgType(), info.getParamType());
+    // TODO: It would be great so somehow point out which arguments are missing.
+    return true;
+  }
+
+  // Function type has fewer arguments than expected by context:
+  //
+  // ```
+  // func foo() {}
+  // let _: (Int) -> Void = foo
+  // ```
+  if (locator->isLastElement(ConstraintLocator::ContextualType)) {
+    auto &cs = getConstraintSystem();
+    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
+                   getType(anchor), resolveType(cs.getContextualType()));
+    // TODO: It would be great so somehow point out which arguments are missing.
+    return true;
+  }
+
+  if (diagnoseInvalidTupleDestructuring())
+    return true;
+
+  if (SynthesizedArgs.size() == 1)
+    return diagnoseSingleMissingArgument();
+
+  // At this point we know that this is a situation when
+  // there are multiple arguments missing, so let's produce
+  // a diagnostic which lists all of them and a fix-it
+  // to add arguments at appropriate positions.
+
+  SmallString<32> diagnostic;
+  llvm::raw_svector_ostream arguments(diagnostic);
+
+  interleave(
+      SynthesizedArgs,
+      [&](const AnyFunctionType::Param &arg) {
+        if (arg.hasLabel()) {
+          arguments << "'" << arg.getLabel().str() << "'";
+        } else {
+          auto *typeVar = arg.getPlainType()->castTo<TypeVariableType>();
+          auto *locator = typeVar->getImpl().getLocator();
+          auto paramIdx = locator->findLast<LocatorPathElt::ApplyArgToParam>()
+                              ->getParamIdx();
+
+          arguments << "#" << (paramIdx + 1);
+        }
+      },
+      [&] { arguments << ", "; });
+
+  auto diag = emitDiagnostic(anchor->getLoc(), diag::missing_arguments_in_call,
+                             arguments.str());
+
+  Expr *fnExpr = nullptr;
+  Expr *argExpr = nullptr;
+  unsigned numArguments = 0;
+  bool hasTrailingClosure = false;
+
+  std::tie(fnExpr, argExpr, numArguments, hasTrailingClosure) =
+      getCallInfo(getRawAnchor());
+
+  // TODO(diagnostics): We should be able to suggest this fix-it
+  // unconditionally.
+  if (argExpr && numArguments == 0) {
+    SmallString<32> scratch;
+    llvm::raw_svector_ostream fixIt(scratch);
+    interleave(
+        SynthesizedArgs,
+        [&](const AnyFunctionType::Param &arg) { forFixIt(fixIt, arg); },
+        [&] { fixIt << ", "; });
+
+    auto *tuple = cast<TupleExpr>(argExpr);
+    diag.fixItInsertAfter(tuple->getLParenLoc(), fixIt.str());
+  }
+
+  diag.flush();
+
+  if (auto selectedOverload = getChoiceFor(locator)) {
+    if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
+    }
+  }
+
+  return true;
+}
+
+bool MissingArgumentsFailure::diagnoseSingleMissingArgument() const {
+  auto &ctx = getASTContext();
+
+  auto *anchor = getRawAnchor();
+  if (!(isa<CallExpr>(anchor) || isa<SubscriptExpr>(anchor) ||
+        isa<UnresolvedMemberExpr>(anchor)))
+    return false;
+
+  if (SynthesizedArgs.size() != 1)
+    return false;
+
+  const auto &argument = SynthesizedArgs.front();
+  auto *argType = argument.getPlainType()->castTo<TypeVariableType>();
+  auto *argLocator = argType->getImpl().getLocator();
+  auto position =
+      argLocator->findLast<LocatorPathElt::ApplyArgToParam>()->getParamIdx();
+  auto label = argument.getLabel();
+
+  SmallString<32> insertBuf;
+  llvm::raw_svector_ostream insertText(insertBuf);
+
+  if (position != 0)
+    insertText << ", ";
+
+  forFixIt(insertText, argument);
+
+  Expr *fnExpr = nullptr;
+  Expr *argExpr = nullptr;
+  unsigned insertableEndIdx = 0;
+  bool hasTrailingClosure = false;
+
+  std::tie(fnExpr, argExpr, insertableEndIdx, hasTrailingClosure) =
+      getCallInfo(anchor);
+
+  if (!argExpr)
+    return false;
+
+  if (hasTrailingClosure)
+    insertableEndIdx -= 1;
+
+  if (position == 0 && insertableEndIdx != 0)
+    insertText << ", ";
+
+  SourceLoc insertLoc;
+  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    // fn():
+    //   fn([argMissing])
+    // fn(argX, argY):
+    //   fn([argMissing, ]argX, argY)
+    //   fn(argX[, argMissing], argY)
+    //   fn(argX, argY[, argMissing])
+    // fn(argX) { closure }:
+    //   fn([argMissing, ]argX) { closure }
+    //   fn(argX[, argMissing]) { closure }
+    //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
+    if (insertableEndIdx == 0)
+      insertLoc = TE->getRParenLoc();
+    else if (position != 0) {
+      auto argPos = std::min(TE->getNumElements(), position) - 1;
+      insertLoc = Lexer::getLocForEndOfToken(
+          ctx.SourceMgr, TE->getElement(argPos)->getEndLoc());
+    } else {
+      insertLoc = TE->getElementNameLoc(0);
+      if (insertLoc.isInvalid())
+        insertLoc = TE->getElement(0)->getStartLoc();
+    }
+  } else {
+    auto *PE = cast<ParenExpr>(argExpr);
+    if (PE->getRParenLoc().isValid()) {
+      // fn(argX):
+      //   fn([argMissing, ]argX)
+      //   fn(argX[, argMissing])
+      // fn() { closure }:
+      //   fn([argMissing]) {closure}
+      //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
+      if (insertableEndIdx == 0)
+        insertLoc = PE->getRParenLoc();
+      else if (position == 0)
+        insertLoc = PE->getSubExpr()->getStartLoc();
+      else
+        insertLoc = Lexer::getLocForEndOfToken(ctx.SourceMgr,
+                                               PE->getSubExpr()->getEndLoc());
+    } else {
+      // fn { closure }:
+      //   fn[(argMissing)] { closure }
+      //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
+      assert(!isa<SubscriptExpr>(anchor) && "bracket less subscript");
+      assert(PE->hasTrailingClosure() &&
+             "paren less ParenExpr without trailing closure");
+      insertBuf.insert(insertBuf.begin(), '(');
+      insertBuf.insert(insertBuf.end(), ')');
+      insertLoc =
+          Lexer::getLocForEndOfToken(ctx.SourceMgr, fnExpr->getEndLoc());
+    }
+  }
+
+  if (insertLoc.isInvalid())
+    return false;
+
+  if (label.empty()) {
+    emitDiagnostic(insertLoc, diag::missing_argument_positional, position + 1)
+        .fixItInsert(insertLoc, insertText.str());
+  } else if (isPropertyWrapperInitialization()) {
+    auto *TE = cast<TypeExpr>(fnExpr);
+    emitDiagnostic(TE->getLoc(), diag::property_wrapper_missing_arg_init, label,
+                   resolveType(TE->getInstanceType())->getString());
+  } else {
+    emitDiagnostic(insertLoc, diag::missing_argument_named, label)
+        .fixItInsert(insertLoc, insertText.str());
+  }
+
+  if (auto selectedOverload = getChoiceFor(getLocator())) {
+    if (auto *decl = selectedOverload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
+    }
+  }
+
+  return true;
 }
 
 bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
@@ -3598,14 +3820,15 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
   if (!funcType)
     return false;
 
-  auto diff = funcType->getNumParams() - NumSynthesized;
+  unsigned numSynthesized = SynthesizedArgs.size();
+  auto diff = funcType->getNumParams() - numSynthesized;
 
   // If the closure didn't specify any arguments and it is in a context that
   // needs some, produce a fixit to turn "{...}" into "{ _,_ in ...}".
   if (diff == 0) {
     auto diag =
         emitDiagnostic(closure->getStartLoc(),
-                       diag::closure_argument_list_missing, NumSynthesized);
+                       diag::closure_argument_list_missing, numSynthesized);
 
     std::string fixText; // Let's provide fixits for up to 10 args.
     if (funcType->getNumParams() <= 10) {
@@ -3649,15 +3872,177 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
     llvm::raw_svector_ostream OS(fixIt);
 
     OS << ",";
-    for (unsigned i = 0; i != NumSynthesized; ++i) {
+    for (unsigned i = 0; i != numSynthesized; ++i) {
       OS << ((onlyAnonymousParams) ? "_" : "<#arg#>");
-      OS << ((i == NumSynthesized - 1) ? " " : ",");
+      OS << ((i == numSynthesized - 1) ? " " : ",");
     }
 
     diag.fixItInsertAfter(params->getEndLoc(), OS.str());
   }
 
   return true;
+}
+
+bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
+  auto *locator = getLocator();
+  if (!locator->isLastElement(ConstraintLocator::ApplyArgument))
+    return false;
+
+  if (SynthesizedArgs.size() < 2)
+    return false;
+
+  auto *anchor = getAnchor();
+
+  Expr *argExpr = nullptr;
+  // Something like `foo(x: (1, 2))`
+  if (auto *TE = dyn_cast<TupleExpr>(anchor)) {
+    if (TE->getNumElements() == 1)
+      argExpr = TE->getElement(0);
+  } else { // or `foo((1, 2))`
+    argExpr = cast<ParenExpr>(anchor)->getSubExpr();
+  }
+
+  if (!(argExpr && getType(argExpr)->getRValueType()->is<TupleType>()))
+    return false;
+
+  auto selectedOverload = getChoiceFor(locator);
+  if (!selectedOverload)
+    return false;
+
+  auto *decl = selectedOverload->choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto name = decl->getBaseName();
+  auto diagnostic =
+      emitDiagnostic(anchor->getLoc(),
+                     diag::cannot_convert_single_tuple_into_multiple_arguments,
+                     decl->getDescriptiveKind(), name, name.isSpecial(),
+                     SynthesizedArgs.size(), isa<TupleExpr>(argExpr));
+
+  // If argument is a literal tuple, let's suggest removal of parentheses.
+  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    diagnostic.fixItRemove(TE->getLParenLoc()).fixItRemove(TE->getRParenLoc());
+  }
+
+  diagnostic.flush();
+
+  // Add a note which points to the overload choice location.
+  emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
+  return true;
+}
+
+bool MissingArgumentsFailure::isPropertyWrapperInitialization() const {
+  auto *call = dyn_cast<CallExpr>(getRawAnchor());
+  if (!(call && call->isImplicit()))
+    return false;
+
+  auto TE = dyn_cast<TypeExpr>(call->getFn());
+  if (!TE)
+    return false;
+
+  auto instanceTy = TE->getInstanceType();
+  if (!instanceTy)
+    return false;
+
+  auto *NTD = resolveType(instanceTy)->getAnyNominal();
+  return NTD && NTD->getAttrs().hasAttribute<PropertyWrapperAttr>();
+}
+
+bool MissingArgumentsFailure::isMisplacedMissingArgument(
+    ConstraintSystem &cs, ConstraintLocator *locator) {
+  auto *calleeLocator = cs.getCalleeLocator(locator);
+  auto overloadChoice = cs.findSelectedOverloadFor(calleeLocator);
+  if (!overloadChoice)
+    return false;
+
+  auto *fnType =
+      cs.simplifyType(overloadChoice->ImpliedType)->getAs<FunctionType>();
+  if (!(fnType && fnType->getNumParams() == 2))
+    return false;
+
+  auto *anchor = locator->getAnchor();
+
+  auto hasFixFor = [&](FixKind kind, ConstraintLocator *locator) -> bool {
+    auto fix = llvm::find_if(cs.getFixes(), [&](const ConstraintFix *fix) {
+      return fix->getLocator() == locator;
+    });
+
+    if (fix == cs.getFixes().end())
+      return false;
+
+    return (*fix)->getKind() == kind;
+  };
+
+  auto *callLocator =
+      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument);
+
+  auto argFlags = fnType->getParams()[0].getParameterFlags();
+  auto *argLoc = cs.getConstraintLocator(
+      callLocator, LocatorPathElt::ApplyArgToParam(0, 0, argFlags));
+
+  if (!(hasFixFor(FixKind::AllowArgumentTypeMismatch, argLoc) &&
+        hasFixFor(FixKind::AddMissingArguments, callLocator)))
+    return false;
+
+  Expr *argExpr = nullptr;
+  if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    argExpr = call->getArg();
+  } else if (auto *subscript = dyn_cast<SubscriptExpr>(anchor)) {
+    argExpr = subscript->getIndex();
+  } else {
+    return false;
+  }
+
+  Expr *argument = nullptr;
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    argument = PE->getSubExpr();
+  } else {
+    auto *tuple = cast<TupleExpr>(argExpr);
+    if (tuple->getNumElements() != 1)
+      return false;
+    argument = tuple->getElement(0);
+  }
+
+  auto argType = cs.simplifyType(cs.getType(argument));
+  auto paramType = fnType->getParams()[1].getPlainType();
+
+  auto &TC = cs.getTypeChecker();
+  return TC.isConvertibleTo(argType, paramType, cs.DC);
+}
+
+std::tuple<Expr *, Expr *, unsigned, bool>
+MissingArgumentsFailure::getCallInfo(Expr *anchor) const {
+  if (auto *call = dyn_cast<CallExpr>(anchor)) {
+    return std::make_tuple(call->getFn(), call->getArg(),
+                           call->getNumArguments(), call->hasTrailingClosure());
+  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+    return std::make_tuple(UME, UME->getArgument(), UME->getNumArguments(),
+                           UME->hasTrailingClosure());
+  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
+    return std::make_tuple(SE, SE->getIndex(), SE->getNumArguments(),
+                           SE->hasTrailingClosure());
+  }
+
+  return std::make_tuple(nullptr, nullptr, 0, false);
+}
+
+void MissingArgumentsFailure::forFixIt(
+    llvm::raw_svector_ostream &out,
+    const AnyFunctionType::Param &argument) const {
+  if (argument.hasLabel())
+    out << argument.getLabel().str() << ": ";
+
+  // Explode inout type.
+  if (argument.isInOut())
+    out << "&";
+
+  auto resolvedType = resolveType(argument.getPlainType());
+  // @autoclosure; the type should be the result type.
+  if (argument.isAutoClosure())
+    resolvedType = resolvedType->castTo<FunctionType>()->getResult();
+
+  out << "<#" << resolvedType << "#>";
 }
 
 bool ClosureParamDestructuringFailure::diagnoseAsError() {
@@ -4604,6 +4989,9 @@ void InOutConversionFailure::fixItChangeArgumentType() const {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsError() {
+  if (diagnoseMisplacedMissingArgument())
+    return true;
+
   if (diagnoseConversionToBool())
     return true;
 
@@ -4831,6 +5219,33 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
                  describeGenericType(paramDecl, true));
 
   return true;
+}
+
+bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
+  auto &cs = getConstraintSystem();
+  auto *locator = getLocator();
+
+  if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
+    return false;
+
+  auto info = *getFunctionArgApplyInfo(locator);
+
+  auto *argType = cs.createTypeVariable(
+      cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
+      /*flags=*/0);
+
+  // Assign new type variable to a type of a parameter.
+  auto *fnType = info.getFnType();
+  const auto &param = fnType->getParams()[0];
+  cs.assignFixedType(argType, param.getOldType());
+
+  auto *anchor = getRawAnchor();
+
+  MissingArgumentsFailure failure(
+      getParentExpr(), cs, {param.withType(argType)},
+      cs.getConstraintLocator(anchor, ConstraintLocator::ApplyArgument));
+
+  return failure.diagnoseSingleMissingArgument();
 }
 
 void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(

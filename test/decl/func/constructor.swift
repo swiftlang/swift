@@ -79,7 +79,7 @@ extension D {
   init() { i = 17 }
 }
 
-F() // expected-error{{missing argument for parameter 'd'}}
+F() // expected-error{{missing arguments for parameters 'd', 'b', 'c' in call}}
 D() // okay // expected-warning{{unused}}
 B() // okay // expected-warning{{unused}}
 C() // expected-error{{missing argument for parameter 'd'}}

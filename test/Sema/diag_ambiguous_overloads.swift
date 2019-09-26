@@ -114,7 +114,7 @@ struct Count { // expected-note {{'init(title:)' declared here}}
 func getCounts(_ scheduler: sr5154_Scheduler, _ handler: @escaping ([Count]) -> Void) {
   scheduler.inBackground(run: {
     return [Count()] // expected-error {{missing argument for parameter 'title' in call}}
-  }, completedBy: {
+  }, completedBy: { // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{20-20= _ in}}
   })
 }
 
