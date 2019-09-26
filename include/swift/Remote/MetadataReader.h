@@ -50,9 +50,11 @@ private:
   const T *LocalBuffer;
 
 public:
-  /*implicit*/
-  RemoteRef(std::nullptr_t _)
+  RemoteRef()
     : Address(0), LocalBuffer(nullptr) {}
+
+  /*implicit*/
+  RemoteRef(std::nullptr_t _) : RemoteRef() {}
 
   template<typename StoredPointer>
   explicit RemoteRef(StoredPointer address, const T *localBuffer)
@@ -69,7 +71,7 @@ public:
   explicit operator bool() const {
     return LocalBuffer != nullptr;
   }
-
+  
   const T *operator->() const {
     assert(LocalBuffer);
     return LocalBuffer;
@@ -103,6 +105,11 @@ public:
   template<typename U>
   uint64_t resolveRelativeFieldData(U &field) const {
     return getField(field).resolveRelativeAddressData();
+  }
+  
+  RemoteRef atByteOffset(int64_t Offset) const {
+    return RemoteRef(Address + Offset,
+                     (const T *)((intptr_t)LocalBuffer + Offset));
   }
 };
 

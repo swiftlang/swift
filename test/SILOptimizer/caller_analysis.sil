@@ -12,7 +12,7 @@ import Builtin
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @dead_func : $@convention(thin) () -> () {
+sil private @dead_func : $@convention(thin) () -> () {
   %2 = tuple ()
   return %2 : $()
 }
@@ -25,7 +25,7 @@ sil hidden @dead_func : $@convention(thin) () -> () {
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @call_top : $@convention(thin) () -> () {
+sil private @call_top : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @call_middle : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -42,7 +42,7 @@ bb0:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - call_top
 // CHECK-NEXT:  ...
-sil hidden @call_middle : $@convention(thin) () -> () {
+sil private @call_middle : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @call_bottom : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -59,7 +59,7 @@ bb0:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - call_middle
 // CHECK-NEXT:  ...
-sil hidden @call_bottom : $@convention(thin) () -> () {
+sil private @call_bottom : $@convention(thin) () -> () {
 bb0:
   %0 = tuple ()
   return %0 : $()
@@ -74,7 +74,7 @@ bb0:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - self_recursive_func
 // CHECK-NEXT:  ...
-sil hidden @self_recursive_func : $@convention(thin) () -> () {
+sil private @self_recursive_func : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @self_recursive_func : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -91,7 +91,7 @@ bb0:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - mutual_recursive_func2
 // CHECK-NEXT:  ...
-sil hidden @mutual_recursive_func1 : $@convention(thin) () -> () {
+sil private @mutual_recursive_func1 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @mutual_recursive_func2 : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -108,7 +108,7 @@ bb0:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - mutual_recursive_func1
 // CHECK-NEXT:  ...
-sil hidden @mutual_recursive_func2 : $@convention(thin) () -> () {
+sil private @mutual_recursive_func2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @mutual_recursive_func1 : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -125,7 +125,7 @@ bb0:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - multi_calles
 // CHECK-NEXT:  ...
-sil hidden @multi_called : $@convention(thin) () -> () {
+sil private @multi_called : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
@@ -139,7 +139,7 @@ bb0:
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @multi_calles : $@convention(thin) () -> () {
+sil private @multi_calles : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @multi_called : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -165,7 +165,7 @@ bb3:
 // CHECK-NEXT:    - multi_caller1
 // CHECK-NEXT:    - multi_caller2
 // CHECK-NEXT:  ...
-sil hidden @multi_callers : $@convention(thin) () -> () {
+sil private @multi_callers : $@convention(thin) () -> () {
 bb0:
   %2 = tuple ()
   return %2 : $()
@@ -179,7 +179,7 @@ bb0:
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @multi_caller1 : $@convention(thin) () -> () {
+sil private @multi_caller1 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @multi_callers : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -195,7 +195,7 @@ bb0:
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil hidden @multi_caller2 : $@convention(thin) () -> () {
+sil private @multi_caller2 : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @multi_callers : $@convention(thin) () -> ()
   %1 = apply %0() : $@convention(thin) () -> ()
@@ -243,7 +243,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil @partial_apply_one_arg : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned (Builtin.Int32) -> Builtin.Int32 {
+sil private @partial_apply_one_arg : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned (Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = function_ref @closure1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
   %2 = partial_apply %1(%0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
@@ -258,7 +258,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil @partial_apply_two_args1 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
+sil private @partial_apply_two_args1 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = function_ref @closure1 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
   %2 = partial_apply %1(%0, %0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
@@ -273,7 +273,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NEXT:  partialAppliers:
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:  ...
-sil @partial_apply_two_args2 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
+sil private @partial_apply_two_args2 : $@convention(thin) (Builtin.Int32) -> @owned @callee_owned () -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32):
   %1 = function_ref @closure2 : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
   %2 = partial_apply %1(%0, %0) : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32
@@ -290,7 +290,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  ...
-sil @called_closure : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil private @called_closure : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %0 : $Builtin.Int32
 }
@@ -317,7 +317,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  ...
-sil @called_closure_then_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil private @called_closure_then_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %0 : $Builtin.Int32
 }
@@ -367,7 +367,7 @@ bb0(%0 : $Builtin.Int32):
 // CHECK-NEXT:  fullAppliers:
 // CHECK-NEXT:    - partial_apply_that_is_applied
 // CHECK-NEXT:  ...
-sil @called_closure_then_copy_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
+sil private @called_closure_then_copy_destroy : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> Builtin.Int32 {
 bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %0 : $Builtin.Int32
 }
@@ -414,7 +414,7 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
 // CHECK-NEXT:    - partial_apply_that_is_applied_and_passed_noescape
 // CHECK-NEXT:    - thin_to_thick_is_applied_and_passed_noescape
 // CHECK-NEXT:  ...
-sil @noescape_caller : $@convention(thin) (@noescape @callee_owned () -> Builtin.Int32) -> () {
+sil private @noescape_caller : $@convention(thin) (@noescape @callee_owned () -> Builtin.Int32) -> () {
 bb0(%0 : $@noescape @callee_owned () -> Builtin.Int32):
   %1 = apply %0() : $@noescape @callee_owned () -> Builtin.Int32
   %9999 = tuple()
