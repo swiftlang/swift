@@ -2408,25 +2408,14 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
     // Inlined from TapExpr:
     // TODO: This is only necessary because constant evaluation requires that
     // the box for the var gets defined before the initializer happens.
-    auto VarType = ETap->getType()->getCanonicalType();
 
     Scope outerScope(SGF, CleanupLocation(ETap));
 
-    // Initialize the var with our SubExpr.
-    auto VarInit = SGF.emitTemporary(SILLocation(E),
-                                     SGF.getTypeLowering(VarType));
-
     // Modified from TapExpr to evaluate the SubExpr directly rather than
     // indirectly through the OpaqueValue system.
-    RValue builderInit =
-        emitInterpolationBuilderInit(*this, E, SGFContext());
+    RValue builderInit = emitInterpolationBuilderInit(*this, E, SGFContext());
 
-    if (!builderInit.isInContext())
-      std::move(builderInit)
-        .ensurePlusOne(SGF, SILLocation(E))
-        .forwardInto(SGF, SILLocation(E), VarInit.get());
-
-    auto VarAddress = VarInit->getManagedAddress();
+    auto VarAddress = std::move(builderInit).materialize(SGF, SILLocation(E));
     SILGenFunction::OpaqueValueRAII temporaryRef(SGF, ETap->getTemporaryRef(),
                                                  VarAddress);
 
@@ -5368,16 +5357,12 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 }
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
-  auto VarType = E->getType()->getCanonicalType();
-
   Scope outerScope(SGF, CleanupLocation(E));
 
   // Initialize the var with our SubExpr.
-  auto VarInit = SGF.emitTemporary(SILLocation(E),
-                                   SGF.getTypeLowering(VarType));
-  SGF.emitExprInto(E->getSubExpr(), VarInit.get(), SILLocation(E));
+  RValue subExprValue = visit(E->getSubExpr());
 
-  auto VarAddress = VarInit->getManagedAddress();
+  auto VarAddress = std::move(subExprValue).materialize(SGF, SILLocation(E));
   SILGenFunction::OpaqueValueRAII temporaryRef(SGF, E->getTemporaryRef(),
                                                VarAddress);
 
