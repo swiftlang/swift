@@ -574,8 +574,11 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
 
     DeclAttributes attrs;
     if (auto attrsSyntax = elem.getAttributes()) {
-      auto attrsLoc = advanceLocBegin(Loc, *attrsSyntax->getFirstToken());
-      attrs = getDeclAttributes(attrsLoc);
+      if (auto firstTok = attrsSyntax->getFirstToken()) {
+        auto attrsLoc = advanceLocBegin(Loc, *firstTok);
+        if (hasDeclAttributes(attrsLoc))
+          attrs = getDeclAttributes(attrsLoc);
+      }
     }
     Identifier name = Context.getIdentifier(elem.getName().getIdentifierText());
     SourceLoc nameLoc = advanceLocBegin(Loc, elem.getName());
