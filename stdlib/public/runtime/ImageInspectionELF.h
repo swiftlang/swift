@@ -21,8 +21,6 @@
 
 #define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"
 
-#if defined(__ELF__)
-
 #include "../SwiftShims/Visibility.h"
 #include <cstdint>
 #include <cstddef>
@@ -61,10 +59,10 @@ struct MetadataSections {
 };
 } // namespace swift
 
+#if defined(__ELF__)
 // Called by injected constructors when a dynamic library is loaded.
 SWIFT_RUNTIME_EXPORT
 void swift_addNewDSOImage(const void *addr);
-
 #endif // defined(__ELF__)
 
 #endif // SWIFT_RUNTIME_IMAGE_INSPECTION_ELF_H
