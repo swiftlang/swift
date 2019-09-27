@@ -149,10 +149,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
     sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
     sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
     sectionFromInfo<const void *>(Info, Info.type_references),
-    sectionFromInfo<const void *>(Info, Info.reflection_strings),
-    Info.LocalStartAddress,
-    Info.RemoteStartAddress
-  };
+    sectionFromInfo<const void *>(Info, Info.reflection_strings)};
   
   Context->addReflectionInfo(ContextInfo);
 }
