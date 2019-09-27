@@ -2476,9 +2476,10 @@ namespace {
                                          memberName,
                                          defaultMemberLookupOptions);
 
-          // Filter out any functions, instance members or enum cases with
-          // associated values.
-          results.filter([](const LookupResultEntry entry, bool isOuter) {
+          // Filter out any functions, instance members, enum cases with
+          // associated values or variables whose type does not match the
+          // contextual type.
+          results.filter([&](const LookupResultEntry entry, bool isOuter) {
             if (auto member = entry.getValueDecl()) {
               if (isa<FuncDecl>(member))
                 return false;
@@ -2486,6 +2487,10 @@ namespace {
                 return false;
               if (auto EED = dyn_cast<EnumElementDecl>(member)) {
                 return !EED->hasAssociatedValues();
+              }
+              if (auto VD = dyn_cast<VarDecl>(member)) {
+                auto baseType = DSCE->getType()->lookThroughAllOptionalTypes();
+                return VD->getInterfaceType()->isEqual(baseType);
               }
             }
 
@@ -2497,15 +2502,7 @@ namespace {
           }
           
           if (auto member = results.front().getValueDecl()) {
-            // If this is a variable whose type does not match the base type
-            // of the target then ignore it.
-            if (auto VD = dyn_cast<VarDecl>(member)) {
-              auto baseType = DSCE->getType()->lookThroughAllOptionalTypes();
-              if (!VD->getInterfaceType()->isEqual(baseType))
-                return;
-            }
-            
-            // Emit a diagnostic with some fixits
+            // Emit a diagnostic with some fix-its
             auto baseTyName = baseTy->getCanonicalType().getString();
             auto baseTyUnwrappedName = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
