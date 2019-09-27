@@ -1179,41 +1179,47 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
 
-  using TypeASTResult = ParserResult<TypeRepr>;
-  using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
+  ParserResult<TypeRepr> parseType();
+  ParserResult<TypeRepr> parseType(Diag<> MessageID,
+                                   bool HandleCodeCompletion = true,
+                                   bool IsSILFuncDecl = false);
+  ParserStatus parseGenericArguments(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
+                                     SourceLoc &LAngleLoc,
+                                     SourceLoc &RAngleLoc);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
+                                 ParamDecl::Specifier Specifier,
+                                 SourceLoc SpecifierLoc);
+  ParserResult<TypeRepr> parseAnyTypeAST();
 
   ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
   parseLayoutConstraintSyntax();
 
-  TypeResult parseTypeSyntax();
-  TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
-                             bool IsSILFuncDecl = false);
-
-  TypeASTResult parseType();
-  TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
-                          bool IsSILFuncDecl = false);
-  ParserStatus
-  parseGenericArgumentsAST(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
-                           SourceLoc &LAngleLoc, SourceLoc &RAngleLoc);
-  TypeResult parseSILBoxTypeSyntax(
-      Optional<ParsedGenericParameterClauseListSyntax> genericParams);
-  TypeASTResult parseAnyTypeAST();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax();
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
+                  bool IsSILFuncDecl = false);
 
   ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
   parseGenericArgumentClauseSyntax();
 
-  TypeResult parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
-  TypeResult parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
-  TypeResult parseTypeIdentifier();
-  TypeResult parseAnyType();
-  TypeResult parseTypeTupleBody();
-  TypeResult parseTypeCollection();
-  TypeResult parseMetatypeType(ParsedTypeSyntax Base);
-  TypeResult parseOptionalType(ParsedTypeSyntax Base);
-  TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeIdentifier();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseAnyType();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeTupleBody();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeCollection();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseMetatypeType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseOptionalType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax>
+  parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseSILBoxTypeSyntax(
+      Optional<ParsedGenericParameterClauseListSyntax> genericParams);
 
-  TypeResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
-  TypeResult parseOldStyleProtocolComposition();
+  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeArray(ParsedTypeSyntax Base,
+                                                      SourceLoc BaseLoc);
+  ParsedSyntaxResult<ParsedTypeSyntax> parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
   ParsedTokenSyntax consumeOptionalTokenSyntax();
@@ -1223,13 +1229,11 @@ public:
   ParsedTokenSyntax consumeImplicitlyUnwrappedOptionalTokenSyntax();
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc);
   ParsedSyntaxResult<ParsedTypeSyntax>
   applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&ty,
                              Optional<ParsedTokenSyntax> specifier,
                              Optional<ParsedAttributeListSyntax> attrs);
+
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
 
