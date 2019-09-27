@@ -199,9 +199,9 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, Builtin.UnknownObject>) -> () {
-// CHECK: bb0([[ARG:%.*]] : $Either<Builtin.NativeObject, Builtin.UnknownObject>):
-// CHECK:   switch_enum [[ARG]] : $Either<Builtin.NativeObject, Builtin.UnknownObject>, case #Either.left!enumelt.1: [[SUCC_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
+// CHECK-LABEL: sil @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, AnyObject>) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Either<Builtin.NativeObject, AnyObject>):
+// CHECK:   switch_enum [[ARG]] : $Either<Builtin.NativeObject, AnyObject>, case #Either.left!enumelt.1: [[SUCC_BB:bb[0-9]+]], default [[DEFAULT_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCC_BB]]([[LHS:%.*]] : $Builtin.NativeObject
 // CHECK:   strong_release [[LHS]]
@@ -214,16 +214,16 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 // CHECK: [[EPILOG_BB]]:
 // CHECK:   return
 // CHECK: } // end sil function 'switch_enum_default_case'
-sil [ossa] @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, Builtin.UnknownObject>) -> () {
-bb0(%0 : @owned $Either<Builtin.NativeObject, Builtin.UnknownObject>):
-  switch_enum %0 : $Either<Builtin.NativeObject, Builtin.UnknownObject>, case #Either.left!enumelt.1: bb1, default bb2
+sil [ossa] @switch_enum_default_case : $@convention(thin) (@owned Either<Builtin.NativeObject, Builtin.AnyObject>) -> () {
+bb0(%0 : @owned $Either<Builtin.NativeObject, Builtin.AnyObject>):
+  switch_enum %0 : $Either<Builtin.NativeObject, Builtin.AnyObject>, case #Either.left!enumelt.1: bb1, default bb2
 
 bb1(%1 : @owned $Builtin.NativeObject):
   destroy_value %1 : $Builtin.NativeObject
   br bb3
 
-bb2(%2 : @owned $Either<Builtin.NativeObject, Builtin.UnknownObject>):
-  destroy_value %2 : $Either<Builtin.NativeObject, Builtin.UnknownObject>
+bb2(%2 : @owned $Either<Builtin.NativeObject, Builtin.AnyObject>):
+  destroy_value %2 : $Either<Builtin.NativeObject, Builtin.AnyObject>
   br bb3
 
 bb3:

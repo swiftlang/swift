@@ -1009,8 +1009,8 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 
   case FunctionMetadataConvention::Block:
 #if SWIFT_OBJC_INTEROP
-    // Blocks are ObjC objects, so can share the Builtin.UnknownObject value
-    // witnesses.
+    // Blocks are ObjC objects, so can share the AnyObject value
+    // witnesses (stored as "BO" rather than "yXl" for ABI compat).
     Data.ValueWitnesses = &VALUE_WITNESS_SYM(BO);
 #else
     assert(false && "objc block without objc interop?");

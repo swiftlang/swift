@@ -2615,7 +2615,7 @@ namespace {
       case ClassMetadataStrategy::Fixed: {
         // FIXME: Should this check HasImported instead?
         auto type = (Target->checkAncestry(AncestryFlags::ObjC)
-                    ? IGM.Context.TheUnknownObjectType
+                    ? IGM.Context.getAnyObjectType()
                     : IGM.Context.TheNativeObjectType);
         auto wtable = IGM.getAddrOfValueWitnessTable(type);
         B.add(wtable);
@@ -4012,7 +4012,7 @@ namespace {
       // Without Objective-C interop, foreign classes must still use
       // Swift native reference counting.
       auto type = (IGM.ObjCInterop
-                   ? IGM.Context.TheUnknownObjectType
+                   ? IGM.Context.getAnyObjectType()
                    : IGM.Context.TheNativeObjectType);
       auto wtable = IGM.getAddrOfValueWitnessTable(type);
       B.add(wtable);
