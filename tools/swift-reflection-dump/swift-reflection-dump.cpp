@@ -138,7 +138,6 @@ public:
     for (SectionRef S : O->sections()) {
       if (!needToRelocate(S))
         continue;
-      StringRef Content;
       auto SectionAddr = getSectionAddress(S);
       if (SectionAddr)
         VASize = std::max(VASize, SectionAddr + S.getSize());
