@@ -393,7 +393,8 @@ private:
         os << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
 
-      if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
+      auto *RVE = Elt->getStructuralRawValueExpr();
+      if (auto ILE = cast_or_null<IntegerLiteralExpr>(RVE)) {
         os << " = ";
         if (ILE->isNegative())
           os << "-";
