@@ -35,9 +35,7 @@ using namespace constraints;
 
 MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
-bool MatchCallArgumentListener::extraArguments(ArrayRef<unsigned> argIndices) {
-  return true;
-}
+bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
 
 Optional<unsigned>
 MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
@@ -566,12 +564,15 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
     // If we still haven't claimed all of the arguments,
     // fail if there is no recovery.
     if (numClaimedArgs != numArgs) {
-      SmallVector<unsigned, 4> extraneous;
       for (auto index : indices(claimedArgs)) {
-        if (!claimedArgs[index])
-          extraneous.push_back(index);
+        if (claimedArgs[index])
+          continue;
+
+        if (listener.extraArgument(index))
+          return true;
       }
-      return listener.extraArguments(extraneous);
+
+      return false;
     }
 
     // FIXME: If we had the actual parameters and knew the body names, those
@@ -792,24 +793,22 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
-  FunctionType *ContextualType;
-
   SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
-
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
   unsigned NumSynthesizedArgs = 0;
+  SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> ExtraArguments;
 
 public:
-  ArgumentFailureTracker(ConstraintSystem &cs, FunctionType *contextualType,
+  ArgumentFailureTracker(ConstraintSystem &cs,
                          SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
                          SmallVectorImpl<ParamBinding> &bindings,
                          ConstraintLocatorBuilder locator)
-      : CS(cs), ContextualType(contextualType), Arguments(args),
-        Parameters(params), Bindings(bindings), Locator(locator) {}
+      : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
+        Locator(locator) {}
 
   ~ArgumentFailureTracker() override {
     if (NumSynthesizedArgs > 0) {
@@ -852,23 +851,12 @@ public:
     return newArgIdx;
   }
 
-  bool extraArguments(ArrayRef<unsigned> argIndices) override {
+  bool extraArgument(unsigned argIdx) override {
     if (!CS.shouldAttemptFixes())
       return true;
 
-    // If alleged extraneous argument has a label, the problem
-    // should be diagnosed as non-matching arguments.
-    if (llvm::any_of(argIndices, [&](const unsigned idx) {
-          return Arguments[idx].hasLabel();
-        }))
-      return true;
-
-    SmallVector<std::pair<unsigned, AnyFunctionType::Param>, 4> extraneous;
-    for (const auto index : argIndices)
-      extraneous.push_back({index, Arguments[index]});
-
-    return CS.recordFix(RemoveExtraneousArguments::create(
-        CS, ContextualType, extraneous, CS.getConstraintLocator(Locator)));
+    ExtraArguments.push_back(std::make_pair(argIdx, Arguments[argIdx]));
+    return false;
   }
 
   bool missingLabel(unsigned paramIndex) override {
@@ -923,6 +911,11 @@ public:
     // overload(s) where labels did line up correctly.
     CS.increaseScore(ScoreKind::SK_Fix, numExtraneous);
     return false;
+  }
+
+  ArrayRef<std::pair<unsigned, AnyFunctionType::Param>>
+  getExtraneousArguments() const {
+    return ExtraArguments;
   }
 };
 
@@ -986,7 +979,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
   {
-    ArgumentFailureTracker listener(cs, contextualType, argsWithLabels, params,
+    ArgumentFailureTracker listener(cs, argsWithLabels, params,
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
             argsWithLabels, params, paramInfo, hasTrailingClosure,
@@ -996,6 +989,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
       if (AllowTupleSplatForSingleParameter::attempt(
               cs, argsWithLabels, params, parameterBindings, locator))
+        return cs.getTypeMatchFailure(locator);
+    }
+
+    auto extraArguments = listener.getExtraneousArguments();
+    if (!extraArguments.empty()) {
+      auto *fix = RemoveExtraneousArguments::create(
+          cs, contextualType, extraArguments, cs.getConstraintLocator(locator));
+
+      if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 2))
         return cs.getTypeMatchFailure(locator);
     }
   }
@@ -1417,7 +1419,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
 
 static bool fixExtraneousArguments(ConstraintSystem &cs,
                                    FunctionType *contextualType,
-                                   SmallVectorImpl<AnyFunctionType::Param> &args,
+                                   ArrayRef<AnyFunctionType::Param> args,
                                    int numExtraneous,
                                    ConstraintLocatorBuilder locator) {
   auto AnyType = cs.getASTContext().TheAnyType;
@@ -1426,18 +1428,20 @@ static bool fixExtraneousArguments(ConstraintSystem &cs,
   auto argumentLocator =
       locator.withPathElement(ConstraintLocator::FunctionArgument);
 
-  do {
-    auto param = args.pop_back_val();
-    auto index = args.size();
+  for (unsigned i = args.size() - numExtraneous, n = args.size(); i != n; ++i) {
+    extraneous.push_back({i, args[i]});
+    if (auto *typeVar = args[i].getPlainType()->getAs<TypeVariableType>()) {
+      cs.recordHole(typeVar);
+      cs.addConstraint(
+          ConstraintKind::Defaultable, typeVar, AnyType,
+          argumentLocator.withPathElement(LocatorPathElt::TupleElement(i)));
+    }
+  }
 
-    extraneous.push_back({index, param});
-    cs.addConstraint(ConstraintKind::Defaultable, param.getPlainType(), AnyType,
-                     argumentLocator.withPathElement(
-                         LocatorPathElt::getTupleElement(index)));
-  } while (--numExtraneous);
-
-  return cs.recordFix(RemoveExtraneousArguments::create(
-      cs, contextualType, extraneous, cs.getConstraintLocator(locator)));
+  return cs.recordFix(
+      RemoveExtraneousArguments::create(cs, contextualType, extraneous,
+                                        cs.getConstraintLocator(locator)),
+      /*impact=*/numExtraneous * 2);
 }
 
 ConstraintSystem::TypeMatchResult
@@ -1669,6 +1673,10 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
       // them from the list.
       if (fixExtraneousArguments(*this, func2, func1Params, diff, locator))
         return getTypeMatchFailure(argumentLocator);
+
+      // Drop all of the extraneous arguments.
+      auto numParams = func2Params.size();
+      func1Params.erase(func1Params.begin() + numParams, func1Params.end());
     }
   }
 

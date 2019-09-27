@@ -2156,8 +2156,7 @@ public:
         ParamInfo(paramInfo), Arguments(args), CandidateInfo(CCI),
         IsSubscript(isSubscript) {}
 
-  bool extraArguments(ArrayRef<unsigned> extraArgIndices) override {
-    auto extraArgIdx = extraArgIndices.front();
+  bool extraArgument(unsigned extraArgIdx) override {
     auto name = Arguments[extraArgIdx].getLabel();
     Expr *arg = ArgExpr;
 

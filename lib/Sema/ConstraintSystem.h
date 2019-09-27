@@ -3878,11 +3878,11 @@ public:
   /// Indicates that the argument at the given index does not match any
   /// parameter.
   ///
-  /// \param argIndices The indices of the extra arguments.
+  /// \param argIdx The index of the extra argument.
   ///
   /// \returns true to indicate that this should cause a failure, false
   /// otherwise.
-  virtual bool extraArguments(ArrayRef<unsigned> argIndices);
+  virtual bool extraArgument(unsigned argIdx);
 
   /// Indicates that no argument was provided for the parameter at the given
   /// indices.
