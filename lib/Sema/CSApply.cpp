@@ -2494,7 +2494,10 @@ namespace {
               }
             }
 
-            return true;
+            // Filter out anything that's not one of the above. We don't care
+            // if we have a typealias named 'none' or a struct/class named
+            // 'none'.
+            return false;
           });
 
           if (results.empty()) {
