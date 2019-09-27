@@ -739,6 +739,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   // parameters and holes to default to `Any`.
   if (shouldAttemptFixes() && result.Bindings.empty() &&
       (isHole(typeVar) || result.isGenericParameter())) {
+    result.IsHole = true;
     result.addPotentialBinding({getASTContext().TheAnyType,
         AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
         typeVar->getImpl().getLocator()});

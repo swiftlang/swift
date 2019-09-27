@@ -329,7 +329,8 @@ StepResult ComponentStep::take(bool prevFailed) {
   auto *disjunction = CS.selectDisjunction();
   auto bestBindings = CS.determineBestBindings();
 
-  if (bestBindings && (!disjunction || (!bestBindings->InvolvesTypeVariables &&
+  if (bestBindings && (!disjunction || (!bestBindings->IsHole &&
+                                        !bestBindings->InvolvesTypeVariables &&
                                         !bestBindings->FullyBound))) {
     // Produce a type variable step.
     return suspend(

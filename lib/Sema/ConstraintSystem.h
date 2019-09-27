@@ -3321,7 +3321,8 @@ private:
   };
 
   struct PotentialBindings {
-    using BindingScore = std::tuple<bool, bool, bool, bool, unsigned char, int>;
+    using BindingScore =
+        std::tuple<bool, bool, bool, bool, bool, unsigned char, int>;
 
     TypeVariableType *TypeVar;
 
@@ -3333,6 +3334,9 @@ private:
 
     /// Whether the bindings of this type involve other type variables.
     bool InvolvesTypeVariables = false;
+
+    /// Whether this type variable is considered a hole in the constraint system.
+    bool IsHole = false;
 
     /// Whether the bindings represent (potentially) incomplete set,
     /// there is no way to say with absolute certainty if that's the
@@ -3367,7 +3371,8 @@ private:
     }
 
     static BindingScore formBindingScore(const PotentialBindings &b) {
-      return std::make_tuple(!b.hasNonDefaultableBindings(),
+      return std::make_tuple(b.IsHole,
+                             !b.hasNonDefaultableBindings(),
                              b.FullyBound,
                              b.SubtypeOfExistentialType,
                              b.InvolvesTypeVariables,
