@@ -332,6 +332,9 @@ StepResult ComponentStep::take(bool prevFailed) {
   if (bestBindings && (!disjunction || (!bestBindings->IsHole &&
                                         !bestBindings->InvolvesTypeVariables &&
                                         !bestBindings->FullyBound))) {
+    // If the we chose bindings for a hole, make sure the hole is recorded.
+    if (bestBindings->IsHole)
+      CS.recordHole(bestBindings->TypeVar);
     // Produce a type variable step.
     return suspend(
         llvm::make_unique<TypeVariableStep>(CS, *bestBindings, Solutions));

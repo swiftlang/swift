@@ -989,16 +989,13 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
 
   // If this was from a defaultable binding note that.
   if (Binding.isDefaultableBinding()) {
-    auto *locator = Binding.DefaultableBinding;
-    cs.DefaultedConstraints.push_back(locator);
+    cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
 
-    if (locator->isForGenericParameter()) {
-      cs.recordHole(TypeVar);
-
+    if (locator->isForGenericParameter() && cs.isHoleAt(locator)) {
       auto *fix = ExplicitlySpecifyGenericArguments::create(cs,
           {locator->getGenericParameter()}, locator);
       if (cs.recordFix(fix))
-        return false;
+        return true;
     }
   }
 
