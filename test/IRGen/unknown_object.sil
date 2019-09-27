@@ -5,13 +5,13 @@ sil_stage canonical
 import Builtin
 
 // CHECK-LABEL: @retain_release_unknown_object
-sil [ossa] @retain_release_unknown_object : $@convention(thin) (@guaranteed Builtin.UnknownObject) -> () {
-entry(%x : @guaranteed $Builtin.UnknownObject):
+sil [ossa] @retain_release_unknown_object : $@convention(thin) (@guaranteed Builtin.AnyObject) -> () {
+entry(%x : @guaranteed $Builtin.AnyObject):
   // CHECK-native: swift_retain
   // CHECK-objc: swift_unknownObjectRetain
-  %y = copy_value %x : $Builtin.UnknownObject
+  %y = copy_value %x : $Builtin.AnyObject
   // CHECK-native: swift_release
   // CHECK-objc: swift_unknownObjectRelease
-  destroy_value %y : $Builtin.UnknownObject
+  destroy_value %y : $Builtin.AnyObject
   return undef : $()
 }

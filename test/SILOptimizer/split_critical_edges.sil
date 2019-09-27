@@ -65,14 +65,14 @@ class X {
 // CHECK: bb0(
 // CHECK:   cond_br %1, bb1, bb2
 // CHECK: bb1:
-// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb4
+// CHECK:   dynamic_method_br {{.*}} : $AnyObject, #X.f!1.foreign, bb3, bb4
 // CHECK: bb2:
-// CHECK:   dynamic_method_br {{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb5, bb6
-// CHECK: bb3({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ())
+// CHECK:   dynamic_method_br {{.*}} : $AnyObject, #X.f!1.foreign, bb5, bb6
+// CHECK: bb3({{.*}} : $@convention(objc_method) (AnyObject) -> ())
 // CHECK:   br bb7
 // CHECK: bb4:
 // CHECK:   br bb7
-// CHECK: bb5({{.*}} : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+// CHECK: bb5({{.*}} : $@convention(objc_method) (AnyObject) -> ()):
 // CHECK:   br bb7
 // CHECK: bb6:
 // CHECK:   br bb7
@@ -90,9 +90,7 @@ lookup1:
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
-  %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
-  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
+  dynamic_method_br %4 : $AnyObject, #X.f!1.foreign, bb1, bb2
 
 lookup2:
   %21 = alloc_box $<τ_0_0> { var τ_0_0 } <AnyObject>
@@ -101,17 +99,15 @@ lookup2:
   %23 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %24 = load %21a : $*AnyObject
   strong_retain %24 : $AnyObject
-  %26 = open_existential_ref %24 : $AnyObject to $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject
-  %27 = unchecked_ref_cast %26 : $@opened("12345678-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
-  dynamic_method_br %27 : $Builtin.UnknownObject, #X.f!1.foreign, bb3, bb4
+  dynamic_method_br %24 : $AnyObject, #X.f!1.foreign, bb3, bb4
 
-bb1(%8 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+bb1(%8 : $@convention(objc_method) (AnyObject) -> ()):
   br bb5
 
 bb2:
   br bb5
 
-bb3(%9 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+bb3(%9 : $@convention(objc_method) (AnyObject) -> ()):
   br bb5
 
 bb4:
