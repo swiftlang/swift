@@ -2580,7 +2580,22 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   TypeLoc returnLoc;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
-    returnLoc = VD->getTypeLoc();
+    if (auto *P = VD->getParentPattern()) {
+      while (auto *PP = dyn_cast<ParenPattern>(P))
+        P = PP->getSubPattern();
+
+      if (auto *TP = dyn_cast<TypedPattern>(P)) {
+        P = P->getSemanticsProvidingPattern();
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          assert(NP->getDecl() == VD);
+          (void) NP;
+
+          returnLoc = TP->getTypeLoc();
+        }
+      }
+    } else {
+      returnLoc = VD->getTypeLoc();
+    }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
     returnLoc = FD->getBodyResultTypeLoc();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
@@ -2591,23 +2606,12 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    return func->getOpaqueResultTypeDecl();
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
-    return storage->getOpaqueResultTypeDecl();
-  } else {
+  if (getOpaqueResultTypeRepr() == nullptr)
     return nullptr;
-  }
-}
 
-void ValueDecl::setOpaqueResultTypeDecl(OpaqueTypeDecl *D) {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    func->setOpaqueResultTypeDecl(D);
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)){
-    storage->setOpaqueResultTypeDecl(D);
-  } else {
-    llvm_unreachable("decl does not support opaque result types");
-  }
+  return evaluateOrDefault(getASTContext().evaluator,
+    OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
+    nullptr);
 }
 
 bool ValueDecl::isObjC() const {

@@ -695,9 +695,11 @@ static bool validateTypedPattern(TypeChecker &TC,
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (named) {
-      auto opaqueTy = TC.getOrCreateOpaqueResultType(resolution,
-                                                     named->getDecl(),
-                                                     opaqueRepr);
+      auto *var = named->getDecl();
+      auto opaqueDecl = var->getOpaqueResultTypeDecl();
+      auto opaqueTy = (opaqueDecl
+                       ? opaqueDecl->getDeclaredInterfaceType()
+                       : ErrorType::get(TC.Context));
       TL.setType(named->getDecl()->getDeclContext()
                                  ->mapTypeIntoContext(opaqueTy));
       hadError = opaqueTy->hasError();

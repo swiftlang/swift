@@ -1188,7 +1188,7 @@ public:
   void cacheResult(GenericSignature value) const;
 };
 
-/// Compute the interface type of the underlying definition type of a typealias declaration.
+/// Compute the underlying interface type of a typealias.
 class UnderlyingTypeRequest :
     public SimpleRequest<UnderlyingTypeRequest,
                          Type(TypeAliasDecl *),
@@ -1211,6 +1211,7 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
+/// Looks up the precedence group of an operator declaration.
 class OperatorPrecedenceGroupRequest
     : public SimpleRequest<OperatorPrecedenceGroupRequest,
                            PrecedenceGroupDecl *(InfixOperatorDecl *),
@@ -1266,6 +1267,25 @@ private:
 
   // Evaluation.
   llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Builds an opaque result type for a declaration.
+class OpaqueResultTypeRequest
+    : public SimpleRequest<OpaqueResultTypeRequest,
+                           OpaqueTypeDecl *(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<OpaqueTypeDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
 
 public:
   // Caching.

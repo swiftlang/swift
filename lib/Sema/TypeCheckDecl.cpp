@@ -3793,22 +3793,25 @@ static Type buildAddressorResultType(TypeChecker &TC,
 }
 
 
-static void validateResultType(TypeChecker &TC,
-                               ValueDecl *decl, ParameterList *params,
-                               TypeLoc &resultTyLoc,
-                               TypeResolution resolution) {
+static void validateResultType(ValueDecl *decl,
+                               TypeLoc &resultTyLoc) {
   // Nothing to do if there's no result type loc to set into.
   if (resultTyLoc.isNull())
     return;
 
   // Check the result type. It is allowed to be opaque.
-  if (auto opaqueTy =
-          dyn_cast_or_null<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())) {
-    // Create the decl and type for it.
+  if (decl->getOpaqueResultTypeRepr()) {
+    auto *opaqueDecl = decl->getOpaqueResultTypeDecl();
     resultTyLoc.setType(
-        TC.getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
+        opaqueDecl
+        ? opaqueDecl->getDeclaredInterfaceType()
+        : ErrorType::get(decl->getASTContext()));
   } else {
-    TypeChecker::validateType(TC.Context, resultTyLoc, resolution,
+    auto *dc = decl->getInnermostDeclContext();
+    auto resolution = TypeResolution::forInterface(
+      dc, dc->getGenericSignatureOfContext());
+    TypeChecker::validateType(dc->getASTContext(),
+                              resultTyLoc, resolution,
                               TypeResolverContext::FunctionResult);
   }
 }
@@ -4081,8 +4084,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                                                    FD->getGenericSignature());
     typeCheckParameterList(FD->getParameters(), resolution,
                            TypeResolverContext::AbstractFunctionDecl);
-    validateResultType(*this, FD, FD->getParameters(),
-                       FD->getBodyResultTypeLoc(), resolution);
+    validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
 
@@ -4152,8 +4154,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto res = TypeResolution::forInterface(SD, SD->getGenericSignature());
     typeCheckParameterList(SD->getIndices(), res,
                            TypeResolverContext::SubscriptDecl);
-    validateResultType(*this, SD, SD->getIndices(),
-                       SD->getElementTypeLoc(), res);
+    validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
 
     if (SD->getOpaqueResultTypeDecl()) {

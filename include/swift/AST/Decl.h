@@ -2764,12 +2764,6 @@ public:
   /// Get the representative for this value's opaque result type, if it has one.
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
-  /// Set the opaque return type decl for this decl.
-  ///
-  /// `this` must be of a decl type that supports opaque return types, and
-  /// must not have previously had an opaque result type set.
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
-
   /// Retrieve the attribute associating this declaration with a
   /// function builder, if there is one.
   CustomAttr *getAttachedFunctionBuilder() const;
@@ -4530,8 +4524,6 @@ protected:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
-  OpaqueTypeDecl *OpaqueReturn = nullptr;
-
 public:
 
   /// Should this declaration be treated as if annotated with transparent
@@ -4788,14 +4780,6 @@ public:
   bool hasAnyNativeDynamicAccessors() const;
 
   bool hasAnyDynamicReplacementAccessors() const;
-
-  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
-    return OpaqueReturn;
-  }
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    assert(!OpaqueReturn && "already has opaque type decl");
-    OpaqueReturn = decl;
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -5982,8 +5966,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  OpaqueTypeDecl *OpaqueReturn = nullptr;
-
 protected:
   FuncDecl(DeclKind Kind,
            SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
@@ -6129,15 +6111,7 @@ public:
   }
 
   OperatorDecl *getOperatorDecl() const;
-  
-  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
-    return OpaqueReturn;
-  }
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    assert(!OpaqueReturn && "already has opaque type decl");
-    OpaqueReturn = decl;
-  }
-  
+
   /// Returns true if the function is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const {
     return Bits.FuncDecl.ForcedStaticDispatch;
