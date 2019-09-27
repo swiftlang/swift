@@ -4097,6 +4097,22 @@ ConstraintSystem::simplifyConstructionConstraint(
     return SolutionKind::Unsolved;
 
   case TypeKind::Tuple: {
+    // If this is an attempt to construct `Void` with arguments,
+    // let's diagnose it.
+    if (shouldAttemptFixes()) {
+      if (valueType->isVoid() && fnType->getNumParams() > 0) {
+        auto contextualType = FunctionType::get({}, fnType->getResult());
+        if (fixExtraneousArguments(
+                *this, contextualType, fnType->getParams(),
+                fnType->getNumParams(),
+                getConstraintLocator(locator,
+                                     ConstraintLocator::FunctionArgument)))
+          return SolutionKind::Error;
+
+        fnType = contextualType;
+      }
+    }
+
     // Tuple construction is simply tuple conversion.
     Type argType = AnyFunctionType::composeInput(getASTContext(),
                                                  fnType->getParams(),
