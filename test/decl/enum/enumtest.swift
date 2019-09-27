@@ -509,7 +509,7 @@ let _: GenericEnumWithStaticNone<Int>? = .none // expected-warning {{assuming yo
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{42-42=Optional}}
 // expected-note@-2 {{use 'GenericEnumWithStaticNone<Int>.none' instead}}{{42-42=GenericEnumWithStaticNone<Int>}}
 let _: GenericEnumWithStaticNone<String>? = .none // Okay
-let _: GenericEnumWithStaticNone? = .none // Okay
+let _: GenericEnumWithStaticNone? = .none // FIXME(SR-11535): This should be diagnosed
 
 enum GenericEnumWithoutNone<T> {
   case a
