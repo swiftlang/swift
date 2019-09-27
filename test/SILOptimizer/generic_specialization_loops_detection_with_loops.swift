@@ -23,7 +23,10 @@
 
 // Check that the compiler has produced a specialization information for a call-site that
 // was inlined from a specialized generic function.
-// CHECK-LABEL: // Generic specialization information for call-site $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSaySays5UInt8VGG_SaySaySiGGTg5:
+//
+// Currently, bar4<Int, Double> is inlined into foo4<Int, Double>.
+// CHECK-LABEL: sil shared [noinline] @$s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5 : $@convention(thin) (Int, Double) -> () {
+// CHECK:       // Generic specialization information for call-site $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSaySays5UInt8VGG_SaySaySiGGTg5:
 // CHECK-NEXT:  // Caller: $s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5
 // CHECK-NEXT:  // Parent: $s044generic_specialization_loops_detection_with_C04bar4yyx_q_tr0_lF
 // CHECK-NEXT:  // Substitutions: <Array<UInt8>, Array<Int>>
@@ -33,6 +36,7 @@
 // CHECK-NEXT:  // Substitutions: <Int, Double>
 // CHECK-NEXT:  //
 // CHECK-NEXT: apply %{{.*}}Array<Array<UInt8>>
+// CHECK-LABEL: } // end sil function '$s044generic_specialization_loops_detection_with_C04foo4yyx_q_tr0_lFSi_SdTg5'
 
 // Check specializations of mutually recursive functions which
 // may result in an infinite specialization loop.
@@ -54,6 +58,11 @@ public func testFooBar3() {
 // Check specializations of mutually recursive functions which
 // may result in an infinite specialization loop.
 public var g = 0
+
+// Don't inline foo4 just so we can reliably check for specialization
+// information both at the function and call-site level.
+// bar4 is still inlined so we can test for inlined specialization info.
+@inline(never)
 func foo4<T, S>(_ t: T, _ s: S) {
   // Here we have multiple call-sites of the same generic
   // functions inside the same caller.
