@@ -304,18 +304,22 @@ public final class StreamClass {
         self.buffer = []
     }
 
+    @inline(__always)
     public func write(_ byte: UInt8) {
         buffer.append(byte)
     }
 
+    @inline(__always)
     public func write(_ value: WriteProt) {
         value.writeTo(self)
     }
 
+    @inline(__always)
     public func writeEscaped(_ string: String) {
         writeEscaped(string: string.utf8)
     }
     
+    @inline(__always)
     public func writeEscaped<T: Collection>(
         string sequence: T
     ) where T.Iterator.Element == UInt8 {
@@ -326,12 +330,14 @@ public final class StreamClass {
     }
 }
 
+@inline(__always)
 public func toStream(_ stream: StreamClass, _ value: WriteProt) -> StreamClass {
     stream.write(value)
     return stream
 }
 
 extension UInt8: WriteProt {
+    @inline(__always)
     public func writeTo(_ stream: StreamClass) {
         stream.write(self)
     }
@@ -344,6 +350,7 @@ public func asWriteProt(_ string: String) -> WriteProt {
 private struct EscapedString: WriteProt {
     let value: String
         
+    @inline(__always)
     func writeTo(_ stream: StreamClass) {
         _ = toStream(stream, UInt8(ascii: "a"))
         stream.writeEscaped(value)
@@ -359,6 +366,7 @@ private struct EscapedTransforme<T>: WriteProt {
     let items: [T]
     let transform: (T) -> String
 
+    @inline(__always)
     func writeTo(_ stream: StreamClass) {
         for (i, item) in items.enumerated() {
             if i != 0 { _ = toStream(stream, asWriteProt(transform(item))) }
@@ -388,6 +396,6 @@ public func run_MergeTest9(_ N: Int) {
   let listOfThings: [Thing] = listOfStrings.map(Thing.init)
   for _ in 1...N {
     let stream = StreamClass()
-      _ = toStream(stream, asWriteProt(listOfThings, transform: { $0.value }))
+    _ = toStream(stream, asWriteProt(listOfThings, transform: { $0.value }))
   }
 }
