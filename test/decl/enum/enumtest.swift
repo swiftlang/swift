@@ -523,3 +523,32 @@ let _: GenericEnumWithoutNone<Int>? = .none // expected-warning {{assuming you m
 // expected-note@-1 {{explicitly specify 'Optional' to silence this warning}}{{39-39=Optional}}
 // expected-note@-2 {{use 'GenericEnumWithoutNone<Int>.none' instead}}{{39-39=GenericEnumWithoutNone<Int>}}
 let _: GenericEnumWithoutNone<String>? = .none // Okay
+
+// A couple of edge cases that shouldn't trigger the warning //
+
+enum EnumWithStructNone {
+  case bar
+  struct none {}
+}
+
+enum EnumWithTypealiasNone {
+  case bar
+  typealias none = EnumWithTypealiasNone
+}
+
+enum EnumWithBothStructAndComputedNone {
+  case bar
+  struct none {}
+  var none: EnumWithBothStructAndComputedNone { . bar }
+}
+
+enum EnumWithBothTypealiasAndComputedNone {
+  case bar
+  typealias none = EnumWithBothTypealiasAndComputedNone
+  var none: EnumWithBothTypealiasAndComputedNone { . bar }
+}
+
+let _: EnumWithStructNone? = .none // Okay
+let _: EnumWithTypealiasNone? = .none // Okay
+let _: EnumWithBothStructAndComputedNone? = .none // Okay
+let _: EnumWithBothTypealiasAndComputedNone? = .none // Okay
