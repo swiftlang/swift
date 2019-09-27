@@ -60,36 +60,6 @@ bool ClangImporter::Implementation::isOverAligned(clang::QualType type) {
   return align > clang::CharUnits::fromQuantity(MaximumAlignment);
 }
 
-/// Returns a specialization of the given pointer type for the given pointee.
-///
-/// \p kind must not be a raw pointer kind.
-static Type getPointerTo(Type pointee, PointerTypeKind kind) {
-  ASTContext &ctx = pointee->getASTContext();
-  NominalTypeDecl *pointerDecl = ([&ctx, kind] {
-    switch (kind) {
-    case PTK_UnsafeMutableRawPointer:
-    case PTK_UnsafeRawPointer:
-      llvm_unreachable("these pointer types don't take arguments");
-    case PTK_UnsafePointer:
-      return ctx.getUnsafePointerDecl();
-    case PTK_UnsafeMutablePointer:
-      return ctx.getUnsafeMutablePointerDecl();
-    case PTK_AutoreleasingUnsafeMutablePointer:
-      return ctx.getAutoreleasingUnsafeMutablePointerDecl();
-    }
-    llvm_unreachable("bad kind");
-  }());
-
-  // Specifically handle AUMP being missing to allow testing more of ObjC
-  // interop on non-Apple platforms.
-  assert((pointerDecl || kind == PTK_AutoreleasingUnsafeMutablePointer) &&
-         "could not find standard pointer type");
-  if (!pointerDecl)
-    return Type();
-
-  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, pointee);
-}
-
 namespace {
   /// Various types that we want to do something interesting to after
   /// importing them.
@@ -438,22 +408,35 @@ namespace {
         };
       }
 
+      PointerTypeKind pointerKind;
       if (quals.hasConst()) {
-        return {getPointerTo(pointeeType, PTK_UnsafePointer),
-                ImportHint::OtherPointer};
+        pointerKind = PTK_UnsafePointer;
+      } else {
+        switch (quals.getObjCLifetime()) {
+        case clang::Qualifiers::OCL_Autoreleasing:
+        case clang::Qualifiers::OCL_ExplicitNone:
+          // Mutable pointers with __autoreleasing or __unsafe_unretained
+          // ownership map to AutoreleasingUnsafeMutablePointer<T>.
+          pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
+
+          // FIXME: We have tests using a non-Apple stdlib that nevertheless
+          // exercise ObjC interop. Fail softly for those tests.
+          if (!Impl.SwiftContext.getAutoreleasingUnsafeMutablePointerDecl())
+            return Type();
+          break;
+
+        case clang::Qualifiers::OCL_Weak:
+          // FIXME: We should refuse to import this.
+          LLVM_FALLTHROUGH;
+
+        case clang::Qualifiers::OCL_None:
+        case clang::Qualifiers::OCL_Strong:
+          // All other mutable pointers map to UnsafeMutablePointer.
+          pointerKind = PTK_UnsafeMutablePointer;
+        }
       }
 
-      // Mutable pointers with __autoreleasing or __unsafe_unretained
-      // ownership map to AutoreleasingUnsafeMutablePointer<T>.
-      if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
-          quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
-        return {
-          getPointerTo(pointeeType, PTK_AutoreleasingUnsafeMutablePointer),
-          ImportHint::OtherPointer};
-      }
-
-      // All other mutable pointers map to UnsafeMutablePointer.
-      return {getPointerTo(pointeeType, PTK_UnsafeMutablePointer),
+      return {pointeeType->wrapInPointer(pointerKind),
               ImportHint::OtherPointer};
     }
 
@@ -1269,7 +1252,7 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
   else
     pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
 
-  resultTy = getPointerTo(resultTy, pointerKind);
+  resultTy = resultTy->wrapInPointer(pointerKind);
   return resultTy;
 }
 
