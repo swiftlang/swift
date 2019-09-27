@@ -30,7 +30,6 @@
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
 #include "swift/Runtime/Unreachable.h"
-#include "../../../stdlib/public/runtime/ImageInspectionELF.h"
 
 #include <iostream>
 #include <set>
@@ -60,7 +59,7 @@ template <unsigned char ELFClass> struct ELFTraits;
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
   using Header = const struct llvm::ELF::Elf32_Ehdr;
-  using ProgramHeader = const struct llvm::ELF::Elf32_Phdr;
+  using Section = const struct llvm::ELF::Elf32_Shdr;
   using Offset = llvm::ELF::Elf32_Off;
   using Size = llvm::ELF::Elf32_Word;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS32;
@@ -68,7 +67,7 @@ template <> struct ELFTraits<llvm::ELF::ELFCLASS32> {
 
 template <> struct ELFTraits<llvm::ELF::ELFCLASS64> {
   using Header = const struct llvm::ELF::Elf64_Ehdr;
-  using ProgramHeader = const struct llvm::ELF::Elf64_Phdr;
+  using Section = const struct llvm::ELF::Elf64_Shdr;
   using Offset = llvm::ELF::Elf64_Off;
   using Size = llvm::ELF::Elf64_Xword;
   static constexpr unsigned char ELFClass = llvm::ELF::ELFCLASS64;
@@ -113,7 +112,7 @@ public:
 
   ReflectionContext(const ReflectionContext &other) = delete;
   ReflectionContext &operator=(const ReflectionContext &other) = delete;
-
+  
   MemoryReader &getReader() {
     return *this->Reader;
   }
@@ -196,9 +195,9 @@ public:
       // introduce misaligned pointers mapping between local and remote
       // address space.
       RangeStart = RangeStart & ~7;
-      RangeEnd = RangeEnd + 7 & ~7;
+      RangeEnd = RangeEnd + 7 & ~7;      
     }
-
+ 
     if (RangeStart == UINT64_MAX && RangeEnd == UINT64_MAX)
       return false;
 
@@ -387,105 +386,116 @@ public:
   }
 
   template <typename T> bool readELFSections(RemoteAddress ImageStart) {
-    auto HeaderBuf =
+    auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(typename T::Header));
 
-    auto Hdr = reinterpret_cast<const typename T::Header *>(HeaderBuf.get());
+    auto Hdr = reinterpret_cast<const typename T::Header *>(Buf.get());
     assert(Hdr->getFileClass() == T::ELFClass && "invalid ELF file class");
 
-    const auto ProgramHdrAddress = ImageStart.getAddressData() + Hdr->e_phoff;
-    const auto NumEntries = Hdr->e_phnum;
-    const auto EntrySize = Hdr->e_phentsize;
+    // From the header, grab informations about the section header table.
+    auto SectionHdrAddress = ImageStart.getAddressData() + Hdr->e_shoff;
+    auto SectionHdrNumEntries = Hdr->e_shnum;
+    auto SectionEntrySize = Hdr->e_shentsize;
 
-    uintptr_t MetadataSectionsPtrValue = 0;
-    for (unsigned I = 0; I < NumEntries; ++I) {
-      const StringRef MagicString =
-          SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING;
-      auto ProgramHdrBuf = this->getReader().readBytes(
-          RemoteAddress(ProgramHdrAddress + (I * EntrySize)), EntrySize);
-      auto ProgramHdr = reinterpret_cast<const typename T::ProgramHeader *>(
-          ProgramHdrBuf.get());
-      if (ProgramHdr->p_type != llvm::ELF::PT_NOTE ||
-          ProgramHdr->p_memsz <= MagicString.size())
-        continue;
-      const auto SegmentAddr =
-          ImageStart.getAddressData() + ProgramHdr->p_vaddr;
-      const auto SegmentSize = ProgramHdr->p_memsz;
-      auto SegmentBuf =
-          this->getReader().readBytes(RemoteAddress(SegmentAddr), SegmentSize);
-      const char *SegmentData =
-          reinterpret_cast<const char *>(SegmentBuf.get());
-      if (!StringRef(SegmentData, SegmentSize).startswith(MagicString))
-        continue;
-      MetadataSectionsPtrValue = *reinterpret_cast<const uintptr_t *>(
-          SegmentData + MagicString.size() + 1);
-      break;
+    // Collect all the section headers, we need them to look up the
+    // reflection sections (by name) and the string table.
+    std::vector<const typename T::Section *> SecHdrVec;
+    for (unsigned I = 0; I < SectionHdrNumEntries; ++I) {
+      auto SecBuf = this->getReader().readBytes(
+          RemoteAddress(SectionHdrAddress + (I * SectionEntrySize)),
+          SectionEntrySize);
+      auto SecHdr =
+          reinterpret_cast<const typename T::Section *>(SecBuf.get());
+      SecHdrVec.push_back(SecHdr);
     }
-    if (!MetadataSectionsPtrValue)
+
+    // This provides quick access to the section header string table index.
+    // We also here handle the unlikely even where the section index overflows
+    // and it's just a pointer to secondary storage (SHN_XINDEX).
+    uint32_t SecIdx = Hdr->e_shstrndx;
+    if (SecIdx == llvm::ELF::SHN_XINDEX) {
+      assert(!SecHdrVec.empty() && "malformed ELF object");
+      SecIdx = SecHdrVec[0]->sh_link;
+    }
+
+    assert(SecIdx < SecHdrVec.size() && "malformed ELF object");
+
+    const typename T::Section *SecHdrStrTab = SecHdrVec[SecIdx];
+    typename T::Offset StrTabOffset = SecHdrStrTab->sh_offset;
+    typename T::Size StrTabSize = SecHdrStrTab->sh_size;
+
+    auto StrTabStart =
+        RemoteAddress(ImageStart.getAddressData() + StrTabOffset);
+    auto StrTabBuf = this->getReader().readBytes(StrTabStart, StrTabSize);
+    auto StrTab = reinterpret_cast<const char *>(StrTabBuf.get());
+
+    auto findELFSectionByName = [&](std::string Name)
+        -> std::pair<RemoteRef<void>, uint64_t> {
+      // Now for all the sections, find their name.
+      for (const typename T::Section *Hdr : SecHdrVec) {
+        uint32_t Offset = Hdr->sh_name;
+        auto SecName = std::string(StrTab + Offset);
+        if (SecName != Name)
+          continue;
+        auto SecStart =
+            RemoteAddress(ImageStart.getAddressData() + Hdr->sh_addr);
+        auto SecSize = Hdr->sh_size;
+        auto SecBuf = this->getReader().readBytes(SecStart, SecSize);
+        auto SecContents = RemoteRef<void>(SecStart.getAddressData(),
+                                           SecBuf.get());
+        savedBuffers.push_back(std::move(SecBuf));
+        return {SecContents, SecSize};
+      }
+      return {nullptr, 0};
+    };
+
+    auto FieldMdSec = findELFSectionByName("swift5_fieldmd");
+    auto AssocTySec = findELFSectionByName("swift5_assocty");
+    auto BuiltinTySec = findELFSectionByName("swift5_builtin");
+    auto CaptureSec = findELFSectionByName("swift5_capture");
+    auto TypeRefMdSec = findELFSectionByName("swift5_typeref");
+    auto ReflStrMdSec = findELFSectionByName("swift5_reflstr");
+
+    // We succeed if at least one of the sections is present in the
+    // ELF executable.
+    if (FieldMdSec.first == nullptr &&
+        AssocTySec.first == nullptr &&
+        BuiltinTySec.first == nullptr &&
+        CaptureSec.first == nullptr &&
+        TypeRefMdSec.first == nullptr &&
+        ReflStrMdSec.first == nullptr)
       return false;
 
-    auto MetadataSectionsStructBuf = this->getReader().readBytes(
-        RemoteAddress(MetadataSectionsPtrValue), sizeof(MetadataSections));
-    const auto *Sections = reinterpret_cast<const MetadataSections *>(
-        MetadataSectionsStructBuf.get());
+    auto LocalStartAddress = reinterpret_cast<uint64_t>(Buf.get());
+    auto RemoteStartAddress =
+        static_cast<uint64_t>(ImageStart.getAddressData());
 
-    auto BeginAddr = std::min(
-        {Sections->swift5_fieldmd.start, Sections->swift5_assocty.start,
-         Sections->swift5_builtin.start, Sections->swift5_capture.start,
-         Sections->swift5_typeref.start, Sections->swift5_reflstr.start});
-    auto EndAddr = std::max({
-        Sections->swift5_fieldmd.start + Sections->swift5_fieldmd.length,
-        Sections->swift5_assocty.start + Sections->swift5_assocty.length,
-        Sections->swift5_builtin.start + Sections->swift5_builtin.length,
-        Sections->swift5_capture.start + Sections->swift5_capture.length,
-        Sections->swift5_typeref.start + Sections->swift5_typeref.length,
-        Sections->swift5_reflstr.start + Sections->swift5_reflstr.length,
-    });
+    ReflectionInfo info = {
+        {FieldMdSec.first, FieldMdSec.second},
+        {AssocTySec.first, AssocTySec.second},
+        {BuiltinTySec.first, BuiltinTySec.second},
+        {CaptureSec.first, CaptureSec.second},
+        {TypeRefMdSec.first, TypeRefMdSec.second},
+        {ReflStrMdSec.first, ReflStrMdSec.second},
+        LocalStartAddress,
+        RemoteStartAddress};
 
-    // Extend the range [BeginAddr, EndAddr) to include the data segments.
-    for (unsigned I = 0; I < NumEntries; ++I) {
-      auto ProgramHdrBuf = this->getReader().readBytes(
-          RemoteAddress(ProgramHdrAddress + (I * EntrySize)), EntrySize);
-      auto ProgramHdr = reinterpret_cast<const typename T::ProgramHeader *>(
-          ProgramHdrBuf.get());
-      if (ProgramHdr->p_type == llvm::ELF::PT_LOAD &&
-          ProgramHdr->p_flags & (llvm::ELF::PF_W & llvm::ELF::PF_R)) {
-        const decltype(BeginAddr) SegmentBeginAddr =
-            ImageStart.getAddressData() + ProgramHdr->p_vaddr;
-        const decltype(BeginAddr) SegmentEndAddr =
-            SegmentBeginAddr + ProgramHdr->p_memsz;
-        BeginAddr = std::min(BeginAddr, SegmentBeginAddr);
-        EndAddr = std::max(EndAddr, SegmentEndAddr);
-      }
-    }
+    this->addReflectionInfo(info);
 
-    auto Buf = this->getReader().readBytes(RemoteAddress(BeginAddr),
-                                           EndAddr - BeginAddr);
-    auto RemoteAddrToRemoteRef = [&](uintptr_t Addr) -> RemoteRef<void> {
-      return RemoteRef<void>(
-          Addr, reinterpret_cast<void *>(
-                    reinterpret_cast<uintptr_t>(Buf.get()) + Addr - BeginAddr));
-    };
-#define SECTION_INFO(NAME)                                                     \
-  {RemoteAddrToRemoteRef(Sections->NAME.start), Sections->NAME.length}
-    ReflectionInfo Info = {
-        SECTION_INFO(swift5_fieldmd),          SECTION_INFO(swift5_assocty),
-        SECTION_INFO(swift5_builtin),          SECTION_INFO(swift5_capture),
-        SECTION_INFO(swift5_typeref),          SECTION_INFO(swift5_reflstr),
-        reinterpret_cast<uint64_t>(Buf.get()), BeginAddr};
-#undef SECTION_INFO
-    this->addReflectionInfo(Info);
     savedBuffers.push_back(std::move(Buf));
     return true;
   }
-
+         
   bool readELF(RemoteAddress ImageStart) {
     auto Buf =
         this->getReader().readBytes(ImageStart, sizeof(llvm::ELF::Elf64_Ehdr));
+
     // Read the header.
     auto Hdr = reinterpret_cast<const llvm::ELF::Elf64_Ehdr *>(Buf.get());
+
     if (!Hdr->checkMagic())
       return false;
+
     // Check if we have a ELFCLASS32 or ELFCLASS64
     unsigned char FileClass = Hdr->getFileClass();
     if (FileClass == llvm::ELF::ELFCLASS64) {
@@ -502,26 +512,26 @@ public:
     auto Magic = this->getReader().readBytes(ImageStart, sizeof(uint32_t));
     if (!Magic)
       return false;
-
+    
     uint32_t MagicWord;
     memcpy(&MagicWord, Magic.get(), sizeof(MagicWord));
-
+    
     // 32- and 64-bit Mach-O.
     if (MagicWord == llvm::MachO::MH_MAGIC) {
       return readMachOSections<MachOTraits<4>>(ImageStart);
     }
-
+    
     if (MagicWord == llvm::MachO::MH_MAGIC_64) {
       return readMachOSections<MachOTraits<8>>(ImageStart);
     }
-
+    
     // PE. (This just checks for the DOS header; `readPECOFF` will further
     // validate the existence of the PE header.)
     auto MagicBytes = (const char*)Magic.get();
     if (MagicBytes[0] == 'M' && MagicBytes[1] == 'Z') {
       return readPECOFF(ImageStart);
     }
-
+    
     // ELF.
     if (MagicBytes[0] == llvm::ELF::ElfMagic[0]
         && MagicBytes[1] == llvm::ELF::ElfMagic[1]
@@ -529,7 +539,7 @@ public:
         && MagicBytes[3] == llvm::ELF::ElfMagic[3]) {
       return readELF(ImageStart);
     }
-
+    
     // We don't recognize the format.
     return false;
   }
@@ -544,7 +554,7 @@ public:
       return true;
     return ownsAddress(RemoteAddress(*MetadataAddress));
   }
-
+  
   /// Returns true if the address falls within a registered image.
   bool ownsAddress(RemoteAddress Address) {
     for (auto Range : imageRanges) {
@@ -554,10 +564,10 @@ public:
           && Address.getAddressData() < End.getAddressData())
         return true;
     }
-
+  
     return false;
   }
-
+  
   /// Return a description of the layout of a class instance with the given
   /// metadata as its isa pointer.
   const TypeInfo *getMetadataTypeInfo(StoredPointer MetadataAddress) {
