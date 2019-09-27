@@ -1,5 +1,3 @@
-Class _SwiftNSMutableArray is a new API without @available attribute
-Class _SwiftNativeNSMutableArray is a new API without @available attribute
 Func _collectReferencesInsideObject(_:) is a new API without @available attribute
 Func _loadDestroyTLSCounter() is a new API without @available attribute
 Protocol _RuntimeFunctionCountersStats is a new API without @available attribute
