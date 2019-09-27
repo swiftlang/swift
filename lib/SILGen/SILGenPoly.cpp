@@ -3744,7 +3744,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   // Otherwise, apply reabstraction/self reordering thunk to linear map.
   SmallVector<SILValue, 8> directResults;
   extractAllElements(apply, loc, thunkSGF.B, directResults);
-  auto linearMap = ManagedValue::forBorrowedObjectRValue(directResults.back());
+  auto linearMap = thunkSGF.emitManagedRValueWithCleanup(directResults.back());
   assert(linearMap.getType().castTo<SILFunctionType>() == linearMapFnType);
   auto linearMapKind = assocFnKind.getLinearMapKind();
   linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
