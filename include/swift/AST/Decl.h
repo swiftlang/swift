@@ -676,6 +676,7 @@ private:
 
   Decl(const Decl&) = delete;
   void operator=(const Decl&) = delete;
+  SourceLoc getLocFromSource() const;
 
 protected:
 
@@ -1582,7 +1583,7 @@ enum class ImportKind : uint8_t {
 class ImportDecl final : public Decl,
     private llvm::TrailingObjects<ImportDecl, std::pair<Identifier,SourceLoc>> {
   friend TrailingObjects;
-
+  friend class Decl;
 public:
   typedef std::pair<Identifier, SourceLoc> AccessPathElement;
 
@@ -1654,7 +1655,7 @@ public:
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }
-  SourceLoc getLoc() const { return getFullAccessPath().front().second; }
+  SourceLoc getLocFromSource() const { return getFullAccessPath().front().second; }
   SourceRange getSourceRange() const {
     return SourceRange(ImportLoc, getFullAccessPath().back().second);
   }
@@ -1716,6 +1717,7 @@ class ExtensionDecl final : public GenericContext, public Decl,
   std::pair<LazyMemberLoader *, uint64_t> takeConformanceLoaderSlow();
 
   friend class ExtendedNominalRequest;
+  friend class Decl;
 public:
   using Decl::getASTContext;
 
@@ -1728,7 +1730,7 @@ public:
                                ClangNode clangNode = ClangNode());
 
   SourceLoc getStartLoc() const { return ExtensionLoc; }
-  SourceLoc getLoc() const { return ExtensionLoc; }
+  SourceLoc getLocFromSource() const { return ExtensionLoc; }
   SourceRange getSourceRange() const {
     return { ExtensionLoc, Braces.End };
   }
@@ -2041,7 +2043,7 @@ private:
 class PatternBindingDecl final : public Decl,
     private llvm::TrailingObjects<PatternBindingDecl, PatternBindingEntry> {
   friend TrailingObjects;
-
+  friend class Decl;
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
@@ -2050,7 +2052,7 @@ class PatternBindingDecl final : public Decl,
   PatternBindingDecl(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
                      SourceLoc VarLoc, unsigned NumPatternEntries,
                      DeclContext *Parent);
-
+  SourceLoc getLocFromSource() const { return VarLoc; }
 public:
   static PatternBindingDecl *create(ASTContext &Ctx, SourceLoc StaticLoc,
                                     StaticSpellingKind StaticSpelling,
@@ -2080,7 +2082,6 @@ public:
   SourceLoc getStartLoc() const {
     return StaticLoc.isValid() ? StaticLoc : VarLoc;
   }
-  SourceLoc getLoc() const { return VarLoc; }
   SourceRange getSourceRange() const;
 
   unsigned getNumPatternEntries() const {
@@ -2216,7 +2217,8 @@ private:
 /// global variables.
 class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
-
+  SourceLoc getLocFromSource() const { return getStartLoc(); }
+  friend class Decl;
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
     : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
@@ -2227,7 +2229,6 @@ public:
   void setBody(BraceStmt *b) { Body = b; }
 
   SourceLoc getStartLoc() const;
-  SourceLoc getLoc() const { return getStartLoc(); }
   SourceRange getSourceRange() const;
 
   static bool classof(const Decl *D) {
@@ -2266,6 +2267,8 @@ class IfConfigDecl : public Decl {
   /// The array is ASTContext allocated.
   ArrayRef<IfConfigClause> Clauses;
   SourceLoc EndLoc;
+  SourceLoc getLocFromSource() const { return Clauses[0].Loc; }
+  friend class Decl;
 public:
   
   IfConfigDecl(DeclContext *Parent, ArrayRef<IfConfigClause> Clauses,
@@ -2291,7 +2294,6 @@ public:
   }
   
   SourceLoc getEndLoc() const { return EndLoc; }
-  SourceLoc getLoc() const { return Clauses[0].Loc; }
 
   bool hadMissingEnd() const { return Bits.IfConfigDecl.HadMissingEnd; }
   
@@ -2308,7 +2310,8 @@ class PoundDiagnosticDecl : public Decl {
   SourceLoc StartLoc;
   SourceLoc EndLoc;
   StringLiteralExpr *Message;
-
+  SourceLoc getLocFromSource() const { return StartLoc; }
+  friend class Decl;
 public:
   PoundDiagnosticDecl(DeclContext *Parent, bool IsError, SourceLoc StartLoc,
                       SourceLoc EndLoc, StringLiteralExpr *Message)
@@ -2337,7 +2340,6 @@ public:
   }
   
   SourceLoc getEndLoc() const { return EndLoc; };
-  SourceLoc getLoc() const { return StartLoc; }
   
   SourceRange getSourceRange() const {
     return SourceRange(StartLoc, EndLoc);
@@ -2400,7 +2402,8 @@ class ValueDecl : public Decl {
   friend class IsFinalRequest;
   friend class IsDynamicRequest;
   friend class IsImplicitlyUnwrappedOptionalRequest;
-
+  friend class Decl;
+  SourceLoc getLocFromSource() const { return NameLoc; }
 protected:
   ValueDecl(DeclKind K,
             llvm::PointerUnion<DeclContext *, ASTContext *> context,
@@ -2473,7 +2476,6 @@ public:
   bool canInferObjCFromRequirement(ValueDecl *requirement);
 
   SourceLoc getNameLoc() const { return NameLoc; }
-  SourceLoc getLoc() const { return NameLoc; }
 
   bool isUsableFromInline() const;
 
@@ -6281,6 +6283,7 @@ AbstractStorageDecl::AccessorRecord::getAccessor(AccessorKind kind) const {
 class EnumCaseDecl final : public Decl,
     private llvm::TrailingObjects<EnumCaseDecl, EnumElementDecl *> {
   friend TrailingObjects;
+  friend class Decl;
   SourceLoc CaseLoc;
   
   EnumCaseDecl(SourceLoc CaseLoc,
@@ -6293,6 +6296,7 @@ class EnumCaseDecl final : public Decl,
     std::uninitialized_copy(Elements.begin(), Elements.end(),
                             getTrailingObjects<EnumElementDecl *>());
   }
+  SourceLoc getLocFromSource() const { return CaseLoc; }
 
 public:
   static EnumCaseDecl *create(SourceLoc CaseLoc,
@@ -6304,11 +6308,6 @@ public:
     return {getTrailingObjects<EnumElementDecl *>(),
             Bits.EnumCaseDecl.NumElements};
   }
-  
-  SourceLoc getLoc() const {
-    return CaseLoc;
-  }
-  
   SourceRange getSourceRange() const;
   
   static bool classof(const Decl *D) {
@@ -6721,7 +6720,8 @@ private:
                       SourceLoc higherThanLoc, ArrayRef<Relation> higherThan,
                       SourceLoc lowerThanLoc, ArrayRef<Relation> lowerThan,
                       SourceLoc rbraceLoc);
-
+  friend class Decl;
+  SourceLoc getLocFromSource() const { return NameLoc; }
 public:
   static PrecedenceGroupDecl *create(DeclContext *dc,
                                      SourceLoc precedenceGroupLoc,
@@ -6741,7 +6741,6 @@ public:
                                      SourceLoc rbraceLoc);
 
 
-  SourceLoc getLoc() const { return NameLoc; }
   SourceRange getSourceRange() const {
     return { PrecedenceGroupLoc, RBraceLoc };
   }
@@ -6860,7 +6859,8 @@ class OperatorDecl : public Decl {
   ArrayRef<Identifier> Identifiers;
   ArrayRef<SourceLoc> IdentifierLocs;
   ArrayRef<NominalTypeDecl *> DesignatedNominalTypes;
-
+  SourceLoc getLocFromSource() const { return NameLoc; }
+  friend class Decl;
 public:
   OperatorDecl(DeclKind kind, DeclContext *DC, SourceLoc OperatorLoc,
                Identifier Name, SourceLoc NameLoc,
@@ -6875,7 +6875,6 @@ public:
       : Decl(kind, DC), OperatorLoc(OperatorLoc), NameLoc(NameLoc), name(Name),
         DesignatedNominalTypes(DesignatedNominalTypes) {}
 
-  SourceLoc getLoc() const { return NameLoc; }
 
   SourceLoc getOperatorLoc() const { return OperatorLoc; }
   SourceLoc getNameLoc() const { return NameLoc; }
@@ -7038,6 +7037,10 @@ class MissingMemberDecl : public Decl {
            && "not enough bits");
     setImplicit();
   }
+  friend class Decl;
+  SourceLoc getLocFromSource() const {
+    return SourceLoc();
+  }
 public:
   static MissingMemberDecl *
   create(ASTContext &ctx, DeclContext *DC, DeclName name,
@@ -7060,10 +7063,6 @@ public:
 
   unsigned getNumberOfFieldOffsetVectorEntries() const {
     return Bits.MissingMemberDecl.NumberOfFieldOffsetVectorEntries;
-  }
-
-  SourceLoc getLoc() const {
-    return SourceLoc();
   }
 
   SourceRange getSourceRange() const {
