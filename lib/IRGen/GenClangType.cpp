@@ -727,21 +727,25 @@ clang::CanQualType GenClangType::visitType(CanType type) {
 }
 
 clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
+  // Look in the cache.
+  auto it = Cache.find(type);
+  if (it != Cache.end()) {
+    return it->second;
+  }
+
   // Try to do this without making cache entries for obvious cases.
   if (auto nominal = dyn_cast<NominalType>(type)) {
     auto decl = nominal->getDecl();
     if (auto clangDecl = decl->getClangDecl()) {
+      auto &ctx = IGM.getClangASTContext();
       if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
-        auto &ctx = IGM.getClangASTContext();
         return ctx.getCanonicalType(ctx.getTypeDeclType(clangTypeDecl))
             .getUnqualifiedType();
       } else if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
-        auto &ctx = IGM.getClangASTContext();
         auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);
         auto ptrTy = ctx.getObjCObjectPointerType(clangType);
         return ctx.getCanonicalType(ptrTy);
       } else if (auto protoDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)){
-        auto &ctx = IGM.getClangASTContext();
         auto clangType  = ctx.getObjCObjectType(
                             ctx.ObjCBuiltinIdTy,
                             const_cast<clang::ObjCProtocolDecl **>(&protoDecl),
@@ -750,12 +754,6 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
         return ctx.getCanonicalType(ptrTy);
       }
     }
-  }
-
-  // Look in the cache.
-  auto it = Cache.find(type);
-  if (it != Cache.end()) {
-    return it->second;
   }
 
   // If that failed, convert the type, cache, and return.
