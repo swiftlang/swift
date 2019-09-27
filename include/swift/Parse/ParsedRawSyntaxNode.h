@@ -117,8 +117,20 @@ public:
     assert(getTokenKind() == tokKind && "Token kind with too large value!");
   }
 
+#ifndef NDEBUG
+  bool ensureDataIsNotRecorded() {
+    if (DK != DataKind::Recorded)
+      return true;
+    llvm::dbgs() << "Leaking node: ";
+    dump(llvm::dbgs());
+    llvm::dbgs() << "\n";
+    return false;
+  }
+#endif
+
   ParsedRawSyntaxNode &operator=(ParsedRawSyntaxNode &&other) {
-    assert(DK != DataKind::Recorded);
+    assert(ensureDataIsNotRecorded() &&
+           "recorded data is being destroyed by assignment");
     switch (other.DK) {
     case DataKind::Null:
       break;
@@ -143,7 +155,7 @@ public:
     *this = std::move(other);
   }
   ~ParsedRawSyntaxNode() {
-    assert(DK != DataKind::Recorded);
+    assert(ensureDataIsNotRecorded() && "recorded data is being destructed");
   }
 
   syntax::SyntaxKind getKind() const { return syntax::SyntaxKind(SynKind); }
