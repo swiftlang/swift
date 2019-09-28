@@ -152,6 +152,166 @@ TrailingWhereClause *ASTGen::generate(const GenericWhereClauseSyntax &syntax,
   return TrailingWhereClause::create(Context, whereLoc, requirements);
 }
 
+Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
+  Expr *result = nullptr;
+
+  if (auto identifierExpr = E.getAs<IdentifierExprSyntax>())
+    result = generate(*identifierExpr, Loc);
+  else if (auto specializeExpr = E.getAs<SpecializeExprSyntax>())
+    result = generate(*specializeExpr, Loc);
+  else if (auto editorPlaceHolderExpr = E.getAs<EditorPlaceholderExprSyntax>())
+    result = generate(*editorPlaceHolderExpr, Loc);
+  else if (auto integerLiteralExpr = E.getAs<IntegerLiteralExprSyntax>())
+    result = generate(*integerLiteralExpr, Loc);
+  else if (auto floatLiteralExpr = E.getAs<FloatLiteralExprSyntax>())
+    result = generate(*floatLiteralExpr, Loc);
+  else if (auto nilLiteral = E.getAs<NilLiteralExprSyntax>())
+    result = generate(*nilLiteral, Loc);
+  else if (auto boolLiteral = E.getAs<BooleanLiteralExprSyntax>())
+    result = generate(*boolLiteral, Loc);
+  else if (auto poundFileExpr = E.getAs<PoundFileExprSyntax>())
+    result = generate(*poundFileExpr, Loc);
+  else if (auto poundLineExpr = E.getAs<PoundLineExprSyntax>())
+    result = generate(*poundLineExpr, Loc);
+  else if (auto poundColumnExpr = E.getAs<PoundColumnExprSyntax>())
+    result = generate(*poundColumnExpr, Loc);
+  else if (auto poundFunctionExpr = E.getAs<PoundFunctionExprSyntax>())
+    result = generate(*poundFunctionExpr, Loc);
+  else if (auto poundDsohandleExpr = E.getAs<PoundDsohandleExprSyntax>())
+    result = generate(*poundDsohandleExpr, Loc);
+  else
+    llvm_unreachable("unsupported expression");
+
+  return result;
+}
+
+std::pair<DeclName, DeclNameLoc> ASTGen::generateUnqualifiedDeclName(
+    const TokenSyntax &idTok, const Optional<DeclNameArgumentsSyntax> &args,
+    const SourceLoc Loc) {
+  SourceLoc baseNameLoc = advanceLocBegin(Loc, idTok);
+
+  DeclBaseName baseName;
+  if (idTok.getTokenKind() == tok::kw_init)
+    baseName = DeclBaseName::createConstructor();
+  else if (idTok.getTokenKind() == tok::kw_deinit)
+    baseName = DeclBaseName::createDestructor();
+  else if (idTok.getTokenKind() == tok::kw_subscript)
+    baseName = DeclBaseName::createSubscript();
+  else
+    baseName = Context.getIdentifier(idTok.getIdentifierText());
+
+  if (!args)
+    return {DeclName(baseName), DeclNameLoc(baseNameLoc)};
+
+  // FIXME: Remove this block and use 'Loc'.
+  // This is needed for the case 'idTok' and 'args' are not in the same tree.
+  // i.e. Call from parseUnqualifiedDeclName().
+  SourceLoc argsLeadingLoc = Loc;
+  if (!args->getParent()) {
+    argsLeadingLoc = Loc.getAdvancedLoc(idTok.getTextLength());
+  } else {
+    assert(idTok.getData().getParent() == args->getData().getParent() &&
+           idTok.getIndexInParent() + 1 == args->getIndexInParent() &&
+           "'idTok' must be immediately followed by 'args'");
+  }
+
+  SmallVector<Identifier, 2> argumentLabels;
+  SmallVector<SourceLoc, 2> argumentLabelLocs;
+  for (auto arg : args->getArguments()) {
+    Identifier label;
+    if (!arg.getName().isMissing() &&
+        arg.getName().getTokenKind() != tok::kw__) {
+      label = Context.getIdentifier(arg.getName().getIdentifierText());
+    }
+    argumentLabels.push_back(label);
+    argumentLabelLocs.push_back(advanceLocBegin(argsLeadingLoc,
+                                                *arg.getFirstToken()));
+  }
+  SourceLoc lParenLoc = advanceLocBegin(argsLeadingLoc, args->getLeftParen());
+  SourceLoc rParenLoc = advanceLocBegin(argsLeadingLoc, args->getRightParen());
+
+  DeclName name(Context, baseName, argumentLabels);
+  DeclNameLoc nameLoc;
+  if (argumentLabelLocs.empty())
+    nameLoc = DeclNameLoc(baseNameLoc);
+  else
+    nameLoc = DeclNameLoc(Context, baseNameLoc, lParenLoc, argumentLabelLocs,
+                          rParenLoc);
+  return {name, nameLoc};
+}
+
+Expr *ASTGen::generate(const IdentifierExprSyntax &E, const SourceLoc Loc) {
+  auto idTok = E.getIdentifier();
+  DeclName name;
+  DeclNameLoc nameLoc;
+  std::tie(name, nameLoc) = generateUnqualifiedDeclName(
+      E.getIdentifier(), E.getDeclNameArguments(), Loc);
+
+  ValueDecl *D = nullptr;
+  if (!P.InPoundIfEnvironment) {
+    D = lookupInScope(name);
+    // FIXME: We want this to work: "var x = { x() }", but for now it's better
+    // to disallow it than to crash.
+    if (D) {
+      for (auto activeVar : P.DisabledVars) {
+        if (activeVar != D)
+          continue;
+        P.diagnose(nameLoc.getBaseNameLoc(), P.DisabledVarReason);
+        return new (Context) ErrorExpr(nameLoc.getSourceRange());
+      }
+    } else {
+      for (auto activeVar : P.DisabledVars) {
+        if (activeVar->getFullName() != name)
+          continue;
+        P.diagnose(nameLoc.getBaseNameLoc(), P.DisabledVarReason);
+        return new (Context) ErrorExpr(nameLoc.getSourceRange());
+      }
+    }
+  }
+
+  if (!D) {
+    return new (Context)
+        UnresolvedDeclRefExpr(name, DeclRefKind::Ordinary, nameLoc);
+  }
+
+  if (auto TD = dyn_cast<TypeDecl>(D)) {
+    // When parsing default argument expressions for generic functions,
+    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
+    // to the FuncDecl yet. Other than that, we should only ever find
+    // global or local declarations here.
+    assert(!TD->getDeclContext()->isTypeContext() ||
+           isa<GenericTypeParamDecl>(TD));
+    return TypeExpr::createForDecl(nameLoc.getBaseNameLoc(), TD,
+                                   /*DeclContext=*/nullptr,
+                                   /*inplicit=*/false);
+  }
+
+  return new (Context) DeclRefExpr(D, nameLoc, /*implicit=*/false);
+}
+
+Expr *ASTGen::generate(const EditorPlaceholderExprSyntax &E, const SourceLoc Loc) {
+  assert(!E.getIdentifier().isMissing());
+
+  auto text = E.getIdentifier().getText();
+  auto tokLoc = advanceLocBegin(Loc, E.getIdentifier());
+  return P.parseExprEditorPlaceholder(tokLoc, text);
+}
+
+Expr *ASTGen::generate(const SpecializeExprSyntax &E, const SourceLoc Loc) {
+  auto base = generate(E.getExpression(), Loc);
+
+  SourceLoc lAngleLoc, rAngleLoc;
+  SmallVector<TypeRepr *, 4> argTyRs;
+  generate(E.getGenericArgumentClause(), Loc, lAngleLoc, rAngleLoc, argTyRs);
+  if (argTyRs.empty())
+    return base;
+
+  SmallVector<TypeLoc, 4> args;
+  args.assign(argTyRs.begin(), argTyRs.end());
+  return UnresolvedSpecializeExpr::create(Context, base, lAngleLoc, args,
+                                          rAngleLoc);
+}
+
 Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,
                        const SourceLoc Loc) {
   auto Digits = Expr.getDigits();
@@ -584,15 +744,12 @@ ComponentIdentTypeRepr *ASTGen::generateIdentifier(const T &Type,
   auto IdentifierLoc = advanceLocBegin(Loc, Type.getName());
   auto Identifier = Context.getIdentifier(Type.getName().getIdentifierText());
   if (auto Clause = Type.getGenericArgumentClause()) {
-    auto Args = Clause->getArguments();
-    if (!Args.empty()) {
-      auto LAngleLoc = advanceLocBegin(Loc, Clause->getLeftAngleBracket());
-      auto RAngleLoc = advanceLocBegin(Loc, Clause->getRightAngleBracket());
-      SourceRange Range{LAngleLoc, RAngleLoc};
-      auto ArgsAST = generate(Args, Loc);
+    SourceLoc lAngleLoc, rAngleLoc;
+    SmallVector<TypeRepr *, 4> args;
+    generate(*Clause, Loc, lAngleLoc, rAngleLoc, args);
+    if (!args.empty())
       return GenericIdentTypeRepr::create(Context, IdentifierLoc, Identifier,
-                                          ArgsAST, Range);
-    }
+                                          args, {lAngleLoc, rAngleLoc});
   }
   return new (Context) SimpleIdentTypeRepr(IdentifierLoc, Identifier);
 }
@@ -721,13 +878,11 @@ TypeRepr *ASTGen::generate(const SILBoxTypeSyntax &Type, const SourceLoc Loc,
   auto RBraceLoc = advanceLocBegin(Loc, Type.getRightBrace());
 
   SourceLoc LAngleLoc, RAngleLoc;
-  SmallVector<TypeRepr*, 4> Args;
+  SmallVector<TypeRepr *, 4> Args;
   if (auto genericArgs = Type.getGenericArgumentClause()) {
     if (genericArgs->getRightAngleBracket().isMissing())
       return nullptr;
-    LAngleLoc = advanceLocBegin(Loc, genericArgs->getLeftAngleBracket());
-    RAngleLoc = advanceLocBegin(Loc, genericArgs->getRightAngleBracket());
-    Args = generate(genericArgs->getArguments(), Loc);
+    generate(*genericArgs, Loc, LAngleLoc, RAngleLoc, Args);
   }
 
   auto SILType = SILBoxTypeRepr::create(Context, generics, LBraceLoc, Fields,
@@ -843,22 +998,20 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
   return nullptr;
 }
 
-SmallVector<TypeRepr *, 4>
-ASTGen::generate(const GenericArgumentListSyntax &Args, const SourceLoc Loc) {
-  SmallVector<TypeRepr *, 4> Types;
-  for (auto Arg : Args) {
-    auto tyR = generate(Arg, Loc);
+void
+ASTGen::generate(const GenericArgumentClauseSyntax &clause, const SourceLoc Loc,
+                 SourceLoc &lAngleLoc, SourceLoc &rAngleLoc,
+                 SmallVectorImpl<TypeRepr *> &args) {
+  lAngleLoc = advanceLocBegin(Loc, clause.getLeftAngleBracket());
+  rAngleLoc = advanceLocBegin(Loc, clause.getRightAngleBracket());
+
+  assert(args.empty());
+  for (auto Arg : clause.getArguments()) {
+    auto tyR = generate(Arg.getArgumentType(), Loc);
     if (!tyR)
       tyR = new (Context) ErrorTypeRepr(advanceLocBegin(Loc, Arg));
-    Types.push_back(tyR);
+    args.push_back(tyR);
   }
-
-  return Types;
-}
-
-TypeRepr *ASTGen::generate(const GenericArgumentSyntax &Arg,
-                           const SourceLoc Loc) {
-  return generate(Arg.getArgumentType(), Loc);
 }
 
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
