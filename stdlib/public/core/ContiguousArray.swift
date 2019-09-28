@@ -947,6 +947,13 @@ extension ContiguousArray: RangeReplaceableCollection {
     }
     return _copyCollectionToContiguousArray(self)
   }
+  
+  @inlinable
+  public mutating func swapAt(_ i: Int, _ j: Int) {
+    withUnsafeMutableBufferPointer { buffer in
+      buffer.swapAt(i, j)
+    }
+  }
 }
 
 extension ContiguousArray: CustomReflectable {

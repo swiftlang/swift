@@ -1311,6 +1311,13 @@ extension Array: RangeReplaceableCollection {
     }
     return _copyCollectionToContiguousArray(self)
   }
+  
+  @inlinable
+  public mutating func swapAt(_ i: Int, _ j: Int) {
+    withUnsafeMutableBufferPointer { buffer in
+      buffer.swapAt(i, j)
+    }
+  }
 }
 
 // Implementations of + and += for same-type arrays. This combined
