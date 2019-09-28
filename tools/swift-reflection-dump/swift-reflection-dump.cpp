@@ -144,10 +144,10 @@ static section_iterator findSectionByName(StringRef Name, const ObjectFile &O) {
   SmallVector<section_iterator, 1> FoundSections;
   std::copy_if(Sections.begin(), Sections.end(),
                std::back_inserter(FoundSections), [Name](SectionRef S) {
-                 StringRef N;
-                 if (auto EC = S.getName(N))
-                   reportError(EC);
-                 return N == Name;
+                 auto NameOrErr = S.getName();
+                 if (!NameOrErr)
+                   reportError(toString(NameOrErr.takeError()));
+                 return *NameOrErr == Name;
                });
   if (FoundSections.size() != 1)
     return Sections.end();
