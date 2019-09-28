@@ -75,12 +75,15 @@ namespace {
       /// 'Bool'.
       Boolean,
 
+      /// The source type is 'NSUInteger'.
+      NSUInteger,
+
+      /// The source type is 'va_list'.
+      VAList,
+
       /// The source type is an Objective-C class type bridged to a Swift
       /// type.
       ObjCBridged,
-
-      /// The source type is 'NSUInteger'.
-      NSUInteger,
 
       /// The source type is an Objective-C object pointer type.
       ObjCPointer,
@@ -96,11 +99,6 @@ namespace {
 
       /// The source type is any other pointer type.
       OtherPointer,
-
-      /// The source type created a new Swift type, using swift_newtype, of an
-      /// original underlying CFPointer. This distinction is necessary to
-      /// trigger audit-checking.
-      SwiftNewtypeFromCFPointer,
     };
 
     ImportHintKind Kind;
@@ -138,7 +136,7 @@ namespace {
     case ImportHint::ObjCPointer:
     case ImportHint::CFunctionPointer:
     case ImportHint::OtherPointer:
-    case ImportHint::SwiftNewtypeFromCFPointer:
+    case ImportHint::VAList:
       return true;
     }
 
@@ -426,28 +424,35 @@ namespace {
         };
       }
 
+      PointerTypeKind pointerKind;
       if (quals.hasConst()) {
-        return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                     "UnsafePointer",
-                                                     pointeeType),
-                ImportHint::OtherPointer};
+        pointerKind = PTK_UnsafePointer;
+      } else {
+        switch (quals.getObjCLifetime()) {
+        case clang::Qualifiers::OCL_Autoreleasing:
+        case clang::Qualifiers::OCL_ExplicitNone:
+          // Mutable pointers with __autoreleasing or __unsafe_unretained
+          // ownership map to AutoreleasingUnsafeMutablePointer<T>.
+          pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
+
+          // FIXME: We have tests using a non-Apple stdlib that nevertheless
+          // exercise ObjC interop. Fail softly for those tests.
+          if (!Impl.SwiftContext.getAutoreleasingUnsafeMutablePointerDecl())
+            return Type();
+          break;
+
+        case clang::Qualifiers::OCL_Weak:
+          // FIXME: We should refuse to import this.
+          LLVM_FALLTHROUGH;
+
+        case clang::Qualifiers::OCL_None:
+        case clang::Qualifiers::OCL_Strong:
+          // All other mutable pointers map to UnsafeMutablePointer.
+          pointerKind = PTK_UnsafeMutablePointer;
+        }
       }
 
-      // Mutable pointers with __autoreleasing or __unsafe_unretained
-      // ownership map to AutoreleasingUnsafeMutablePointer<T>.
-      if (quals.getObjCLifetime() == clang::Qualifiers::OCL_Autoreleasing ||
-          quals.getObjCLifetime() == clang::Qualifiers::OCL_ExplicitNone) {
-        return {
-          Impl.getNamedSwiftTypeSpecialization(
-            Impl.getStdlibModule(), "AutoreleasingUnsafeMutablePointer",
-            pointeeType),
-          ImportHint::OtherPointer};
-      }
-
-      // All other mutable pointers map to UnsafeMutablePointer.
-      return {Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                   "UnsafeMutablePointer",
-                                                   pointeeType),
+      return {pointeeType->wrapInPointer(pointerKind),
               ImportHint::OtherPointer};
     }
 
@@ -663,10 +668,6 @@ namespace {
       Type mappedType = decl->getDeclaredInterfaceType();
 
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
-        if (isCFTypeDecl(type->getDecl())) {
-          return {mappedType, ImportHint::SwiftNewtypeFromCFPointer};
-        }
-
         auto underlying = Visit(type->getDecl()->getUnderlyingType());
         switch (underlying.Hint) {
         case ImportHint::None:
@@ -676,7 +677,7 @@ namespace {
         case ImportHint::ObjCPointer:
         case ImportHint::CFunctionPointer:
         case ImportHint::OtherPointer:
-        case ImportHint::SwiftNewtypeFromCFPointer:
+        case ImportHint::VAList:
           return {mappedType, underlying.Hint};
 
         case ImportHint::Boolean:
@@ -706,6 +707,10 @@ namespace {
           break;
         }
 
+        static const llvm::StringLiteral vaListNames[] = {
+          "va_list", "__gnuc_va_list", "__va_list"
+        };
+
         ImportHint hint = ImportHint::None;
         if (type->getDecl()->getName() == "BOOL") {
           hint = ImportHint::Boolean;
@@ -714,6 +719,9 @@ namespace {
           hint = ImportHint::Boolean;
         } else if (type->getDecl()->getName() == "NSUInteger") {
           hint = ImportHint::NSUInteger;
+        } else if (llvm::is_contained(vaListNames,
+                                      type->getDecl()->getName())) {
+          hint = ImportHint::VAList;
         } else if (isImportedCFPointer(type->desugar(), mappedType)) {
           hint = ImportHint::CFPointer;
         } else if (mappedType->isAnyExistentialType()) { // id, Class
@@ -791,8 +799,11 @@ namespace {
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
       if (clangCtx.hasSameType(type->getOriginalType(),
-                               clangCtx.getBuiltinVaListType()))
-        return Impl.getNamedSwiftType(Impl.getStdlibModule(), "CVaListPointer");
+                               clangCtx.getBuiltinVaListType())) {
+        return {Impl.getNamedSwiftType(Impl.getStdlibModule(),
+                                       "CVaListPointer"),
+                ImportHint::VAList};
+      }
       return Visit(type->desugar());
     }
 
@@ -1176,6 +1187,85 @@ static bool isNSString(Type type) {
   return false;
 }
 
+static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
+                                           Type importedType,
+                                           bool resugarNSErrorPointer) {
+  PointerTypeKind PTK;
+  auto elementType = importedType->getAnyPointerElementType(PTK);
+  if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
+    return Type();
+
+  auto elementObj = elementType->getOptionalObjectType();
+  if (!elementObj)
+    return Type();
+
+  auto elementClass = elementObj->getClassOrBoundGenericClass();
+  if (!elementClass)
+    return Type();
+
+  // FIXME: Avoid string comparison by caching this identifier.
+  if (elementClass->getName().str() !=
+        impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
+    return Type();
+
+  ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
+  if (!foundationModule ||
+      foundationModule->getName()
+        != elementClass->getModuleContext()->getName())
+    return Type();
+
+
+  if (resugarNSErrorPointer)
+    return impl.getNamedSwiftType(
+      foundationModule,
+        impl.SwiftContext.getSwiftName(
+          KnownFoundationEntity::NSErrorPointer));
+
+  // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?
+  // so we have to manually make them match. We also want to assume this in
+  // general for error out-parameters even if they weren't marked nullable in C.
+  // Or at least we do for source-compatibility reasons...
+  return OptionalType::get(importedType);
+}
+
+static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
+                                      Type importedType,
+                                      ImportTypeKind importKind) {
+  PointerTypeKind PTK;
+  auto elementType = importedType->getAnyPointerElementType(PTK);
+  if (!elementType || PTK != PTK_UnsafeMutablePointer)
+    return Type();
+
+  auto insideOptionalType = elementType->getOptionalObjectType();
+  bool isOptional = (bool) insideOptionalType;
+  if (!insideOptionalType)
+    insideOptionalType = elementType;
+
+  auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
+  if (!boundGenericTy)
+    return Type();
+
+  auto boundGenericBase = boundGenericTy->getDecl();
+  if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
+    return Type();
+
+  assert(boundGenericTy->getGenericArgs().size() == 1 &&
+         "signature of Unmanaged has changed");
+
+  auto resultTy = boundGenericTy->getGenericArgs().front();
+  if (isOptional)
+    resultTy = OptionalType::get(resultTy);
+
+  PointerTypeKind pointerKind;
+  if (importKind == ImportTypeKind::CFRetainedOutParameter)
+    pointerKind = PTK_UnsafeMutablePointer;
+  else
+    pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
+
+  resultTy = resultTy->wrapInPointer(pointerKind);
+  return resultTy;
+}
+
 static ImportedType adjustTypeForConcreteImport(
     ClangImporter::Implementation &impl,
     ImportResult importResult, ImportTypeKind importKind,
@@ -1188,196 +1278,149 @@ static ImportedType adjustTypeForConcreteImport(
     return {importedType, false};
   }
 
-  // 'void' can only be imported as a function result type.
-  if (hint == ImportHint::Void &&
-      (importKind == ImportTypeKind::AuditedResult ||
-       importKind == ImportTypeKind::Result)) {
-    return {impl.getNamedSwiftType(impl.getStdlibModule(), "Void"), false};
-  }
-
-  // Import NSString * globals as String.
-  if (hint == ImportHint::ObjCBridged && isNSString(importedType) &&
-      (importKind == ImportTypeKind::Variable ||
-       importKind == ImportTypeKind::AuditedVariable)) {
-    return {hint.BridgedType, false};
-  }
-
-  // For anything else, if we completely failed to import the type
-  // abstractly, give up now.
-  if (!importedType)
+  // If we completely failed to import the type, give up now.
+  // Special-case for 'void' which is valid in result positions.
+  if (!importedType && hint != ImportHint::Void)
     return {Type(), false};
 
-  // Special case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
-  auto maybeImportNSErrorPointer = [&]() -> Type {
-    if (importKind != ImportTypeKind::Parameter)
-      return Type();
+  switch (hint) {
+  case ImportHint::None:
+    break;
 
-    PointerTypeKind PTK;
-    auto elementType = importedType->getAnyPointerElementType(PTK);
-    if (!elementType || PTK != PTK_AutoreleasingUnsafeMutablePointer)
-      return Type();
+  case ImportHint::ObjCPointer:
+  case ImportHint::CFunctionPointer:
+    break;
 
-    auto elementObj = elementType->getOptionalObjectType();
-    if (!elementObj)
-      return Type();
-
-    auto elementClass = elementObj->getClassOrBoundGenericClass();
-    if (!elementClass)
-      return Type();
-
-    // FIXME: Avoid string comparison by caching this identifier.
-    if (elementClass->getName().str() !=
-          impl.SwiftContext.getSwiftName(KnownFoundationEntity::NSError))
-      return Type();
-
-    ModuleDecl *foundationModule = impl.tryLoadFoundationModule();
-    if (!foundationModule ||
-        foundationModule->getName()
-          != elementClass->getModuleContext()->getName())
-      return Type();
-
-
-    if (resugarNSErrorPointer)
-      return impl.getNamedSwiftType(
-        foundationModule,
-          impl.SwiftContext.getSwiftName(
-            KnownFoundationEntity::NSErrorPointer));
-
-    // The imported type is AUMP<NSError?>, but the typealias is AUMP<NSError?>?
-    // so we have to manually make them match.
-    return OptionalType::get(importedType);
-  };
-
-  if (Type result = maybeImportNSErrorPointer()) {
-    return {result, false};
-  }
-
-  auto maybeImportCFOutParameter = [&]() -> Type {
-    if (importKind != ImportTypeKind::CFRetainedOutParameter &&
-        importKind != ImportTypeKind::CFUnretainedOutParameter) {
-      return Type();
+  case ImportHint::Void:
+    // 'void' can only be imported as a function result type.
+    if (importKind != ImportTypeKind::AuditedResult &&
+        importKind != ImportTypeKind::Result) {
+      return {Type(), false};
     }
+    importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
+    break;
 
-    PointerTypeKind PTK;
-    auto elementType = importedType->getAnyPointerElementType(PTK);
-    if (!elementType || PTK != PTK_UnsafeMutablePointer)
-      return Type();
-
-    auto insideOptionalType = elementType->getOptionalObjectType();
-    bool isOptional = (bool) insideOptionalType;
-    if (!insideOptionalType)
-      insideOptionalType = elementType;
-
-    auto boundGenericTy = insideOptionalType->getAs<BoundGenericType>();
-    if (!boundGenericTy)
-      return Type();
-
-    auto boundGenericBase = boundGenericTy->getDecl();
-    if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
-      return Type();
-
-    assert(boundGenericTy->getGenericArgs().size() == 1 &&
-           "signature of Unmanaged has changed");
-
-    auto resultTy = boundGenericTy->getGenericArgs().front();
-    if (isOptional)
-      resultTy = OptionalType::get(resultTy);
-
-    StringRef pointerName;
-    if (importKind == ImportTypeKind::CFRetainedOutParameter)
-      pointerName = "UnsafeMutablePointer";
-    else
-      pointerName = "AutoreleasingUnsafeMutablePointer";
-
-    resultTy = impl.getNamedSwiftTypeSpecialization(impl.getStdlibModule(),
-                                                    pointerName,
-                                                    resultTy);
-    return resultTy;
-  };
-  if (Type outParamTy = maybeImportCFOutParameter()) {
-    importedType = outParamTy;
-  }
-
-  // SwiftTypeConverter turns block pointers into @convention(block) types.
-  // In some contexts, we bridge them to use the Swift function type
-  // representation. This includes typedefs of block types, which use the
-  // Swift function type representation.
-  if (hint == ImportHint::Block) {
-    if (canBridgeTypes(importKind)) {
-      // Determine the function type representation we need.
-      //
-      // For Objective-C collection arguments, we cannot bridge from a block
-      // to a Swift function type, so force the block representation. Normally
-      // the mapped type will have a block representation (making this a no-op),
-      // but in cases where the Clang type was written as a typedef of a
-      // block type, that typedef will have a Swift function type
-      // representation. This code will then break down the imported type
-      // alias and produce a function type with block representation.
-      auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
-      if (importKind == ImportTypeKind::ObjCCollectionElement) {
-        requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
-      }
-
-      auto fTy = importedType->castTo<FunctionType>();
-      FunctionType::ExtInfo einfo = fTy->getExtInfo();
-      if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
-        einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
-        importedType = fTy->withExtInfo(einfo);
-      }
-    }
-  }
-
-  // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
-  // losslessly.
-  if (hint == ImportHint::Boolean && bridging == Bridgeability::Full &&
-      canBridgeTypes(importKind)) {
-    return {impl.SwiftContext.getBoolDecl()->getDeclaredType(), false};
-  }
-
-  // When NSUInteger is used as an enum's underlying type or if it does not come
-  // from a system module, make sure it stays unsigned.
-  if (hint == ImportHint::NSUInteger) {
-    if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt) {
-      return {impl.SwiftContext.getUIntDecl()->getDeclaredType(), false};
-    }
-  }
-
-  // Wrap CF pointers up as unmanaged types, unless this is an audited
-  // context.
-  if (hint == ImportHint::CFPointer && !isCFAudited(importKind)) {
-    importedType = getUnmanagedType(impl, importedType);
-  }
-
-  // For types we import as new types in Swift, if the use is CF un-audited,
-  // then we have to force it to be unmanaged
-  if (hint == ImportHint::SwiftNewtypeFromCFPointer &&
-      !isCFAudited(importKind)) {
-    auto underlyingType = importedType->getSwiftNewtypeUnderlyingType();
-    if (underlyingType)
-      importedType = getUnmanagedType(impl, underlyingType);
-  }
-
-  // If we have a bridged Objective-C type and we are allowed to
-  // bridge, do so.
-  if (hint == ImportHint::ObjCBridged &&
-      canBridgeTypes(importKind) &&
-      importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
-      !(importKind == ImportTypeKind::Typedef &&
-        bridging == Bridgeability::None)) {
-    // id and Any can be bridged without Foundation. There would be
-    // bootstrapping issues with the ObjectiveC module otherwise.
-    if (hint.BridgedType->isAny()
-        || impl.tryLoadFoundationModule()
-        || impl.ImportForwardDeclarations) {
-
-      // Set the bridged type if it wasn't done already.
-      if (!importedType->isEqual(hint.BridgedType))
+  case ImportHint::ObjCBridged:
+    // Import NSString * globals as non-optional String.
+    if (isNSString(importedType)) {
+      if (importKind == ImportTypeKind::Variable ||
+          importKind == ImportTypeKind::AuditedVariable) {
         importedType = hint.BridgedType;
+        optKind = OTK_None;
+        break;
+      }
     }
+
+    // If we have a bridged Objective-C type and we are allowed to
+    // bridge, do so.
+    if (canBridgeTypes(importKind) &&
+        importKind != ImportTypeKind::PropertyWithReferenceSemantics &&
+        !(importKind == ImportTypeKind::Typedef &&
+          bridging == Bridgeability::None)) {
+      // id and Any can be bridged without Foundation. There would be
+      // bootstrapping issues with the ObjectiveC module otherwise.
+      if (hint.BridgedType->isAny()
+          || impl.tryLoadFoundationModule()
+          || impl.ImportForwardDeclarations) {
+
+        // Set the bridged type if it wasn't done already.
+        if (!importedType->isEqual(hint.BridgedType))
+          importedType = hint.BridgedType;
+      }
+    }
+    break;
+
+  case ImportHint::Block: {
+    // SwiftTypeConverter turns block pointers into @convention(block) types.
+    // In some contexts, we bridge them to use the Swift function type
+    // representation. This includes typedefs of block types, which use the
+    // Swift function type representation.
+    if (!canBridgeTypes(importKind))
+      break;
+
+    // Determine the function type representation we need.
+    //
+    // For Objective-C collection arguments, we cannot bridge from a block
+    // to a Swift function type, so force the block representation. Normally
+    // the mapped type will have a block representation (making this a no-op),
+    // but in cases where the Clang type was written as a typedef of a
+    // block type, that typedef will have a Swift function type
+    // representation. This code will then break down the imported type
+    // alias and produce a function type with block representation.
+    auto requiredFunctionTypeRepr = FunctionTypeRepresentation::Swift;
+    if (importKind == ImportTypeKind::ObjCCollectionElement) {
+      requiredFunctionTypeRepr = FunctionTypeRepresentation::Block;
+    }
+
+    auto fTy = importedType->castTo<FunctionType>();
+    FunctionType::ExtInfo einfo = fTy->getExtInfo();
+    if (einfo.getRepresentation() != requiredFunctionTypeRepr) {
+      einfo = einfo.withRepresentation(requiredFunctionTypeRepr);
+      importedType = fTy->withExtInfo(einfo);
+    }
+    break;
   }
 
-  if (!importedType)
-    return {importedType, false};
+  case ImportHint::Boolean:
+    // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
+    // losslessly.
+    if (bridging == Bridgeability::Full && canBridgeTypes(importKind))
+      importedType = impl.SwiftContext.getBoolDecl()->getDeclaredType();
+    break;
+
+  case ImportHint::NSUInteger:
+    // When NSUInteger is used as an enum's underlying type or if it does not
+    // come from a system module, make sure it stays unsigned.
+    if (importKind == ImportTypeKind::Enum || !allowNSUIntegerAsInt)
+      importedType = impl.SwiftContext.getUIntDecl()->getDeclaredType();
+    break;
+
+  case ImportHint::CFPointer:
+    // Wrap CF pointers up as unmanaged types, unless this is an audited
+    // context.
+    if (!isCFAudited(importKind)) {
+      Type underlyingType = importedType->getSwiftNewtypeUnderlyingType();
+      if (!underlyingType)
+        underlyingType = importedType;
+      importedType = getUnmanagedType(impl, underlyingType);
+    }
+    break;
+
+  case ImportHint::VAList:
+    // Treat va_list specially: null-unspecified va_list parameters should be
+    // assumed to be non-optional. (Most people don't even think of va_list as a
+    // pointer, and it's not a portable assumption anyway.)
+    if (importKind == ImportTypeKind::Parameter &&
+        optKind == OTK_ImplicitlyUnwrappedOptional) {
+      optKind = OTK_None;
+    }
+    break;
+
+  case ImportHint::OtherPointer:
+    // Special-case AutoreleasingUnsafeMutablePointer<NSError?> parameters.
+    if (importKind == ImportTypeKind::Parameter) {
+      if (Type result = maybeImportNSErrorOutParameter(impl, importedType,
+                                                       resugarNSErrorPointer)) {
+        importedType = result;
+        optKind = OTK_None;
+        break;
+      }
+    }
+
+    // Remove 'Unmanaged' from audited CF out-parameters.
+    if (importKind == ImportTypeKind::CFRetainedOutParameter ||
+        importKind == ImportTypeKind::CFUnretainedOutParameter) {
+      if (Type outParamTy = maybeImportCFOutParameter(impl, importedType,
+                                                      importKind)) {
+        importedType = outParamTy;
+        break;
+      }
+    }
+
+    break;
+  }
+
+  assert(importedType);
 
   if (importKind == ImportTypeKind::RecordField &&
       importedType->isAnyClassReferenceType()) {
@@ -1390,26 +1433,13 @@ static ImportedType adjustTypeForConcreteImport(
     importedType = getUnmanagedType(impl, importedType);
   }
 
-  // Treat va_list specially: null-unspecified va_list parameters should be
-  // assumed to be non-optional. (Most people don't even think of va_list as a
-  // pointer, and it's not a portable assumption anyway.)
-  if (importKind == ImportTypeKind::Parameter &&
-      optKind == OTK_ImplicitlyUnwrappedOptional) {
-    if (auto *nominal = importedType->getNominalOrBoundGenericNominal()) {
-      if (nominal->getName().str() == "CVaListPointer" &&
-          nominal->getParentModule()->isStdlibModule()) {
-        optKind = OTK_None;
-      }
-    }
-  }
-
   // Wrap class, class protocol, function, and metatype types in an
   // optional type.
   bool isIUO = false;
-  if (importKind != ImportTypeKind::Typedef && canImportAsOptional(hint)) {
+  if (importKind != ImportTypeKind::Typedef && optKind != OTK_None &&
+      canImportAsOptional(hint)) {
     isIUO = optKind == OTK_ImplicitlyUnwrappedOptional;
-    if (optKind != OTK_None)
-      importedType = OptionalType::get(importedType);
+    importedType = OptionalType::get(importedType);
   }
 
   return {importedType, isIUO};
@@ -2331,33 +2361,6 @@ Type ClangImporter::Implementation::getNamedSwiftType(StringRef moduleName,
   if (!module) return Type();
 
   return getNamedSwiftType(module, name);
-}
-
-Type
-ClangImporter::Implementation::
-getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
-                                ArrayRef<Type> args) {
-  if (!module)
-    return Type();
-
-  // Look for the type.
-  SmallVector<ValueDecl *, 2> results;
-  module->lookupValue(SwiftContext.getIdentifier(name),
-                      NLKind::UnqualifiedLookup, results);
-  if (results.size() == 1) {
-    if (auto nominalDecl = dyn_cast<NominalTypeDecl>(results.front())) {
-      if (auto params = nominalDecl->getGenericParams()) {
-        if (params->size() == args.size()) {
-          // When we form the bound generic type, make sure we get the
-          // substitutions.
-          auto *BGT = BoundGenericType::get(nominalDecl, Type(), args);
-          return BGT;
-        }
-      }
-    }
-  }
-
-  return Type();
 }
 
 Decl *ClangImporter::Implementation::importDeclByName(StringRef name) {
