@@ -370,19 +370,6 @@ extension Counter {
 }
 ```
 
-The getter/setter syntax also allows for subscripts by using the base name `subscript`.
-
-```objc
-__attribute__((swift_name("getter:LinkedListOfInts.subscript(self:_:)")))
-int LinkedListGetAtIndex(const LinkedListOfInts *head, int index);
-```
-
-```swift
-extension LinkedListOfInts {
-  subscript(_ index: Int32) -> Int32 { get }
-}
-```
-
 Finally, functions can be imported as initializers as well by using the base name `init`. These are considered "factory" initializers and are never inherited or overridable. They must not have a `self` parameter.
 
 ```objc
