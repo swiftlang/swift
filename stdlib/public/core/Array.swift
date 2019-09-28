@@ -1314,9 +1314,8 @@ extension Array: RangeReplaceableCollection {
   
   @inlinable
   public mutating func swapAt(_ i: Int, _ j: Int) {
-    withUnsafeMutableBufferPointer { buffer in
-      buffer.swapAt(i, j)
-    }
+    _makeUniqueAndReserveCapacityIfNotUnique()
+    _buffer.swapAt(i, j)
   }
 }
 

@@ -307,6 +307,19 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return firstElementAddress[i]
   }
 
+  @inlinable
+  @inline(__always)
+  internal func swapAt(_ i: Int, _ j: Int) {
+    guard i != j else { return }
+    _internalInvariant(i >= 0 && i < count, "Array index out of range")
+    _internalInvariant(j >= 0 && j < count, "Array index out of range")
+    let pi = firstElementAddress + i
+    let pj = firstElementAddress + j
+    let tmp = pi.move()
+    pi.moveInitialize(from: pj, count: 1)
+    pj.initialize(to: tmp)
+  }
+
   /// Get or set the value of the ith element.
   @inlinable
   internal subscript(i: Int) -> Element {
