@@ -608,6 +608,8 @@ public:
       auto CDAddr = this->readCaptureDescriptorFromMetadata(*MetadataAddress);
       if (!CDAddr)
         return nullptr;
+      if (!CDAddr->isResolved())
+        return nullptr;
 
       // FIXME: Non-generic SIL boxes also use the HeapLocalVariable metadata
       // kind, but with a null capture descriptor right now (see
@@ -615,7 +617,8 @@ public:
       //
       // Non-generic SIL boxes share metadata among types with compatible
       // layout, but we need some way to get an outgoing pointer map for them.
-      auto CD = getBuilder().getCaptureDescriptor(*CDAddr);
+      auto CD = getBuilder().getCaptureDescriptor(
+                                CDAddr->getResolvedAddress().getAddressData());
       if (CD == nullptr)
         return nullptr;
 
