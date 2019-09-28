@@ -385,47 +385,6 @@ Type TypeChecker::getOptionalType(SourceLoc loc, Type elementType) {
   return OptionalType::get(elementType);
 }
 
-static Type getPointerType(TypeChecker &tc, SourceLoc loc, Type pointeeType,
-                           PointerTypeKind kind) {
-  auto pointerDecl = [&] {
-    switch (kind) {
-    case PTK_UnsafeMutableRawPointer:
-    case PTK_UnsafeRawPointer:
-      llvm_unreachable("these pointer types don't take arguments");
-    case PTK_UnsafePointer:
-      return tc.Context.getUnsafePointerDecl();
-    case PTK_UnsafeMutablePointer:
-      return tc.Context.getUnsafeMutablePointerDecl();
-    case PTK_AutoreleasingUnsafeMutablePointer:
-      return tc.Context.getAutoreleasingUnsafeMutablePointerDecl();
-    }
-    llvm_unreachable("bad kind");
-  }();
-  if (!pointerDecl) {
-    tc.diagnose(loc, diag::pointer_type_not_found,
-                kind == PTK_UnsafePointer ? 0 :
-                kind == PTK_UnsafeMutablePointer ? 1 : 2);
-    return Type();
-  }
-
-  // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-  (void)pointerDecl->getInterfaceType();
-  if (pointerDecl->isInvalid())
-    return Type();
-
-  // TODO: validate generic signature?
-
-  return BoundGenericType::get(pointerDecl, nullptr, pointeeType);
-}
-
-Type TypeChecker::getUnsafePointerType(SourceLoc loc, Type pointeeType) {
-  return getPointerType(*this, loc, pointeeType, PTK_UnsafePointer);
-}
-
-Type TypeChecker::getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType) {
-  return getPointerType(*this, loc, pointeeType, PTK_UnsafeMutablePointer);
-}
-
 Type TypeChecker::getStringType(DeclContext *dc) {
   if (auto typeDecl = Context.getStringDecl())
     return typeDecl->getDeclaredInterfaceType();

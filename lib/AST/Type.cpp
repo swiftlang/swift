@@ -624,6 +624,28 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   return Type();
 }
 
+Type TypeBase::wrapInPointer(PointerTypeKind kind) {
+  ASTContext &ctx = getASTContext();
+  NominalTypeDecl *pointerDecl = ([&ctx, kind] {
+    switch (kind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
+      llvm_unreachable("these pointer types don't take arguments");
+    case PTK_UnsafePointer:
+      return ctx.getUnsafePointerDecl();
+    case PTK_UnsafeMutablePointer:
+      return ctx.getUnsafeMutablePointerDecl();
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return ctx.getAutoreleasingUnsafeMutablePointerDecl();
+    }
+    llvm_unreachable("bad kind");
+  }());
+
+  assert(pointerDecl);
+  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
+}
+
+
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
   while (auto objType = type->getOptionalObjectType())
