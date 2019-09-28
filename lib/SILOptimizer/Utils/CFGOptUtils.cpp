@@ -1,8 +1,8 @@
-//===--- CFG.cpp - Utilities for SIL CFG transformations ------------------===//
+//===--- CFGOptUtils.cpp - SIL CFG edge utilities -------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,14 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
-#include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/TinyPtrVector.h"
 
 using namespace swift;
 
@@ -100,20 +101,22 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
     llvm::copy(cbi->getFalseArgs(), std::back_inserter(falseArgs));
 
     if (destBlock == cbi->getTrueBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(), argIndex);
+      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getTrueOperands(),
+                                                argIndex);
       trueArgs.erase(trueArgs.begin() + argIndex);
     }
 
     if (destBlock == cbi->getFalseBB()) {
-      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(), argIndex);
+      deleteTriviallyDeadOperandsOfDeadArgument(cbi->getFalseOperands(),
+                                                argIndex);
       falseArgs.erase(falseArgs.begin() + argIndex);
     }
 
     SILBuilderWithScope builder(cbi);
-    auto *result = builder.createCondBranch(cbi->getLoc(), cbi->getCondition(),
-                             cbi->getTrueBB(), trueArgs, cbi->getFalseBB(),
-                             falseArgs, cbi->getTrueBBCount(),
-                             cbi->getFalseBBCount());
+    auto *result = builder.createCondBranch(
+        cbi->getLoc(), cbi->getCondition(), cbi->getTrueBB(), trueArgs,
+        cbi->getFalseBB(), falseArgs, cbi->getTrueBBCount(),
+        cbi->getFalseBBCount());
     branch->eraseFromParent();
     return result;
   }
@@ -124,7 +127,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 
     deleteTriviallyDeadOperandsOfDeadArgument(bi->getAllOperands(), argIndex);
     args.erase(args.begin() + argIndex);
-    auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(), bi->getDestBB(), args);
+    auto *result = SILBuilderWithScope(bi).createBranch(bi->getLoc(),
+                                                        bi->getDestBB(), args);
     branch->eraseFromParent();
     return result;
   }
@@ -133,8 +137,8 @@ TermInst *swift::deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
 }
 
 void swift::erasePhiArgument(SILBasicBlock *block, unsigned argIndex) {
-  assert(block->getArgument(argIndex)->isPhiArgument() &&
-         "Only should be used on phi arguments");
+  assert(block->getArgument(argIndex)->isPhiArgument()
+         && "Only should be used on phi arguments");
   block->eraseArgument(argIndex);
 
   // Determine the set of predecessors in case any predecessor has
@@ -182,8 +186,8 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
       else
         TrueArgs.push_back(OldTrueArgs[i]);
     }
-    assert(TrueArgs.size() == CBI->getTrueBB()->getNumArguments() &&
-           "Destination block's number of arguments must match");
+    assert(TrueArgs.size() == CBI->getTrueBB()->getNumArguments()
+           && "Destination block's number of arguments must match");
 
     OperandValueArrayRef OldFalseArgs = CBI->getFalseArgs();
     bool BranchOnFalse = CBI->getFalseBB() == Dest;
@@ -196,8 +200,8 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
       else
         FalseArgs.push_back(OldFalseArgs[i]);
     }
-    assert(FalseArgs.size() == CBI->getFalseBB()->getNumArguments() &&
-           "Destination block's number of arguments must match");
+    assert(FalseArgs.size() == CBI->getFalseBB()->getNumArguments()
+           && "Destination block's number of arguments must match");
 
     CBI = Builder.createCondBranch(
         CBI->getLoc(), CBI->getCondition(), CBI->getTrueBB(), TrueArgs,
@@ -234,32 +238,32 @@ TermInst *swift::changeEdgeValue(TermInst *Branch, SILBasicBlock *Dest,
 
 template <class SwitchEnumTy, class SwitchEnumCaseTy>
 SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
-                                     SmallVectorImpl<SwitchEnumCaseTy> &Cases,
-                                     unsigned EdgeIdx, SILBasicBlock *NewDest) {
-    auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
-    for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
-      if (EdgeIdx != i)
-        Cases.push_back(S->getCase(i));
-      else
-        Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
-    if (EdgeIdx == S->getNumCases())
-      DefaultBB = NewDest;
-    return DefaultBB;
+                                 SmallVectorImpl<SwitchEnumCaseTy> &Cases,
+                                 unsigned EdgeIdx, SILBasicBlock *NewDest) {
+  auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
+  for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
+    if (EdgeIdx != i)
+      Cases.push_back(S->getCase(i));
+    else
+      Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
+  if (EdgeIdx == S->getNumCases())
+    DefaultBB = NewDest;
+  return DefaultBB;
 }
 
 template <class SwitchEnumTy, class SwitchEnumCaseTy>
-SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
-                                     SmallVectorImpl<SwitchEnumCaseTy> &Cases,
-                                     SILBasicBlock *OldDest, SILBasicBlock *NewDest) {
-    auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
-    for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
-      if (S->getCase(i).second != OldDest)
-        Cases.push_back(S->getCase(i));
-      else
-        Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
-    if (OldDest == DefaultBB)
-      DefaultBB = NewDest;
-    return DefaultBB;
+SILBasicBlock *
+replaceSwitchDest(SwitchEnumTy *S, SmallVectorImpl<SwitchEnumCaseTy> &Cases,
+                  SILBasicBlock *OldDest, SILBasicBlock *NewDest) {
+  auto *DefaultBB = S->hasDefault() ? S->getDefaultBB() : nullptr;
+  for (unsigned i = 0, e = S->getNumCases(); i != e; ++i)
+    if (S->getCase(i).second != OldDest)
+      Cases.push_back(S->getCase(i));
+    else
+      Cases.push_back(std::make_pair(S->getCase(i).first, NewDest));
+  if (OldDest == DefaultBB)
+    DefaultBB = NewDest;
+  return DefaultBB;
 }
 
 /// Replace a branch target.
@@ -269,7 +273,7 @@ SILBasicBlock *replaceSwitchDest(SwitchEnumTy *S,
 /// \param NewDest The new target block.
 /// \param PreserveArgs If set, preserve arguments on the replaced edge.
 void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
-                               SILBasicBlock *NewDest, bool PreserveArgs) {
+                                SILBasicBlock *NewDest, bool PreserveArgs) {
   SILBuilderWithScope B(T);
 
   switch (T->getTermKind()) {
@@ -328,7 +332,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::SwitchEnumInst: {
     auto SEI = cast<SwitchEnumInst>(T);
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
     B.createSwitchEnum(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
     SEI->eraseFromParent();
@@ -337,7 +341,7 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::SwitchEnumAddrInst: {
     auto SEI = cast<SwitchEnumAddrInst>(T);
-    SmallVector<std::pair<EnumElementDecl*, SILBasicBlock*>, 8> Cases;
+    SmallVector<std::pair<EnumElementDecl *, SILBasicBlock *>, 8> Cases;
     auto *DefaultBB = replaceSwitchDest(SEI, Cases, OldDest, NewDest);
     B.createSwitchEnumAddr(SEI->getLoc(), SEI->getOperand(), DefaultBB, Cases);
     SEI->eraseFromParent();
@@ -346,20 +350,26 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::DynamicMethodBranchInst: {
     auto DMBI = cast<DynamicMethodBranchInst>(T);
-    assert(OldDest == DMBI->getHasMethodBB() || OldDest == DMBI->getNoMethodBB() && "Invalid edge index");
-    auto HasMethodBB = OldDest == DMBI->getHasMethodBB() ? NewDest : DMBI->getHasMethodBB();
-    auto NoMethodBB = OldDest == DMBI->getNoMethodBB() ? NewDest : DMBI->getNoMethodBB();
+    assert(OldDest == DMBI->getHasMethodBB()
+           || OldDest == DMBI->getNoMethodBB() && "Invalid edge index");
+    auto HasMethodBB =
+        OldDest == DMBI->getHasMethodBB() ? NewDest : DMBI->getHasMethodBB();
+    auto NoMethodBB =
+        OldDest == DMBI->getNoMethodBB() ? NewDest : DMBI->getNoMethodBB();
     B.createDynamicMethodBranch(DMBI->getLoc(), DMBI->getOperand(),
-        DMBI->getMember(), HasMethodBB, NoMethodBB);
+                                DMBI->getMember(), HasMethodBB, NoMethodBB);
     DMBI->eraseFromParent();
     return;
   }
 
   case TermKind::CheckedCastBranchInst: {
     auto CBI = cast<CheckedCastBranchInst>(T);
-    assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
-    auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    assert(OldDest == CBI->getSuccessBB()
+           || OldDest == CBI->getFailureBB() && "Invalid edge index");
+    auto SuccessBB =
+        OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
+    auto FailureBB =
+        OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     B.createCheckedCastBranch(CBI->getLoc(), CBI->isExact(), CBI->getOperand(),
                               CBI->getCastType(), SuccessBB, FailureBB,
                               CBI->getTrueBBCount(), CBI->getFalseBBCount());
@@ -369,8 +379,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::CheckedCastValueBranchInst: {
     auto CBI = cast<CheckedCastValueBranchInst>(T);
-    assert(OldDest == CBI->getSuccessBB() ||
-           OldDest == CBI->getFailureBB() && "Invalid edge index");
+    assert(OldDest == CBI->getSuccessBB()
+           || OldDest == CBI->getFailureBB() && "Invalid edge index");
     auto SuccessBB =
         OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
     auto FailureBB =
@@ -383,9 +393,12 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
 
   case TermKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(T);
-    assert(OldDest == CBI->getSuccessBB() || OldDest == CBI->getFailureBB() && "Invalid edge index");
-    auto SuccessBB = OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
-    auto FailureBB = OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
+    assert(OldDest == CBI->getSuccessBB()
+           || OldDest == CBI->getFailureBB() && "Invalid edge index");
+    auto SuccessBB =
+        OldDest == CBI->getSuccessBB() ? NewDest : CBI->getSuccessBB();
+    auto FailureBB =
+        OldDest == CBI->getFailureBB() ? NewDest : CBI->getFailureBB();
     auto TrueCount = CBI->getTrueBBCount();
     auto FalseCount = CBI->getFalseBBCount();
     B.createCheckedCastAddrBranch(CBI->getLoc(), CBI->getConsumptionKind(),
@@ -402,7 +415,8 @@ void swift::replaceBranchTarget(TermInst *T, SILBasicBlock *OldDest,
   case TermKind::UnreachableInst:
   case TermKind::UnwindInst:
   case TermKind::YieldInst:
-    llvm_unreachable("Branch target cannot be replaced for this terminator instruction!");
+    llvm_unreachable(
+        "Branch target cannot be replaced for this terminator instruction!");
   }
   llvm_unreachable("Not yet implemented!");
 }
@@ -412,7 +426,7 @@ bool swift::isCriticalEdge(TermInst *T, unsigned EdgeIdx) {
   assert(T->getSuccessors().size() > EdgeIdx && "Not enough successors");
 
   auto SrcSuccs = T->getSuccessors();
-  
+
   if (SrcSuccs.size() <= 1 &&
       // Also consider non-branch instructions with a single successor for
       // critical edges, for example: a switch_enum of a single-case enum.
@@ -571,7 +585,8 @@ bool swift::mergeBasicBlockWithSuccessor(SILBasicBlock *BB, DominanceInfo *DT,
 bool swift::mergeBasicBlocks(SILFunction *F) {
   bool merged = false;
   for (auto BBIter = F->begin(); BBIter != F->end();) {
-    if (mergeBasicBlockWithSuccessor(&*BBIter, /*DT*/ nullptr, /*LI*/ nullptr)) {
+    if (mergeBasicBlockWithSuccessor(&*BBIter, /*DT*/ nullptr,
+                                     /*LI*/ nullptr)) {
       merged = true;
       // Continue to merge the current block without advancing.
       continue;
@@ -584,8 +599,7 @@ bool swift::mergeBasicBlocks(SILFunction *F) {
 /// Splits the critical edges between from and to. This code assumes there is
 /// only one edge between the two basic blocks.
 SILBasicBlock *swift::splitIfCriticalEdge(SILBasicBlock *From,
-                                          SILBasicBlock *To,
-                                          DominanceInfo *DT,
+                                          SILBasicBlock *To, DominanceInfo *DT,
                                           SILLoopInfo *LI) {
   auto *T = From->getTerminator();
   for (unsigned i = 0, e = T->getSuccessors().size(); i != e; ++i) {
@@ -603,8 +617,8 @@ void swift::completeJointPostDominanceSet(
 
   // If we have only one def block and one user block and they are the same
   // block, then just return.
-  if (DefBlocks.size() == 1 && UserBlocks.size() == 1 &&
-      UserBlocks[0] == DefBlocks[0]) {
+  if (DefBlocks.size() == 1 && UserBlocks.size() == 1
+      && UserBlocks[0] == DefBlocks[0]) {
     return;
   }
 
@@ -645,8 +659,9 @@ void swift::completeJointPostDominanceSet(
   while (!Worklist.empty()) {
     // Grab the next block from the worklist.
     auto *Block = Worklist.pop_back_val();
-    assert(VisitedBlocks.count(Block) && "All blocks from worklist should be "
-                                         "in the visited blocks set.");
+    assert(VisitedBlocks.count(Block)
+           && "All blocks from worklist should be "
+              "in the visited blocks set.");
 
     // Since we are visiting this block now, we know that this block can not be
     // apart of a the post-dominance closure of our UseBlocks.
@@ -715,29 +730,86 @@ bool swift::splitAllCondBrCriticalEdgesWithNonTrivialArgs(SILFunction &Fn,
   return true;
 }
 
-bool swift::removeUnreachableBlocks(SILFunction &Fn) {
-  // All reachable blocks, but does not include the entry block.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> Visited;
-
-  // Walk over the CFG, starting at the entry block, until all reachable blocks are visited.
-  llvm::SmallVector<SILBasicBlock *, 8> Worklist(1, Fn.getEntryBlock());
-  while (!Worklist.empty()) {
-    SILBasicBlock *BB = Worklist.pop_back_val();
-    for (auto &Succ : BB->getSuccessors()) {
-      if (Visited.insert(Succ).second)
-        Worklist.push_back(Succ);
-    }
+static bool isSafeNonExitTerminator(TermInst *TI) {
+  switch (TI->getTermKind()) {
+  case TermKind::BranchInst:
+  case TermKind::CondBranchInst:
+  case TermKind::SwitchValueInst:
+  case TermKind::SwitchEnumInst:
+  case TermKind::SwitchEnumAddrInst:
+  case TermKind::DynamicMethodBranchInst:
+  case TermKind::CheckedCastBranchInst:
+  case TermKind::CheckedCastValueBranchInst:
+  case TermKind::CheckedCastAddrBranchInst:
+    return true;
+  case TermKind::UnreachableInst:
+  case TermKind::ReturnInst:
+  case TermKind::ThrowInst:
+  case TermKind::UnwindInst:
+    return false;
+  // yield is special because it can do arbitrary,
+  // potentially-process-terminating things.
+  case TermKind::YieldInst:
+    return false;
+  case TermKind::TryApplyInst:
+    return true;
   }
 
-  // Remove the blocks we never reached. Exclude the entry block from the iteration because it's
-  // not included in the Visited set.
-  bool Changed = false;
-  for (auto It = std::next(Fn.begin()), End = Fn.end(); It != End; ) {
-    auto *BB = &*It++;
-    if (!Visited.count(BB)) {
-      removeDeadBlock(BB);
-      Changed = true;
+  llvm_unreachable("Unhandled TermKind in switch.");
+}
+
+static bool isTrapNoReturnFunction(ApplyInst *AI) {
+  const char *fatalName = MANGLE_AS_STRING(
+      MANGLE_SYM(s18_fatalErrorMessageyys12StaticStringV_AcCSutF));
+  auto *Fn = AI->getReferencedFunctionOrNull();
+
+  // We use endswith here since if we specialize fatal error we will always
+  // prepend the specialization records to fatalName.
+  if (!Fn || !Fn->getName().endswith(fatalName))
+    return false;
+
+  return true;
+}
+
+bool swift::findAllNonFailureExitBBs(
+    SILFunction *F, llvm::TinyPtrVector<SILBasicBlock *> &BBs) {
+  for (SILBasicBlock &BB : *F) {
+    TermInst *TI = BB.getTerminator();
+
+    // If we know that this terminator is not an exit terminator, continue.
+    if (isSafeNonExitTerminator(TI))
+      continue;
+
+    // A return inst is always a non-failure exit bb.
+    if (TI->isFunctionExiting()) {
+      BBs.push_back(&BB);
+      continue;
     }
+
+    // If we don't have an unreachable inst at this point, this is a terminator
+    // we don't understand. Be conservative and return false.
+    if (!isa<UnreachableInst>(TI))
+      return false;
+
+    // Ok, at this point we know we have a terminator. If it is the only
+    // instruction in our BB, it is a failure BB. continue...
+    if (TI == &*BB.begin())
+      continue;
+
+    // If the unreachable is preceded by a no-return apply inst, then it is a
+    // non-failure exit BB. Add it to our list and continue.
+    auto PrevIter = std::prev(SILBasicBlock::iterator(TI));
+    if (auto *AI = dyn_cast<ApplyInst>(&*PrevIter)) {
+      if (AI->isCalleeNoReturn() && !isTrapNoReturnFunction(AI)) {
+        BBs.push_back(&BB);
+        continue;
+      }
+    }
+
+    // Otherwise, it must be a failure BB where we leak, continue.
+    continue;
   }
-  return Changed;
+
+  // We understood all terminators, return true.
+  return true;
 }

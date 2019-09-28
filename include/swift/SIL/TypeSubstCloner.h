@@ -21,10 +21,10 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
-#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/Support/Debug.h"
 

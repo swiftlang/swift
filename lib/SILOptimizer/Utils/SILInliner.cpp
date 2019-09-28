@@ -16,7 +16,7 @@
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "swift/SIL/TypeSubstCloner.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"

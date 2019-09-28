@@ -1,20 +1,34 @@
-//===--- CFG.h - Utilities for SIL CFG transformations ----------*- C++ -*-===//
+//===--- CFGOptUtils.h - SIL CFG edge utilities -----------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+///
+/// APIs used by the SILOptimizer for low-level branch and CFG edge analysis
+/// and operations. These may merge blocks, split blocks, or create empty
+/// blocks, but don't duplicate whole blocks.
+///
+/// Essential CFG utilities are in SIL/CFG.h.
+///
+/// Whole block-level transformations are in BasicBlockOptUtils.h.
+///
+//===----------------------------------------------------------------------===//
 
-#ifndef SWIFT_SILOPTIMIZER_UTILS_CFG_H
-#define SWIFT_SILOPTIMIZER_UTILS_CFG_H
+#ifndef SWIFT_SILOPTIMIZER_UTILS_CFGOPTUTILS_H
+#define SWIFT_SILOPTIMIZER_UTILS_CFGOPTUTILS_H
 
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILInstruction.h"
+
+namespace llvm {
+template <typename T> class TinyPtrVector;
+}
 
 namespace swift {
 
@@ -98,16 +112,6 @@ bool splitCriticalEdgesFrom(SILBasicBlock *fromBB, DominanceInfo *DT = nullptr,
 void splitEdgesFromTo(SILBasicBlock *From, SILBasicBlock *To,
                       DominanceInfo *DT = nullptr, SILLoopInfo *LI = nullptr);
 
-/// Rotate a loop's header as long as it is exiting and not equal to the
-/// passed basic block.
-/// If \p RotateSingleBlockLoops is true a single basic block loop will be
-/// rotated once. ShouldVerify specifies whether to perform verification after
-/// the transformation.
-/// Returns true if the loop could be rotated.
-bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
-                bool RotateSingleBlockLoops, SILBasicBlock *UpTo,
-                bool ShouldVerify);
-
 /// Splits the basic block before the instruction with an unconditional branch
 /// and updates the dominator tree and loop info. Returns the new, branched to
 /// block that contains the end of \p SplitBeforeInst's block.
@@ -180,8 +184,26 @@ void completeJointPostDominanceSet(
     ArrayRef<SILBasicBlock *> UserBlocks, ArrayRef<SILBasicBlock *> DefBlocks,
     llvm::SmallVectorImpl<SILBasicBlock *> &Completion);
 
-/// Remove all unreachable blocks in a function.
-bool removeUnreachableBlocks(SILFunction &Fn);
+/// Return true if we conservatively find all BB's that are non-failure exit
+/// basic blocks and place them in \p BBs. If we find something we don't
+/// understand, bail.
+///
+/// A non-failure exit BB is defined as a BB that:
+///
+/// 1. Has a return terminator.
+/// 2. unreachable + noreturn terminator sequence.
+/// 3. has a throw terminator.
+///
+/// If we just have an unreachable without a noreturn call before it, we must
+/// have a failure BB.
+///
+/// We use a TinyPtrVector since in most cases this will only return one
+/// SILBasicBlock since non-failure noreturn functions should not occur often
+/// implying in most cases this will be one element.
+///
+/// TODO:
+bool findAllNonFailureExitBBs(SILFunction *F,
+                              llvm::TinyPtrVector<SILBasicBlock *> &BBs);
 
 } // end namespace swift
 

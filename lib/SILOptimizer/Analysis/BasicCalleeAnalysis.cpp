@@ -13,9 +13,10 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Compiler.h"
 
 #include <algorithm>

@@ -29,7 +29,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 
 using namespace swift;
