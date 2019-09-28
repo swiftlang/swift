@@ -475,10 +475,9 @@ TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
 }
 
 OpaqueTypeDecl *
-ModuleDecl::lookupOpaqueResultType(StringRef MangledName,
-                                   LazyResolver *resolver) {
+ModuleDecl::lookupOpaqueResultType(StringRef MangledName) {
   for (auto file : getFiles()) {
-    auto OTD = file->lookupOpaqueResultType(MangledName, resolver);
+    auto OTD = file->lookupOpaqueResultType(MangledName);
     if (OTD)
       return OTD;
   }
@@ -670,9 +669,8 @@ void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
 void
 SourceFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &Results)
 const {
-  for (auto &member : ValidatedOpaqueReturnTypes) {
-    Results.push_back(member.second);
-  }
+  auto result = const_cast<SourceFile *>(this)->getOpaqueReturnTypeDecls();
+  llvm::copy(result, std::back_inserter(Results));
 }
 
 TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
@@ -1806,9 +1804,24 @@ void SourceFile::createReferencedNameTracker() {
   ReferencedNames.emplace(ReferencedNameTracker());
 }
 
+ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
+  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes) {
+    if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
+      auto inserted = ValidatedOpaqueReturnTypes.insert(
+                {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
+                 opaqueDecl});
+      if (inserted.second) {
+        OpaqueReturnTypes.push_back(opaqueDecl);
+      }
+    }
+  }
+
+  UnvalidatedDeclsWithOpaqueReturnTypes.clear();
+  return OpaqueReturnTypes;
+}
+
 OpaqueTypeDecl *
-SourceFile::lookupOpaqueResultType(StringRef MangledName,
-                                   LazyResolver *resolver) {
+SourceFile::lookupOpaqueResultType(StringRef MangledName) {
   // Check already-validated decls.
   auto found = ValidatedOpaqueReturnTypes.find(MangledName);
   if (found != ValidatedOpaqueReturnTypes.end())
@@ -1816,32 +1829,14 @@ SourceFile::lookupOpaqueResultType(StringRef MangledName,
     
   // If there are unvalidated decls with opaque types, go through and validate
   // them now.
-  if (resolver && !UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
-    while (!UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
-      ValueDecl *decl = *UnvalidatedDeclsWithOpaqueReturnTypes.begin();
-      UnvalidatedDeclsWithOpaqueReturnTypes.erase(decl);
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)decl->getInterfaceType();
-    }
-    
-    found = ValidatedOpaqueReturnTypes.find(MangledName);
-    if (found != ValidatedOpaqueReturnTypes.end())
-      return found->second;
-  }
+  (void) getOpaqueReturnTypeDecls();
+
+  found = ValidatedOpaqueReturnTypes.find(MangledName);
+  if (found != ValidatedOpaqueReturnTypes.end())
+    return found->second;
   
   // Otherwise, we don't have a matching opaque decl.
   return nullptr;
-}
-
-void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
-  UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
-  if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-    auto inserted = ValidatedOpaqueReturnTypes.insert(
-              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
-    if (inserted.second) {
-      OpaqueReturnTypes.push_back(opaqueDecl);
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//

@@ -1135,14 +1135,6 @@ recur:
     var->getTypeLoc() = tyLoc;
     var->getTypeLoc().setType(var->getType());
 
-    // FIXME: Copy pasted from validateDecl(). This needs to be converted to
-    // use requests.
-    if (var->getOpaqueResultTypeDecl()) {
-      if (auto sf = var->getInnermostDeclContext()->getParentSourceFile()) {
-        sf->markDeclWithOpaqueResultTypeAsValidated(var);
-      }
-    }
-
     // FIXME: Should probably just remove the forbidden prefix stuff, it no
     // longer makes a lot of sense in a request-based world.
     checkForForbiddenPrefix(var);

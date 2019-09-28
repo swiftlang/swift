@@ -3966,12 +3966,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       setBoundVarsTypeError(parentPattern, Context);
     }
 
-    if (VD->getOpaqueResultTypeDecl()) {
-      if (auto SF = VD->getInnermostDeclContext()->getParentSourceFile()) {
-        SF->markDeclWithOpaqueResultTypeAsValidated(VD);
-      }
-    }
-
     break;
   }
 
@@ -4111,13 +4105,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    // Mark the opaque result type as validated, if there is one.
-    if (FD->getOpaqueResultTypeDecl()) {
-      if (auto sf = FD->getDeclContext()->getParentSourceFile()) {
-        sf->markDeclWithOpaqueResultTypeAsValidated(FD);
-      }
-    }
     
     break;
   }
@@ -4156,12 +4143,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                            TypeResolverContext::SubscriptDecl);
     validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
-
-    if (SD->getOpaqueResultTypeDecl()) {
-      if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
-        SF->markDeclWithOpaqueResultTypeAsValidated(SD);
-      }
-    }
 
     break;
   }
