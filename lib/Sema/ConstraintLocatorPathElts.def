@@ -128,7 +128,7 @@ SIMPLE_LOCATOR_PATH_ELT(ParentType)
 
 /// The requirement that we're matching during protocol conformance
 /// checking.
-CUSTOM_LOCATOR_PATH_ELT(Requirement)
+CUSTOM_LOCATOR_PATH_ELT(ProtocolRequirement)
 
 /// Type parameter requirements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyRequirement)

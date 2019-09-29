@@ -37,9 +37,11 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.castTo<LocatorPathElt::GenericParameter>().getType());
       break;
 
-    case Requirement:
-      id.AddPointer(elt.castTo<LocatorPathElt::Requirement>().getDecl());
+    case ProtocolRequirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
+      id.AddPointer(reqElt.getDecl());
       break;
+    }
 
     case Witness:
       id.AddPointer(elt.castTo<LocatorPathElt::Witness>().getDecl());
@@ -338,9 +340,9 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "key path component #" << llvm::utostr(kpElt.getIndex());
       break;
     }
-    case Requirement: {
-      auto reqElt = elt.castTo<LocatorPathElt::Requirement>();
-      out << "requirement ";
+    case ProtocolRequirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
+      out << "protocol requirement ";
       reqElt.getDecl()->dumpRef(out);
       break;
     }

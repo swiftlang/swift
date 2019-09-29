@@ -81,7 +81,7 @@ public:
     case ExistentialSuperclassType:
     case SequenceElementType:
     case AutoclosureResult:
-    case Requirement:
+    case ProtocolRequirement:
     case Witness:
     case ImplicitlyUnwrappedDisjunctionChoice:
     case DynamicLookupResult:
@@ -148,7 +148,7 @@ public:
     case GenericArgument:
     case NamedTupleElement:
     case TupleElement:
-    case Requirement:
+    case ProtocolRequirement:
     case Witness:
     case KeyPathComponent:
     case ConditionalRequirement:
@@ -179,7 +179,7 @@ public:
     /// Describes the kind of data stored here.
     enum StoredKind : unsigned char {
       StoredGenericParameter,
-      StoredRequirement,
+      StoredProtocolRequirement,
       StoredWitness,
       StoredGenericSignature,
       StoredKeyPathDynamicMemberBase,
@@ -291,8 +291,8 @@ public:
       case StoredGenericParameter:
         return PathElementKind::GenericParameter;
 
-      case StoredRequirement:
-        return PathElementKind::Requirement;
+      case StoredProtocolRequirement:
+        return PathElementKind::ProtocolRequirement;
 
       case StoredWitness:
         return PathElementKind::Witness;
@@ -788,15 +788,15 @@ public:
   }
 };
 
-class LocatorPathElt::Requirement final : public LocatorPathElt {
+class LocatorPathElt::ProtocolRequirement final : public LocatorPathElt {
 public:
-  Requirement(ValueDecl *decl)
-      : LocatorPathElt(LocatorPathElt::StoredRequirement, decl) {}
+  ProtocolRequirement(ValueDecl *decl)
+      : LocatorPathElt(LocatorPathElt::StoredProtocolRequirement, decl) {}
 
   ValueDecl *getDecl() const { return getStoredPointer<ValueDecl>(); }
 
   static bool classof(const LocatorPathElt *elt) {
-    return elt->getKind() == ConstraintLocator::Requirement;
+    return elt->getKind() == ConstraintLocator::ProtocolRequirement;
   }
 };
 
