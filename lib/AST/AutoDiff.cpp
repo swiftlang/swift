@@ -1,4 +1,4 @@
-//===-------- AutoDiff.cpp - Routines for USR generation ------------------===//
+//===--- AutoDiff.cpp - Swift Automatic Differentiation -------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -47,7 +47,6 @@ autodiff::getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder) {
 bool autodiff::getBuiltinAutoDiffApplyConfig(
     StringRef operationName, AutoDiffAssociatedFunctionKind &kind,
     unsigned &arity, unsigned &order, bool &rethrows) {
-  // SWIFT_ENABLE_TENSORFLOW
   if (!operationName.startswith("autodiffApply_"))
     return false;
   operationName = operationName.drop_front(strlen("autodiffApply_"));

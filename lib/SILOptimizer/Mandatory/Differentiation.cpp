@@ -5180,10 +5180,6 @@ public:
         differentialAndBuilder(initializeDifferentialAndBuilder(
             context, original, attr, &differentialInfo)),
         diffLocalAllocBuilder(getDifferential()) {
-    // Get JVP generic signature.
-    CanGenericSignature jvpGenSig = nullptr;
-    if (auto *jvpGenEnv = jvp->getGenericEnvironment())
-      jvpGenSig = jvpGenEnv->getGenericSignature()->getCanonicalSignature();
     // Create empty differential function.
     context.getGeneratedFunctions().push_back(&getDifferential());
   }
@@ -7966,10 +7962,10 @@ bool ADContext::processDifferentiableAttribute(
     jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
     getGeneratedFunctions().push_back(jvp);
 
-    // For now, only run JVP emission if the flag is on and if there is no
-    // user defined VJP. If there is a user defined VJP but no JVP, that means
-    // the user should have provided a custom JVP as well since we likely
-    // cannot derive a custom JVP. Thus create empty body.
+    // For now, only do JVP generation if the flag is enabled and if custom VJP
+    // does not exist. If custom VJP exists but custom JVP does not, skip JVP
+    // generation because generated JVP may not match semantics of custom VJP.
+    // Instead, create an empty JVP.
     if (RunJVPGeneration && !vjp) {
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
       if (emitter.run())
@@ -7978,23 +7974,18 @@ bool ADContext::processDifferentiableAttribute(
       LLVM_DEBUG(getADDebugStream()
                  << "Generating empty JVP for original @"
                  << original->getName() << '\n');
-      // Create empty body of JVP if the user defined their own custom VJP.
+      // Create empty JVP body since custom VJP exists.
       auto *entry = jvp->createBasicBlock();
       createEntryArguments(jvp);
       SILBuilder builder(entry);
       auto loc = jvp->getLocation();
 
       // Destroy all owned arguments.
-      for (auto *arg : entry->getArguments()) {
-        if (arg->getOwnershipKind() == ValueOwnershipKind::Owned) {
-          if (arg->getType().isObject())
-            builder.emitDestroyValueOperation(loc, arg);
-          else
-            builder.emitDestroyAddr(loc, arg);
-        }
-      }
+      for (auto *arg : entry->getArguments())
+        if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+          builder.emitDestroyOperation(loc, arg);
 
-      // Add a fatal error in case this function is called by the user.
+      // Fatal error in case this JVP is called by the user.
       auto neverResultInfo = SILResultInfo(
           module.getASTContext().getNeverType(), ResultConvention::Unowned);
       auto fatalErrorJVPType = SILFunctionType::get(
