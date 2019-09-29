@@ -22,6 +22,8 @@ public let RandomShuffle = [
     tags: [.api], setUpFunction: { blackHole(numbersDef) }, legacyFactor: 4),
   BenchmarkInfo(name: "RandomShuffleLCG2", runFunction: run_RandomShuffleLCG,
     tags: [.api], setUpFunction: { blackHole(numbersLCG) }, legacyFactor: 16),
+  BenchmarkInfo(name: "RandomShuffleReference", runFunction: run_RandomShuffleReference,
+    tags: [.api], setUpFunction: { blackHole(numbersReference) }),
 ]
 
 /// A linear congruential PRNG.
@@ -39,8 +41,23 @@ struct LCRNG: RandomNumberGenerator {
   }
 }
 
+class IntRef: Comparable {
+    var value: Int
+
+    init(_ v: Int) { value = v }
+
+    static func ==(lhs: IntRef, rhs: IntRef) -> Bool {
+        lhs.value == rhs.value
+    }
+
+    static func < (lhs: IntRef, rhs: IntRef) -> Bool {
+        lhs.value < rhs.value
+    }
+}
+
 var numbersDef: [Int] = Array(0...2_500)
 var numbersLCG: [Int] = Array(0...6_250)
+var numbersReference: [IntRef] = (0...2_500).map(IntRef.init)
 
 @inline(never)
 public func run_RandomShuffleDef(_ N: Int) {
@@ -56,5 +73,13 @@ public func run_RandomShuffleLCG(_ N: Int) {
   for _ in 0 ..< N {
     numbersLCG.shuffle(using: &generator)
     blackHole(numbersLCG.first!)
+  }
+}
+
+@inline(never)
+public func run_RandomShuffleReference(_ N: Int) {
+  for _ in 0 ..< N {
+    numbersReference.shuffle()
+    blackHole(numbersReference.first!)
   }
 }
