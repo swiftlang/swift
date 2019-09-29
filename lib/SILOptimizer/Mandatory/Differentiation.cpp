@@ -267,11 +267,11 @@ static GenericSignature *getConstrainedDerivativeGenericSignature(
       nullptr);
 }
 
-// Returns the canonical derivative generic signature for the given
-// `[differentiable]` attribute and original function.
-// - Return the `[differentiable]` attribute derivative generic signature if it
-//   exists.
-// - Otherwise, return the original function's generic signature.
+/// Returns the canonical derivative generic signature for the given
+/// `[differentiable]` attribute and original function.
+/// - Return the `[differentiable]` attribute derivative generic signature if
+///   it exists.
+/// - Otherwise, return the original function's generic signature.
 static CanGenericSignature getDerivativeGenericSignature(
     SILDifferentiableAttr *attr, SILFunction *original) {
   if (auto *attrDerivativeGenSig = attr->getDerivativeGenericSignature())
