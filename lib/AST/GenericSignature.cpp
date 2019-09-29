@@ -467,13 +467,10 @@ bool GenericSignatureImpl::conformsToProtocol(Type type, ProtocolDecl *proto) {
 
 /// Determine whether the given dependent type is equal to a concrete type.
 bool GenericSignatureImpl::isConcreteType(Type type) {
-  return bool(getConcreteType(type));
+  return bool(maybeGetConcreteType(type).getValueOr(Type()));
 }
 
-/// Return the concrete type that the given dependent type is constrained to,
-/// or the null Type if it is not the subject of a concrete same-type
-/// constraint.
-Type GenericSignatureImpl::getConcreteType(Type type) {
+Optional<Type> GenericSignatureImpl::maybeGetConcreteType(Type type) {
   if (!type->isTypeParameter()) return Type();
 
   auto &builder = *getGenericSignatureBuilder();
@@ -481,7 +478,7 @@ Type GenericSignatureImpl::getConcreteType(Type type) {
     builder.resolveEquivalenceClass(
                                   type,
                                   ArchetypeResolutionKind::CompleteWellFormed);
-  if (!equivClass) return Type();
+  if (!equivClass) return None;
 
   return equivClass->concreteType;
 }

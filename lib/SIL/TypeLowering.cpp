@@ -256,9 +256,9 @@ namespace {
       if (auto genericSig = getGenericSignature()) {
         if (genericSig->requiresClass(type)) {
           return asImpl().handleReference(type);
-        } else if (genericSig->isConcreteType(type)) {
-          return asImpl().visit(genericSig->getConcreteType(type)
-                                    ->getCanonicalType());
+        } else if (auto concreteTy = genericSig
+                      ->maybeGetConcreteType(type).getValueOr(Type())) {
+          return asImpl().visit(concreteTy->getCanonicalType());
         } else {
           return asImpl().handleAddressOnly(type,
                                             RecursiveProperties::forOpaque());
@@ -281,7 +281,8 @@ namespace {
         auto signature = getGenericSignature();
         assert(signature && "dependent type without generic signature?!");
 
-        if (auto concreteType = signature->getConcreteType(type))
+        if (auto concreteType = signature
+                ->maybeGetConcreteType(type).getValueOr(Type()))
           return concreteType->getCanonicalType();
 
         assert(signature->requiresClass(type));

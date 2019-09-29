@@ -77,3 +77,31 @@ protocol P2 {
   associatedtype AT
 }
 protocol P3: P2 where AT == Y<X> {}
+
+
+// SR-10831:
+struct G<T> {}
+
+protocol SR10831_P1 {
+  associatedtype A
+  associatedtype B
+  associatedtype C
+}
+
+protocol SR10831_P2: SR10831_P1 where A == G<G<C?>> {}
+protocol SR10831_P3: SR10831_P2 where B == Int, C == G<B> {}
+
+struct SR10831: SR10831_P3 {} // OK
+
+
+// SR-11671:
+protocol SR11671_P1 {
+  associatedtype A
+  associatedtype B
+}
+protocol SR11671_P2: SR11671_P1 where A == Self {}
+protocol SR11671_P3: SR11671_P2 where B == G<Self?> {}
+
+struct SR11671_S1: SR11671_P3 {} // OK
+
+struct SR11671_S2<T, U>: SR11671_P3 {} // OK

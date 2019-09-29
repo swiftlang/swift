@@ -794,8 +794,22 @@ Type AssociatedTypeInference::computeFixedTypeWitness(
     auto genericSig = conformedProto->getGenericSignature();
     if (!genericSig) return Type();
 
-    Type concreteType = genericSig->getConcreteType(dependentType);
-    if (!concreteType) continue;
+    Type concreteType;
+    if (auto optType = genericSig->maybeGetConcreteType(dependentType)) {
+      if (optType.getValue()) {
+        concreteType = optType.getValue();
+
+      // If this associated type has a same-type constraint
+      // with Self, the fixed type is the adoptee.
+      } else if (genericSig->areSameTypeParameterInContext(
+                    dependentType, proto->getSelfInterfaceType())) {
+        concreteType = adoptee;
+      } else {
+        continue;
+      }
+    } else {
+      continue;
+    }
 
     if (!resultType) {
       resultType = concreteType;
@@ -936,9 +950,16 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
   llvm::DenseSet<AssociatedTypeDecl *> recursionCheck;
   foldDependentMemberTypes = [&](Type type) -> Type {
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
-      auto baseTy = depMemTy->getBase().transform(foldDependentMemberTypes);
-      if (baseTy.isNull() || baseTy->hasTypeParameter())
-        return nullptr;
+      Type baseTy;
+      if (depMemTy->getBase()->is<GenericTypeParamType>()) {
+        // The base type is Self.
+        baseTy = depMemTy->getBase();
+      } else {
+        baseTy = depMemTy->getBase().transform(foldDependentMemberTypes);
+
+        if (baseTy.isNull() || baseTy->hasTypeParameter())
+          return nullptr;
+      }
 
       auto assocType = depMemTy->getAssocType();
       if (!assocType)
@@ -949,21 +970,26 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
 
       SWIFT_DEFER { recursionCheck.erase(assocType); };
 
-      // Try to substitute into the base type.
-      Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy);
-      if (!result->hasError())
-        return result;
+      // If the base type is Self, we are folding a fixed type witness, which
+      // is to say, a witness through same-type constraints on protocols;
+      // substituting into the base and conformance lookup are irrelevant.
+      if (!baseTy->is<GenericTypeParamType>()) {
+        // Try to substitute into the base type.
+        Type result = depMemTy->substBaseType(dc->getParentModule(), baseTy);
+        if (!result->hasError())
+          return result;
 
-      // If that failed, check whether it's because of the conformance we're
-      // evaluating.
-      auto localConformance
-        = TypeChecker::conformsToProtocol(
-                          baseTy, assocType->getProtocol(), dc,
-                          ConformanceCheckFlags::SkipConditionalRequirements);
-      if (localConformance.isInvalid() || localConformance.isAbstract() ||
-          (localConformance.getConcrete()->getRootConformance() !=
-           conformance)) {
-        return nullptr;
+        // If that failed, check whether it's because of the conformance we're
+        // evaluating.
+        auto localConformance
+          = TypeChecker::conformsToProtocol(
+                            baseTy, assocType->getProtocol(), dc,
+                            ConformanceCheckFlags::SkipConditionalRequirements);
+        if (localConformance.isInvalid() || localConformance.isAbstract() ||
+            (localConformance.getConcrete()->getRootConformance() !=
+             conformance)) {
+          return nullptr;
+        }
       }
 
       // Find the tentative type witness for this associated type.
@@ -974,10 +1000,13 @@ Type AssociatedTypeInference::substCurrentTypeWitnesses(Type type) {
       return known->first.transform(foldDependentMemberTypes);
     }
 
-    // The presence of a generic type parameter indicates that we
-    // cannot use this type binding.
-    if (type->is<GenericTypeParamType>()) {
-      return nullptr;
+    if (const auto genParam = type->getAs<GenericTypeParamType>()) {
+      bool isProtocolSelf = true;
+      if (const auto gpDecl = genParam->getDecl())
+        if (adoptee->getAnyNominal() == gpDecl->getDeclContext())
+          isProtocolSelf = false;
+      if (isProtocolSelf)
+        return adoptee;
     }
 
     return type;

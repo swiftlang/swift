@@ -266,7 +266,8 @@ Type SubstitutionMap::lookupSubstitution(CanSubstitutableType type) const {
 
   // The generic parameter may have been made concrete by the generic signature,
   // substitute into the concrete type.
-  if (auto concreteType = genericSig->getConcreteType(genericParam)){
+  if (auto concreteType = genericSig
+          ->maybeGetConcreteType(genericParam).getValueOr(Type())) {
     // Set the replacement type to an error, to block infinite recursion.
     replacementType = ErrorType::get(concreteType);
 

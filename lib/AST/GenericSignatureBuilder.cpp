@@ -2165,6 +2165,18 @@ void EquivalenceClass::dump(llvm::raw_ostream &out,
              }, [&] {
                out << ", ";
              });
+  if (!concreteTypeConstraints.empty()) {
+    out << "\nConcrete-type constraints:";
+    interleave(concreteTypeConstraints, [&](const Constraint<Type> &c) {
+      out << "\n  " << c.getSubjectDependentType({ })
+          << " == " << c.value;
+
+      if (c.source->isDerivedRequirement())
+        out << " [derived]";
+    }, [&] {
+      out << ", ";
+    });
+  }
   if (concreteType)
     out << "\nConcrete type: " << concreteType.getString();
   if (superclass)

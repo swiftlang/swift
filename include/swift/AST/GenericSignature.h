@@ -334,9 +334,9 @@ public:
   bool isConcreteType(Type type);
 
   /// Return the concrete type that the given dependent type is constrained to,
-  /// or the null Type if it is not the subject of a concrete same-type
-  /// constraint.
-  Type getConcreteType(Type type);
+  /// the null Type if it is not the subject of a concrete same-type
+  /// constraint, or None if the equivalence class failed to resolve.
+  Optional<Type> maybeGetConcreteType(Type type);
 
   /// Return the layout constraint that the given dependent type is constrained
   /// to, or the null LayoutConstraint if it is not the subject of layout
