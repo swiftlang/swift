@@ -112,8 +112,8 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
                 indices)).str();
       }
       auto *silDiffAttr = SILDifferentiableAttr::create(
-          M, indices, A->getRequirements(), M.allocateCopy(jvpName),
-          M.allocateCopy(vjpName));
+          M, indices, M.allocateCopy(jvpName), M.allocateCopy(vjpName),
+          A->getDerivativeGenericSignature());
 #ifndef NDEBUG
       // Verify that no existing attributes have the same indices.
       for (auto *existingAttr : F->getDifferentiableAttrs()) {

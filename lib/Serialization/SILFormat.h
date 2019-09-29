@@ -321,6 +321,7 @@ namespace sil_block {
     SIL_DIFFERENTIABLE_ATTR,
     IdentifierIDField,    // JVP name.
     IdentifierIDField,    // VJP name.
+    GenericSignatureIDField, // Derivative function generic signature.
     BCVBR<8>,             // Result index.
     BCArray<ValueIDField> // Parameter indices.
   >;

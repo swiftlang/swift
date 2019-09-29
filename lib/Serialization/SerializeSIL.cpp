@@ -466,8 +466,8 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
         DA->hasVJP()
             ? S.addDeclBaseNameRef(Ctx.getIdentifier(DA->getVJPName()))
             : IdentifierID(),
+        S.addGenericSignatureRef(DA->getDerivativeGenericSignature()),
         indices.source, parameters);
-    S.writeGenericRequirements(DA->getRequirements(), SILAbbrCodes);
   }
 
   // Assign a unique ID to each basic block of the SILFunction.
