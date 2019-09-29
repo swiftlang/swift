@@ -1553,13 +1553,13 @@ class DifferentiableAttr final
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
   AutoDiffParameterIndices *ParameterIndices = nullptr;
-  /// The trailing where clause, if it exists.
+  /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
-  /// The requirements for autodiff associated functions. Resolved by the type
-  /// checker based on the original function's generic signature and the
-  /// attribute's where clause requirements. This is set only if the attribute's
-  /// where clause exists.
-  MutableArrayRef<Requirement> Requirements;
+  /// The generic signature for autodiff associated functions. Resolved by the
+  /// type checker based on the original function's generic signature and the
+  /// attribute's where clause requirements. This is set only if the attribute
+  /// has a where clause.
+  GenericSignature *DerivativeGenericSignature = nullptr;
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
@@ -1575,7 +1575,7 @@ class DifferentiableAttr final
                               AutoDiffParameterIndices *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
-                              ArrayRef<Requirement> requirements);
+                              GenericSignature *derivativeGenericSignature);
 
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
@@ -1592,7 +1592,7 @@ public:
                                     AutoDiffParameterIndices *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
-                                    ArrayRef<Requirement> requirements);
+                                    GenericSignature *derivativeGenSig);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
@@ -1627,9 +1627,13 @@ public:
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  ArrayRef<Requirement> getRequirements() const { return Requirements; }
-  MutableArrayRef<Requirement> getRequirements() { return Requirements; }
-  void setRequirements(ASTContext &context, ArrayRef<Requirement> requirements);
+  GenericSignature *getDerivativeGenericSignature() const {
+    return DerivativeGenericSignature;
+  }
+  void setDerivativeGenericSignature(ASTContext &context,
+                                     GenericSignature* derivativeGenSig) {
+    DerivativeGenericSignature = derivativeGenSig;
+  }
 
   FuncDecl *getJVPFunction() const { return JVPFunction; }
   void setJVPFunction(FuncDecl *decl);
@@ -1641,10 +1645,10 @@ public:
     return ParameterIndices->parameters == other.ParameterIndices->parameters;
   }
 
-  /// Computes the derivative generic environment for the given
-  /// `@differentiable` attribute and original function.
+  /// Get the derivative generic environment for the given `@differentiable`
+  /// attribute and original function.
   GenericEnvironment *
-  computeDerivativeGenericEnvironment(AbstractFunctionDecl *original) const;
+  getDerivativeGenericEnvironment(AbstractFunctionDecl *original) const;
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.

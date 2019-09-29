@@ -3164,13 +3164,16 @@ void SILDifferentiableAttr::print(llvm::raw_ostream &OS) const {
   if (!VJPName.empty()) {
     OS << " vjp @" << VJPName;
   }
-  if (!getRequirements().empty()) {
+  if (!getDerivativeGenericSignature())
+    return;
+  auto requirements = getDerivativeGenericSignature()->getRequirements();
+  if (!requirements.empty()) {
     OS << " where ";
     SILFunction *original = getOriginal();
     assert(original);
     auto genericEnv = original->getGenericEnvironment();
     PrintOptions SubPrinter = PrintOptions::printSIL();
-    interleave(getRequirements(), [&](Requirement req) {
+    interleave(requirements, [&](Requirement req) {
       if (!genericEnv) {
          req.print(OS, SubPrinter);
          return;
