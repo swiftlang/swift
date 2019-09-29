@@ -19,8 +19,6 @@
 #ifndef SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
 #define SWIFT_RUNTIME_IMAGEINSPECTIONELF_H
 
-#define SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING "swift_reflection_metadata_magic_string"
-
 #if defined(__ELF__)
 
 #include "../SwiftShims/Visibility.h"
