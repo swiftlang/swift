@@ -1533,11 +1533,15 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
 /// Returns a flag indicating whether the instruction should be differentiated,
 /// given the differentiation indices of the instruction's parent function.
 /// Whether the instruction should be differentiated is determined sequentially
-/// from the following conditions:
+/// from any of the following conditions:
 /// 1. The instruction is an `apply` and `shouldDifferentiateApplyInst` returns
 ///    true.
-/// 2. The instruction has an active operand and an active result.
-/// 3. The instruction has side effects and an active operand.
+/// 2. The instruction has a source operand and a destination operand, both
+///    being active.
+/// 3. The instruction is an allocation instruction and has an active result.
+/// 4. The instruction performs reference counting, lifetime ending, access
+///    ending, or destroying on an active operand.
+/// 5. The instruction creates an SSA copy of an active operand.
 bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // An `apply` with an active argument and an active result (direct or
   // indirect) should be differentiated.
@@ -1551,40 +1555,32 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
       [&](SILValue val) { return activityInfo.isActive(val, indices); });
   if (hasActiveOperands && hasActiveResults)
     return true;
-
-  switch (kind) {
-  case AutoDiffLinearMapKind::Differential: {
+  // A `store`-like instruction does not have an SSA result, but has two
+  // operands that represent the source and the destination. We treat them as
+  // the input and the output, respectively.
 #define CHECK_INST_TYPE_ACTIVE_DEST(INST) \
-    if (auto *castInst = dyn_cast<INST##Inst>(inst)) \
-      return activityInfo.isActive(castInst->getDest(), indices);
-    CHECK_INST_TYPE_ACTIVE_DEST(Store)
-    CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
-    CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
-    CHECK_INST_TYPE_ACTIVE_DEST(UnconditionalCheckedCastAddr)
+  if (auto *castInst = dyn_cast<INST##Inst>(inst)) \
+    return activityInfo.isActive(castInst->getDest(), indices);
+  CHECK_INST_TYPE_ACTIVE_DEST(Store)
+  CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
+  CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
+  CHECK_INST_TYPE_ACTIVE_DEST(UnconditionalCheckedCastAddr)
 #undef CHECK_INST_TYPE_ACTIVE_DEST
-    if ((isa<AllocationInst>(inst) && hasActiveResults))
+  // Should differentiate any allocation instruction that has an active result.
+  if ((isa<AllocationInst>(inst) && hasActiveResults))
+    return true;
+  if (hasActiveOperands) {
+    // Should differentiate any instruction that performs reference counting,
+    // lifetime ending, access ending, or destroying on an active operand.
+    if (isa<RefCountingInst>(inst) || isa<EndAccessInst>(inst) ||
+        isa<EndBorrowInst>(inst) || isa<DeallocationInst>(inst) ||
+        isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst))
       return true;
-
-#define CHECK_INST_TYPE_ACTIVE_OPERANDS(INST) \
-    if (isa<INST##Inst>(inst) && hasActiveOperands) \
+    // Should differentiate any instruction that creates an SSA copy of an
+    // active operand.
+    if (isa<CopyValueInst>(inst))
       return true;
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(RefCounting)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndAccess)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(EndBorrow)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(Deallocation)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(CopyValue)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyValue)
-    CHECK_INST_TYPE_ACTIVE_OPERANDS(DestroyAddr)
-    break;
-#undef CHECK_INST_TYPE_ACTIVE_OPERANDS
   }
-  case AutoDiffLinearMapKind::Pullback: {
-    if (inst->mayHaveSideEffects() && hasActiveOperands)
-      return true;
-    break;
-  }
-  }
-
   return false;
 }
 
