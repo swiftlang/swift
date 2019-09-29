@@ -234,9 +234,9 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
   return nullptr;
 }
 
-// Return the canonical derivative generic signature for the given original
-// function and (possibly uncanonical) derivative generic signature.
-// The canonical derivative generic signature constrains all wrt parameters
+// Return the canonical "constrained" derivative generic signature for the given
+// original function and (possibly uncanonical) derivative generic signature.
+// The constrained derivative generic signature constrains all wrt parameters
 // to conform to `Differentiable`.
 // TODO(TF-818): Change `@differentiable` attribute type-checking and
 // `[differentiable]` construction so that all derivative generic signatures
@@ -244,7 +244,7 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 // longer be needed (except for constructing attributes in
 // `ADContext::getOrCreateDifferentiableAttr`), improving compiler
 // performance.
-static CanGenericSignature getCanonicalDerivativeGenericSignature(
+static CanGenericSignature getConstrainedDerivativeGenericSignature(
     SILDifferentiableAttr *attr, SILFunction *original) {
   auto originalFnTy = original->getLoweredFunctionType();
   CanGenericSignature derivativeGenSig = originalFnTy->getGenericSignature();
@@ -266,10 +266,10 @@ static CanGenericSignature getCanonicalDerivativeGenericSignature(
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
-        derivativeGenSig,
-        /*addedGenericParams*/ {},
-        std::move(requirements)},
-        nullptr)->getCanonicalSignature();
+          derivativeGenSig,
+          /*addedGenericParams*/ {},
+          std::move(requirements)},
+      nullptr)->getCanonicalSignature();
 }
 
 // Clone the generic parameters of the given generic signature and return a new
@@ -3379,7 +3379,8 @@ public:
         mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffLinearMapKind::Pullback,
             indices)).str();
-    auto pbGenericSig = getCanonicalDerivativeGenericSignature(attr, original);
+    auto pbGenericSig =
+        getConstrainedDerivativeGenericSignature(attr, original);
     auto *pbGenericEnv =
         pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
     auto pbType = SILFunctionType::get(
@@ -5247,7 +5248,7 @@ public:
             original->getName(), AutoDiffLinearMapKind::Differential,
             indices)).str();
     auto diffGenericSig =
-        getCanonicalDerivativeGenericSignature(attr, original);
+        getConstrainedDerivativeGenericSignature(attr, original);
     auto *diffGenericEnv =
         diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
     auto diffType = SILFunctionType::get(
@@ -7786,7 +7787,7 @@ ADContext::declareExternalAssociatedFunction(
   auto &indices = attr->getIndices();
   auto originalTy = original->getLoweredFunctionType();
   auto originalLoc = original->getLocation();
-  auto assocGenSig = getCanonicalDerivativeGenericSignature(attr, original);
+  auto assocGenSig = getConstrainedDerivativeGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
@@ -7821,7 +7822,7 @@ static SILFunction *createEmptyVJP(
       mangler.mangleAutoDiffAssociatedFunctionHelper(
           original->getName(), AutoDiffAssociatedFunctionKind::VJP, indices))
               .str();
-  auto vjpGenericSig = getCanonicalDerivativeGenericSignature(attr, original);
+  auto vjpGenericSig = getConstrainedDerivativeGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that calls to `module.Types.getTypeLowering()` below
@@ -7871,7 +7872,7 @@ static SILFunction *createEmptyJVP(
       mangler.mangleAutoDiffAssociatedFunctionHelper(
           original->getName(), AutoDiffAssociatedFunctionKind::JVP, indices))
               .str();
-  auto jvpGenericSig = getCanonicalDerivativeGenericSignature(attr, original);
+  auto jvpGenericSig = getConstrainedDerivativeGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that calls to `module.Types.getTypeLowering()` below
