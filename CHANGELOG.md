@@ -26,6 +26,38 @@ CHANGELOG
 Swift Next
 ----------
 
+* [SR-11429][]:
+
+  The compiler will now correctly strip argument labels from function references
+  used with the `as` operator in a function call. As a result, the `as` operator
+  can now be used to disambiguate a call to a function with argument labels. 
+  
+  ```swift
+  func foo(x: Int) {}
+  func foo(x: UInt) {}
+  
+  (foo as (Int) -> Void)(5)  // Calls foo(x: Int)
+  (foo as (UInt) -> Void)(5) // Calls foo(x: UInt)
+  ```
+  
+  Previously this was only possible for functions without argument labels.
+  
+  This change also means that a generic type alias can no longer be used to
+  preserve the argument labels of a function reference through the `as`
+  operator. The following is now rejected:
+  
+  ```swift
+  typealias Magic<T> = T
+  func foo(x: Int) {}
+  (foo as Magic)(x: 5) // error: Extraneous argument label 'x:' in call
+  ```
+  
+  The function value must instead be called without argument labels:
+  
+  ```swift
+  (foo as Magic)(5)
+  ```
+
 * [SR-11298][]:
 
   A class-constrained protocol extension, where the extended protocol does
@@ -7825,3 +7857,4 @@ Swift 1.0
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
 [SR-11298]: <https://bugs.swift.org/browse/SR-11298>
+[SR-11429]: <https://bugs.swift.org/browse/SR-11429>
