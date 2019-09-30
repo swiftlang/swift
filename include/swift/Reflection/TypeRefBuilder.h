@@ -203,9 +203,6 @@ struct ReflectionInfo {
   CaptureSection Capture;
   GenericSection TypeReference;
   GenericSection ReflectionString;
-
-  uint64_t LocalStartAddress;
-  uint64_t RemoteStartAddress;
 };
 
 struct ClosureContextInfo {

@@ -13,14 +13,12 @@
 // binaries.
 //===----------------------------------------------------------------------===//
 
-#include "../../stdlib/public/runtime/ImageInspectionELF.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/Reflection/ReflectionContext.h"
 #include "swift/Reflection/TypeRef.h"
 #include "swift/Reflection/TypeRefBuilder.h"
-
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Object/Archive.h"
 #include "llvm/Object/COFF.h"
@@ -83,26 +81,22 @@ template <typename T> static T unwrap(llvm::Expected<T> value) {
   exit(EXIT_FAILURE);
 }
 
-static void reportError(StringRef Message) {
-  llvm::errs() << "swift-reflection-test error: " << Message << ".\n";
+static void reportError(std::error_code EC) {
+  assert(EC);
+  llvm::errs() << "swift-reflection-test error: " << EC.message() << ".\n";
   exit(EXIT_FAILURE);
 }
 
-static void reportError(std::error_code EC) {
-  assert(EC);
-  reportError(EC.message());
-}
-
-using NativeReflectionContext = swift::reflection::ReflectionContext<
-    External<RuntimeTarget<sizeof(uintptr_t)>>>;
+using NativeReflectionContext =
+    swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
 
 using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
 static uint64_t getSectionAddress(SectionRef S) {
-  // See COFFObjectFile.cpp for the implementation of
+  // See COFFObjectFile.cpp for the implementation of 
   // COFFObjectFile::getSectionAddress. The image base address is added
-  // to all the addresses of the sections, thus the behavior is slightly
-  // different from the other platforms.
+  // to all the addresses of the sections, thus the behavior is slightly different from
+  // the other platforms.
   if (auto C = dyn_cast<COFFObjectFile>(S.getObject()))
     return S.getAddress() - C->getImageBase();
   return S.getAddress();
@@ -114,157 +108,87 @@ static bool needToRelocate(SectionRef S) {
 
   if (auto EO = dyn_cast<ELFObjectFileBase>(S.getObject())) {
     static const llvm::StringSet<> ELFSectionsList = {
-        ".data",
-        ".rodata",
-        ".note.swift_reflection_metadata",
-        "swift5_protocols",
-        "swift5_protocol_conformances",
-        "swift5_typeref",
-        "swift5_reflstr",
-        "swift5_assocty",
-        "swift5_replace",
-        "swift5_type_metadata",
-        "swift5_fieldmd",
-        "swift5_capture",
-        "swift5_builtin",
+      ".data", ".rodata", "swift5_protocols", "swift5_protocol_conformances",
+      "swift5_typeref", "swift5_reflstr", "swift5_assocty", "swift5_replace",
+      "swift5_type_metadata", "swift5_fieldmd", "swift5_capture", "swift5_builtin"
     };
-    llvm::Expected<llvm::StringRef> NameOrErr = S.getName();
-    if (!NameOrErr) {
-      reportError(errorToErrorCode(NameOrErr.takeError()));
-      return false;
-    }
-    return ELFSectionsList.count(*NameOrErr);
+    StringRef Name;
+    if (auto EC = S.getName(Name))
+      reportError(EC);
+    return ELFSectionsList.count(Name);
   }
 
   return true;
 }
 
-static section_iterator findSectionByName(StringRef Name, const ObjectFile &O) {
-  auto Sections = O.sections();
-  SmallVector<section_iterator, 1> FoundSections;
-  std::copy_if(Sections.begin(), Sections.end(),
-               std::back_inserter(FoundSections), [Name](SectionRef S) {
-                 StringRef N;
-                 if (auto EC = S.getName(N))
-                   reportError(EC);
-                 return N == Name;
-               });
-  if (FoundSections.size() != 1)
-    return Sections.end();
-  return FoundSections.front();
-}
-
-template <class ELFObj,
-          typename std::enable_if<
-              std::is_base_of<ELFObjectFileBase, ELFObj>::value, int>::type = 0>
-const typename ELFObj::Elf_Rela *findRelaForOffset(uint64_t Offset,
-                                                   const ELFObj &O) {
-  for (const SectionRef &S :
-       static_cast<const ObjectFile *>(&O)->dynamic_relocation_sections()) {
-    const auto *Sec = O.getSection(S.getRawDataRefImpl());
-    if (Sec->sh_type != llvm::ELF::SHT_RELA)
-      continue;
-    for (const RelocationRef &R : S.relocations()) {
-      const auto *Rela = O.getRela(R.getRawDataRefImpl());
-      if (Rela->r_offset == Offset &&
-          Rela->getType(false /* isMips64EL */) == llvm::ELF::R_X86_64_RELATIVE)
-        return Rela;
-    }
-  }
-  return nullptr;
-}
-
-static void updateReflectionMetdataNote(const ObjectFile &O, char *Memory) {
-  auto EO = dyn_cast<const ELFObjectFileBase>(&O);
-  if (!EO)
-    return;
-  auto Note = findSectionByName(".note.swift_reflection_metadata", O);
-  if (Note == O.sections().end())
-    return;
-  const StringRef MagicString = SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING;
-  if (StringRef(Memory + Note->getAddress(), MagicString.size()) != MagicString)
-    reportError(".note.swift_reflection_metadata is invalid");
-
-  const uint64_t Offset = Note->getAddress() + MagicString.size() + 1;
-  uint64_t Addend = 0;
-  if (auto *ELF32LEObj = dyn_cast<ELF32LEObjectFile>(EO))
-    if (auto *Rela = findRelaForOffset(Offset, *ELF32LEObj))
-      Addend = static_cast<uint64_t>(Rela->r_addend);
-  if (auto *ELF64LEObj = dyn_cast<ELF64LEObjectFile>(EO))
-    if (auto *Rela = findRelaForOffset(Offset, *ELF64LEObj))
-      Addend = static_cast<uint64_t>(Rela->r_addend);
-  if (!Addend)
-    reportError("No supported relocations found");
-  uintptr_t PtrValue = reinterpret_cast<uintptr_t>(Memory) + Addend;
-  *reinterpret_cast<uintptr_t *>(Memory + Note->getAddress() +
-                                 MagicString.size() + 1) = PtrValue;
-  auto S = reinterpret_cast<MetadataSections *>(PtrValue);
-
-#define STRINGIFY(s) #s
-#define UPDATE_SECTION_RANGE(Name)                                             \
-  [&]() {                                                                      \
-    auto It = findSectionByName(STRINGIFY(Name), O);                           \
-    if (It == O.sections().end())                                              \
-      return;                                                                  \
-    uintptr_t Addr = reinterpret_cast<uintptr_t>(Memory) + It->getAddress();   \
-    S->Name = {Addr, It->getSize()};                                           \
-  }();
-
-  UPDATE_SECTION_RANGE(swift5_protocols)
-  UPDATE_SECTION_RANGE(swift5_protocol_conformances)
-  UPDATE_SECTION_RANGE(swift5_type_metadata)
-  UPDATE_SECTION_RANGE(swift5_typeref)
-  UPDATE_SECTION_RANGE(swift5_reflstr)
-  UPDATE_SECTION_RANGE(swift5_fieldmd)
-  UPDATE_SECTION_RANGE(swift5_assocty)
-  UPDATE_SECTION_RANGE(swift5_replace)
-  UPDATE_SECTION_RANGE(swift5_replac2)
-  UPDATE_SECTION_RANGE(swift5_builtin)
-  UPDATE_SECTION_RANGE(swift5_capture)
-#undef STRINGIFY
-#undef UPDATE_SECTION_RANGE
-}
 
 class Image {
-  std::vector<char> Memory;
+  const ObjectFile *O;
+  uint64_t VASize;
+
+  struct RelocatedRegion {
+    uint64_t Start, Size;
+    const char *Base;
+  };
+
+  std::vector<RelocatedRegion> RelocatedRegions;
 
 public:
-  explicit Image(const ObjectFile *O) {
-    uint64_t VASize = O->getData().size();
-    for (SectionRef S : O->sections()) {
-      if (auto SectionAddr = getSectionAddress(S))
-        VASize = std::max(VASize, SectionAddr + S.getSize());
-    }
-    Memory.resize(VASize);
-    std::memcpy(&Memory[0], O->getData().data(), O->getData().size());
-
+  explicit Image(const ObjectFile *O) : O(O), VASize(O->getData().size()) {
     for (SectionRef S : O->sections()) {
       if (!needToRelocate(S))
         continue;
-      llvm::Expected<llvm::StringRef> Content = S.getContents();
+      auto SectionAddr = getSectionAddress(S);
+      if (SectionAddr)
+        VASize = std::max(VASize, SectionAddr + S.getSize());
+
+     llvm::Expected<llvm::StringRef> Content = S.getContents();
       if (!Content)
         reportError(errorToErrorCode(Content.takeError()));
-      std::memcpy(&Memory[getSectionAddress(S)], Content->data(),
-                  Content->size());
+
+      auto PhysOffset = (uintptr_t)Content->data() - (uintptr_t)O->getData().data();
+      
+      if (PhysOffset == SectionAddr) {
+        continue;
+      }
+
+      RelocatedRegions.push_back(RelocatedRegion{
+        SectionAddr,
+        Content->size(),
+        Content->data()});
     }
-    updateReflectionMetdataNote(*O, Memory.data());
   }
 
   RemoteAddress getStartAddress() const {
-    return RemoteAddress((uintptr_t)Memory.data());
+    return RemoteAddress((uintptr_t)O->getData().data());
   }
 
   bool isAddressValid(RemoteAddress Addr, uint64_t Size) const {
-    return (uintptr_t)Memory.data() <= Addr.getAddressData() &&
-           Addr.getAddressData() + Size <=
-               (uintptr_t)Memory.data() + Memory.size();
+    auto start = getStartAddress().getAddressData();
+    return start <= Addr.getAddressData()
+      && Addr.getAddressData() + Size <= start + VASize;
   }
 
   ReadBytesResult readBytes(RemoteAddress Addr, uint64_t Size) {
     if (!isAddressValid(Addr, Size))
       return ReadBytesResult(nullptr, [](const void *) {});
-    return ReadBytesResult((const void *)(Addr.getAddressData()),
-                           [](const void *) {});
+    
+    auto addrValue = Addr.getAddressData();
+    auto base = O->getData().data();
+    auto offset = addrValue - (uint64_t)base;
+    for (auto &region : RelocatedRegions) {
+      if (region.Start <= offset && offset < region.Start + region.Size) {
+        // Read shouldn't need to straddle section boundaries.
+        if (offset + Size > region.Start + region.Size)
+          return ReadBytesResult(nullptr, [](const void *) {});
+
+        offset -= region.Start;
+        base = region.Base;
+        break;
+      }
+    }
+    
+    return ReadBytesResult(base + offset, [](const void *) {});
   }
 };
 
@@ -339,7 +263,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     const ObjectFile *O = dyn_cast<ObjectFile>(BinaryFile);
     if (!O) {
       auto Universal = cast<MachOUniversalBinary>(BinaryFile);
-      ObjectOwner = unwrap(Universal->getMachOObjectForArch(Arch));
+      ObjectOwner = unwrap(Universal->getObjectForArch(Arch));
       O = ObjectOwner.get();
     }
 

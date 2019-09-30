@@ -914,19 +914,6 @@ public:
   /// \returns The named type, or null if the type could not be found.
   Type getNamedSwiftType(ModuleDecl *module, StringRef name);
 
-  /// Retrieve a specialization of the named Swift type, e.g.,
-  /// UnsafeMutablePointer<T>.
-  ///
-  /// \param module The name of the module in which the type should occur.
-  ///
-  /// \param name The name of the type to find.
-  ///
-  /// \param args The arguments to use in the specialization.
-  ///
-  /// \returns The named type, or null if the type could not be found.
-  Type getNamedSwiftTypeSpecialization(ModuleDecl *module, StringRef name,
-                                       ArrayRef<Type> args);
-
   /// Retrieve the NSObject type.
   Type getNSObjectType();
 

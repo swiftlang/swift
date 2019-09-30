@@ -3130,7 +3130,7 @@ public:
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
-    auto nominal = ED->getExtendedNominal();
+    auto nominal = ED->computeExtendedNominal();
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
@@ -3770,11 +3770,11 @@ static Type buildAddressorResultType(TypeChecker &TC,
   assert(addressor->getAccessorKind() == AccessorKind::Address ||
          addressor->getAccessorKind() == AccessorKind::MutableAddress);
 
-  Type pointerType =
+  PointerTypeKind pointerKind =
     (addressor->getAccessorKind() == AccessorKind::Address)
-      ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
-      : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
-  return pointerType;
+      ? PTK_UnsafePointer
+      : PTK_UnsafeMutablePointer;
+  return valueType->wrapInPointer(pointerKind);
 }
 
 

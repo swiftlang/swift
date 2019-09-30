@@ -1206,8 +1206,8 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
 /// Determine whether the given locator is for a witness or requirement.
 static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   if (auto last = locator.last()) {
-    return last->getKind() == ConstraintLocator::Requirement ||
-    last->getKind() == ConstraintLocator::Witness;
+    return last->getKind() == ConstraintLocator::ProtocolRequirement ||
+           last->getKind() == ConstraintLocator::Witness;
   }
 
   return false;

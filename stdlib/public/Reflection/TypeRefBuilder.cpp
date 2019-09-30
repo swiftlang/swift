@@ -268,15 +268,13 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   return nullptr;
 }
 
-// TODO: This can probably be eliminated.
 RemoteRef<CaptureDescriptor>
 TypeRefBuilder::getCaptureDescriptor(uint64_t RemoteAddress) {
   for (auto Info : ReflectionInfos) {
     for (auto CD : Info.Capture) {
-      auto OtherAddr = (reinterpret_cast<uint64_t>(CD.getLocalBuffer()) -
-                        Info.LocalStartAddress + Info.RemoteStartAddress);
-      if (OtherAddr == RemoteAddress)
+      if (RemoteAddress == CD.getAddressData()) {
         return CD;
+      }
     }
   }
 
