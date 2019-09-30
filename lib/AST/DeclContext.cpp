@@ -489,6 +489,10 @@ bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
   return false;
 }
 
+bool DeclContext::canBeParentOfExtension() const {
+  return isa<SourceFile>(this);
+}
+
 bool DeclContext::walkContext(ASTWalker &Walker) {
   switch (getContextKind()) {
   case DeclContextKind::Module:
