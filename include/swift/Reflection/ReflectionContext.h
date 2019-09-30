@@ -393,6 +393,8 @@ public:
       auto SecBuf = this->getReader().readBytes(
           RemoteAddress(SectionHdrAddress + (I * SectionEntrySize)),
           SectionEntrySize);
+      if (!SecBuf)
+        return false;
       auto SecHdr =
           reinterpret_cast<const typename T::Section *>(SecBuf.get());
       SecHdrVec.push_back(SecHdr);
