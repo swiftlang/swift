@@ -1964,43 +1964,88 @@ static bool onlyForwardsNone(SILBasicBlock *noneBB, SILBasicBlock *someBB,
   return true;
 }
 
-/// Check whether \p noneBB has the same ultimate successor as the successor to someBB.
-///  someBB       noneBB
-///   \             |
-///    \            ... (more bbs?)
+/// Check whether the \p someBB has only one single successor and that successor
+/// post-dominates \p noneBB.
+///
+///                          (maybe otherNoneBB)
+///  someBB       noneBB     /
+///   \             |       v
+///    \            ... more bbs? (A)
 ///     \           /
 ///       ulimateBB
+///
+/// This routine does not support diverging control flow in (A). This means that
+/// there must not be any loops or diamonds beginning in that region. We do
+/// support side-entrances from blocks not reachable from noneBB in order to
+/// ensure that we properly handle other failure cases where the failure case
+/// merges into .noneBB before ultimate BB.
+///
+/// DISCUSSION: We allow this side-entrance pattern to handle iterative
+/// conditional checks which all feed the failing case through the .none
+/// path. This is a common pattern in swift code. As an example consider a
+/// switch statement with multiple pattern binding matching that use the same
+/// cleanup code upon failure.
 static bool hasSameUltimateSuccessor(SILBasicBlock *noneBB, SILBasicBlock *someBB) {
   // Make sure that both our some, none blocks both have single successors that
   // are not themselves (which can happen due to single block loops).
   auto *someSuccessorBB = someBB->getSingleSuccessorBlock();
   if (!someSuccessorBB || someSuccessorBB == someBB)
     return false;
+
   auto *noneSuccessorBB = noneBB->getSingleSuccessorBlock();
   if (!noneSuccessorBB || noneSuccessorBB == noneBB)
     return false;
 
-  // If we immediately find a diamond, return true. We are done.
+  // If we immediately find a simple diamond, return true. We are done.
   if (noneSuccessorBB == someSuccessorBB)
     return true;
 
-  // Otherwise, lets keep looking down the none case.
-  auto *next = noneSuccessorBB;
-  while (next != someSuccessorBB) {
-    noneSuccessorBB = next;
-    next = noneSuccessorBB->getSingleSuccessorBlock();
+  // Otherwise, lets begin a traversal along the successors of noneSuccessorBB,
+  // searching for someSuccessorBB, being careful to only allow for blocks to be
+  // visited once. This enables us to guarantee that there are not any loops or
+  // any sub-diamonds in the part of the CFG we are traversing. This /does/
+  // allow for side-entrances to the region from blocks not reachable from
+  // noneSuccessorBB. See function level comment above.
+  SILBasicBlock *iter = noneSuccessorBB;
+  SmallPtrSet<SILBasicBlock *, 8> visitedBlocks;
+  visitedBlocks.insert(iter);
 
-    // If we find another single successor and it is not our own block (due to a
-    // self-loop), continue.
-    if (next && next != noneSuccessorBB)
-      continue;
+  do {
+    // First try to grab our single successor if we have only one. If we have no
+    // successor or more than one successor, bail and do not optimize.
+    //
+    // DISCUSSION: Trivially, if we do not have a successor, then we have
+    // reached either a return/unreachable and this path will never merge with
+    // the ultimate block. If we have more than one successor, then for our
+    // condition to pass, we must have that both successors eventually join into
+    // someSuccessorBB. But this would imply that either someSuccessorBB has
+    // more than two predecessors and or that we merge the two paths before we
+    // visit someSuccessorBB.
+    auto *succBlock = iter->getSingleSuccessorBlock();
+    if (!succBlock)
+      return false;
 
-    // Otherwise, we either have multiple successors or a self-loop. We do not
-    // support this, return false.
-    return false;
-  }
+    // Then check if our single successor block has been visited already. If so,
+    // we have some sort of loop or have some sort of merge point that is not
+    // the final merge point.
+    //
+    // NOTE: We do not need to worry about someSuccessorBB being in
+    // visitedBlocks since before we begin the loop, we check that
+    // someSuccessorBB != iter and also check that in the do-while condition. So
+    // we can never have visited someSuccessorBB on any previous iteration
+    // meaning that the only time we can have succBlock equal to someSuccessorBB
+    // is on the last iteration before we exit the loop.
+    if (!visitedBlocks.insert(succBlock).second)
+      return false;
 
-  // At this point, we know that next must be someSuccessorBB.
+    // Otherwise, set iter to succBlock.
+    iter = succBlock;
+
+    // And then check if this new successor block is someSuccessorBB. If so, we
+    // break and then return true since we have found our target. Otherwise, we
+    // need to visit further successors, so go back around the loop.
+  } while (iter != someSuccessorBB);
+
   return true;
 }
 
