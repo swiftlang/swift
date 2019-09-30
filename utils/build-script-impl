@@ -2740,6 +2740,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_C_COMPILER:PATH=${LLVM_BIN}/clang
                   -DCMAKE_CXX_COMPILER:PATH=${LLVM_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
+                  -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
@@ -3370,6 +3371,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_C_COMPILER:PATH=${LLVM_BIN}/clang
                   -DCMAKE_CXX_COMPILER:PATH=${LLVM_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
+                  -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
