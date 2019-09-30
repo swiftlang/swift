@@ -4152,7 +4152,7 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   llvm::AllocaInst *alloca =
       new llvm::AllocaInst(type, IGM.DataLayout.getAllocaAddrSpace(), name,
                            AllocaIP);
-  alloca->setAlignment(alignment.getValue());
+  alloca->setAlignment(llvm::MaybeAlign(alignment.getValue()));
   return Address(alloca, alignment);
 }
 
