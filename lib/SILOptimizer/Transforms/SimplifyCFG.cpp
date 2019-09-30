@@ -1293,9 +1293,17 @@ static bool isReachable(SILBasicBlock *Block) {
 }
 #endif
 
+static llvm::cl::opt<bool> SimplifyUnconditionalBranches(
+    "simplify-cfg-simplify-unconditional-branches", llvm::cl::init(true));
+
 /// simplifyBranchBlock - Simplify a basic block that ends with an unconditional
 /// branch.
 bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
+  // If we are asked to not simplify unconditional branches (for testing
+  // purposes), exit early.
+  if (!SimplifyUnconditionalBranches)
+    return false;
+
   // First simplify instructions generating branch operands since that
   // can expose CFG simplifications.
   bool Simplified = simplifyBranchOperands(BI->getArgs());
