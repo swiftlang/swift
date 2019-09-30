@@ -421,7 +421,7 @@
                 "swift-corelibs-xctest": "master",
                 "swift-corelibs-foundation": "master",
                 "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master",
+                "swift-integration-tests": "master-rebranch",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
