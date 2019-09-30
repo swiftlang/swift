@@ -7455,9 +7455,20 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       if (fixes == fixesPerExpr.end())
         return;
 
-      for (const auto *fix : fixes->second) {
-        auto diagnosed = fix->diagnose(root);
-        if (fix->isWarning()) {
+      // Coalesce fixes with the same locator to avoid duplicating notes.
+      llvm::SmallMapVector<ConstraintLocator *,
+          llvm::SmallVector<ConstraintFix *, 4>, 4> aggregatedFixes;
+      for (auto *fix : fixes->second)
+        aggregatedFixes[fix->getLocator()].push_back(fix);
+
+      for (auto fixesPerLocator : aggregatedFixes) {
+        auto fixes = fixesPerLocator.second;
+        auto *primaryFix = fixes[0];
+        ArrayRef<ConstraintFix *> secondaryFixes{fixes.begin() + 1, fixes.end()};
+
+        auto *coalescedFix = primaryFix->coalescedWith(secondaryFixes);
+        auto diagnosed = coalescedFix->diagnose(root);
+        if (coalescedFix->isWarning()) {
           assert(diagnosed && "warnings should always be diagnosed");
           (void)diagnosed;
         } else {

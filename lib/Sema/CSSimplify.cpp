@@ -7954,12 +7954,6 @@ bool ConstraintSystem::recordFix(ConstraintFix *fix, unsigned impact) {
     return true;
 
   if (isAugmentingFix(fix)) {
-    // Always useful, unless duplicate of exactly the same fix and location.
-    // This situation might happen when the same fix kind is applicable to
-    // different overload choices.
-    if (hasFixFor(fix->getLocator()))
-      return false;
-
     Fixes.push_back(fix);
   } else {
     // Only useful to record if no pre-existing fix in the subexpr tree.
