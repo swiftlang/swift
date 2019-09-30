@@ -74,17 +74,19 @@ Optional<NominalTypeDecl *> ExtendedNominalRequest::getCachedResult() const {
   // Note: if we fail to compute any nominal declaration, it's considered
   // a cache miss. This allows us to recompute the extended nominal types
   // during extension binding.
+  // This recomputation is also what allows you to extend types defined inside
+  // other extensions, regardless of source file order. See \c bindExtensions(),
+  // which uses a worklist algorithm that attempts to bind everything until
+  // fixed point.
   auto ext = std::get<0>(getStorage());
-  if (ext->ExtendedNominal)
-    return ext->ExtendedNominal;
-
-  return None;
+  if (!ext->hasBeenBound() || !ext->getExtendedNominal())
+    return None;
+  return ext->getExtendedNominal();
 }
 
 void ExtendedNominalRequest::cacheResult(NominalTypeDecl *value) const {
   auto ext = std::get<0>(getStorage());
-  if (value)
-    ext->ExtendedNominal = value;
+  ext->setExtendedNominal(value);
 }
 
 //----------------------------------------------------------------------------//

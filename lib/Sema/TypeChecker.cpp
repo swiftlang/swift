@@ -229,7 +229,9 @@ static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    if (auto nominal = ext->getExtendedNominal()) {
+    assert(!ext->canNeverBeBound() &&
+           "Only extensions that can ever be bound get here.");
+    if (auto nominal = ext->computeExtendedNominal()) {
       bindExtensionToNominal(ext, nominal);
       return true;
     }
@@ -622,7 +624,7 @@ void swift::typeCheckCompletionDecl(Decl *D) {
   DiagnosticSuppression suppression(Ctx.Diags);
   (void)createTypeChecker(Ctx);
   if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-    if (auto *nominal = ext->getExtendedNominal()) {
+    if (auto *nominal = ext->computeExtendedNominal()) {
       // FIXME(InterfaceTypeRequest): Remove this.
       (void)nominal->getInterfaceType();
     }
