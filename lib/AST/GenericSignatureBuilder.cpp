@@ -7320,7 +7320,7 @@ void GenericSignatureBuilder::dump(llvm::raw_ostream &out) {
   out << "\n";
 }
 
-void GenericSignatureBuilder::addGenericSignature(GenericSignature *sig) {
+void GenericSignatureBuilder::addGenericSignature(GenericSignature sig) {
   if (!sig) return;
 
   for (auto param : sig->getGenericParams())
@@ -7379,7 +7379,7 @@ static void collectRequirements(GenericSignatureBuilder &builder,
   });
 }
 
-GenericSignature *GenericSignatureBuilder::computeGenericSignature(
+GenericSignature GenericSignatureBuilder::computeGenericSignature(
                                           SourceLoc loc,
                                           bool allowConcreteGenericParams,
                                           bool allowBuilderToMove) && {
@@ -7417,7 +7417,7 @@ GenericSignature *GenericSignatureBuilder::computeGenericSignature(
 #pragma mark Generic signature verification
 
 void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
-                                                     GenericSignature *sig) {
+                                                     GenericSignature sig) {
   llvm::errs() << "Validating generic signature: ";
   sig->print(llvm::errs());
   llvm::errs() << "\n";
@@ -7455,7 +7455,7 @@ void GenericSignatureBuilder::verifyGenericSignature(ASTContext &context,
                                       /*allowBuilderToMove=*/true);
 
     // The new signature should be equal.
-    if (newSig->getCanonicalSignature() != sig->getCanonicalSignature()) {
+    if (!newSig->isEqual(sig)) {
       context.Diags.diagnose(SourceLoc(), diag::generic_signature_not_equal,
                              sig->getAsString(), newSig->getAsString());
     }
@@ -7518,7 +7518,7 @@ void GenericSignatureBuilder::verifyGenericSignaturesInModule(
   if (!loadedFile) return;
 
   // Check all of the (canonical) generic signatures.
-  SmallVector<GenericSignature *, 8> allGenericSignatures;
+  SmallVector<GenericSignature, 8> allGenericSignatures;
   SmallPtrSet<CanGenericSignature, 4> knownGenericSignatures;
   (void)loadedFile->getAllGenericSignatures(allGenericSignatures);
   ASTContext &context = module->getASTContext();
@@ -7542,7 +7542,7 @@ bool InferredGenericSignatureRequest::isCached() const {
       
 /// Check whether the inputs to the \c AbstractGenericSignatureRequest are
 /// all canonical.
-static bool isCanonicalRequest(GenericSignature *baseSignature,
+static bool isCanonicalRequest(GenericSignature baseSignature,
                                ArrayRef<GenericTypeParamType *> genericParams,
                                ArrayRef<Requirement> requirements) {
   if (baseSignature && !baseSignature->isCanonical())
@@ -7561,10 +7561,10 @@ static bool isCanonicalRequest(GenericSignature *baseSignature,
   return true;
 }
 
-llvm::Expected<GenericSignature *>
+llvm::Expected<GenericSignature>
 AbstractGenericSignatureRequest::evaluate(
          Evaluator &evaluator,
-         GenericSignature *baseSignature,
+         GenericSignatureImpl *baseSignature,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
          SmallVector<Requirement, 2> addedRequirements) const {
   // If nothing is added to the base signature, just return the base
@@ -7594,7 +7594,7 @@ AbstractGenericSignatureRequest::evaluate(
   // generic signature builder.
   if (!isCanonicalRequest(baseSignature, addedParameters, addedRequirements)) {
     // Canonicalize the inputs so we can form the canonical request.
-    GenericSignature *canBaseSignature = nullptr;
+    GenericSignature canBaseSignature = GenericSignature();
     if (baseSignature)
       canBaseSignature = baseSignature->getCanonicalSignature();
 
@@ -7616,7 +7616,7 @@ AbstractGenericSignatureRequest::evaluate(
     // Build the canonical signature.
     auto canSignatureResult = evaluator(
         AbstractGenericSignatureRequest{
-          canBaseSignature, std::move(canAddedParameters),
+          canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements)});
     if (!canSignatureResult || !*canSignatureResult)
       return canSignatureResult;
@@ -7674,10 +7674,10 @@ AbstractGenericSignatureRequest::evaluate(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
 }
 
-llvm::Expected<GenericSignature *>
+llvm::Expected<GenericSignature>
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
-        GenericSignature *parentSig,
+        GenericSignatureImpl *parentSig,
         GenericParamList *gpl,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,

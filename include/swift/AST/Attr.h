@@ -1279,27 +1279,27 @@ public:
 
 private:
   TrailingWhereClause *trailingWhereClause;
-  GenericSignature *specializedSignature;
+  GenericSignature specializedSignature;
 
   SpecializeAttr(SourceLoc atLoc, SourceRange Range,
                  TrailingWhereClause *clause, bool exported,
                  SpecializationKind kind,
-                 GenericSignature *specializedSignature);
+                 GenericSignature specializedSignature);
 
 public:
   static SpecializeAttr *create(ASTContext &Ctx, SourceLoc atLoc,
                                 SourceRange Range, TrailingWhereClause *clause,
                                 bool exported, SpecializationKind kind,
-                                GenericSignature *specializedSignature
+                                GenericSignature specializedSignature
                                     = nullptr);
 
   TrailingWhereClause *getTrailingWhereClause() const;
 
-  GenericSignature *getSpecializedSgnature() const {
+  GenericSignature getSpecializedSgnature() const {
     return specializedSignature;
   }
 
-  void setSpecializedSignature(GenericSignature *newSig) {
+  void setSpecializedSignature(GenericSignature newSig) {
     specializedSignature = newSig;
   }
 

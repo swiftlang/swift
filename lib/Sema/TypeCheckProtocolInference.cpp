@@ -202,7 +202,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
       return true;
 
     // Build a generic signature.
-    auto *extensionSig = extension->getGenericSignature();
+    auto extensionSig = extension->getGenericSignature();
     
     // The condition here is a bit more fickle than
     // `isExtensionApplied`. That check would prematurely reject
@@ -926,7 +926,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   }
 
   // If there is a generic parameter of the named type, use that.
-  if (auto *genericSig = dc->getGenericSignatureOfContext()) {
+  if (auto genericSig = dc->getGenericSignatureOfContext()) {
     for (auto gp : genericSig->getInnermostGenericParams()) {
       if (gp->getName() == assocType->getName())
         return dc->mapTypeIntoContext(gp);

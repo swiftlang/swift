@@ -592,7 +592,7 @@ class TypeConverter {
   llvm::BumpPtrAllocator IndependentBPA;
 
   struct CachingTypeKey {
-    GenericSignature *Sig;
+    CanGenericSignature Sig;
     AbstractionPattern::CachingKey OrigType;
     CanType SubstType;
 
@@ -846,7 +846,7 @@ public:
   const SILConstantInfo &getConstantInfo(SILDeclRef constant);
 
   /// Get the generic environment for a constant.
-  GenericSignature *getConstantGenericSignature(SILDeclRef constant);
+  GenericSignature getConstantGenericSignature(SILDeclRef constant);
 
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
@@ -1090,7 +1090,7 @@ namespace llvm {
     }
     static unsigned getHashValue(CachingTypeKey val) {
       auto hashSig =
-        DenseMapInfo<swift::GenericSignature *>::getHashValue(val.Sig);
+        DenseMapInfo<swift::GenericSignature>::getHashValue(val.Sig);
       auto hashOrig =
         CachingKeyInfo::getHashValue(val.OrigType);
       auto hashSubst =

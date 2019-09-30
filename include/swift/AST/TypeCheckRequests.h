@@ -17,6 +17,7 @@
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/GenericSignature.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/SimpleRequest.h"
@@ -1064,9 +1065,9 @@ void simple_display(llvm::raw_ostream &out, AncestryFlags value);
 
 class AbstractGenericSignatureRequest :
     public SimpleRequest<AbstractGenericSignatureRequest,
-                         GenericSignature *(GenericSignature *,
-                                            SmallVector<GenericTypeParamType *, 2>,
-                                            SmallVector<Requirement, 2>),
+                         GenericSignature (GenericSignatureImpl *,
+                                           SmallVector<GenericTypeParamType *, 2>,
+                                           SmallVector<Requirement, 2>),
                          CacheKind::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1075,9 +1076,9 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   evaluate(Evaluator &evaluator,
-           GenericSignature *baseSignature,
+           GenericSignatureImpl *baseSignature,
            SmallVector<GenericTypeParamType *, 2> addedParameters,
            SmallVector<Requirement, 2> addedRequirements) const;
 
@@ -1093,8 +1094,8 @@ public:
 
 class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
-                         GenericSignature *(ModuleDecl *,
-                                            GenericSignature *,
+                         GenericSignature (ModuleDecl *,
+                                            GenericSignatureImpl *,
                                             GenericParamList *,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
@@ -1107,10 +1108,10 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
-           GenericSignature *baseSignature,
+           GenericSignatureImpl *baseSignature,
            GenericParamList *gpl,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
@@ -1169,7 +1170,7 @@ public:
 
 class GenericSignatureRequest :
     public SimpleRequest<GenericSignatureRequest,
-                         GenericSignature *(GenericContext *),
+                         GenericSignature (GenericContext *),
                          CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -1178,14 +1179,14 @@ private:
   friend SimpleRequest;
   
   // Evaluation.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   evaluate(Evaluator &evaluator, GenericContext *value) const;
   
 public:
   // Separate caching.
   bool isCached() const { return true; }
-  Optional<GenericSignature *> getCachedResult() const;
-  void cacheResult(GenericSignature *value) const;
+  Optional<GenericSignature> getCachedResult() const;
+  void cacheResult(GenericSignature value) const;
 };
 
 /// Compute the interface type of the underlying definition type of a typealias declaration.
@@ -1236,6 +1237,16 @@ inline bool AnyValue::Holder<Type>::equals(const HolderBase &other) const {
   assert(typeID == other.typeID && "Caller should match type IDs");
   return value.getPointer() ==
       static_cast<const Holder<Type> &>(other).value.getPointer();
+}
+
+// Allow AnyValue to compare two GenericSignature values.
+template <>
+inline bool
+AnyValue::Holder<GenericSignature>::equals(const HolderBase &other) const {
+  assert(typeID == other.typeID && "Caller should match type IDs");
+  return value.getPointer() ==
+         static_cast<const Holder<GenericSignature> &>(other)
+             .value.getPointer();
 }
 
 void simple_display(llvm::raw_ostream &out, Type value);

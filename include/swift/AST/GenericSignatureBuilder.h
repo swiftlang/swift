@@ -599,7 +599,7 @@ public:
                                   ModuleDecl *inferForModule);
 
   /// Add all of a generic signature's parameters and requirements.
-  void addGenericSignature(GenericSignature *sig);
+  void addGenericSignature(GenericSignature sig);
 
   /// Infer requirements from the given type, recursively.
   ///
@@ -636,13 +636,13 @@ public:
   ///
   /// After this point, one cannot introduce new requirements, and the
   /// generic signature builder no longer has valid state.
-  GenericSignature *computeGenericSignature(
+  GenericSignature computeGenericSignature(
                       SourceLoc loc,
                       bool allowConcreteGenericParams = false,
                       bool allowBuilderToMove = true) &&;
 
   /// Compute the requirement signature for the given protocol.
-  static GenericSignature *computeRequirementSignature(ProtocolDecl *proto);
+  static GenericSignature computeRequirementSignature(ProtocolDecl *proto);
 
 private:
   /// Finalize the set of requirements, performing any remaining checking
@@ -811,7 +811,7 @@ public:
   /// This routine will test that the given generic signature is both minimal
   /// and canonical, emitting errors if it is not.
   static void verifyGenericSignature(ASTContext &context,
-                                     GenericSignature *sig);
+                                     GenericSignature sig);
 
   /// Verify all of the generic sigantures in the given module.
   static void verifyGenericSignaturesInModule(ModuleDecl *module);

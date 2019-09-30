@@ -388,7 +388,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
       do {
         if (auto *parent = DC->getAsDecl()) {
           if (auto *GC = parent->getAsGenericContext()) {
-            if (GC->getGenericSignature() != Signature)
+            // FIXME: Is this intending an exact match?
+            if (GC->getGenericSignature().getPointer() != Signature.getPointer())
               continue;
 
             // If this is a signature if an extension
@@ -410,7 +411,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   return getAffectedDeclFromType(getOwnerType());
 }
 
-GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
+GenericSignature RequirementFailure::getSignature(ConstraintLocator *locator) {
   if (isConditional())
     return Conformance->getGenericSignature();
 
@@ -436,7 +437,7 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   auto *DC = AffectedDecl->getDeclContext();
 
   do {
-    if (auto *sig = DC->getGenericSignatureOfContext()) {
+    if (auto sig = DC->getGenericSignatureOfContext()) {
       if (sig->isRequirementSatisfied(req))
         return DC;
     }

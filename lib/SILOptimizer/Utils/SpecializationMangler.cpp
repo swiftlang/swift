@@ -74,7 +74,7 @@ std::string SpecializationMangler::finalize() {
 //                           Generic Specialization
 //===----------------------------------------------------------------------===//
 
-std::string GenericSpecializationMangler::mangle(GenericSignature *Sig) {
+std::string GenericSpecializationMangler::mangle(GenericSignature Sig) {
   beginMangling();
 
   if (!Sig) {

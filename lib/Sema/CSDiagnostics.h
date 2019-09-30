@@ -210,7 +210,7 @@ protected:
   /// The source of the requirement, if available. One exception
   /// is failure associated with conditional requirement where
   /// underlying conformance is specialized.
-  const GenericSignature *Signature;
+  GenericSignature Signature;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -299,7 +299,7 @@ private:
   ValueDecl *getDeclRef() const;
 
   /// Retrieve generic signature where this parameter originates from.
-  GenericSignature *getSignature(ConstraintLocator *locator);
+  GenericSignature getSignature(ConstraintLocator *locator);
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
 

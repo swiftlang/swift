@@ -1820,7 +1820,7 @@ static bool diagnoseIndirectGenericTypeParam(SourceLoc loc, Type type,
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   DeclContext *DC = D->getDeclContext();
   auto *FD = cast<AbstractFunctionDecl>(D);
-  auto *genericSig = FD->getGenericSignature();
+  auto genericSig = FD->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
@@ -2740,8 +2740,8 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   if (!underlyingType)
     underlyingType = type;
 
-  auto *sig = var->getDeclContext()->getGenericSignatureOfContext();
-  if (!underlyingType->allowsOwnership(sig)) {
+  auto sig = var->getDeclContext()->getGenericSignatureOfContext();
+  if (!underlyingType->allowsOwnership(sig.getPointer())) {
     auto D = diag::invalid_ownership_type;
 
     if (underlyingType->isExistentialType() ||

@@ -38,7 +38,7 @@ class ArchetypeType;
 class ClassDecl;
 class CanType;
 class EnumDecl;
-class GenericSignature;
+class GenericSignatureImpl;
 class ModuleDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -124,10 +124,12 @@ public:
 /// Functor class suitable for use as a \c LookupConformanceFn that fetches
 /// conformances from a generic signature.
 class LookUpConformanceInSignature {
-  const GenericSignature &Sig;
+  const GenericSignatureImpl *Sig;
 public:
-  LookUpConformanceInSignature(const GenericSignature &Sig)
-    : Sig(Sig) {}
+  LookUpConformanceInSignature(const GenericSignatureImpl *Sig)
+    : Sig(Sig) {
+      assert(Sig && "Cannot lookup conformance in null signature!");
+    }
   
   Optional<ProtocolConformanceRef>
   operator()(CanType dependentType,
@@ -377,7 +379,7 @@ private:
 class CanType : public Type {
   bool isActuallyCanonicalOrNull() const;
 
-  static bool isReferenceTypeImpl(CanType type, GenericSignature *sig,
+  static bool isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
                                   bool functionsCount);
   static bool isExistentialTypeImpl(CanType type);
   static bool isAnyExistentialTypeImpl(CanType type);
@@ -429,7 +431,7 @@ public:
   ///   - existentials with class or class protocol bounds
   /// But not:
   ///   - function types
-  bool allowsOwnership(GenericSignature *sig) const {
+  bool allowsOwnership(GenericSignatureImpl *sig) const {
     return isReferenceTypeImpl(*this, sig,
                                /*functions count*/ false);
   }
@@ -589,37 +591,6 @@ template <class X, class P>
 inline CanTypeWrapper<X> dyn_cast_or_null(CanTypeWrapper<P> type) {
   return CanTypeWrapper<X>(dyn_cast_or_null<X>(type.getPointer()));
 }
-  
-class GenericTypeParamType;
-  
-/// A reference to a canonical generic signature.
-class CanGenericSignature {
-  GenericSignature *Signature;
-  
-public:
-  CanGenericSignature() : Signature(nullptr) {}
-  CanGenericSignature(std::nullptr_t) : Signature(nullptr) {}
-  
-  // in Decl.h
-  explicit CanGenericSignature(GenericSignature *Signature);
-  ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
-
-  GenericSignature *operator->() const {
-    return Signature;
-  }
-  
-  operator GenericSignature *() const {
-    return Signature;
-  }
-  
-  GenericSignature *getPointer() const {
-    return Signature;
-  }
-
-  bool operator==(const swift::CanGenericSignature &other) {
-    return Signature == other.Signature;
-  }
-};
 
 template <typename T>
 inline T *staticCastHelper(const Type &Ty) {
@@ -699,19 +670,6 @@ namespace llvm {
       return swift::CanType((swift::TypeBase*)P);
     }
   };
-
-  template<>
-  struct PointerLikeTypeTraits<swift::CanGenericSignature> {
-  public:
-    static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
-      return swift::CanGenericSignature((swift::GenericSignature*)P);
-    }
-    static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
-      return (void*)S.getPointer();
-    }
-    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
-  };
-  
 } // end namespace llvm
 
 #endif

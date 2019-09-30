@@ -166,7 +166,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     bool Unmergable;
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
-    void addRequirement(GenericSignature *GenericSig,
+    void addRequirement(GenericSignature GenericSig,
                         Type First, Type Second, RequirementKind Kind) {
       CanType CanFirst = GenericSig->getCanonicalTypeInContext(First);
       CanType CanSecond;
@@ -280,7 +280,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     }
 
     auto handleRequirements = [&](SubstitutionMap subMap,
-                                  GenericSignature *GenericSig,
+                                  GenericSignature GenericSig,
                                   ArrayRef<Requirement> Reqs) {
       for (auto Req : Reqs) {
         auto Kind = Req.getKind();

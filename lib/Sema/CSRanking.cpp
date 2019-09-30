@@ -332,8 +332,8 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // If the two generic signatures are identical, neither is as specialized
   // as the other.
-  GenericSignature *sig1 = dc1->getGenericSignatureOfContext();
-  GenericSignature *sig2 = dc2->getGenericSignatureOfContext();
+  GenericSignature sig1 = dc1->getGenericSignatureOfContext();
+  GenericSignature sig2 = dc2->getGenericSignatureOfContext();
   if (sig1->getCanonicalSignature() == sig2->getCanonicalSignature())
     return false;
 

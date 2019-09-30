@@ -431,7 +431,7 @@ public:
                                             llvm::raw_ostream &OS);
 
   static void
-  printFullyAnnotatedGenericReq(const swift::GenericSignature *Sig,
+  printFullyAnnotatedGenericReq(const swift::GenericSignature Sig,
                                 llvm::raw_ostream &OS);
 
   /// Print 'description' or 'sourcetext' the given \p VD to \p OS. If

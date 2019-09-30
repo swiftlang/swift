@@ -2910,7 +2910,7 @@ buildThunkSignature(SILGenFunction &SGF,
 
   // Add the existing generic signature.
   int depth = 0;
-  GenericSignature *baseGenericSig = nullptr;
+  GenericSignature baseGenericSig = GenericSignature();
   if (inheritGenericSig) {
     if (auto genericSig = SGF.F.getLoweredFunctionType()->getGenericSignature()) {
       baseGenericSig = genericSig;
@@ -2923,11 +2923,11 @@ buildThunkSignature(SILGenFunction &SGF,
   Requirement newRequirement(RequirementKind::Conformance, newGenericParam,
                              openedExistential->getOpenedExistentialType());
 
-  GenericSignature *genericSig = evaluateOrDefault(
+  auto genericSig = evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
-        baseGenericSig, { newGenericParam }, { newRequirement }},
-      nullptr);
+        baseGenericSig.getPointer(), { newGenericParam }, { newRequirement }},
+      GenericSignature());
   genericEnv = genericSig->getGenericEnvironment();
 
   newArchetype = genericEnv->mapTypeIntoContext(newGenericParam)
