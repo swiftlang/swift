@@ -53,21 +53,6 @@ static SILValue stripCopiesAndBorrows(SILValue v) {
   return v;
 }
 
-/// If \p applySite is a terminator then pass the first instruction of each
-/// successor to fun. Otherwise, pass std::next(applySite).
-static void
-insertAfterApply(SILInstruction *applySite,
-                 llvm::function_ref<void(SILBasicBlock::iterator)> &&fun) {
-  auto *ti = dyn_cast<TermInst>(applySite);
-  if (!ti) {
-    return fun(std::next(applySite->getIterator()));
-  }
-
-  for (auto *succBlocks : ti->getSuccessorBlocks()) {
-    fun(succBlocks->begin());
-  }
-}
-
 /// Fixup reference counts after inlining a function call (which is a no-op
 /// unless the function is a thick function).
 ///
@@ -174,13 +159,12 @@ static void fixupReferenceCounts(
       // insert a destroy after the apply since the leak will just cover the
       // other path.
       if (!error.getFoundOverConsume()) {
-        insertAfterApply(
-            applySite.getInstruction(), [&](SILBasicBlock::iterator iter) {
-              if (hasOwnership) {
-                SILBuilderWithScope(iter).createEndBorrow(loc, argument);
-              }
-              SILBuilderWithScope(iter).emitDestroyValueOperation(loc, copy);
-            });
+        applySite.insertAfter([&](SILBasicBlock::iterator iter) {
+          if (hasOwnership) {
+            SILBuilderWithScope(iter).createEndBorrow(loc, argument);
+          }
+          SILBuilderWithScope(iter).emitDestroyValueOperation(loc, copy);
+        });
       }
       v = argument;
       break;
@@ -215,10 +199,9 @@ static void fixupReferenceCounts(
         }
       }
 
-      insertAfterApply(
-          applySite.getInstruction(), [&](SILBasicBlock::iterator iter) {
-            SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
-          });
+      applySite.insertAfter([&](SILBasicBlock::iterator iter) {
+        SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
+      });
       break;
     }
 
@@ -263,10 +246,9 @@ static void fixupReferenceCounts(
   // Destroy the callee as the apply would have done if our function is not
   // callee guaranteed.
   if (!isCalleeGuaranteed) {
-    insertAfterApply(
-        applySite.getInstruction(), [&](SILBasicBlock::iterator iter) {
-          SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
-        });
+    applySite.insertAfter([&](SILBasicBlock::iterator iter) {
+      SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
+    });
   }
 }
 
