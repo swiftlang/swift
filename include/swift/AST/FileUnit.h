@@ -337,7 +337,7 @@ public:
   /// \returns \c true if this module file supports retrieving all of the
   /// generic signatures, \c false otherwise.
   virtual bool getAllGenericSignatures(
-                 SmallVectorImpl<GenericSignature*> &genericSignatures) {
+                 SmallVectorImpl<GenericSignature> &genericSignatures) {
     return false;
   }
 

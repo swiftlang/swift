@@ -319,7 +319,7 @@ IRGenModule::getTypeRef(CanType type, CanGenericSignature sig,
 }
 
 std::pair<llvm::Constant *, unsigned>
-IRGenModule::getTypeRef(Type type, GenericSignature *genericSig,
+IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig),
       genericSig ? genericSig->getCanonicalSignature() : CanGenericSignature(),
@@ -348,7 +348,7 @@ IRGenModule::getLoweredTypeRef(SILType loweredType,
 llvm::Constant *
 IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
-                                      GenericSignature *origGenericSig,
+                                      GenericSignature origGenericSig,
                                       bool shouldSetLowBit) {
   std::tie(type, conformance)
     = substOpaqueTypesWithUnderlyingTypes(type, conformance);
@@ -399,10 +399,12 @@ IRGenModule::emitWitnessTableRefString(CanType type,
 
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
-          if (origType->hasTypeParameter())
+          if (origType->hasTypeParameter()) {
+            auto origSig = genericEnv->getGenericSignature();
             conformance = conformance.subst(origType,
               QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+              LookUpConformanceInSignature(origSig.getPointer()));
+          }
           auto ret = emitWitnessTableRef(IGF, type, conformance);
           IGF.Builder.CreateRet(ret);
         }
@@ -517,7 +519,7 @@ protected:
   ///
   /// For reflection records which are demangled to produce type metadata
   /// in-process, pass MangledTypeRefRole::Metadata instead.
-  void addTypeRef(Type type, GenericSignature *genericSig,
+  void addTypeRef(Type type, GenericSignature genericSig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     addTypeRef(type->getCanonicalType(genericSig),
@@ -566,7 +568,7 @@ protected:
         IGM.getAddrOfStringForTypeRef(mangledStr, role);
       B.addRelativeAddress(mangledName);
     } else {
-      addTypeRef(nominal->getDeclaredType(), /*genericSig*/nullptr, role);
+      addTypeRef(nominal->getDeclaredType(), GenericSignature(), role);
     }
   }
 
@@ -673,7 +675,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const NominalTypeDecl *NTD;
 
   void addFieldDecl(const ValueDecl *value, Type type,
-                    GenericSignature *genericSig, bool indirect=false) {
+                    GenericSignature genericSig, bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))

@@ -691,7 +691,7 @@ public:
   ///
   /// \param locator The locator that describes where the substitutions came
   /// from.
-  SubstitutionMap computeSubstitutions(GenericSignature *sig,
+  SubstitutionMap computeSubstitutions(GenericSignature sig,
                                        ConstraintLocatorBuilder locator) const;
 
   /// Return the disjunction choice for the given constraint location.
@@ -2584,14 +2584,14 @@ public:
   /// Open the generic parameter list and its requirements,
   /// creating type variables for each of the type parameters.
   void openGeneric(DeclContext *outerDC,
-                   GenericSignature *signature,
+                   GenericSignature signature,
                    ConstraintLocatorBuilder locator,
                    OpenedTypeMap &replacements);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
   void openGenericParameters(DeclContext *outerDC,
-                             GenericSignature *signature,
+                             GenericSignature signature,
                              OpenedTypeMap &replacements,
                              ConstraintLocatorBuilder locator);
 
@@ -2599,7 +2599,7 @@ public:
   /// using substitution function, and record them in the
   /// constraint system for further processing.
   void openGenericRequirements(DeclContext *outerDC,
-                               GenericSignature *signature,
+                               GenericSignature signature,
                                bool skipProtocolSelfConstraint,
                                ConstraintLocatorBuilder locator,
                                llvm::function_ref<Type(Type)> subst);

@@ -16,9 +16,9 @@
 //===----------------------------------------------------------------------===//
 
 SWIFT_REQUEST(TypeChecker, AbstractGenericSignatureRequest,
-              GenericSignature *(GenericSignature *,
-                                 SmallVector<GenericTypeParamType *, 2>,
-                                 SmallVector<Requirement, 2>),
+              GenericSignature (GenericSignatureImpl *,
+                                SmallVector<GenericTypeParamType *, 2>,
+                                SmallVector<Requirement, 2>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, AttachedFunctionBuilderRequest,
               CustomAttr *(ValueDecl *), Cached, NoLocationInfo)
@@ -50,10 +50,10 @@ SWIFT_REQUEST(TypeChecker, FunctionBuilderTypeRequest, Type(ValueDecl *),
 SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
-              GenericSignature *(GenericContext *),
+              GenericSignature (GenericContext *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
-              GenericSignature *(ModuleDecl *, GenericSignature *,
+              GenericSignature (ModuleDecl *, GenericSignatureImpl *,
                                  GenericParamList *,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),

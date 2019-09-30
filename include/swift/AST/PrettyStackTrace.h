@@ -162,12 +162,12 @@ void printConformanceDescription(llvm::raw_ostream &out,
 
 class PrettyStackTraceGenericSignature : public llvm::PrettyStackTraceEntry {
   const char *Action;
-  GenericSignature *GenericSig;
+  GenericSignature GenericSig;
   Optional<unsigned> Requirement;
 
 public:
   PrettyStackTraceGenericSignature(const char *action,
-                                   GenericSignature *genericSig,
+                                   GenericSignature genericSig,
                                    Optional<unsigned> requirement = None)
     : Action(action), GenericSig(genericSig), Requirement(requirement) { }
 

@@ -819,11 +819,12 @@ public:
 
 class LocatorPathElt::OpenedGeneric final : public LocatorPathElt {
 public:
-  OpenedGeneric(GenericSignature *sig)
-      : LocatorPathElt(LocatorPathElt::StoredGenericSignature, sig) {}
+  OpenedGeneric(GenericSignature sig)
+      : LocatorPathElt(LocatorPathElt::StoredGenericSignature,
+                       sig.getPointer()) {}
 
-  GenericSignature *getSignature() const {
-    return getStoredPointer<GenericSignature>();
+  GenericSignature getSignature() const {
+    return getStoredPointer<GenericSignatureImpl>();
   }
 
   static bool classof(const LocatorPathElt *elt) {
