@@ -393,7 +393,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
   // proper interface type. This is required for generic functions.
   mapInterfaceTypes(F, InterfaceParams, InterfaceResults, InterfaceErrorResult);
 
-  GenericSignature *GenericSig =
+  GenericSignature GenericSig =
       UsesGenerics ? FTy->getGenericSignature() : nullptr;
 
   return SILFunctionType::get(

@@ -186,10 +186,10 @@ Type TypeChecker::getOrCreateOpaqueResultType(TypeResolution resolution,
   auto interfaceSignature = evaluateOrDefault(
       Context.evaluator,
       AbstractGenericSignatureRequest{
-        outerGenericSignature,
+        outerGenericSignature.getPointer(),
         std::move(genericParamTypes),
         std::move(requirements)},
-      nullptr);
+      GenericSignature());
 
   // Create the OpaqueTypeDecl for the result type.
   // It has the same parent context and generic environment as the originating
@@ -245,7 +245,7 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
   // set didn't add any requirements to Self or its associated types.
   if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext())) {
     auto protoSelf = proto->getSelfInterfaceType();
-    auto *sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
+    auto sig = decl->getInnermostDeclContext()->getGenericSignatureOfContext();
     for (auto req : sig->getRequirements()) {
       // If one of the types in the requirement is dependent on a non-Self
       // type parameter, this requirement is okay.
@@ -281,7 +281,7 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     return;
 
   auto *genericParams = dc->getGenericParams();
-  auto *genericSig = dc->getGenericSignatureOfContext();
+  auto genericSig = dc->getGenericSignatureOfContext();
   if (!genericParams)
     return;
 
@@ -447,21 +447,21 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 /// Generic types
 ///
 
-GenericSignature *TypeChecker::checkGenericSignature(
+GenericSignature TypeChecker::checkGenericSignature(
                       GenericParamList *genericParamList,
                       DeclContext *dc,
-                      GenericSignature *parentSig,
+                      GenericSignature parentSig,
                       bool allowConcreteGenericParams,
                       SmallVector<Requirement, 2> additionalRequirements,
                       SmallVector<TypeLoc, 2> inferenceSources) {
   assert(genericParamList && "Missing generic parameters?");
 
   auto request = InferredGenericSignatureRequest{
-    dc->getParentModule(), parentSig, genericParamList,
+    dc->getParentModule(), parentSig.getPointer(), genericParamList,
     additionalRequirements, inferenceSources,
     allowConcreteGenericParams};
-  auto *sig = evaluateOrDefault(dc->getASTContext().evaluator,
-                                request, nullptr);
+  auto sig = evaluateOrDefault(dc->getASTContext().evaluator,
+                               request, nullptr);
 
   // Debugging of the generic signature builder and generic signature
   // generation.
@@ -574,7 +574,7 @@ static unsigned getExtendedTypeGenericDepth(ExtensionDecl *ext) {
   return sig->getGenericParams().back()->getDepth();
 }
 
-llvm::Expected<GenericSignature *>
+llvm::Expected<GenericSignature>
 GenericSignatureRequest::evaluate(Evaluator &evaluator,
                                   GenericContext *GC) const {
   // The signature of a Protocol is trivial (Self: TheProtocol) so let's compute
@@ -583,7 +583,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     auto self = PD->getSelfInterfaceType()->castTo<GenericTypeParamType>();
     auto req =
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
-    auto *sig = GenericSignature::get({self}, {req});
+    auto sig = GenericSignature::get({self}, {req});
 
     // Debugging of the generic signature builder and generic signature
     // generation.
@@ -620,7 +620,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
   }
 
-  auto *parentSig = GC->getParent()->getGenericSignatureOfContext();
+  auto parentSig = GC->getParent()->getGenericSignatureOfContext();
   bool allowConcreteGenericParams = false;
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
@@ -976,7 +976,7 @@ StructuralTypeRequest::evaluate(Evaluator &evaluator,
   auto resolution = TypeResolution::forStructural(typeAlias);
   auto type = resolution.resolveType(underlyingTypeRepr, options);
   
-  auto *genericSig = typeAlias->getGenericSignature();
+  auto genericSig = typeAlias->getGenericSignature();
   SubstitutionMap subs;
   if (genericSig)
     subs = genericSig->getIdentitySubstitutionMap();

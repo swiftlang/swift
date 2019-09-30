@@ -455,7 +455,7 @@ public:
 
   /// getCanonicalType - Stronger canonicalization which folds away equivalent
   /// associated types, or type parameters that have been made concrete.
-  CanType getCanonicalType(GenericSignature *sig);
+  CanType getCanonicalType(GenericSignature sig);
 
   /// Reconstitute type sugar, e.g., for array types, dictionary
   /// types, optionals, etc.
@@ -541,7 +541,7 @@ public:
   
   /// allowsOwnership() - Are variables of this type permitted to have
   /// ownership attributes?
-  bool allowsOwnership(GenericSignature *sig=nullptr);
+  bool allowsOwnership(GenericSignatureImpl *sig = nullptr);
 
   /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
@@ -1690,7 +1690,7 @@ class TypeAliasType final
 
 public:
   /// Retrieve the generic signature used for substitutions.
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     return getSubstitutionMap().getGenericSignature();
   }
 
@@ -3017,7 +3017,7 @@ public:
   ArrayRef<Param> getParams() const;
   unsigned getNumParams() const { return Bits.AnyFunctionType.NumParams; }
 
-  GenericSignature *getOptGenericSignature() const;
+  GenericSignature getOptGenericSignature() const;
   
   ExtInfo getExtInfo() const {
     return ExtInfo(Bits.AnyFunctionType.ExtInfo);
@@ -3173,10 +3173,10 @@ class GenericFunctionType final : public AnyFunctionType,
     private llvm::TrailingObjects<GenericFunctionType, AnyFunctionType::Param> {
   friend TrailingObjects;
       
-  GenericSignature *Signature;
+  GenericSignature Signature;
 
   /// Construct a new generic function type.
-  GenericFunctionType(GenericSignature *sig,
+  GenericFunctionType(GenericSignature sig,
                       ArrayRef<Param> params,
                       Type result,
                       ExtInfo info,
@@ -3185,7 +3185,7 @@ class GenericFunctionType final : public AnyFunctionType,
       
 public:
   /// Create a new generic function type.
-  static GenericFunctionType *get(GenericSignature *sig,
+  static GenericFunctionType *get(GenericSignature sig,
                                   ArrayRef<Param> params,
                                   Type result,
                                   ExtInfo info = ExtInfo());
@@ -3196,7 +3196,7 @@ public:
   }
       
   /// Retrieve the generic signature of this function type.
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     return Signature;
   }
   
@@ -3216,7 +3216,7 @@ public:
             getExtInfo());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
-                      GenericSignature *sig,
+                      GenericSignature sig,
                       ArrayRef<Param> params,
                       Type result,
                       ExtInfo info);
@@ -3266,7 +3266,7 @@ CanAnyFunctionType::get(CanGenericSignature signature, CanParamArrayRef params,
   }
 }
 
-inline GenericSignature *AnyFunctionType::getOptGenericSignature() const {
+inline GenericSignature AnyFunctionType::getOptGenericSignature() const {
   if (auto genericFn = dyn_cast<GenericFunctionType>(this)) {
     return genericFn->getGenericSignature();
   } else {
@@ -3842,7 +3842,7 @@ private:
     return *(reinterpret_cast<CanType *>(ptr) + 1);
   }
 
-  SILFunctionType(GenericSignature *genericSig, ExtInfo ext,
+  SILFunctionType(GenericSignature genericSig, ExtInfo ext,
                   SILCoroutineKind coroutineKind,
                   ParameterConvention calleeConvention,
                   ArrayRef<SILParameterInfo> params,
@@ -3854,7 +3854,7 @@ private:
                   Optional<ProtocolConformanceRef> witnessMethodConformance);
 
 public:
-  static CanSILFunctionType get(GenericSignature *genericSig,
+  static CanSILFunctionType get(GenericSignature genericSig,
                                 ExtInfo ext,
                                 SILCoroutineKind coroutineKind,
                                 ParameterConvention calleeConvention,
@@ -4033,7 +4033,7 @@ public:
     return getParameters().back();
   }
 
-  bool isPolymorphic() const { return GenericSig != nullptr; }
+  bool isPolymorphic() const { return !GenericSig.isNull(); }
   CanGenericSignature getGenericSignature() const { return GenericSig; }
 
   CanType getSelfInstanceType() const;
@@ -4146,7 +4146,7 @@ public:
             getWitnessMethodConformanceOrNone());
   }
   static void Profile(llvm::FoldingSetNodeID &ID,
-                      GenericSignature *genericSig,
+                      GenericSignature genericSig,
                       ExtInfo info,
                       SILCoroutineKind coroutineKind,
                       ParameterConvention calleeConvention,
@@ -4826,7 +4826,7 @@ public:
   /// equivalent to the OpaqueTypeDecl's interface generic signature, with
   /// all of the generic parameters aside from the opaque type's interface
   /// type same-type-constrained to their substitutions for this type.
-  GenericSignature *getBoundSignature() const;
+  GenericSignature getBoundSignature() const;
   
   /// Get a generic environment that has this opaque archetype bound within it.
   GenericEnvironment *getGenericEnvironment() const {

@@ -1061,7 +1061,7 @@ public:
   }
 
   void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
+                          GenericSignature Sig = GenericSignature()) {
     if (!Subs.hasAnySubstitutableParams()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses

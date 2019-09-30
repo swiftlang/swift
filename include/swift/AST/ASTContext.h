@@ -857,7 +857,7 @@ private:
   /// Register the given generic signature builder to be used as the canonical
   /// generic signature builder for the given signature, if we don't already
   /// have one.
-  void registerGenericSignatureBuilder(GenericSignature *sig,
+  void registerGenericSignatureBuilder(GenericSignature sig,
                                        GenericSignatureBuilder &&builder);
   friend class GenericSignatureBuilder;
 
@@ -876,8 +876,8 @@ public:
   CanGenericSignature getExistentialSignature(CanType existential,
                                               ModuleDecl *mod);
 
-  GenericSignature *getOverrideGenericSignature(const ValueDecl *base,
-                                                const ValueDecl *derived);
+  GenericSignature getOverrideGenericSignature(const ValueDecl *base,
+                                               const ValueDecl *derived);
 
   enum class OverrideGenericSignatureReqCheck {
     /// Base method's generic requirements are satisifed by derived method

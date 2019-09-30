@@ -194,7 +194,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
 }
 
 static SubstitutionMap
-createSubstitutionMapFromGenericArgs(GenericSignature *genericSig,
+createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
                                      ArrayRef<Type> args,
                                      ModuleDecl *moduleDecl) {
   if (!genericSig)
@@ -231,7 +231,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
     return Type();
 
   // Build a SubstitutionMap.
-  auto *genericSig = nominalDecl->getGenericSignature();
+  auto genericSig = nominalDecl->getGenericSignature();
   auto subs = createSubstitutionMapFromGenericArgs(
       genericSig, args, decl->getParentModule());
   if (!subs)
@@ -304,7 +304,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   auto *aliasDecl = cast<TypeAliasDecl>(decl);
 
-  auto *genericSig = aliasDecl->getGenericSignature();
+  auto genericSig = aliasDecl->getGenericSignature();
   for (unsigned i = 0, e = args.size(); i < e; i++) {
     auto origTy = genericSig->getInnermostGenericParams()[i];
     auto substTy = args[i];
@@ -446,7 +446,7 @@ Type ASTBuilder::createImplFunctionType(
     ArrayRef<Demangle::ImplFunctionResult<Type>> results,
     Optional<Demangle::ImplFunctionResult<Type>> errorResult,
     ImplFunctionTypeFlags flags) {
-  GenericSignature *genericSig = nullptr;
+  GenericSignature genericSig = GenericSignature();
 
   SILCoroutineKind funcCoroutineKind = SILCoroutineKind::None;
   ParameterConvention funcCalleeConvention =
@@ -858,8 +858,9 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   return evaluateOrDefault(
       Ctx.evaluator,
       AbstractGenericSignatureRequest{
-        nominalDecl->getGenericSignature(), { }, std::move(requirements)},
-      nullptr)->getCanonicalSignature();
+        nominalDecl->getGenericSignature().getPointer(), { },
+        std::move(requirements)},
+      GenericSignature())->getCanonicalSignature();
 }
 
 DeclContext *

@@ -191,7 +191,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericSignature *Sig) {
+                          GenericSignature Sig) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -457,7 +457,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericSignature *GenericSig = nullptr;
+    GenericSignature GenericSig = GenericSignature();
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -477,7 +477,7 @@ namespace {
           ctx.evaluator,
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
-          nullptr);
+          GenericSignature());
     }
 
     template <class G>

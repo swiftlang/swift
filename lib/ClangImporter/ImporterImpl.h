@@ -789,7 +789,7 @@ public:
                            Version version, ProtocolDecl *proto);
 
   /// Utility function for building simple generic signatures.
-  GenericSignature *buildGenericSignature(GenericParamList *genericParams,
+  GenericSignature buildGenericSignature(GenericParamList *genericParams,
                                           DeclContext *dc);
 
   /// Import the given Clang declaration context into Swift.

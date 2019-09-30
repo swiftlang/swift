@@ -653,7 +653,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
   GenericEnvironment *genericEnv = nullptr;
   if (!declarationOnly)
-    if (auto *genericSig = MF->getGenericSignature(genericSigID))
+    if (auto genericSig = MF->getGenericSignature(genericSigID))
       genericEnv = genericSig->getGenericEnvironment();
 
   // If the next entry is the end of the block, then this function has
@@ -2446,7 +2446,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     SmallVector<Requirement, 4> requirements;
     MF->readGenericRequirements(requirements, SILCursor);
     
-    CanGenericSignature sig = nullptr;
+    CanGenericSignature sig = CanGenericSignature();
     if (!genericParams.empty() || !requirements.empty())
       sig = GenericSignature::get(genericParams, requirements)
          ->getCanonicalSignature();

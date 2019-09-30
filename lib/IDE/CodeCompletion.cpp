@@ -1917,7 +1917,7 @@ public:
   /// protocol compositions.
   ///
   /// FIXME: Perhaps this should be an option in PrintOptions instead.
-  Type eraseArchetypes(Type type, GenericSignature *genericSig) {
+  Type eraseArchetypes(Type type, GenericSignature genericSig) {
     if (!genericSig)
       return type;
 
@@ -2042,7 +2042,7 @@ public:
   }
 
   Type getTypeOfMember(const ValueDecl *VD, Type ExprType) {
-    auto *GenericSig = VD->getInnermostDeclContext()
+    auto GenericSig = VD->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
 
     Type T = VD->getInterfaceType();

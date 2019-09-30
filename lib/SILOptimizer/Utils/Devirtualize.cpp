@@ -886,13 +886,13 @@ static SubstitutionMap
 getWitnessMethodSubstitutions(
     ModuleDecl *mod,
     ProtocolConformanceRef conformanceRef,
-    GenericSignature *requirementSig,
-    GenericSignature *witnessThunkSig,
+    GenericSignature requirementSig,
+    GenericSignature witnessThunkSig,
     SubstitutionMap origSubMap,
     bool isSelfAbstract,
     ClassDecl *classWitness) {
 
-  if (witnessThunkSig == nullptr)
+  if (witnessThunkSig.isNull())
     return SubstitutionMap();
 
   if (isSelfAbstract && !classWitness)
@@ -907,7 +907,7 @@ getWitnessMethodSubstitutions(
 
   unsigned baseDepth = 0;
   auto *rootConformance = conformance->getRootConformance();
-  if (auto *witnessSig = rootConformance->getGenericSignature())
+  if (auto witnessSig = rootConformance->getGenericSignature())
     baseDepth = witnessSig->getGenericParams().back()->getDepth() + 1;
 
   // If the witness has a class-constrained 'Self' generic parameter,

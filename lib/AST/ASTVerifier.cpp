@@ -194,7 +194,7 @@ class Verifier : public ASTWalker {
   SmallVector<ScopeLike, 4> Scopes;
 
   /// The stack of generic contexts.
-  using GenericLike = llvm::PointerUnion<DeclContext *, GenericSignature *>;
+  using GenericLike = llvm::PointerUnion<DeclContext *, GenericSignature>;
   SmallVector<GenericLike, 2> Generics;
 
   /// The stack of optional evaluations active at this point.
@@ -627,16 +627,16 @@ public:
           // Get the archetype's generic signature.
           auto rootPrimary = cast<PrimaryArchetypeType>(root);
           auto *archetypeEnv = rootPrimary->getGenericEnvironment();
-          auto *archetypeSig = archetypeEnv->getGenericSignature();
+          auto archetypeSig = archetypeEnv->getGenericSignature();
 
           auto genericCtx = Generics.back();
-          GenericSignature *genericSig;
+          GenericSignature genericSig;
           if (auto *genericDC = genericCtx.dyn_cast<DeclContext *>())
             genericSig = genericDC->getGenericSignatureOfContext();
           else
-            genericSig = genericCtx.get<GenericSignature *>();
+            genericSig = genericCtx.get<GenericSignature>();
 
-          if (genericSig != archetypeSig) {
+          if (genericSig.getPointer() != archetypeSig.getPointer()) {
             Out << "Archetype " << root->getString() << " not allowed "
                 << "in this context\n";
             Out << "Archetype generic signature: "
@@ -2686,8 +2686,8 @@ public:
           verifyChecked(witness.getSubstitutions());
 
           if (auto *genericEnv = witness.getSyntheticEnvironment()) {
-            assert(Generics.back().get<GenericSignature*>()
-                   == genericEnv->getGenericSignature());
+            assert(Generics.back().get<GenericSignature>().getPointer()
+                   == genericEnv->getGenericSignature().getPointer());
             Generics.pop_back();
           }
 
@@ -2991,7 +2991,7 @@ public:
       // If the function has a generic interface type, it should also have a
       // generic signature.
       if (AFD->isGenericContext() !=
-          (AFD->getGenericSignature() != nullptr)) {
+          (!AFD->getGenericSignature().isNull())) {
         Out << "Functions in generic context must have a generic signature\n";
         AFD->dump(Out);
         abort();

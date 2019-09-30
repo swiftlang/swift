@@ -550,9 +550,9 @@ swift::matchWitness(
 /// multiple protocols or conformances.
 static const RequirementEnvironment &getOrCreateRequirementEnvironment(
     WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-    DeclContext *dc, GenericSignature *reqSig, ProtocolDecl *proto,
+    DeclContext *dc, GenericSignature reqSig, ProtocolDecl *proto,
     ClassDecl *covariantSelf, ProtocolConformance *conformance) {
-  WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig,
+  WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig.getPointer(),
                                                           covariantSelf);
   auto cacheIter = reqEnvCache.find(cacheKey);
   if (cacheIter == reqEnvCache.end()) {
@@ -650,7 +650,7 @@ swift::matchWitness(TypeChecker &tc,
   Type openedFullWitnessType;
   Type reqType, openedFullReqType;
 
-  auto *reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
+  auto reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
 
   ClassDecl *covariantSelf = nullptr;
   if (witness->getDeclContext()->getExtendedProtocolDecl()) {
@@ -1765,7 +1765,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   if (!decl->getDeclContext()->isTypeContext())
     return type;
 
-  GenericSignature *sigWithoutReqts = nullptr;
+  GenericSignature sigWithoutReqts = GenericSignature();
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
     // For generic functions, build a new generic function... but strip off
     // the requirements. They don't add value.
@@ -1821,7 +1821,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
     auto result = substType(fnTy->getResult(), /*result*/true);
 
-    auto *genericSig = fnTy->getOptGenericSignature();
+    auto genericSig = fnTy->getOptGenericSignature();
     if (genericSig) {
       if (genericSig->getGenericParams().size() > 1) {
         genericSig = GenericSignature::get(
@@ -3387,7 +3387,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                ProtocolDecl *proto,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
-  auto *genericSig = proto->getGenericSignature();
+  auto genericSig = proto->getGenericSignature();
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 

@@ -36,7 +36,7 @@
 using namespace swift;
 
 SubstitutionMap::Storage::Storage(
-                              GenericSignature *genericSig,
+                              GenericSignature genericSig,
                               ArrayRef<Type> replacementTypes,
                               ArrayRef<ProtocolConformanceRef> conformances)
   : genericSig(genericSig),
@@ -53,7 +53,7 @@ SubstitutionMap::Storage::Storage(
 }
 
 SubstitutionMap::SubstitutionMap(
-                                GenericSignature *genericSig,
+                                GenericSignature genericSig,
                                 ArrayRef<Type> replacementTypes,
                                 ArrayRef<ProtocolConformanceRef> conformances)
   : storage(Storage::get(genericSig, replacementTypes, conformances)) { }
@@ -92,12 +92,12 @@ ArrayRef<Type> SubstitutionMap::getReplacementTypes() const {
   return getReplacementTypesBuffer();
 }
 
-GenericSignature *SubstitutionMap::getGenericSignature() const {
+GenericSignature SubstitutionMap::getGenericSignature() const {
   return storage ? storage->getGenericSignature() : nullptr;
 }
 
 bool SubstitutionMap::empty() const {
-  return getGenericSignature() == nullptr;
+  return getGenericSignature().isNull();
 }
 
 bool SubstitutionMap::hasAnySubstitutableParams() const {
@@ -172,7 +172,7 @@ SubstitutionMap SubstitutionMap::getCanonical() const {
 }
 
 
-SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
+SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      SubstitutionMap substitutions) {
   if (!genericSig) {
     assert(!substitutions.hasAnySubstitutableParams() &&
@@ -190,7 +190,7 @@ SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
 
 /// Build an interface type substitution map for the given generic signature
 /// from a type substitution function and conformance lookup function.
-SubstitutionMap SubstitutionMap::get(GenericSignature *genericSig,
+SubstitutionMap SubstitutionMap::get(GenericSignature genericSig,
                                      TypeSubstitutionFn subs,
                                      LookupConformanceFn lookupConformance) {
   if (!genericSig) {
@@ -354,7 +354,7 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // Check whether the superclass conforms.
   if (auto superclass = genericSig->getSuperclassBound(type)) {
-    LookUpConformanceInSignature lookup(*getGenericSignature());
+    LookUpConformanceInSignature lookup(getGenericSignature().getPointer());
     if (auto conformance = lookup(type->getCanonicalType(), superclass, proto))
       return conformance;
   }
@@ -454,7 +454,7 @@ SubstitutionMap SubstitutionMap::subst(TypeSubstitutionFn subs,
   SmallVector<ProtocolConformanceRef, 4> newConformances;
   auto oldConformances = getConformances();
 
-  auto *genericSig = getGenericSignature();
+  auto genericSig = getGenericSignature();
   for (const auto &req : genericSig->getRequirements()) {
     if (req.getKind() != RequirementKind::Conformance) continue;
 
@@ -512,9 +512,9 @@ SubstitutionMap::getOverrideSubstitutions(
   auto *baseClass = baseDecl->getDeclContext()->getSelfClassDecl();
   auto *derivedClass = derivedDecl->getDeclContext()->getSelfClassDecl();
 
-  auto *baseSig = baseDecl->getInnermostDeclContext()
+  auto baseSig = baseDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-  auto *derivedSig = derivedDecl->getInnermostDeclContext()
+  auto derivedSig = derivedDecl->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
 
   return getOverrideSubstitutions(baseClass, derivedClass,
@@ -525,17 +525,17 @@ SubstitutionMap::getOverrideSubstitutions(
 SubstitutionMap
 SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
                                           const ClassDecl *derivedClass,
-                                          GenericSignature *baseSig,
-                                          GenericSignature *derivedSig,
+                                          GenericSignature baseSig,
+                                          GenericSignature derivedSig,
                                           Optional<SubstitutionMap> derivedSubs) {
-  if (baseSig == nullptr)
+  if (baseSig.isNull())
     return SubstitutionMap();
 
   auto *M = baseClass->getParentModule();
 
   unsigned baseDepth = 0;
   SubstitutionMap baseSubMap;
-  if (auto *baseClassSig = baseClass->getGenericSignature()) {
+  if (auto baseClassSig = baseClass->getGenericSignature()) {
     baseDepth = baseClassSig->getGenericParams().back()->getDepth() + 1;
 
     auto derivedClassTy = derivedClass->getDeclaredInterfaceType();
@@ -549,7 +549,7 @@ SubstitutionMap::getOverrideSubstitutions(const ClassDecl *baseClass,
   }
 
   unsigned origDepth = 0;
-  if (auto *derivedClassSig = derivedClass->getGenericSignature())
+  if (auto derivedClassSig = derivedClass->getGenericSignature())
     origDepth = derivedClassSig->getGenericParams().back()->getDepth() + 1;
 
   SubstitutionMap origSubMap;
@@ -574,7 +574,7 @@ SubstitutionMap::combineSubstitutionMaps(SubstitutionMap firstSubMap,
                                          CombineSubstitutionMaps how,
                                          unsigned firstDepthOrIndex,
                                          unsigned secondDepthOrIndex,
-                                         GenericSignature *genericSig) {
+                                         GenericSignature genericSig) {
   auto &ctx = genericSig->getASTContext();
 
   auto replaceGenericParameter = [&](Type type) -> Type {
@@ -669,7 +669,7 @@ bool SubstitutionMap::isIdentity() const {
   if (empty())
     return true;
 
-  GenericSignature *sig = getGenericSignature();
+  GenericSignature sig = getGenericSignature();
   bool hasNonIdentityReplacement = false;
   auto replacements = getReplacementTypesBuffer();
 
