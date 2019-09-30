@@ -265,11 +265,6 @@ TypeRepr *ASTGen::generate(const TypeSyntax &Type, const SourceLoc Loc,
   else if (auto Unknown = Type.getAs<UnknownTypeSyntax>())
     TypeAST = generate(*Unknown, Loc);
 
-  // todo [gsoc]: handle InheritedTypeSyntax & ClassRestrictionTypeSyntax?
-
-  if (!TypeAST && hasType(advanceLocBegin(Loc, Type)))
-    TypeAST = getType(advanceLocBegin(Loc, Type));
-
   return cacheType(Type, TypeAST);
 }
 
@@ -1063,18 +1058,6 @@ TypeRepr *ASTGen::cacheType(TypeSyntax Type, TypeRepr *TypeAST) {
 TypeRepr *ASTGen::lookupType(TypeSyntax Type) {
   auto Found = TypeCache.find(Type.getId());
   return Found != TypeCache.end() ? Found->second : nullptr;
-}
-
-void ASTGen::addType(TypeRepr *Type, const SourceLoc Loc) {
-  Types.insert({Loc, Type});
-}
-
-bool ASTGen::hasType(const SourceLoc Loc) const {
-  return Types.find(Loc) != Types.end();
-}
-
-TypeRepr *ASTGen::getType(const SourceLoc Loc) const {
-  return Types.find(Loc)->second;
 }
 
 void ASTGen::addDeclAttributes(DeclAttributes attrs, SourceLoc Loc) {
