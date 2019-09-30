@@ -12,7 +12,7 @@
 
 #include "DocFormat.h"
 #include "Serialization.h"
-
+#include "SourceInfoFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
@@ -298,6 +298,44 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
   GroupNames.emit(Scratch, BlobStream.str());
 }
 
+static bool shouldIncludeDecl(Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    // Skip the decl if it's not visible to clients. The use of
+    // getEffectiveAccess is unusual here; we want to take the testability
+    // state into account and emit documentation if and only if they are
+    // visible to clients (which means public ordinarily, but
+    // public+internal when testing enabled).
+    if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
+      return false;
+  }
+  // Exclude decls with double-underscored names, either in arguments or
+  // base names.
+  StringRef Prefix = "__";
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    return shouldIncludeDecl(ED->getExtendedNominal());
+  }
+
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // If it's a function with a parameter with leading double underscore,
+    // it's a private function.
+    if (AFD->getParameters()->hasInternalParameter(Prefix))
+      return false;
+  }
+
+  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+    if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
+      return false;
+  }
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    auto Name = VD->getBaseName();
+    if (!Name.isSpecial() &&
+        Name.getIdentifier().str().startswith(Prefix)) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static void writeDeclCommentTable(
     const comment_block::DeclCommentListLayout &DeclCommentList,
     const SourceFile *SF, const ModuleDecl *M,
@@ -321,44 +359,6 @@ static void writeDeclCommentTable(
       char *Mem = static_cast<char *>(Arena.Allocate(String.size(), 1));
       std::copy(String.begin(), String.end(), Mem);
       return StringRef(Mem, String.size());
-    }
-
-    bool shouldIncludeDecl(Decl *D) {
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        // Skip the decl if it's not visible to clients. The use of
-        // getEffectiveAccess is unusual here; we want to take the testability
-        // state into account and emit documentation if and only if they are
-        // visible to clients (which means public ordinarily, but
-        // public+internal when testing enabled).
-        if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
-          return false;
-      }
-      // Exclude decls with double-underscored names, either in arguments or
-      // base names.
-      StringRef Prefix = "__";
-      if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-        return shouldIncludeDecl(ED->getExtendedNominal());
-      }
-
-      if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-        // If it's a function with a parameter with leading double underscore,
-        // it's a private function.
-        if (AFD->getParameters()->hasInternalParameter(Prefix))
-          return false;
-      }
-
-      if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-        if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
-          return false;
-      }
-      if (auto *VD = dyn_cast<ValueDecl>(D)) {
-        auto Name = VD->getBaseName();
-        if (!Name.isSpecial() &&
-            Name.getIdentifier().str().startswith(Prefix)) {
-          return false;
-        }
-      }
-      return true;
     }
 
     bool shouldSerializeDoc(Decl *D) {
@@ -502,7 +502,390 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 
   S.writeToStream(os);
 }
+namespace {
+struct LineColoumn {
+  uint32_t Line = UINT32_MAX;
+  uint32_t Column = UINT32_MAX;
+};
 
+struct DeclLocationsTableData {
+  uint32_t SourceFileID;
+  LineColoumn Loc;
+  LineColoumn NameLoc;
+  LineColoumn StartLoc;
+  LineColoumn EndLoc;
+};
+
+class DeclLocsTableInfo {
+public:
+  using key_type = uint32_t;
+  using key_type_ref = key_type;
+  using data_type = DeclLocationsTableData;
+  using data_type_ref = const data_type &;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  hash_value_type ComputeHash(key_type_ref key) {
+    return key;
+  }
+
+  std::pair<unsigned, unsigned>
+  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+    const unsigned numLen = 4;
+    const unsigned LineColumnLen = numLen * 2;
+    uint32_t keyLength = numLen;
+    uint32_t dataLength = 0;
+
+    // File ID
+    dataLength += numLen;
+
+    // Loc
+    dataLength += LineColumnLen;
+
+    // NameLoc
+    dataLength += LineColumnLen;
+
+    // StartLoc
+    dataLength += LineColumnLen;
+
+    // EndLoc
+    dataLength += LineColumnLen;
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(keyLength);
+    writer.write<uint32_t>(dataLength);
+    return { keyLength, dataLength };
+  }
+
+  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(key);
+  }
+
+  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data, unsigned len) {
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(data.SourceFileID);
+#define WRITE_LINE_COLUMN(X)                                                                      \
+writer.write<uint32_t>(data.X.Line);                                                              \
+writer.write<uint32_t>(data.X.Column);
+    WRITE_LINE_COLUMN(Loc)
+    WRITE_LINE_COLUMN(NameLoc);
+    WRITE_LINE_COLUMN(StartLoc);
+    WRITE_LINE_COLUMN(EndLoc);
+#undef WRITE_LINE_COLUMN
+  }
+};
+
+class USRTableInfo {
+public:
+  using key_type = StringRef;
+  using key_type_ref = key_type;
+  using data_type = uint32_t;
+  using data_type_ref = const data_type &;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  hash_value_type ComputeHash(key_type_ref key) {
+    assert(!key.empty());
+    return llvm::djbHash(key, SWIFTSOURCEINFO_HASH_SEED);
+  }
+
+  std::pair<unsigned, unsigned>
+  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+    const unsigned numLen = 4;
+    uint32_t keyLength = key.size();
+    uint32_t dataLength = numLen;
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(keyLength);
+    writer.write<uint32_t>(dataLength);
+    return { keyLength, dataLength };
+  }
+
+  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    out << key;
+  }
+
+  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data, unsigned len) {
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(data);
+  }
+};
+
+class DeclUSRsTableWriter {
+  llvm::StringMap<uint32_t> USRMap;
+  llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
+  uint32_t CurId = 0;
+public:
+  uint32_t getUSRID(StringRef USR) {
+    if (USRMap.find(USR) == USRMap.end()) {
+      ++CurId;
+      generator.insert(USRMap.insert(std::make_pair(USR, CurId)).first->getKey(), CurId);
+    }
+    return USRMap.find(USR)->second;
+  }
+  void emitUSRsRecord(llvm::BitstreamWriter &out) {
+    sourceinfo_block::DeclUSRSLayout USRsList(out);
+    SmallVector<uint64_t, 8> scratch;
+    llvm::SmallString<32> hashTableBlob;
+    uint32_t tableOffset;
+    {
+      llvm::raw_svector_ostream blobStream(hashTableBlob);
+      // Make sure that no bucket is at offset 0
+      endian::write<uint32_t>(blobStream, 0, little);
+      tableOffset = generator.Emit(blobStream);
+    }
+    USRsList.emit(scratch, tableOffset, hashTableBlob);
+  }
+};
+
+class FilePathsTableInfo {
+public:
+  using key_type = uint32_t;
+  using key_type_ref = key_type;
+  using data_type = StringRef;
+  using data_type_ref = const data_type &;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  hash_value_type ComputeHash(key_type_ref key) {
+    return key;
+  }
+
+  std::pair<unsigned, unsigned>
+  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
+    const unsigned numLen = 4;
+    uint32_t keyLength = numLen;
+    uint32_t dataLength = data.size();
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(keyLength);
+    writer.write<uint32_t>(dataLength);
+    return { keyLength, dataLength };
+  }
+
+  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(key);
+  }
+
+  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data, unsigned len) {
+    out << data;
+  }
+};
+
+class FilePathTableWriter {
+  llvm::StringMap<uint32_t> PathIDMap;
+  llvm::OnDiskChainedHashTableGenerator<FilePathsTableInfo> generator;
+  uint32_t CurId = 0;
+public:
+  uint32_t getFileID(StringRef Path) {
+    if (PathIDMap.find(Path) == PathIDMap.end()) {
+      ++CurId;
+      generator.insert(CurId, PathIDMap.insert(std::make_pair(Path, CurId)).first->getKey());
+    }
+    return PathIDMap.find(Path)->second;
+  }
+  void emitSourceFilesRecord(llvm::BitstreamWriter &Out) {
+    sourceinfo_block::SourceFilePathsLayout SourceFilesList(Out);
+    SmallVector<uint64_t, 8> scratch;
+    llvm::SmallString<32> hashTableBlob;
+    uint32_t tableOffset;
+    {
+      llvm::raw_svector_ostream blobStream(hashTableBlob);
+      // Make sure that no bucket is at offset 0
+      endian::write<uint32_t>(blobStream, 0, little);
+      tableOffset = generator.Emit(blobStream);
+    }
+    SourceFilesList.emit(scratch, tableOffset, hashTableBlob);
+  }
+};
+
+struct BasicDeclLocsTableWriter : public ASTWalker {
+  llvm::OnDiskChainedHashTableGenerator<DeclLocsTableInfo> generator;
+  DeclUSRsTableWriter &USRWriter;
+  FilePathTableWriter &FWriter;
+  BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
+                           FilePathTableWriter &FWriter): USRWriter(USRWriter), FWriter(FWriter) {}
+
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S }; }
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E }; }
+  bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
+  bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+  bool walkToParameterListPre(ParameterList *PL) override { return false; }
+
+  Optional<uint32_t> calculateUSRId(Decl *D) {
+    llvm::SmallString<512> Buffer;
+    llvm::raw_svector_ostream OS(Buffer);
+    if (ide::printDeclUSRForModuleDoc(D, OS))
+      return None;
+    return USRWriter.getUSRID(OS.str());
+  }
+
+  LineColoumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
+    LineColoumn Result;
+    if (Loc.isValid()) {
+      auto LC = SM.getLineAndColumn(Loc);
+      Result.Line = LC.first;
+      Result.Column = LC.second;
+    }
+    return Result;
+  }
+
+  Optional<DeclLocationsTableData> getLocDataFromSource(Decl *D, SourceFile *SF) {
+    if (SF->getFilename().empty())
+      return None;
+    if (!SF->getBufferID().hasValue())
+      return None;
+    auto &SM = D->getASTContext().SourceMgr;
+    DeclLocationsTableData Result;
+    SmallString<128> SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
+    Result.SourceFileID = FWriter.getFileID(SourceFilePath);
+    Result.Loc = getLineColumn(SM, D->getLoc());
+    if (auto *VD = dyn_cast<ValueDecl>(D)) {
+      Result.NameLoc = getLineColumn(SM, VD->getNameLoc());
+    } else if(auto *OD = dyn_cast<OperatorDecl>(D)) {
+      Result.NameLoc = getLineColumn(SM, OD->getNameLoc());
+    } else if(auto *PD = dyn_cast<PrecedenceGroupDecl>(D)) {
+      Result.NameLoc = getLineColumn(SM, PD->getNameLoc());
+    }
+    Result.StartLoc = getLineColumn(SM, D->getStartLoc());
+    Result.EndLoc = getLineColumn(SM, D->getEndLoc());
+    return Result;
+  }
+
+  Optional<DeclLocationsTableData> getLocData(Decl *D) {
+    auto *File = D->getDeclContext()->getModuleScopeContext();
+    if (auto *SF = dyn_cast<SourceFile>(File)) {
+      return getLocDataFromSource(D, SF);
+    } else {
+      auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
+      if (!Locs.hasValue())
+        return None;
+      DeclLocationsTableData Result;
+      Result.SourceFileID = FWriter.getFileID(Locs->SourceFilePath);
+#define FIELD(X)                                                                                  \
+      if (Locs->X.hasValue()) {                                                                   \
+        Result.X.Line = Locs->X->Line;                                                            \
+        Result.X.Column = Locs->X->Column;                                                        \
+      }
+      FIELD(Loc)
+      FIELD(NameLoc)
+      FIELD(StartLoc)
+      FIELD(EndLoc)
+#undef FIELD
+      return Result;
+    }
+  }
+
+  bool shouldSerializeSourceLoc(Decl *D) {
+    if (D->isImplicit())
+      return false;
+    return true;
+  }
+
+  bool walkToDeclPre(Decl *D) override {
+    if (!shouldIncludeDecl(D))
+      return false;
+    if (!shouldSerializeSourceLoc(D))
+      return true;
+    auto USR = calculateUSRId(D);
+    auto LocData = getLocData(D);
+    if (!USR.hasValue() || !LocData.hasValue())
+      return true;
+    generator.insert(*USR, *LocData);
+    return true;
+  }
+};
+
+static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
+                                ModuleOrSourceFile MSF, DeclUSRsTableWriter &USRWriter,
+                                FilePathTableWriter &FWriter) {
+  assert(MSF);
+  const sourceinfo_block::BasicDeclLocsLayout DeclLocsList(Out);
+  BasicDeclLocsTableWriter Writer(USRWriter, FWriter);
+  if (auto *SF = MSF.dyn_cast<SourceFile*>()) {
+    SF->walk(Writer);
+  } else {
+    MSF.get<ModuleDecl*>()->walk(Writer);
+  }
+
+  SmallVector<uint64_t, 8> scratch;
+  llvm::SmallString<32> hashTableBlob;
+  uint32_t tableOffset;
+  {
+    llvm::raw_svector_ostream blobStream(hashTableBlob);
+    // Make sure that no bucket is at offset 0
+    endian::write<uint32_t>(blobStream, 0, little);
+    tableOffset = Writer.generator.Emit(blobStream);
+  }
+  DeclLocsList.emit(scratch, tableOffset, hashTableBlob);
+}
+
+class SourceInfoSerializer : public SerializerBase {
+public:
+  using SerializerBase::SerializerBase;
+  using SerializerBase::writeToStream;
+
+  using SerializerBase::Out;
+  using SerializerBase::M;
+  using SerializerBase::SF;
+  /// Writes the BLOCKINFO block for the module documentation file.
+  void writeSourceInfoBlockInfoBlock() {
+    BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
+
+    SmallVector<unsigned char, 64> nameBuffer;
+#define BLOCK(X) emitBlockID(X ## _ID, #X, nameBuffer)
+#define BLOCK_RECORD(K, X) emitRecordID(K::X, #X, nameBuffer)
+
+    BLOCK(MODULE_SOURCEINFO_BLOCK);
+
+    BLOCK(CONTROL_BLOCK);
+    BLOCK_RECORD(control_block, METADATA);
+    BLOCK_RECORD(control_block, MODULE_NAME);
+    BLOCK_RECORD(control_block, TARGET);
+
+    BLOCK(DECL_LOCS_BLOCK);
+    BLOCK_RECORD(sourceinfo_block, BASIC_DECL_LOCS);
+    BLOCK_RECORD(sourceinfo_block, DECL_USRS);
+    BLOCK_RECORD(sourceinfo_block, SOURCE_FILE_PATHS);
+
+#undef BLOCK
+#undef BLOCK_RECORD
+  }
+  /// Writes the Swift sourceinfo file header and name.
+  void writeSourceInfoHeader() {
+    {
+      BCBlockRAII restoreBlock(Out, CONTROL_BLOCK_ID, 3);
+      control_block::ModuleNameLayout ModuleName(Out);
+      control_block::MetadataLayout Metadata(Out);
+      control_block::TargetLayout Target(Out);
+
+      auto& LangOpts = M->getASTContext().LangOpts;
+      Metadata.emit(ScratchRecord, SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR,
+                    /*short version string length*/0, /*compatibility length*/0,
+                    version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion));
+
+      ModuleName.emit(ScratchRecord, M->getName().str());
+      Target.emit(ScratchRecord, LangOpts.Target.str());
+    }
+  }
+};
+}
 void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC) {
-  os << "Some stuff";
+  assert(DC);
+  SourceInfoSerializer S{SWIFTSOURCEINFO_SIGNATURE, DC};
+  // FIXME: This is only really needed for debugging. We don't actually use it.
+  S.writeSourceInfoBlockInfoBlock();
+  {
+    BCBlockRAII moduleBlock(S.Out, MODULE_SOURCEINFO_BLOCK_ID, 2);
+    S.writeSourceInfoHeader();
+    {
+      BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
+      DeclUSRsTableWriter USRWriter;
+      FilePathTableWriter FPWriter;
+      emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
+      USRWriter.emitUSRsRecord(S.Out);
+      FPWriter.emitSourceFilesRecord(S.Out);
+    }
+  }
+
+  S.writeToStream(os);
 }

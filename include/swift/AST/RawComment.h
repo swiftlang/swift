@@ -78,6 +78,19 @@ struct CommentInfo {
   uint32_t SourceOrder;
 };
 
+struct LineColumn {
+  uint32_t Line;
+  uint32_t Column;
+};
+
+struct BasicDeclLocs {
+  StringRef SourceFilePath;
+  Optional<LineColumn> Loc;
+  Optional<LineColumn> NameLoc;
+  Optional<LineColumn> StartLoc;
+  Optional<LineColumn> EndLoc;
+};
+
 } // namespace swift
 
 #endif // LLVM_SWIFT_AST_RAW_COMMENT_H

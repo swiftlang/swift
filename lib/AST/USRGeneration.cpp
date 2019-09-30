@@ -341,3 +341,19 @@ bool ide::printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS) {
   return true;
 }
 
+bool ide::printDeclUSRForModuleDoc(const Decl *D, raw_ostream &OS) {
+  if (D->isImplicit())
+    return true;
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (ide::printDeclUSR(VD, OS)) {
+      return true;
+    }
+  } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    if (ide::printExtensionUSR(ED, OS)) {
+      return true;
+    }
+  } else {
+    return true;
+  }
+  return false;
+}

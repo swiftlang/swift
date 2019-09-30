@@ -131,6 +131,10 @@ public:
     return None;
   }
 
+  virtual Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const {
+    return None;
+  }
+
   virtual void collectAllGroups(std::vector<StringRef> &Names) const {}
 
   /// Returns an implementation-defined "discriminator" for \p D, which

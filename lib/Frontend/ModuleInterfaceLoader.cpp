@@ -988,8 +988,10 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
   StringRef ModuleDocFilename,
+  StringRef ModuleSourceInfoFilename,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.

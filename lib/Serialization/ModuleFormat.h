@@ -638,6 +638,19 @@ enum BlockID {
   ///
   /// \sa comment_block
   COMMENT_BLOCK_ID,
+
+  /// The module source location container block, which contains all other
+  /// source location blocks.
+  ///
+  /// This is part of a stable format and must not be renumbered!
+  MODULE_SOURCEINFO_BLOCK_ID = 192,
+
+  /// The source location block, which contains decl locations.
+  ///
+  /// This is part of a stable format and must not be renumbered!
+  ///
+  /// \sa sourceinfo_block
+  DECL_LOCS_BLOCK_ID,
 };
 
 /// The record types within the control block.

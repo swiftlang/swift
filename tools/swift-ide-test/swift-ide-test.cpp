@@ -2510,6 +2510,18 @@ public:
     }
   }
 
+  void printSerializedLoc(Decl *D) {
+    auto moduleLoc = cast<FileUnit>(D->getDeclContext()->getModuleScopeContext())->
+      getBasicLocsForDecl(D);
+    if (!moduleLoc.hasValue())
+      return;
+    if (!moduleLoc->Loc.hasValue())
+      return;
+    OS << moduleLoc->SourceFilePath
+       << ":" << moduleLoc->Loc->Line
+       << ":" << moduleLoc->Loc->Column << ": ";
+  }
+
   bool walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
       return true;
@@ -2518,8 +2530,10 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << SM.getDisplayNameForLoc(VD->getLoc())
+        OS << SM.getDisplayNameForLoc(Loc)
            << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      } else {
+        printSerializedLoc(D);
       }
       OS << Decl::getKindName(VD->getKind()) << "/";
       printDeclName(VD);
@@ -2535,8 +2549,10 @@ public:
       SourceLoc Loc = D->getLoc();
       if (Loc.isValid()) {
         auto LineAndColumn = SM.getLineAndColumn(Loc);
-        OS << SM.getDisplayNameForLoc(D->getLoc())
+        OS << SM.getDisplayNameForLoc(Loc)
         << ":" << LineAndColumn.first << ":" << LineAndColumn.second << ": ";
+      } else {
+        printSerializedLoc(D);
       }
       OS << Decl::getKindName(D->getKind()) << "/";
       OS << " ";

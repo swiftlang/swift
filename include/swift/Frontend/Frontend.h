@@ -395,6 +395,7 @@ class CompilerInstance {
   struct PartialModuleInputs {
     std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
     std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer;
   };
 
   /// Contains \c MemoryBuffers for partial serialized module files and
@@ -555,13 +556,17 @@ private:
 
   Optional<unsigned> getRecordedBufferID(const InputFile &input, bool &failed);
 
+  struct ModuleBuffers {
+    std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> ModuleDocBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> ModuleSourceInfoBuffer;
+  };
+
   /// Given an input file, return a buffer to use for its contents,
   /// and a buffer for the corresponding module doc file if one exists.
   /// On failure, return a null pointer for the first element of the returned
   /// pair.
-  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
-            std::unique_ptr<llvm::MemoryBuffer>>
-  getInputBufferAndModuleDocBufferIfPresent(const InputFile &input);
+  ModuleBuffers getInputBuffersIfPresent(const InputFile &input);
 
   /// Try to open the module doc file corresponding to the input parameter.
   /// Return None for error, nullptr if no such file exists, or the buffer if
@@ -569,6 +574,11 @@ private:
   Optional<std::unique_ptr<llvm::MemoryBuffer>>
   openModuleDoc(const InputFile &input);
 
+  /// Try to open the module source info file corresponding to the input parameter.
+  /// Return None for error, nullptr if no such file exists, or the buffer if
+  /// one was found.
+  Optional<std::unique_ptr<llvm::MemoryBuffer>>
+  openModuleSourceInfo(const InputFile &input);
 public:
   /// Parses and type-checks all input files.
   void performSema();

@@ -14,6 +14,7 @@
 #include "BCReadingExtras.h"
 #include "DeserializationErrors.h"
 #include "DocFormat.h"
+#include "SourceInfoFormat.h"
 #include "ModuleFormat.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Subsystems.h"
@@ -1222,13 +1223,272 @@ bool ModuleFile::readModuleDocIfPresent() {
   return true;
 }
 
+class ModuleFile::BasicDeclLocTableInfo {
+  ModuleFile &F;
+public:
+  using internal_key_type = uint32_t;
+  using external_key_type = StringRef;
+  using data_type = BasicDeclLocs;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+  BasicDeclLocTableInfo(ModuleFile &F): F(F) {}
+  hash_value_type ComputeHash(internal_key_type key) { return key; }
+
+  internal_key_type GetInternalKey(external_key_type key) {
+    return F.getDeclUSRId(key);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    assert(length == 4);
+    return *reinterpret_cast<const uint32_t*>(data);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data,
+                     unsigned length) {
+    data_type result;
+    result.SourceFilePath =
+      F.getSourceFilePathById(endian::readNext<uint32_t, little, unaligned>(data));
+    auto readPair = [](const uint8_t *&data) -> Optional<LineColumn> {
+      LineColumn Result;
+      Result.Line = endian::readNext<uint32_t, little, unaligned>(data);
+      Result.Column = endian::readNext<uint32_t, little, unaligned>(data);
+      if (Result.Line == UINT32_MAX || Result.Column == UINT32_MAX) {
+        return None;
+      }
+      return Result;
+    };
+#define READ(X) result.X = readPair(data);
+    READ(Loc)
+    READ(NameLoc)
+    READ(StartLoc)
+    READ(EndLoc)
+#undef READ
+    return result;
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedBasicDeclLocsTable>
+ModuleFile::readBasicDeclLocsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  if (fields.empty() || blobData.empty())
+     return nullptr;
+   uint32_t tableOffset = static_cast<uint32_t>(fields.front());
+   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+   return std::unique_ptr<SerializedBasicDeclLocsTable>(
+     SerializedBasicDeclLocsTable::Create(base + tableOffset,
+                                          base + sizeof(uint32_t), base,
+                                          BasicDeclLocTableInfo(*this)));
+}
+
+class ModuleFile::SourceFilePathTableInfo {
+  public:
+  using internal_key_type = uint32_t;
+  using external_key_type = uint32_t;
+  using data_type = StringRef;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type key) { return key; }
+
+  hash_value_type ComputeHash(internal_key_type key) { return key; }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) { return lhs == rhs; }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    assert(length == 4);
+    return *reinterpret_cast<const uint32_t*>(data);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char*>(data), length);
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedSourceFilePathTable>
+ModuleFile::readSourceFilePathsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  if (fields.empty() || blobData.empty())
+     return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+  return std::unique_ptr<SerializedSourceFilePathTable>(
+    SerializedSourceFilePathTable::Create(base + tableOffset,
+                                          base + sizeof(uint32_t), base,
+                                          SourceFilePathTableInfo()));
+}
+
+class ModuleFile::DeclUSRTableInfo {
+  public:
+  using internal_key_type = StringRef;
+  using external_key_type = StringRef;
+  using data_type = uint32_t;
+  using hash_value_type = uint32_t;
+  using offset_type = unsigned;
+
+  internal_key_type GetInternalKey(external_key_type key) { return key; }
+
+  hash_value_type ComputeHash(internal_key_type key) {
+    assert(!key.empty());
+    return llvm::djbHash(key, SWIFTSOURCEINFO_HASH_SEED);
+  }
+
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) { return lhs == rhs; }
+
+  static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
+    unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
+    unsigned dataLength = endian::readNext<uint32_t, little, unaligned>(data);
+    return { keyLength, dataLength };
+  }
+
+  static internal_key_type ReadKey(const uint8_t *data, unsigned length) {
+    return StringRef(reinterpret_cast<const char*>(data), length);
+  }
+
+  data_type ReadData(internal_key_type key, const uint8_t *data, unsigned length) {
+    assert(length == 4);
+    return *reinterpret_cast<const uint32_t*>(data);
+  }
+};
+
+std::unique_ptr<ModuleFile::SerializedDeclUSRTable>
+ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
+  if (fields.empty() || blobData.empty())
+     return nullptr;
+  uint32_t tableOffset = static_cast<uint32_t>(fields.front());
+  auto base = reinterpret_cast<const uint8_t *>(blobData.data());
+  return std::unique_ptr<SerializedDeclUSRTable>(
+    SerializedDeclUSRTable::Create(base + tableOffset, base + sizeof(uint32_t), base,
+                                   DeclUSRTableInfo()));
+}
+
+bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
+  cursor.EnterSubBlock(DECL_LOCS_BLOCK_ID);
+
+  SmallVector<uint64_t, 4> scratch;
+  StringRef blobData;
+
+  while (!cursor.AtEndOfStream()) {
+    auto entry = cursor.advance();
+    switch (entry.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      // Unknown sub-block, which this version of the compiler won't use.
+      if (cursor.SkipBlock())
+        return false;
+      break;
+
+    case llvm::BitstreamEntry::Record:
+      scratch.clear();
+      unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+
+      switch (kind) {
+      case sourceinfo_block::BASIC_DECL_LOCS:
+        BasicDeclLocsTable = readBasicDeclLocsTable(scratch, blobData);
+        break;
+      case sourceinfo_block::SOURCE_FILE_PATHS:
+        SourceFilePathsTable = readSourceFilePathsTable(scratch, blobData);
+        break;
+      case sourceinfo_block::DECL_USRS:
+        DeclUSRsTable = readDeclUSRsTable(scratch, blobData);
+        break;
+      default:
+        // Unknown index kind, which this version of the compiler won't use.
+        break;
+      }
+      break;
+    }
+  }
+
+  return false;
+}
+
+bool ModuleFile::readModuleSourceInfoIfPresent() {
+  if (!this->ModuleSourceInfoInputBuffer)
+    return true;
+
+  llvm::BitstreamCursor infoCursor{ModuleSourceInfoInputBuffer->getMemBufferRef()};
+  if (!checkModuleSignature(infoCursor, SWIFTSOURCEINFO_SIGNATURE) ||
+      !enterTopLevelModuleBlock(infoCursor, MODULE_SOURCEINFO_BLOCK_ID)) {
+    return false;
+  }
+
+  SmallVector<uint64_t, 64> scratch;
+  llvm::BitstreamEntry topLevelEntry;
+
+  bool hasValidControlBlock = false;
+  ValidationInfo info;
+
+  while (!infoCursor.AtEndOfStream()) {
+    topLevelEntry = infoCursor.advance(AF_DontPopBlockAtEnd);
+    if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
+      break;
+
+    switch (topLevelEntry.ID) {
+    case CONTROL_BLOCK_ID: {
+      infoCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+
+      info = validateControlBlock(infoCursor, scratch,
+                                  {SWIFTSOURCEINFO_VERSION_MAJOR,
+                                   SWIFTSOURCEINFO_VERSION_MINOR},
+                                  /*extendedInfo*/nullptr);
+      if (info.status != Status::Valid)
+        return false;
+      // Check that the swiftsourceinfo is actually for this module.
+      if (info.name != Name)
+        return false;
+      hasValidControlBlock = true;
+      break;
+    }
+
+    case DECL_LOCS_BLOCK_ID: {
+      if (!hasValidControlBlock || !readDeclLocsBlock(infoCursor))
+        return false;
+      break;
+    }
+
+    default:
+      // Unknown top-level block, possibly for use by a future version of the
+      // module format.
+      if (infoCursor.SkipBlock())
+        return false;
+      break;
+    }
+  }
+
+  if (topLevelEntry.Kind != llvm::BitstreamEntry::EndBlock)
+    return false;
+
+  return true;
+}
+
 ModuleFile::ModuleFile(
     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
     bool isFramework, serialization::ValidationInfo &info,
     serialization::ExtendedValidationInfo *extInfo)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
+      ModuleSourceInfoInputBuffer(std::move(moduleSourceInfoInputBuffer)),
       DeserializedTypeCallback([](Type ty) {}) {
   assert(!hasError());
   Bits.IsFramework = isFramework;
@@ -1465,7 +1725,8 @@ ModuleFile::ModuleFile(
     info.status = error(Status::Malformed);
     return;
   }
-
+  // Read source info file.
+  readModuleSourceInfoIfPresent();
   if (!readModuleDocIfPresent()) {
     info.status = error(Status::MalformedDocumentation);
     return;
@@ -2202,34 +2463,48 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
 
   if (!DeclCommentTable)
     return None;
-
-  if (D->isImplicit())
-    return None;
-
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    // Compute the USR.
-    llvm::SmallString<128> USRBuffer;
-    {
-      llvm::raw_svector_ostream OS(USRBuffer);
-      if (ide::printExtensionUSR(ED, OS))
-        return None;
-    }
-     return getCommentForDeclByUSR(USRBuffer.str());
-  }
-
-  auto *VD = dyn_cast<ValueDecl>(D);
-  if (!VD)
-    return None;
-
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
-  {
-    llvm::raw_svector_ostream OS(USRBuffer);
-    if (ide::printDeclUSR(VD, OS))
-      return None;
-  }
+  llvm::raw_svector_ostream OS(USRBuffer);
+  if (ide::printDeclUSRForModuleDoc(D, OS))
+    return None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
+}
+
+Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
+  assert(D);
+
+  // Keep these as assertions instead of early exits to ensure that we are not
+  // doing extra work.  These cases should be handled by clients of this API.
+  assert(!D->hasClangNode() &&
+         "cannot find comments for Clang decls in Swift modules");
+  assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
+         "Decl is from a different serialized file");
+  if (!BasicDeclLocsTable)
+    return None;
+  // Compute the USR.
+  llvm::SmallString<128> USRBuffer;
+  llvm::raw_svector_ostream OS(USRBuffer);
+  if (ide::printDeclUSRForModuleDoc(D, OS))
+    return None;
+  auto I = BasicDeclLocsTable->find(OS.str());
+  if (I == BasicDeclLocsTable->end())
+    return None;
+  return *I;
+}
+
+StringRef ModuleFile::getSourceFilePathById(unsigned Id) const {
+  assert(SourceFilePathsTable);
+  auto I = SourceFilePathsTable->find(Id);
+  assert(I != SourceFilePathsTable->end());
+  return *I;
+}
+
+uint32_t ModuleFile::getDeclUSRId(StringRef USR) const {
+  assert(DeclUSRsTable);
+  auto I = DeclUSRsTable->find(USR);
+  return I != DeclUSRsTable->end() ? *I : 0;
 }
 
 const static StringRef Separator = "/";

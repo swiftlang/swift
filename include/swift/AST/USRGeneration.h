@@ -22,6 +22,7 @@
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
+class Decl;
 class AbstractStorageDecl;
 class ValueDecl;
 class ExtensionDecl;
@@ -55,6 +56,10 @@ bool printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 /// Prints out the extension USR for the given extension Decl.
 /// \returns true if it failed, false on success.
 bool printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS);
+
+/// Prints out the Decl USRs suitable for keys .swiftdoc and .swiftsourceinfo files.
+/// \returns true if it failed, false on success.
+bool printDeclUSRForModuleDoc(const Decl *D, raw_ostream &OS);
 
 } // namespace ide
 } // namespace swift
