@@ -327,6 +327,10 @@ namespace swift {
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
+    /// Whether to enable experimental differentiable programming features:
+    /// `@differentiable` declaration attribute, etc.
+    bool EnableExperimentalDifferentiableProgramming = false;
+
     /// Whether to enable #quote, #unquote and @quoted.
     bool EnableExperimentalQuasiquotes = false;
 
