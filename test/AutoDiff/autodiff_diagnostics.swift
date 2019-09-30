@@ -42,11 +42,9 @@ struct NoDerivativeProperty : Differentiable {
   var x: Float
   @noDerivative var y: Float
 }
-// expected-error @+1 {{function is not differentiable}}
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
   var tmp = s
-  // expected-note @+1 {{cannot differentiate through a '@noDerivative' stored property; do you want to use 'withoutDerivative(at:)'?}}
-  tmp.y = tmp.x
+  tmp.y = tmp.x // No diagnostics expected.
   return tmp.x
 }
 _ = gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s in
