@@ -1003,24 +1003,5 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
     }
   }
 
-  // If this type variable is a hole in the constraint system, propagate
-  // this information and mark adjacent type variables as potential holes.
-  //
-  // Consider this example:
-  //
-  // func foo<T: BinaryInteger>(_: T) {}
-  // foo(.bar) <- Since `.bar` can't be inferred due to lack of info about its
-  //              base type, it's member type is going to get defaulted to
-  //              `Any` which has to be propaged to type variable associated
-  //              with `T` and vice versa.
-  if (cs.shouldAttemptFixes() && cs.isHole(TypeVar)) {
-    auto &CG = cs.getConstraintGraph();
-    for (auto *constraint : CG.gatherConstraints(
-        TypeVar, ConstraintGraph::GatheringKind::EquivalenceClass)) {
-      for (auto *typeVar : constraint->getTypeVariables())
-        cs.recordHole(typeVar);
-    }
-  }
-
   return !cs.failedConstraint && !cs.simplify();
 }
