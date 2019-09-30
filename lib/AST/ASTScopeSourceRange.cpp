@@ -756,3 +756,9 @@ SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {
   return Lexer::getCharSourceRangeFromSourceRange(SM, etr->getSourceRange())
       .getEnd();
 }
+
+SourceLoc swift::extractNearestSourceLoc(
+    std::tuple<ASTScopeImpl *, ScopeCreator *> scopeAndCreator) {
+  const ASTScopeImpl *scope = std::get<0>(scopeAndCreator);
+  return scope->getSourceRangeOfThisASTNode().Start;
+}

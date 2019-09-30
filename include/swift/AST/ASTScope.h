@@ -30,6 +30,9 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/NameLookup.h" // for DeclVisibilityKind
+// extractNearestSourceLoc, simple_display declarations must come before this
+// Alternatively, declare these in SimpleDisplay.h or elsewhere
+//#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
@@ -88,6 +91,12 @@ struct AnnotatedInsertionPoint {
   ASTScopeImpl *insertionPoint;
   const char *explanation;
 };
+} // namespace ast_scope
+
+SourceLoc extractNearestSourceLoc(
+    std::tuple<ast_scope::ASTScopeImpl *, ast_scope::ScopeCreator *>);
+
+namespace ast_scope {
 
 #pragma mark the root ASTScopeImpl class
 
@@ -333,6 +342,7 @@ private:
 public:
   /// expandScope me, sending deferred nodes to my descendants.
   /// Return the scope into which to place subsequent decls
+  ASTScopeImpl *expandAndBeCurrentDetectingRecursion(ScopeCreator &);
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
   unsigned getASTAncestorScopeCount() const { return astAncestorScopeCount; }

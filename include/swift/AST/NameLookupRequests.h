@@ -30,6 +30,10 @@ class GenericContext;
 class GenericParamList;
 class TypeAliasDecl;
 class TypeDecl;
+namespace ast_scope {
+class ASTScopeImpl;
+class ScopeCreator;
+} // namespace ast_scope
 
 /// Display a nominal type or extension thereof.
 void simple_display(
@@ -321,6 +325,28 @@ public:
   SourceLoc getNearestLoc() const;
                                
   // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Expand the given ASTScope. Requestified to detect recursion.
+class ExpandASTScopeRequest
+    : public SimpleRequest<ExpandASTScopeRequest,
+                           ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
+                                                     ast_scope::ScopeCreator *),
+                           CacheKind::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ast_scope::ASTScopeImpl *>
+  evaluate(Evaluator &evaluator, ast_scope::ASTScopeImpl *,
+           ast_scope::ScopeCreator *) const;
+
+public:
+  // Caching
   bool isCached() const { return true; }
 };
 

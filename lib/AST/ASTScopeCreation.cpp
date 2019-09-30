@@ -23,6 +23,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
@@ -340,7 +341,8 @@ private:
       if (auto *ip = child->insertionPointForDeferredExpansion().getPtrOrNull())
         return ip;
     }
-    ASTScopeImpl *insertionPoint = child->expandAndBeCurrent(*this);
+    ASTScopeImpl *insertionPoint =
+        child->expandAndBeCurrentDetectingRecursion(*this);
     ASTScopeAssert(child->verifyThatThisNodeComeAfterItsPriorSibling(),
                    "Ensure search will work");
     return insertionPoint;
@@ -1083,6 +1085,18 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 
 #pragma mark implementations of expansion
 
+ASTScopeImpl *
+ASTScopeImpl::expandAndBeCurrentDetectingRecursion(ScopeCreator &scopeCreator) {
+  return evaluateOrDefault(scopeCreator.getASTContext().evaluator,
+                           ExpandASTScopeRequest{this, &scopeCreator}, nullptr);
+}
+
+llvm::Expected<ASTScopeImpl *>
+ExpandASTScopeRequest::evaluate(Evaluator &evaluator, ASTScopeImpl *parent,
+                                ScopeCreator *scopeCreator) const {
+  return parent->expandAndBeCurrent(*scopeCreator);
+}
+
 ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   auto *insertionPoint = expandSpecifically(scopeCreator);
   if (scopeCreator.shouldBeLazy()) {
@@ -1755,7 +1769,7 @@ void ASTScopeImpl::reexpand(ScopeCreator &scopeCreator) {
   disownDescendants(scopeCreator);
   // If the expansion recurses back into the tree for lookup, the ASTAncestor
   // scopes will have already been rescued and won't be found!
-  expandAndBeCurrent(scopeCreator);
+  expandAndBeCurrentDetectingRecursion(scopeCreator);
   replaceASTAncestorScopes(astAncestorScopes);
 }
 
@@ -2072,4 +2086,9 @@ ScopeCreator::findLocalizableDeclContextsInAST() const {
 
 bool ASTSourceFileScope::crossCheckWithAST() {
   return scopeCreator->containsAllDeclContextsFromAST();
+}
+
+void swift::simple_display(llvm::raw_ostream &out,
+                           const ast_scope::ScopeCreator *scopeCreator) {
+  scopeCreator->print(out);
 }
