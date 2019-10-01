@@ -54,7 +54,7 @@ SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature *(ModuleDecl *, GenericSignature *,
-                                 SmallVector<GenericParamList *, 2>,
+                                 GenericParamList *,
                                  SmallVector<Requirement, 2>,
                                  SmallVector<TypeLoc, 2>, bool),
               Cached, NoLocationInfo)
@@ -85,6 +85,9 @@ SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
               OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, OperatorPrecedenceGroupRequest,
+              PrecedenceGroupDecl *(PrecedenceGroupDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OverriddenDeclsRequest,
               llvm::TinyPtrVector<ValueDecl *>(ValueDecl *), SeparatelyCached,
               NoLocationInfo)

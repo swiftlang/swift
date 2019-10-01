@@ -320,6 +320,8 @@ public struct OSLogMessage :
   }
 }
 
+public typealias ByteBufferPointer = UnsafeMutablePointer<UInt8>
+public typealias StorageObjects = [AnyObject]
 
 /// A representation of a sequence of arguments and headers (of possibly
 /// different types) that have to be serialized to a byte buffer. The arguments
@@ -330,73 +332,64 @@ public struct OSLogMessage :
 @usableFromInline
 internal struct OSLogArguments {
   /// An array of closures that captures arguments of possibly different types.
+  /// Each closure accepts a pointer into a byte buffer and serializes the
+  /// captured arguments at the pointed location. The closures also accept an
+  /// array of AnyObject to store references to auxiliary storage created during
+  /// serialization.
   @usableFromInline
-  internal var argumentClosures: [(inout OSLogByteBufferBuilder) -> ()]?
+  internal var argumentClosures: [(inout ByteBufferPointer,
+    inout StorageObjects) -> ()]
 
   /// This function must be constant evaluable.
   @inlinable
   @_semantics("constant_evaluable")
   @_optimize(none)
   internal init() {
-    argumentClosures = nil
+    argumentClosures = []
   }
 
   @usableFromInline
   internal init(capacity: Int) {
     argumentClosures = []
-    argumentClosures!.reserveCapacity(capacity)
+    argumentClosures.reserveCapacity(capacity)
   }
 
   /// Append a byte-sized header, constructed by
   /// `OSLogMessage.appendInterpolation`, to the tracked array of closures.
   @usableFromInline
   internal mutating func append(_ header: UInt8) {
-    argumentClosures!.append({ $0.serialize(header) })
+    argumentClosures.append({ (position, _) in
+      serialize(header, at: &position)
+    })
   }
 
   /// `append` for other types must be implemented by extensions.
 
+  /// Serialize the arguments tracked by self in a byte buffer.
+  /// - Parameters:
+  ///   - bufferPosition: the pointer to a location within a byte buffer where
+  ///   the argument must be serialized. This will be incremented by the number
+  ///   of bytes used up to serialize the arguments.
+  ///   - storageObjects: An array to store references to objects representing
+  ///   auxiliary storage created during serialization. This is only used while
+  ///   serializing strings.
   @usableFromInline
-  internal func serialize(into bufferBuilder: inout OSLogByteBufferBuilder) {
-    argumentClosures?.forEach { $0(&bufferBuilder) }
+  internal func serializeAt(
+    _ bufferPosition: inout ByteBufferPointer,
+    using storageObjects: inout StorageObjects
+  ) {
+    argumentClosures.forEach { $0(&bufferPosition, &storageObjects) }
   }
 }
 
-/// A struct that manages serialization of instances of specific types to a
-/// byte buffer. The byte buffer is provided as an argument to the initializer
-/// so that its lifetime can be managed by the caller.
+/// Serialize a UInt8 value at the buffer location pointed to by `bufferPosition`,
+/// and increment the `bufferPosition` with the byte size of the serialized value.
 @usableFromInline
-internal struct OSLogByteBufferBuilder {
-  internal var position: UnsafeMutablePointer<UInt8>
-
-  /// Objects denoting storage created by the serialize methods. Such storage
-  /// is created while serializing strings as os_log requires stable pointers to
-  /// Swift strings, which may require copying them to a in-memory buffer.
-  /// The lifetime of this auxiliary storage is same as the lifetime of `self`.
-  internal var auxiliaryStorage: [AnyObject]
-
-  /// Initializer that accepts a pointer to a preexisting buffer.
-  /// - Parameter bufferStart: the starting pointer to a byte buffer
-  ///   that must contain the serialized bytes.
-  @usableFromInline
-  internal init(_ bufferStart: UnsafeMutablePointer<UInt8>) {
-    position = bufferStart
-    auxiliaryStorage = []
-  }
-
-  /// Serialize a UInt8 value at the buffer location pointed to by `position`.
-  @usableFromInline
-  internal mutating func serialize(_ value: UInt8) {
-    position[0] = value
-    position += 1
-  }
-
-  /// `serialize` for other other types must be implemented by extensions.
-
-  /// This function exists so that clients can control the lifetime of a stack-
-  /// allocated instance of OSLogByteBufferBuilder.
-  @usableFromInline
-  internal mutating func destroy() {
-    auxiliaryStorage = []
-  }
+@_alwaysEmitIntoClient
+internal func serialize(
+  _ value: UInt8,
+  at bufferPosition: inout ByteBufferPointer)
+{
+  bufferPosition[0] = value
+  bufferPosition += 1
 }

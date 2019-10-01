@@ -21,6 +21,9 @@
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
+class ComponentIdentTypeRepr;
+class TupleTypeRepr;
+
 /// Generates AST nodes from Syntax nodes.
 class Parser;
 class ASTGen {

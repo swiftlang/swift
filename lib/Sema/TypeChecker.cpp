@@ -229,7 +229,9 @@ static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    if (auto nominal = ext->getExtendedNominal()) {
+    assert(!ext->canNeverBeBound() &&
+           "Only extensions that can ever be bound get here.");
+    if (auto nominal = ext->computeExtendedNominal()) {
       bindExtensionToNominal(ext, nominal);
       return true;
     }
@@ -400,6 +402,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
+
+    if (Options.contains(TypeCheckingFlags::SkipNonInlinableFunctionBodies))
+      // Disable this optimization if we're compiling SwiftOnoneSupport, because
+      // we _definitely_ need to look inside every declaration to figure out
+      // what gets prespecialized.
+      if (!SF.getParentModule()->isOnoneSupportModule())
+        TC.setSkipNonInlinableBodies(true);
 
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
@@ -623,7 +632,7 @@ void swift::typeCheckCompletionDecl(Decl *D) {
   DiagnosticSuppression suppression(Ctx.Diags);
   (void)createTypeChecker(Ctx);
   if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-    if (auto *nominal = ext->getExtendedNominal()) {
+    if (auto *nominal = ext->computeExtendedNominal()) {
       // FIXME(InterfaceTypeRequest): Remove this.
       (void)nominal->getInterfaceType();
     }

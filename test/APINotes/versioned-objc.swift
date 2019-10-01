@@ -166,7 +166,7 @@ extension PrintingInterference {
   func testDroppingRenamedPrints() {
     // CHECK-DIAGS-4: [[@LINE+1]]:{{[0-9]+}}: warning: use of 'print' treated as a reference to instance method
     print(self)
-    // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: use of 'print' nearly matches global function 'print(_:separator:terminator:)' in module 'Swift' rather than instance method 'print(_:extra:)'
+    // CHECK-DIAGS-5: [[@LINE-1]]:{{[0-9]+}}: error: missing argument for parameter 'extra' in call
 
     // CHECK-DIAGS-4-NOT: [[@LINE+1]]:{{[0-9]+}}:
     print(self, extra: self)

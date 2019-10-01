@@ -231,6 +231,17 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
   return nullptr;
 }
 
+DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
+  auto dc = this;
+  do {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
+      if (afd->isBodySkipped())
+        return afd;
+  } while ((dc = dc->getParent()));
+
+  return nullptr;
+}
+
 DeclContext *DeclContext::getParentForLookup() const {
   if (isa<ProtocolDecl>(this) || isa<ExtensionDecl>(this)) {
     // If we are inside a protocol or an extension, skip directly
@@ -476,6 +487,10 @@ bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
       return PD->getAttrs().hasAttribute<ObjCAttr>();
 
   return false;
+}
+
+bool DeclContext::canBeParentOfExtension() const {
+  return isa<SourceFile>(this);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {

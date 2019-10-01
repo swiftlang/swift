@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Parse/ParsedSyntaxBuilders.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
@@ -73,12 +74,17 @@ Parser::parseGenericParameterClauseSyntax() {
 
     // Parse attributes.
     // TODO: Implement syntax attribute parsing.
-    DeclAttributes attrsAST;
-    parseDeclAttributeList(attrsAST);
-    auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
-    if (attrs) {
-      paramBuilder.useAttributes(std::move(*attrs));
-      Generator.addDeclAttributes(attrsAST, attrsAST.getStartLoc());
+    if (Tok.is(tok::at_sign)) {
+      SyntaxParsingContext TmpCtxt(SyntaxContext);
+      TmpCtxt.setTransparent();
+
+      DeclAttributes attrsAST;
+      parseDeclAttributeList(attrsAST);
+      if (!attrsAST.isEmpty())
+        Generator.addDeclAttributes(attrsAST, attrsAST.getStartLoc());
+      auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
+      if (attrs)
+        paramBuilder.useAttributes(std::move(*attrs));
     }
 
     // Parse the name of the parameter.

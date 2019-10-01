@@ -409,6 +409,15 @@ public:
         const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
   }
 
+  /// Returns the innermost context that is an AbstractFunctionDecl whose
+  /// body has been skipped.
+  LLVM_READONLY
+  DeclContext *getInnermostSkippedFunctionContext();
+  const DeclContext *getInnermostSkippedFunctionContext() const {
+    return
+        const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
+  }
+
   /// Returns the semantic parent of this context.  A context has a
   /// parent if and only if it is not a module context.
   DeclContext *getParent() const {
@@ -460,6 +469,10 @@ public:
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;
+
+  /// Extensions are only allowed at the level in a file
+  /// FIXME: do this for Protocols, too someday
+  bool canBeParentOfExtension() const;
 
   /// Returns true if lookups within this context could affect downstream files.
   ///

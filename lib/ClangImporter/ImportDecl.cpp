@@ -3730,7 +3730,7 @@ namespace {
       } else {
         // Import the function type. If we have parameters, make sure their
         // names get into the resulting function type.
-        importedType = Impl.importFunctionType(
+        importedType = Impl.importFunctionParamsAndReturnType(
             dc, decl, {decl->param_begin(), decl->param_size()},
             decl->isVariadic(), isInSystemModule(dc), name, bodyParams);
 
@@ -4294,10 +4294,11 @@ namespace {
             prop->getSetterMethodDecl() != decl)
           return nullptr;
         importedType =
-            Impl.importAccessorMethodType(dc, prop, decl, isInSystemModule(dc),
-                                          importedName, &bodyParams);
+            Impl.importAccessorParamsAndReturnType(dc, prop, decl,
+                                                   isInSystemModule(dc),
+                                                   importedName, &bodyParams);
       } else {
-        importedType = Impl.importMethodType(
+        importedType = Impl.importMethodParamsAndReturnType(
             dc, decl, decl->parameters(), decl->isVariadic(),
             isInSystemModule(dc), &bodyParams, importedName,
             errorConvention, kind);
@@ -4701,9 +4702,6 @@ namespace {
           Impl.importSourceLoc(decl->getLocation()), name, None,
           /*TrailingWhere=*/nullptr);
       result->computeType();
-
-      // FIXME: Kind of awkward that we have to do this here
-      result->getGenericParams()->getParams()[0]->setDepth(0);
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
@@ -6258,7 +6256,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   // Import the type that this method will have.
   Optional<ForeignErrorConvention> errorConvention;
   ParameterList *bodyParams;
-  auto importedType = Impl.importMethodType(
+  auto importedType = Impl.importMethodParamsAndReturnType(
       dc, objcMethod, args, variadic, isInSystemModule(dc), &bodyParams,
       importedName, errorConvention, SpecialMethodKind::Constructor);
   if (!importedType)

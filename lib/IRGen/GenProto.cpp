@@ -864,7 +864,7 @@ static bool hasDependentTypeWitness(
             return false;
 
           // RESILIENCE: this could be an opaque conformance
-          return type->hasTypeParameter();
+          return type->getCanonicalType()->hasTypeParameter();
        },
        /*useResolver=*/true)) {
     return true;

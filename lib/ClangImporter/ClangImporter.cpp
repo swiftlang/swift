@@ -513,19 +513,6 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
     if (!triple.isOSDarwin())
       invocationArgStrs.insert(invocationArgStrs.end(),
                                {"-fobjc-runtime=ios-7.0"});
-
-    // Define macros that Swift bridging headers use.
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-          "-DSWIFT_CLASS_EXTRA=__attribute__((__annotate__("
-          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-          "-DSWIFT_PROTOCOL_EXTRA=__attribute__((__annotate__("
-          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-          "-DSWIFT_EXTENSION_EXTRA=__attribute__((__annotate__("
-          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-          "-DSWIFT_ENUM_EXTRA=__attribute__((__annotate__("
-          "\"" SWIFT_NATIVE_ANNOTATION_STRING "\")))",
-      });
-
   } else {
     bool EnableCXXInterop = LangOpts.EnableCXXInterop;
     invocationArgStrs.insert(invocationArgStrs.end(),
@@ -569,6 +556,10 @@ getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 
       // Request new APIs from UIKit.
       "-DSWIFT_SDK_OVERLAY_UIKIT_EPOCH=2",
+
+      // Backwards compatibility for headers that were checking this instead of
+      // '__swift__'.
+      "-DSWIFT_CLASS_EXTRA=",
     });
 
     // Get the version of this compiler and pass it to C/Objective-C

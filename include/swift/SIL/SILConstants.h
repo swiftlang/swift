@@ -28,8 +28,7 @@ class SILValue;
 class SILBuilder;
 class SerializedSILLoader;
 
-struct APIntSymbolicValue;
-struct ArraySymbolicValue;
+struct SymbolicArrayStorage;
 struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
 struct SymbolicValueMemoryObject;
@@ -256,6 +255,12 @@ private:
 
     /// This represents an index *into* a memory object.
     RK_DerivedAddress,
+
+    /// This represents the internal storage of an array.
+    RK_ArrayStorage,
+
+    /// This represents an array.
+    RK_Array,
   };
 
   union {
@@ -299,6 +304,31 @@ private:
     /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
     /// information about the memory object and access path of the access.
     DerivedAddressValue *derivedAddress;
+
+    // The following fields are for representing an Array.
+    //
+    // In Swift, an array is a non-trivial struct that stores a reference to an
+    // internal storage: _ContiguousArrayStorage. Though arrays have value
+    // semantics in Swift, it is not the case in SIL. In SIL, an array can be
+    // mutated by taking the address of the internal storage i.e., through a
+    // shared, mutable pointer to the internal storage of the array. In fact,
+    // this is how an array initialization is lowered in SIL. Therefore, the
+    // symbolic representation of an array is an addressable "memory cell"
+    // (i.e., a SymbolicValueMemoryObject) containing the array storage. The
+    // array storage is modeled by the type: SymbolicArrayStorage. This
+    // representation of the array enables obtaining the address of the internal
+    // storage and modifying the array through that address. Array operations
+    // such as `append` that mutate an array must clone the internal storage of
+    // the array, following the semantics of the Swift implementation of those
+    // operations.
+
+    /// Representation of array storage (RK_ArrayStorage). SymbolicArrayStorage
+    /// is a container for a sequence of symbolic values.
+    SymbolicArrayStorage *arrayStorage;
+
+    /// When this symbolic value is of an "Array" kind, this stores a memory
+    /// object that contains a SymbolicArrayStorage value.
+    SymbolicValueMemoryObject *array;
   } value;
 
   RepresentationKind representationKind : 8;
@@ -347,6 +377,12 @@ public:
 
     /// This value represents the address of, or into, a memory object.
     Address,
+
+    /// This represents an internal array storage.
+    ArrayStorage,
+
+    /// This represents an array value.
+    Array,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -471,6 +507,32 @@ public:
   /// Return just the memory object for an address value.
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
 
+  /// Create a symbolic array storage containing \c elements.
+  static SymbolicValue
+  getSymbolicArrayStorage(ArrayRef<SymbolicValue> elements, CanType elementType,
+                          SymbolicValueAllocator &allocator);
+
+  /// Create a symbolic array using the given symbolic array storage, which
+  /// contains the array elements.
+  static SymbolicValue getArray(Type arrayType, SymbolicValue arrayStorage,
+                                SymbolicValueAllocator &allocator);
+
+  /// Return the elements stored in this SymbolicValue of "ArrayStorage" kind.
+  ArrayRef<SymbolicValue> getStoredElements(CanType &elementType) const;
+
+  /// Return the symbolic value representing the internal storage of this array.
+  SymbolicValue getStorageOfArray() const;
+
+  /// Return the symbolic value representing the address of the element of this
+  /// array at the given \c index. The return value is a derived address whose
+  /// base is the memory object \c value.array (which contains the array
+  /// storage) and whose accesspath is \c index.
+  SymbolicValue getAddressOfArrayElement(SymbolicValueAllocator &allocator,
+                                         unsigned index) const;
+
+  /// Return the type of this array symbolic value.
+  Type getArrayType() const;
+
   //===--------------------------------------------------------------------===//
   // Helpers
 
@@ -545,7 +607,6 @@ private:
   SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
   void operator=(const SymbolicValueMemoryObject &) = delete;
 };
-
 } // end namespace swift
 
 #endif

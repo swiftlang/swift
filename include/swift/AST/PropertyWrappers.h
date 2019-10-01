@@ -35,12 +35,13 @@ struct PropertyWrapperTypeInfo {
   /// directed.
   VarDecl *valueVar = nullptr;
 
-  /// The initializer init(wrappedValue:) that will be called when the
+  /// Whether there is an init(wrappedValue:) that will be called when the
   /// initializing the property wrapper type from a value of the property type.
-  ///
-  /// This initializer is optional, but if present will be used for the `=`
-  /// initialization syntax.
-  ConstructorDecl *wrappedValueInit = nullptr;
+  enum {
+    NoWrappedValueInit = 0,
+    HasWrappedValueInit,
+    HasInitialValueInit
+  } wrappedValueInit = NoWrappedValueInit;
 
   /// The initializer `init()` that will be called to default-initialize a
   /// value with an attached property wrapper.

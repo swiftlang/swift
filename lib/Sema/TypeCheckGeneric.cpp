@@ -448,26 +448,16 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 ///
 
 GenericSignature *TypeChecker::checkGenericSignature(
-                      GenericParamList *genericParams,
+                      GenericParamList *genericParamList,
                       DeclContext *dc,
                       GenericSignature *parentSig,
                       bool allowConcreteGenericParams,
                       SmallVector<Requirement, 2> additionalRequirements,
                       SmallVector<TypeLoc, 2> inferenceSources) {
-  assert(genericParams && "Missing generic parameters?");
-
-  // Type check the generic parameters, treating all generic type
-  // parameters as dependent, unresolved.
-  SmallVector<GenericParamList *, 2> gpLists;
-  for (auto *outerParams = genericParams;
-       outerParams != nullptr;
-       outerParams = outerParams->getOuterParameters()) {
-    gpLists.push_back(outerParams);
-  }
+  assert(genericParamList && "Missing generic parameters?");
 
   auto request = InferredGenericSignatureRequest{
-    dc->getParentModule(), parentSig,
-    gpLists,
+    dc->getParentModule(), parentSig, genericParamList,
     additionalRequirements, inferenceSources,
     allowConcreteGenericParams};
   auto *sig = evaluateOrDefault(dc->getASTContext().evaluator,
@@ -595,12 +585,6 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         Requirement(RequirementKind::Conformance, self, PD->getDeclaredType());
     auto *sig = GenericSignature::get({self}, {req});
 
-    // The requirement signature is created lazily by
-    // ProtocolDecl::getRequirementSignature().
-    // The generic signature and environment is created lazily by
-    // GenericContext::getGenericSignature(), so there is nothing we
-    // need to do.
-
     // Debugging of the generic signature builder and generic signature
     // generation.
     if (GC->getASTContext().LangOpts.DebugGenericSignatures) {
@@ -636,6 +620,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
     return cast<SubscriptDecl>(accessor->getStorage())->getGenericSignature();
   }
 
+  auto *parentSig = GC->getParent()->getGenericSignatureOfContext();
   bool allowConcreteGenericParams = false;
   SmallVector<TypeLoc, 2> inferenceSources;
   SmallVector<Requirement, 2> sameTypeReqs;
@@ -716,13 +701,15 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
 
     // Allow parameters to be equated with concrete types.
     allowConcreteGenericParams = true;
+    // Extensions must occur at the top level, they have no
+    // (valid) parent signature.
+    parentSig = nullptr;
     inferenceSources.emplace_back(nullptr, extInterfaceType);
   }
 
   // EGREGIOUS HACK: The GSB cannot handle the addition of parent signatures
   // from malformed decls in many cases.  Check the invalid bit and null out the
   // parent signature.
-  auto *parentSig = GC->getParent()->getGenericSignatureOfContext();
   if (auto *DD = GC->getParent()->getAsDecl()) {
     parentSig = DD->isInvalid() ? nullptr : parentSig;
   }
@@ -997,6 +984,6 @@ StructuralTypeRequest::evaluate(Evaluator &evaluator,
   Type parent;
   auto parentDC = typeAlias->getDeclContext();
   if (parentDC->isTypeContext())
-    parent = parentDC->getDeclaredInterfaceType();
+    parent = parentDC->getSelfInterfaceType();
   return TypeAliasType::get(typeAlias, parent, subs, type);
 }

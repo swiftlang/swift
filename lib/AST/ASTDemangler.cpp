@@ -190,9 +190,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
   auto *dc = aliasDecl->getDeclContext();
   auto subs = parent->getContextSubstitutionMap(dc->getParentModule(), dc);
 
-  // FIXME: subst() should build the sugar for us
-  declaredType = declaredType.subst(subs);
-  return TypeAliasType::get(aliasDecl, parent, subs, declaredType);
+  return declaredType.subst(subs);
 }
 
 static SubstitutionMap
@@ -323,9 +321,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   if (!subMap)
     return Type();
 
-  // FIXME: subst() should build the sugar for us
-  auto declaredType = aliasDecl->getDeclaredInterfaceType().subst(subMap);
-  return TypeAliasType::get(aliasDecl, parent, subMap, declaredType);
+  return aliasDecl->getDeclaredInterfaceType().subst(subMap);
 }
 
 Type ASTBuilder::createTupleType(ArrayRef<Type> eltTypes,

@@ -265,12 +265,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    bool WalkGenerics = NTD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams();
 
-    if (WalkGenerics) {
-      visitGenericParamList(NTD->getGenericParams());
-    }
+    bool WalkGenerics = visitGenericParamListIfNeeded(NTD);
 
     for (auto &Inherit : NTD->getInherited()) {
       if (doIt(Inherit))
@@ -329,11 +325,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitSubscriptDecl(SubscriptDecl *SD) {
-    bool WalkGenerics = SD->getGenericParams() &&
-      Walker.shouldWalkIntoGenericParams();
-    if (WalkGenerics) {
-      visitGenericParamList(SD->getGenericParams());
-    }
+    bool WalkGenerics = visitGenericParamListIfNeeded(SD);
+
     visit(SD->getIndices());
     if (doIt(SD->getElementTypeLoc()))
       return true;
@@ -364,14 +357,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
 
-    bool WalkGenerics = AFD->getGenericParams() &&
-        Walker.shouldWalkIntoGenericParams() &&
+    bool WalkGenerics =
         // accessor generics are visited from the storage decl
-        !isa<AccessorDecl>(AFD);
-
-    if (WalkGenerics) {
-      visitGenericParamList(AFD->getGenericParams());
-    }
+        !isa<AccessorDecl>(AFD) && visitGenericParamListIfNeeded(AFD);
 
     if (auto *PD = AFD->getImplicitSelfDecl(/*createIfNeeded=*/false))
       visit(PD);
@@ -415,15 +403,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visit(PL);
     }
 
-    // The getRawValueExpr should remain the untouched original LiteralExpr for
-    // serialization and validation purposes. We only traverse the type-checked
-    // form, unless we haven't populated it yet.
-    if (auto *rawValueExpr = ED->getTypeCheckedRawValueExpr()) {
-      if (auto newRawValueExpr = doIt(rawValueExpr))
-        ED->setTypeCheckedRawValueExpr(newRawValueExpr);
-      else
-        return true;
-    } else if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
+    if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
       Expr *newRawExpr = doIt(rawLiteralExpr);
       if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
         ED->setRawValueExpr(newRawLiteralExpr);
@@ -1379,6 +1359,18 @@ public:
       if (doIt(Req.getFirstTypeLoc()))
         return true;
       break;
+    }
+    return false;
+  }
+
+private:
+  bool visitGenericParamListIfNeeded(GenericContext *gc) {
+    // Must check this first in case extensions have not been bound yet
+    if (Walker.shouldWalkIntoGenericParams()) {
+      if (auto *params = gc->getGenericParams()) {
+        visitGenericParamList(params);
+        return true;
+      }
     }
     return false;
   }

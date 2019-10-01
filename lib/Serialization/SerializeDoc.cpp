@@ -502,3 +502,7 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
 
   S.writeToStream(os);
 }
+
+void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+  os << "Some stuff";
+}

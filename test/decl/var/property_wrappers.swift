@@ -99,13 +99,13 @@ struct InitialValueTypeMismatch<Value> {
 }
 
 @propertyWrapper
-struct MultipleInitialValues<Value> { // expected-error{{property wrapper type 'MultipleInitialValues' has multiple initial-value initializers}}
-  var wrappedValue: Value? = nil
+struct MultipleInitialValues<Value> {
+  var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-note{{initializer 'init(wrappedValue:)' declared here}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
   }
 }
 
@@ -1696,4 +1696,30 @@ struct SR_11381_W<T> {
 
 struct SR_11381_S {
   @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+}
+
+// rdar://problem/53349209 - regression in property wrapper inference
+struct Concrete1: P {}
+
+@propertyWrapper struct ConcreteWrapper {
+  var wrappedValue: Concrete1 { get { fatalError() } }
+}
+
+struct TestConcrete1 {
+  @ConcreteWrapper() var s1
+
+  func f() {
+    // Good:
+    let _: P = self.s1
+
+    // Bad:
+    self.g(s1: self.s1)
+
+    // Ugly:
+    self.g(s1: self.s1 as P)
+  }
+
+  func g(s1: P) {
+    // ...
+  }
 }

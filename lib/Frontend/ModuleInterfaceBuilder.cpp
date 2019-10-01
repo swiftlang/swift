@@ -366,7 +366,9 @@ bool ModuleInterfaceBuilder::buildSwiftModule(
       // We don't want to serialize module docs in the cache -- they
       // will be serialized beside the interface file.
       serializeToBuffers(Mod, SerializationOpts, ModuleBuffer,
-                         /*ModuleDocBuffer*/nullptr, SILMod.get());
+                         /*ModuleDocBuffer*/nullptr,
+                         /*SourceInfoBuffer*/nullptr,
+                         SILMod.get());
     });
 
     LLVM_DEBUG(llvm::dbgs() << "Running SIL processing passes\n");

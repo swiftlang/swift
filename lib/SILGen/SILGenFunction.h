@@ -1460,6 +1460,12 @@ public:
       AbstractionPattern origResultType,
       SGFContext C);
 
+  RValue emitApplyOfPropertyWrapperBackingInitializer(
+      SILLocation loc,
+      VarDecl *var,
+      RValue &&originalValue,
+      SGFContext C = SGFContext());
+
   /// A convenience method for emitApply that just handles monomorphic
   /// applications.
   RValue emitMonomorphicApply(SILLocation loc,
@@ -1485,12 +1491,6 @@ public:
   RValue emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
                          ArgumentSource &&self, PreparedArguments &&args,
                          SGFContext C);
-
-  RValue emitApplyPropertyWrapperAllocator(SILLocation loc,
-                                            SubstitutionMap subs,
-                                            SILDeclRef ctorRef,
-                                            Type wrapperTy,
-                                            CanAnyFunctionType funcTy);
 
   CleanupHandle emitBeginApply(SILLocation loc, ManagedValue fn,
                                SubstitutionMap subs, ArrayRef<ManagedValue> args,

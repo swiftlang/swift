@@ -33,6 +33,7 @@ class AbstractStorageDecl;
 class AccessorDecl;
 enum class AccessorKind;
 class GenericParamList;
+class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperMutability;
 class RequirementRepr;
@@ -1101,7 +1102,7 @@ class InferredGenericSignatureRequest :
     public SimpleRequest<InferredGenericSignatureRequest,
                          GenericSignature *(ModuleDecl *,
                                             GenericSignature *,
-                                            SmallVector<GenericParamList *, 2>,
+                                            GenericParamList *,
                                             SmallVector<Requirement, 2>,
                                             SmallVector<TypeLoc, 2>,
                                             bool),
@@ -1117,7 +1118,7 @@ private:
   evaluate(Evaluator &evaluator,
            ModuleDecl *module,
            GenericSignature *baseSignature,
-           SmallVector<GenericParamList *, 2> addedParameters,
+           GenericParamList *gpl,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeLoc, 2> inferenceSources,
            bool allowConcreteGenericParams) const;
@@ -1214,6 +1215,25 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+};
+
+class OperatorPrecedenceGroupRequest
+    : public SimpleRequest<OperatorPrecedenceGroupRequest,
+                           PrecedenceGroupDecl *(InfixOperatorDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<PrecedenceGroupDecl *>
+  evaluate(Evaluator &evaluator, InfixOperatorDecl *PGD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

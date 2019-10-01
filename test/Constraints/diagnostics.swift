@@ -409,7 +409,7 @@ f8(b: 1.0)         // expected-error {{extraneous argument label 'b:' in call}}
 class CurriedClass {
   func method1() {}
   func method2(_ a: Int) -> (_ b : Int) -> () { return { b in () } }
-  func method3(_ a: Int, b : Int) {}  // expected-note 5 {{'method3(_:b:)' declared here}}
+  func method3(_ a: Int, b : Int) {}  // expected-note 3 {{'method3(_:b:)' declared here}}
 }
 
 let c = CurriedClass()
@@ -449,15 +449,17 @@ _ = CurriedClass.method3(1, 2)           // expected-error {{instance member 'me
 // expected-error@-1 {{missing argument label 'b:' in call}}
 CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 CurriedClass.method3(c)(1)               // expected-error {{missing argument for parameter 'b' in call}}
-CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter #1 in call}} expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 
 
 extension CurriedClass {
   func f() {
     method3(1, b: 2)
-    method3()            // expected-error {{missing argument for parameter #1 in call}}
+    method3()            // expected-error {{missing arguments for parameters #1, 'b' in call}} {{13-13=<#Int#>, b: <#Int#>}}
     method3(42)          // expected-error {{missing argument for parameter 'b' in call}}
-    method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
+    method3(self)
+    // expected-error@-1:13 {{cannot convert value of type 'CurriedClass' to expected argument type 'Int'}}
+    // expected-error@-2:17 {{missing argument for parameter 'b' in call}} {{17-17=, b: <#Int#>}}
   }
 }
 
