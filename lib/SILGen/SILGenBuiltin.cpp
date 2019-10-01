@@ -1041,8 +1041,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     origFnArgVals.push_back(arg.getValue());
 
   // Get the associated function.
-  SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
-          loc, kind, /*differentiationOrder*/ 1, origFnVal);
+  SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, kind, /*differentiationOrder*/ 1, origFnVal);
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
 
   // We don't need to destroy the original function or retain the `assocFn`,

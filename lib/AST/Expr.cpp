@@ -351,8 +351,9 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
   PASS_THROUGH_REFERENCE(ForeignObjectConversion, getSubExpr);
   PASS_THROUGH_REFERENCE(UnevaluatedInstance, getSubExpr);
   // SWIFT_ENABLE_TENSORFLOW
-  PASS_THROUGH_REFERENCE(AutoDiffFunction, getSubExpr);
-  PASS_THROUGH_REFERENCE(AutoDiffFunctionExtractOriginal, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunction, getSubExpr);
+  PASS_THROUGH_REFERENCE(DifferentiableFunctionExtractOriginal, getSubExpr);
+  // SWIFT_ENABLE_TENSORFLOW END
   PASS_THROUGH_REFERENCE(BridgeToObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
@@ -676,8 +677,9 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
   // SWIFT_ENABLE_TENSORFLOW
-  case ExprKind::AutoDiffFunction:
-  case ExprKind::AutoDiffFunctionExtractOriginal:
+  case ExprKind::DifferentiableFunction:
+  case ExprKind::DifferentiableFunctionExtractOriginal:
+  // SWIFT_ENABLE_TENSORFLOW END
   case ExprKind::EnumIsCase:
   case ExprKind::ConditionalBridgeFromObjC:
   case ExprKind::BridgeFromObjC:

@@ -2396,17 +2396,18 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   // SWIFT_ENABLE_TENSORFLOW
-  void visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E) {
-    printCommon(E, "autodiff_function") << '\n';
+  void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
+    printCommon(E, "differentiable_function") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitAutoDiffFunctionExtractOriginalExpr(
-      AutoDiffFunctionExtractOriginalExpr *E) {
-    printCommon(E, "autodiff_function_extract_original") << '\n';
+  void visitDifferentiableFunctionExtractOriginalExpr(
+      DifferentiableFunctionExtractOriginalExpr *E) {
+    printCommon(E, "differentiable_function_extract_original") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';

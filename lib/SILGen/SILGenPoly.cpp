@@ -3269,10 +3269,10 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       outputSubstType->getWithoutDifferentiability());
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
-  // `autodiff_function_extract` is consuming; copy `fn` before passing as
+  // `differentiable_function_extract` is consuming; copy `fn` before passing as
   // operand.
   auto borrowedFnValue = fn.borrow(SGF, loc);
-  SILValue original = SGF.B.createAutoDiffFunctionExtractOriginal(
+  SILValue original = SGF.B.createDifferentiableFunctionExtractOriginal(
       loc, borrowedFnValue.getValue());
   original = SGF.B.emitCopyValueOperation(loc, original);
   auto managedOriginal = SGF.emitManagedRValueWithCleanup(original);
@@ -3316,7 +3316,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
     auto assocFnOutputSubstType = getAssocFnTy(outputSubstTypeNotDiff, kind);
     auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
                                                   assocFnOutputSubstType);
-    SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
+    SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
         loc, kind, /*differentiationOrder*/ 1, borrowedFnValue.getValue());
     assocFn = SGF.B.emitCopyValueOperation(loc, assocFn);
     auto managedAssocFn = SGF.emitManagedRValueWithCleanup(assocFn);
@@ -3328,7 +3328,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto jvpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::JVP);
   auto vjpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::VJP);
 
-  SILValue convertedBundle = SGF.B.createAutoDiffFunction(
+  SILValue convertedBundle = SGF.B.createDifferentiableFunction(
       loc, sourceType->getDifferentiationParameterIndices(),
       /*differentiationOrder*/ 1,
       originalThunk.forward(SGF),
@@ -4301,11 +4301,10 @@ getWitnessFunctionRef(SILGenFunction &SGF,
       auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
           SGF.getASTContext(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
-      auto autoDiffFn = SGF.B.createAutoDiffFunction(
+      auto autoDiffFn = SGF.B.createDifferentiableFunction(
           loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
-      return SGF.B.createAutoDiffFunctionExtract(
-          loc,
-          AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
+      return SGF.B.createDifferentiableFunctionExtract(
+          loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
           /*differentiationOrder*/ 1, autoDiffFn);
     }
 

@@ -174,8 +174,8 @@ namespace sil_block {
     SIL_TWO_OPERANDS_EXTRA_ATTR,
     // SWIFT_ENABLE_TENSORFLOW
     SIL_DIFFERENTIABLE_ATTR,
-    SIL_INST_AUTODIFF_FUNCTION,
-    SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -412,16 +412,16 @@ namespace sil_block {
   >;
 
   // SWIFT_ENABLE_TENSORFLOW
-  using SILInstAutoDiffFunctionLayout = BCRecordLayout<
-    SIL_INST_AUTODIFF_FUNCTION,
+  using SILInstDifferentiableFunctionLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION,
     BCVBR<8>,             // differentiation order
     BCVBR<8>,             // number of function parameters
     BCVBR<8>,             // number of operands
     BCArray<ValueIDField> // parameter indices and operands
   >;
 
-  using SILInstAutoDiffFunctionExtractLayout = BCRecordLayout<
-    SIL_INST_AUTODIFF_FUNCTION_EXTRACT,
+  using SILInstDifferentiableFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,

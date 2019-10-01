@@ -1118,17 +1118,16 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SIL_INST_AUTODIFF_FUNCTION:
-    SILInstAutoDiffFunctionLayout::readRecord(scratch, /*order*/ Attr,
-                                              /*numParams*/ Attr2, NumArguments,
-                                              ListOfValues);
-    RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionInst;
+  case SIL_INST_DIFFERENTIABLE_FUNCTION:
+    SILInstDifferentiableFunctionLayout::readRecord(
+        scratch, /*order*/ Attr, /*numParams*/ Attr2, NumArguments,
+        ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionInst;
     break;
-  case SIL_INST_AUTODIFF_FUNCTION_EXTRACT:
-    SILInstAutoDiffFunctionExtractLayout::readRecord(scratch, TyID, TyCategory,
-                                                     ValID, /*extractee*/ Attr,
-                                                     /*order*/ Attr2);
-    RawOpCode = (unsigned)SILInstructionKind::AutoDiffFunctionExtractInst;
+  case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
+    SILInstDifferentiableFunctionExtractLayout::readRecord(
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr, /*order*/ Attr2);
+    RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
     break;
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
@@ -1521,7 +1520,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffFunctionInst: {
+  case SILInstructionKind::DifferentiableFunctionInst: {
     auto numParamIndices = ListOfValues.size() - NumArguments * 3;
     auto rawParamIndices =
        map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
@@ -1535,21 +1534,22 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
       operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
-    ResultVal = Builder.createAutoDiffFunction(Loc, paramIndices,
-        /*differentiationOrder*/ Attr, operands[0],
+    ResultVal = Builder.createDifferentiableFunction(
+        Loc, paramIndices, /*differentiationOrder*/ Attr, operands[0],
         ArrayRef<SILValue>(operands).drop_front());
     break;
   }
-  case SILInstructionKind::AutoDiffFunctionExtractInst: {
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
     auto astTy = MF->getType(TyID);
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
-    AutoDiffFunctionExtractee extractee(Attr);
+    DifferentiableFunctionExtractee extractee(Attr);
     auto order = Attr2;
     ResultVal =
-        Builder.createAutoDiffFunctionExtract(Loc, extractee, order, val);
+        Builder.createDifferentiableFunctionExtract(Loc, extractee, order, val);
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::AllocGlobalInst: {
     // Format: Name and type. Use SILOneOperandLayout.
     StringRef Name = MF->getIdentifierText(ValID);

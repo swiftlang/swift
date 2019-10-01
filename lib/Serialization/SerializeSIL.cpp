@@ -986,34 +986,34 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffFunctionInst: {
-    auto *adfi = cast<AutoDiffFunctionInst>(&SI);
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto *dfi = cast<DifferentiableFunctionInst>(&SI);
     SmallVector<ValueID, 4> trailingInfo;
-    auto *paramIndices = adfi->getParameterIndices();
+    auto *paramIndices = dfi->getParameterIndices();
     for (unsigned idx : paramIndices->getIndices())
       trailingInfo.push_back(idx);
-    for (auto &op : adfi->getAllOperands()) {
+    for (auto &op : dfi->getAllOperands()) {
       auto val = op.get();
       trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
       trailingInfo.push_back((unsigned)val->getType().getCategory());
       trailingInfo.push_back(addValueRef(val));
     }
-    SILInstAutoDiffFunctionLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstAutoDiffFunctionLayout::Code],
-        adfi->getDifferentiationOrder(), paramIndices->getCapacity(),
-        adfi->getNumOperands(), trailingInfo);
+    SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
+        dfi->getDifferentiationOrder(), paramIndices->getCapacity(),
+        dfi->getNumOperands(), trailingInfo);
     break;
   }
-  case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    auto *adfei = cast<AutoDiffFunctionExtractInst>(&SI);
-    auto operandRef = addValueRef(adfei->getFunctionOperand());
-    auto operandType = adfei->getFunctionOperand()->getType();
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
+    auto operandRef = addValueRef(dfei->getFunctionOperand());
+    auto operandType = dfei->getFunctionOperand()->getType();
     auto operandTypeRef = S.addTypeRef(operandType.getASTType());
-    auto rawExtractee = (unsigned)adfei->getExtractee();
-    SILInstAutoDiffFunctionExtractLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstAutoDiffFunctionExtractLayout::Code],
+    auto rawExtractee = (unsigned)dfei->getExtractee();
+    SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, adfei->getDifferentiationOrder());
+        rawExtractee, dfei->getDifferentiationOrder());
     break;
   }
   case SILInstructionKind::ApplyInst: {
@@ -2535,8 +2535,8 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   registerSILAbbr<SILSpecializeAttrLayout>();
   // SWIFT_ENABLE_TENSORFLOW
   registerSILAbbr<SILDifferentiableAttrLayout>();
-  registerSILAbbr<SILInstAutoDiffFunctionLayout>();
-  registerSILAbbr<SILInstAutoDiffFunctionExtractLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionLayout>();
+  registerSILAbbr<SILInstDifferentiableFunctionExtractLayout>();
 
   // Register the abbreviation codes so these layouts can exist in both
   // decl blocks and sil blocks.

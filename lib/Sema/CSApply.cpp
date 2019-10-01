@@ -6579,7 +6579,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       fromFunc = fromFunc->getWithoutDifferentiability()
           ->castTo<FunctionType>();
       expr = cs.cacheType(new (tc.Context)
-          AutoDiffFunctionExtractOriginalExpr(expr, fromFunc));
+          DifferentiableFunctionExtractOriginalExpr(expr, fromFunc));
     }
     // Handle implicit conversion to @differentiable.
     maybeDiagnoseUnsupportedDifferentiableConversion(cs, expr, toFunc);
@@ -6590,7 +6590,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
           ->withExtInfo(newEI)
           ->castTo<FunctionType>();
       expr = cs.cacheType(new (tc.Context)
-                              AutoDiffFunctionExpr(expr, fromFunc));
+                              DifferentiableFunctionExpr(expr, fromFunc));
     }
 
     // If we have a ClosureExpr, then we can safely propagate the 'no escape'

@@ -59,10 +59,10 @@ using llvm::SmallDenseSet;
 using llvm::SmallMapVector;
 using llvm::SmallSet;
 
-/// This flag is used to disable `autodiff_function_extract` instruction folding
-/// for SIL testing purposes.
-static llvm::cl::opt<bool> SkipFoldingAutoDiffFunctionExtraction(
-    "differentiation-skip-folding-autodiff-function-extraction",
+/// This flag is used to disable `differentiable_function_extract` instruction
+/// folding for SIL testing purposes.
+static llvm::cl::opt<bool> SkipFoldingDifferentiableFunctionExtraction(
+    "differentiation-skip-folding-differentiable-function-extraction",
     llvm::cl::init(true));
 
 /// This flag is used to enable full JVP generation.
@@ -296,12 +296,12 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   return GenericParamList::create(ctx, SourceLoc(), clonedParams, SourceLoc());
 }
 
-/// Given an `autodiff_function` instruction, find the corresponding
+/// Given an `differentiable_function` instruction, find the corresponding
 /// differential operator used in the AST. If no differential operator is found,
 /// return nullptr.
-static AutoDiffFunctionExpr *
-findDifferentialOperator(AutoDiffFunctionInst *inst) {
-  return inst->getLoc().getAsASTNode<AutoDiffFunctionExpr>();
+static DifferentiableFunctionExpr *
+findDifferentialOperator(DifferentiableFunctionInst *inst) {
+  return inst->getLoc().getAsASTNode<DifferentiableFunctionExpr>();
 }
 
 /// Returns the underlying instruction for the given SILValue, if it exists,
@@ -327,16 +327,17 @@ namespace {
 class ADContext;
 
 /// The invoker of a differentiation task. It can be some user syntax, e.g.
-/// an `autodiff_function` instruction lowered from an `AutoDiffFunctionExpr`
-/// expression, the differentiation pass, or nothing at all. This will be used
-/// to emit informative diagnostics.
+/// an `differentiable_function` instruction lowered from an
+/// `DifferentiableFunctionExpr` expression, the differentiation pass, or
+/// nothing at all. This will be used to emit informative diagnostics.
 struct DifferentiationInvoker {
 public:
   /// The kind of the invoker of a differentiation task.
   enum class Kind {
-    // Invoked by an `autodiff_function` instruction, which may or may not be
-    // linked to a Swift AST node (e.g. an `AutoDiffFunctionExpr` expression).
-    AutoDiffFunctionInst,
+    // Invoked by an `differentiable_function` instruction, which may or may not
+    // be linked to a Swift AST node (e.g. an `DifferentiableFunctionExpr`
+    // expression).
+    DifferentiableFunctionInst,
 
     // Invoked by the indirect application of differentiation. This case has an
     // associated original `apply` instruction and `[differentiable]` attribute.
@@ -351,9 +352,9 @@ public:
 private:
   Kind kind;
   union Value {
-    /// The instruction associated with the `AutoDiffFunctionInst` case.
-    AutoDiffFunctionInst *adFuncInst;
-    Value(AutoDiffFunctionInst *inst) : adFuncInst(inst) {}
+    /// The instruction associated with the `DifferentiableFunctionInst` case.
+    DifferentiableFunctionInst *adFuncInst;
+    Value(DifferentiableFunctionInst *inst) : adFuncInst(inst) {}
 
     /// The parent `apply` instruction and `[differentiable]` attribute
     /// associated with the `IndirectDifferentiation` case.
@@ -372,8 +373,8 @@ private:
   DifferentiationInvoker(Kind kind, Value value) : kind(kind), value(value) {}
 
 public:
-  DifferentiationInvoker(AutoDiffFunctionInst *inst)
-      : kind(Kind::AutoDiffFunctionInst), value(inst) {}
+  DifferentiationInvoker(DifferentiableFunctionInst *inst)
+      : kind(Kind::DifferentiableFunctionInst), value(inst) {}
   DifferentiationInvoker(ApplyInst *applyInst, SILDifferentiableAttr *attr)
       : kind(Kind::IndirectDifferentiation),
         value({applyInst, attr}) {}
@@ -382,8 +383,8 @@ public:
 
   Kind getKind() const { return kind; }
 
-  AutoDiffFunctionInst *getAutoDiffFunctionInst() const {
-    assert(kind == Kind::AutoDiffFunctionInst);
+  DifferentiableFunctionInst *getDifferentiableFunctionInst() const {
+    assert(kind == Kind::DifferentiableFunctionInst);
     return value.adFuncInst;
   }
 
@@ -401,8 +402,8 @@ public:
 
   SourceLoc getLocation() const {
     switch (kind) {
-    case Kind::AutoDiffFunctionInst:
-      return getAutoDiffFunctionInst()->getLoc().getSourceLoc();
+    case Kind::DifferentiableFunctionInst:
+      return getDifferentiableFunctionInst()->getLoc().getSourceLoc();
     case Kind::IndirectDifferentiation:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
     case Kind::SILDifferentiableAttribute:
@@ -793,8 +794,9 @@ static inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   os << "(differentiation_invoker ";
   switch (kind) {
-  case Kind::AutoDiffFunctionInst:
-    os << "autodiff_function_inst=(" << *getAutoDiffFunctionInst() << ")";
+  case Kind::DifferentiableFunctionInst:
+    os << "differentiable_function_inst=(" << *getDifferentiableFunctionInst()
+       << ")";
     break;
   case Kind::IndirectDifferentiation: {
     auto indDiff = getIndirectDifferentiation();
@@ -840,20 +842,22 @@ private:
   /// Shared pass manager.
   SILPassManager &passManager;
 
-  /// The worklist (stack) of `autodiff_function` instructions to be processed.
-  SmallVector<AutoDiffFunctionInst *, 32> autoDiffFunctionInsts;
+  /// The worklist (stack) of `differentiable_function` instructions to be
+  /// processed.
+  SmallVector<DifferentiableFunctionInst *, 32> differentiableFunctionInsts;
 
-  /// The set of `autodiff_function` instructions that have been processed.
-  /// Used to avoid reprocessing invalidated instructions.
-  SmallPtrSet<AutoDiffFunctionInst *, 32> processedAutoDiffFunctionInsts;
+  /// The set of `differentiable_function` instructions that have been
+  /// processed. Used to avoid reprocessing invalidated instructions.
+  SmallPtrSet<DifferentiableFunctionInst *, 32>
+      processedDifferentiableFunctionInsts;
 
   /// Mapping from `[differentiable]` attributes to invokers.
   /// `SmallMapVector` is used for deterministic insertion order iteration.
   SmallMapVector<SILDifferentiableAttr *, DifferentiationInvoker, 32>
       invokers;
 
-  /// Mapping from `autodiff_function` instructions to result indices.
-  DenseMap<AutoDiffFunctionInst *, unsigned> resultIndices;
+  /// Mapping from `differentiable_function` instructions to result indices.
+  DenseMap<DifferentiableFunctionInst *, unsigned> resultIndices;
 
   /// Mapping from original `apply` instructions to their corresponding
   /// `NestedApplyInfo`s.
@@ -894,12 +898,14 @@ public:
   SILPassManager &getPassManager() const { return passManager; }
   Lowering::TypeConverter &getTypeConverter() { return module.Types; }
 
-  SmallVectorImpl<AutoDiffFunctionInst *> &getAutoDiffFunctionInsts() {
-    return autoDiffFunctionInsts;
+  SmallVectorImpl<DifferentiableFunctionInst *> &
+  getDifferentiableFunctionInsts() {
+    return differentiableFunctionInsts;
   }
 
-  SmallPtrSetImpl<AutoDiffFunctionInst *> &getProcessedAutoDiffFunctionInsts() {
-    return processedAutoDiffFunctionInsts;
+  SmallPtrSetImpl<DifferentiableFunctionInst *> &
+  getProcessedDifferentiableFunctionInsts() {
+    return processedDifferentiableFunctionInsts;
   }
 
   llvm::SmallMapVector<SILDifferentiableAttr *, DifferentiationInvoker, 32> &
@@ -907,7 +913,7 @@ public:
     return invokers;
   }
 
-  DenseMap<AutoDiffFunctionInst *, unsigned> &getResultIndices() {
+  DenseMap<DifferentiableFunctionInst *, unsigned> &getResultIndices() {
     return resultIndices;
   }
 
@@ -1093,26 +1099,26 @@ public:
                                     derivativeGenericSignature);
   }
 
-  /// Creates an `autodiff_function` instruction using the given builder and
-  /// arguments. Erase the newly created instruction from the processed set, if
-  /// it exists - it may exist in the processed set if it has the same pointer
-  /// value as a previously processed and deleted instruction.
-  AutoDiffFunctionInst *createAutoDiffFunction(
+  /// Creates an `differentiable_function` instruction using the given builder
+  /// and arguments. Erase the newly created instruction from the processed set,
+  /// if it exists - it may exist in the processed set if it has the same
+  /// pointer value as a previously processed and deleted instruction.
+  DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc,
       AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
       SILValue original, ArrayRef<SILValue> associatedFunctions = {}) {
-    auto *adfi = builder.createAutoDiffFunction(
+    auto *dfi = builder.createDifferentiableFunction(
         loc, parameterIndices, differentiationOrder, original,
         associatedFunctions);
-    processedAutoDiffFunctionInsts.erase(adfi);
-    return adfi;
+    processedDifferentiableFunctionInsts.erase(dfi);
+    return dfi;
   }
 
 private:
-  /// Promotes the given `autodiff_function` instruction to a valid
+  /// Promotes the given `differentiable_function` instruction to a valid
   /// `@differentiable` function-typed value.
   SILValue promoteToDifferentiableFunction(
-      AutoDiffFunctionInst *inst, SILBuilder &builder, SILLocation loc,
+      DifferentiableFunctionInst *inst, SILBuilder &builder, SILLocation loc,
       DifferentiationInvoker invoker);
 
 public:
@@ -1122,18 +1128,20 @@ public:
       SILFunction *original, SILDifferentiableAttr *attr,
       DifferentiationInvoker invoker);
 
-  /// Process the given `autodiff_function` instruction, filling in missing
-  /// associated functions if necessary.
-  bool processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi);
+  /// Process the given `differentiable_function` instruction, filling in
+  /// missing associated functions if necessary.
+  bool processDifferentiableFunctionInst(DifferentiableFunctionInst *dfi);
 
-  /// Fold `autodiff_function_extract` users of the given `autodiff_function`
-  /// instruction, directly replacing them with `autodiff_function` instruction
-  /// operands. If the `autodiff_function` instruction has no remaining uses,
-  /// delete the instruction itself after folding.
+  /// Fold `differentiable_function_extract` users of the given
+  /// `differentiable_function` instruction, directly replacing them with
+  /// `differentiable_function` instruction operands. If the
+  /// `differentiable_function` instruction has no remaining uses, delete the
+  /// instruction itself after folding.
   ///
-  /// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction`
-  /// flag for SIL testing purposes.
-  void foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source);
+  /// Folding can be disabled by the
+  /// `SkipFoldingDifferentiableFunctionExtraction` flag for SIL testing
+  /// purposes.
+  void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 
   /// Get or create an associated function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
@@ -1241,12 +1249,12 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
                                          DifferentiationInvoker invoker,
                                          Diag<T...> diag, U &&...args) {
   switch (invoker.getKind()) {
-  // For `autodiff_function` instructions: if the `autodiff_function`
+  // For `differentiable_function` instructions: if the `differentiable_function`
   // instruction comes from a differential operator, emit an error on the
   // expression and a note on the non-differentiable operation. Otherwise, emit
   // both an error and note on the non-differentiation operation.
-  case DifferentiationInvoker::Kind::AutoDiffFunctionInst: {
-    auto *inst = invoker.getAutoDiffFunctionInst();
+  case DifferentiationInvoker::Kind::DifferentiableFunctionInst: {
+    auto *inst = invoker.getDifferentiableFunctionInst();
     if (auto *expr = findDifferentialOperator(inst)) {
       diagnose(expr->getLoc(), diag::autodiff_function_not_differentiable_error)
           .highlight(expr->getSubExpr()->getSourceRange());
@@ -2304,7 +2312,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
         // TODO: Check other layout requirements. Note that `@differentiable`
         // attribute type-checking does not yet support layout requirements in
         // where clauses; layout requirements in derivative generic signatures
-        // can be formed only from `autodiff_function` instructions whose
+        // can be formed only from `differentiable_function` instructions whose
         // original function operand is generic with layout requirements.
         break;
       }
@@ -2524,14 +2532,14 @@ emitAssociatedFunctionReference(
 
   SILValue functionSource = original;
 
-  // If `original` is itself an `AutoDiffFunctionExtractInst` whose kind matches
+  // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind matches
   // the given kind and desired differentiation parameter indices, simply
   // extract the associated function of its function operand, retain the
   // associated function, and return it.
   if (auto *inst = original->getDefiningInstruction())
-    if (auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(inst))
-      if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original)
-        functionSource = adfei->getFunctionOperand();
+    if (auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(inst))
+      if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
+        functionSource = dfei->getFunctionOperand();
 
   // If `functionSource` is a `@differentiable` function, just extract the
   // associated function.
@@ -2548,7 +2556,7 @@ emitAssociatedFunctionReference(
       }
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(
           functionSource.getLoc(), functionSource);
-      SILValue assocFn = builder.createAutoDiffFunctionExtract(
+      SILValue assocFn = builder.createDifferentiableFunctionExtract(
           borrowedDiffFunc.getLoc(), kind, /*differentiationOrder*/ 1,
           borrowedDiffFunc);
       assocFn =
@@ -3755,8 +3763,8 @@ public:
         }
       }
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
-      vjpValue = builder.createAutoDiffFunctionExtract(
-          loc, AutoDiffFunctionExtractInst::Extractee::VJP,
+      vjpValue = builder.createDifferentiableFunctionExtract(
+          loc, DifferentiableFunctionExtractInst::Extractee::VJP,
           /*differentiationOrder*/ 1, borrowedDiffFunc);
       vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
     }
@@ -3791,10 +3799,11 @@ public:
     if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
       return;
 
-    // If VJP has not yet been found, emit an `autodiff_function` instruction
-    // on the remapped original function operand and `autodiff_function_extract`
-    // the VJP. The actual VJP functions will be populated in the
-    // `autodiff_function` during the transform main loop.
+    // If VJP has not yet been found, emit an `differentiable_function`
+    // instruction on the remapped original function operand and
+    // an `differentiable_function_extract` instruction to get the VJP.
+    // The `differentiable_function` instruction will be canonicalized during
+    // the transform main loop.
     if (!vjpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
       // redesign: currently, each original function + attribute pair is mapped
@@ -3826,25 +3835,24 @@ public:
           return;
       }
 
-      auto *autoDiffFuncInst = context.createAutoDiffFunction(
+      auto *diffFuncInst = context.createDifferentiableFunction(
           getBuilder(), loc, indices.parameters, /*differentiationOrder*/ 1,
           original);
 
-      // Record the `autodiff_function` instruction.
-      context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
-      // TODO(TF-689): Make `autodiff_function` store result indices and remove
-      // `ADContext::resultIndices`.
-      context.getResultIndices()[autoDiffFuncInst] =
-          activeResultIndices.front();
+      // Record the `differentiable_function` instruction.
+      context.getDifferentiableFunctionInsts().push_back(diffFuncInst);
+      // TODO(TF-689): Make `differentiable_function` store result indices and
+      // remove `ADContext::resultIndices`.
+      context.getResultIndices()[diffFuncInst] = activeResultIndices.front();
 
       auto borrowedADFunc =
-          builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
-      auto extractedVJP = getBuilder().createAutoDiffFunctionExtract(
-          loc, AutoDiffFunctionExtractInst::Extractee::VJP,
+          builder.emitBeginBorrowOperation(loc, diffFuncInst);
+      auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
+          loc, DifferentiableFunctionExtractInst::Extractee::VJP,
           /*differentiationOrder*/ 1, borrowedADFunc);
       vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
       builder.emitEndBorrowOperation(loc, borrowedADFunc);
-      builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
+      builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
     // Record desired/actual VJP indices.
@@ -3926,12 +3934,12 @@ public:
             getOpValue(origCallee)->getDefiningInstruction());
   }
 
-  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // Clone `autodiff_function` from original to VJP, then add the cloned
-    // instruction to the `autodiff_function` worklist.
-    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
-    auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
-    context.getAutoDiffFunctionInsts().push_back(newADFI);
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    // Clone `differentiable_function` from original to VJP, then add the cloned
+    // instruction to the `differentiable_function` worklist.
+    TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
+    auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
+    context.getDifferentiableFunctionInsts().push_back(newDFI);
   }
 };
 } // end anonymous namespace
@@ -5450,16 +5458,17 @@ public:
         }
       }
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
-      jvpValue = builder.createAutoDiffFunctionExtract(
-          loc, AutoDiffFunctionExtractInst::Extractee::JVP,
+      jvpValue = builder.createDifferentiableFunctionExtract(
+          loc, DifferentiableFunctionExtractInst::Extractee::JVP,
           /*differentiationOrder*/ 1, borrowedDiffFunc);
       jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
     }
 
-    // If JVP has not yet been found, emit an `autodiff_function` instruction
-    // on the remapped original function operand and `autodiff_function_extract`
-    // the JVP. The actual JVP functions will be populated in the
-    // `autodiff_function` during the transform main loop.
+    // If JVP has not yet been found, emit an `differentiable_function`
+    // instruction on the remapped original function operand and
+    // an `differentiable_function_extract` instruction to get the JVP.
+    // The `differentiable_function` instruction will be canonicalized during
+    // the transform main loop.
     if (!jvpValue) {
       // FIXME: Handle indirect differentiation invokers. This may require some
       // redesign: currently, each original function + attribute pair is mapped
@@ -5517,23 +5526,24 @@ public:
       if (diagnoseNondifferentiableOriginalFunctionType(originalFnTy))
         return;
 
-      auto *autoDiffFuncInst =
-          context.createAutoDiffFunction(builder, loc, indices.parameters,
-                                         /*differentiationOrder*/ 1, original);
+      auto *diffFuncInst = context.createDifferentiableFunction(
+          builder, loc, indices.parameters, /*differentiationOrder*/ 1,
+          original);
 
-      // Record the `autodiff_function` instruction.
-      context.getAutoDiffFunctionInsts().push_back(autoDiffFuncInst);
-      context.getResultIndices()[autoDiffFuncInst] =
-          activeResultIndices.front();
+      // Record the `differentiable_function` instruction.
+      context.getDifferentiableFunctionInsts().push_back(diffFuncInst);
+      // TODO(TF-689): Make `differentiable_function` store result indices and
+      // remove `ADContext::resultIndices`.
+      context.getResultIndices()[diffFuncInst] = activeResultIndices.front();
 
       auto borrowedADFunc =
-          builder.emitBeginBorrowOperation(loc, autoDiffFuncInst);
-      auto extractedJVP = builder.createAutoDiffFunctionExtract(
-          loc, AutoDiffFunctionExtractInst::Extractee::JVP,
+          builder.emitBeginBorrowOperation(loc, diffFuncInst);
+      auto extractedJVP = builder.createDifferentiableFunctionExtract(
+          loc, DifferentiableFunctionExtractInst::Extractee::JVP,
           /*differentiationOrder*/ 1, borrowedADFunc);
       jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
       builder.emitEndBorrowOperation(loc, borrowedADFunc);
-      builder.emitDestroyValueOperation(loc, autoDiffFuncInst);
+      builder.emitDestroyValueOperation(loc, diffFuncInst);
     }
 
     // Call the JVP using the original parameters.
@@ -5655,12 +5665,12 @@ public:
     llvm_unreachable("Unsupported SIL instruction.");
   }
 
-  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    // Clone `autodiff_function` from original to JVP, then add the cloned
-    // instruction to the `autodiff_function` worklist.
-    TypeSubstCloner::visitAutoDiffFunctionInst(adfi);
-    auto *newADFI = cast<AutoDiffFunctionInst>(getOpValue(adfi));
-    context.getAutoDiffFunctionInsts().push_back(newADFI);
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    // Clone `differentiable_function` from original to JVP, then add the cloned
+    // instruction to the `differentiable_function` worklist.
+    TypeSubstCloner::visitDifferentiableFunctionInst(dfi);
+    auto *newDFI = cast<DifferentiableFunctionInst>(getOpValue(dfi));
+    context.getDifferentiableFunctionInsts().push_back(newDFI);
   }
 };
 } // end anonymous namespace
@@ -8463,13 +8473,13 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
 }
 
 SILValue ADContext::promoteToDifferentiableFunction(
-    AutoDiffFunctionInst *adfi, SILBuilder &builder, SILLocation loc,
+    DifferentiableFunctionInst *dfi, SILBuilder &builder, SILLocation loc,
     DifferentiationInvoker invoker) {
-  auto origFnOperand = adfi->getOriginalFunction();
+  auto origFnOperand = dfi->getOriginalFunction();
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
-  auto parameterIndices = adfi->getParameterIndices();
-  unsigned resultIndex = resultIndices[adfi];
-  unsigned differentiationOrder = adfi->getDifferentiationOrder();
+  auto parameterIndices = dfi->getParameterIndices();
+  unsigned resultIndex = resultIndices[dfi];
+  unsigned differentiationOrder = dfi->getDifferentiationOrder();
 
   // Handle curry thunk applications specially.
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
@@ -8504,8 +8514,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
             thunk->isDynamicallyReplaceable(), ProfileCounter(),
             thunk->isThunk());
         // If new thunk is newly created: clone the old thunk body, wrap the
-        // returned function value with an `autodiff_function` instruction,
-        // and process the `autodiff_function` instruction.
+        // returned function value with an `differentiable_function`
+        // instruction, and process the `differentiable_function` instruction.
         if (newThunk->empty()) {
           if (auto newThunkGenSig = thunkType->getGenericSignature())
             newThunk->setGenericEnvironment(
@@ -8516,16 +8526,16 @@ SILValue ADContext::promoteToDifferentiableFunction(
           auto *retInst =
               cast<ReturnInst>(newThunk->findReturnBB()->getTerminator());
           SILBuilder thunkBuilder(retInst);
-          auto *adfi = createAutoDiffFunction(thunkBuilder, loc,
-                                              parameterIndices,
-                                              differentiationOrder,
-                                              retInst->getOperand());
-          resultIndices[adfi] = resultIndex;
-          thunkBuilder.createReturn(loc, adfi);
+          auto *dfi = createDifferentiableFunction(thunkBuilder, loc,
+                                                   parameterIndices,
+                                                   differentiationOrder,
+                                                   retInst->getOperand());
+          resultIndices[dfi] = resultIndex;
+          thunkBuilder.createReturn(loc, dfi);
           retInst->eraseFromParent();
 
-          getAutoDiffFunctionInsts().push_back(adfi);
-          if (processAutoDiffFunctionInst(adfi))
+          getDifferentiableFunctionInsts().push_back(dfi);
+          if (processDifferentiableFunctionInst(dfi))
             return nullptr;
         }
 
@@ -8644,46 +8654,49 @@ SILValue ADContext::promoteToDifferentiableFunction(
     builder.createDeallocStack(loc, buf);
 
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
-  auto *newADFI = createAutoDiffFunction(
+  auto *newDFI = createDifferentiableFunction(
       builder, loc, parameterIndices, differentiationOrder, origFnCopy,
       assocFns);
-  resultIndices[adfi] = resultIndex;
-  getAutoDiffFunctionInsts().push_back(adfi);
+  resultIndices[dfi] = resultIndex;
+  getDifferentiableFunctionInsts().push_back(dfi);
 
-  return newADFI;
+  return newDFI;
 }
 
-/// Fold `autodiff_function_extract` users of the given `autodiff_function`
-/// instruction, directly replacing them with `autodiff_function` instruction
-/// operands. If the `autodiff_function` instruction has no remaining uses,
-/// delete the instruction itself after folding.
+/// Fold `differentiable_function_extract` users of the given
+/// `differentiable_function` instruction, directly replacing them with
+/// `differentiable_function` instruction operands. If the
+/// `differentiable_function` instruction has no remaining uses, delete the
+/// instruction itself after folding.
 ///
-/// Folding can be disabled by the `SkipFoldingAutoDiffFunctionExtraction` flag
-/// for SIL testing purposes.
+/// Folding can be disabled by the `SkipFoldingDifferentiableFunctionExtraction`
+/// flag for SIL testing purposes.
 // FIXME: This function is not correctly detecting the foldable pattern and
 // needs to be rewritten.
-void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
-  // Iterate through all `autodiff_function` instruction uses.
+void ADContext::foldDifferentiableFunctionExtraction(
+    DifferentiableFunctionInst *source) {
+  // Iterate through all `differentiable_function` instruction uses.
   for (auto use : source->getUses()) {
-    auto *adfei = dyn_cast<AutoDiffFunctionExtractInst>(use->getUser());
-    // If user is not an `autodiff_function_extract` instruction, set flag to
-    // false.
-    if (!adfei)
+    auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(use->getUser());
+    // If user is not an `differentiable_function_extract` instruction, set flag
+    // to false.
+    if (!dfei)
       continue;
     // Fold original function extractors.
-    if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original) {
+    if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original) {
       auto originalFnValue = source->getOriginalFunction();
-      adfei->replaceAllUsesWith(originalFnValue);
-      adfei->eraseFromParent();
+      dfei->replaceAllUsesWith(originalFnValue);
+      dfei->eraseFromParent();
       continue;
     }
     // Fold associated function extractors.
     auto assocFnValue = source->getAssociatedFunction(
-        adfei->getDifferentiationOrder(), adfei->getAssociatedFunctionKind());
-    adfei->replaceAllUsesWith(assocFnValue);
-    adfei->eraseFromParent();
+        dfei->getDifferentiationOrder(), dfei->getAssociatedFunctionKind());
+    dfei->replaceAllUsesWith(assocFnValue);
+    dfei->eraseFromParent();
   }
-  // If the `autodiff_function` instruction has no remaining uses, erase it.
+  // If the `differentiable_function` instruction has no remaining uses, erase
+  // it.
   if (isInstructionTriviallyDead(source)) {
     SILBuilder builder(source);
     for (auto &assocFn : source->getAssociatedFunctions())
@@ -8691,43 +8704,46 @@ void ADContext::foldAutoDiffFunctionExtraction(AutoDiffFunctionInst *source) {
     source->eraseFromParent();
   }
   // Mark `source` as processed so that it won't be reprocessed after deletion.
-  processedAutoDiffFunctionInsts.insert(source);
+  processedDifferentiableFunctionInsts.insert(source);
 }
 
-bool ADContext::processAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
+bool ADContext::processDifferentiableFunctionInst(
+    DifferentiableFunctionInst *dfi) {
   LLVM_DEBUG({
-    auto &s = getADDebugStream() << "Processing AutoDiffFunctionInst:\n";
-    adfi->printInContext(s);
+    auto &s = getADDebugStream() << "Processing DifferentiableFunctionInst:\n";
+    dfi->printInContext(s);
   });
 
-  if (adfi->getNumAssociatedFunctions() ==
+  if (dfi->getNumAssociatedFunctions() ==
       autodiff::getNumAutoDiffAssociatedFunctions(
-          adfi->getDifferentiationOrder()))
+          dfi->getDifferentiationOrder()))
     return false;
-  assert(adfi->getNumAssociatedFunctions() == 0 &&
+  assert(dfi->getNumAssociatedFunctions() == 0 &&
          "some functions are already filled in but not all of them");
 
-  SILFunction *parent = adfi->getFunction();
-  auto loc = adfi->getLoc();
-  SILBuilder builder(adfi);
+  SILFunction *parent = dfi->getFunction();
+  auto loc = dfi->getLoc();
+  SILBuilder builder(dfi);
 
   auto differentiableFnValue =
-      promoteToDifferentiableFunction(adfi, builder, loc, adfi);
-  // Mark `adfi` as processed so that it won't be reprocessed after deletion.
-  processedAutoDiffFunctionInsts.insert(adfi);
+      promoteToDifferentiableFunction(dfi, builder, loc, dfi);
+  // Mark `dfi` as processed so that it won't be reprocessed after deletion.
+  processedDifferentiableFunctionInsts.insert(dfi);
   if (!differentiableFnValue)
     return true;
-  // Replace all uses of `adfi`.
-  adfi->replaceAllUsesWith(differentiableFnValue);
+  // Replace all uses of `dfi`.
+  dfi->replaceAllUsesWith(differentiableFnValue);
   // Destroy the original operand.
-  builder.emitDestroyValueOperation(loc, adfi->getOriginalFunction());
-  adfi->eraseFromParent();
+  builder.emitDestroyValueOperation(loc, dfi->getOriginalFunction());
+  dfi->eraseFromParent();
   // If the promoted `@differentiable` function-typed value is an
-  // `autodiff_function` instruction, fold `autodiff_function_extract`
-  // instructions. If `autodiff_function_extract` folding is disabled, return.
-  if (!SkipFoldingAutoDiffFunctionExtraction)
-    if (auto *newADFI = dyn_cast<AutoDiffFunctionInst>(differentiableFnValue))
-      foldAutoDiffFunctionExtraction(newADFI);
+  // `differentiable_function` instruction, fold
+  // `differentiable_function_extract` instructions. If
+  // `differentiable_function_extract` folding is disabled, return.
+  if (!SkipFoldingDifferentiableFunctionExtraction)
+    if (auto *newDFI =
+            dyn_cast<DifferentiableFunctionInst>(differentiableFnValue))
+      foldDifferentiableFunctionExtraction(newDFI);
   transform.invalidateAnalysis(
       parent, SILAnalysis::InvalidationKind::FunctionBody);
   return false;
@@ -8742,7 +8758,7 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(*this);
 
-  // Register all `@differentiable` attributes and `autodiff_function`
+  // Register all `@differentiable` attributes and `differentiable_function`
   // instructions in the module that trigger differentiation.
   for (SILFunction &f : module) {
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
@@ -8754,13 +8770,13 @@ void Differentiation::run() {
     }
     for (SILBasicBlock &bb : f)
       for (SILInstruction &i : bb)
-        if (auto *adfi = dyn_cast<AutoDiffFunctionInst>(&i))
-          context.getAutoDiffFunctionInsts().push_back(adfi);
+        if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
+          context.getDifferentiableFunctionInsts().push_back(dfi);
   }
 
   // If nothing has triggered differentiation, there's nothing to do.
   if (context.getInvokers().empty() &&
-      context.getAutoDiffFunctionInsts().empty())
+      context.getDifferentiableFunctionInsts().empty())
     return;
 
   // AD relies on stdlib (the Swift module). If it's not imported, it's an
@@ -8782,17 +8798,17 @@ void Differentiation::run() {
         context.processDifferentiableAttribute(original, attr, invoker);
   }
 
-  // Iteratively process `autodiff_function` instruction worklist.
-  while (!context.getAutoDiffFunctionInsts().empty()) {
-    auto *adfi = context.getAutoDiffFunctionInsts().back();
-    context.getAutoDiffFunctionInsts().pop_back();
+  // Iteratively process `differentiable_function` instruction worklist.
+  while (!context.getDifferentiableFunctionInsts().empty()) {
+    auto *dfi = context.getDifferentiableFunctionInsts().back();
+    context.getDifferentiableFunctionInsts().pop_back();
     // Skip instructions that have been already been processed.
-    if (context.getProcessedAutoDiffFunctionInsts().count(adfi)) continue;
-    errorOccurred |= context.processAutoDiffFunctionInst(adfi);
+    if (context.getProcessedDifferentiableFunctionInsts().count(dfi)) continue;
+    errorOccurred |= context.processDifferentiableFunctionInst(dfi);
   }
 
   // If any error occurred while processing `[differentiable]` attributes or
-  // `autodiff_function` instructions, clean up.
+  // `differentiable_function` instructions, clean up.
   if (errorOccurred) {
     context.cleanUp();
     return;

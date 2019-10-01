@@ -504,9 +504,10 @@ namespace {
     RValue visitTapExpr(TapExpr *E, SGFContext C);
 
     // SWIFT_ENABLE_TENSORFLOW
-    RValue visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E, SGFContext C);
-    RValue visitAutoDiffFunctionExtractOriginalExpr(
-        AutoDiffFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E,
+                                           SGFContext C);
+    RValue visitDifferentiableFunctionExtractOriginalExpr(
+        DifferentiableFunctionExtractOriginalExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5386,24 +5387,25 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
-                                                SGFContext C) {
-  auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+RValue RValueEmitter::visitDifferentiableFunctionExpr(
+    DifferentiableFunctionExpr *E, SGFContext C) {
+  auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   // TODO(rxwei): Use the order specified in E's function type.
-  auto *diffFunc = SGF.B.createAutoDiffFunction(
+  auto *diffFunc = SGF.B.createDifferentiableFunction(
       E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
-      orig.forward(SGF));
+      origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 
-RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
-    AutoDiffFunctionExtractOriginalExpr *E, SGFContext C) {
+RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
+    DifferentiableFunctionExtractOriginalExpr *E, SGFContext C) {
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
+  auto *origFunc = SGF.B.createDifferentiableFunctionExtractOriginal(
       E, diffFunc.forward(SGF));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(orig));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(origFunc));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
   // This implementation is not very robust; if TapExpr were to ever become
