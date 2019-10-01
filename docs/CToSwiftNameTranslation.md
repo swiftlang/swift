@@ -212,6 +212,29 @@ Additionally, typedefs for `void *` or `const void *` that are themselves annota
 If a typedef's underlying type is itself a "CF pointer" typedef, the "alias" typedef will be imported as a regular typealias, with the suffix "Ref" still dropped from its name (if present) unless doing so would conflict with another declaration in the same module as the typedef.
 
 
+## Objective-C Properties
+
+By default, most property names are not transformed at all. However, if the getter of a property overrides a superclass or adopted protocol method that is also a property accessor, the Swift name of the overridden accessor's property will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
+
+Properties with the type `BOOL` or `Boolean` use the name of the getter as the name of the Swift property by default, rather than the name of the property in Objective-C. This accounts for a difference in Swift and Objective-C naming conventions for boolean properties that use "is".
+
+```objc
+@property(getter=isContrivedExample) BOOL contrivedExample;
+@property BOOL hasAnotherForm;
+```
+
+```swift
+var isContrivedExample: Bool { get set }
+var hasAnotherForm: Bool { get set }
+```
+
+_This rule should probably have applied to C's native `bool` as well._
+
+A property declaration with the `SwiftImportPropertyAsAccessors` API note will not be imported at all, and its accessors will be imported as methods. Additionally, properties whose names start with "accessibility" in the NSAccessibility protocol are always imported as methods, as are properties whose names start with "accessibility" in an `@interface` declaration (class or category) that provides the adoption of NSAccessibility.
+
+_Objective-C code has historically not been consistent about whether the NSAccessibility declarations should be considered properties and therefore the Swift compiler chooses to import them as methods, as a sort of lowest common denominator._
+
+
 ## `swift_private`
 
 The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override; in that case the name needs to match the overridden declaration.
