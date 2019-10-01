@@ -2275,7 +2275,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
   SmallVector<Requirement, 2> unsatisfiedRequirements;
   for (auto req : requirements) {
     auto firstType = req.getFirstType();
-    auto secondType = req.getSecondType();
+    Type secondType;
     // Substitute first and second types using the given substitution map,
     // looking up conformances in the current module, if possible.
     if (auto substFirstType =
@@ -2283,12 +2283,33 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
                             LookUpConformanceInModule(swiftModule))) {
       firstType = substFirstType;
     }
-    if (auto substSecondType =
-            secondType.subst(QuerySubstitutionMap{substMap},
-                             LookUpConformanceInModule(swiftModule))) {
-      secondType = substSecondType;
+    if (req.getKind() != RequirementKind::Layout) {
+      secondType = req.getSecondType();
+      if (auto substSecondType =
+              secondType.subst(QuerySubstitutionMap{substMap},
+                               LookUpConformanceInModule(swiftModule))) {
+        secondType = substSecondType;
+      }
     }
     switch (req.getKind()) {
+    // Check layout requirements.
+    case RequirementKind::Layout: {
+      auto layout = req.getLayoutConstraint();
+      switch (layout->getKind()) {
+      case LayoutConstraintKind::Class:
+        if (!firstType->satisfiesClassConstraint())
+          unsatisfiedRequirements.push_back(req);
+        continue;
+      default:
+        // TODO: Check other layout requirements. Note that `@differentiable`
+        // attribute type-checking does not yet support layout requirements in
+        // where clauses; layout requirements in derivative generic signatures
+        // can be formed only from `autodiff_function` instructions whose
+        // original function operand is generic with layout requirements.
+        break;
+      }
+      continue;
+    }
     // Check same type requirements.
     case RequirementKind::SameType:
       // If the first type does not equal the second type, then record the
@@ -2296,6 +2317,14 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       if (!firstType->isEqual(secondType))
         unsatisfiedRequirements.push_back(req);
       continue;
+    // Check superclass requirements.
+    case RequirementKind::Superclass: {
+      // If the second type is not an exact superclass of second type, then
+      // record the unsatisfied requirement.
+      if (!secondType->isExactSuperclassOf(firstType))
+        unsatisfiedRequirements.push_back(req);
+      continue;
+    }
     // Check conformance requirements.
     case RequirementKind::Conformance: {
       auto protocolType = req.getSecondType()->castTo<ProtocolType>();
@@ -2307,10 +2336,6 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
         unsatisfiedRequirements.push_back(req);
       continue;
     }
-    // Ignore other requirements (superclass and layout).
-    // Layout requirements are rejected during type-checking.
-    default:
-      continue;
     }
   }
   if (unsatisfiedRequirements.empty())
