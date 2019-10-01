@@ -2658,7 +2658,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                   cmake_options=(
                     ${cmake_options[@]}
-                    -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
