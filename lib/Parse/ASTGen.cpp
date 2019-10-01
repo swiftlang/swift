@@ -18,6 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
+#include "swift/Parse/Scope.h"
 
 using namespace swift;
 using namespace swift::syntax;
@@ -46,6 +47,8 @@ Decl *ASTGen::generate(const DeclSyntax &D, const SourceLoc Loc) {
 
   if (auto associatedTypeDecl = D.getAs<AssociatedtypeDeclSyntax>()) {
     DeclAST = generate(*associatedTypeDecl, Loc);
+  } else if (auto typealiasDecl = D.getAs<TypealiasDeclSyntax>()) {
+    DeclAST = generate(*typealiasDecl, Loc);
   } else {
     llvm_unreachable("unsupported decl kind");
   }
@@ -105,8 +108,8 @@ TypeDecl *ASTGen::generate(const AssociatedtypeDeclSyntax &D,
     return nullptr;
 
   auto keywordLoc = advanceLocBegin(Loc, D.getAssociatedtypeKeyword());
-  auto name = Context.getIdentifier(idToken.getIdentifierText());
-  auto nameLoc = advanceLocBegin(Loc, idToken);
+  Identifier name;
+  SourceLoc nameLoc = generateIdentifierDeclName(idToken, Loc, name);
 
   DeclAttributes attrs =
       generateDeclAttributes(D, D.getAttributes(), D.getModifiers(), Loc, true);
@@ -134,6 +137,89 @@ TypeDecl *ASTGen::generate(const AssociatedtypeDeclSyntax &D,
     assocType->setInherited(Context.AllocateCopy(inherited));
   addToScope(assocType);
   return assocType;
+}
+
+TypeDecl *ASTGen::generate(const TypealiasDeclSyntax &D, const SourceLoc Loc) {
+  auto idToken = D.getIdentifier();
+  if (idToken.isMissing())
+    return nullptr;
+
+  auto keywordLoc = advanceLocBegin(Loc, D.getTypealiasKeyword());
+  Identifier name;
+  SourceLoc nameLoc = generateIdentifierDeclName(idToken, Loc, name);
+  auto attrs =
+      generateDeclAttributes(D, D.getAttributes(), D.getModifiers(), Loc, true);
+  SourceLoc equalLoc;
+
+  DebuggerContextChange DCC(P, name, DeclKind::TypeAlias);
+
+  Optional<Scope> GenericScope;
+  GenericParamList *genericParams = nullptr;
+  GenericScope.emplace(&P, ScopeKind::Generics);
+  if (auto clause = D.getGenericParameterClause())
+    genericParams = generate(*clause, Loc);
+
+  auto *TAD = new (Context) TypeAliasDecl(keywordLoc, equalLoc, name, nameLoc,
+                                          genericParams, P.CurDeclContext);
+  P.setLocalDiscriminator(TAD);
+  TAD->getAttrs() = attrs;
+
+  TypeRepr *underlyingType = nullptr;
+  SourceLoc typeEndLoc;
+  if (auto init = D.getInitializer()) {
+    Parser::ContextChange CC(P, TAD);
+    equalLoc = generate(init->getEqual(), Loc);
+    underlyingType = generate(init->getValue(), Loc);
+    if (auto lastToken = init->getLastToken())
+      typeEndLoc = generate(*lastToken, Loc);
+  }
+  TAD->setUnderlyingTypeRepr(underlyingType);
+
+  SourceLoc whereLoc;
+  if (auto clause = D.getGenericWhereClause()) {
+    whereLoc = advanceLocBegin(Loc, clause->getWhereKeyword());
+    Parser::ContextChange CC(P, TAD);
+    generateFreeStandingGenericWhereClause(*clause, Loc, genericParams);
+  }
+  P.diagnoseWhereClauseInGenericParamList(genericParams, whereLoc);
+
+  if (equalLoc.isInvalid())
+    return nullptr;
+
+  GenericScope.reset();
+
+  addToScope(TAD);
+  return DCC.fixupParserResult(TAD).getPtrOrNull();
+}
+
+void ASTGen::generateFreeStandingGenericWhereClause(
+    const syntax::GenericWhereClauseSyntax &syntax, const SourceLoc Loc,
+    GenericParamList *genericParams) {
+
+  SourceLoc whereLoc = generate(syntax.getWhereKeyword(), Loc);
+
+  if (!genericParams) {
+    P.diagnose(whereLoc, diag::where_without_generic_params,
+               unsigned(Parser::WhereClauseKind::Declaration));
+    return;
+  }
+
+  // Push the generic parameters back into a local scope so that references
+  // will find them.
+  Scope S(&P, ScopeKind::Generics);
+  for (auto pd : genericParams->getParams())
+    addToScope(pd);
+
+  SmallVector<RequirementRepr, 4> requirements;
+  requirements.reserve(syntax.getRequirementList().size());
+  for (auto elem : syntax.getRequirementList()) {
+    if (auto req = generate(elem, Loc))
+      requirements.push_back(*req);
+  }
+  if (requirements.empty())
+    return;
+
+  genericParams->addTrailingWhereClause(Context, whereLoc, requirements);
 }
 
 TrailingWhereClause *ASTGen::generate(const GenericWhereClauseSyntax &syntax,
