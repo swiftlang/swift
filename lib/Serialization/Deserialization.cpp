@@ -1120,11 +1120,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 
     if (isType != isa<TypeDecl>(value))
       return true;
-    auto ifaceTy = value->getInterfaceType();
-    if (!ifaceTy)
-      return true;
-    if (canTy && ifaceTy->getCanonicalType() != canTy)
-      return true;
+
+    // If we're expecting a type, make sure this decl has the expected type.
+    if (canTy)  {
+      auto ifaceTy = value->getInterfaceType();
+      if (!ifaceTy || !ifaceTy->isEqual(canTy))
+        return true;
+    }
+
     if (value->isStatic() != isStatic)
       return true;
     if (value->hasClangNode() != importedFromClang)
