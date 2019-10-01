@@ -1,3 +1,4 @@
+// REQUIRES: VENDOR=apple 
 // RUN: %empty-directory(%t)
 
 // 1. Emit two TBDs, one with -tbd-is-installapi set, and one without

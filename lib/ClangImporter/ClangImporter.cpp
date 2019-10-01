@@ -14,11 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/ClangImporter/ClangModule.h"
+#include "ClangDiagnosticConsumer.h"
 #include "IAMInference.h"
 #include "ImporterImpl.h"
-#include "ClangDiagnosticConsumer.h"
-#include "swift/Subsystems.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticEngine.h"
@@ -36,9 +34,11 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
-#include "swift/Config.h"
+#include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
@@ -50,8 +50,6 @@
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/Utils.h"
 #include "clang/Index/IndexingAction.h"
-#include "clang/Serialization/ASTReader.h"
-#include "clang/Serialization/ASTWriter.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
 #include "clang/Parse/Parser.h"
@@ -59,9 +57,12 @@
 #include "clang/Rewrite/Frontend/Rewriters.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
+#include "clang/Serialization/ASTReader.h"
+#include "clang/Serialization/ASTWriter.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CrashRecoveryContext.h"
+#include "llvm/Support/FileCollector.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/Support/Path.h"
 #include <algorithm>
@@ -224,7 +225,7 @@ namespace {
                                                   error);
       assert(!error && "failed to allocated read-only zero-filled memory");
       init(static_cast<char *>(memory.base()),
-           static_cast<char *>(memory.base()) + memory.size() - 1,
+           static_cast<char *>(memory.base()) + memory.allocatedSize() - 1,
            /*null-terminated*/true);
     }
 
@@ -322,11 +323,15 @@ private:
 class ClangImporterDependencyCollector : public clang::DependencyCollector
 {
   llvm::StringSet<> ExcludedPaths;
+  /// The FileCollector is used by LLDB to generate reproducers. It's not used
+  /// by Swift to track dependencies.
+  std::shared_ptr<llvm::FileCollector> FileCollector;
   const bool TrackSystemDeps;
 
 public:
-  ClangImporterDependencyCollector(bool TrackSystemDeps)
-    : TrackSystemDeps(TrackSystemDeps) {}
+  ClangImporterDependencyCollector(
+      bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector)
+      : FileCollector(FileCollector), TrackSystemDeps(TrackSystemDeps) {}
 
   void excludePath(StringRef filename) {
     ExcludedPaths.insert(filename);
@@ -355,13 +360,22 @@ public:
       return false;
     return true;
   }
+
+  void maybeAddDependency(StringRef Filename, bool FromModule, bool IsSystem,
+                          bool IsModuleFile, bool IsMissing) override {
+    if (FileCollector)
+      FileCollector->addFile(Filename);
+    clang::DependencyCollector::maybeAddDependency(
+        Filename, FromModule, IsSystem, IsModuleFile, IsMissing);
+  }
 };
 } // end anonymous namespace
 
 std::shared_ptr<clang::DependencyCollector>
-ClangImporter::createDependencyCollector(bool TrackSystemDeps)
-{
-  return std::make_shared<ClangImporterDependencyCollector>(TrackSystemDeps);
+ClangImporter::createDependencyCollector(
+    bool TrackSystemDeps, std::shared_ptr<llvm::FileCollector> FileCollector) {
+  return std::make_shared<ClangImporterDependencyCollector>(TrackSystemDeps,
+                                                            FileCollector);
 }
 
 void ClangImporter::Implementation::addBridgeHeaderTopLevelDecls(
@@ -1017,17 +1031,11 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
 
   // Set up the file manager.
   {
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty() ||
-        importerOpts.ForceUseSwiftVirtualFileSystem) {
-      // If the clang instance has overlays it means the user has provided
-      // -ivfsoverlay options.  We're going to clobber their file system with
-      // the Swift file system, so warn about it.
-      if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
-        ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
-      }
-      instance.setVirtualFileSystem(ctx.SourceMgr.getFileSystem());
-    }
-    instance.createFileManager();
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
+        clang::createVFSFromCompilerInvocation(instance.getInvocation(),
+                                               instance.getDiagnostics(),
+                                               ctx.SourceMgr.getFileSystem());
+    instance.createFileManager(std::move(VFS));
   }
 
   // Don't stop emitting messages if we ever can't load a module.
@@ -1041,8 +1049,7 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
   clangDiags.setSeverity(clang::diag::err_module_not_built,
                          clang::diag::Severity::Error,
                          clang::SourceLocation());
-  clangDiags.setSuppressAfterFatalError(
-      !ctx.Diags.getShowDiagnosticsAfterFatalError());
+  clangDiags.setFatalsAsError(ctx.Diags.getShowDiagnosticsAfterFatalError());
 
 
   // Create the associated action.
@@ -1157,17 +1164,18 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
 bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework,
                                   bool isSystem) {
   clang::FileManager &fileMgr = Impl.Instance->getFileManager();
-  const clang::DirectoryEntry *entry = fileMgr.getDirectory(newSearchPath);
-  if (!entry)
+  auto optionalEntry = fileMgr.getOptionalDirectoryRef(newSearchPath);
+  if (!optionalEntry)
     return true;
+  auto entry = *optionalEntry;
 
   auto &headerSearchInfo = Impl.getClangPreprocessor().getHeaderSearchInfo();
   auto exists = std::any_of(headerSearchInfo.search_dir_begin(),
                             headerSearchInfo.search_dir_end(),
                             [&](const clang::DirectoryLookup &lookup) -> bool {
     if (isFramework)
-      return lookup.getFrameworkDir() == entry;
-    return lookup.getDir() == entry;
+      return lookup.getFrameworkDir() == &entry.getDirEntry();
+    return lookup.getDir() == &entry.getDirEntry();
   });
   if (exists) {
     // Don't bother adding a search path that's already there. Clang would have
@@ -1338,10 +1346,9 @@ bool ClangImporter::importHeader(StringRef header, ModuleDecl *adapter,
                                  off_t expectedSize, time_t expectedModTime,
                                  StringRef cachedContents, SourceLoc diagLoc) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*OpenFile=*/true);
-  if (headerFile && headerFile->getSize() == expectedSize &&
-      headerFile->getModificationTime() == expectedModTime) {
+  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
+  if (headerFile && (*headerFile)->getSize() == expectedSize &&
+      (*headerFile)->getModificationTime() == expectedModTime) {
     return importBridgingHeader(header, adapter, diagLoc, false, true);
   }
 
@@ -1374,8 +1381,7 @@ bool ClangImporter::importBridgingHeader(StringRef header, ModuleDecl *adapter,
   }
 
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
-  const clang::FileEntry *headerFile = fileManager.getFile(header,
-                                                           /*OpenFile=*/true);
+  auto headerFile = fileManager.getFile(header, /*OpenFile=*/true);
   if (!headerFile) {
     Impl.SwiftContext.Diags.diagnose(diagLoc, diag::bridging_header_missing,
                                      header);
@@ -1408,7 +1414,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
+      clang::FrontendInputFile(headerPath, clang::Language::ObjC));
 
   invocation->getPreprocessorOpts().resetNonModularOptions();
 
@@ -1451,9 +1457,10 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
     return "";
   }
 
-  const clang::FileEntry *fileInfo = fileManager.getFile(headerPath);
-  fileSize = fileInfo->getSize();
-  fileModTime = fileInfo->getModificationTime();
+  if (auto fileInfo = fileManager.getFile(headerPath)) {
+    fileSize = (*fileInfo)->getSize();
+    fileModTime = (*fileInfo)->getModificationTime();
+  }
   return result;
 }
 
@@ -1465,7 +1472,7 @@ ClangImporter::emitBridgingPCH(StringRef headerPath,
   invocation->getFrontendOpts().DisableFree = false;
   invocation->getFrontendOpts().Inputs.clear();
   invocation->getFrontendOpts().Inputs.push_back(
-      clang::FrontendInputFile(headerPath, clang::InputKind::ObjC));
+      clang::FrontendInputFile(headerPath, clang::Language::ObjC));
   invocation->getFrontendOpts().OutputFile = outputPCHPath;
   invocation->getFrontendOpts().ProgramAction = clang::frontend::GeneratePCH;
   invocation->getPreprocessorOpts().resetNonModularOptions();
@@ -2376,8 +2383,7 @@ void ClangImporter::lookupBridgingHeaderDecls(
 bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
-  const clang::FileEntry *File =
-    getClangPreprocessor().getFileManager().getFile(Filename);
+  auto File = getClangPreprocessor().getFileManager().getFile(Filename);
   if (!File)
     return true;
 
@@ -2386,7 +2392,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
   auto &ClangPP = getClangPreprocessor();
 
   // Look up the header in the includes of the bridging header.
-  if (Impl.BridgeHeaderFiles.count(File)) {
+  if (Impl.BridgeHeaderFiles.count(*File)) {
     auto headerFilter = [&](ClangNode ClangN) -> bool {
       if (ClangN.isNull())
         return false;
@@ -2395,7 +2401,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != File)
+      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != *File)
         return false;
 
       return filter(ClangN);
@@ -2405,7 +2411,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
     return false;
   }
 
-  clang::FileID FID = ClangSM.translateFile(File);
+  clang::FileID FID = ClangSM.translateFile(*File);
   if (FID.isInvalid())
     return false;
 
