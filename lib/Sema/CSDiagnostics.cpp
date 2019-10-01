@@ -5037,8 +5037,8 @@ bool ArgumentMismatchFailure::diagnoseAsNote() {
   auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
   assert(argToParam);
 
-  if (auto *decl = getDecl()) {
-    emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
+  if (auto *callee = getCallee()) {
+    emitDiagnostic(callee, diag::candidate_has_invalid_argument_at_position,
                    getToType(), argToParam->getParamIdx());
     return true;
   }
@@ -5066,11 +5066,10 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // one would cover both arguments.
   if (getAnchor() == rhs && rhsType->is<FunctionType>()) {
     auto &cs = getConstraintSystem();
-    auto info = getFunctionArgApplyInfo(locator);
-    if (info && cs.hasFixFor(cs.getConstraintLocator(
-                    binaryOp, {ConstraintLocator::ApplyArgument,
-                               LocatorPathElt::ApplyArgToParam(
-                                   0, 0, info->getParameterFlagsAtIndex(0))})))
+    if (cs.hasFixFor(cs.getConstraintLocator(
+            binaryOp, {ConstraintLocator::ApplyArgument,
+                       LocatorPathElt::ApplyArgToParam(
+                           0, 0, getParameterFlagsAtIndex(0))})))
       return true;
   }
 
@@ -5228,14 +5227,12 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
     return false;
 
-  auto info = *getFunctionArgApplyInfo(locator);
-
   auto *argType = cs.createTypeVariable(
       cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
       /*flags=*/0);
 
   // Assign new type variable to a type of a parameter.
-  auto *fnType = info.getFnType();
+  auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
   cs.assignFixedType(argType, param.getOldType());
 
