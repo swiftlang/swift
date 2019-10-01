@@ -2300,7 +2300,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
-      auto attr = cast<DifferentiableAttr>(DA);
+      auto *attr = cast<DifferentiableAttr>(DA);
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
@@ -2324,9 +2324,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef, indices);
-
-      S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
+          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
+          indices);
       return;
     }
 

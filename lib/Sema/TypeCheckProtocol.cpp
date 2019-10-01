@@ -573,7 +573,7 @@ swift::matchWitness(
               ctx, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
               reqDiffAttr->getParameterIndices(), /*jvp*/ None,
-              /*vjp*/ None, reqDiffAttr->getRequirements());
+              /*vjp*/ None, reqDiffAttr->getDerivativeGenericSignature());
           auto insertion = ctx.DifferentiableAttrs.try_emplace(
               {witness, newAttr->getParameterIndices()}, newAttr);
           // Valid `@differentiable` attributes are uniqued by their parameter
@@ -2256,7 +2256,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // inferred differentiation parameters.
     auto *original = cast<AbstractFunctionDecl>(match.Witness);
     auto *whereClauseGenEnv =
-        reqAttr->computeDerivativeGenericEnvironment(original);
+        reqAttr->getDerivativeGenericEnvironment(original);
     auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
         original, whereClauseGenEnv);
     bool omitWrtClause = reqAttr->getParameterIndices()->parameters.count() ==

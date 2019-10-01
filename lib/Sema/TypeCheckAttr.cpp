@@ -3397,8 +3397,8 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     whereClauseGenSig = std::move(builder).computeGenericSignature(
         attr->getLocation(), /*allowConcreteGenericParams=*/true);
     whereClauseGenEnv = whereClauseGenSig->getGenericEnvironment();
-    // Store the resolved requirements in the attribute.
-    attr->setRequirements(ctx, whereClauseGenSig->getRequirements());
+    // Store the resolved derivative generic signature in the attribute.
+    attr->setDerivativeGenericSignature(ctx, whereClauseGenSig);
   }
 
   // Validate the 'wrt:' parameters.
@@ -3523,7 +3523,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
     auto *newAttr = DifferentiableAttr::create(
         ctx, /*implicit*/ true, attr->AtLoc, attr->getRange(), attr->isLinear(),
         attr->getParameterIndices(), attr->getJVP(), attr->getVJP(),
-        attr->getRequirements());
+        attr->getDerivativeGenericSignature());
     newAttr->setJVPFunction(attr->getJVPFunction());
     newAttr->setVJPFunction(attr->getVJPFunction());
     auto insertion = ctx.DifferentiableAttrs.try_emplace(
@@ -3808,16 +3808,6 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
 
-  // Compute derivative generic requirements that are not satisfied by original
-  // function.
-  SmallVector<Requirement, 8> derivativeRequirements;
-  if (auto derivativeGenSig = derivative->getGenericSignature()) {
-    auto originalGenSig = originalFn->getGenericSignature();
-    for (auto req : derivativeGenSig->getRequirements())
-      if (!originalGenSig->isRequirementSatisfied(req))
-        derivativeRequirements.push_back(req);
-  }
-
   // Try to find a `@differentiable` attribute on the original function with the
   // same differentiation parameters.
   DifferentiableAttr *da = nullptr;
@@ -3830,7 +3820,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     da = DifferentiableAttr::create(ctx, /*implicit*/ true, attr->AtLoc,
                                     attr->getRange(), attr->isLinear(),
                                     checkedWrtParamIndices, /*jvp*/ None,
-                                    /*vjp*/ None, derivativeRequirements);
+                                    /*vjp*/ None,
+                                    derivative->getGenericSignature());
     switch (kind) {
     case AutoDiffAssociatedFunctionKind::JVP:
       da->setJVPFunction(derivative);

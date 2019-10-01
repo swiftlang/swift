@@ -132,18 +132,14 @@ private:
   SILAutoDiffIndices indices;
   /// The JVP and VJP function names.
   StringRef JVPName, VJPName;
-  /// The trailing constraint clause.
+  /// The trailing where clause (optional).
+  /// This is defined only for parsed attributes and is resolved to
+  /// `DerivativeGenericSignature` by the SIL parser.
   TrailingWhereClause *WhereClause = nullptr;
-  /// The number of constraint clause requirements.
-  unsigned NumRequirements;
-  /// The constraint clause requirements.
-  ArrayRef<Requirement> Requirements;
+  /// The derivative generic signature (optional).
+  GenericSignature *DerivativeGenericSignature = nullptr;
   /// The original function.
   SILFunction *Original = nullptr;
-
-  Requirement *getRequirementsData() {
-    return reinterpret_cast<Requirement *>(this+1);
-  }
 
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                         StringRef jvpName,
@@ -153,7 +149,7 @@ private:
   SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                         StringRef jvpName,
                         StringRef vjpName,
-                        ArrayRef<Requirement> requirements);
+                        GenericSignature *derivativeGenSig);
 
 public:
   static SILDifferentiableAttr *create(
@@ -163,8 +159,8 @@ public:
 
   static SILDifferentiableAttr *create(
       SILModule &M, const SILAutoDiffIndices &indices,
-      ArrayRef<Requirement> requirements, StringRef jvpName = StringRef(),
-      StringRef vjpName = StringRef());
+      StringRef jvpName = StringRef(), StringRef vjpName = StringRef(),
+      GenericSignature *derivativeGenSig = nullptr);
 
   bool hasJVP() const { return !JVPName.empty(); }
   StringRef getJVPName() const { assert(hasJVP()); return JVPName; }
@@ -183,11 +179,12 @@ public:
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  ArrayRef<Requirement> getRequirements() const {
-    return {const_cast<SILDifferentiableAttr *>(this)->getRequirementsData(),
-            NumRequirements};
+  GenericSignature *getDerivativeGenericSignature() const {
+    return DerivativeGenericSignature;
   }
-  void setRequirements(ArrayRef<Requirement> requirements);
+  void setDerivativeGenericSignature(GenericSignature *derivativeGenSig) {
+    DerivativeGenericSignature = derivativeGenSig;
+  };
 
   void print(llvm::raw_ostream &OS) const;
 };
