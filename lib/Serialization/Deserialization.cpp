@@ -4054,12 +4054,12 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         DeclID jvpDeclId;
         uint64_t vjpNameId;
         DeclID vjpDeclId;
+        GenericSignatureID derivativeGenSigId;
         ArrayRef<uint64_t> parameters;
-        SmallVector<Requirement, 4> requirements;
 
         serialization::decls_block::DifferentiableDeclAttrLayout::readRecord(
             scratch, isImplicit, linear, jvpNameId, jvpDeclId, vjpNameId,
-            vjpDeclId, parameters);
+            vjpDeclId, derivativeGenSigId, parameters);
 
         Optional<DeclNameWithLoc> jvp;
         FuncDecl *jvpDecl = nullptr;
@@ -4075,17 +4075,17 @@ llvm::Error DeclDeserializer::deserializeDeclAttributes() {
         if (vjpDeclId != 0)
           vjpDecl = cast<FuncDecl>(MF.getDecl(vjpDeclId));
 
+        auto derivativeGenSig = MF.getGenericSignature(derivativeGenSigId);
+
         llvm::SmallBitVector parametersBitVector(parameters.size());
         for (unsigned i : indices(parameters))
           parametersBitVector[i] = parameters[i];
         auto *indices = AutoDiffParameterIndices::get(parametersBitVector, ctx);
 
-        MF.readGenericRequirements(requirements, MF.DeclTypeCursor);
-
         auto diffAttr =
             DifferentiableAttr::create(ctx, isImplicit, SourceLoc(),
                                        SourceRange(), linear, indices, jvp, vjp,
-                                       requirements);
+                                       derivativeGenSig);
         diffAttr->setJVPFunction(jvpDecl);
         diffAttr->setVJPFunction(vjpDecl);
         Attr = diffAttr;

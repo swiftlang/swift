@@ -470,7 +470,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-09-24-a",
                 "clang": "fcefc0babd0915287ee479d2baee5bb020de014b",
                 "swift": "tensorflow",
-                "lldb": "1be6bc1723a5e68dd5d304115227d487fa242fdd",
+                "lldb": "330b13139f36e2a64fc347a108992ba8966f3033",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-09-24-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-09-24-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-09-24-a",

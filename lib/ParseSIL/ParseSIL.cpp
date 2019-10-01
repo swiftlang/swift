@@ -5826,7 +5826,14 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         FunctionState.convertRequirements(
             FunctionState.F, attr->getWhereClause()->getRequirements(),
             requirements);
-        attr->setRequirements(requirements);
+        auto *derivativeGenSig = evaluateOrDefault(
+            P.Context.evaluator,
+            AbstractGenericSignatureRequest{
+              FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+              /*addedGenericParams=*/{},
+              std::move(requirements)},
+              nullptr);
+        attr->setDerivativeGenericSignature(derivativeGenSig);
       }
 
       // Parse the basic block list.

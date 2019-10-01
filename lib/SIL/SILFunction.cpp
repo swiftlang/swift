@@ -57,18 +57,15 @@ SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                       StringRef vjpName,
                       TrailingWhereClause *whereClause)
   : indices(indices), JVPName(jvpName), VJPName(vjpName),
-    WhereClause(whereClause),
-    NumRequirements(whereClause ? whereClause->getRequirements().size() : 0) {}
+    WhereClause(whereClause) {}
 
 SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                       StringRef jvpName,
                       StringRef vjpName,
-                      ArrayRef<Requirement> requirements)
+                      GenericSignature *derivativeGenSig)
   : indices(indices), JVPName(jvpName), VJPName(vjpName),
-    NumRequirements(requirements.size()) {
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
-}
+    DerivativeGenericSignature(derivativeGenSig) {}
 
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
@@ -76,10 +73,8 @@ SILDifferentiableAttr::create(SILModule &M,
                               StringRef jvpName,
                               StringRef vjpName,
                               TrailingWhereClause *whereClause) {
-  unsigned size = sizeof(SILDifferentiableAttr);
-  if (whereClause)
-    size += whereClause->getRequirements().size() * sizeof(Requirement);
-  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
+  void *mem =
+      M.allocate(sizeof(SILDifferentiableAttr), alignof(SILDifferentiableAttr));
   return ::new (mem)
       SILDifferentiableAttr(indices, jvpName, vjpName, whereClause);
 }
@@ -87,25 +82,13 @@ SILDifferentiableAttr::create(SILModule &M,
 SILDifferentiableAttr *
 SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
-                              ArrayRef<Requirement> requirements,
                               StringRef jvpName,
-                              StringRef vjpName) {
-  unsigned size = sizeof(SILDifferentiableAttr) +
-      requirements.size() * sizeof(Requirement);
-  void *mem = M.allocate(size, alignof(SILDifferentiableAttr));
+                              StringRef vjpName,
+                              GenericSignature *derivativeGenSig) {
+  void *mem =
+      M.allocate(sizeof(SILDifferentiableAttr), alignof(SILDifferentiableAttr));
   return ::new (mem)
-      SILDifferentiableAttr(indices, jvpName, vjpName, requirements);
-}
-
-void SILDifferentiableAttr::setRequirements(
-    ArrayRef<Requirement> requirements) {
-  unsigned numClauseRequirements =
-      WhereClause ? WhereClause->getRequirements().size() : 0;
-  assert(requirements.size() <= numClauseRequirements &&
-         "Requirements size must not exceed number of requirements used for "
-         "allocation");
-  NumRequirements = numClauseRequirements;
-  std::copy(requirements.begin(), requirements.end(), getRequirementsData());
+      SILDifferentiableAttr(indices, jvpName, vjpName, derivativeGenSig);
 }
 
 void SILFunction::addDifferentiableAttr(SILDifferentiableAttr *attr) {

@@ -24,6 +24,14 @@
 
 namespace swift {
 
+class AnyFunctionType;
+class AutoDiffIndexSubset;
+class AutoDiffParameterIndicesBuilder;
+class SILFunctionType;
+typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
+class Type;
+enum class SILLinkage : uint8_t;
+
 enum class DifferentiabilityKind: uint8_t {
   NonDifferentiable = 0b00,
   Normal = 0b01,
@@ -92,12 +100,6 @@ public:
     return getKind() == Kind::Self;
   }
 };
-
-class AnyFunctionType;
-class AutoDiffIndexSubset;
-class AutoDiffParameterIndicesBuilder;
-class Type;
-enum class SILLinkage : uint8_t;
 
 /// Identifies a subset of a function's parameters.
 ///

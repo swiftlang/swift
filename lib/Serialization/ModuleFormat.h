@@ -52,7 +52,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 519; // SIL function availability
+const uint16_t SWIFTMODULE_VERSION_MINOR = 520; // store generic signature in AST/SIL differentiable attributes
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1733,6 +1733,7 @@ namespace decls_block {
     DeclIDField, // JVP function declaration.
     IdentifierIDField, // VJP name.
     DeclIDField, // VJP function declaration.
+    GenericSignatureIDField, // Derivative generic signature.
     BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
   >;
 
