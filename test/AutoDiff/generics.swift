@@ -274,4 +274,64 @@ extension TF_697_Sequential: TF_697_Layer where Layer1: TF_697_Layer {
     }
 }
 
+// Test layout requirements.
+
+// The layout requirement is "contextual": the requirement is not on `T`, the
+// differentiable function parameter/result type.
+struct ContextualLayoutRequirement<T: Differentiable, U: AnyObject> {
+  var stored: T
+}
+extension ContextualLayoutRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+// The layout requirement directly involves `T`, the differentiable function
+// parameter/result type.
+// TODO(TF-851): Uncomment the tests below after `@differentiable` function
+// SILGen thunking is fixed.
+/*
+struct LayoutRequirement<T: AnyObject & Differentiable> {
+  var stored: T
+}
+extension LayoutRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+*/
+
+// Test superclass requirements.
+
+class Super: Differentiable {}
+
+// The superclass requirement is "contextual": the requirement is not on `T`,
+// the differentiable function parameter/result type.
+struct ContextualSuperclassRequirement<T: Differentiable, U: Super> {
+  var stored: T
+}
+extension ContextualSuperclassRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+// The superclass requirement directly involves `T`, the differentiable
+// function parameter/result type.
+// TODO(TF-851): Uncomment the tests below after `@differentiable` function
+// SILGen thunking is fixed.
+/*
+struct SuperclassRequirement<T: Super & Differentiable> {
+  var stored: T
+}
+extension SuperclassRequirement {
+  func test(_ x: T) {
+    let _: @differentiable (T) -> T = { _ in self.stored }
+    let _: @differentiable (T) -> T = { $0 }
+  }
+}
+*/
+
 // TODO: add more tests.

@@ -234,28 +234,23 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
   return nullptr;
 }
 
-// Return the canonical "constrained" derivative generic signature for the given
-// original function and (possibly uncanonical) derivative generic signature.
-// The constrained derivative generic signature constrains all wrt parameters
-// to conform to `Differentiable`.
-// TODO(TF-818): Change `@differentiable` attribute type-checking and
-// `[differentiable]` construction so that all derivative generic signatures
-// constrain wrt parameters to `Differentiable`. Then, this helper will no
-// longer be needed (except for constructing attributes in
-// `ADContext::getOrCreateDifferentiableAttr`), improving compiler
-// performance.
-static CanGenericSignature getConstrainedDerivativeGenericSignature(
-    SILDifferentiableAttr *attr, SILFunction *original) {
-  auto originalFnTy = original->getLoweredFunctionType();
-  CanGenericSignature derivativeGenSig = originalFnTy->getGenericSignature();
-  if (auto *attrDerivativeGenSig = attr->getDerivativeGenericSignature())
-    derivativeGenSig = attrDerivativeGenSig->getCanonicalSignature();
+/// Returns the "constrained" derivative generic signature given:
+/// - An original SIL function type.
+/// - A wrt parameter index subset.
+/// - A possibly uncanonical derivative generic signature (optional).
+/// - Additional derivative requirements (optional).
+/// The constrained derivative generic signature constrains all wrt parameters
+/// to conform to `Differentiable`.
+static GenericSignature *getConstrainedDerivativeGenericSignature(
+    CanSILFunctionType originalFnTy, AutoDiffIndexSubset *paramIndexSet,
+    GenericSignature *derivativeGenSig) {
+  if (!derivativeGenSig)
+    derivativeGenSig = originalFnTy->getGenericSignature();
   if (!derivativeGenSig)
     return nullptr;
   // Constrain all wrt parameters to `Differentiable`.
-  auto &ctx = original->getASTContext();
+  auto &ctx = derivativeGenSig->getASTContext();
   auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto paramIndexSet = attr->getIndices().parameters;
   SmallVector<Requirement, 4> requirements;
   for (unsigned paramIdx : paramIndexSet->getIndices()) {
     auto paramType = originalFnTy->getParameters()[paramIdx].getType();
@@ -269,7 +264,19 @@ static CanGenericSignature getConstrainedDerivativeGenericSignature(
           derivativeGenSig,
           /*addedGenericParams*/ {},
           std::move(requirements)},
-      nullptr)->getCanonicalSignature();
+      nullptr);
+}
+
+/// Returns the canonical derivative generic signature for the given
+/// `[differentiable]` attribute and original function.
+/// - Return the `[differentiable]` attribute derivative generic signature if
+///   it exists.
+/// - Otherwise, return the original function's generic signature.
+static CanGenericSignature getDerivativeGenericSignature(
+    SILDifferentiableAttr *attr, SILFunction *original) {
+  if (auto *attrDerivativeGenSig = attr->getDerivativeGenericSignature())
+    return attrDerivativeGenSig->getCanonicalSignature();
+  return original->getLoweredFunctionType()->getGenericSignature();
 }
 
 // Clone the generic parameters of the given generic signature and return a new
@@ -1063,10 +1070,13 @@ public:
       SILFunction *original, const SILAutoDiffIndices &indices,
       GenericSignature *derivativeGenericSignature) const {
     assert(!lookUpDifferentiableAttr(original, indices));
+    auto derivativeConstrainedGenSig = getConstrainedDerivativeGenericSignature(
+        original->getLoweredFunctionType(), indices.parameters,
+        derivativeGenericSignature);
     auto *attr = SILDifferentiableAttr::create(getModule(), indices,
                                                /*jvpName*/ StringRef(),
                                                /*vjpName*/ StringRef(),
-                                               derivativeGenericSignature);
+                                               derivativeConstrainedGenSig);
     original->addDifferentiableAttr(attr);
     return attr;
   }
@@ -2265,7 +2275,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
   SmallVector<Requirement, 2> unsatisfiedRequirements;
   for (auto req : requirements) {
     auto firstType = req.getFirstType();
-    auto secondType = req.getSecondType();
+    Type secondType;
     // Substitute first and second types using the given substitution map,
     // looking up conformances in the current module, if possible.
     if (auto substFirstType =
@@ -2273,12 +2283,33 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
                             LookUpConformanceInModule(swiftModule))) {
       firstType = substFirstType;
     }
-    if (auto substSecondType =
-            secondType.subst(QuerySubstitutionMap{substMap},
-                             LookUpConformanceInModule(swiftModule))) {
-      secondType = substSecondType;
+    if (req.getKind() != RequirementKind::Layout) {
+      secondType = req.getSecondType();
+      if (auto substSecondType =
+              secondType.subst(QuerySubstitutionMap{substMap},
+                               LookUpConformanceInModule(swiftModule))) {
+        secondType = substSecondType;
+      }
     }
     switch (req.getKind()) {
+    // Check layout requirements.
+    case RequirementKind::Layout: {
+      auto layout = req.getLayoutConstraint();
+      switch (layout->getKind()) {
+      case LayoutConstraintKind::Class:
+        if (!firstType->satisfiesClassConstraint())
+          unsatisfiedRequirements.push_back(req);
+        continue;
+      default:
+        // TODO: Check other layout requirements. Note that `@differentiable`
+        // attribute type-checking does not yet support layout requirements in
+        // where clauses; layout requirements in derivative generic signatures
+        // can be formed only from `autodiff_function` instructions whose
+        // original function operand is generic with layout requirements.
+        break;
+      }
+      continue;
+    }
     // Check same type requirements.
     case RequirementKind::SameType:
       // If the first type does not equal the second type, then record the
@@ -2286,6 +2317,14 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       if (!firstType->isEqual(secondType))
         unsatisfiedRequirements.push_back(req);
       continue;
+    // Check superclass requirements.
+    case RequirementKind::Superclass: {
+      // If the second type is not an exact superclass of second type, then
+      // record the unsatisfied requirement.
+      if (!secondType->isExactSuperclassOf(firstType))
+        unsatisfiedRequirements.push_back(req);
+      continue;
+    }
     // Check conformance requirements.
     case RequirementKind::Conformance: {
       auto protocolType = req.getSecondType()->castTo<ProtocolType>();
@@ -2297,10 +2336,6 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
         unsatisfiedRequirements.push_back(req);
       continue;
     }
-    // Ignore other requirements (superclass and layout).
-    // Layout requirements are rejected during type-checking.
-    default:
-      continue;
     }
   }
   if (unsatisfiedRequirements.empty())
@@ -3375,8 +3410,7 @@ public:
         mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffLinearMapKind::Pullback,
             indices)).str();
-    auto pbGenericSig =
-        getConstrainedDerivativeGenericSignature(attr, original);
+    auto pbGenericSig = getDerivativeGenericSignature(attr, original);
     auto *pbGenericEnv =
         pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
     auto pbType = SILFunctionType::get(
@@ -5239,8 +5273,7 @@ public:
         mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffLinearMapKind::Differential,
             indices)).str();
-    auto diffGenericSig =
-        getConstrainedDerivativeGenericSignature(attr, original);
+    auto diffGenericSig = getDerivativeGenericSignature(attr, original);
     auto *diffGenericEnv =
         diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
     auto diffType = SILFunctionType::get(
@@ -7779,7 +7812,7 @@ ADContext::declareExternalAssociatedFunction(
   auto &indices = attr->getIndices();
   auto originalTy = original->getLoweredFunctionType();
   auto originalLoc = original->getLocation();
-  auto assocGenSig = getConstrainedDerivativeGenericSignature(attr, original);
+  auto assocGenSig = getDerivativeGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
@@ -7814,7 +7847,7 @@ static SILFunction *createEmptyVJP(
       mangler.mangleAutoDiffAssociatedFunctionHelper(
           original->getName(), AutoDiffAssociatedFunctionKind::VJP, indices))
               .str();
-  auto vjpGenericSig = getConstrainedDerivativeGenericSignature(attr, original);
+  auto vjpGenericSig = getDerivativeGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that calls to `module.Types.getTypeLowering()` below
@@ -7864,7 +7897,7 @@ static SILFunction *createEmptyJVP(
       mangler.mangleAutoDiffAssociatedFunctionHelper(
           original->getName(), AutoDiffAssociatedFunctionKind::JVP, indices))
               .str();
-  auto jvpGenericSig = getConstrainedDerivativeGenericSignature(attr, original);
+  auto jvpGenericSig = getDerivativeGenericSignature(attr, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that calls to `module.Types.getTypeLowering()` below
