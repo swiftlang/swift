@@ -304,6 +304,21 @@ SimpleMathTests.test("StructGeneric") {
   expectEqual(405, gradient(at: 3, in: fifthPower))
 }
 
+SimpleMathTests.test("StructWithNoDerivativeProperty") {
+  struct NoDerivativeProperty : Differentiable {
+    var x: Float
+    @noDerivative var y: Float
+  }
+  expectEqual(
+    NoDerivativeProperty.TangentVector(x: 1),
+    gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
+      var tmp = s
+      tmp.y = tmp.x
+      return tmp.x
+    }
+  )
+}
+
 SimpleMathTests.test("SubsetIndices") {
   func grad(_ lossFunction: @differentiable (Float, Float) -> Float) -> Float {
     return gradient(at: 1) { x in lossFunction(x * x, 10.0) }
