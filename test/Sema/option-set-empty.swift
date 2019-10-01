@@ -3,6 +3,8 @@
 struct SomeOptions: OptionSet {
     var rawValue: Int
     static let some = MyOptions(rawValue: 4)
+    let empty = SomeOptions(rawValue: 0)
+    var otherVal = SomeOptions(rawValue: 0)
 }
 
 struct MyOptions: OptionSet {
