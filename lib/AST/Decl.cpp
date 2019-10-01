@@ -5079,6 +5079,10 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   if (!isLet())
     return supportsMutation();
 
+  // Debugger expression 'let's are initialized through a side-channel.
+  if (isDebuggerVar())
+    return false;
+
   // We have a 'let'; we must be checking settability from a specific
   // DeclContext to go on further.
   if (UseDC == nullptr)

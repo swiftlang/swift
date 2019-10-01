@@ -3,8 +3,6 @@
 // REQUIRES: CPU=x86_64
 // REQUIRES: executable_test
 // REQUIRES: fuzzer_runtime
-// TODO(dliew): Re-enable for macosx (rdar://problem/49853280)
-// XFAIL: OS=macosx
 // XFAIL: OS=ios
 // XFAIL: OS=tvos
 // XFAIL: OS=watchos
