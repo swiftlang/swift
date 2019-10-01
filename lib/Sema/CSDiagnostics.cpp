@@ -229,12 +229,20 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     choice = overload->choice;
     rawFnType = overload->openedType;
   } else {
-    // If we didn't resolve an overload for the callee, we must be dealing with
-    // a call of an arbitrary function expr.
-    auto *call = cast<CallExpr>(anchor);
-    assert(!shouldHaveDirectCalleeOverload(call) &&
-           "Should we have resolved a callee for this?");
-    rawFnType = cs.getType(call->getFn());
+    // If we didn't resolve an overload for the callee, we should be dealing
+    // with a call of an arbitrary function expr.
+    if (auto *call = dyn_cast<CallExpr>(anchor)) {
+      assert(!shouldHaveDirectCalleeOverload(call) &&
+             "Should we have resolved a callee for this?");
+      rawFnType = cs.getType(call->getFn());
+    } else {
+      // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
+      // we can end up a BinaryExpr here with an unresolved callee. It should be
+      // possible to remove this once we've gotten rid of the old CSDiag logic
+      // and just assert that we have a CallExpr.
+      auto *apply = cast<ApplyExpr>(anchor);
+      rawFnType = cs.getType(apply->getFn());
+    }
   }
 
   // Try to resolve the function type by loading lvalues and looking through
