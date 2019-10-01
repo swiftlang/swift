@@ -1,5 +1,3 @@
-// FIXME(TF-847): Re-enable this test.
-// XFAIL: *
 // RUN: %target-swift-frontend -typecheck -verify %s
 
 // ~~~~~~~~~~~~~ Test top-level functions. ~~~~~~~~~~~~~
