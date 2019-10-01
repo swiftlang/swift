@@ -100,12 +100,14 @@ private:
   
   uint64_t HeaderAddress;
   std::vector<Segment> Segments;
+  llvm::DenseMap<uint64_t, StringRef> DynamicRelocations;
   
   void scanMachO(const MachOObjectFile *O) {
     using namespace llvm::MachO;
 
     HeaderAddress = UINT64_MAX;
     
+    // Collect the segment preferred vm mappings.
     for (const auto &Load : O->load_commands()) {
       if (Load.C.cmd == LC_SEGMENT_64) {
         auto Seg = O->getSegment64LoadCommand(Load);
@@ -134,6 +136,23 @@ private:
         Segments.push_back({Seg.vmaddr, contents});
         HeaderAddress = std::min(HeaderAddress, (uint64_t)Seg.vmaddr);
       }
+    }
+    
+    // Walk through the bindings list to collect all the external references
+    // in the image.
+    llvm::Error error = llvm::Error::success();
+    auto OO = const_cast<MachOObjectFile*>(O);
+
+    for (auto bind : OO->bindTable(error)) {
+      if (error) {
+        llvm::consumeError(std::move(error));
+        break;
+      }
+    
+      DynamicRelocations.insert({bind.address(), bind.symbolName()});
+    }
+    if (error) {
+      llvm::consumeError(std::move(error));
     }
   }
   
@@ -249,6 +268,15 @@ public:
     }
     return {};
   }
+  
+  RemoteAbsolutePointer
+  resolvePointer(uint64_t Addr, uint64_t pointerValue) const {
+    auto found = DynamicRelocations.find(Addr);
+    if (found == DynamicRelocations.end())
+      return RemoteAbsolutePointer("", pointerValue);
+    
+    return RemoteAbsolutePointer(found->second, pointerValue);
+  }
 };
 
 /// MemoryReader that reads from the on-disk representation of an executable
@@ -260,14 +288,31 @@ public:
 /// the image.
 class ObjectMemoryReader : public MemoryReader {
   std::vector<Image> Images;
+  
+  std::pair<const Image *, uint64_t>
+  decodeImageIndexAndAddress(uint64_t Addr) const {
+    unsigned index = Addr >> 48;
+    if (index >= Images.size())
+      return {nullptr, 0};
+    
+    return {&Images[index], Addr & ((1ull << 48) - 1)};
+  }
+  
+  uint64_t
+  encodeImageIndexAndAddress(const Image *image, uint64_t imageAddr) const {
+    unsigned index = image - Images.data();
+    return imageAddr | ((uint64_t)index << 48);
+  }
 
   StringRef getContentsAtAddress(uint64_t Addr, uint64_t Size) {
-    auto imageIndex = Addr >> 48;
-    if (imageIndex >= Images.size())
+    const Image *image;
+    uint64_t imageAddr;
+    std::tie(image, imageAddr) = decodeImageIndexAndAddress(Addr);
+
+    if (!image)
       return StringRef();
     
-    return Images[imageIndex]
-      .getContentsAtAddress(Addr & 0xFFFFFFFFFFFFull, Size);
+    return image->getContentsAtAddress(imageAddr, Size);
   }
   
 public:
@@ -305,7 +350,8 @@ public:
   RemoteAddress getImageStartAddress(unsigned i) const {
     assert(i < Images.size());
     
-    return RemoteAddress(Images[i].getStartAddress() | ((uint64_t)i << 48));
+    return RemoteAddress(
+           encodeImageIndexAndAddress(&Images[i], Images[i].getStartAddress()));
   }
 
   // TODO: We could consult the dynamic symbol tables of the images to
@@ -337,6 +383,29 @@ public:
   found_terminator:
     Dest.append(resultBuffer.begin(), resultBuffer.begin() + i);
     return true;
+  }
+  
+  RemoteAbsolutePointer resolvePointer(RemoteAddress Addr,
+                                       uint64_t pointerValue) override {
+    auto addrValue = Addr.getAddressData();
+    const Image *image;
+    uint64_t imageAddr;
+    std::tie(image, imageAddr) =
+      decodeImageIndexAndAddress(addrValue);
+    
+    if (!image)
+      return RemoteAbsolutePointer();
+    
+    auto resolved = image->resolvePointer(imageAddr, pointerValue);
+    
+    if (resolved && resolved.isResolved()) {
+      // Mix in the image index again to produce a remote address pointing into
+      // the same image.
+      return RemoteAbsolutePointer("", encodeImageIndexAndAddress(image,
+                               resolved.getResolvedAddress().getAddressData()));
+    }
+    // If the pointer is relative to an unresolved relocation, leave it as is.
+    return resolved;
   }
 };
 
