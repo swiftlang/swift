@@ -194,6 +194,21 @@ bool GenericParamScope::doesContextMatchStartingContext(
   return false;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+bool DifferentiableAttributeScope::doesContextMatchStartingContext(
+    const DeclContext *context) const {
+  // Need special logic to handle case where `attributedDeclaration` is an
+  // `AbstractStorageDecl` (`SubscriptDecl` or `VarDecl`). The initial starting
+  // context in `ASTScopeImpl::findStartingScopeForLookup` will be an accessor
+  // of the `attributedDeclaration`.
+  if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration))
+    for (auto accessor : asd->getAllAccessors())
+      if (up_cast<DeclContext>(accessor) == context)
+        return true;
+  return false;
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 #pragma mark lookup methods that run once per scope
 
 void ASTScopeImpl::lookup(SmallVectorImpl<const ASTScopeImpl *> &history,
@@ -423,6 +438,27 @@ bool SpecializeAttributeScope::lookupLocalsOrMembers(
         return true;
   return false;
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+bool DifferentiableAttributeScope::lookupLocalsOrMembers(
+    ArrayRef<const ASTScopeImpl *>, DeclConsumer consumer) const {
+  auto visitAbstractFunctionDecl = [&](AbstractFunctionDecl *afd) {
+    if (auto *params = afd->getGenericParams())
+      for (auto *param : params->getParams())
+        if (consumer.consume({param}, DeclVisibilityKind::GenericParameter))
+          return true;
+    return false;
+  };
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(attributedDeclaration)) {
+    return visitAbstractFunctionDecl(afd);
+  } else if (auto *asd = dyn_cast<AbstractStorageDecl>(attributedDeclaration)) {
+    for (auto *accessor : asd->getAllAccessors())
+      if (visitAbstractFunctionDecl(accessor))
+        return true;
+  }
+  return false;
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 bool BraceStmtScope::lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
                                            DeclConsumer consumer) const {
