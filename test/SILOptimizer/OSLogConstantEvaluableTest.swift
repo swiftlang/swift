@@ -4,9 +4,10 @@
 // Run the (mandatory) passes on which constant evaluator depends, and run the
 // constant evaluator on the SIL produced after the dependent passes are run.
 //
-// RUN: %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 1024 -test-constant-evaluable-subset %t/OSLogConstantEvaluableTest_silgen.sil > %t/OSLogConstantEvaluableTest.sil 2> %t/error-output
+// TODO(TF-799): Re-enable RUN lines after SR-11336 is fixed.
+// UN: %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 1024 -test-constant-evaluable-subset %t/OSLogConstantEvaluableTest_silgen.sil > %t/OSLogConstantEvaluableTest.sil 2> %t/error-output
 //
-// RUN: %FileCheck %s < %t/error-output
+// UN: %FileCheck %s < %t/error-output
 //
 // REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
