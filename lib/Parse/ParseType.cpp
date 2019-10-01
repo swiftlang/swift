@@ -183,9 +183,6 @@ Parser::parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion) {
   case tok::code_complete: {
     if (!HandleCodeCompletion)
       break;
-    if (CodeCompletion)
-      CodeCompletion->completeTypeSimpleBeginning();
-
     ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeCodeCompletionType(
         None, None, consumeTokenSyntax(), *SyntaxContext);
     return makeParsedCodeCompletion(std::move(ty));
@@ -607,9 +604,6 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeIdentifier() {
       return parseAnyType();
 
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeSimpleBeginning();
-
       auto CCTok = consumeTokenSyntax(tok::code_complete);
       auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
           None, None, std::move(CCTok), *SyntaxContext);
@@ -700,9 +694,6 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeIdentifier() {
     assert(!genericArgs);
 
     if (Tok.is(tok::code_complete)) {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithDot();
-
       auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
           result.get(), std::move(period), consumeTokenSyntax(),
           *SyntaxContext);
@@ -717,9 +708,6 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeIdentifier() {
 
   if (result.isSuccess() && Tok.is(tok::code_complete) &&
       !Tok.isAtStartOfLine()) {
-    if (CodeCompletion)
-      CodeCompletion->completeTypeIdentifierWithoutDot();
-
     auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
         result.get(), None, consumeTokenSyntax(), *SyntaxContext);
     return makeParsedCodeCompletion(std::move(ty));

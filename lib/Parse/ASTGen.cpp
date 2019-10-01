@@ -756,13 +756,20 @@ TypeRepr *ASTGen::generate(const SILFunctionTypeSyntax &Type,
 TypeRepr *ASTGen::generate(const CodeCompletionTypeSyntax &Type,
                            const SourceLoc Loc) {
   auto base = Type.getBase();
-  if (!base)
+  if (!base) {
+    if (P.CodeCompletion)
+      P.CodeCompletion->completeTypeSimpleBeginning();
     return nullptr;
+  }
 
   if (P.CodeCompletion) {
-    TypeRepr *parsedTyR = generate(*base, Loc);
-    if (parsedTyR)
+    if (auto *parsedTyR = generate(*base, Loc)) {
       P.CodeCompletion->setParsedTypeLoc(parsedTyR);
+      if (Type.getPeriod())
+        P.CodeCompletion->completeTypeIdentifierWithDot();
+      else
+        P.CodeCompletion->completeTypeIdentifierWithoutDot();
+    }
   }
 
   // Return nullptr to typecheck this TypeRepr independently in code completion.
@@ -810,11 +817,26 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
   if (ChildrenCount >= 1) {
     auto LParen = Type.getChild(0)->getAs<TokenSyntax>();
     if (LParen && LParen->getTokenKind() == tok::l_paren) {
+      // generate child 'TypeSyntax' anyway to trigger the side effects e.g.
+      // code-completion.
+      for (size_t i = 1; i != ChildrenCount; ++i) {
+        auto elem = *Type.getChild(i);
+        if (auto ty = elem.getAs<TypeSyntax>())
+          (void)generate(*ty, Loc);
+      }
       auto LParenLoc = advanceLocBegin(Loc, *LParen);
       auto EndLoc =
           advanceLocBegin(Loc, *Type.getChild(Type.getNumChildren() - 1));
       return TupleTypeRepr::createEmpty(Context, {LParenLoc, EndLoc});
     }
+  }
+
+  // generate child 'TypeSyntax' anyway to trigger the side effects e.g.
+  // code-completion.
+  for (size_t i = 0; i != ChildrenCount; ++i) {
+    auto elem = *Type.getChild(i);
+    if (auto ty = elem.getAs<TypeSyntax>())
+      (void)generate(*ty, Loc);
   }
 
   // let's hope the main `generate` method can find this node in the type map
