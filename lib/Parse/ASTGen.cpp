@@ -616,25 +616,37 @@ TypeRepr *ASTGen::generate(const DictionaryTypeSyntax &Type,
                            const SourceLoc Loc) {
   TypeRepr *ValueType = generate(Type.getValueType(), Loc);
   TypeRepr *KeyType = generate(Type.getKeyType(), Loc);
-  auto LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
+  if (!ValueType || !KeyType)
+    return nullptr;
   auto ColonLoc = advanceLocBegin(Loc, Type.getColon());
-  auto RBraceLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  SourceRange Range{LBraceLoc, RBraceLoc};
+
+  SourceLoc LBracketLoc, RBracketLoc;
+  if (Type.getLeftSquareBracket().isPresent())
+    LBracketLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
+  else
+    LBracketLoc = advanceLocBegin(Loc, *Type.getFirstToken());
+  if (Type.getRightSquareBracket().isPresent())
+    RBracketLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
+  else
+    RBracketLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  SourceRange Range{LBracketLoc, RBracketLoc};
   return new (Context) DictionaryTypeRepr(KeyType, ValueType, ColonLoc, Range);
 }
 
 TypeRepr *ASTGen::generate(const ArrayTypeSyntax &Type, SourceLoc Loc) {
   TypeRepr *ElementType = generate(Type.getElementType(), Loc);
-  SourceLoc LBraceLoc, RBraceLoc;
+  if (!ElementType)
+    return nullptr;
+  SourceLoc LBracketLoc, RBracketLoc;
   if (Type.getLeftSquareBracket().isPresent())
-    LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
+    LBracketLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
   else
-    LBraceLoc = advanceLocBegin(Loc, Type.getElementType());
-  if (Type.getLeftSquareBracket().isPresent())
-    RBraceLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
+    LBracketLoc = advanceLocBegin(Loc, *Type.getFirstToken());
+  if (Type.getRightSquareBracket().isPresent())
+    RBracketLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
   else
-    RBraceLoc = advanceLocBegin(Loc, *Type.getLastToken());
-  return new (Context) ArrayTypeRepr(ElementType, {LBraceLoc, RBraceLoc});
+    RBracketLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  return new (Context) ArrayTypeRepr(ElementType, {LBracketLoc, RBracketLoc});
 }
 
 TypeRepr *ASTGen::generate(const MetatypeTypeSyntax &Type,

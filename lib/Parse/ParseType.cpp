@@ -1276,14 +1276,19 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollection() {
   auto ElementTypeResult = parseTypeSyntax(diag::expected_element_type);
   Status |= ElementTypeResult.getStatus();
   auto ElementType = ElementTypeResult.getOrNull();
+  if (!ElementType)
+    ElementType = ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext);
 
   Optional<ParsedTokenSyntax> Colon;
   Optional<ParsedTypeSyntax> ValueType;
 
   if (Tok.is(tok::colon)) {
     Colon = consumeTokenSyntax(tok::colon);
-    auto ValueTypeResult = parseTypeSyntax(diag::expected_dictionary_value_type);
+    auto ValueTypeResult =
+        parseTypeSyntax(diag::expected_dictionary_value_type);
     ValueType = ValueTypeResult.getOrNull();
+    if (!ValueType)
+      ValueType = ParsedSyntaxRecorder::makeUnknownType({}, *SyntaxContext);
     Status |= ValueTypeResult.getStatus();
   }
 
@@ -1291,36 +1296,28 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollection() {
                     : diag::expected_rbracket_array_type;
 
   SourceLoc RSquareLoc;
-  auto RSquare = parseMatchingTokenSyntax(tok::r_square, RSquareLoc, Diag,
-                                          LSquareLoc);
+  auto RSquare =
+      parseMatchingTokenSyntax(tok::r_square, RSquareLoc, Diag, LSquareLoc);
   if (!RSquare)
     Status.setIsParseError();
 
-  if (!Status.isSuccess()) {
-    SmallVector<ParsedSyntax, 0> Pieces;
-    Pieces.push_back(std::move(LSquare));
-    if (ElementType)
-      Pieces.push_back(std::move(*ElementType));
-    if (Colon)
-      Pieces.push_back(std::move(*Colon));
-    if (ValueType)
-      Pieces.push_back(std::move(*ValueType));
+  if (Colon) {
+    ParsedDictionaryTypeSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftSquareBracket(std::move(LSquare));
+    builder.useKeyType(std::move(*ElementType));
+    builder.useColon(std::move(*Colon));
+    builder.useValueType(std::move(*ValueType));
     if (RSquare)
-      Pieces.push_back(std::move(*RSquare));
-
-    ParsedTypeSyntax ty =
-        ParsedSyntaxRecorder::makeUnknownType(Pieces, *SyntaxContext);
-    return makeParsedResult(std::move(ty), Status);
+      builder.useRightSquareBracket(std::move(*RSquare));
+    return makeParsedResult(builder.build(), Status);
+  } else {
+    ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftSquareBracket(std::move(LSquare));
+    builder.useElementType(std::move(*ElementType));
+    if (RSquare)
+      builder.useRightSquareBracket(std::move(*RSquare));
+    return makeParsedResult(builder.build(), Status);
   }
-
-  if (Colon)
-    return makeParsedResult(ParsedSyntaxRecorder::makeDictionaryType(
-        std::move(LSquare), std::move(*ElementType), std::move(*Colon),
-        std::move(*ValueType), std::move(*RSquare), *SyntaxContext));
-
-  return makeParsedResult(ParsedSyntaxRecorder::makeArrayType(
-      std::move(LSquare), std::move(*ElementType), std::move(*RSquare),
-      *SyntaxContext));
 }
 
 ParsedSyntaxResult<ParsedTypeSyntax>
