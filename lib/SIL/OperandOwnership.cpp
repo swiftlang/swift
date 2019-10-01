@@ -339,8 +339,8 @@ FORWARD_ANY_OWNERSHIP_INST(UncheckedEnumData)
 FORWARD_ANY_OWNERSHIP_INST(DestructureStruct)
 FORWARD_ANY_OWNERSHIP_INST(DestructureTuple)
 // SWIFT_ENABLE_TENSORFLOW
-FORWARD_ANY_OWNERSHIP_INST(AutoDiffFunction)
-FORWARD_ANY_OWNERSHIP_INST(AutoDiffFunctionExtract)
+FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunction)
+FORWARD_ANY_OWNERSHIP_INST(DifferentiableFunctionExtract)
 #undef FORWARD_ANY_OWNERSHIP_INST
 
 // An instruction that forwards a constant ownership or trivial ownership.

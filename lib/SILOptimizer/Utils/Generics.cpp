@@ -527,12 +527,13 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
   // SWIFT_ENABLE_TENSORFLOW
   // Disable specialization for instructions that are operands of
-  // `autodiff_function` instructions.
+  // `differentiable_function` instructions.
   if (Apply.getInstruction())
     for (auto result : Apply.getInstruction()->getResults())
       for (auto use : result->getUses())
-        if (isa<AutoDiffFunctionInst>(use->getUser()))
+        if (isa<DifferentiableFunctionInst>(use->getUser()))
           return false;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   return true;
 }

@@ -79,9 +79,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Look through `autodiff_function`.
-  if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(user)) {
-    followUses(ADFI);
+  // Look through `differentiable_function`.
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(user)) {
+    followUses(DFI);
     return false;
   }
 

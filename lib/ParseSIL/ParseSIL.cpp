@@ -2926,10 +2926,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffFunctionInst: {
-    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    // e.g. differentiable_function [wrt 0 1 2] [order 2] %0 : $T
     //
-    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T with
+    // e.g. differentiable_function [wrt 0 1 2] [order 2] %0 : $T with
     //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
@@ -3017,15 +3017,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     auto *parameterIndicesSubset =
         AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
                                  parameterIndices);
-    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndicesSubset, order,
-                                         original, associatedFunctions);
+    ResultVal = B.createDifferentiableFunction(
+        InstLoc, parameterIndicesSubset, order, original, associatedFunctions);
     break;
   }
   
-  case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    // Parse the rest of the instruction: an associated function kind, a
-    // function operand, an order operand and a debug location.
-    AutoDiffFunctionExtractInst::Extractee extractee;
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    // Parse the rest of the instruction: an extractee, a differentiation order,
+    // a differentiable function operand, and a debug location.
+    DifferentiableFunctionExtractee extractee;
     StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
     unsigned order = 0;
     SILValue functionOperand;
@@ -3056,10 +3056,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, extractee, order,
-                                                functionOperand);
+    ResultVal = B.createDifferentiableFunctionExtract(
+        InstLoc, extractee, order, functionOperand);
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   case SILInstructionKind::DynamicFunctionRefInst: {
     SILFunction *Fn;

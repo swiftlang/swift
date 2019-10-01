@@ -864,9 +864,9 @@ namespace {
 
   // SWIFT_ENABLE_TENSORFLOW
   using DifferentiableSILFunctionTypeIndex =
-      std::pair<AutoDiffFunctionExtractee, unsigned>;
-  class DifferentiableSILFuncionTypeLowering final
-      : public LoadableAggTypeLowering<DifferentiableSILFuncionTypeLowering,
+      std::pair<DifferentiableFunctionExtractee, unsigned>;
+  class DifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<DifferentiableSILFunctionTypeLowering,
                                        DifferentiableSILFunctionTypeIndex> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
@@ -875,8 +875,8 @@ namespace {
                                SILValue tupleValue,
                                DifferentiableSILFunctionTypeIndex index,
                                const TypeLowering &eltLowering) const {
-      return B.createAutoDiffFunctionExtract(loc, index.first, index.second,
-                                             tupleValue);
+      return B.createDifferentiableFunctionExtract(
+          loc, index.first, index.second, tupleValue);
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
@@ -886,8 +886,8 @@ namespace {
       // TODO: Retrieve the differentiation order when that is properly stored
       // in the function type.
       unsigned maxOrder = 1;
-      return B.createAutoDiffFunction(loc, paramIndices, maxOrder,
-                                      values.front(), values.drop_front());
+      return B.createDifferentiableFunction(
+          loc, paramIndices, maxOrder, values.front(), values.drop_front());
     }
 
     void lowerChildren(TypeConverter &TC,
@@ -901,7 +901,7 @@ namespace {
       auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
-        {AutoDiffFunctionExtractee::Original, 0},
+        {DifferentiableFunctionExtractee::Original, 0},
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
       for (auto order : range(1, maxOrder + 1)) {
@@ -913,7 +913,7 @@ namespace {
               LookUpConformanceInModule(&TC.M));
           auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
           children.push_back(Child{
-            {AutoDiffFunctionExtractee(kind), order},
+            {DifferentiableFunctionExtractee(kind), order},
             TC.getTypeLowering(silTy, getResilienceExpansion())
           });
         }
@@ -1421,7 +1421,7 @@ namespace {
     visitDifferentiableSILFunctionType(CanSILFunctionType type) {
       assert(type->isDifferentiable());
       auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
-      return handleAggregateByProperties<DifferentiableSILFuncionTypeLowering>(
+      return handleAggregateByProperties<DifferentiableSILFunctionTypeLowering>(
           type, props);
     }
 
