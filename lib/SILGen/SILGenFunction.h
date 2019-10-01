@@ -770,12 +770,14 @@ public:
 
   /// emitProlog - Generates prolog code to allocate and clean up mutable
   /// storage for closure captures and local arguments.
-  void emitProlog(AnyFunctionRef TheClosure,
+  void emitProlog(const CaptureInfo &captureInfo,
                   ParameterList *paramList, ParamDecl *selfParam,
-                  Type resultType, bool throws);
+                  DeclContext *DC, Type resultType,
+                  bool throws, SourceLoc throwsLoc);
   /// returns the number of variables in paramPatterns.
   uint16_t emitProlog(ParameterList *paramList, ParamDecl *selfParam,
-                      Type resultType, DeclContext *DeclCtx, bool throws);
+                      Type resultType, DeclContext *DC,
+                      bool throws, SourceLoc throwsLoc);
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1211,7 +1213,7 @@ public:
                                   bool isBaseGuaranteed = false);
 
   void emitCaptures(SILLocation loc,
-                    AnyFunctionRef TheClosure,
+                    SILDeclRef closure,
                     CaptureEmission purpose,
                     SmallVectorImpl<ManagedValue> &captures);
 

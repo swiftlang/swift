@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/SIL/SILArgument.h"
@@ -168,7 +169,7 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
 }
 
 void SILGenFunction::emitCaptures(SILLocation loc,
-                                  AnyFunctionRef closure,
+                                  SILDeclRef closure,
                                   CaptureEmission purpose,
                                   SmallVectorImpl<ManagedValue> &capturedArgs) {
   auto captureInfo = SGM.Types.getLoweredLocalCaptures(closure);
@@ -229,8 +230,21 @@ void SILGenFunction::emitCaptures(SILLocation loc,
     if (found == VarLocs.end()) {
       auto &Diags = getASTContext().Diags;
 
-      Diags.diagnose(closure.getLoc(),
-                     closure.isDeferBody()
+      SourceLoc loc;
+      bool isDeferBody;
+      if (closure.kind == SILDeclRef::Kind::DefaultArgGenerator) {
+        auto *param = getParameterAt(closure.getDecl(),
+                                     closure.defaultArgIndex);
+        loc = param->getLoc();
+        isDeferBody = false;
+      } else {
+        auto f = *closure.getAnyFunctionRef();
+        loc = f.getLoc();
+        isDeferBody = f.isDeferBody();
+      }
+
+      Diags.diagnose(loc,
+                     isDeferBody
                      ? diag::capture_before_declaration_defer
                      : diag::capture_before_declaration,
                      vd->getBaseName().getIdentifier());
@@ -359,10 +373,7 @@ ManagedValue
 SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
                                  CanType expectedType,
                                  SubstitutionMap subs) {
-  auto closure = *constant.getAnyFunctionRef();
-  auto captureInfo = closure.getCaptureInfo();
-  auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(closure);
-  auto hasCaptures = SGM.Types.hasLoweredLocalCaptures(closure);
+  auto loweredCaptureInfo = SGM.Types.getLoweredLocalCaptures(constant);
 
   auto constantInfo = getConstantInfo(constant);
   SILValue functionRef = emitGlobalFunctionRef(loc, constant, constantInfo);
@@ -371,6 +382,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // Apply substitutions.
   auto pft = constantInfo.SILFnType;
 
+  auto closure = *constant.getAnyFunctionRef();
   auto *dc = closure.getAsDeclContext()->getParent();
   if (dc->isLocalContext() && !loweredCaptureInfo.hasGenericParamCaptures()) {
     // If the lowered function type is not polymorphic but we were given
@@ -395,11 +407,12 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   // globals, but we still need to mark them as escaping so that DI can flag
   // uninitialized uses.
   if (this == SGM.TopLevelSGF) {
+    auto captureInfo = closure.getCaptureInfo();
     SGM.emitMarkFunctionEscapeForTopLevelCodeGlobals(
         loc, captureInfo);
   }
 
-  if (!hasCaptures && !wasSpecialized) {
+  if (loweredCaptureInfo.getCaptures().empty() && !wasSpecialized) {
     auto result = ManagedValue::forUnmanaged(functionRef);
     return emitOrigToSubstValue(loc, result,
                                 AbstractionPattern(expectedType),
@@ -407,7 +420,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   }
 
   SmallVector<ManagedValue, 4> capturedArgs;
-  emitCaptures(loc, closure, CaptureEmission::PartialApplication,
+  emitCaptures(loc, constant, CaptureEmission::PartialApplication,
                capturedArgs);
 
   // The partial application takes ownership of the context parameters.
@@ -439,8 +452,9 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
 void SILGenFunction::emitFunction(FuncDecl *fd) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(fd);
 
-  emitProlog(fd, fd->getParameters(), fd->getImplicitSelfDecl(),
-             fd->getResultInterfaceType(), fd->hasThrows());
+  auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(SILDeclRef(fd));
+  emitProlog(captureInfo, fd->getParameters(), fd->getImplicitSelfDecl(), fd,
+             fd->getResultInterfaceType(), fd->hasThrows(), fd->getThrowsLoc());
   Type resultTy = fd->mapTypeIntoContext(fd->getResultInterfaceType());
   prepareEpilog(resultTy, fd->hasThrows(), CleanupLocation(fd));
 
@@ -456,8 +470,10 @@ void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
   MagicFunctionName = SILGenModule::getMagicFunctionName(ace);
 
   auto resultIfaceTy = ace->getResultType()->mapTypeOutOfContext();
-  emitProlog(ace, ace->getParameters(), /*selfParam=*/nullptr,
-             resultIfaceTy, ace->isBodyThrowing());
+  auto captureInfo = SGM.M.Types.getLoweredLocalCaptures(
+    SILDeclRef(ace));
+  emitProlog(captureInfo, ace->getParameters(), /*selfParam=*/nullptr,
+             ace, resultIfaceTy, ace->isBodyThrowing(), ace->getLoc());
   prepareEpilog(ace->getResultType(), ace->isBodyThrowing(),
                 CleanupLocation(ace));
   emitProfilerIncrement(ace);
@@ -668,10 +684,13 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
     }
   }
 
+  CaptureInfo captureInfo;
+  if (function.getAnyFunctionRef())
+    captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   auto *dc = function.getDecl()->getInnermostDeclContext();
   auto interfaceType = value->getType()->mapTypeOutOfContext();
-  emitProlog(/*paramList=*/nullptr, /*selfParam=*/nullptr, interfaceType,
-             dc, false);
+  emitProlog(captureInfo, /*paramList=*/nullptr, /*selfParam=*/nullptr,
+             dc, interfaceType, /*throws=*/false, SourceLoc());
   if (EmitProfilerIncrement)
     emitProfilerIncrement(value);
   prepareEpilog(value->getType(), false, CleanupLocation::get(Loc));
@@ -701,7 +720,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
   }
 
   emitProlog(/*paramList*/ nullptr, /*selfParam*/ nullptr, interfaceType, dc,
-             false);
+             /*throws=*/false, SourceLoc());
   prepareEpilog(varType, false, CleanupLocation::get(loc));
 
   auto pbd = var->getParentPatternBinding();

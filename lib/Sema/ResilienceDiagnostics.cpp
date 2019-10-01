@@ -21,6 +21,7 @@
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDeclFinder.h"
 
 using namespace swift;

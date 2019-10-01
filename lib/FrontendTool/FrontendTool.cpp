@@ -749,13 +749,16 @@ static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";
+    scope.buildFullyExpandedTree();
     scope.print(llvm::errs());
     return;
   }
   // Probe each of the locations, and dump what we find.
   for (auto lineColumn :
-       Invocation.getFrontendOptions().DumpScopeMapLocations)
+       Invocation.getFrontendOptions().DumpScopeMapLocations) {
+    scope.buildFullyExpandedTree();
     scope.dumpOneScopeMapLocation(lineColumn);
+  }
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,
@@ -1122,6 +1125,14 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::ActionType::Typecheck) {
     if (emitIndexData(Invocation, Instance))
       return true;
+    // FIXME: Whole-module outputs with a non-whole-module -typecheck ought to
+    // be disallowed, but the driver implements -index-file mode by generating a
+    // regular whole-module frontend command line and modifying it to index just
+    // one file (by making it a primary) instead of all of them. If that
+    // invocation also has flags to emit whole-module supplementary outputs, the
+    // compiler can crash trying to access information for non-type-checked
+    // declarations in the non-primary files. For now, prevent those crashes by
+    // guarding the emission of whole-module supplementary outputs.
     if (opts.InputsAndOutputs.isWholeModule()) {
       if (emitAnyWholeModulePostTypeCheckSupplementaryOutputs(Instance,
                                                               Invocation,

@@ -8,6 +8,6 @@
 
 #assert(false, "error message")
 
-#assert(123) // expected-error{{'Int' is not convertible to 'Bool'}}
+#assert(123) // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
-#assert(123, "error message") // expected-error{{'Int' is not convertible to 'Bool'}}
+#assert(123, "error message") // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}

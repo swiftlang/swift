@@ -368,6 +368,14 @@ SourceLoc RequirementRequest::getNearestLoc() const {
   return owner.getLoc();
 }
 
+void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
+  // For now, the GSB does a better job of describing the exact structure of
+  // the cycle.
+  //
+  // FIXME: We should consider merging the circularity handling the GSB does
+  // into this request.  See rdar://55263708
+}
+
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
   if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
@@ -816,4 +824,50 @@ IsImplicitlyUnwrappedOptionalRequest::getCachedResult() const {
 void IsImplicitlyUnwrappedOptionalRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setImplicitlyUnwrappedOptional(value);
+}
+
+//----------------------------------------------------------------------------//
+// GenericSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<GenericSignature *> GenericSignatureRequest::getCachedResult() const {
+  auto *GC = std::get<0>(getStorage());
+  if (GC->GenericSigAndBit.getInt()) {
+    return GC->GenericSigAndBit.getPointer();
+  }
+  return None;
+}
+
+void GenericSignatureRequest::cacheResult(GenericSignature *value) const {
+  auto *GC = std::get<0>(getStorage());
+  GC->GenericSigAndBit.setPointerAndInt(value, true);
+}
+
+//----------------------------------------------------------------------------//
+// GenericSignatureRequest computation.
+//----------------------------------------------------------------------------//
+
+void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
+  // For now, the GSB does a better job of describing the exact structure of
+  // the cycle.
+  //
+  // FIXME: We should consider merging the circularity handling the GSB does
+  // into this request.  See rdar://55263708
+}
+
+//----------------------------------------------------------------------------//
+// IsImplicitlyUnwrappedOptionalRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Type>
+UnderlyingTypeRequest::getCachedResult() const {
+  auto *typeAlias = std::get<0>(getStorage());
+  if (auto type = typeAlias->UnderlyingTy.getType())
+    return type;
+  return None;
+}
+
+void UnderlyingTypeRequest::cacheResult(Type value) const {
+  auto *typeAlias = std::get<0>(getStorage());
+  typeAlias->UnderlyingTy.setType(value);
 }

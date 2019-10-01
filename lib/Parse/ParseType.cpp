@@ -61,81 +61,62 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   return ty;
 }
 
-LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
-  LayoutConstraint layoutConstraint =
-      getLayoutConstraint(LayoutConstraintID, Context);
-  assert(layoutConstraint->isKnownLayout() &&
-         "Expected layout constraint definition");
+/// Parse layout constraint for 'where' clause in '@_specialize' attribute
+/// and in SIL.
+///
+///   layout-constraint:
+///     identifier
+///     identifier '(' integer-literal ')'
+///     identifier '(' integer-literal ',' integer-literal ')'
+ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
+Parser::parseLayoutConstraintSyntax() {
+  assert(Tok.is(tok::identifier));
+  ParsedLayoutConstraintSyntaxBuilder builder(*SyntaxContext);
 
-  if (!layoutConstraint->isTrivial())
-    return layoutConstraint;
+  builder.useName(consumeTokenSyntax(tok::identifier));
 
-  SourceLoc LParenLoc;
-  if (!consumeIf(tok::l_paren, LParenLoc)) {
-    // It is a trivial without any size constraints.
-    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Trivial,
-                                                 Context);
-  }
+  if (!Tok.isFollowingLParen())
+    return makeParsedResult(builder.build());
 
-  int size = 0;
-  int alignment = 0;
+  auto lParenLoc = Tok.getLoc();
+  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
 
-  auto ParseTrivialLayoutConstraintBody = [&] () -> bool {
-    // Parse the size and alignment.
-    if (Tok.is(tok::integer_literal)) {
-      if (Tok.getText().getAsInteger(10, size)) {
-        diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
+  auto parseTrivialConstraintBody = [&]() -> bool {
+    int value;
+
+    if (!Tok.is(tok::integer_literal) ||
+        Tok.getText().getAsInteger(10, value) || value < 0) {
+      diagnose(Tok, diag::layout_size_should_be_positive);
+      return true;
+    }
+    builder.useSize(consumeTokenSyntax(tok::integer_literal));
+
+    if (Tok.is(tok::comma)) {
+      builder.useComma(consumeTokenSyntax(tok::comma));
+
+      if (!Tok.is(tok::integer_literal) ||
+          Tok.getText().getAsInteger(10, value) || value < 0) {
+        diagnose(Tok, diag::layout_alignment_should_be_positive);
         return true;
       }
-      consumeToken();
-      if (consumeIf(tok::comma)) {
-        // parse alignment.
-        if (Tok.is(tok::integer_literal)) {
-          if (Tok.getText().getAsInteger(10, alignment)) {
-            diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-            return true;
-          }
-          consumeToken();
-        } else {
-          diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-          return true;
-        }
-      }
-    } else {
-      diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
-      return true;
+      builder.useAlignment(consumeTokenSyntax(tok::integer_literal));
     }
     return false;
   };
 
-  if (ParseTrivialLayoutConstraintBody()) {
-    // There was an error during parsing.
-    skipUntil(tok::r_paren);
-    consumeIf(tok::r_paren);
-    return LayoutConstraint::getUnknownLayout();
+  if (parseTrivialConstraintBody()) {
+    ignoreUntil(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      builder.useRightParen(consumeTokenSyntax(tok::r_paren));
+  } else {
+    SourceLoc rParenLoc;
+    auto rParen = parseMatchingTokenSyntax(tok::r_paren, rParenLoc,
+                             diag::expected_rparen_layout_constraint,
+                             lParenLoc);
+    if (rParen)
+      builder.useRightParen(std::move(*rParen));
   }
-
-  if (!consumeIf(tok::r_paren)) {
-    // Expected a closing r_paren.
-    diagnose(Tok.getLoc(), diag::expected_rparen_layout_constraint);
-    consumeToken();
-    return LayoutConstraint::getUnknownLayout();
-  }
-
-  if (size < 0) {
-    diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
-    return LayoutConstraint::getUnknownLayout();
-  }
-
-  if (alignment < 0) {
-    diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
-    return LayoutConstraint::getUnknownLayout();
-  }
-
-  // Otherwise it is a trivial layout constraint with
-  // provided size and alignment.
-  return LayoutConstraint::getLayoutConstraint(layoutConstraint->getKind(), size,
-                                               alignment, Context);
+  return makeParsedResult(builder.build());
 }
 
 /// parseTypeSimple
@@ -369,7 +350,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     // the function body; otherwise, they are visible when parsing the type.
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
-    generics = maybeParseGenericParams().getPtrOrNull();
+    generics = parseSILGenericParams().getPtrOrNull();
   }
 
   // In SIL mode, parse box types { ... }.
@@ -656,94 +637,87 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   if (isParsingQualifiedDeclName && !canParseTypeQualifierForDeclName())
     return makeParsedError<ParsedTypeSyntax>();
 
+  // SWIFT_ENABLE_TENSORFLOW: Condition body intentionally not indented, to
+  // reduce merge conflicts.
   if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {
-    if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
-      // is this the 'Any' type
-      if (Tok.is(tok::kw_Any))
-        return parseAnyType();
+  if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
+    // is this the 'Any' type
+    if (Tok.is(tok::kw_Any))
+      return parseAnyType();
 
-      if (Tok.is(tok::code_complete)) {
-        if (CodeCompletion)
-          CodeCompletion->completeTypeSimpleBeginning();
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeTypeSimpleBeginning();
 
-        auto CCTok = consumeTokenSyntax(tok::code_complete);
-        auto ty = ParsedSyntaxRecorder::makeUnknownType(
-            {&CCTok, 1}, *SyntaxContext);
-        return makeParsedCodeCompletion(std::move(ty));
-      }
-
-      diagnose(Tok, diag::expected_identifier_for_type);
-
-      // If there is a keyword at the start of a new line, we won't want to
-      // skip it as a recovery but rather keep it.
-      if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
-        auto kwTok = consumeTokenSyntax();
-        ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeUnknownType(
-            {&kwTok, 1}, *SyntaxContext);
-        return makeParsedError(std::move(ty));
-      }
-
-      return makeParsedError<ParsedTypeSyntax>();
+      auto CCTok = consumeTokenSyntax(tok::code_complete);
+      auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+          None, None, std::move(CCTok), *SyntaxContext);
+      return makeParsedCodeCompletion(std::move(ty));
     }
-  }
 
+    diagnose(Tok, diag::expected_identifier_for_type);
+
+    // If there is a keyword at the start of a new line, we won't want to
+    // skip it as a recovery but rather keep it.
+    if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
+      auto kwTok = consumeTokenSyntax();
+      ParsedTypeSyntax ty =
+          ParsedSyntaxRecorder::makeUnknownType({&kwTok, 1}, *SyntaxContext);
+      return makeParsedError(std::move(ty));
+    }
+
+    return makeParsedError<ParsedTypeSyntax>();
+  }
+  }
 
   SmallVector<ParsedSyntax, 0> Junk;
 
-  auto BaseLoc = leadingTriviaLoc();
-  ParserStatus Status;
-  Optional<ParsedTypeSyntax> Base;
-  Optional<ParsedTokenSyntax> Period;
-  while (true) {
-    Optional<ParsedTokenSyntax> Identifier;
-    if (Tok.is(tok::kw_Self)) {
-      Identifier = consumeIdentifierSyntax();
-    } else if (isParsingQualifiedDeclName && Tok.isAnyOperator()) {
-      // If an operator is encountered, break and do not backtrack later.
-      break;
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      Identifier =
-          parseIdentifierSyntax(diag::expected_identifier_in_dotted_type);
-    }
+  auto parseComponent =
+      [&](Optional<ParsedTokenSyntax> &Identifier,
+          Optional<ParsedGenericArgumentClauseSyntax> &GenericArgs) {
+        if (Tok.is(tok::kw_Self)) {
+          Identifier = consumeIdentifierSyntax();
+        } else {
+          // FIXME: specialize diagnostic for 'Type': type cannot start with
+          // 'metatype'
+          // FIXME: offer a fixit: 'self' -> 'Self'
+          Identifier =
+              parseIdentifierSyntax(diag::expected_identifier_in_dotted_type);
+        }
 
-    if (Identifier) {
-      Optional<ParsedGenericArgumentClauseSyntax> GenericArgs;
+        if (!Identifier)
+          return makeParserError();
 
-      if (startsWithLess(Tok)) {
+        if (!startsWithLess(Tok))
+          return makeParserSuccess();
+
         SmallVector<TypeRepr *, 4> GenericArgsAST;
         SourceLoc LAngleLoc, RAngleLoc;
         auto GenericArgsResult = parseGenericArgumentClauseSyntax();
-        if (GenericArgsResult.isError()) {
-          if (Base)
-            Junk.push_back(std::move(*Base));
-          if (Period)
-            Junk.push_back(std::move(*Period));
-          Junk.push_back(std::move(*Identifier));
-          if (!GenericArgsResult.isNull())
-            Junk.push_back(GenericArgsResult.get());
-          auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
-          return makeParsedResult(std::move(ty), GenericArgsResult.getStatus());
-        }
-        GenericArgs = GenericArgsResult.get();
-      }
+        if (!GenericArgsResult.isNull())
+          GenericArgs = GenericArgsResult.get();
+        return GenericArgsResult.getStatus();
+      };
 
-      if (!Base)
-        Base = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
-            std::move(*Identifier), std::move(GenericArgs), *SyntaxContext);
-      else
-        Base = ParsedSyntaxRecorder::makeMemberTypeIdentifier(
-            std::move(*Base), std::move(*Period), std::move(*Identifier),
-            std::move(GenericArgs), *SyntaxContext);
-    } else {
-      Status.setIsParseError();
-      if (Base)
-        Junk.push_back(std::move(*Base));
-      if (Period)
-        Junk.push_back(std::move(*Period));
-    }
+  ParsedSyntaxResult<ParsedTypeSyntax> result;
+
+  // Parse the base identifier.
+  result = [&]() {
+    Optional<ParsedTokenSyntax> identifier;
+    Optional<ParsedGenericArgumentClauseSyntax> genericArgs;
+    auto status = parseComponent(identifier, genericArgs);
+    assert(identifier);
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
+            std::move(*identifier), std::move(genericArgs), *SyntaxContext),
+        status);
+  }();
+
+  // Parse member identifiers.
+  while (result.isSuccess() && Tok.isAny(tok::period, tok::period_prefix)) {
+    if (peekToken().isContextualKeyword("Type") ||
+        peekToken().isContextualKeyword("Protocol"))
+      break;
 
     if (isParsingQualifiedDeclName) {
       // If we're parsing a qualified decl name, break out before parsing the
@@ -760,57 +734,66 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
         break;
     }
 
-    // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
-      if (peekToken().is(tok::code_complete)) {
-        Status.setHasCodeCompletion();
-        break;
-      }
-      if (!peekToken().isContextualKeyword("Type") &&
-          !peekToken().isContextualKeyword("Protocol")) {
-        Period = consumeTokenSyntax();
-        continue;
-      }
-    } else if (Tok.is(tok::code_complete)) {
-      if (!Tok.isAtStartOfLine())
-        Status.setHasCodeCompletion();
+    // Parse '.'.
+    auto period = consumeTokenSyntax();
+
+    if (isParsingQualifiedDeclName && Tok.isAnyOperator()) {
+      // If an operator is encountered, break and do not backtrack later.
       break;
     }
-    break;
+
+    // Parse component;
+    Optional<ParsedTokenSyntax> identifier;
+    Optional<ParsedGenericArgumentClauseSyntax> genericArgs;
+    auto status = parseComponent(identifier, genericArgs);
+    if (identifier) {
+      ParsedMemberTypeIdentifierSyntaxBuilder builder(*SyntaxContext);
+      builder.useBaseType(result.get());
+      builder.usePeriod(std::move(period));
+      builder.useName(std::move(*identifier));
+      if (genericArgs)
+        builder.useGenericArgumentClause(std::move(*genericArgs));
+      result = makeParsedResult(builder.build(), status);
+      continue;
+    }
+
+    assert(!genericArgs);
+
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithDot();
+
+      auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+          result.get(), std::move(period), consumeTokenSyntax(),
+          *SyntaxContext);
+      return makeParsedCodeCompletion(std::move(ty));
+    }
+
+    ParsedSyntax parts[] = {result.get(), std::move(period)};
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeUnknownType({parts, 2}, *SyntaxContext),
+        status);
   }
 
-  if (Status.hasCodeCompletion()) {
-    IdentTypeRepr *ITR = nullptr;
+  if (result.isSuccess() && Tok.is(tok::code_complete) &&
+      !Tok.isAtStartOfLine()) {
+    if (CodeCompletion)
+      CodeCompletion->completeTypeIdentifierWithoutDot();
 
-    if (Base) {
-      SyntaxContext->addSyntax(std::move(*Base));
-      auto T = SyntaxContext->topNode<TypeSyntax>();
-      Junk.push_back(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      ITR = dyn_cast<IdentTypeRepr>(Generator.generate(T, BaseLoc));
-    }
-
-    if (Tok.isNot(tok::code_complete)) {
-      // We have a dot.
-      auto Dot = consumeTokenSyntax();
-      Junk.push_back(std::move(Dot));
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithDot(ITR);
-    } else {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
-    }
-    // Eat the code completion token because we handled it.
-    Junk.push_back(consumeTokenSyntax(tok::code_complete));
-    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
+    auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+        result.get(), None, consumeTokenSyntax(), *SyntaxContext);
     return makeParsedCodeCompletion(std::move(ty));
   }
-  if (Status.isError()) {
-    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
-    return makeParsedError(std::move(ty));
+
+  // Don't propagate malformed type as valid type.
+  if (!result.isSuccess()) {
+    auto ty = result.get();
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeUnknownType({&ty, 1}, *SyntaxContext),
+        result.getStatus());
   }
 
-  return makeParsedResult(std::move(*Base));
+  return result;
 }
 
 Parser::TypeASTResult
@@ -970,7 +953,7 @@ Parser::TypeResult Parser::parseOldStyleProtocolComposition() {
       bool IsAny = Tok.getKind() == tok::kw_Any;
       auto TypeResult = parseTypeIdentifier();
       Status |= TypeResult.getStatus();
-      if (TypeResult.isSuccess()) {
+      if (!TypeResult.isNull()) {
         auto Type = TypeResult.get();
         Junk.push_back(Type.copyDeferred());
         if (!IsAny)
@@ -1230,6 +1213,8 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
   });
 
   if (!Status.isSuccess()) {
+    if (RParen)
+      Junk.push_back(std::move(*RParen));
     auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
     return makeParsedResult(std::move(ty), Status);
   }
@@ -1317,9 +1302,9 @@ Parser::TypeResult Parser::parseTypeArray(ParsedTypeSyntax Base,
   // Ignore integer literal between '[' and ']'
   ignoreIf(tok::integer_literal);
 
-  auto RSquareLoc = Tok.getLoc();
+  SourceLoc RSquareLoc;
   auto RSquare = parseMatchingTokenSyntax(
-      tok::r_square, diag::expected_rbracket_array_type, LSquareLoc);
+      tok::r_square, RSquareLoc, diag::expected_rbracket_array_type, LSquareLoc);
 
   if (RSquare) {
     // If we parsed something valid, diagnose it with a fixit to rewrite it to
@@ -1365,7 +1350,9 @@ Parser::TypeResult Parser::parseTypeCollection() {
   auto Diag = Colon ? diag::expected_rbracket_dictionary_type
                     : diag::expected_rbracket_array_type;
 
-  auto RSquare = parseMatchingTokenSyntax(tok::r_square, Diag, LSquareLoc);
+  SourceLoc RSquareLoc;
+  auto RSquare = parseMatchingTokenSyntax(tok::r_square, RSquareLoc, Diag,
+                                          LSquareLoc);
   if (!RSquare)
     Status.setIsParseError();
 

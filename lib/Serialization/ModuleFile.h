@@ -17,6 +17,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/RawComment.h"
 #include "swift/AST/TypeLoc.h"

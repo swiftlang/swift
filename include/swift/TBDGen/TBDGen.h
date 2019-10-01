@@ -33,6 +33,9 @@ struct TBDGenOptions {
   /// Whether this compilation has multiple IRGen instances.
   bool HasMultipleIGMs;
 
+  /// Whether this compilation is producing a TBD for InstallAPI.
+  bool IsInstallAPI;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 

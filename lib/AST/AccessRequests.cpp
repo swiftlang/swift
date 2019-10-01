@@ -17,6 +17,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 
 #include "llvm/Support/MathExtras.h"

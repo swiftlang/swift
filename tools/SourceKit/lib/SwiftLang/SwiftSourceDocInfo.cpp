@@ -778,11 +778,11 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   unsigned USREnd = SS.size();
 
   unsigned TypenameBegin = SS.size();
-  if (VD->hasInterfaceType()) {
+  if (auto vdType = VD->getInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
     Options.PrintTypeAliasUnderlyingType = true;
-    VD->getInterfaceType().print(OS, Options);
+    vdType.print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();
 

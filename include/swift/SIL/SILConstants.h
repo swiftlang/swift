@@ -37,69 +37,6 @@ struct UnknownSymbolicValue;
 
 extern llvm::cl::opt<unsigned> ConstExprLimit;
 
-/// When we fail to constant fold a value, this captures a reason why,
-/// allowing the caller to produce a specific diagnostic.  The "Unknown"
-/// SymbolicValue representation also includes a pointer to the SILNode in
-/// question that was problematic.
-enum class UnknownReason {
-  // TODO: Eliminate the default code, by making classifications for each
-  // failure mode.
-  Default,
-
-  /// The constant expression was too big.  This is reported on a random
-  /// instruction within the constexpr that triggered the issue.
-  TooManyInstructions,
-
-  /// A control flow loop was found.
-  Loop,
-
-  /// Integer overflow detected.
-  Overflow,
-
-  /// Unspecified trap detected.
-  Trap,
-
-  /// An operation was applied over operands whose symbolic values were
-  /// constants but were not valid for the operation.
-  InvalidOperandValue,
-
-  /// Encountered an instruction not supported by the interpreter.
-  UnsupportedInstruction,
-
-  /// Encountered a function call where the body of the called function is
-  /// not available.
-  CalleeImplementationUnknown,
-
-  /// Attempted to load from/store into a SIL value that was not tracked by
-  /// the interpreter.
-  UntrackedSILValue,
-
-  /// Attempted to find a concrete protocol conformance for a witness method
-  /// and failed.
-  UnknownWitnessMethodConformance,
-
-  /// Attempted to determine the SIL function of a witness method (based on a
-  /// concrete protocol conformance) and failed.
-  UnresolvableWitnessMethod,
-
-  /// The value of a top-level variable cannot be determined to be a constant.
-  /// This is only relevant in the backward evaluation mode, which is used by
-  /// #assert.
-  NotTopLevelConstant,
-
-  /// A top-level value has multiple writers. This is only relevant in the
-  /// non-flow-sensitive evaluation mode,  which is used by #assert.
-  MutipleTopLevelWriters,
-
-  /// Indicates the return value of an instruction that was not evaluated during
-  /// interpretation.
-  ReturnedByUnevaluatedInstruction,
-
-  /// Indicates that the value was possibly modified by an instruction
-  /// that was not evaluated during the interpretation.
-  MutatedByUnevaluatedInstruction,
-};
-
 /// An abstract class that exposes functions for allocating symbolic values.
 /// The implementors of this class have to determine where to allocate them and
 /// and manage the lifetime of the allocated symbolic values.
@@ -136,6 +73,132 @@ public:
 
   void *allocate(unsigned long byteSize, unsigned alignment) {
     return bumpAllocator.Allocate(byteSize, alignment);
+  }
+};
+
+/// When we fail to constant fold a value, this captures a reason why,
+/// allowing the caller to produce a specific diagnostic.  The "Unknown"
+/// SymbolicValue representation also includes a pointer to the SILNode in
+/// question that was problematic.
+class UnknownReason {
+public:
+  enum UnknownKind {
+    // TODO: Eliminate the default kind, by making classifications for each
+    // failure mode.
+    Default,
+
+    /// The constant expression was too big.  This is reported on a random
+    /// instruction within the constexpr that triggered the issue.
+    TooManyInstructions,
+
+    /// A control flow loop was found.
+    Loop,
+
+    /// Integer overflow detected.
+    Overflow,
+
+    /// Trap detected. Traps will a message as a payload.
+    Trap,
+
+    /// An operation was applied over operands whose symbolic values were
+    /// constants but were not valid for the operation.
+    InvalidOperandValue,
+
+    /// Encountered an instruction not supported by the interpreter.
+    UnsupportedInstruction,
+
+    /// Encountered a function call where the body of the called function is
+    /// not available.
+    CalleeImplementationUnknown,
+
+    /// Attempted to load from/store into a SIL value that was not tracked by
+    /// the interpreter.
+    UntrackedSILValue,
+
+    /// Attempted to find a concrete protocol conformance for a witness method
+    /// and failed.
+    UnknownWitnessMethodConformance,
+
+    /// Attempted to determine the SIL function of a witness method  and failed.
+    NoWitnesTableEntry,
+
+    /// The value of a top-level variable cannot be determined to be a constant.
+    /// This is only relevant in the backward evaluation mode, which is used by
+    /// #assert.
+    NotTopLevelConstant,
+
+    /// A top-level value has multiple writers. This is only relevant in the
+    /// non-flow-sensitive evaluation mode,  which is used by #assert.
+    MutipleTopLevelWriters,
+
+    /// Indicates the return value of an instruction that was not evaluated
+    /// during interpretation.
+    ReturnedByUnevaluatedInstruction,
+
+    /// Indicates that the value was possibly modified by an instruction
+    /// that was not evaluated during the interpretation.
+    MutatedByUnevaluatedInstruction,
+  };
+
+private:
+  UnknownKind kind;
+
+  // Auxiliary information for different unknown kinds.
+  union {
+    SILFunction *function;
+    const char *trapMessage;
+  } payload;
+
+public:
+  UnknownKind getKind() { return kind; }
+
+  static bool isUnknownKindWithPayload(UnknownKind kind) {
+    switch (kind) {
+    case UnknownKind::CalleeImplementationUnknown:
+    case UnknownKind::Trap:
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  static UnknownReason create(UnknownKind kind) {
+    assert(!isUnknownKindWithPayload(kind));
+    UnknownReason reason;
+    reason.kind = kind;
+    return reason;
+  }
+
+  static UnknownReason createCalleeImplementationUnknown(SILFunction *callee) {
+    assert(callee);
+    UnknownReason reason;
+    reason.kind = UnknownKind::CalleeImplementationUnknown;
+    reason.payload.function = callee;
+    return reason;
+  }
+
+  SILFunction *getCalleeWithoutImplmentation() {
+    assert(kind == UnknownKind::CalleeImplementationUnknown);
+    return payload.function;
+  }
+
+  static UnknownReason createTrap(StringRef message,
+                                  SymbolicValueAllocator &allocator) {
+    // Copy and null terminate the string.
+    size_t size = message.size();
+    char *messagePtr = allocator.allocate<char>(size + 1);
+    std::uninitialized_copy(message.begin(), message.end(), messagePtr);
+    messagePtr[size] = '\0';
+
+    UnknownReason reason;
+    reason.kind = UnknownKind::Trap;
+    reason.payload.trapMessage = messagePtr;
+    return reason;
+  }
+
+  const char *getTrapMessage() {
+    assert(kind == UnknownKind::Trap);
+    return payload.trapMessage;
   }
 };
 
@@ -241,9 +304,6 @@ private:
   RepresentationKind representationKind : 8;
 
   union {
-    /// This is the reason code for RK_Unknown values.
-    UnknownReason unknownReason : 32;
-
     /// This is the number of bits in an RK_Integer or RK_IntegerInline
     /// representation, which makes the number of entries in the list derivable.
     unsigned integerBitwidth;

@@ -1493,6 +1493,7 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
   typealias->setAccess(AccessLevel::Public);
   typealias->setValidationToChecked();
   typealias->setImplicit();
+  typealias->computeType();
 
   nominal->addMember(typealias);
 }
@@ -2563,6 +2564,8 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                   underlying->getDeclaredInterfaceType());
+              typealias->setValidationToChecked();
+              typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2582,6 +2585,8 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                 Impl.SwiftContext.getAnyObjectType());
+              typealias->setValidationToChecked();
+              typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2629,13 +2634,13 @@ namespace {
             return newtype;
 
       if (!SwiftType) {
-        // Import typedefs of blocks as their fully-bridged equivalent Swift
-        // type. That matches how we want to use them in most cases. All other
-        // types should be imported in a non-bridged way.
+        // Note that the code below checks to see if the typedef allows
+        // bridging, i.e. if the imported typealias should name a bridged type
+        // or the original C type.
         clang::QualType ClangType = Decl->getUnderlyingType();
         SwiftType = Impl.importTypeIgnoreIUO(
             ClangType, ImportTypeKind::Typedef, isInSystemModule(DC),
-            getTypedefBridgeability(Decl, ClangType), OTK_Optional);
+            getTypedefBridgeability(Decl), OTK_Optional);
       }
 
       if (!SwiftType)
@@ -2649,7 +2654,9 @@ namespace {
                                       Loc,
                                       /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftType);
-
+      Result->setValidationToChecked();
+      Result->computeType();
+      
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
         auto attr = AvailableAttr::createPlatformAgnostic(
@@ -2943,6 +2950,8 @@ namespace {
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
           alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
+          alias->setValidationToChecked();
+          alias->computeType();
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -4033,7 +4042,9 @@ namespace {
           Loc,
           /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
-      
+      Result->setValidationToChecked();
+      Result->computeType();
+
       return Result;
     }
 
@@ -5169,6 +5180,8 @@ namespace {
       }
 
       typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+      typealias->setValidationToChecked();
+      typealias->computeType();
       return typealias;
     }
 
@@ -5404,7 +5417,9 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   }
 
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-
+  alias->setValidationToChecked();
+  alias->computeType();
+  
   // Record that this is the official version of this declaration.
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;
   markAsVariant(alias, correctSwiftName);
@@ -8240,7 +8255,7 @@ ClangImporter::Implementation::createConstant(Identifier name, DeclContext *dc,
 
       auto maxFloatTypeDecl = context.get_MaxBuiltinFloatTypeDecl();
       floatExpr->setBuiltinType(
-          maxFloatTypeDecl->getUnderlyingTypeLoc().getType());
+          maxFloatTypeDecl->getUnderlyingType());
 
       auto *floatDecl = literalType->getAnyNominal();
       floatExpr->setBuiltinInitializer(

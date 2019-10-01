@@ -707,6 +707,7 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   aliasDecl->setValidationToChecked();
+  aliasDecl->computeType();
   TC.validateDecl(aliasDecl);
   C.addSynthesizedDecl(aliasDecl);
 };
@@ -853,6 +854,7 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
     aliasDecl->setImplicit();
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
     aliasDecl->setValidationToChecked();
+    aliasDecl->computeType();
     TC.validateDecl(aliasDecl);
     derived.addMembersToConformanceContext({aliasDecl});
     C.addSynthesizedDecl(aliasDecl);

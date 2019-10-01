@@ -38,25 +38,38 @@ class SILNode;
 class SymbolicValue;
 class SymbolicValueAllocator;
 class ConstExprFunctionState;
-enum class UnknownReason;
+class UnknownReason;
 
 /// This class is the main entrypoint for evaluating constant expressions.  It
 /// also handles caching of previously computed constexpr results.
 class ConstExprEvaluator {
   SymbolicValueAllocator &allocator;
 
+  // Assert configuration that must be used by the evaluator. This determines
+  // the result of the builtin "assert_configuration".
+  unsigned assertConfig;
+
   /// The current call stack, used for providing accurate diagnostics.
   llvm::SmallVector<SourceLoc, 4> callStack;
+
+  /// When set to true, keep track of all functions called during an evaluation.
+  bool trackCallees;
+  /// Functions called during the evaluation. This is an auxiliary information
+  /// provided to the clients.
+  llvm::SmallPtrSet<SILFunction *, 2> calledFunctions;
 
   void operator=(const ConstExprEvaluator &) = delete;
 
 public:
-  explicit ConstExprEvaluator(SymbolicValueAllocator &alloc);
+  explicit ConstExprEvaluator(SymbolicValueAllocator &alloc,
+                              unsigned assertConf, bool trackCallees = false);
   ~ConstExprEvaluator();
 
   explicit ConstExprEvaluator(const ConstExprEvaluator &other);
 
   SymbolicValueAllocator &getAllocator() { return allocator; }
+
+  unsigned getAssertConfig() { return assertConfig; }
 
   void pushCallStack(SourceLoc loc) { callStack.push_back(loc); }
 
@@ -75,12 +88,23 @@ public:
   /// This is done in code that is not necessarily itself a constexpr
   /// function.  The results are added to the results list which is a parallel
   /// structure to the input values.
-  ///
-  /// TODO: Return information about which callees were found to be
-  /// constexprs, which would allow the caller to delete dead calls to them
-  /// that occur after after folding them.
   void computeConstantValues(ArrayRef<SILValue> values,
                              SmallVectorImpl<SymbolicValue> &results);
+
+  void recordCalledFunctionIfEnabled(SILFunction *callee) {
+    if (trackCallees) {
+      calledFunctions.insert(callee);
+    }
+  }
+
+  /// If the evaluator was initialized with \c trackCallees enabled, return the
+  /// SIL functions encountered during the evaluations performed with this
+  /// evaluator. The returned functions include those that were called but
+  /// failed to complete successfully.
+  const SmallPtrSetImpl<SILFunction *> &getFuncsCalledDuringEvaluation() const {
+    assert(trackCallees && "evaluator not configured to track callees");
+    return calledFunctions;
+  }
 };
 
 /// A constant-expression evaluator that can be used to step through a control
@@ -106,7 +130,8 @@ public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a
   /// SILFunction.
   explicit ConstExprStepEvaluator(SymbolicValueAllocator &alloc,
-                                  SILFunction *fun);
+                                  SILFunction *fun, unsigned assertConf,
+                                  bool trackCallees = false);
   ~ConstExprStepEvaluator();
 
   /// Evaluate an instruction in the current interpreter state.
@@ -162,8 +187,6 @@ public:
 
   Optional<SymbolicValue> lookupConstValue(SILValue value);
 
-  bool isKnownFunction(SILFunction *fun);
-
   /// Returns true if and only if `errorVal` denotes an error that requires
   /// aborting interpretation and returning the error. Skipping an instruction
   /// that produces such errors is not a valid behavior.
@@ -175,7 +198,18 @@ public:
   /// Note that 'skipByMakingEffectsNonConstant' operation is not considered
   /// as an evaluation.
   unsigned instructionsEvaluatedByLastEvaluation() { return stepsEvaluated; }
+
+  /// If the evaluator was initialized with \c trackCallees enabled, return the
+  /// SIL functions encountered during the evaluations performed with this
+  /// evaluator. The returned functions include those that were called but
+  /// failed to complete successfully. Targets of skipped apply instructions
+  /// will not be included in the returned set.
+  const SmallPtrSetImpl<SILFunction *> &getFuncsCalledDuringEvaluation() {
+    return evaluator.getFuncsCalledDuringEvaluation();
+  }
 };
+
+bool isKnownConstantEvaluableFunction(SILFunction *fun);
 
 } // end namespace swift
 #endif

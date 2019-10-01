@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
@@ -23,7 +24,7 @@
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "constant-folding"
+#define DEBUG_TYPE "sil-constant-folding"
 
 using namespace swift;
 
@@ -580,6 +581,20 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   // Add the literal instruction to represent the result of the division.
   SILBuilderWithScope B(BI);
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
+}
+
+static SILValue specializePolymorphicBuiltin(BuiltinInst *bi,
+                                             BuiltinValueKind id) {
+  // If we are not a polymorphic builtin, return an empty SILValue()
+  // so we keep on scanning.
+  if (!isPolymorphicBuiltin(id))
+    return SILValue();
+
+  // Otherwise, try to perform the mapping.
+  if (auto newBuiltin = getStaticOverloadForSpecializedPolymorphicBuiltin(bi))
+    return newBuiltin;
+
+  return SILValue();
 }
 
 /// Fold binary operations.
@@ -1201,9 +1216,8 @@ static SILValue constantFoldBuiltin(BuiltinInst *BI,
 #include "swift/AST/Builtins.def"
     return constantFoldBinaryWithOverflow(BI, Builtin.ID, ResultsInError);
 
-#define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
-case BuiltinValueKind::id:
+#define BUILTIN(id, name, attrs)
+#define BUILTIN_BINARY_OPERATION(id, name, attrs) case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       return constantFoldBinary(BI, Builtin.ID, ResultsInError);
 
@@ -1594,6 +1608,15 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
+      if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
+        if (auto kind = bi->getBuiltinKind()) {
+          if (isPolymorphicBuiltin(kind.getValue())) {
+            WorkList.insert(bi);
+            continue;
+          }
+        }
+      }
+
       // If we have nominal type literals like struct, tuple, enum visit them
       // like we do in the worklist to see if we can fold any projection
       // manipulation operations.
@@ -1803,6 +1826,21 @@ ConstantFolder::processWorkList() {
         InvalidateInstructions = true;
       }
       continue;
+    }
+
+    if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+      if (auto kind = bi->getBuiltinKind()) {
+        if (SILValue v = specializePolymorphicBuiltin(bi, kind.getValue())) {
+          // If bi had a result, RAUW.
+          if (bi->getResult(0)->getType() !=
+              bi->getModule().Types.getEmptyTupleType())
+            bi->replaceAllUsesWith(v);
+          // Then delete no matter what.
+          bi->eraseFromParent();
+          InvalidateInstructions = true;
+          continue;
+        }
+      }
     }
 
     // Go through all users of the constant and try to fold them.

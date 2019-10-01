@@ -645,7 +645,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setPlatform(tapi::internal::mapToSinglePlatform(target));
   auto arch = tapi::internal::getArchType(target.getArchName());
   file.setArch(arch);
-  file.setInstallAPI();
+  file.setInstallAPI(opts.IsInstallAPI);
 
   TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
 

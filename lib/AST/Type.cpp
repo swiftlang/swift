@@ -1098,8 +1098,8 @@ CanType TypeBase::computeCanonicalType() {
       assert(resolver && "Need to resolve generic parameter depth");
       if (auto decl =
             gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
-        if (auto valueDecl = dyn_cast<ValueDecl>(decl))
-          resolver->resolveDeclSignature(valueDecl);
+        if (auto valueDecl = decl->getAsGenericContext())
+          (void)valueDecl->getGenericSignature();
     }
 
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&

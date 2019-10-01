@@ -248,13 +248,13 @@ namespace swift {
     /// Default is in \c ParseLangArgs
     ///
     /// This is a staging flag; eventually it will be removed.
-    bool EnableASTScopeLookup = false;
+    bool EnableASTScopeLookup = true;
 
     /// Someday, ASTScopeLookup will supplant lookup in the parser
     bool DisableParserLookup = false;
 
     /// Should  we compare to ASTScope-based resolution for debugging?
-    bool CompareToASTScopeLookup = false;
+    bool CrosscheckUnqualifiedLookup = false;
 
     /// Should  we stress ASTScope-based resolution for debugging?
     bool StressASTScopeLookup = false;

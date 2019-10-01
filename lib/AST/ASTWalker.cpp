@@ -232,7 +232,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
         return true;
     }
 
-    return doIt(TAD->getUnderlyingTypeLoc());
+    if (auto typerepr = TAD->getUnderlyingTypeRepr())
+      if (doIt(typerepr))
+        return true;
+    return false;
   }
   
   bool visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {

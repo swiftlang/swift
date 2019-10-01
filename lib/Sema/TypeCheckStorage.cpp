@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 using namespace swift;
@@ -268,8 +269,9 @@ void swift::validatePatternBindingEntries(TypeChecker &tc,
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -297,7 +299,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storage->getDeclContext()))
+  if (isa<ProtocolDecl>(storageDC))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -323,8 +325,9 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  bool result = (!storage->isStatic() &&
-                 doesContextHaveValueSemantics(storage->getDeclContext()));
+  auto storageDC = storage->getDeclContext();
+  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
+                 storageDC->hasValueSemantics());
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
@@ -583,10 +586,8 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    TargetImpl target,
                                    bool isLValue,
                                    ASTContext &ctx) {
-  // FIXME: Temporary workaround.
-  if (!accessor->hasInterfaceType())
-    ctx.getLazyResolver()->resolveDeclSignature(accessor);
-
+  (void)accessor->getInterfaceType();
+  
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;
@@ -830,30 +831,10 @@ createPropertyLoadOrCallSuperclassGetter(AccessorDecl *accessor,
                                ctx);
 }
 
-/// Look up the NSCopying protocol from the Foundation module, if present.
-/// Otherwise return null.
-static ProtocolDecl *getNSCopyingProtocol(ASTContext &ctx,
-                                          DeclContext *DC) {
-  auto foundation = ctx.getLoadedModule(ctx.Id_Foundation);
-  if (!foundation)
-    return nullptr;
-
-  SmallVector<ValueDecl *, 2> results;
-  DC->lookupQualified(foundation,
-                      ctx.getSwiftId(KnownFoundationEntity::NSCopying),
-                      NL_QualifiedDefault | NL_KnownNonCascadingDependency,
-                      results);
-
-  if (results.size() != 1)
-    return nullptr;
-
-  return dyn_cast<ProtocolDecl>(results.front());
-}
-
 static Optional<ProtocolConformanceRef>
 checkConformanceToNSCopying(ASTContext &ctx, VarDecl *var, Type type) {
   auto dc = var->getDeclContext();
-  auto proto = getNSCopyingProtocol(ctx, dc);
+  auto proto = ctx.getNSCopyingDecl();
 
   if (proto) {
     auto result = TypeChecker::conformsToProtocol(type, proto, dc, None);
@@ -2041,12 +2022,8 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   NameBuf += "$__lazy_storage_$_";
   NameBuf += VD->getName().str();
   auto StorageName = Context.getIdentifier(NameBuf);
-
-  if (!VD->hasInterfaceType())
-    Context.getLazyResolver()->resolveDeclSignature(VD);
-
-  auto StorageTy = OptionalType::get(VD->getType());
   auto StorageInterfaceTy = OptionalType::get(VD->getInterfaceType());
+  auto StorageTy = OptionalType::get(VD->getType());
 
   auto *Storage = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                                         /*IsCaptureList*/false, VD->getLoc(),
@@ -2121,9 +2098,6 @@ static VarDecl *synthesizePropertyWrapperStorageWrapperProperty(
   Identifier name = ctx.getIdentifier(nameBuf);
 
   // Determine the type of the property.
-  if (!wrapperVar->hasInterfaceType()) {
-    static_cast<TypeChecker &>(*ctx.getLazyResolver()).validateDecl(wrapperVar);
-  }
   Type propertyType = wrapperType->getTypeOfMember(
       var->getModuleContext(), wrapperVar,
       wrapperVar->getValueInterfaceType());
@@ -2304,18 +2278,13 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   Type storageInterfaceType = wrapperType;
   Type storageType = dc->mapTypeIntoContext(storageInterfaceType);
 
-  if (!var->hasInterfaceType()) {
-    auto &tc = *static_cast<TypeChecker *>(ctx.getLazyResolver());
-    tc.validateDecl(var);
-    assert(var->hasInterfaceType());
-  }
-
   // Make sure that the property type matches the value of the
   // wrapper type.
   if (!storageInterfaceType->hasError()) {
     Type expectedPropertyType =
         computeWrappedValueType(var, storageInterfaceType);
     Type propertyType = var->getValueInterfaceType();
+    assert(propertyType);
     if (!expectedPropertyType->hasError() &&
         !propertyType->hasError() &&
         !propertyType->isEqual(expectedPropertyType)) {
@@ -2349,8 +2318,8 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
   pbdPattern->setType(storageType);
   pbdPattern = TypedPattern::createImplicit(ctx, pbdPattern, storageType);
   auto pbd = PatternBindingDecl::createImplicit(
-      ctx, backingVar->getCorrectStaticSpelling(), pbdPattern,
-      /*init*/nullptr, dc, SourceLoc());
+      ctx, var->getCorrectStaticSpelling(), pbdPattern,
+      /*init*/ nullptr, dc, SourceLoc());
   addMemberToContextIfNeeded(pbd, dc, var);
   pbd->setStatic(var->isStatic());
 

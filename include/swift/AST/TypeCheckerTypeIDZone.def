@@ -49,6 +49,9 @@ SWIFT_REQUEST(TypeChecker, FunctionBuilderTypeRequest, Type(ValueDecl *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, FunctionOperatorRequest, OperatorDecl *(FuncDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(NameLookup, GenericSignatureRequest,
+              GenericSignature *(GenericContext *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
               GenericSignature *(ModuleDecl *, GenericSignature *,
                                  SmallVector<GenericParamList *, 2>,
@@ -129,5 +132,7 @@ SWIFT_REQUEST(TypeChecker, SynthesizeAccessorRequest,
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, TypeCheckFunctionBodyUntilRequest,
               bool(AbstractFunctionDecl *, SourceLoc), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
               Cached, NoLocationInfo)

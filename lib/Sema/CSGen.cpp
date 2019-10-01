@@ -962,7 +962,8 @@ namespace {
       if (!decl)
         return nullptr;
       
-      CS.getTypeChecker().validateDecl(decl);
+      // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+      (void)decl->getInterfaceType();
       if (decl->isInvalid())
         return nullptr;
 
@@ -1327,9 +1328,9 @@ namespace {
       // FIXME: If the decl is in error, we get no information from this.
       // We may, alternatively, want to use a type variable in that case,
       // and possibly infer the type of the variable that way.
-      CS.getTypeChecker().validateDecl(E->getDecl());
+      auto oldInterfaceTy = E->getDecl()->getInterfaceType();
       if (E->getDecl()->isInvalid()) {
-        CS.setType(E, E->getDecl()->getInterfaceType());
+        CS.setType(E, oldInterfaceTy);
         return nullptr;
       }
 
@@ -1442,7 +1443,8 @@ namespace {
         // If the result is invalid, skip it.
         // FIXME: Note this as invalid, in case we don't find a solution,
         // so we don't let errors cascade further.
-        CS.getTypeChecker().validateDecl(decls[i]);
+        // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+        (void)decls[i]->getInterfaceType();
         if (decls[i]->isInvalid())
           continue;
 
@@ -2000,7 +2002,6 @@ namespace {
       if (dictionaryKeyTy->isTypeVariableOrMember() &&
           tc.Context.getAnyHashableDecl()) {
         auto anyHashable = tc.Context.getAnyHashableDecl();
-        tc.validateDecl(anyHashable);
         CS.addConstraint(ConstraintKind::Defaultable, dictionaryKeyTy,
                          anyHashable->getDeclaredInterfaceType(), locator);
       }

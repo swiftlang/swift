@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Parse/Lexer.h"
@@ -1092,7 +1093,8 @@ bool swift::isValidDynamicCallableMethod(FuncDecl *decl, DeclContext *DC,
   //    `ExpressibleByStringLiteral`.
   //    `D.Value` and the return type can be arbitrary.
 
-  TC.validateDeclForNameLookup(decl);
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)decl->getInterfaceType();
   auto paramList = decl->getParameters();
   if (paramList->size() != 1 || paramList->get(0)->isVariadic()) return false;
   auto argType = paramList->get(0)->getType();
@@ -1172,7 +1174,7 @@ static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
     return false;
 
   auto *index = indices->get(0);
-  if (index->isVariadic() || !index->hasValidSignature())
+  if (index->isVariadic() || !index->hasInterfaceType())
     return false;
 
   if (ignoreLabel) {
@@ -1263,7 +1265,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
     auto oneCandidate = candidates.front().getValueDecl();
     candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
       auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      TC.validateDeclForNameLookup(cand);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)cand->getInterfaceType();
       return isValidDynamicMemberLookupSubscript(cand, decl, TC);
     });
 
@@ -1286,7 +1289,8 @@ visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
   // Validate the candidates while ignoring the label.
   newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
     auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    TC.validateDeclForNameLookup(cand);
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)cand->getInterfaceType();
     return isValidDynamicMemberLookupSubscript(cand, decl, TC,
                                                /*ignoreLabel*/ true);
   });
@@ -2154,7 +2158,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   // Filter out any accessors that won't work.
   if (!results.empty()) {
     auto replacementStorage = replacement->getStorage();
-    TC.validateDecl(replacementStorage);
     Type replacementStorageType = getDynamicComparisonType(replacementStorage);
     results.erase(std::remove_if(results.begin(), results.end(),
         [&](ValueDecl *result) {
@@ -2166,7 +2169,6 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
             return true;
 
           // Check for type mismatch.
-          TC.validateDecl(result);
           auto resultType = getDynamicComparisonType(result);
           if (!resultType->isEqual(replacementStorageType) &&
               !resultType->matches(
@@ -2200,7 +2202,9 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   }
 
   assert(!isa<FuncDecl>(results[0]));
-  TC.validateDecl(results[0]);
+  
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)results[0]->getInterfaceType();
   auto *origStorage = cast<AbstractStorageDecl>(results[0]);
   if (!origStorage->isDynamic()) {
     TC.diagnose(attr->getLocation(),
@@ -2216,8 +2220,8 @@ static FuncDecl *findReplacedAccessor(DeclName replacedVarName,
   if (!origAccessor)
     return nullptr;
 
-  TC.validateDecl(origAccessor);
-
+  // FIXME(InterfaceTypeRequest): Remove this.
+  (void)origAccessor->getInterfaceType();
   if (origAccessor->isImplicit() &&
       !(origStorage->getReadImpl() == ReadImplKind::Stored &&
         origStorage->getWriteImpl() == WriteImplKind::Stored)) {
@@ -2249,9 +2253,7 @@ findReplacedFunction(DeclName replacedFunctionName,
     // Check for static/instance mismatch.
     if (result->isStatic() != replacement->isStatic())
       continue;
-
-    if (TC)
-      TC->validateDecl(result);
+    
     TypeMatchOptions matchMode = TypeMatchFlags::AllowABICompatible;
     matchMode |= TypeMatchFlags::AllowCompatibleOpaqueTypeArchetypes;
     if (result->getInterfaceType()->getCanonicalType()->matches(
@@ -2372,7 +2374,8 @@ void AttributeChecker::visitDynamicReplacementAttr(DynamicReplacementAttr *attr)
       if (attr->isInvalid())
         return;
 
-       TC.validateDecl(accessor);
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)accessor->getInterfaceType();
        auto *orig = findReplacedAccessor(attr->getReplacedFunctionName(),
                                          accessor, attr, TC);
        if (!orig)
@@ -3468,7 +3471,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
             lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
-      TC.validateDeclForNameLookup(jvpCandidate);
+      TC.validateDecl(jvpCandidate);
       return checkFunctionSignature(
           cast<AnyFunctionType>(expectedJVPFnTy->getCanonicalType()),
           jvpCandidate->getInterfaceType()->getCanonicalType());
@@ -3494,7 +3497,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
             lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
-      TC.validateDeclForNameLookup(vjpCandidate);
+      TC.validateDecl(vjpCandidate);
       return checkFunctionSignature(
           cast<AnyFunctionType>(expectedVJPFnTy->getCanonicalType()),
           vjpCandidate->getInterfaceType()->getCanonicalType());
@@ -3638,7 +3641,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   };
 
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
-    TC.validateDeclForNameLookup(originalCandidate);
+    TC.validateDecl(originalCandidate);
     return checkFunctionSignature(
         cast<AnyFunctionType>(originalFnType->getCanonicalType()),
         originalCandidate->getInterfaceType()->getCanonicalType(),
@@ -3991,7 +3994,7 @@ void AttributeChecker::visitTransposingAttr(TransposingAttr *attr) {
     };
   
   auto isValidOriginal = [&](FuncDecl *originalCandidate) {
-    TC.validateDeclForNameLookup(originalCandidate);
+    TC.validateDecl(originalCandidate);
     return checkFunctionSignature(
         cast<AnyFunctionType>(expectedOriginalFnType->getCanonicalType()),
         originalCandidate->getInterfaceType()->getCanonicalType(),

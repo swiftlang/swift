@@ -1920,9 +1920,6 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
-        if (!field->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(field);
-
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
@@ -1946,9 +1943,6 @@ namespace {
       for (auto elt : decl->getAllElements()) {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
-
-        if (!elt->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
 
         if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;

@@ -284,12 +284,10 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
-    if (!VD->hasInterfaceType()) {
-      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
-      if (!VD->hasInterfaceType())
-        continue;
-    }
     Type declaredMemberType = VD->getInterfaceType();
+    if (!declaredMemberType) {
+      continue;
+    }
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
     if (VD->getDeclContext()->isTypeContext()) {
@@ -899,7 +897,7 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
   if (VD->isOperator())
     return false;
 
-  if (!VD->hasInterfaceType())
+  if (!VD->getInterfaceType())
     return false;
 
   if (T->getOptionalObjectType() &&
