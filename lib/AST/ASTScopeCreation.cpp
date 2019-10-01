@@ -459,7 +459,13 @@ public:
     std::vector<DifferentiableAttr *> sortedDifferentiableAttrs;
     for (auto *attr : decl->getAttrs())
       if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr))
-        sortedDifferentiableAttrs.push_back(diffAttr);
+        // NOTE(TF-835): Skipping implicit `@differentiable` attributes is
+        // necessary to avoid verification failure:
+        // `ASTScopeImpl::verifyThatChildrenAreContainedWithin`.
+        // Perhaps this check is no longer necessary after TF-835: robust
+        // `@differentiating` attribute lowering.
+        if (!diffAttr->isImplicit())
+          sortedDifferentiableAttrs.push_back(diffAttr);
     for (auto *diffAttr : sortBySourceRange(sortedDifferentiableAttrs))
       fn(diffAttr);
   }
