@@ -185,10 +185,9 @@ Parser::parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion) {
       break;
     if (CodeCompletion)
       CodeCompletion->completeTypeSimpleBeginning();
-    // Eat the code completion token because we handled it.
-    auto CCTok = consumeTokenSyntax(tok::code_complete);
-    ParsedTypeSyntax ty =
-        ParsedSyntaxRecorder::makeUnknownType({&CCTok, 1}, *SyntaxContext);
+
+    ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+        None, None, consumeTokenSyntax(), *SyntaxContext);
     return makeParsedCodeCompletion(std::move(ty));
   }
   case tok::l_square:
