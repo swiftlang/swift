@@ -637,6 +637,8 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
   if (isParsingQualifiedDeclName && !canParseTypeQualifierForDeclName())
     return makeParsedError<ParsedTypeSyntax>();
 
+  // SWIFT_ENABLE_TENSORFLOW: Condition body intentionally not indented, to
+  // reduce merge conflicts.
   if (!isParsingQualifiedDeclName || Tok.isNotAnyOperator()) {
   if (Tok.isNot(tok::identifier) && Tok.isNot(tok::kw_Self)) {
     // is this the 'Any' type
@@ -717,8 +719,28 @@ Parser::parseTypeIdentifier(bool isParsingQualifiedDeclName) {
         peekToken().isContextualKeyword("Protocol"))
       break;
 
+    if (isParsingQualifiedDeclName) {
+      // If we're parsing a qualified decl name, break out before parsing the
+      // last period.
+
+      BacktrackingScope backtrack(*this);
+
+      if (Tok.is(tok::period) || Tok.is(tok::period_prefix))
+        consumeToken();
+      else if (startsWithSymbol(Tok, '.'))
+        consumeStartingCharacterOfCurrentToken(tok::period);
+
+      if (!canParseTypeQualifierForDeclName())
+        break;
+    }
+
     // Parse '.'.
     auto period = consumeTokenSyntax();
+
+    if (isParsingQualifiedDeclName && Tok.isAnyOperator()) {
+      // If an operator is encountered, break and do not backtrack later.
+      break;
+    }
 
     // Parse component;
     Optional<ParsedTokenSyntax> identifier;
