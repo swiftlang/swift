@@ -164,6 +164,9 @@ SIMPLE_LOCATOR_PATH_ELT(UnresolvedMember)
 /// The candidate witness during protocol conformance checking.
 CUSTOM_LOCATOR_PATH_ELT(Witness)
 
+/// An explicit type coercion.
+SIMPLE_LOCATOR_PATH_ELT(ExplicitTypeCoercion)
+
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT
 #undef SIMPLE_LOCATOR_PATH_ELT

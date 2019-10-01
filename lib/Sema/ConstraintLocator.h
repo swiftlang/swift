@@ -89,6 +89,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case ExplicitTypeCoercion:
       return 0;
 
     case ContextualType:
@@ -162,6 +163,7 @@ public:
     case KeyPathRoot:
     case KeyPathValue:
     case KeyPathComponentResult:
+    case ExplicitTypeCoercion:
       return 0;
 
     case FunctionArgument:
