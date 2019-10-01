@@ -23,6 +23,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Parse/SyntaxParsingContext.h"
+#include "swift/Parse/ParsedSyntaxBuilders.h"
+#include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Subsystems.h"
 #include "swift/Syntax/TokenSyntax.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -2529,49 +2531,76 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
 /// stmt-pound-assert:
 ///   '#assert' '(' expr (',' string_literal)? ')'
 ParserResult<Stmt> Parser::parseStmtPoundAssert() {
-  SyntaxContext->setCreateSyntax(SyntaxKind::PoundAssertStmt);
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseStmtPoundAssertSyntax();
+  SyntaxContext->addSyntax(parsed.get());
+  auto poundAssertSyntax = SyntaxContext->topNode<PoundAssertStmtSyntax>();
+  auto poundAssert = Generator.generate(poundAssertSyntax, leadingLoc);
+  return makeParserResult(parsed.getStatus(), poundAssert);
+}
 
-  SourceLoc startLoc = consumeToken(tok::pound_assert);
-  SourceLoc endLoc;
+ParsedSyntaxResult<ParsedPoundAssertStmtSyntax>
+Parser::parseStmtPoundAssertSyntax() {
+  ParsedPoundAssertStmtSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
 
-  if (Tok.isNot(tok::l_paren)) {
-    diagnose(Tok, diag::pound_assert_expected_lparen);
-    return makeParserError();
+  SourceLoc startLoc = Tok.getLoc();
+  builder.usePoundAssert(consumeTokenSyntax(tok::pound_assert));
+  if (!Tok.isFollowingLParen()) {
+    diagnose(Tok.getLoc(), diag::pound_assert_expected_lparen);
+    status.setIsParseError();
+    builder.useCondition(ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
+    return makeParsedResult(builder.build(), status);
   }
-  SourceLoc LBLoc = consumeToken(tok::l_paren);
+  SourceLoc lParenLoc = Tok.getLoc();
+  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
 
-  auto conditionExprResult = parseExpr(diag::pound_assert_expected_expression);
-  if (conditionExprResult.isParseError())
-    return ParserStatus(conditionExprResult);
+  auto conditionExprResult = parseExpressionSyntax(diag::pound_assert_expected_expression);
+  status |= conditionExprResult.getStatus();
+  builder.useCondition(conditionExprResult.isNull()
+      ? ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext)
+      : conditionExprResult.get());
 
-  StringRef message;
-  if (consumeIf(tok::comma)) {
+  if (auto Comma = consumeTokenSyntaxIf(tok::comma)) {
+    builder.useComma(std::move(*Comma));
+
     if (Tok.isNot(tok::string_literal)) {
       diagnose(Tok.getLoc(), diag::pound_assert_expected_string_literal);
-      return makeParserError();
+      status.setIsParseError();
+      return makeParsedResult(builder.build(), status);
     }
-
-    auto messageOpt = getStringLiteralIfNotInterpolated(Tok.getLoc(),
-                                                        "'#assert' message");
-    consumeToken();
-    if (!messageOpt)
-      return makeParserError();
-
-    message = *messageOpt;
+    auto MessageLoc = Tok.getLoc();
+    // FIXME: Support extended escaping string literal.
+    if (Tok.getCustomDelimiterLen()) {
+      diagnose(MessageLoc, diag::forbidden_extended_escaping_string, "'#assert' message");
+      status.setIsParseError();
+    } else {
+      SmallVector<Lexer::StringSegment, 1> Segments;
+      L->getStringLiteralSegments(Tok, Segments);
+      if (Segments.size() != 1 ||
+          Segments.front().Kind == Lexer::StringSegment::Expr) {
+        diagnose(MessageLoc, diag::forbidden_interpolated_string, "'#assert' message");
+        status.setIsParseError();
+      }
+    }
+    builder.useMessage(consumeTokenSyntax(tok::string_literal));
   }
 
-  if (parseMatchingToken(tok::r_paren, endLoc,
-                         diag::pound_assert_expected_rparen, LBLoc)) {
-    return makeParserError();
+  SourceLoc EndLoc;
+  if (auto rParen = parseMatchingTokenSyntax(tok::r_paren, EndLoc,
+                                             diag::pound_assert_expected_rparen,
+                                             lParenLoc)) {
+    builder.useRightParen(std::move(*rParen));
+  } else {
+    status.setIsParseError();
   }
 
   // We check this after consuming everything, so that the SyntaxContext
   // understands this statement even when the feature is disabled.
   if (!Context.LangOpts.EnableExperimentalStaticAssert) {
     diagnose(startLoc, diag::pound_assert_disabled);
-    return makeParserError();
+    status.setIsParseError();
   }
 
-  return makeParserResult<Stmt>(new (Context) PoundAssertStmt(
-      SourceRange(startLoc, endLoc), conditionExprResult.get(), message));
+  return makeParsedResult(builder.build(), status);
 }

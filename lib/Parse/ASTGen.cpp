@@ -711,8 +711,48 @@ LayoutConstraint ASTGen::generate(const LayoutConstraintSyntax &constraint,
                                                Context);
 }
 
+Stmt *ASTGen::generate(const syntax::PoundAssertStmtSyntax &Stmt,
+                       const SourceLoc Loc) {
+  // Don't form a PoundAssertStmt without a condition
+  if (Stmt.getCondition().isUnknown())
+    return nullptr;
+  SourceLoc CondLoc = advanceLocBegin(Loc, Stmt.getCondition());
+  if (!hasExpr(CondLoc))
+    return nullptr;
+
+  Expr *CondExpr = getExpr(CondLoc);
+  SourceLoc Start = advanceLocBegin(Loc, Stmt.getPoundAssert());
+  SourceLoc End = advanceLocEnd(Loc, Stmt.getRightParen());
+
+  StringRef MessageText = "";
+  if (auto Message = Stmt.getMessage()) {
+    auto Tok = P.L->getTokenAt(generate(*Message, Loc));
+    SmallVector<Lexer::StringSegment, 1> Segments;
+    P.L->getStringLiteralSegments(Tok, Segments);
+    if (Segments.size() == 1 &&
+      Segments.front().Kind == Lexer::StringSegment::Literal &&
+      // FIXME: Support extended escaping string literal.
+      Tok.getCustomDelimiterLen() == 0) {
+      MessageText = P.SourceMgr.extractText(
+          CharSourceRange(Segments.front().Loc, Segments.front().Length));
+    }
+  }
+  return new (Context) PoundAssertStmt(SourceRange(Start, End), CondExpr,
+                                       MessageText);
+}
+
 SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
   return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
+}
+
+SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc,
+                                const syntax::Syntax &Node) {
+  if (auto Tok = Node.getLastToken())
+    return advanceLocBegin(Loc, *Tok);
+  if (auto Prev = Node.getPreviousNode())
+    return advanceLocBegin(Loc, *Prev->getLastToken());
+  assert(false && "No tokens in tree?");
+  return Loc;
 }
 
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
@@ -778,6 +818,30 @@ bool ASTGen::hasType(const SourceLoc Loc) const {
 
 TypeRepr *ASTGen::getType(const SourceLoc Loc) const {
   return Types.find(Loc)->second;
+}
+
+void ASTGen::addExpr(Expr *E, const SourceLoc Loc) {
+#ifndef NDEBUG
+  if (hasExpr(Loc)) {
+    bool PrevIsSubExpr = false;
+    Expr *Prev = Exprs.find(Loc)->second;
+    E->forEachChildExpr([&](Expr *Child) {
+      if (Child == Prev)
+        PrevIsSubExpr = true;
+      return Child;
+    });
+    assert(PrevIsSubExpr);
+  }
+#endif
+  Exprs.insert({Loc, E});
+}
+
+bool ASTGen::hasExpr(const SourceLoc Loc) const {
+  return Exprs.find(Loc) != Exprs.end();
+}
+
+Expr *ASTGen::getExpr(const SourceLoc Loc) const {
+  return Exprs.find(Loc)->second;
 }
 
 void ASTGen::addDeclAttributes(DeclAttributes attrs, SourceLoc Loc) {

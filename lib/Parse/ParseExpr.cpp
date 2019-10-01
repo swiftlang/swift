@@ -34,6 +34,18 @@
 using namespace swift;
 using namespace swift::syntax;
 
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExpressionSyntax(Diag<> ID) {
+  SourceLoc ExprLoc = Tok.getLoc();
+  SyntaxParsingContext ExprParsingContext(SyntaxContext, SyntaxContextKind::Expr);
+  ExprParsingContext.setTransparent();
+  ParserResult<Expr> Result = parseExpr(ID);
+  if (auto ParsedExpr = ExprParsingContext.popIf<ParsedExprSyntax>()) {
+    Generator.addExpr(Result.getPtrOrNull(), ExprLoc);
+    return makeParsedResult(std::move(*ParsedExpr), Result.getStatus());
+  }
+  return Result.getStatus();
+}
+
 /// parseExpr
 ///
 ///   expr:

@@ -1420,6 +1420,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
+  ParsedSyntaxResult<ParsedExprSyntax> parseExpressionSyntax(Diag<> ID);
   ParserResult<Expr> parseExpr(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/false);
   }
@@ -1603,6 +1604,7 @@ public:
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
   ParserResult<CaseStmt> parseStmtCase(bool IsActive);
   ParserResult<Stmt> parseStmtPoundAssert();
+  ParsedSyntaxResult<ParsedPoundAssertStmtSyntax> parseStmtPoundAssertSyntax();
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

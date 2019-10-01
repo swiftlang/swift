@@ -169,6 +169,9 @@ public:
   /// Returns true if the node is "present" in the source.
   bool isPresent() const;
 
+  /// Get the node immediately before this current node that does contain a
+  /// non-missing token. Return nullptr if we cannot find such node.
+  Optional<Syntax> getPreviousNode() const;
 
   /// Returns the first non-missing token in this syntax. Returns None if there
   /// is no non-missing token.
