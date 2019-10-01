@@ -2,11 +2,11 @@
 
 // CHECK: @"$s36access_type_metadata_by_mangled_name3FooCyAA3BarCyAA3ZimCyAA4ZangCGGGMD" = linkonce_odr hidden global { i32, i32 }
 
-// CHECK-little-SAME: @"symbolic 36access_type_metadata_by_mangled_name3FooCyAA3BarCyAA3ZimCyAA4ZangCGGG"
-// CHECK-little-SAME: i32 -71
+// CHECK-little-SAME: @"symbolic{{.*}}36access_type_metadata_by_mangled_name3FooC{{.*}}AA3BarC{{.*}}AA3ZimC{{.*}}AA4ZangC{{.*}}"
+// CHECK-little-SAME: i32 -{{[0-9]+}}
 
-// CHECK-big-SAME:    i32 -71
-// CHECK-big-SAME:    @"symbolic 36access_type_metadata_by_mangled_name3FooCyAA3BarCyAA3ZimCyAA4ZangCGGG"
+// CHECK-big-SAME:    i32 -{{[0-9]+}}
+// CHECK-big-SAME:    @"symbolic{{.*}}36access_type_metadata_by_mangled_name3FooC{{.*}}AA3BarC{{.*}}AA3ZimCyAA4ZangC{{.*}}"
 
 // CHECK-SAME: align 8
 
