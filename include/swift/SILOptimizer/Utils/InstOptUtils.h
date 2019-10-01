@@ -41,52 +41,54 @@ using ValueBaseUserRange =
     TransformRange<IteratorRange<ValueBase::use_iterator>, UserTransform>;
 
 inline ValueBaseUserRange
-makeUserRange(iterator_range<ValueBase::use_iterator> R) {
-  auto toUser = [](Operand *O) { return O->getUser(); };
-  return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
+makeUserRange(iterator_range<ValueBase::use_iterator> range) {
+  auto toUser = [](Operand *operand) { return operand->getUser(); };
+  return makeTransformRange(makeIteratorRange(range.begin(), range.end()),
                             UserTransform(toUser));
 }
 
 using DeadInstructionSet = llvm::SmallSetVector<SILInstruction *, 8>;
 
 /// Create a retain of \p Ptr before the \p InsertPt.
-NullablePtr<SILInstruction> createIncrementBefore(SILValue Ptr,
-                                                  SILInstruction *InsertPt);
+NullablePtr<SILInstruction> createIncrementBefore(SILValue ptr,
+                                                  SILInstruction *insertpt);
 
 /// Create a release of \p Ptr before the \p InsertPt.
-NullablePtr<SILInstruction> createDecrementBefore(SILValue Ptr,
-                                                  SILInstruction *InsertPt);
+NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
+                                                  SILInstruction *insertpt);
 
 /// For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///
-/// \param I The ArrayRef of instructions to be deleted.
-/// \param Force If Force is set, don't check if the top level instructions
+/// \param inst The ArrayRef of instructions to be deleted.
+/// \param force If Force is set, don't check if the top level instructions
 ///        are considered dead - delete them regardless.
-/// \param C a callback called whenever an instruction is deleted.
+/// \param callback a callback called whenever an instruction is deleted.
 void recursivelyDeleteTriviallyDeadInstructions(
-    ArrayRef<SILInstruction *> I, bool Force = false,
-    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
+    ArrayRef<SILInstruction *> inst, bool force = false,
+    llvm::function_ref<void(SILInstruction *)> callback = [](SILInstruction *) {
+    });
 
 /// If the given instruction is dead, delete it along with its dead
 /// operands.
 ///
-/// \param I The instruction to be deleted.
-/// \param Force If Force is set, don't check if the top level instruction is
+/// \param inst The instruction to be deleted.
+/// \param force If Force is set, don't check if the top level instruction is
 ///        considered dead - delete it regardless.
-/// \param C a callback called whenever an instruction is deleted.
+/// \param callback a callback called whenever an instruction is deleted.
 void recursivelyDeleteTriviallyDeadInstructions(
-    SILInstruction *I, bool Force = false,
-    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
+    SILInstruction *inst, bool force = false,
+    llvm::function_ref<void(SILInstruction *)> callback = [](SILInstruction *) {
+    });
 
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
-bool isInstructionTriviallyDead(SILInstruction *I);
+bool isInstructionTriviallyDead(SILInstruction *inst);
 
 /// Return true if this is a release instruction that's not going to
 /// free the object.
-bool isIntermediateRelease(SILInstruction *I, EpilogueARCFunctionInfo *ERFI);
+bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
 
 /// Recursively collect all the uses and transitive uses of the
 /// instruction.
@@ -96,12 +98,12 @@ void collectUsesOfValue(SILValue V,
 /// Recursively erase all of the uses of the instruction (but not the
 /// instruction itself)
 void eraseUsesOfInstruction(
-    SILInstruction *Inst,
-    llvm::function_ref<void(SILInstruction *)> C = [](SILInstruction *) {});
+    SILInstruction *inst, llvm::function_ref<void(SILInstruction *)> callback =
+                              [](SILInstruction *) {});
 
 /// Recursively erase all of the uses of the value (but not the
 /// value itself)
-void eraseUsesOfValue(SILValue V);
+void eraseUsesOfValue(SILValue value);
 
 FullApplySite findApplyFromDevirtualizedResult(SILValue value);
 
@@ -110,61 +112,62 @@ FullApplySite findApplyFromDevirtualizedResult(SILValue value);
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
-SILValue castValueToABICompatibleType(SILBuilder *B, SILLocation Loc,
-                                      SILValue Value, SILType SrcTy,
-                                      SILType DestTy);
+SILValue castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
+                                      SILValue value, SILType srcTy,
+                                      SILType destTy);
 /// Peek through trivial Enum initialization, typically for pointless
 /// Optionals.
 ///
 /// The returned InitEnumDataAddr dominates the given
 /// UncheckedTakeEnumDataAddrInst.
 InitEnumDataAddrInst *
-findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *UTEDAI);
+findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
 /// after \p ABI and returns it.
-ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *ABI, unsigned Index);
+ProjectBoxInst *getOrCreateProjectBox(AllocBoxInst *abi, unsigned index);
 
 /// Return true if any call inside the given function may bind dynamic
 /// 'Self' to a generic argument of the callee.
-bool mayBindDynamicSelf(SILFunction *F);
+bool mayBindDynamicSelf(SILFunction *f);
 
 /// Check whether the \p addr is an address of a tail-allocated array element.
 bool isAddressOfArrayElement(SILValue addr);
 
 /// Move an ApplyInst's FuncRef so that it dominates the call site.
-void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
+void placeFuncRef(ApplyInst *ai, DominanceInfo *dt);
 
 /// Add an argument, \p val, to the branch-edge that is pointing into
 /// block \p Dest. Return a new instruction and do not erase the old
 /// instruction.
-TermInst *addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
-                              TermInst *Branch);
+TermInst *addArgumentToBranch(SILValue val, SILBasicBlock *dest,
+                              TermInst *branch);
 
 /// Get the linkage to be used for specializations of a function with
 /// the given linkage.
-SILLinkage getSpecializedLinkage(SILFunction *F, SILLinkage L);
+SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 
 /// Tries to optimize a given apply instruction if it is a concatenation of
 /// string literals. Returns a new instruction if optimization was possible.
-SingleValueInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
+SingleValueInstruction *tryToConcatenateStrings(ApplyInst *ai,
+                                                SILBuilder &builder);
 
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
-    SILFunction *Fn, DominanceInfo *DT,
-    SmallVectorImpl<SILBasicBlock *> &BlocksForWorklist);
+    SILFunction *fn, DominanceInfo *dt,
+    SmallVectorImpl<SILBasicBlock *> &blocksForWorklist);
 
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {
   using CallbackTy = std::function<void(SILInstruction *)>;
-  CallbackTy DeleteInst = [](SILInstruction *I) { I->eraseFromParent(); };
-  CallbackTy CreatedNewInst = [](SILInstruction *) {};
+  CallbackTy deleteInst = [](SILInstruction *inst) { inst->eraseFromParent(); };
+  CallbackTy createdNewInst = [](SILInstruction *) {};
 
-  InstModCallbacks(CallbackTy DeleteInst, CallbackTy CreatedNewInst)
-      : DeleteInst(DeleteInst), CreatedNewInst(CreatedNewInst) {}
+  InstModCallbacks(CallbackTy deleteInst, CallbackTy createdNewInst)
+      : deleteInst(deleteInst), createdNewInst(createdNewInst) {}
   InstModCallbacks() = default;
   ~InstModCallbacks() = default;
   InstModCallbacks(const InstModCallbacks &) = default;
@@ -179,19 +182,20 @@ struct InstModCallbacks {
 ///    captured args if we have a partial_apply.
 ///
 /// In the future this should be extended to be less conservative with users.
-bool tryDeleteDeadClosure(SingleValueInstruction *Closure,
-                          InstModCallbacks Callbacks = InstModCallbacks());
+bool tryDeleteDeadClosure(SingleValueInstruction *closure,
+                          InstModCallbacks callbacks = InstModCallbacks());
 
 /// Given a SILValue argument to a partial apply \p Arg and the associated
 /// parameter info for that argument, perform the necessary cleanups to Arg when
 /// one is attempting to delete the partial apply.
 void releasePartialApplyCapturedArg(
-    SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
-    InstModCallbacks Callbacks = InstModCallbacks());
+    SILBuilder &builder, SILLocation loc, SILValue arg,
+    SILParameterInfo paramInfo,
+    InstModCallbacks callbacks = InstModCallbacks());
 
 /// Insert destroys of captured arguments of partial_apply [stack].
 void insertDestroyOfCapturedArguments(
-    PartialApplyInst *PAI, SILBuilder &B,
+    PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
         [](SILValue arg) -> bool { return true; });
 
@@ -201,57 +205,57 @@ void insertDestroyOfCapturedArguments(
 /// interposed.
 class IgnoreExpectUseIterator
     : public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
-  ValueBaseUseIterator OrigUseChain;
-  ValueBaseUseIterator CurrentIter;
+  ValueBaseUseIterator origUseChain;
+  ValueBaseUseIterator currentIter;
 
-  static BuiltinInst *isExpect(Operand *Use) {
-    if (auto *BI = dyn_cast<BuiltinInst>(Use->getUser()))
-      if (BI->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
-        return BI;
+  static BuiltinInst *isExpect(Operand *use) {
+    if (auto *bi = dyn_cast<BuiltinInst>(use->getUser()))
+      if (bi->getIntrinsicInfo().ID == llvm::Intrinsic::expect)
+        return bi;
     return nullptr;
   }
 
   // Advance through expect users to their users until we encounter a user that
   // is not an expect.
   void advanceThroughExpects() {
-    while (CurrentIter == OrigUseChain
-           && CurrentIter != ValueBaseUseIterator(nullptr)) {
-      auto *Expect = isExpect(*CurrentIter);
+    while (currentIter == origUseChain
+           && currentIter != ValueBaseUseIterator(nullptr)) {
+      auto *Expect = isExpect(*currentIter);
       if (!Expect)
         return;
-      CurrentIter = Expect->use_begin();
+      currentIter = Expect->use_begin();
       // Expect with no users advance to next item in original use chain.
-      if (CurrentIter == Expect->use_end())
-        CurrentIter = ++OrigUseChain;
+      if (currentIter == Expect->use_end())
+        currentIter = ++origUseChain;
     }
   }
 
 public:
-  IgnoreExpectUseIterator(ValueBase *V)
-      : OrigUseChain(V->use_begin()), CurrentIter(V->use_begin()) {
+  IgnoreExpectUseIterator(ValueBase *value)
+      : origUseChain(value->use_begin()), currentIter(value->use_begin()) {
     advanceThroughExpects();
   }
 
   IgnoreExpectUseIterator() = default;
 
-  Operand *operator*() const { return *CurrentIter; }
-  Operand *operator->() const { return *CurrentIter; }
-  SILInstruction *getUser() const { return CurrentIter->getUser(); }
+  Operand *operator*() const { return *currentIter; }
+  Operand *operator->() const { return *currentIter; }
+  SILInstruction *getUser() const { return currentIter->getUser(); }
 
   IgnoreExpectUseIterator &operator++() {
     assert(**this && "increment past end()!");
-    if (OrigUseChain == CurrentIter) {
+    if (origUseChain == currentIter) {
       // Use chain of the original value.
-      ++OrigUseChain;
-      ++CurrentIter;
+      ++origUseChain;
+      ++currentIter;
       // Ignore expects.
       advanceThroughExpects();
     } else {
       // Use chain of an expect.
-      ++CurrentIter;
-      if (CurrentIter == ValueBaseUseIterator(nullptr)) {
+      ++currentIter;
+      if (currentIter == ValueBaseUseIterator(nullptr)) {
         // At the end of the use chain of an expect.
-        CurrentIter = ++OrigUseChain;
+        currentIter = ++origUseChain;
         advanceThroughExpects();
       }
     }
@@ -259,13 +263,13 @@ public:
   }
 
   IgnoreExpectUseIterator operator++(int unused) {
-    IgnoreExpectUseIterator Copy = *this;
+    IgnoreExpectUseIterator copy = *this;
     ++*this;
-    return Copy;
+    return copy;
   }
   friend bool operator==(IgnoreExpectUseIterator lhs,
                          IgnoreExpectUseIterator rhs) {
-    return lhs.CurrentIter == rhs.CurrentIter;
+    return lhs.currentIter == rhs.currentIter;
   }
   friend bool operator!=(IgnoreExpectUseIterator lhs,
                          IgnoreExpectUseIterator rhs) {
@@ -274,8 +278,8 @@ public:
 };
 
 inline iterator_range<IgnoreExpectUseIterator>
-ignore_expect_uses(ValueBase *V) {
-  return make_range(IgnoreExpectUseIterator(V), IgnoreExpectUseIterator());
+ignore_expect_uses(ValueBase *value) {
+  return make_range(IgnoreExpectUseIterator(value), IgnoreExpectUseIterator());
 }
 
 /// Run simplifyInstruction() on all of the instruction I's users if they only
@@ -286,53 +290,53 @@ ignore_expect_uses(ValueBase *V) {
 /// An example of how this is useful is in cases where one is splitting up an
 /// aggregate and reforming it, the reformed aggregate may have extract
 /// operations from it. These can be simplified and removed.
-bool simplifyUsers(SingleValueInstruction *I);
+bool simplifyUsers(SingleValueInstruction *inst);
 
 ///  True if a type can be expanded
 /// without a significant increase to code size.
-bool shouldExpand(SILModule &Module, SILType Ty);
+bool shouldExpand(SILModule &module, SILType ty);
 
-/// Check if the value of V is computed by means of a simple initialization.
+/// Check if the value of value is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
 /// The check is performed by recursively walking the computation of the
 /// SIL value being analyzed.
-bool analyzeStaticInitializer(SILValue V,
-                              SmallVectorImpl<SILInstruction *> &Insns);
+bool analyzeStaticInitializer(SILValue value,
+                              SmallVectorImpl<SILInstruction *> &insns);
 
 /// Returns true if the below operation will succeed.
-bool canReplaceLoadSequence(SILInstruction *I);
+bool canReplaceLoadSequence(SILInstruction *inst);
 
 /// Replace load sequence which may contain
 /// a chain of struct_element_addr followed by a load.
 /// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
-void replaceLoadSequence(SILInstruction *I, SILValue Value);
+void replaceLoadSequence(SILInstruction *inst, SILValue value);
 
 /// Do we have enough information to determine all callees that could
 /// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &M, SILDeclRef Decl);
+bool calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl);
 
-// Attempt to get the instance for S, whose static type is the same as
+// Attempt to get the instance for , whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.
 // The information that a static type is the same as the exact dynamic,
 // can be derived e.g.:
 // - from a constructor or
 // - from a successful outcome of a checked_cast_br [exact] instruction.
-SILValue getInstanceWithExactDynamicType(SILValue S,
-                                         ClassHierarchyAnalysis *CHA);
+SILValue getInstanceWithExactDynamicType(SILValue instance,
+                                         ClassHierarchyAnalysis *cha);
 
 /// Try to determine the exact dynamic type of an object.
 /// returns the exact dynamic type of the object, or an empty type if the exact
 /// type could not be determined.
-SILType getExactDynamicType(SILValue S, ClassHierarchyAnalysis *CHA,
-                            bool ForUnderlyingObject = false);
+SILType getExactDynamicType(SILValue instance, ClassHierarchyAnalysis *cha,
+                            bool forUnderlyingObject = false);
 
 /// Try to statically determine the exact dynamic type of the underlying object.
 /// returns the exact dynamic type of the underlying object, or an empty SILType
 /// if the exact type could not be determined.
-SILType getExactDynamicTypeOfUnderlyingObject(SILValue S,
-                                              ClassHierarchyAnalysis *CHA);
+SILType getExactDynamicTypeOfUnderlyingObject(SILValue instance,
+                                              ClassHierarchyAnalysis *cha);
 
 // Move only data structure that is the result of findLocalApplySite.
 ///
@@ -379,7 +383,7 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 /// 1. We discovered that the function_ref never escapes.
 /// 2. We were able to find either a partial apply or a full apply site.
 Optional<FindLocalApplySitesResult>
-findLocalApplySites(FunctionRefBaseInst *FRI);
+findLocalApplySites(FunctionRefBaseInst *fri);
 
 } // end namespace swift
 

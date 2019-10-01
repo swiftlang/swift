@@ -17,110 +17,112 @@
 
 using namespace swift;
 
-/// Remove all instructions in the body of \p BB in safe manner by using
+/// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
-void swift::clearBlockBody(SILBasicBlock *BB) {
+void swift::clearBlockBody(SILBasicBlock *bb) {
   // Instructions in the dead block may be used by other dead blocks.  Replace
   // any uses of them with undef values.
-  while (!BB->empty()) {
-    // Grab the last instruction in the BB.
-    auto *Inst = &BB->back();
+  while (!bb->empty()) {
+    // Grab the last instruction in the bb.
+    auto *inst = &bb->back();
 
     // Replace any still-remaining uses with undef values and erase.
-    Inst->replaceAllUsesOfAllResultsWithUndef();
-    Inst->eraseFromParent();
+    inst->replaceAllUsesOfAllResultsWithUndef();
+    inst->eraseFromParent();
   }
 }
 
 // Handle the mechanical aspects of removing an unreachable block.
-void swift::removeDeadBlock(SILBasicBlock *BB) {
-  // Clear the body of BB.
-  clearBlockBody(BB);
+void swift::removeDeadBlock(SILBasicBlock *bb) {
+  // Clear the body of bb.
+  clearBlockBody(bb);
 
-  // Now that the BB is empty, eliminate it.
-  BB->eraseFromParent();
+  // Now that the bb is empty, eliminate it.
+  bb->eraseFromParent();
 }
 
-
-bool swift::removeUnreachableBlocks(SILFunction &Fn) {
+bool swift::removeUnreachableBlocks(SILFunction &f) {
   // All reachable blocks, but does not include the entry block.
-  llvm::SmallPtrSet<SILBasicBlock *, 8> Visited;
+  llvm::SmallPtrSet<SILBasicBlock *, 8> visited;
 
   // Walk over the CFG, starting at the entry block, until all reachable blocks are visited.
-  llvm::SmallVector<SILBasicBlock *, 8> Worklist(1, Fn.getEntryBlock());
-  while (!Worklist.empty()) {
-    SILBasicBlock *BB = Worklist.pop_back_val();
-    for (auto &Succ : BB->getSuccessors()) {
-      if (Visited.insert(Succ).second)
-        Worklist.push_back(Succ);
+  llvm::SmallVector<SILBasicBlock *, 8> worklist(1, f.getEntryBlock());
+  while (!worklist.empty()) {
+    SILBasicBlock *bb = worklist.pop_back_val();
+    for (auto &Succ : bb->getSuccessors()) {
+      if (visited.insert(Succ).second)
+        worklist.push_back(Succ);
     }
   }
 
   // Remove the blocks we never reached. Exclude the entry block from the iteration because it's
   // not included in the Visited set.
-  bool Changed = false;
-  for (auto It = std::next(Fn.begin()), End = Fn.end(); It != End; ) {
-    auto *BB = &*It++;
-    if (!Visited.count(BB)) {
-      removeDeadBlock(BB);
-      Changed = true;
+  bool changed = false;
+  for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
+    auto *bb = &*ii++;
+    if (!visited.count(bb)) {
+      removeDeadBlock(bb);
+      changed = true;
     }
   }
-  return Changed;
+  return changed;
 }
 
 /// Helper function to perform SSA updates in case of jump threading.
-void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
-                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp;
-  for (auto AvailValPair : Cloner.AvailVals) {
-    ValueBase *Inst = AvailValPair.first;
-    if (Inst->use_empty())
+void swift::updateSSAAfterCloning(BasicBlockCloner &cloner,
+                                  SILBasicBlock *srcBB, SILBasicBlock *destBB) {
+  SILSSAUpdater ssaUpdater;
+  for (auto availValPair : cloner.AvailVals) {
+    ValueBase *inst = availValPair.first;
+    if (inst->use_empty())
       continue;
 
-    SILValue NewRes(AvailValPair.second);
+    SILValue newResult(availValPair.second);
 
-    SmallVector<UseWrapper, 16> UseList;
+    SmallVector<UseWrapper, 16> useList;
     // Collect the uses of the value.
-    for (auto Use : Inst->getUses())
-      UseList.push_back(UseWrapper(Use));
+    for (auto *use : inst->getUses())
+      useList.push_back(UseWrapper(use));
 
-    SSAUp.Initialize(Inst->getType());
-    SSAUp.AddAvailableValue(DestBB, Inst);
-    SSAUp.AddAvailableValue(SrcBB, NewRes);
+    ssaUpdater.Initialize(inst->getType());
+    ssaUpdater.AddAvailableValue(destBB, inst);
+    ssaUpdater.AddAvailableValue(srcBB, newResult);
 
-    if (UseList.empty())
+    if (useList.empty())
       continue;
 
     // Update all the uses.
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SILInstruction *User = Use->getUser();
-      assert(User && "Missing user");
+    for (auto useWrapper : useList) {
+      Operand *use = useWrapper;
+      SILInstruction *user = use->getUser();
+      assert(user && "Missing user");
 
       // Ignore uses in the same basic block.
-      if (User->getParent() == DestBB)
+      if (user->getParent() == destBB)
         continue;
 
-      SSAUp.RewriteUse(*Use);
+      ssaUpdater.RewriteUse(*use);
     }
   }
 }
 
 // FIXME: Remove this. SILCloner should not create critical edges.
-bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *DT, SILLoopInfo *LI) {
+bool BasicBlockCloner::splitCriticalEdges(DominanceInfo *domInfo,
+                                          SILLoopInfo *loopInfo) {
   bool changed = false;
   // Remove any critical edges that the EdgeThreadingCloner may have
   // accidentally created.
   for (unsigned succIdx = 0, succEnd = origBB->getSuccessors().size();
        succIdx != succEnd; ++succIdx) {
-    if (nullptr != splitCriticalEdge(origBB->getTerminator(), succIdx, DT, LI))
+    if (nullptr
+        != splitCriticalEdge(origBB->getTerminator(), succIdx, domInfo,
+                             loopInfo))
       changed |= true;
   }
   for (unsigned succIdx = 0, succEnd = getNewBB()->getSuccessors().size();
        succIdx != succEnd; ++succIdx) {
-    auto *newBB =
-        splitCriticalEdge(getNewBB()->getTerminator(), succIdx, DT, LI);
+    auto *newBB = splitCriticalEdge(getNewBB()->getTerminator(), succIdx,
+                                    domInfo, loopInfo);
     changed |= (newBB != nullptr);
   }
   return changed;
@@ -199,45 +201,44 @@ bool SinkAddressProjections::cloneProjections() {
   return true;
 }
 
-void StaticInitCloner::add(SILInstruction *InitVal) {
+void StaticInitCloner::add(SILInstruction *initVal) {
   // Don't schedule an instruction twice for cloning.
-  if (NumOpsToClone.count(InitVal) != 0)
+  if (numOpsToClone.count(initVal) != 0)
     return;
 
-  ArrayRef<Operand> Ops = InitVal->getAllOperands();
-  NumOpsToClone[InitVal] = Ops.size();
-  if (Ops.empty()) {
+  ArrayRef<Operand> operands = initVal->getAllOperands();
+  numOpsToClone[initVal] = operands.size();
+  if (operands.empty()) {
     // It's an instruction without operands, e.g. a literal. It's ready to be
     // cloned first.
-    ReadyToClone.push_back(InitVal);
+    readyToClone.push_back(initVal);
   } else {
     // Recursively add all operands.
-    for (const Operand &Op : Ops) {
-      add(cast<SingleValueInstruction>(Op.get()));
+    for (const Operand &operand : operands) {
+      add(cast<SingleValueInstruction>(operand.get()));
     }
   }
 }
 
 SingleValueInstruction *
-StaticInitCloner::clone(SingleValueInstruction *InitVal) {
-  assert(NumOpsToClone.count(InitVal) != 0 && "InitVal was not added");
+StaticInitCloner::clone(SingleValueInstruction *initVal) {
+  assert(numOpsToClone.count(initVal) != 0 && "initVal was not added");
   // Find the right order to clone: all operands of an instruction must be
   // cloned before the instruction itself.
-  while (!ReadyToClone.empty()) {
-    SILInstruction *I = ReadyToClone.pop_back_val();
+  while (!readyToClone.empty()) {
+    SILInstruction *inst = readyToClone.pop_back_val();
 
     // Clone the instruction into the SILGlobalVariable
-    visit(I);
+    visit(inst);
 
     // Check if users of I can now be cloned.
-    for (SILValue result : I->getResults()) {
-      for (Operand *Use : result->getUses()) {
-        SILInstruction *User = Use->getUser();
-        if (NumOpsToClone.count(User) != 0 && --NumOpsToClone[User] == 0)
-          ReadyToClone.push_back(User);
+    for (SILValue result : inst->getResults()) {
+      for (Operand *use : result->getUses()) {
+        SILInstruction *user = use->getUser();
+        if (numOpsToClone.count(user) != 0 && --numOpsToClone[user] == 0)
+          readyToClone.push_back(user);
       }
     }
   }
-  return cast<SingleValueInstruction>(getMappedValue(InitVal));
+  return cast<SingleValueInstruction>(getMappedValue(initVal));
 }
-

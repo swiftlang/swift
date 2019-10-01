@@ -32,21 +32,21 @@ class BasicBlockCloner;
 class SILLoop;
 class SILLoopInfo;
 
-/// Remove all instructions in the body of \p BB in safe manner by using
+/// Remove all instructions in the body of \p bb in safe manner by using
 /// undef.
-void clearBlockBody(SILBasicBlock *BB);
+void clearBlockBody(SILBasicBlock *bb);
 
 /// Handle the mechanical aspects of removing an unreachable block.
-void removeDeadBlock(SILBasicBlock *BB);
+void removeDeadBlock(SILBasicBlock *bb);
 
 /// Remove all unreachable blocks in a function.
-bool removeUnreachableBlocks(SILFunction &Fn);
+bool removeUnreachableBlocks(SILFunction &f);
 
-/// Return true if there are any users of V outside the specified block.
-inline bool isUsedOutsideOfBlock(SILValue V) {
-  auto *BB = V->getParentBlock();
-  for (auto UI : V->getUses())
-    if (UI->getUser()->getParent() != BB)
+/// Return true if there are any users of v outside the specified block.
+inline bool isUsedOutsideOfBlock(SILValue v) {
+  auto *bb = v->getParentBlock();
+  for (auto *use : v->getUses())
+    if (use->getUser()->getParent() != bb)
       return true;
   return false;
 }
@@ -57,13 +57,13 @@ inline bool isUsedOutsideOfBlock(SILValue V) {
 /// rotated once. ShouldVerify specifies whether to perform verification after
 /// the transformation.
 /// Returns true if the loop could be rotated.
-bool rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
-                bool RotateSingleBlockLoops, SILBasicBlock *UpTo,
-                bool ShouldVerify);
+bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo, SILLoopInfo *loopInfo,
+                bool rotateSingleBlockLoops, SILBasicBlock *upToBB,
+                bool shouldVerify);
 
 /// Helper function to perform SSA updates in case of jump threading.
-void updateSSAAfterCloning(BasicBlockCloner &Cloner, SILBasicBlock *SrcBB,
-                           SILBasicBlock *DestBB);
+void updateSSAAfterCloning(BasicBlockCloner &cloner, SILBasicBlock *srcBB,
+                           SILBasicBlock *destBB);
 
 /// Clone a single basic block and any required successor edges within the same
 /// function.
@@ -95,14 +95,14 @@ public:
 
   /// Clone the given branch instruction's destination block, splitting
   /// its successors, and rewrite the branch instruction.
-  void cloneBranchTarget(BranchInst *BI) {
-    assert(origBB == BI->getDestBB());
+  void cloneBranchTarget(BranchInst *bi) {
+    assert(origBB == bi->getDestBB());
 
-    cloneBlock(/*insertAfter*/BI->getParent());
+    cloneBlock(/*insertAfter*/ bi->getParent());
 
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), getNewBB(),
-                                         BI->getArgs());
-    BI->eraseFromParent();
+    SILBuilderWithScope(bi).createBranch(bi->getLoc(), getNewBB(),
+                                         bi->getArgs());
+    bi->eraseFromParent();
   }
 
   /// Get the newly cloned block corresponding to `origBB`.
@@ -112,27 +112,27 @@ public:
 
   /// Call this after processing all instructions to fix the control flow
   /// graph. The branch cloner may have left critical edges.
-  bool splitCriticalEdges(DominanceInfo *DT, SILLoopInfo *LI);
+  bool splitCriticalEdges(DominanceInfo *domInfo, SILLoopInfo *loopInfo);
 
 protected:
   // MARK: CRTP overrides.
 
   /// Override getMappedValue to allow values defined outside the block to be
   /// cloned to be reused in the newly cloned block.
-  SILValue getMappedValue(SILValue Value) {
-    if (auto SI = Value->getDefiningInstruction()) {
-      if (!isBlockCloned(SI->getParent()))
-        return Value;
-    } else if (auto BBArg = dyn_cast<SILArgument>(Value)) {
-      if (!isBlockCloned(BBArg->getParent()))
-        return Value;
+  SILValue getMappedValue(SILValue value) {
+    if (auto si = value->getDefiningInstruction()) {
+      if (!isBlockCloned(si->getParent()))
+        return value;
+    } else if (auto bbArg = dyn_cast<SILArgument>(value)) {
+      if (!isBlockCloned(bbArg->getParent()))
+        return value;
     } else {
-      assert(isa<SILUndef>(Value) && "Unexpected Value kind");
-      return Value;
+      assert(isa<SILUndef>(value) && "Unexpected Value kind");
+      return value;
     }
     // `value` is not defined outside the cloned block, so consult the cloner's
     // map of cloned values.
-    return SuperTy::getMappedValue(Value);
+    return SuperTy::getMappedValue(value);
   }
 
   void mapValue(SILValue origValue, SILValue mappedValue) {
@@ -150,18 +150,18 @@ public:
   typedef std::function<bool (SILInstruction *)> FilterType;
 
 private:
-  FilterType Filter;
+  FilterType filter;
 
   // Pairs of collected instructions; (new, old)
-  llvm::SmallVector<value_type, 4> InstructionPairs;
+  llvm::SmallVector<value_type, 4> instructionpairs;
 
-  void collect(SILInstruction *Old, SILInstruction *New) {
-    if (Filter(New))
-      InstructionPairs.push_back(std::make_pair(New, Old));
+  void collect(SILInstruction *oldI, SILInstruction *newI) {
+    if (filter(newI))
+      instructionpairs.push_back(std::make_pair(newI, oldI));
   }
 
 public:
-  CloneCollector(FilterType Filter) : Filter(Filter) {}
+  CloneCollector(FilterType filter) : filter(filter) {}
 
   CallbackType getCallback() {
     return std::bind(&CloneCollector::collect, this, std::placeholders::_1,
@@ -169,7 +169,7 @@ public:
   }
 
   llvm::SmallVectorImpl<value_type> &getInstructionPairs() {
-    return InstructionPairs;
+    return instructionpairs;
   }
 };
 
@@ -220,37 +220,37 @@ class StaticInitCloner : public SILCloner<StaticInitCloner> {
   friend class SILCloner<StaticInitCloner>;
 
   /// The number of not yet cloned operands for each instruction.
-  llvm::DenseMap<SILInstruction *, int> NumOpsToClone;
+  llvm::DenseMap<SILInstruction *, int> numOpsToClone;
 
   /// List of instructions for which all operands are already cloned (or which
   /// don't have any operands).
-  llvm::SmallVector<SILInstruction *, 8> ReadyToClone;
+  llvm::SmallVector<SILInstruction *, 8> readyToClone;
 
 public:
-  StaticInitCloner(SILGlobalVariable *GVar)
-      : SILCloner<StaticInitCloner>(GVar) { }
+  StaticInitCloner(SILGlobalVariable *gVar)
+      : SILCloner<StaticInitCloner>(gVar) {}
 
   /// Add \p InitVal and all its operands (transitively) for cloning.
   ///
   /// Note: all init values must are added, before calling clone().
-  void add(SILInstruction *InitVal);
+  void add(SILInstruction *initVal);
 
   /// Clone \p InitVal and all its operands into the initializer of the
   /// SILGlobalVariable.
   ///
   /// \return Returns the cloned instruction in the SILGlobalVariable.
-  SingleValueInstruction *clone(SingleValueInstruction *InitVal);
+  SingleValueInstruction *clone(SingleValueInstruction *initVal);
 
   /// Convenience function to clone a single \p InitVal.
-  static void appendToInitializer(SILGlobalVariable *GVar,
-                                  SingleValueInstruction *InitVal) {
-    StaticInitCloner Cloner(GVar);
-    Cloner.add(InitVal);
-    Cloner.clone(InitVal);
+  static void appendToInitializer(SILGlobalVariable *gVar,
+                                  SingleValueInstruction *initVal) {
+    StaticInitCloner cloner(gVar);
+    cloner.add(initVal);
+    cloner.clone(initVal);
   }
 
 protected:
-  SILLocation remapLocation(SILLocation Loc) {
+  SILLocation remapLocation(SILLocation loc) {
     return ArtificialUnreachableLocation();
   }
 };

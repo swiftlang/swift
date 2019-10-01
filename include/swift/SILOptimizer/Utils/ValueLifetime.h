@@ -39,16 +39,17 @@ public:
 
   /// Constructor for the value \p Def with a specific set of users of Def's
   /// users.
-  ValueLifetimeAnalysis(SILInstruction *Def, ArrayRef<SILInstruction*> UserList) :
-      DefValue(Def), UserSet(UserList.begin(), UserList.end()) {
+  ValueLifetimeAnalysis(SILInstruction *def,
+                        ArrayRef<SILInstruction *> userList)
+      : defValue(def), userSet(userList.begin(), userList.end()) {
     propagateLiveness();
   }
 
-  /// Constructor for the value \p Def considering all the value's uses.
-  ValueLifetimeAnalysis(SILInstruction *Def) : DefValue(Def) {
-    for (auto result : Def->getResults()) {
+  /// Constructor for the value \p def considering all the value's uses.
+  ValueLifetimeAnalysis(SILInstruction *def) : defValue(def) {
+    for (auto result : def->getResults()) {
       for (Operand *op : result->getUses()) {
-        UserSet.insert(op->getUser());
+        userSet.insert(op->getUser());
       }
     }
     propagateLiveness();
@@ -69,31 +70,32 @@ public:
     UsersMustPostDomDef
   };
 
-  /// Computes and returns the lifetime frontier for the value in \p Fr.
+  /// Computes and returns the lifetime frontier for the value in \p frontier.
   ///
   /// Returns true if all instructions in the frontier could be found in
   /// non-critical edges.
   /// Returns false if some frontier instructions are located on critical edges.
   /// In this case, if \p mode is AllowToModifyCFG, those critical edges are
-  /// split, otherwise nothing is done and the returned \p Fr is not valid.
+  /// split, otherwise nothing is done and the returned \p frontier is not
+  /// valid.
   ///
-  /// If \p deadEndBlocks is provided, all dead-end blocks are ignored. This
+  /// If \p deBlocks is provided, all dead-end blocks are ignored. This
   /// prevents unreachable-blocks to be included in the frontier.
-  bool computeFrontier(Frontier &Fr, Mode mode,
-                       DeadEndBlocks *DEBlocks = nullptr);
+  bool computeFrontier(Frontier &frontier, Mode mode,
+                       DeadEndBlocks *deBlocks = nullptr);
 
   /// Returns true if the instruction \p Inst is located within the value's
   /// lifetime.
-  /// It is assumed that \p Inst is located after the value's definition.
-  bool isWithinLifetime(SILInstruction *Inst);
+  /// It is assumed that \p inst is located after the value's definition.
+  bool isWithinLifetime(SILInstruction *inst);
 
-  /// Returns true if the value is alive at the begin of block \p BB.
-  bool isAliveAtBeginOfBlock(SILBasicBlock *BB) {
-    return LiveBlocks.count(BB) && BB != DefValue->getParent();
+  /// Returns true if the value is alive at the begin of block \p bb.
+  bool isAliveAtBeginOfBlock(SILBasicBlock *bb) {
+    return liveBlocks.count(bb) && bb != defValue->getParent();
   }
 
   /// Checks if there is a dealloc_ref inside the value's live range.
-  bool containsDeallocRef(const Frontier &Frontier);
+  bool containsDeallocRef(const Frontier &frontier);
 
   /// For debug dumping.
   void dump() const;
@@ -101,20 +103,20 @@ public:
 private:
 
   /// The value.
-  SILInstruction *DefValue;
+  SILInstruction *defValue;
 
   /// The set of blocks where the value is live.
-  llvm::SmallSetVector<SILBasicBlock *, 16> LiveBlocks;
+  llvm::SmallSetVector<SILBasicBlock *, 16> liveBlocks;
 
   /// The set of instructions where the value is used, or the users-list
   /// provided with the constructor.
-  llvm::SmallPtrSet<SILInstruction*, 16> UserSet;
+  llvm::SmallPtrSet<SILInstruction *, 16> userSet;
 
   /// Propagates the liveness information up the control flow graph.
   void propagateLiveness();
 
-  /// Returns the last use of the value in the live block \p BB.
-  SILInstruction *findLastUserInBlock(SILBasicBlock *BB);
+  /// Returns the last use of the value in the live block \p bb.
+  SILInstruction *findLastUserInBlock(SILBasicBlock *bb);
 };
 
 
