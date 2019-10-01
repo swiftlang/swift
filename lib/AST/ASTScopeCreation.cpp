@@ -60,6 +60,11 @@ static SourceRange getRangeableSourceRange(const Rangeable *const p) {
 static SourceRange getRangeableSourceRange(const SpecializeAttr *a) {
   return a->getRange();
 }
+// SWIFT_ENABLE_TENSORFLOW
+static SourceRange getRangeableSourceRange(const DifferentiableAttr *a) {
+  return a->getRange();
+}
+// SWIFT_ENABLE_TENSORFLOW END
 static SourceRange getRangeableSourceRange(const ASTNode n) {
   return n.getSourceRange();
 }
@@ -93,6 +98,19 @@ static void dumpRangeable(SpecializeAttr *r,
 static void dumpRangeable(SpecializeAttr *r, llvm::raw_ostream &f) {
   llvm::errs() << "SpecializeAttr\n";
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+static void dumpRangeable(const DifferentiableAttr *a,
+                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
+static void dumpRangeable(const DifferentiableAttr *a, llvm::raw_ostream &f) {
+  llvm::errs() << "DifferentiableAttr\n";
+}
+static void dumpRangeable(DifferentiableAttr *a,
+                          llvm::raw_ostream &f) LLVM_ATTRIBUTE_USED;
+static void dumpRangeable(DifferentiableAttr *a, llvm::raw_ostream &f) {
+  llvm::errs() << "DifferentiableAttr\n";
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// For Debugging
 template <typename T>
@@ -434,6 +452,24 @@ public:
     for (auto *specializeAttr : sortBySourceRange(sortedSpecializeAttrs))
       fn(specializeAttr);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void forEachDifferentiableAttrInSourceOrder(
+      Decl *decl, function_ref<void(DifferentiableAttr *)> fn) {
+    std::vector<DifferentiableAttr *> sortedDifferentiableAttrs;
+    for (auto *attr : decl->getAttrs())
+      if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr))
+        // NOTE(TF-835): Skipping implicit `@differentiable` attributes is
+        // necessary to avoid verification failure:
+        // `ASTScopeImpl::verifyThatChildrenAreContainedWithin`.
+        // Perhaps this check is no longer necessary after TF-835: robust
+        // `@differentiating` attribute lowering.
+        if (!diffAttr->isImplicit())
+          sortedDifferentiableAttrs.push_back(diffAttr);
+    for (auto *diffAttr : sortBySourceRange(sortedDifferentiableAttrs))
+      fn(diffAttr);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   std::vector<ASTNode> expandIfConfigClausesThenCullAndSortElementsOrMembers(
       ArrayRef<ASTNode> input) const {
@@ -1045,6 +1081,15 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
                   return enclosingAbstractStorageDecl == ad->getStorage();
                 });
 
+  // SWIFT_ENABLE_TENSORFLOW
+  // Create scopes for `@differentiable` attributes.
+  forEachDifferentiableAttrInSourceOrder(
+      asd, [&](DifferentiableAttr *diffAttr) {
+    ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
+        parent, diffAttr, asd);
+  });
+  // SWIFT_ENABLE_TENSORFLOW END
+
   // Sort in order to include synthesized ones, which are out of order.
   // Part of rdar://53921774 rm extra copy
   for (auto *accessor : sortBySourceRange(accessorsToScope))
@@ -1152,6 +1197,9 @@ NO_EXPANSION(GenericParamScope)
 NO_EXPANSION(ASTSourceFileScope)
 NO_EXPANSION(ClosureParametersScope)
 NO_EXPANSION(SpecializeAttributeScope)
+// SWIFT_ENABLE_TENSORFLOW
+NO_EXPANSION(DifferentiableAttributeScope)
+// SWIFT_ENABLE_TENSORFLOW END
 NO_EXPANSION(ConditionalClausePatternUseScope)
 NO_EXPANSION(LookupParentDiversionScope)
 
@@ -1309,6 +1357,17 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
         scopeCreator.ifUniqueConstructExpandAndInsert<SpecializeAttributeScope>(
             this, specializeAttr, decl);
       });
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Create scopes for `@differentiable` attributes.
+  scopeCreator.forEachDifferentiableAttrInSourceOrder(
+      decl, [&](DifferentiableAttr *diffAttr) {
+        scopeCreator
+            .ifUniqueConstructExpandAndInsert<DifferentiableAttributeScope>(
+                this, diffAttr, decl);
+      });
+  // SWIFT_ENABLE_TENSORFLOW END
+
   // Create scopes for generic and ordinary parameters.
   // For a subscript declaration, the generic and ordinary parameters are in an
   // ancestor scope, so don't make them here.
@@ -1636,6 +1695,12 @@ NullablePtr<AbstractStorageDecl>
 SpecializeAttributeScope::getEnclosingAbstractStorageDecl() const {
   return getParent().get()->getEnclosingAbstractStorageDecl();
 }
+// SWIFT_ENABLE_TENSORFLOW
+NullablePtr<AbstractStorageDecl>
+DifferentiableAttributeScope::getEnclosingAbstractStorageDecl() const {
+  return getParent().get()->getEnclosingAbstractStorageDecl();
+}
+// SWIFT_ENABLE_TENSORFLOW END
 NullablePtr<AbstractStorageDecl>
 AbstractFunctionDeclScope::getEnclosingAbstractStorageDecl() const {
   return getParent().get()->getEnclosingAbstractStorageDecl();
@@ -1784,6 +1849,9 @@ GET_REFERRENT(AbstractStmtScope, getStmt())
 GET_REFERRENT(CaptureListScope, getExpr())
 GET_REFERRENT(WholeClosureScope, getExpr())
 GET_REFERRENT(SpecializeAttributeScope, specializeAttr)
+// SWIFT_ENABLE_TENSORFLOW
+GET_REFERRENT(DifferentiableAttributeScope, differentiableAttr)
+// SWIFT_ENABLE_TENSORFLOW END
 GET_REFERRENT(GenericTypeOrExtensionScope, portion->getReferrentOfScope(this));
 
 const Decl *

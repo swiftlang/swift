@@ -485,12 +485,7 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
       DC, initialIsCascadingUse};
   const bool crosscheckUnqualifiedLookup =
       Ctx.LangOpts.CrosscheckUnqualifiedLookup;
-  // SWIFT_ENABLE_TENSORFLOW
-  // NOTE(TF-815): using AST scopes for lookup causes standard library
-  // type-checking for `@differentiable` attributes to fail.
-  if ((false)) {
-  // if (useASTScopesForLookup()) {
-  // SWIFT_ENABLE_TENSORFLOW END
+  if (useASTScopesForLookup()) {
     static bool haveWarned = false;
     if (!haveWarned && Ctx.LangOpts.WarnIfASTScopeLookup) {
       haveWarned = true;

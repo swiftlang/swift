@@ -1531,6 +1531,44 @@ protected:
                              DeclConsumer) const override;
 };
 
+// SWIFT_ENABLE_TENSORFLOW
+/// A `@differentiable` attribute scope.
+/// This exists because `@differentiable` attribute may have a where clause
+/// referring to generic parameters from some generic context.
+class DifferentiableAttributeScope final : public ASTScopeImpl {
+public:
+  DifferentiableAttr *const differentiableAttr;
+  ValueDecl *const attributedDeclaration;
+
+  DifferentiableAttributeScope(DifferentiableAttr *diffAttr,
+                               ValueDecl *decl)
+      : differentiableAttr(diffAttr), attributedDeclaration(decl) {
+  }
+  virtual ~DifferentiableAttributeScope() {}
+
+  std::string getClassName() const override;
+  SourceRange
+  getSourceRangeOfThisASTNode(bool omitAssertions = false) const override;
+  NullablePtr<const void> addressForPrinting() const override {
+    return differentiableAttr;
+  }
+
+  NullablePtr<AbstractStorageDecl>
+  getEnclosingAbstractStorageDecl() const override;
+
+  NullablePtr<DeclAttribute> getDeclAttributeIfAny() const override {
+    return differentiableAttr;
+  }
+  NullablePtr<const void> getReferrent() const override;
+
+protected:
+  ASTScopeImpl *expandSpecifically(ScopeCreator &) override;
+  bool lookupLocalsOrMembers(ArrayRef<const ASTScopeImpl *>,
+                             DeclConsumer) const override;
+  bool doesContextMatchStartingContext(const DeclContext *) const override;
+};
+// SWIFT_ENABLE_TENSORFLOW END
+
 class SubscriptDeclScope final : public ASTScopeImpl {
 public:
   SubscriptDecl *const decl;
