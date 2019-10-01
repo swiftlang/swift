@@ -1084,22 +1084,28 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeTupleBody() {
       return ty.getStatus();
     }
 
-    if (IsInOutObsoleted) {
-      bool IsTypeAlreadyAttributed = false;
-      if (auto AttributedType = ty.getAs<ParsedAttributedTypeSyntax>()) {
-        IsTypeAlreadyAttributed =
-            AttributedType->getDeferredSpecifier().hasValue();
-        ty = makeParsedResult(std::move(*AttributedType), ty.getStatus());
-      }
-
-      if (IsTypeAlreadyAttributed) {
-        // If the parsed type is already attributed, suggest removing `inout`.
-        diagnose(Tok, diag::parameter_specifier_repeated)
-            .fixItRemove(InOutLoc);
+    if (InOut) {
+      if (IsInOutObsoleted) {
+        bool IsTypeAlreadyAttributed = false;
+        if (auto AttributedType = ty.getAs<ParsedAttributedTypeSyntax>()) {
+          IsTypeAlreadyAttributed =
+              AttributedType->getDeferredSpecifier().hasValue();
+          ty = makeParsedResult(std::move(*AttributedType), ty.getStatus());
+        }
+        if (IsTypeAlreadyAttributed) {
+          // If the parsed type is already attributed, suggest removing `inout`.
+          diagnose(Tok, diag::parameter_specifier_repeated)
+              .fixItRemove(InOutLoc);
+        } else {
+          diagnose(InOutLoc, diag::parameter_specifier_as_attr_disallowed, "inout")
+              .fixItRemove(InOutLoc)
+              .fixItInsert(TypeLoc, "inout ");
+        }
       } else {
-        diagnose(InOutLoc, diag::parameter_specifier_as_attr_disallowed, "inout")
-            .fixItRemove(InOutLoc)
-            .fixItInsert(TypeLoc, "inout ");
+        // Apply 'inout' to the parsed type.
+        ParsedAttributedTypeSyntaxBuilder builder(*SyntaxContext);
+        ty = applyAttributeToTypeSyntax(std::move(ty), std::move(InOut), None);
+        InOut.reset();
       }
     }
 
