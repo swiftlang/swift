@@ -175,22 +175,9 @@ public protocol Differentiable {
       this property
       """)
   var zeroTangentVector: TangentVector { get }
-
-  @available(*, deprecated, message: """
-    'AllDifferentiableVariables' is now equal to 'Self' and will be removed
-    """)
-  typealias AllDifferentiableVariables = Self
 }
 
 public extension Differentiable {
-  @available(*, deprecated, message: """
-    'allDifferentiableVariables' is now equal to 'self' and will be removed
-    """)
-  var allDifferentiableVariables: AllDifferentiableVariables {
-    get { return self }
-    set { self = newValue }
-  }
-
   // This is a temporary solution that allows us to add `zeroTangentVector`
   // without implementing derived conformances. This property is marked
   // unavailable because it will produce incorrect results when tangent vectors
