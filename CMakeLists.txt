@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.4.3)
 
+if(SWIFT_INSTALL_AS_SYMLINKS)
+  cmake_minimum_required(VERSION 3.14.0)
+endif()
+
 # TODO: Fix RPATH usage to be CMP0068 compliant
 # Disable Policy CMP0068 for CMake 3.9
 # rdar://37725888

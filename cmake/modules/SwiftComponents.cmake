@@ -150,9 +150,9 @@ endfunction()
 function(swift_install_in_component)
   cmake_parse_arguments(
       ARG # prefix
-      "" # options
-      "COMPONENT" # single-value args
-      "" # multi-value args
+      "RUNTIME;ARCHIVE;LIBRARY;FRAMEWORK" # options
+      "COMPONENT;DESTINATION;RENAME" # single-value args
+      "TARGETS;FILES;PROGRAMS;DIRECTORY" # multi-value args
       ${ARGN})
 
   precondition(ARG_COMPONENT MESSAGE "Component name is required")
@@ -162,7 +162,27 @@ function(swift_install_in_component)
     return()
   endif()
 
-  install(${ARGN})
+  if((NOT SWIFT_INSTALL_AS_SYMLINKS) OR
+     (NOT ARG_DESTINATION) OR
+     (ARG_RENAME))
+    install(${ARGN})
+    return()
+  endif()
+
+  foreach(target ${ARG_TARGETS})
+    swift_install_symlink_component("${ARG_COMPONENT}"
+      TARGET "$<TARGET_FILE:${target}>"
+      LINK_NAME "$<TARGET_FILE_NAME:${target}>"
+      DESTINATION "${ARG_DESTINATION}")
+  endforeach()
+  foreach(file ${ARG_FILES} ${ARG_PROGRAMS} ${ARG_DIRECTORY})
+    string(REGEX REPLACE "[\\/]$" "" file "${file}") # strip trailing slashes
+    get_filename_component(basename "${file}" NAME)
+    swift_install_symlink_component("${ARG_COMPONENT}"
+      TARGET "${file}"
+      LINK_NAME "${basename}"
+      DESTINATION "${ARG_DESTINATION}")
+  endforeach()
 endfunction()
 
 function(swift_install_symlink_component component)
