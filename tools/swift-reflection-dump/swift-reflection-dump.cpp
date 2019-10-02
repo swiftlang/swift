@@ -81,15 +81,11 @@ template <typename T> static T unwrap(llvm::Expected<T> value) {
   exit(EXIT_FAILURE);
 }
 
-using NativeReflectionContext =
-    swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
-
 using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
 // Since ObjectMemoryReader maintains ownership of the ObjectFiles and their
 // raw data, we can vend ReadBytesResults with no-op destructors.
 static void no_op_destructor(const void*) {}
-
 
 class Image {
 private:
@@ -97,7 +93,7 @@ private:
     uint64_t Addr;
     StringRef Contents;
   };
-  
+  const ObjectFile *O;
   uint64_t HeaderAddress;
   std::vector<Segment> Segments;
   llvm::DenseMap<uint64_t, StringRef> DynamicRelocations;
@@ -148,7 +144,6 @@ private:
         llvm::consumeError(std::move(error));
         break;
       }
-    
       DynamicRelocations.insert({bind.address(), bind.symbolName()});
     }
     if (error) {
@@ -224,7 +219,7 @@ private:
   }
 
 public:
-  explicit Image(const ObjectFile *O) {
+  explicit Image(const ObjectFile *O) : O(O) {
     // Unfortunately llvm doesn't provide a uniform interface for iterating
     // loadable segments or dynamic relocations in executable images yet.
     if (auto macho = dyn_cast<MachOObjectFile>(O)) {
@@ -249,6 +244,10 @@ public:
       }
     }
   }
+  
+  unsigned getBytesInAddress() const {
+    return O->getBytesInAddress();
+  }
     
   uint64_t getStartAddress() const {
     return HeaderAddress;
@@ -263,8 +262,8 @@ public:
         continue;
 
       auto offset = Addr - Segment.Addr;
-          
-      return Segment.Contents.drop_front(offset);
+      auto result = Segment.Contents.drop_front(offset);
+      return result;
     }
     return {};
   }
@@ -272,10 +271,12 @@ public:
   RemoteAbsolutePointer
   resolvePointer(uint64_t Addr, uint64_t pointerValue) const {
     auto found = DynamicRelocations.find(Addr);
+    RemoteAbsolutePointer result;
     if (found == DynamicRelocations.end())
-      return RemoteAbsolutePointer("", pointerValue);
-    
-    return RemoteAbsolutePointer(found->second, pointerValue);
+      result = RemoteAbsolutePointer("", pointerValue);
+    else
+      result = RemoteAbsolutePointer(found->second, pointerValue);
+    return result;
   }
 };
 
@@ -318,28 +319,42 @@ class ObjectMemoryReader : public MemoryReader {
 public:
   explicit ObjectMemoryReader(
       const std::vector<const ObjectFile *> &ObjectFiles) {
-    // We use a 16-bit index for images, so can't take more than 64K at once.
-    if (ObjectFiles.size() >= 0x10000) {
-      fputs("can't dump more than 65,536 images at once", stderr);
+    if (ObjectFiles.empty()) {
+      fputs("no object files provided\n", stderr);
       abort();
     }
-    for (const ObjectFile *O : ObjectFiles)
+    // We use a 16-bit index for images, so can't take more than 64K at once.
+    if (ObjectFiles.size() > 0x10000) {
+      fputs("can't dump more than 65,536 images at once\n", stderr);
+      abort();
+    }
+    unsigned WordSize = 0;
+    for (const ObjectFile *O : ObjectFiles) {
+      // All the object files we look at should share a word size.
+      if (!WordSize) {
+        WordSize = O->getBytesInAddress();
+      } else if (WordSize != O->getBytesInAddress()) {
+        fputs("object files must all be for the same architecture\n", stderr);
+        abort();
+      }
       Images.emplace_back(O);
+    }
   }
 
   ArrayRef<Image> getImages() const { return Images; }
 
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
+    auto wordSize = Images.front().getBytesInAddress();
     switch (type) {
     case DLQ_GetPointerSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
-      *result = sizeof(void *);
+      *result = wordSize;
       return true;
     }
     case DLQ_GetSizeSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
-      *result = sizeof(size_t);
+      *result = wordSize;
       return true;
     }
     }
@@ -409,6 +424,47 @@ public:
   }
 };
 
+using ReflectionContextOwner
+  = std::unique_ptr<void, void (*)(void*)>;
+
+template<typename Runtime>
+static std::pair<ReflectionContextOwner, TypeRefBuilder &>
+makeReflectionContextForMetadataReader(
+                                   std::shared_ptr<ObjectMemoryReader> reader) {
+  using ReflectionContext = ReflectionContext<Runtime>;
+  auto context = new ReflectionContext(reader);
+  auto &builder = context->getBuilder();
+  for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
+    context->addImage(reader->getImageStartAddress(i));
+  }
+  return {ReflectionContextOwner(context,
+                                 [](void *x){ delete (ReflectionContext*)x; }),
+          builder};
+}
+                                          
+
+static std::pair<ReflectionContextOwner, TypeRefBuilder &>
+makeReflectionContextForObjectFiles(
+                          const std::vector<const ObjectFile *> &objectFiles) {
+  auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
+
+  uint8_t pointerSize;
+  Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
+                          nullptr, &pointerSize);
+  
+  switch (pointerSize) {
+  case 4:
+    return makeReflectionContextForMetadataReader<External<RuntimeTarget<4>>>
+                                                            (std::move(Reader));
+  case 8:
+    return makeReflectionContextForMetadataReader<External<RuntimeTarget<8>>>
+                                                            (std::move(Reader));
+  default:
+    fputs("unsupported word size in object file\n", stderr);
+    abort();
+  }
+}
+
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
                                     StringRef Arch, ActionType Action,
                                     std::ostream &OS) {
@@ -437,17 +493,14 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     ObjectOwners.push_back(std::move(ObjectOwner));
     ObjectFiles.push_back(O);
   }
-
-  auto Reader = std::make_shared<ObjectMemoryReader>(ObjectFiles);
-  NativeReflectionContext Context(Reader);
-  for (unsigned i = 0, e = Reader->getImages().size(); i < e; ++i) {
-    Context.addImage(Reader->getImageStartAddress(i));
- }
+  
+  auto context = makeReflectionContextForObjectFiles(ObjectFiles);
+  auto &builder = context.second;
 
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    Context.getBuilder().dumpAllSections(OS);
+    builder.dumpAllSections(OS);
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {
@@ -460,15 +513,14 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       Demangle::Demangler Dem;
       auto Demangled = Dem.demangleType(Line);
       auto *TypeRef =
-          swift::Demangle::decodeMangledType(Context.getBuilder(), Demangled);
+          swift::Demangle::decodeMangledType(builder, Demangled);
       if (TypeRef == nullptr) {
         OS << "Invalid typeref: " << Line << "\n";
         continue;
       }
 
       TypeRef->dump(OS);
-      auto *TypeInfo =
-          Context.getBuilder().getTypeConverter().getTypeInfo(TypeRef);
+      auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef);
       if (TypeInfo == nullptr) {
         OS << "Invalid lowering\n";
         continue;
