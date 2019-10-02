@@ -5601,7 +5601,7 @@ Automatic Differentiation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 differentiable_function
-`````````````````
+```````````````````````
 
 ::
 
@@ -5645,7 +5645,7 @@ In canonical SIL, a ``with`` clause is mandatory.
 
 
 differentiable_function_extract
-`````````````````````````
+```````````````````````````````
 
 ::
 
