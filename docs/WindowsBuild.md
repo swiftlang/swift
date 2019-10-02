@@ -186,13 +186,11 @@ cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 md "S:\b\lldb"
 cd "S:\b\lldb"
 cmake -G Ninja^
+  -DLLVM_DIR="S:/b/llvm/lib/cmake/llvm"^
+  -DClang_DIR="S:/b/llvm/lib/cmake/clang"^
+  -DSwift_DIR="S:/b/swift/lib/cmake/swift"^
   -DCMAKE_BUILD_TYPE=RelWithDebInfo^
   -DLLDB_ALLOW_STATIC_BINDINGS=YES^
-  -DLLDB_PATH_TO_CLANG_SOURCE="S:\clang"^
-  -DLLDB_PATH_TO_SWIFT_SOURCE="S:\swift"^
-  -DLLDB_PATH_TO_CLANG_BUILD="S:\b\llvm"^
-  -DLLDB_PATH_TO_LLVM_BUILD="S:\b\llvm"^
-  -DLLDB_PATH_TO_SWIFT_BUILD="S:\b\swift"^
   -DLLVM_ENABLE_ASSERTIONS=ON^
   -DPYTHON_HOME="%ProgramFiles(x86)%\Microsoft Visual Studio\Shared\Python37_64"^
   S:\lldb
