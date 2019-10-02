@@ -129,23 +129,24 @@ class SomeClass {
       return 0
     }
 
+    // Implicit 'self' should be accepted when 'self' has value semantics.
     struct Outer {
       @discardableResult
       func bar() -> Int {
         bar()
 
         func plain() { bar() }
-        let plain2 = { bar() } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{23-23= [self] in}} expected-note{{reference 'self.' explicitly}} {{24-24=self.}}
+        let plain2 = { bar() }
         _ = plain2
 
         func multi() -> Int { bar(); return 0 }
-        let _: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{29-29= [self] in}} expected-note{{reference 'self.' explicitly}} {{30-30=self.}}
+        let _: () -> Int = { bar(); return 0 }
 
-        doesEscape { bar() } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{21-21= [self] in}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
-        takesNoEscapeClosure { bar() } // okay
+        doesEscape { bar() }
+        takesNoEscapeClosure { bar() }
 
-        doesEscape { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{21-21= [self] in}} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
-        takesNoEscapeClosure { bar(); return 0 } // okay
+        doesEscape { bar(); return 0 }
+        takesNoEscapeClosure { bar(); return 0 }
 
         return 0
       }
@@ -158,17 +159,17 @@ class SomeClass {
           bar() // no-warning
 
           func plain() { bar() }
-          let plain2 = { bar() } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{25-25= [self] in}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}}
+          let plain2 = { bar() }
           _ = plain2
 
           func multi() -> Int { bar(); return 0 }
-          let _: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{31-31= [self] in}} expected-note{{reference 'self.' explicitly}} {{32-32=self.}}
+          let _: () -> Int = { bar(); return 0 }
 
-          doesEscape { bar() } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{23-23= [self] in}} expected-note{{reference 'self.' explicitly}} {{24-24=self.}}
-          takesNoEscapeClosure { bar() } // okay
+          doesEscape { bar() }
+          takesNoEscapeClosure { bar() }
 
-          doesEscape { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{23-23= [self] in}} expected-note{{reference 'self.' explicitly}} {{24-24=self.}}
-          takesNoEscapeClosure { bar(); return 0 } // okay
+          doesEscape { bar(); return 0 }
+          takesNoEscapeClosure { bar(); return 0 }
 
           return 0
         }

@@ -1308,10 +1308,11 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
   const_cast<Expr *>(E)->walk(walker);
 }
 
-/// Look for any property references in closures that lack a "self." qualifier.
-/// Within a closure, we require that the source code contain "self." explicitly
-/// because 'self' is captured, not the property value.  This is a common source
-/// of confusion, so we force an explicit self.
+/// Look for any property references in closures that lack a 'self.' qualifier.
+/// Within a closure, we require that the source code contain 'self.' explicitly
+/// (or that the closure explicitly capture 'self' in the capture list) because
+/// 'self' is captured, not the property value.  This is a common source of
+/// confusion, so we force an explicit self.
 static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
                                              const DeclContext *DC) {
   class DiagnoseWalker : public ASTWalker {
@@ -1324,8 +1325,10 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
             Closures.push_back(ACE);
         }
 
-    /// Return true if this is an implicit reference to self.
-    static bool isImplicitSelfParamUse(Expr *E) {
+    /// Return true if this is an implicit reference to self which is required
+    /// to be explicit in an escaping closure. Metatype references and value
+    /// type references are excluded.
+    static bool isImplicitSelfParamUseLikelyToCauseCycle(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
 
       if (!DRE || !DRE->isImplicit() || !isa<VarDecl>(DRE->getDecl()) ||
@@ -1340,7 +1343,15 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
         return false;
 
       // Metatype self captures don't extend the lifetime of an object.
-      return !ty->is<MetatypeType>();
+      if (ty->is<MetatypeType>())
+        return false;
+
+      // If self does not have reference semantics, it is very unlikely that
+      // capturing it will create a reference cycle.
+      if (!ty->hasReferenceSemantics())
+        return false;
+
+      return true;
     }
 
     /// Return true if this is a closure expression that will require explicit
@@ -1380,7 +1391,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       
       SourceLoc memberLoc = SourceLoc();
       if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (isImplicitSelfParamUse(MRE->getBase())) {
+        if (isImplicitSelfParamUseLikelyToCauseCycle(MRE->getBase())) {
           memberLoc = MRE->getLoc();
           TC.diagnose(MRE->getLoc(),
                       diag::property_use_in_closure_without_explicit_self,
@@ -1389,7 +1400,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 
       // Handle method calls with a specific diagnostic + fixit.
       if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (isImplicitSelfParamUse(DSCE->getBase()) &&
+        if (isImplicitSelfParamUseLikelyToCauseCycle(DSCE->getBase()) &&
             isa<DeclRefExpr>(DSCE->getFn())) {
           auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
           memberLoc = DSCE->getLoc();
@@ -1480,7 +1491,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
       }
       
       // Catch any other implicit uses of self with a generic diagnostic.
-      if (isImplicitSelfParamUse(E))
+      if (isImplicitSelfParamUseLikelyToCauseCycle(E))
         TC.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure);
 
       return { true, E };

@@ -208,6 +208,42 @@ class ExplicitSelfRequiredTest {
   }
 }
 
+// If the implicit self is of value type, no diagnostic should be produced.
+struct ImplicitSelfAllowedInStruct {
+    var x = 42
+    mutating func method() -> Int {
+        doStuff({ x+1 })
+        doVoidStuff({ x += 1 })
+        doStuff({ method() })
+        doVoidStuff({ _ = method() })
+    }
+    
+    func method2() -> Int {
+        doStuff({ x+1 })
+        doVoidStuff({ _ = x+1 })
+        doStuff({ method2() })
+        doVoidStuff({ _ = method2() })
+    }
+}
+
+enum ImplicitSelfAllowedInEnum {
+    case foo
+    var x: Int { 42 }
+    mutating func method() -> Int {
+        doStuff({ x+1 })
+        doVoidStuff({ _ = x+1 })
+        doStuff({ method() })
+        doVoidStuff({ _ = method() })
+    }
+    
+    func method2() -> Int {
+        doStuff({ x+1 })
+        doVoidStuff({ _ = x+1 })
+        doStuff({ method2() })
+        doVoidStuff({ _ = method2() })
+    }
+}
+
 
 class SomeClass {
   var field : SomeClass?
