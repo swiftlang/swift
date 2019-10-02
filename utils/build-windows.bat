@@ -285,7 +285,9 @@ cmake "%source_root%\lldb"^
     -DPYTHON_HOME=%PYTHON_HOME%^
     -DCMAKE_CXX_FLAGS:STRING="/GS- /Oy"^
     -DCMAKE_EXE_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
-    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO %exitOnError%
+    -DCMAKE_SHARED_LINKER_FLAGS:STRING=/INCREMENTAL:NO^
+    -Dclang_DIR=%build_root%\llvm\lib\cmake\clang^
+  %exitOnError%
 
 popd
 
