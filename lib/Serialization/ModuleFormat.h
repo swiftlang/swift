@@ -1734,7 +1734,19 @@ namespace decls_block {
     GenericSignatureIDField // specialized signature
   >;
 
-#define SIMPLE_DECL_ATTR(X, CLASS, ...) \
+  using DifferentiableDeclAttrLayout = BCRecordLayout<
+    Differentiable_DECL_ATTR,
+    BCFixed<1>, // Implicit flag.
+    BCFixed<1>, // Linear flag.
+    IdentifierIDField, // JVP name.
+    DeclIDField, // JVP function declaration.
+    IdentifierIDField, // VJP name.
+    DeclIDField, // VJP function declaration.
+    GenericSignatureIDField, // Derivative generic signature.
+    BCArray<BCFixed<1>> // Differentiation parameter indices' bitvector.
+  >;
+
+#define SIMPLE_DECL_ATTR(X, CLASS, ...)         \
   using CLASS##DeclAttrLayout = BCRecordLayout< \
     CLASS##_DECL_ATTR, \
     BCFixed<1> /* implicit flag */ \
