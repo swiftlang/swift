@@ -254,7 +254,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
   
   @objc(exchangeObjectAtIndex:withObjectAtIndex:)
   dynamic internal func exchange(at index: Int, with index2: Int) {
-    swap(&contents[index], &contents[index2])
+    contents.swapAt(index, index2)
   }
   
   @objc(replaceObjectsInRange:withObjects:count:)
@@ -263,7 +263,13 @@ extension __SwiftNativeNSArrayWithContiguousStorage: _NSArrayCore {
                                count: Int) {
     let range = range.location ..< range.location + range.length
     let buf = UnsafeBufferPointer(start: objects, count: count)
-    contents.replaceSubrange(range, with: buf)
+    if range == contents.startIndex..<contents.endIndex {
+      contents = Array(buf)
+    } else {
+      // We make an Array here to make sure that something is holding onto the
+      // objects in `buf`, since replaceSubrange could release them
+      contents.replaceSubrange(range, with: Array(buf))
+    }
   }
   
   @objc(insertObjects:count:atIndex:)
