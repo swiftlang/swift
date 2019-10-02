@@ -1106,8 +1106,6 @@ makeBitFieldAccessors(ClangImporter::Implementation &Impl,
   auto recordType = Ctx.getRecordType(structDecl);
   auto recordPointerType = Ctx.getPointerType(recordType);
   auto fieldType = fieldDecl->getType();
-  auto fieldNameInfo = clang::DeclarationNameInfo(fieldDecl->getDeclName(),
-                                                  clang::SourceLocation());
 
   auto cGetterName = getAccessorDeclarationName(Ctx, importedStructDecl,
                                                 importedFieldDecl, "getter");
