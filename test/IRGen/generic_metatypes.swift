@@ -77,7 +77,7 @@ func protocolTypeof(_ x: Bas) -> Bas.Type {
 struct Zim : Bas {}
 class Zang : Bas {}
 
-// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA3ZimVmF"()
+// CHECK-LABEL: define hidden swiftcc { %swift.type*, i8** } @"$s17generic_metatypes15metatypeErasureyAA3Bas_pXpAA3ZimVmF"() #0
 func metatypeErasure(_ z: Zim.Type) -> Bas.Type {
   // CHECK: ret { %swift.type*, i8** } {{.*}} @"$s17generic_metatypes3ZimVMf", {{.*}} @"$s17generic_metatypes3ZimVAA3BasAAWP"
   return z
