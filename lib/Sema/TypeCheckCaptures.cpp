@@ -365,6 +365,11 @@ public:
       return false;
     }
 
+    // Don't walk into local types; we'll walk their initializers when we check
+    // the local type itself.
+    if (isa<NominalTypeDecl>(D))
+      return false;
+
     return true;
   }
 
