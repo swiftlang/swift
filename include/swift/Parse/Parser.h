@@ -979,6 +979,20 @@ public:
   ParserResult<ImplementsAttr> parseImplementsAttribute(SourceLoc AtLoc,
                                                         SourceLoc Loc);
 
+  /// Parse the @differentiable attribute.
+  ParserResult<DifferentiableAttr> parseDifferentiableAttribute(SourceLoc AtLoc,
+                                                                SourceLoc Loc);
+
+  /// Parse the arguments inside the @differentiable attribute.
+  bool parseDifferentiableAttributeArguments(
+      bool &linear, SmallVectorImpl<ParsedAutoDiffParameter> &params,
+      Optional<DeclNameWithLoc> &jvpSpec, Optional<DeclNameWithLoc> &vjpSpec,
+      TrailingWhereClause *&whereClause);
+
+  /// Parse a differentiation parameters clause.
+  bool parseDifferentiationParametersClause(
+      SmallVectorImpl<ParsedAutoDiffParameter> &params, StringRef attrName);
+
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc);
 

@@ -111,6 +111,9 @@ public:
   IGNORED_ATTR(DisfavoredOverload)
   IGNORED_ATTR(ProjectedValueProperty)
   IGNORED_ATTR(ReferenceOwnership)
+
+  // TODO: Changes are yet to be upstreamed from apple/tensorflow branch.
+  IGNORED_ATTR(Differentiable)
 #undef IGNORED_ATTR
 
   void visitAlignmentAttr(AlignmentAttr *attr) {

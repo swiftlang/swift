@@ -502,6 +502,12 @@ SIMPLE_DECL_ATTR(_nonEphemeral, NonEphemeral,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   90)
 
+DECL_ATTR(differentiable, Differentiable,
+  OnAccessor | OnConstructor | OnFunc | OnVar | OnSubscript | LongAttribute |
+  AllowMultipleAttributes |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  90)
+
 SIMPLE_DECL_ATTR(IBSegueAction, IBSegueAction,
   OnFunc |
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
