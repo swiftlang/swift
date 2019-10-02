@@ -29,7 +29,7 @@ import resilient_objc_class
 // -- field descriptor
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMF"
 // -- superclass
-// CHECK-SAME: @"symbolic 15resilient_class22ResilientOutsideParentC"
+// CHECK-SAME: @"symbolic{{[^"]*}}15resilient_class22ResilientOutsideParentC"
 // -- metadata bounds
 // CHECK-SAME: @"$s31class_update_callback_with_stub17ResilientSubclassCMo"
 // -- extra class flags -- has Objective-C resilient class stub

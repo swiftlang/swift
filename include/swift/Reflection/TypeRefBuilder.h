@@ -376,11 +376,8 @@ public:
     // Try to resolve to the underlying type, if we can.
     if (opaqueDescriptor->getKind() ==
                             Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
-      if (!OpaqueUnderlyingTypeReader)
-        return nullptr;
-      
       auto underlyingTy = OpaqueUnderlyingTypeReader(
-                           (const void *)opaqueDescriptor->getIndex(), ordinal);
+                                         opaqueDescriptor->getIndex(), ordinal);
       
       if (!underlyingTy)
         return nullptr;
@@ -598,7 +595,7 @@ private:
   unsigned PointerSize;
   std::function<Demangle::Node * (RemoteRef<char>)>
     TypeRefDemangler;
-  std::function<const TypeRef* (const void*, unsigned)>
+  std::function<const TypeRef* (uint64_t, unsigned)>
     OpaqueUnderlyingTypeReader;
   
 public:
@@ -613,9 +610,8 @@ public:
                                Dem, /*useOpaqueTypeSymbolicReferences*/ true);
       }),
       OpaqueUnderlyingTypeReader(
-      [&reader](const void *descriptor, unsigned ordinal) -> const TypeRef* {
-        auto context = (typename Runtime::StoredPointer)descriptor;
-        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(context,
+      [&reader](uint64_t descriptorAddr, unsigned ordinal) -> const TypeRef* {
+        return reader.readUnderlyingTypeForOpaqueTypeDescriptor(descriptorAddr,
                                                                 ordinal);
       })
   {}
