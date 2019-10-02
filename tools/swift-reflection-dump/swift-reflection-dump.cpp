@@ -232,17 +232,6 @@ public:
       fputs("unsupported image format\n", stderr);
       abort();
     }
-    
-    // ObjectMemoryReader uses the most significant 16 bits of the address to
-    // index multiple images, so if an object maps stuff out of that range
-    // we won't be able to read it. 2**48 of virtual address space ought to be
-    // enough for anyone, but warn if we blow that limit.
-    for (auto Segment : Segments) {
-      if (Segment.Addr >= 0xFFFFFFFFFFFFull) {
-        fputs("warning: segment mapped at address above 2**48\n", stderr);
-        continue;
-      }
-    }
   }
   
   unsigned getBytesInAddress() const {
@@ -251,6 +240,14 @@ public:
     
   uint64_t getStartAddress() const {
     return HeaderAddress;
+  }
+  
+  uint64_t getEndAddress() const {
+    uint64_t max = 0;
+    for (auto &Segment : Segments) {
+      max = std::max(max, Segment.Addr + Segment.Contents.size());
+    }
+    return max;
   }
 
   StringRef getContentsAtAddress(uint64_t Addr, uint64_t Size) const {
@@ -288,21 +285,27 @@ public:
 /// and the low 48 bits correspond to the preferred virtual address mapping of
 /// the image.
 class ObjectMemoryReader : public MemoryReader {
-  std::vector<Image> Images;
+  struct ImageEntry {
+    Image TheImage;
+    uint64_t Slide;
+  };
+  std::vector<ImageEntry> Images;
   
   std::pair<const Image *, uint64_t>
   decodeImageIndexAndAddress(uint64_t Addr) const {
-    unsigned index = Addr >> 48;
-    if (index >= Images.size())
-      return {nullptr, 0};
-    
-    return {&Images[index], Addr & ((1ull << 48) - 1)};
+    for (auto &Image : Images) {
+      if (Image.TheImage.getStartAddress() + Image.Slide <= Addr
+          && Addr < Image.TheImage.getEndAddress() + Image.Slide) {
+        return {&Image.TheImage, Addr - Image.Slide};
+      }
+    }
+    return {nullptr, 0};
   }
   
   uint64_t
   encodeImageIndexAndAddress(const Image *image, uint64_t imageAddr) const {
-    unsigned index = image - Images.data();
-    return imageAddr | ((uint64_t)index << 48);
+    auto entry = (const ImageEntry*)image;
+    return imageAddr + entry->Slide;
   }
 
   StringRef getContentsAtAddress(uint64_t Addr, uint64_t Size) {
@@ -323,11 +326,6 @@ public:
       fputs("no object files provided\n", stderr);
       abort();
     }
-    // We use a 16-bit index for images, so can't take more than 64K at once.
-    if (ObjectFiles.size() > 0x10000) {
-      fputs("can't dump more than 65,536 images at once\n", stderr);
-      abort();
-    }
     unsigned WordSize = 0;
     for (const ObjectFile *O : ObjectFiles) {
       // All the object files we look at should share a word size.
@@ -337,15 +335,32 @@ public:
         fputs("object files must all be for the same architecture\n", stderr);
         abort();
       }
-      Images.emplace_back(O);
+      Images.push_back({Image(O), 0});
+    }
+    
+    // If there is more than one image loaded, try to fit them into one address
+    // space.
+    if (Images.size() > 1) {
+      uint64_t NextAddrSpace = 0;
+      for (auto &Image : Images) {
+        Image.Slide = NextAddrSpace - Image.TheImage.getStartAddress();
+        NextAddrSpace +=
+          Image.TheImage.getEndAddress() - Image.TheImage.getStartAddress();
+        NextAddrSpace = (NextAddrSpace + 16383) & ~16383;
+      }
+      
+      if (WordSize < 8 && NextAddrSpace > 0xFFFFFFFFu) {
+        fputs("object files did not fit in address space", stderr);
+        abort();
+      }
     }
   }
 
-  ArrayRef<Image> getImages() const { return Images; }
+  ArrayRef<ImageEntry> getImages() const { return Images; }
 
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
-    auto wordSize = Images.front().getBytesInAddress();
+    auto wordSize = Images.front().TheImage.getBytesInAddress();
     switch (type) {
     case DLQ_GetPointerSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
@@ -366,7 +381,8 @@ public:
     assert(i < Images.size());
     
     return RemoteAddress(
-           encodeImageIndexAndAddress(&Images[i], Images[i].getStartAddress()));
+           encodeImageIndexAndAddress(&Images[i].TheImage,
+                                      Images[i].TheImage.getStartAddress()));
   }
 
   // TODO: We could consult the dynamic symbol tables of the images to
