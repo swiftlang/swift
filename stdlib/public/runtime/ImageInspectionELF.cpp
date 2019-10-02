@@ -27,107 +27,102 @@
 using namespace swift;
 
 namespace {
-static const swift::MetadataSections *registered = nullptr;
+static swift::MetadataSectionsList *registered = nullptr;
 
-void record(const swift::MetadataSections *sections) {
+void record(swift::MetadataSectionsList *section_list) {
   if (registered == nullptr) {
-    registered = sections;
-    sections->next = sections->prev = sections;
+    registered = section_list;
+    section_list->next = section_list->prev = section_list;
   } else {
-    registered->prev->next = sections;
-    sections->next = registered;
-    sections->prev = registered->prev;
-    registered->prev = sections;
+    registered->prev->next = section_list;
+    section_list->next = registered;
+    section_list->prev = registered->prev;
+    registered->prev = section_list;
   }
 }
 }
 
 void swift::initializeProtocolLookup() {
-  const swift::MetadataSections *sections = registered;
+  const swift::MetadataSectionsList *sections_list = registered;
   while (true) {
     const swift::MetadataSections::Range &protocols =
-        sections->swift5_protocols;
-    if (protocols.length)
+        sections_list->sections->swift5_protocols;
+    if (protocols.length())
       addImageProtocolsBlockCallbackUnsafe(
-          reinterpret_cast<void *>(protocols.start), protocols.length);
+          protocols.start.get(), protocols.length());
 
-    if (sections->next == registered)
+    if (sections_list->next == registered)
       break;
-    sections = sections->next;
+    sections_list = sections_list->next;
   }
 }
 void swift::initializeProtocolConformanceLookup() {
-  const swift::MetadataSections *sections = registered;
+  const swift::MetadataSectionsList *sections_list = registered;
   while (true) {
     const swift::MetadataSections::Range &conformances =
-        sections->swift5_protocol_conformances;
-    if (conformances.length)
+        sections_list->sections->swift5_protocol_conformances;
+    if (conformances.length())
       addImageProtocolConformanceBlockCallbackUnsafe(
-          reinterpret_cast<void *>(conformances.start), conformances.length);
+          conformances.start.get(), conformances.length());
 
-    if (sections->next == registered)
+    if (sections_list->next == registered)
       break;
-    sections = sections->next;
+    sections_list = sections_list->next;
   }
 }
 
 void swift::initializeTypeMetadataRecordLookup() {
-  const swift::MetadataSections *sections = registered;
+  const swift::MetadataSectionsList *sections_list = registered;
   while (true) {
     const swift::MetadataSections::Range &type_metadata =
-        sections->swift5_type_metadata;
-    if (type_metadata.length)
+        sections_list->sections->swift5_type_metadata;
+    if (type_metadata.length())
       addImageTypeMetadataRecordBlockCallbackUnsafe(
-          reinterpret_cast<void *>(type_metadata.start), type_metadata.length);
+          type_metadata.start.get(), type_metadata.length());
 
-    if (sections->next == registered)
+    if (sections_list->next == registered)
       break;
-    sections = sections->next;
+    sections_list = sections_list->next;
   }
 }
 
 void swift::initializeDynamicReplacementLookup() {
 }
 
-// As ELF images are loaded, ImageInspectionInit:sectionDataInit() will call
-// addNewDSOImage() with an address in the image that can later be used via
-// dladdr() to dlopen() the image after the appropriate initialize*Lookup()
-// function has been called.
+// As ELF images are loaded, a global constructor will call
+// addNewImage() with an address in the image that can be used to build
+// a linked list of section directories for all of the currently loaded
+// Swift images in the process.
 SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(const void *addr) {
-  const swift::MetadataSections *sections =
-      static_cast<const swift::MetadataSections *>(addr);
+void swift::swift_addNewImage(MetadataSectionsList *node) {
+  record(node);
 
-  record(sections);
+  auto sections = node->sections;
 
   const auto &protocols_section = sections->swift5_protocols;
-  const void *protocols =
-      reinterpret_cast<void *>(protocols_section.start);
-  if (protocols_section.length)
-    addImageProtocolsBlockCallback(protocols, protocols_section.length);
+  const void *protocols = protocols_section.start.get();
+  if (protocols_section.length())
+    addImageProtocolsBlockCallback(protocols, protocols_section.length());
 
   const auto &protocol_conformances = sections->swift5_protocol_conformances;
-  const void *conformances =
-      reinterpret_cast<void *>(protocol_conformances.start);
-  if (protocol_conformances.length)
+  const void *conformances = protocol_conformances.start.get();
+  if (protocol_conformances.length())
     addImageProtocolConformanceBlockCallback(conformances,
-                                             protocol_conformances.length);
+                                             protocol_conformances.length());
 
   const auto &type_metadata = sections->swift5_type_metadata;
-  const void *metadata = reinterpret_cast<void *>(type_metadata.start);
-  if (type_metadata.length)
-    addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length);
+  const void *metadata = type_metadata.start.get();
+  if (type_metadata.length())
+    addImageTypeMetadataRecordBlockCallback(metadata, type_metadata.length());
 
   const auto &dynamic_replacements = sections->swift5_replace;
-  const auto *replacements =
-      reinterpret_cast<void *>(dynamic_replacements.start);
-  if (dynamic_replacements.length) {
+  const auto *replacements = dynamic_replacements.start.get();
+  if (dynamic_replacements.length()) {
     const auto &dynamic_replacements_some = sections->swift5_replac2;
-    const auto *replacements_some =
-      reinterpret_cast<void *>(dynamic_replacements_some.start);
+    const auto *replacements_some = dynamic_replacements_some.start.get();
     addImageDynamicReplacementBlockCallback(
-        replacements, dynamic_replacements.length, replacements_some,
-        dynamic_replacements_some.length);
+        replacements, dynamic_replacements.length(), replacements_some,
+        dynamic_replacements_some.length());
   }
 }
 

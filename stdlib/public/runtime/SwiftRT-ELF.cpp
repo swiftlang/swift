@@ -14,66 +14,62 @@
 
 #include <cstddef>
 
+#define FOR_EACH_SWIFT_SECTION(do) \
+  do(swift5_protocols) \
+  do(swift5_protocol_conformances) \
+  do(swift5_type_metadata) \
+  do(swift5_typeref) \
+  do(swift5_reflstr) \
+  do(swift5_fieldmd) \
+  do(swift5_assocty) \
+  do(swift5_replace) \
+  do(swift5_replac2) \
+  do(swift5_builtin) \
+  do(swift5_capture)
+
 // Create empty sections to ensure that the start/stop symbols are synthesized
 // by the linker.  Otherwise, we may end up with undefined symbol references as
 // the linker table section was never constructed.
 
-#define DECLARE_SWIFT_SECTION(name)                                                          \
-  __asm__("\t.section " #name ",\"a\"\n");                                                   \
-  __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __start_##name; \
-  __attribute__((__visibility__("hidden"),__aligned__(1))) extern const char __stop_##name;
+struct Section;
+
+#define DECLARE_SWIFT_SECTION(name) \
+  __asm__("\t.section " #name ",\"a\"\n");
 
 extern "C" {
-DECLARE_SWIFT_SECTION(swift5_protocols)
-DECLARE_SWIFT_SECTION(swift5_protocol_conformances)
-DECLARE_SWIFT_SECTION(swift5_type_metadata)
-
-DECLARE_SWIFT_SECTION(swift5_typeref)
-DECLARE_SWIFT_SECTION(swift5_reflstr)
-DECLARE_SWIFT_SECTION(swift5_fieldmd)
-DECLARE_SWIFT_SECTION(swift5_assocty)
-DECLARE_SWIFT_SECTION(swift5_replace)
-DECLARE_SWIFT_SECTION(swift5_replac2)
-DECLARE_SWIFT_SECTION(swift5_builtin)
-DECLARE_SWIFT_SECTION(swift5_capture)
+  FOR_EACH_SWIFT_SECTION(DECLARE_SWIFT_SECTION)
 }
 
 #undef DECLARE_SWIFT_SECTION
 
-namespace {
-static swift::MetadataSections sections{};
-}
+__attribute__((visibility("hidden")))
+extern "C" swift::MetadataSections __swift_metadataSections;
+
+#define PREFIX 
+
+// Define `__swift_metadataSections using assembly language, because C++
+// constant expressions won't let us subtract global pointers.
+__asm__(
+"\t.text\n"
+"\t.p2align 4\n"
+PREFIX "__swift_metadataSections:\n"
+"\t.long 0\n"
+#define DEFINE_METADATA_SECTION_BOUNDS(section) \
+  "\t.long " PREFIX "__start_" #section " - .\n" \
+  "\t.long " PREFIX "__stop_" #section " - .\n" \
+
+FOR_EACH_SWIFT_SECTION(DEFINE_METADATA_SECTION_BOUNDS)
+#undef DEFINE_METADATA_SECTION_BOUNDS
+);
+
+static swift::MetadataSectionsList metadataSectionList = {
+  nullptr, nullptr,
+  &__swift_metadataSections,
+};
 
 __attribute__((__constructor__))
 static void swift_image_constructor() {
-#define SWIFT_SECTION_RANGE(name)                                              \
-  { reinterpret_cast<uintptr_t>(&__start_##name),                              \
-    static_cast<uintptr_t>(&__stop_##name - &__start_##name) }
-
-  sections = {
-      swift::CurrentSectionMetadataVersion,
-      0,
-
-      nullptr,
-      nullptr,
-
-      SWIFT_SECTION_RANGE(swift5_protocols),
-      SWIFT_SECTION_RANGE(swift5_protocol_conformances),
-      SWIFT_SECTION_RANGE(swift5_type_metadata),
-
-      SWIFT_SECTION_RANGE(swift5_typeref),
-      SWIFT_SECTION_RANGE(swift5_reflstr),
-      SWIFT_SECTION_RANGE(swift5_fieldmd),
-      SWIFT_SECTION_RANGE(swift5_assocty),
-      SWIFT_SECTION_RANGE(swift5_replace),
-      SWIFT_SECTION_RANGE(swift5_replac2),
-      SWIFT_SECTION_RANGE(swift5_builtin),
-      SWIFT_SECTION_RANGE(swift5_capture),
-  };
-
-#undef SWIFT_SECTION_RANGE
-
-  swift_addNewDSOImage(&sections);
+  swift_addNewImage(&metadataSectionList);
 }
 
 __asm__(".section \".note.swift_reflection_metadata\", \"aw\"");
@@ -85,4 +81,4 @@ struct {
   const char MagicString[sizeof(SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING)];
   const swift::MetadataSections *Sections;
 } __attribute__((__packed__))
-Note = {SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING, &sections};
+Note = {SWIFT_REFLECTION_METADATA_ELF_NOTE_MAGIC_STRING, &__swift_metadataSections};

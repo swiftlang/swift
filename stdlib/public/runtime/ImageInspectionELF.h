@@ -24,6 +24,7 @@
 #if defined(__ELF__)
 
 #include "../SwiftShims/Visibility.h"
+#include "swift/Basic/RelativePointer.h"
 #include <cstdint>
 #include <cstddef>
 
@@ -33,37 +34,44 @@ struct SectionInfo {
   const char *data;
 };
 
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 1;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 0;
 
 struct MetadataSections {
-  uintptr_t version;
-  uintptr_t reserved;
-
-  mutable const MetadataSections *next;
-  mutable const MetadataSections *prev;
+  const uint32_t version;
 
   struct Range {
-    uintptr_t start;
-    size_t length;
+    const RelativeDirectPointer<void> start;
+    const RelativeDirectPointer<void> end;
+
+    uintptr_t length() const {
+      return (uintptr_t)end.get() - (uintptr_t)start.get();
+    }
   };
 
-  Range swift5_protocols;
-  Range swift5_protocol_conformances;
-  Range swift5_type_metadata;
-  Range swift5_typeref;
-  Range swift5_reflstr;
-  Range swift5_fieldmd;
-  Range swift5_assocty;
-  Range swift5_replace;
-  Range swift5_replac2;
-  Range swift5_builtin;
-  Range swift5_capture;
+  const Range swift5_protocols;
+  const Range swift5_protocol_conformances;
+  const Range swift5_type_metadata;
+  const Range swift5_typeref;
+  const Range swift5_reflstr;
+  const Range swift5_fieldmd;
+  const Range swift5_assocty;
+  const Range swift5_replace;
+  const Range swift5_replac2;
+  const Range swift5_builtin;
+  const Range swift5_capture;
 };
+
+struct MetadataSectionsList {
+  MetadataSectionsList *prev, *next;
+  const MetadataSections *const sections;
+};
+
+// Called by injected constructors when an image is loaded.
+SWIFT_RUNTIME_EXPORT
+void swift_addNewImage(MetadataSectionsList *addr);
+
 } // namespace swift
 
-// Called by injected constructors when a dynamic library is loaded.
-SWIFT_RUNTIME_EXPORT
-void swift_addNewDSOImage(const void *addr);
 
 #endif // defined(__ELF__)
 
