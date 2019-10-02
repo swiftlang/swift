@@ -2721,6 +2721,7 @@ static void printSILDifferentiabilityWitnesses(
   std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
     [] (const SILDifferentiabilityWitness *w1,
         const SILDifferentiabilityWitness *w2) -> bool {
+      // TODO: Sort based on more criteria.
       return w1->getOriginalFunction()->getName()
           .compare(w2->getOriginalFunction()->getName());
     }
@@ -3074,19 +3075,20 @@ void SILDifferentiabilityWitness::print(
   // sil_differentiability_witness @original-function-name
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_differentiability_witness @" << originalFunction->getName();
-  // wrt 0, 1, ...
-  OS << " wrt ";
+  // parameters (0, 1, ...)
+  OS << " parameters (";
   interleave(parameterIndices->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
-  // sources 0, 1, ...
-  OS << " sources ";
+  // results (0, 1, ...)
+  OS << ") results (";
   interleave(resultIndices->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << ", "; });
+  OS << ')';
   // wrt 0, 1, ...
   if (derivativeGenericSignature) {
-    OS << " derivative_generic_signature ";
+    OS << " where ";
     // NOTE: This needs to be changed if there is no utility for parsing
     // generic signatures. Idea: we could instead print the type of the original
     // function substituted into this generic signature.
