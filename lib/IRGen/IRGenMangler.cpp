@@ -93,26 +93,43 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
   AllowSymbolicReferences = true;
   CanSymbolicReference = [&IGM](SymbolicReferent s) -> bool {
     if (auto type = s.dyn_cast<const NominalTypeDecl *>()) {
-      // FIXME: Sometimes we fail to emit metadata for Clang imported types
-      // even after noting use of their type descriptor or metadata. Work
-      // around by not symbolic-referencing imported types for now.
-      if (type->hasClangNode())
+      // The short-substitution types in the standard library have compact
+      // manglings already, and the runtime ought to have a lookup table for
+      // them. Symbolic referencing would be wasteful.
+      if (type->getModuleContext()->isStdlibModule()
+          && Mangle::getStandardTypeSubst(type->getName().str())) {
         return false;
+      }
       
-      // TODO: We ought to be able to use indirect symbolic references even
-      // when the referent may be in another file, once the on-disk
-      // ObjectMemoryReader can handle them.
-      // Private entities are known to be accessible.
-      auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
-      if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
-          (!IGM.CurSourceFile ||
-           IGM.CurSourceFile != type->getParentSourceFile()))
-        return false;
-      
-      // @objc protocols don't have descriptors.
-      if (auto proto = dyn_cast<ProtocolDecl>(type))
-        if (proto->isObjC())
+      // TODO: We could assign a symbolic reference discriminator to refer
+      // to objc protocol refs.
+      if (auto proto = dyn_cast<ProtocolDecl>(type)) {
+        if (proto->isObjC()) {
           return false;
+        }
+      }
+
+      // Classes defined in Objective-C don't have descriptors.
+      // TODO: We could assign a symbolic reference discriminator to refer
+      // to objc class refs.
+      if (auto clas = dyn_cast<ClassDecl>(type)) {
+        if (clas->hasClangNode()
+            && clas->getForeignClassKind() != ClassDecl::ForeignKind::CFType) {
+          return false;
+        }
+      }
+
+      // TODO: ObjectMemoryReader for ELF and PE platforms still does not
+      // implement symbol relocations. For now, on non-Mach-O platforms,
+      // only symbolic reference things in the same module.
+      if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::MachO) {
+        auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
+        if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
+            (!IGM.CurSourceFile ||
+             IGM.CurSourceFile != type->getParentSourceFile())) {
+          return false;
+        }
+      }
       
       return true;
     } else if (auto opaque = s.dyn_cast<const OpaqueTypeDecl *>()) {
