@@ -967,32 +967,31 @@ SILCloner<ImplClass>::visitEndApplyInst(EndApplyInst *Inst) {
 
 // SWIFT_ENABLE_TENSORFLOW
 template<typename ImplClass>
-void
-SILCloner<ImplClass>::visitAutoDiffFunctionInst(AutoDiffFunctionInst *Inst) {
+void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
+    DifferentiableFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   SmallVector<SILValue, 16> mappedAssocFns;
   mappedAssocFns.reserve(Inst->getNumAssociatedFunctions());
   for (auto &fn : Inst->getAssociatedFunctions())
     mappedAssocFns.push_back(getOpValue(fn.get()));
-  recordClonedInstruction(Inst,
-    getBuilder().createAutoDiffFunction(getOpLocation(Inst->getLoc()),
-                                        Inst->getParameterIndices(),
-                                        Inst->getDifferentiationOrder(),
-                                        getOpValue(Inst->getOriginalFunction()),
-                                        mappedAssocFns));
+  recordClonedInstruction(
+      Inst, getBuilder().createDifferentiableFunction(
+                getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
+                Inst->getDifferentiationOrder(),
+                getOpValue(Inst->getOriginalFunction()), mappedAssocFns));
 }
 
 template<typename ImplClass>
 void SILCloner<ImplClass>::
-visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *Inst) {
+visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst,
-      getBuilder().createAutoDiffFunctionExtract(
-          getOpLocation(Inst->getLoc()),
-          Inst->getExtractee(),
-          Inst->getDifferentiationOrder(),
-          getOpValue(Inst->getFunctionOperand())));
+  recordClonedInstruction(
+      Inst, getBuilder().createDifferentiableFunctionExtract(
+                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
+                Inst->getDifferentiationOrder(),
+                getOpValue(Inst->getFunctionOperand())));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 template<typename ImplClass>
 void

@@ -11,7 +11,7 @@ func diffableClosureInStruct(s: Foo) {
 // CHECK-LABEL: @{{.*}}diffableClosureInStruct{{.*}} : $@convention(thin) (@guaranteed Foo) -> () {
 // CHECK:   [[CLOSURE:%.*]] = struct_extract {{%.*}} : $Foo, #Foo.f
 // CHECK:   retain_value [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK:   autodiff_function_extract [original] [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK:   differentiable_function_extract [original] [[CLOSURE]] : $@differentiable @callee_guaranteed (Float) -> Float
 
 struct InoutAliasableCapture {
   var x: Float = .zero

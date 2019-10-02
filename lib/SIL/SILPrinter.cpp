@@ -1162,44 +1162,45 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    if (!adfi->getParameterIndices()->isEmpty()) {
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    if (!dfi->getParameterIndices()->isEmpty()) {
       *this << "[wrt";
-      for (auto i : adfi->getParameterIndices()->getIndices())
+      for (auto i : dfi->getParameterIndices()->getIndices())
         *this << ' ' << i;
       *this << "] ";
     }
-    *this << "[order " << adfi->getDifferentiationOrder() << "] ";
-    *this << getIDAndType(adfi->getOriginalFunction());
-    if (!adfi->getAssociatedFunctions().empty()) {
+    *this << "[order " << dfi->getDifferentiationOrder() << "] ";
+    *this << getIDAndType(dfi->getOriginalFunction());
+    if (!dfi->getAssociatedFunctions().empty()) {
       *this << " with ";
-      interleave(range(1, adfi->getDifferentiationOrder() + 1),
+      interleave(range(1, dfi->getDifferentiationOrder() + 1),
                  [&](unsigned order) {
-                   auto pair = adfi->getAssociatedFunctionPair(order);
+                   auto pair = dfi->getAssociatedFunctionPair(order);
                    *this << '{' << getIDAndType(pair.first) << ", "
                          << getIDAndType(pair.second) << '}';
                  }, [this] { *this << ", "; });
     }
   }
 
-  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
     *this << '[';
-    switch (adfei->getExtractee()) {
-    case AutoDiffFunctionExtractee::Original:
+    switch (dfei->getExtractee()) {
+    case DifferentiableFunctionExtractee::Original:
       *this << "original";
       break;
-    case AutoDiffFunctionExtractee::JVP:
+    case DifferentiableFunctionExtractee::JVP:
       *this << "jvp";
       break;
-    case AutoDiffFunctionExtractee::VJP:
+    case DifferentiableFunctionExtractee::VJP:
       *this << "vjp";
       break;
     }
     *this << "] ";
-    auto order = adfei->getDifferentiationOrder();
+    auto order = dfei->getDifferentiationOrder();
     if (order > 0)
       *this << "[order " << order << "] ";
-    *this << getIDAndType(adfei->getFunctionOperand());
+    *this << getIDAndType(dfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {

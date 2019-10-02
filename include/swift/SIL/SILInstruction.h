@@ -7845,13 +7845,13 @@ class TryApplyInst final
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-/// `autodiff_function` - given a function and differentiation indices and its
-/// associated differentiation functions, create an `@differentiable` function that
-/// represents a bundle of these functions and configurations.
-class AutoDiffFunctionInst final :
+/// `differentiable_function` - given a function and differentiation indices and
+/// its associated differentiation functions, create an `@differentiable`
+/// function that represents a bundle of these functions and configurations.
+class DifferentiableFunctionInst final :
     public InstructionBaseWithTrailingOperands<
-               SILInstructionKind::AutoDiffFunctionInst,
-               AutoDiffFunctionInst, OwnershipForwardingSingleValueInst> {
+               SILInstructionKind::DifferentiableFunctionInst,
+               DifferentiableFunctionInst, OwnershipForwardingSingleValueInst> {
 private:
   friend SILBuilder;
   /// Differentiation parameter indices.
@@ -7863,19 +7863,17 @@ private:
   /// this is the new AD model or the legacy reverse-mode AD model.
   unsigned numOperands;
 
-  AutoDiffFunctionInst(SILModule &module, SILDebugLocation debugLoc,
-                       AutoDiffIndexSubset *parameterIndices,
-                       unsigned differentiationOrder,
-                       SILValue originalFunction,
-                       ArrayRef<SILValue> associatedFunctions);
+  DifferentiableFunctionInst(SILModule &module, SILDebugLocation debugLoc,
+                             AutoDiffIndexSubset *parameterIndices,
+                             unsigned differentiationOrder,
+                             SILValue originalFunction,
+                             ArrayRef<SILValue> associatedFunctions);
 
 public:
-  static AutoDiffFunctionInst *create(SILModule &module,
-                                      SILDebugLocation debugLoc,
-                                      AutoDiffIndexSubset *parameterIndices,
-                                      unsigned differentiationOrder,
-                                      SILValue originalFunction,
-                                      ArrayRef<SILValue> associatedFunctions);
+  static DifferentiableFunctionInst *create(
+      SILModule &module, SILDebugLocation debugLoc,
+      AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
+      SILValue originalFunction, ArrayRef<SILValue> associatedFunctions);
 
   static SILType getAutoDiffType(SILValue original,
                                  unsigned differentiationOrder,
@@ -7913,12 +7911,13 @@ public:
                                  AutoDiffAssociatedFunctionKind kind) const;
 };
 
-/// `autodiff_function_extract` - given an `@differentiable` function representing a
-/// bundle of the original function and associated functions, extract the
-/// specified function.
-class AutoDiffFunctionExtractInst
-    : public InstructionBase<SILInstructionKind::AutoDiffFunctionExtractInst,
-                             OwnershipForwardingSingleValueInst> {
+/// `differentiable_function_extract` - given an `@differentiable` function
+/// representing a bundle of the original function and associated functions,
+/// extract the specified function.
+class DifferentiableFunctionExtractInst
+    : public InstructionBase<
+          SILInstructionKind::DifferentiableFunctionExtractInst,
+          OwnershipForwardingSingleValueInst> {
 public:
   struct Extractee {
     enum innerty : unsigned {
@@ -7951,7 +7950,7 @@ private:
                    unsigned differentiationOrder, SILModule &module);
 
 public:
-  explicit AutoDiffFunctionExtractInst(
+  explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
       unsigned differentiationOrder, SILValue theFunction);
 
@@ -7982,7 +7981,9 @@ public:
   }
 };
 
-typedef AutoDiffFunctionExtractInst::Extractee AutoDiffFunctionExtractee;
+typedef DifferentiableFunctionExtractInst::Extractee
+    DifferentiableFunctionExtractee;
+// SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on
 // PartialApplyInst being defined, but PartialApplyInst is a subclass of

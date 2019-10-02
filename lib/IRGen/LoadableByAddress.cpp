@@ -2734,24 +2734,25 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffFunctionInst: {
-    auto instr = cast<AutoDiffFunctionInst>(convInstr);
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    auto instr = cast<DifferentiableFunctionInst>(convInstr);
     SmallVector<SILValue, 2> associatedFunctions;
     for (auto &assocFn : instr->getAssociatedFunctions())
       associatedFunctions.push_back(assocFn.get());
-    newInstr = convBuilder.createAutoDiffFunction(
+    newInstr = convBuilder.createDifferentiableFunction(
         instr->getLoc(), instr->getParameterIndices(),
         instr->getDifferentiationOrder(), instr->getOriginalFunction(),
         associatedFunctions);
     break;
   }
-  case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    auto instr = cast<AutoDiffFunctionExtractInst>(convInstr);
-    newInstr = convBuilder.createAutoDiffFunctionExtract(
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    auto instr = cast<DifferentiableFunctionExtractInst>(convInstr);
+    newInstr = convBuilder.createDifferentiableFunctionExtract(
         instr->getLoc(), instr->getExtractee(),
         instr->getDifferentiationOrder(), instr->getFunctionOperand());
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW END
   default:
     llvm_unreachable("Unexpected conversion instruction");
   }
@@ -2840,10 +2841,11 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ConvertEscapeToNoEscapeInst:
               case SILInstructionKind::MarkDependenceInst:
               case SILInstructionKind::ThinFunctionToPointerInst:
-              // SWIFT_ENABLE_TENSORFLOW
               case SILInstructionKind::ThinToThickFunctionInst:
-              case SILInstructionKind::AutoDiffFunctionInst:
-              case SILInstructionKind::AutoDiffFunctionExtractInst: {
+              // SWIFT_ENABLE_TENSORFLOW
+              case SILInstructionKind::DifferentiableFunctionInst:
+              case SILInstructionKind::DifferentiableFunctionExtractInst: {
+              // SWIFT_ENABLE_TENSORFLOW END
                 conversionInstrs.insert(
                               cast<SingleValueInstruction>(currInstr));
                 break;
@@ -2910,10 +2912,11 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
-        } else if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(&I)) {
-          conversionInstrs.insert(ADFI);
-        } else if (auto *ADFEI = dyn_cast<AutoDiffFunctionExtractInst>(&I)) {
-          conversionInstrs.insert(ADFEI);
+        } else if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(&I)) {
+          conversionInstrs.insert(DFI);
+        } else if (auto *DFEI =
+                       dyn_cast<DifferentiableFunctionExtractInst>(&I)) {
+          conversionInstrs.insert(DFEI);
         }
       }
     }

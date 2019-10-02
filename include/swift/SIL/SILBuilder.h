@@ -510,31 +510,29 @@ public:
   }
 
   /// SWIFT_ENABLE_TENSORFLOW
-  AutoDiffFunctionInst *createAutoDiffFunction(
+  DifferentiableFunctionInst *createDifferentiableFunction(
       SILLocation loc, AutoDiffIndexSubset *parameterIndices,
       unsigned differentiationOrder, SILValue original,
       ArrayRef<SILValue> associatedFunctions = {}) {
-    return insert(AutoDiffFunctionInst::create(getModule(),
-                                               getSILDebugLocation(loc),
-                                               parameterIndices,
-                                               differentiationOrder,
-                                               original,
-                                               associatedFunctions));
+    return insert(DifferentiableFunctionInst::create(
+        getModule(), getSILDebugLocation(loc), parameterIndices,
+        differentiationOrder, original, associatedFunctions));
   }
   
-  AutoDiffFunctionExtractInst *createAutoDiffFunctionExtract(
-      SILLocation loc, AutoDiffFunctionExtractInst::Extractee extractee,
+  DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
+      SILLocation loc, DifferentiableFunctionExtractee extractee,
       unsigned differentiationOrder, SILValue theFunction) {
-    return insert(new (getModule()) AutoDiffFunctionExtractInst(
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(loc), extractee, differentiationOrder,
         theFunction));
   }
 
-  AutoDiffFunctionExtractInst *createAutoDiffFunctionExtractOriginal(
-      SILLocation loc, SILValue theFunction) {
-    return insert(new (getModule()) AutoDiffFunctionExtractInst(
+  DifferentiableFunctionExtractInst *
+  createDifferentiableFunctionExtractOriginal(SILLocation loc,
+                                              SILValue theFunction) {
+    return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(loc),
-        AutoDiffFunctionExtractee::Original, 0, theFunction));
+        DifferentiableFunctionExtractee::Original, 0, theFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

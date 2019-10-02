@@ -489,8 +489,8 @@ void swift::findClosuresForFunctionValue(
         continue;
       }
       // SWIFT_ENABLE_TENSORFLOW
-      if (auto *ADFI = dyn_cast<AutoDiffFunctionInst>(I)) {
-        worklistInsert(ADFI->getOperand(0));
+      if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(I)) {
+        worklistInsert(DFI->getOperand(0));
         continue;
       }
     }

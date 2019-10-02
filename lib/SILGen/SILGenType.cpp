@@ -91,7 +91,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // SWIFT_ENABLE_TENSORFLOW
   } else if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
-    // `autodiff_function` instruction, which is later filled during the
+    // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
     implFn = getOrCreateAutoDiffClassMethodThunk(
         derived, Types.getConstantInfo(derived).SILFnType);

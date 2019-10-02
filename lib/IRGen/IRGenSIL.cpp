@@ -920,8 +920,10 @@ public:
   void visitBuiltinInst(BuiltinInst *i);
 
   // SWIFT_ENABLE_TENSORFLOW
-  void visitAutoDiffFunctionInst(AutoDiffFunctionInst *i);
-  void visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i);
+  void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *i);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
   void visitFunctionRefInst(FunctionRefInst *i);
@@ -1868,7 +1870,8 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
+void IRGenSILFunction::
+visitDifferentiableFunctionInst(DifferentiableFunctionInst *i) {
   // The original function and associated functions can be thin or thick.
   auto origExp = getLoweredExplosion(i->getOriginalFunction());
   Explosion e;
@@ -1879,9 +1882,9 @@ void IRGenSILFunction::visitAutoDiffFunctionInst(AutoDiffFunctionInst *i) {
 }
 
 void IRGenSILFunction::
-visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
+visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i) {
   unsigned structFieldOffset = 0;
-  if (i->getExtractee() != AutoDiffFunctionExtractee::Original)
+  if (i->getExtractee() != DifferentiableFunctionExtractee::Original)
     structFieldOffset = 1 + autodiff::getOffsetForAutoDiffAssociatedFunction(
       i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
   unsigned fieldSize = 1;
@@ -1890,10 +1893,10 @@ visitAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *i) {
     structFieldOffset *= 2;
     fieldSize = 2;
   }
-  auto adFnExp = getLoweredExplosion(i->getFunctionOperand());
+  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
   Explosion e;
-  e.add(adFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
-  (void)adFnExp.claimAll();
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
   setLoweredExplosion(i, e);
 }
 

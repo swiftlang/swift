@@ -33,8 +33,7 @@ using namespace swift;
 using namespace irgen;
 
 /// A pair of `@differentiable` function extractee and differentiation order.
-using DiffFuncIndex =
-    std::pair<AutoDiffFunctionExtractInst::Extractee, unsigned>;
+using DiffFuncIndex = std::pair<DifferentiableFunctionExtractee, unsigned>;
 
 namespace {
 class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
@@ -53,11 +52,11 @@ public:
     auto extractee = std::get<0>(Index);
     auto differentiationOrder = std::get<1>(Index);
     switch (extractee) {
-    case AutoDiffFunctionExtractInst::Extractee::Original:
+    case DifferentiableFunctionExtractee::Original:
       return "original";
-    case AutoDiffFunctionExtractInst::Extractee::JVP:
+    case DifferentiableFunctionExtractee::JVP:
       return "jvp_" + llvm::itostr(differentiationOrder);
-    case AutoDiffFunctionExtractInst::Extractee::VJP:
+    case DifferentiableFunctionExtractee::VJP:
       return "vjp_" + llvm::itostr(differentiationOrder);
     }
   }
@@ -65,7 +64,7 @@ public:
   SILType getType(IRGenModule &IGM, SILType t) const {
     auto fnTy = t.castTo<SILFunctionType>();
     auto origFnTy = fnTy->getWithoutDifferentiability();
-    if (std::get<0>(Index) == AutoDiffFunctionExtractInst::Extractee::Original)
+    if (std::get<0>(Index) == DifferentiableFunctionExtractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
     auto differentiationOrder = std::get<1>(Index);
     auto kind = *std::get<0>(Index).getExtracteeAsAssociatedFunction();
@@ -155,7 +154,7 @@ public:
   }
 
   SILType getType(DiffFuncIndex field) {
-    if (std::get<0>(field) == AutoDiffFunctionExtractInst::Extractee::Original)
+    if (std::get<0>(field) == DifferentiableFunctionExtractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy->getCanonicalType());
     auto differentiationOrder = std::get<1>(field);
     auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
@@ -178,10 +177,10 @@ TypeConverter::convertDifferentiableFunctionType(SILFunctionType *type) {
   DiffFuncTypeBuilder builder(IGM, type);
   SmallVector<DiffFuncIndex, 3> fields;
   fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::Original, 0));
+      std::make_pair(DifferentiableFunctionExtractee::Original, 0));
   fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::JVP, 1));
+      std::make_pair(DifferentiableFunctionExtractee::JVP, 1));
   fields.push_back(
-      std::make_pair(AutoDiffFunctionExtractInst::Extractee::VJP, 1));
+      std::make_pair(DifferentiableFunctionExtractee::VJP, 1));
   return builder.layout(fields);
 }
