@@ -103,7 +103,8 @@ public:
     using llvm::hash_combine;
 
     auto Code = hash_value(ModuleCachePath);
-    // ExtraArgs ignored - already considered in Clang's module hashing.
+    Code = hash_combine(Code, llvm::hash_combine_range(ExtraArgs.begin(),
+                                                       ExtraArgs.end()));
     Code = hash_combine(Code, OverrideResourceDir);
     Code = hash_combine(Code, TargetCPU);
     Code = hash_combine(Code, BridgingHeader);
