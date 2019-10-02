@@ -569,12 +569,18 @@ bool SILValueOwnershipChecker::checkUses() {
 //===----------------------------------------------------------------------===//
 
 void SILInstruction::verifyOperandOwnership() const {
-#ifndef NDEBUG
   if (DisableOwnershipVerification)
     return;
 
   if (isStaticInitializerInst())
     return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  if (!getModule().getOptions().VerifyAll)
+    return;
+#endif
 
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().VerifySILOwnership)
@@ -631,13 +637,26 @@ void SILInstruction::verifyOperandOwnership() const {
            "At this point, we are expected to assert");
     llvm_unreachable("triggering standard assertion failure routine");
   }
-#endif
 }
 
 void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-#ifndef NDEBUG
   if (DisableOwnershipVerification)
     return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  if (!getModule().getOptions().VerifyAll)
+    return;
+#endif
+
+  // Make sure that we are not a value of an instruction in a SILGlobalVariable
+  // block.
+  if (auto *definingInst = getDefiningInstruction()) {
+    if (definingInst->isStaticInitializerInst()) {
+      return;
+    }
+  }
 
   // Since we do not have SILUndef, we now know that getFunction() should return
   // a real function. Assert in case this assumption is no longer true.
@@ -667,5 +686,4 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
                              liveBlocks)
         .check();
   }
-#endif
 }
