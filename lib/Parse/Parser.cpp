@@ -907,6 +907,52 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
+bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
+                                  const Diagnostic &D) {
+  auto IntTok = Tok;
+  if (parseToken(tok::integer_literal, Loc, D))
+    return true;
+  if (IntTok.getText().getAsInteger(0, Result)) {
+    diagnose(IntTok.getLoc(), D);
+    return true;
+  }
+  return false;
+}
+
+Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
+                                                     const Diagnostic &D) {
+  if (Tok.is(K)) {
+    TokLoc = Tok.getLoc();
+    return consumeTokenSyntax();
+  }
+
+  checkForInputIncomplete();
+  diagnose(Tok, D);
+  return None;
+}
+
+ParsedSyntaxResult<ParsedTokenSyntax>
+Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                                 bool silenceDiag) {
+  if (Tok.is(K))
+    return makeParsedResult(consumeTokenSyntax(K));
+  checkForInputIncomplete();
+
+  if (!silenceDiag) {
+    diagnose(Tok, ErrorDiag);
+
+    Diag<> OtherNote;
+    switch (K) {
+    case tok::r_paren:  OtherNote = diag::opening_paren; break;
+    case tok::r_square: OtherNote = diag::opening_bracket; break;
+    case tok::r_brace:  OtherNote = diag::opening_brace; break;
+    default: llvm_unreachable("unknown matching token!");
+    }
+    diagnose(OtherLoc, OtherNote);
+  }
+  return makeParserError();
+}
+
 SourceLoc Parser::getLocForMissingMatchingToken() const {
   // At present, use the same location whether it's an error or whether
   // the matching token is missing.
