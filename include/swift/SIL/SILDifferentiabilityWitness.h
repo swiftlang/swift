@@ -1,4 +1,4 @@
-//===--- SILProperty.h - Defines the SILProperty class ----------*- C++ -*-===//
+//===--- SILDifferentiabilityWitness.h - Differentiability witnesses ------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,9 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file defines the SILProperty class, which is used to capture the
-// metadata about a property definition necessary for it to be resiliently
-// included in KeyPaths across modules.
+// This file defines the SILDifferentiabilityWitness class, which maps an
+// original SILFunction and derivative configuration (parameter indices, result
+// indices, derivative generic signature) to derivative functions (JVP and VJP).
+//
+// SIL differentiability witnesses are generated from the `@differentiable`
+// and `@differentiating` attributes AST declaration attributes.
+// Differentiability witnesses are canonicalized by the differentiation SIL
+// transform, which fills in missing derivative functions. Canonical
+// differentiability witnesses from other modules can be deserialized to look up
+// derivative functions.
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,52 +42,56 @@ class SILDifferentiabilityWitness
       public SILAllocated<SILDifferentiabilityWitness>
 {
 private:
-  /// The module which contains the SILWitnessTable.
+  /// The module which contains the SIL differentiability witness.
   SILModule &module;
   /// The original function.
   SILFunction *originalFunction;
-  /// The parameter indieces.
+  /// The parameter indices.
   AutoDiffIndexSubset *parameterIndices;
-  /// The result indieces.
+  /// The result indices.
   AutoDiffIndexSubset *resultIndices;
-  /// The max differentiation order.
-  unsigned maxOrder;
-  /// Derivative functions.
-  MutableArrayRef<SILFunciton *> derivatives;
-  /// True if serialized.
+  /// The derivative generic signature (optional).
+  GenericSignature *derivativeGenericSignature;
+  /// The JVP (Jacobian-vector products) derivative function.
+  SILFunction *jvp;
+  /// The VJP (vector-Jacobian products) derivative function.
+  SILFunction *vjp;
+  /// Whether or not this differentiability witness is serialized, which allows
+  /// devirtualization from another module.
   bool serialized;
 
-  SILDifferentiabilityWitness(SILModule &module,
-                              SILFunction *originalFunction,
+  SILDifferentiabilityWitness(SILModule &module, SILFunction *originalFunction,
                               AutoDiffIndexSubset *parameterIndices,
                               AutoDiffIndexSubset *resultIndices,
+                              GenericSignature *derivativeGenSig,
+                              SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized)
-    : moduel(module), originalFunction(originalFunction),
+    : module(module), originalFunction(originalFunction),
       parameterIndices(parameterIndices), resultIndices(resultIndices),
+      derivativeGenericSignature(derivativeGenSig), jvp(jvp), vjp(vjp),
       serialized(isSerialized) {}
 
 public:
-  static SILProperty *create(SILModule &M,
-                             bool Serialized,
-                             AbstractStorageDecl *Decl,
-                             Optional<KeyPathPatternComponent> Component);
-  
-  bool isSerialized() const { return Serialized; }
-  
-  AbstractStorageDecl *getDecl() const { return Decl; }
-  
-  bool isTrivial() const {
-    return !Component.hasValue();
+  SILModule &getModule() const { return module; }
+  SILFunction *getOriginalFunction() const { return originalFunction; }
+  AutoDiffIndexSubset *getParameterIndices() const {
+    return parameterIndices;
   }
-  
-  const Optional<KeyPathPatternComponent> &getComponent() const {
-    return Component;
+  AutoDiffIndexSubset *getResultIndices() const {
+    return resultIndices;
   }
-  
-  void print(SILPrintContext &Ctx) const;
-  void dump() const;
-  
-  void verify(const SILModule &M) const;
+  GenericSignature *getDerivativeGenericSignature() const {
+    return derivativeGenericSignature;
+  }
+  SILFunction *getJVP() const { return jvp; }
+  SILFunction *getVJP() const { return vjp; }
+  bool isSerialized() const { return serialized; }
+
+  static SILDifferentiabilityWitness *create(
+      SILModule &module, SILFunction *originalFunction,
+      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+      GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+      bool isSerialized);
 };
 
 } // end namespace swift
@@ -88,21 +99,23 @@ public:
 namespace llvm {
 
 //===----------------------------------------------------------------------===//
-// ilist_traits for SILProperty
+// ilist_traits for SILDifferentiabilityWitness
 //===----------------------------------------------------------------------===//
 
 template <>
-struct ilist_traits<::swift::SILProperty>
-    : public ilist_node_traits<::swift::SILProperty> {
-  using SILProperty = ::swift::SILProperty;
+struct ilist_traits<::swift::SILDifferentiabilityWitness>
+    : public ilist_node_traits<::swift::SILDifferentiabilityWitness> {
+  using SILDifferentiabilityWitness = ::swift::SILDifferentiabilityWitness;
 
 public:
-  static void deleteNode(SILProperty *VT) { VT->~SILProperty(); }
+  static void deleteNode(SILDifferentiabilityWitness *DW) {
+    DW->~SILDifferentiabilityWitness();
+  }
 
 private:
-  void createNode(const SILProperty &);
+  void createNode(const SILDifferentiabilityWitness &);
 };
 
 } // namespace llvm
 
-#endif
+#endif // SWIFT_SIL_SILDIFFERENTIABILITYWITNESS_H
