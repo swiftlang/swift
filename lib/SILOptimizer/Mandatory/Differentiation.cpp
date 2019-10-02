@@ -4691,7 +4691,8 @@ public:
   CLONE_AND_EMIT_TANGENT(AllocStack, asi) {
     auto &diffBuilder = getDifferentialBuilder();
     auto *mappedAllocStackInst = diffBuilder.createAllocStack(
-        asi->getLoc(), getRemappedTangentType(asi->getElementType()));
+        asi->getLoc(), getRemappedTangentType(asi->getElementType()),
+        asi->getVarInfo());
     bufferMap.try_emplace({asi->getParent(), asi},
                           mappedAllocStackInst);
   }
