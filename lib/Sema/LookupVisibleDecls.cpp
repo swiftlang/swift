@@ -24,6 +24,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Sema/IDETypeCheckingRequests.h"
@@ -124,11 +125,7 @@ static bool isDeclVisibleInLookupMode(ValueDecl *Member, LookupState LS,
   // Accessors are never visible directly in the source language.
   if (isa<AccessorDecl>(Member))
     return false;
-
-  if (!Member->hasInterfaceType()) {
-    Member->getASTContext().getLazyResolver()->resolveDeclSignature(Member);
-  }
-
+  
   // Check access when relevant.
   if (!Member->getDeclContext()->isLocalContext() &&
       !isa<GenericTypeParamDecl>(Member) && !isa<ParamDecl>(Member)) {
@@ -283,10 +280,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
         return;
 
       // Ensure that the declaration has a type.
-      if (!D->hasInterfaceType()) {
-        D->getASTContext().getLazyResolver()->resolveDeclSignature(D);
-        if (!D->hasInterfaceType()) return;
-      }
+      if (!D->getInterfaceType()) return;
 
       switch (D->getKind()) {
 #define DECL(ID, SUPER) \
@@ -433,8 +427,9 @@ static void lookupDeclsFromProtocolsBeingConformedTo(
           continue;
         }
         if (auto *VD = dyn_cast<ValueDecl>(Member)) {
+          // FIXME(InterfaceTypeRequest): Remove this.
+          (void)VD->getInterfaceType();
           if (auto *TypeResolver = VD->getASTContext().getLazyResolver()) {
-            TypeResolver->resolveDeclSignature(VD);
             if (!NormalConformance->hasWitness(VD) &&
                 (Conformance->getDeclContext()->getParentSourceFile() !=
                 FromContext->getParentSourceFile()))
@@ -745,10 +740,8 @@ public:
       return;
     }
 
-    if (!VD->hasInterfaceType()) {
-      VD->getASTContext().getLazyResolver()->resolveDeclSignature(VD);
-      if (!VD->hasInterfaceType())
-        return;
+    if (!VD->getInterfaceType()) {
+      return;
     }
 
     if (VD->isInvalid()) {

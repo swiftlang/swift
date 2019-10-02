@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -127,10 +128,12 @@ ProtocolConformanceRef::subst(Type origType,
 
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
-    auto optConformance =
-      proto->getModuleContext()->lookupExistentialConformance(substType, proto);
-    assert(optConformance && "existential type didn't self-conform");
-    return *optConformance;
+    if (auto optConformance =
+          proto->getModuleContext()->lookupExistentialConformance(
+            substType, proto))
+      return *optConformance;
+
+    return ProtocolConformanceRef::forInvalid();
   }
 
   // Check the conformance map.
@@ -139,7 +142,7 @@ ProtocolConformanceRef::subst(Type origType,
     return *result;
   }
 
-  llvm_unreachable("Invalid conformance substitution");
+  return ProtocolConformanceRef::forInvalid();
 }
 
 ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
@@ -528,7 +531,7 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     assert(CRState == ConditionalRequirementsState::Computing);
     CRState = ConditionalRequirementsState::Uncomputed;
   };
-
+  
   auto &ctxt = getProtocol()->getASTContext();
   auto DC = getDeclContext();
   // A non-extension conformance won't have conditional requirements.
@@ -547,29 +550,24 @@ void NormalProtocolConformance::differenceAndStoreConditionalRequirements()
     return;
   }
 
-  auto extensionSig = ext->getGenericSignature();
-  if (!extensionSig) {
-    if (auto lazyResolver = ctxt.getLazyResolver()) {
-      lazyResolver->resolveExtension(ext);
-      extensionSig = ext->getGenericSignature();
-    }
+  // If the extension is invalid, it won't ever get a signature, so we
+  // "succeed" with an empty result instead.
+  if (ext->isInvalid()) {
+    success({});
+    return;
   }
 
-  // The type is generic, but the extension doesn't have a signature yet, so
-  // we might be in a recursive validation situation.
-  if (!extensionSig) {
-    // If the extension is invalid, it won't ever get a signature, so we
-    // "succeed" with an empty result instead.
-    if (ext->isInvalid()) {
-      success({});
-      return;
-    }
-
-    // Otherwise we'll try again later.
+  // Recursively validating the signature comes up frequently as expanding
+  // conformance requirements might re-enter this method.  We can at least catch
+  // this and come back to these requirements later.
+  //
+  // FIXME: In the long run, break this cycle in a more principled way.
+  if (ext->isComputingGenericSignature()) {
     failure();
     return;
   }
 
+  auto extensionSig = ext->getGenericSignature();
   auto canExtensionSig = extensionSig->getCanonicalSignature();
   auto canTypeSig = typeSig->getCanonicalSignature();
   if (canTypeSig == canExtensionSig) {

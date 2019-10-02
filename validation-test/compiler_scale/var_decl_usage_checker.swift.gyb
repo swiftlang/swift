@@ -1,5 +1,4 @@
 // RUN: %scale-test --begin 1 --end 5 --step 1 --select VarDeclUsageCheckerExprVisits %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 
 protocol Proto {}

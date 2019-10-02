@@ -76,20 +76,8 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   assert((method || abstractStorage) && "Not a method or abstractStorage?");
   SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
-  if (!member->hasInterfaceType()) {
-    auto lazyResolver = ctx.getLazyResolver();
-    assert(lazyResolver && "Need to resolve interface type");
-    lazyResolver->resolveDeclSignature(member);
-  }
-
   auto memberType = member->getInterfaceType();
   if (derivedDecl) {
-    if (!derivedDecl->hasInterfaceType()) {
-      auto lazyResolver = ctx.getLazyResolver();
-      assert(lazyResolver && "Need to resolve interface type");
-      lazyResolver->resolveDeclSignature(derivedDecl);
-    }
-
     auto *dc = derivedDecl->getDeclContext();
     auto owningType = dc->getDeclaredInterfaceType();
     assert(owningType);

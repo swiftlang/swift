@@ -86,6 +86,10 @@ def tbd_compatibility_version
 def tbd_compatibility_version_EQ : Joined<["-"], "tbd-compatibility-version=">,
   Alias<tbd_compatibility_version>;
 
+def tbd_is_installapi: Flag<["-"], "tbd-is-installapi">,
+  HelpText<"If the TBD file should indicate it's being generated during "
+           "InstallAPI">;
+
 def verify : Flag<["-"], "verify">,
   HelpText<"Verify diagnostics against expected-{error|warning|note} "
            "annotations">;
@@ -122,8 +126,8 @@ def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
   
-def compare_to_astscope_lookup : Flag<["-"], "compare-to-astscope-lookup">,
-  HelpText<"Compare legacy to ASTScope-based unqualified name lookup (for debugging)">;
+def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
+  HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
 def stress_astscope_lookup : Flag<["-"], "stress-astscope-lookup">,
   HelpText<"Stress ASTScope-based unqualified name lookup (for testing)">;

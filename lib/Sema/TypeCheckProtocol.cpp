@@ -329,18 +329,12 @@ swift::matchWitness(
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
 
-  // If the witness has not been validated yet, do so now.
-  if (!witness->hasValidSignature()) {
-    auto &ctx = dc->getASTContext();
-    ctx.getLazyResolver()->resolveDeclSignature(witness);
-  }
-
   // If the witness is invalid, record that and stop now.
   if (witness->isInvalid())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->hasValidSignature())
+  if (!witness->getInterfaceType())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.
@@ -579,7 +573,7 @@ swift::matchWitness(
               ctx, /*implicit*/ true, reqDiffAttr->AtLoc,
               reqDiffAttr->getRange(), reqDiffAttr->isLinear(),
               reqDiffAttr->getParameterIndices(), /*jvp*/ None,
-              /*vjp*/ None, reqDiffAttr->getRequirements());
+              /*vjp*/ None, reqDiffAttr->getDerivativeGenericSignature());
           auto insertion = ctx.DifferentiableAttrs.try_emplace(
               {witness, newAttr->getParameterIndices()}, newAttr);
           // Valid `@differentiable` attributes are uniqued by their parameter
@@ -1602,8 +1596,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   conformance->setState(ProtocolConformanceState::Checking);
   SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
-  TC.validateDecl(Proto);
-
+  // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface
+  // type.
+  (void)Proto->getInterfaceType();
+  
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
     conformance->setInvalid();
@@ -2260,7 +2256,7 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     // inferred differentiation parameters.
     auto *original = cast<AbstractFunctionDecl>(match.Witness);
     auto *whereClauseGenEnv =
-        reqAttr->computeDerivativeGenericEnvironment(original);
+        reqAttr->getDerivativeGenericEnvironment(original);
     auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
         original, whereClauseGenEnv);
     bool omitWrtClause = reqAttr->getParameterIndices()->parameters.count() ==
@@ -2288,11 +2284,7 @@ ConformanceChecker::ConformanceChecker(
       Conformance(conformance), Loc(conformance->getLoc()),
       GlobalMissingWitnesses(GlobalMissingWitnesses),
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
-      SuppressDiagnostics(suppressDiagnostics) {
-  // The protocol may have only been validatedDeclForNameLookup'd until
-  // here, so fill in any information that's missing.
-  tc.validateDecl(conformance->getProtocol());
-}
+      SuppressDiagnostics(suppressDiagnostics) { }
 
 ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
@@ -2563,7 +2555,9 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
-
+    aliasDecl->setValidationToChecked();
+    aliasDecl->computeType();
+    
     aliasDecl->setImplicit();
     if (type->hasError())
       aliasDecl->setInvalid();
@@ -3486,6 +3480,8 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
+  // FIXME: This is incorrect; depTy is written in terms of the protocol's
+  // associated types, and we need to substitute in known type witnesses.
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
@@ -3933,11 +3929,8 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // Make sure we've validated the requirement.
-    if (!requirement->hasInterfaceType())
-      TC.validateDecl(requirement);
-
-    if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+    // Make sure we've got an interface type.
+    if (!requirement->getInterfaceType() || requirement->isInvalid()) {
       Conformance->setInvalid();
       continue;
     }
@@ -4053,7 +4046,7 @@ static void diagnoseConformanceFailure(Type T,
       TypeChecker::containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
-      diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
+      diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
                      T, Proto->getDeclaredType());
       return;
     }

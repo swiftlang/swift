@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
@@ -616,9 +617,9 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (TAD->getUnderlyingTypeLoc().getType()) {
+      if (auto underlying = TAD->getUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << TAD->getUnderlyingTypeLoc().getType().getString();
+          << underlying.getString();
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
@@ -987,9 +988,17 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+      }
+
+      if (P->getDefaultValue() &&
+        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+        OS << " ";
+        P->getDefaultArgumentCaptureInfo().print(
+          PrintWithColorRAII(OS, CapturesColor).getOS());
+      }
 
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
@@ -2387,17 +2396,18 @@ public:
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
   // SWIFT_ENABLE_TENSORFLOW
-  void visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E) {
-    printCommon(E, "autodiff_function") << '\n';
+  void visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E) {
+    printCommon(E, "differentiable_function") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitAutoDiffFunctionExtractOriginalExpr(
-      AutoDiffFunctionExtractOriginalExpr *E) {
-    printCommon(E, "autodiff_function_extract_original") << '\n';
+  void visitDifferentiableFunctionExtractOriginalExpr(
+      DifferentiableFunctionExtractOriginalExpr *E) {
+    printCommon(E, "differentiable_function_extract_original") << '\n';
     printRec(E->getSubExpr());
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void visitInOutExpr(InOutExpr *E) {
     printCommon(E, "inout_expr") << '\n';
@@ -3418,6 +3428,12 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
+      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      if (auto underlying = T->getSinglyDesugaredType()) {
+        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+      } else {
+        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+      }
       if (T->getParent())
         printRec("parent", T->getParent());
 

@@ -23,8 +23,8 @@ func unary(_ x: Float) -> Float {
 // CHECK-SIL:   [[FUNC_1:%.*]] = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK-SIL:   [[JVP_1:%.*]] = function_ref @AD__$sSf1moiyS2f_SftFZ__jvp_src_0_wrt_0_1 : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> @out Float)
 // CHECK-SIL:   [[VJP_1:%.*]] = function_ref @AD__$sSf1moiyS2f_SftFZ__vjp_src_0_wrt_0_1 : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float))
-// CHECK-SIL:   [[AUTODIFF_INST_1:%.*]] = autodiff_function [wrt 0 1] [order 1] [[FUNC_1]] : {{.*}} with {[[JVP_1]] : {{.*}}, [[VJP_1]] : {{.*}}}
-// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST_1:%.*]] = autodiff_function_extract [jvp] [order 1] [[AUTODIFF_INST_1]]
+// CHECK-SIL:   [[AUTODIFF_INST_1:%.*]] = differentiable_function [wrt 0 1] [order 1] [[FUNC_1]] : {{.*}} with {[[JVP_1]] : {{.*}}, [[VJP_1]] : {{.*}}}
+// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST_1:%.*]] = differentiable_function_extract [jvp] [order 1] [[AUTODIFF_INST_1]]
 // CHECK-SIL:   [[JVP_APPLY_TUPLE_1:%.*]] = apply [[AUTODIFF_EXTRACT_INST_1]]([[X_ARG]], [[X_ARG]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RESULT_1:%.*]], [[DIFF_1:%.*]]) = destructure_tuple [[JVP_APPLY_TUPLE_1]]
 // CHECK-SIL:   [[DIFF_1_THUNK:%.*]] = function_ref @$sS3fIegnnr_S3fIegyyd_TR : $@convention(thin) (Float, Float, @guaranteed @callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> @out Float) -> Float
@@ -32,8 +32,8 @@ func unary(_ x: Float) -> Float {
 // CHECK-SIL:   [[FUNC_2:%.*]] = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK-SIL:   [[JVP_2:%.*]] = function_ref @AD__$sSf1moiyS2f_SftFZ__jvp_src_0_wrt_0_1 : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> @out Float)
 // CHECK-SIL:   [[VJP_2:%.*]] = function_ref @AD__$sSf1moiyS2f_SftFZ__vjp_src_0_wrt_0_1 : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float))
-// CHECK-SIL:   [[AUTODIFF_INST_2:%.*]] = autodiff_function [wrt 0 1] [order 1] [[FUNC_2]] : {{.*}} with {[[JVP_2]] : {{.*}}, [[VJP_2]] : {{.*}}}
-// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST_1:%.*]] = autodiff_function_extract [jvp] [order 1] [[AUTODIFF_INST_2]]
+// CHECK-SIL:   [[AUTODIFF_INST_2:%.*]] = differentiable_function [wrt 0 1] [order 1] [[FUNC_2]] : {{.*}} with {[[JVP_2]] : {{.*}}, [[VJP_2]] : {{.*}}}
+// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST_1:%.*]] = differentiable_function_extract [jvp] [order 1] [[AUTODIFF_INST_2]]
 // CHECK-SIL:   [[JVP_APPLY_TUPLE_2:%.*]] = apply [[AUTODIFF_EXTRACT_INST_1]]([[ORIG_RESULT_1]], [[X_ARG]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RESULT_2:%.*]], [[DIFF_2:%.*]]) = destructure_tuple [[JVP_APPLY_TUPLE_2]]
 // CHECK-SIL:   [[DIFF_2_THUNK:%.*]] = function_ref @$sS3fIegnnr_S3fIegyyd_TR : $@convention(thin) (Float, Float, @guaranteed @callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> @out Float) -> Float
@@ -80,8 +80,8 @@ func binary(x: Float, y: Float) -> Float {
 // CHECK-SIL:   [[FUNC:%.*]] = function_ref @$sSf1moiyS2f_SftFZ : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK-SIL:   [[JVP:%.*]] = function_ref @AD__$sSf1moiyS2f_SftFZ__jvp_src_0_wrt_0_1 : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float, @in_guaranteed Float) -> @out Float)
 // CHECK-SIL:   [[VJP:%.*]] = function_ref @AD__$sSf1moiyS2f_SftFZ__vjp_src_0_wrt_0_1 : $@convention(method) (Float, Float, @thin Float.Type) -> (Float, @owned @callee_guaranteed (@in_guaranteed Float) -> (@out Float, @out Float))
-// CHECK-SIL:   [[AUTODIFF_INST:%.*]] = autodiff_function [wrt 0 1] [order 1] [[FUNC]] : $@convention(method) (Float, Float, @thin Float.Type) -> Float with {[[JVP]] : {{.*}}, [[VJP]] : {{.*}})}
-// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST:%.*]] = autodiff_function_extract [jvp] [order 1] [[AUTODIFF_INST]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
+// CHECK-SIL:   [[AUTODIFF_INST:%.*]] = differentiable_function [wrt 0 1] [order 1] [[FUNC]] : $@convention(method) (Float, Float, @thin Float.Type) -> Float with {[[JVP]] : {{.*}}, [[VJP]] : {{.*}})}
+// CHECK-SIL:   [[AUTODIFF_EXTRACT_INST:%.*]] = differentiable_function_extract [jvp] [order 1] [[AUTODIFF_INST]] : $@differentiable @convention(method) (Float, Float, @nondiff @thin Float.Type) -> Float
 // CHECK-SIL:   [[JVP_APPLY_TUPLE:%.*]] = apply [[AUTODIFF_EXTRACT_INST]]([[X_ARG]], [[Y_ARG]], {{.*}})
 // CHECK-SIL:   ([[ORIG_RESULT:%.*]], [[DIFF_1:%.*]]) = destructure_tuple [[JVP_APPLY_TUPLE]]
 // CHECK-SIL:   [[DIFF_1_THUNKED:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[DIFF_1]])

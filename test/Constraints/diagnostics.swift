@@ -28,6 +28,9 @@ func f3(_: @escaping (_: @escaping (Int) -> Float) -> Int) {}
 func f4(_ x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
+// expected-note@-1 {{required by global function 'f5' where 'T' = '(Int) -> Int'}}
+// expected-note@-2 {{required by global function 'f5' where 'T' = '(Int, String)'}}
+// expected-note@-3 {{required by global function 'f5' where 'T' = 'Int.Type'}}
 
 func f6<T : P, U : P>(_ t: T, _ u: U) where T.SomeType == U.SomeType {}
 
@@ -46,8 +49,10 @@ f0(i, i,
    i) // expected-error{{extra argument in call}}
 
 
-// Position mismatch
-f5(f4)  // expected-error {{argument type '(Int) -> Int' does not conform to expected type 'P2'}}
+// Cannot conform to protocols.
+f5(f4)  // expected-error {{type '(Int) -> Int' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5((1, "hello"))  // expected-error {{type '(Int, String)' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
+f5(Int.self) // expected-error {{type 'Int.Type' cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // Tuple element not convertible.
 f0(i,
@@ -94,10 +99,11 @@ func f7() -> (c: Int, v: A) {
 }
 
 func f8<T:P2>(_ n: T, _ f: @escaping (T) -> T) {}
+// expected-note@-1 {{required by global function 'f8' where 'T' = 'Tup' (aka '(Int, Double)')}}
 f8(3, f4) // expected-error {{argument type 'Int' does not conform to expected type 'P2'}}
 typealias Tup = (Int, Double)
 func f9(_ x: Tup) -> Tup { return x }
-f8((1,2.0), f9) // expected-error {{argument type 'Tup' (aka '(Int, Double)') does not conform to expected type 'P2'}}
+f8((1,2.0), f9) // expected-error {{type 'Tup' (aka '(Int, Double)') cannot conform to 'P2'; only struct/enum/class types can conform to protocols}}
 
 // <rdar://problem/19658691> QoI: Incorrect diagnostic for calling nonexistent members on literals
 1.doesntExist(0)  // expected-error {{value of type 'Int' has no member 'doesntExist'}}
@@ -188,10 +194,10 @@ func r17224804(_ monthNumber : Int) {
 
 // <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
 func r17020197(_ x : Int?, y : Int) {
-  if x! {  }  // expected-error {{'Int' is not convertible to 'Bool'}}
+  if x! {  }  // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
   // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
-  if y {}    // expected-error {{'Int' is not convertible to 'Bool'}}
+  if y {}    // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 }
 
 // <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
@@ -298,6 +304,62 @@ func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
   (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot convert value of type '(Double, Double)' to expected argument type 'Double'}}
 }
+
+// Diagnose passing an array in lieu of variadic parameters
+func variadic(_ x: Int...) {}
+func variadicArrays(_ x: [Int]...) {}
+func variadicAny(_ x: Any...) {}
+struct HasVariadicSubscript {
+  subscript(_ x: Int...) -> Int {
+    get { 0 }
+  }
+}
+let foo = HasVariadicSubscript()
+
+let array = [1,2,3]
+let arrayWithOtherEltType = ["hello", "world"]
+
+variadic(array) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+variadic([1,2,3]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}}
+variadic([1,2,3,]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{10-11=}} {{16-17=}} {{17-18=}}
+variadic(0, array, 4) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+variadic(0, [1,2,3], 4) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}}
+variadic(0, [1,2,3,], 4) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{13-14=}} {{19-20=}} {{20-21=}}
+variadic(arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+variadic(1, arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Int'}}
+
+// FIXME: SR-11104
+variadic(["hello", "world"]) // expected-error 2 {{cannot convert value of type 'String' to expected element type 'Int'}}
+// expected-error@-1 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-2 {{remove brackets to pass array elements directly}}
+
+variadic([1] + [2] as [Int]) // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+
+foo[array] // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+foo[[1,2,3]] // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{5-6=}} {{11-12=}}
+foo[0, [1,2,3], 4] // expected-error {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-1 {{remove brackets to pass array elements directly}} {{8-9=}} {{14-15=}}
+
+variadicAny(array)
+variadicAny([1,2,3])
+variadicArrays(array)
+variadicArrays([1,2,3])
+variadicArrays(arrayWithOtherEltType) // expected-error {{cannot convert value of type '[String]' to expected argument type '[Int]'}}
+// expected-note@-1 {{arguments to generic parameter 'Element' ('String' and 'Int') are expected to be equal}}
+variadicArrays(1,2,3) // expected-error 3 {{cannot convert value of type 'Int' to expected argument type '[Int]'}}
+
+protocol Proto {}
+func f<T: Proto>(x: [T]) {}
+func f(x: Int...) {}
+f(x: [1,2,3])
+// TODO(diagnostics): Diagnose both the missing conformance and the disallowed array splat to cover both overloads. 
+// expected-error@-2 {{cannot pass array of type '[Int]' as variadic arguments of type 'Int'}}
+// expected-note@-3 {{remove brackets to pass array elements directly}}
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
 func expect<T, U>(_: T) -> (U.Type) -> Int { return { a in 0 } }

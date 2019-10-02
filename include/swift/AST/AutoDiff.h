@@ -24,6 +24,14 @@
 
 namespace swift {
 
+class AnyFunctionType;
+class AutoDiffIndexSubset;
+class AutoDiffParameterIndicesBuilder;
+class SILFunctionType;
+typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
+class Type;
+enum class SILLinkage : uint8_t;
+
 enum class DifferentiabilityKind: uint8_t {
   NonDifferentiable = 0b00,
   Normal = 0b01,
@@ -92,12 +100,6 @@ public:
     return getKind() == Kind::Self;
   }
 };
-
-class AnyFunctionType;
-class AutoDiffIndexSubset;
-class AutoDiffParameterIndicesBuilder;
-class Type;
-enum class SILLinkage : uint8_t;
 
 /// Identifies a subset of a function's parameters.
 ///
@@ -604,8 +606,8 @@ namespace autodiff {
 
 /// Returns the offset for an associated function at a specific differentiation
 /// order.
-/// This is used for both ordering in the `autodiff_function` instruction and
-/// ABI layout.
+/// This is used for both ordering in the `differentiable_function` instruction
+/// and ABI layout.
 ///
 ///                Order 1       Order 2     ...
 /// |----------| |-----|-----| |-----|-----| ...

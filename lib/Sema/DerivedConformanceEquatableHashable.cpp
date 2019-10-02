@@ -45,12 +45,11 @@ enum NonconformingMemberKind {
 static SmallVector<ParamDecl *, 3>
 associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(elt);
-
+    if (!elt->getInterfaceType())
+      continue;
+    
     auto PL = elt->getParameterList();
     if (!PL)
       continue;
@@ -85,19 +84,15 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
 static SmallVector<VarDecl *, 3>
 storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   auto storedProperties = theStruct->getStoredProperties();
   SmallVector<VarDecl *, 3> nonconformingProperties;
   for (auto propertyDecl : storedProperties) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    if (!propertyDecl->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(propertyDecl);
-    if (!propertyDecl->hasInterfaceType())
-      nonconformingProperties.push_back(propertyDecl);
-
     auto type = propertyDecl->getValueInterfaceType();
+    if (!type)
+      nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
                                          DC, None)) {
@@ -1169,9 +1164,6 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // _hashValue(for:)
   auto *hashFunc = C.getHashValueForDecl();
-  if (!hashFunc->hasInterfaceType())
-    static_cast<TypeChecker *>(C.getLazyResolver())->validateDecl(hashFunc);
-
   auto substitutions = SubstitutionMap::get(
       hashFunc->getGenericSignature(),
       [&](SubstitutableType *dependentType) {

@@ -75,7 +75,7 @@ insertAfterApply(SILInstruction *applySite,
 /// apply site, or the callee value are control dependent in any way. This
 /// requires us to need to be very careful. See inline comments.
 static void fixupReferenceCounts(
-    PartialApplyInst *pai, SILInstruction *applySite, SILValue calleeValue,
+    PartialApplyInst *pai, FullApplySite applySite, SILValue calleeValue,
     ArrayRef<ParameterConvention> captureArgConventions,
     MutableArrayRef<SILValue> capturedArgs, bool isCalleeGuaranteed) {
 
@@ -108,7 +108,7 @@ static void fixupReferenceCounts(
       continue;
     }
 
-    auto *f = applySite->getFunction();
+    auto *f = applySite.getFunction();
 
     // See if we have a trivial value. In such a case, just continue. We do not
     // need to fix up anything.
@@ -150,9 +150,10 @@ static void fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      auto error =
-          valueHasLinearLifetime(pai, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(
+          pai, {BranchPropagatedUser(applySite.getCalleeOperand())}, {},
+          errorBehavior, &leakingBlocks);
       if (error.getFoundLeak()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -173,12 +174,13 @@ static void fixupReferenceCounts(
       // insert a destroy after the apply since the leak will just cover the
       // other path.
       if (!error.getFoundOverConsume()) {
-        insertAfterApply(applySite, [&](SILBasicBlock::iterator iter) {
-          if (hasOwnership) {
-            SILBuilderWithScope(iter).createEndBorrow(loc, argument);
-          }
-          SILBuilderWithScope(iter).emitDestroyValueOperation(loc, copy);
-        });
+        insertAfterApply(
+            applySite.getInstruction(), [&](SILBasicBlock::iterator iter) {
+              if (hasOwnership) {
+                SILBuilderWithScope(iter).createEndBorrow(loc, argument);
+              }
+              SILBuilderWithScope(iter).emitDestroyValueOperation(loc, copy);
+            });
       }
       v = argument;
       break;
@@ -201,9 +203,9 @@ static void fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      auto error =
-          valueHasLinearLifetime(pai, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -213,9 +215,10 @@ static void fixupReferenceCounts(
         }
       }
 
-      insertAfterApply(applySite, [&](SILBasicBlock::iterator iter) {
-        SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
-      });
+      insertAfterApply(
+          applySite.getInstruction(), [&](SILBasicBlock::iterator iter) {
+            SILBuilderWithScope(iter).emitDestroyValueOperation(loc, v);
+          });
       break;
     }
 
@@ -240,9 +243,9 @@ static void fixupReferenceCounts(
       // just cares about the block the value is in. In a forthcoming commit, I
       // am going to change this to use a different API on the linear lifetime
       // checker that makes this clearer.
-      auto error =
-          valueHasLinearLifetime(pai, {applySite}, {}, visitedBlocks,
-                                 deadEndBlocks, errorBehavior, &leakingBlocks);
+      LinearLifetimeChecker checker(visitedBlocks, deadEndBlocks);
+      auto error = checker.checkValue(pai, {applySite.getCalleeOperand()}, {},
+                                      errorBehavior, &leakingBlocks);
       if (error.getFoundError()) {
         while (!leakingBlocks.empty()) {
           auto *leakingBlock = leakingBlocks.pop_back_val();
@@ -260,9 +263,10 @@ static void fixupReferenceCounts(
   // Destroy the callee as the apply would have done if our function is not
   // callee guaranteed.
   if (!isCalleeGuaranteed) {
-    insertAfterApply(applySite, [&](SILBasicBlock::iterator iter) {
-      SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
-    });
+    insertAfterApply(
+        applySite.getInstruction(), [&](SILBasicBlock::iterator iter) {
+          SILBuilderWithScope(iter).emitDestroyValueOperation(loc, calleeValue);
+        });
   }
 }
 
@@ -923,9 +927,8 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder,
         // We need to insert the copies before the partial_apply since if we can
         // not remove the partial_apply the captured values will be dead by the
         // time we hit the call site.
-        fixupReferenceCounts(PAI, InnerAI.getInstruction(), CalleeValue,
-                             CapturedArgConventions, CapturedArgs,
-                             IsCalleeGuaranteed);
+        fixupReferenceCounts(PAI, InnerAI, CalleeValue, CapturedArgConventions,
+                             CapturedArgs, IsCalleeGuaranteed);
       }
 
       // Register a callback to record potentially unused function values after

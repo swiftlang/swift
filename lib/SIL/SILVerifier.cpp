@@ -507,7 +507,27 @@ struct ImmutableAddressUseVerifier {
       if (inst->isTypeDependentOperand(*use))
         continue;
 
+      // TODO: Can this switch be restructured so break -> error, continue ->
+      // next iteration, return -> return the final result.
       switch (inst->getKind()) {
+      case SILInstructionKind::BuiltinInst: {
+        // If we are processing a polymorphic builtin that takes an address,
+        // skip the builtin. This is because the builtin must be specialized to
+        // a non-memory reading builtin that works on trivial object values
+        // before the diagnostic passes end (or be DCEed) or we emit a
+        // diagnostic.
+        if (auto builtinKind = cast<BuiltinInst>(inst)->getBuiltinKind()) {
+          if (isPolymorphicBuiltin(*builtinKind)) {
+            break;
+          }
+        }
+
+        // Otherwise this is a builtin that we are not expecting to see, so bail
+        // and assert.
+        llvm::errs() << "Unhandled, unexpected builtin instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
+        break;
+      }
       case SILInstructionKind::MarkDependenceInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DebugValueAddrInst:
@@ -1472,24 +1492,24 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  void checkAutoDiffFunctionInst(AutoDiffFunctionInst *adfi) {
-    require(adfi->getDifferentiationOrder() > 0,
+  void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
+    require(dfi->getDifferentiationOrder() > 0,
             "The differentiation order must be non-zero");
     auto origTy =
-        adfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
+        dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
             "The original function must not be @differentiable");
     if (F.getModule().getStage() == SILStage::Canonical ||
-        adfi->hasAssociatedFunctions()) {
-      for (auto order : range(1, adfi->getDifferentiationOrder() + 1)) {
-        auto pair = adfi->getAssociatedFunctionPair(order);
+        dfi->hasAssociatedFunctions()) {
+      for (auto order : range(1, dfi->getDifferentiationOrder() + 1)) {
+        auto pair = dfi->getAssociatedFunctionPair(order);
         auto jvpType = pair.first->getType().getAs<SILFunctionType>();
         require(jvpType, "The JVP function must have a function type");
         require(!jvpType->isDifferentiable(),
                 "The JVP function must not be @differentiable");
         auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), /*resultIndex*/ 0, order,
+            dfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::JVP, TC,
             LookUpConformanceInModule(M));
         requireSameType(SILType::getPrimitiveObjectType(jvpType),
@@ -1500,7 +1520,7 @@ public:
         require(!vjpType->isDifferentiable(),
                 "The VJP function must not be @differentiable");
         auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
-            adfi->getParameterIndices(), /*resultIndex*/ 0, order,
+            dfi->getParameterIndices(), /*resultIndex*/ 0, order,
             AutoDiffAssociatedFunctionKind::VJP, TC,
             LookUpConformanceInModule(M));
         requireSameType(SILType::getPrimitiveObjectType(vjpType),
@@ -1510,20 +1530,22 @@ public:
     }
   }
   
-  void checkAutoDiffFunctionExtractInst(AutoDiffFunctionExtractInst *adfei) {
-    if (adfei->getExtractee() == AutoDiffFunctionExtractee::Original)
-      require(adfei->getDifferentiationOrder() == 0,
-              "Differentiation order should not have been set when the original"
-              " function is being extracted");
+  void checkDifferentiableFunctionExtractInst(
+      DifferentiableFunctionExtractInst *dfei) {
+    if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
+      require(dfei->getDifferentiationOrder() == 0,
+              "Differentiation order should not have been set when the "
+              "original function is being extracted");
     else
-      require(adfei->getDifferentiationOrder() > 0,
+      require(dfei->getDifferentiationOrder() > 0,
               "Extraction of associated functions requires a differentiation "
               "order");
-    auto fnTy = adfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    auto fnTy = dfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
             "The function operand must be an '@differentiable' function");
   }
+  // SWIFT_ENABLE_TENSORFLOW
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
     // Certain llvm intrinsic require constant values as their operands.
@@ -1691,8 +1713,10 @@ public:
 
   void checkBuiltinInst(BuiltinInst *BI) {
     // Check for special constraints on llvm intrinsics.
-    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)
+    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic) {
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
+      return;
+    }
   }
 
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {

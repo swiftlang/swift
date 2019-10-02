@@ -290,6 +290,10 @@ protected:
            isa<BinaryExpr>(apply);
   }
 
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
+
 private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
@@ -298,10 +302,6 @@ private:
   GenericSignature *getSignature(ConstraintLocator *locator);
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
-
-  /// Determine whether given declaration represents a static
-  /// or instance property/method, excluding operators.
-  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.
@@ -346,6 +346,10 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
+
+private:
+  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+                                 Type protocolType) const;
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -1182,23 +1186,19 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
   unsigned NumSynthesized;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          FunctionType *funcType,
-                          unsigned numSynthesized,
-                          ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), Fn(funcType),
-        NumSynthesized(numSynthesized) {}
+                          unsigned numSynthesized, ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator), NumSynthesized(numSynthesized) {}
 
   bool diagnoseAsError() override;
 
 private:
-  /// If missing arguments come from trailing closure,
+  /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
-  bool diagnoseTrailingClosure(ClosureExpr *closure);
+  bool diagnoseClosure(ClosureExpr *closure);
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
@@ -1586,8 +1586,25 @@ public:
                                               Type paramTy,
                                               ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situation when an array is passed instead of varargs.
+///
+/// ```swift
+/// func foo(_ x: Int...) {}
+/// foo([1,2,3]]) // foo expects varags like foo(1,2,3) instead.
+/// ```
+class ExpandArrayIntoVarargsFailure final : public ContextualFailure {
+public:
+  ExpandArrayIntoVarargsFailure(Expr *root, ConstraintSystem &cs, Type lhs,
+                                Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  void tryDropArrayBracketsFixIt(Expr *anchor) const;
 };
 
 /// Diagnose a situation there is a mismatch between argument and parameter
@@ -1718,6 +1735,10 @@ public:
   /// to.
   ParameterTypeFlags getParameterFlags() const {
     return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
   }
 };
 

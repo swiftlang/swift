@@ -279,7 +279,6 @@ public:
   enum class ValidationState {
     Unchecked,
     Checking,
-    CheckingWithValidSignature,
     Checked,
   };
 
@@ -850,17 +849,9 @@ public:
     case ValidationState::Checked:
       return false;
     case ValidationState::Checking:
-    case ValidationState::CheckingWithValidSignature:
       return true;
     }
     llvm_unreachable("Unknown ValidationState");
-  }
-
-  /// Update the validation state for the declaration to allow access to the
-  /// generic signature.
-  void setSignatureIsValidated() {
-    assert(getValidationState() == ValidationState::Checking);
-    setValidationState(ValidationState::CheckingWithValidSignature);
   }
 
   bool hasValidationStarted() const {
@@ -1505,12 +1496,13 @@ public:
   TrailingWhereClause *TrailingWhere = nullptr;
 
   /// The generic signature of this declaration.
-  GenericSignature *GenericSig = nullptr;
+  llvm::PointerIntPair<GenericSignature *, 1, bool> GenericSigAndBit;
 };
 
 class GenericContext : private _GenericContext, public DeclContext {
   friend class GenericParamListRequest;
-
+  friend class GenericSignatureRequest;
+  
 protected:
   GenericContext(DeclContextKind Kind, DeclContext *Parent,
                  GenericParamList *Params);
@@ -1534,7 +1526,9 @@ public:
   /// }
   /// \endcode
   bool isGeneric() const { return getGenericParams() != nullptr; }
-
+  bool hasComputedGenericSignature() const;
+  bool isComputingGenericSignature() const;
+  
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
     return TrailingWhere;
@@ -1765,11 +1759,6 @@ public:
   ArrayRef<TypeLoc> getInherited() const { return Inherited; }
 
   void setInherited(MutableArrayRef<TypeLoc> i) { Inherited = i; }
-
-  /// Whether we have fully checked the extension signature.
-  bool hasValidSignature() const {
-    return getValidationState() > ValidationState::CheckingWithValidSignature;
-  }
 
   bool hasDefaultAccessLevel() const {
     return Bits.ExtensionDecl.DefaultAndMaxAccessLevel != 0;
@@ -2605,8 +2594,6 @@ public:
 
   /// Set the interface type for the given value.
   void setInterfaceType(Type type);
-
-  bool hasValidSignature() const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
@@ -2945,6 +2932,8 @@ public:
 /// TypeAliasDecl's always have 'MetatypeType' type.
 ///
 class TypeAliasDecl : public GenericTypeDecl {
+  friend class UnderlyingTypeRequest;
+  
   /// The location of the 'typealias' keyword
   SourceLoc TypeAliasLoc;
 
@@ -2972,20 +2961,28 @@ public:
 
   void setTypeEndLoc(SourceLoc e) { TypeEndLoc = e; }
 
-  TypeLoc &getUnderlyingTypeLoc() {
-    return UnderlyingTy;
+  /// Retrieve the TypeRepr corresponding to the parsed underlying type.
+  TypeRepr *getUnderlyingTypeRepr() const {
+    return UnderlyingTy.getTypeRepr();
   }
-  const TypeLoc &getUnderlyingTypeLoc() const {
-    return UnderlyingTy;
+  void setUnderlyingTypeRepr(TypeRepr *repr) {
+    UnderlyingTy = repr;
   }
-
+  
+  /// Retrieve the interface type of the underlying type.
+  Type getUnderlyingType() const;
   void setUnderlyingType(Type type);
 
   /// For generic typealiases, return the unbound generic type.
   UnboundGenericType *getUnboundGenericType() const;
 
+  /// Retrieve a sugared interface type containing the structure of the interface
+  /// type before any semantic validation has occured.
   Type getStructuralType() const;
 
+  /// Set the interface type of this typealias declaration from the underlying type.
+  void computeType();
+  
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
   }
@@ -5186,6 +5183,7 @@ class ParamDecl : public VarDecl {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
     Initializer *InitContext = nullptr;
     StringRef StringRepresentation;
+    CaptureInfo Captures;
   };
 
   enum class Flags : uint8_t {
@@ -5270,6 +5268,13 @@ public:
   }
 
   void setDefaultArgumentInitContext(Initializer *initContext);
+
+  const CaptureInfo &getDefaultArgumentCaptureInfo() const {
+    assert(DefaultValueAndFlags.getPointer());
+    return DefaultValueAndFlags.getPointer()->Captures;
+  }
+
+  void setDefaultArgumentCaptureInfo(const CaptureInfo &captures);
 
   /// Extracts the text of the default argument attached to the provided
   /// ParamDecl, removing all inactive #if clauses and providing only the

@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Timer.h"
@@ -526,7 +527,7 @@ Parser::Parser(std::unique_ptr<Lexer> Lex, SourceFile &SF,
                             L->getBufferID(),
                             SF.SyntaxParsingCache,
                             SF.getASTContext().getSyntaxArena())))),
-    Generator(SF.getASTContext(), &State) {
+    Generator(SF.getASTContext(), *this) {
   State = PersistentState;
   if (!State) {
     OwnedState.reset(new PersistentParserState());
@@ -1254,8 +1255,10 @@ bool Parser::parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
   return false;
 }
 
-Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, const Diagnostic &D) {
+Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
+                                                     const Diagnostic &D) {
   if (Tok.is(K)) {
+    TokLoc = Tok.getLoc();
     return consumeTokenSyntax();
   }
 
@@ -1265,7 +1268,7 @@ Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, const Diagnostic &D)
 }
 
 Optional<ParsedTokenSyntax>
-Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc) {
+Parser::parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag, SourceLoc OtherLoc) {
   Diag<> OtherNote;
   switch (K) {
   case tok::r_paren:  OtherNote = diag::opening_paren; break;
@@ -1274,9 +1277,11 @@ Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc) {
   default: llvm_unreachable("unknown matching token!");
   }
 
-  auto Token = parseTokenSyntax(K, ErrorDiag);
-  if (!Token)
+  auto Token = parseTokenSyntax(K, TokLoc, ErrorDiag);
+  if (!Token) {
+    TokLoc = getLocForMissingMatchingToken();
     diagnose(OtherLoc, OtherNote);
+  }
   return Token;
 }
 
@@ -1403,9 +1408,14 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
+    if (Tok.is(RightK)) {
+      RightLoc = Tok.getLoc();
+      Right = consumeTokenSyntax(RightK);
+    } else {
+      RightLoc = getLocForMissingMatchingToken();
+    }
   } else {
-    Right = parseMatchingTokenSyntax(RightK, ErrorDiag, LeftLoc);
+    Right = parseMatchingTokenSyntax(RightK, RightLoc, ErrorDiag, LeftLoc);
     if (!Right)
       Status.setIsParseError();
   }

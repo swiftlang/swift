@@ -985,7 +985,7 @@ int main(int argc, const char *argv[])
             src_dir = [[[self_executable stringByDeletingLastPathComponent]
                         stringByDeletingLastPathComponent]
                        sst_stringByAppendingPathComponents:
-                       @[ @"lib", @"swift", platform ]];
+                       @[ @"lib", @"swift-5.0", platform ]];
         } else if (!platform) {
             // src_dir is set but platform is not. 
             // Pick platform from src_dir's name.

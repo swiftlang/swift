@@ -26,6 +26,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -138,16 +139,16 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
       SGF.getASTContext(),
       assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
-  auto autoDiffFn = SGF.B.createAutoDiffFunction(
+  auto diffFn = SGF.B.createDifferentiableFunction(
       loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
-  auto autoDiffAssocFn = SGF.B.createAutoDiffFunctionExtract(
-      loc, AutoDiffFunctionExtractInst::Extractee(autoDiffFuncId->getKind()),
-      /*differentiationOrder*/ 1, autoDiffFn);
+  auto diffAssocFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
+      /*differentiationOrder*/ 1, diffFn);
   auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());
   auto apply = SGF.emitApplyWithRethrow(
-      loc, autoDiffAssocFn, autoDiffAssocFnSILTy,
+      loc, diffAssocFn, autoDiffAssocFnSILTy,
       SGF.getForwardingSubstitutionMap(), args);
   SGF.B.createReturn(loc, apply);
   return thunk;
@@ -236,7 +237,7 @@ void SILGenFunction::emitCurryThunk(SILDeclRef thunk) {
   auto *vd = thunk.getDecl();
 
   if (auto *fd = dyn_cast<AbstractFunctionDecl>(vd)) {
-    assert(!SGM.M.Types.hasLoweredLocalCaptures(fd) &&
+    assert(!SGM.M.Types.hasLoweredLocalCaptures(SILDeclRef(fd)) &&
            "methods cannot have captures");
     (void) fd;
   }

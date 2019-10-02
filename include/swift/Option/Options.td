@@ -415,6 +415,10 @@ def disable_bridging_pch : Flag<["-"], "disable-bridging-pch">,
   HelpText<"Disable automatic generation of bridging PCH files">;
 
 // Experimental feature options
+def enable_experimental_differentiable_programming : Flag<["-"], "enable-experimental-differentiable-programming">,
+  Flags<[FrontendOption]>,
+  HelpText<"Enable experimental differentiable programming features">;
+
 def enable_experimental_quasiquotes : Flag<["-"], "enable-experimental-quasiquotes">,
   Flags<[FrontendOption]>,
   HelpText<"Experimental work-in-progress implementation of quasiquotes">;
@@ -513,14 +517,9 @@ def no_static_stdlib: Flag<["-"], "no-static-stdlib">,
 def toolchain_stdlib_rpath: Flag<["-"], "toolchain-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Add an rpath entry for the toolchain's standard library, rather than the OS's">;
-// SWIFT_ENABLE_TENSORFLOW
-// NOTE(TF-797): The default for `toolchain_stdlib_rpath` is set to true to
-// prevent TensorFlow linker errors. Thus, the `no_toolchain_stdlib_rpath` flag
-// is necessary to opt out of the default behavior.
 def no_toolchain_stdlib_rpath: Flag<["-"], "no-toolchain-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
-  HelpText<"Do not add an rpath entry for the toolchain's standard library, rather than the OS's">;
-// SWIFT_ENABLE_TENSORFLOW END
+  HelpText<"Do not add an rpath entry for the toolchain's standard library (default)">;
 def no_stdlib_rpath: Flag<["-"], "no-stdlib-rpath">,
   Flags<[HelpHidden,DoesNotAffectIncrementalBuild]>,
   HelpText<"Don't add any rpath entries.">;

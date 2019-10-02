@@ -447,6 +447,20 @@ public class Container {
   }
 }
 
+// SR-11303 / rdar://problem/54311335 - crash due to wrong archetype used in generated SIL
+public protocol TestProtocol {}
+public class TestClass<T> {
+  @WrapperWithInitialValue var value: T
+
+  // CHECK-LABEL: sil hidden [ossa] @$s17property_wrappers9TestClassC5value8protocolACyxGx_qd__tcAA0C8ProtocolRd__lufc
+  // CHECK: metatype $@thin WrapperWithInitialValue<T>.Type
+  // CHECK: function_ref @$s17property_wrappers23WrapperWithInitialValueV07wrappedF0ACyxGx_tcfCTc
+  init<U: TestProtocol>(value: T, protocol: U) {
+    self.value = value
+  }
+}
+
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter

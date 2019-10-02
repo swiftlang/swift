@@ -913,8 +913,8 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
 
     // Compare each of the bound arguments for this parameter.
     for (auto argIdx : parameterBindings[paramIdx]) {
-      auto loc = locator.withPathElement(
-          LocatorPathElt::ApplyArgToParam(argIdx, paramIdx));
+      auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
+          argIdx, paramIdx, param.getParameterFlags()));
       auto argTy = argsWithLabels[argIdx].getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
@@ -1167,9 +1167,8 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
 /// Attempt to fix missing arguments by introducing type variables
 /// and inferring their types from parameters.
 static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
-                                FunctionType *funcType,
                                 SmallVectorImpl<AnyFunctionType::Param> &args,
-                                SmallVectorImpl<AnyFunctionType::Param> &params,
+                                ArrayRef<AnyFunctionType::Param> params,
                                 unsigned numMissing,
                                 ConstraintLocatorBuilder locator) {
   assert(args.size() < params.size());
@@ -1180,16 +1179,26 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   // tuple e.g. `$0.0`.
   Optional<TypeBase *> argumentTuple;
   if (isa<ClosureExpr>(anchor) && isSingleTupleParam(ctx, args)) {
-    auto isParam = [](const Expr *expr) {
-      if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
-        if (auto *decl = DRE->getDecl())
-          return isa<ParamDecl>(decl);
+    auto argType = args.back().getPlainType();
+    // Let's unpack argument tuple into N arguments, this corresponds
+    // to something like `foo { (bar: (Int, Int)) in }` where `foo`
+    // has a single parameter of type `(Int, Int) -> Void`.
+    if (auto *tuple = argType->getAs<TupleType>()) {
+      args.pop_back();
+      for (const auto &elt : tuple->getElements()) {
+        args.push_back(AnyFunctionType::Param(elt.getType(), elt.getName(),
+                                              elt.getParameterFlags()));
       }
-      return false;
-    };
+    } else if (auto *typeVar = argType->getAs<TypeVariableType>()) {
+      auto isParam = [](const Expr *expr) {
+        if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+          if (auto *decl = DRE->getDecl())
+            return isa<ParamDecl>(decl);
+        }
+        return false;
+      };
 
-    const auto &arg = args.back();
-    if (auto *argTy = arg.getPlainType()->getAs<TypeVariableType>()) {
+      // Something like `foo { x in }` or `foo { $0 }`
       anchor->forEachChildExpr([&](Expr *expr) -> Expr * {
         if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
           if (!isParam(UDE->getBase()))
@@ -1201,7 +1210,7 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
               llvm::any_of(params, [&](const AnyFunctionType::Param &param) {
                 return param.getLabel() == name;
               })) {
-            argumentTuple.emplace(argTy);
+            argumentTuple.emplace(typeVar);
             args.pop_back();
             return nullptr;
           }
@@ -1219,9 +1228,8 @@ static bool fixMissingArguments(ConstraintSystem &cs, Expr *anchor,
   }
 
   ArrayRef<AnyFunctionType::Param> argsRef(args);
-  auto *fix =
-      AddMissingArguments::create(cs, funcType, argsRef.take_back(numMissing),
-                                  cs.getConstraintLocator(locator));
+  auto *fix = AddMissingArguments::create(cs, argsRef.take_back(numMissing),
+                                          cs.getConstraintLocator(locator));
 
   if (cs.recordFix(fix))
     return true;
@@ -1459,7 +1467,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     // If there are missing arguments, let's add them
     // using parameter as a template.
     if (diff < 0) {
-      if (fixMissingArguments(*this, anchor, func2, func1Params, func2Params,
+      if (fixMissingArguments(*this, anchor, func1Params, func2Params,
                               abs(diff), locator))
         return getTypeMatchFailure(argumentLocator);
     } else {
@@ -2136,7 +2144,7 @@ static ConstraintFix *fixPropertyWrapperFailure(
   };
 
   auto applyFix = [&](Fix fix, VarDecl *decl, Type type) -> ConstraintFix * {
-    if (!decl->hasValidSignature() || !type)
+    if (!decl->hasInterfaceType() || !type)
       return nullptr;
 
     if (baseTy->isEqual(type))
@@ -2345,6 +2353,15 @@ bool ConstraintSystem::repairFailures(
     return false;
   };
 
+  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
+    return llvm::any_of(conversionsOrFixes,
+                        [kind](const RestrictionOrFix correction) {
+                          if (auto restriction = correction.getRestriction())
+                            return restriction == kind;
+                          return false;
+                        });
+  };
+
   if (path.empty()) {
     if (!anchor)
       return false;
@@ -2383,19 +2400,38 @@ bool ConstraintSystem::repairFailures(
 
       if (repairViaBridgingCast(*this, lhs, rhs, conversionsOrFixes, locator))
         return true;
+
+      // If we are trying to assign e.g. `Array<Int>` to `Array<Float>` let's
+      // give solver a chance to determine which generic parameters are
+      // mismatched and produce a fix for that.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+        return false;
+
+      // If the situation has to do with protocol composition types and
+      // destination doesn't have one of the conformances e.g. source is
+      // `X & Y` but destination is only `Y` or vice versa, there is a
+      // tailored "missing conformance" fix for that.
+      if (hasConversionOrRestriction(ConversionRestrictionKind::Existential))
+        return false;
+
+      // If this is an attempt to assign something to a value of optional type
+      // there is a possiblity that the problem is related to escapiness, so
+      // fix has to be delayed.
+      if (hasConversionOrRestriction(
+              ConversionRestrictionKind::ValueToOptional))
+        return false;
+
+      // If the destination of an assignment is l-value type
+      // it leaves only possible reason for failure - a type mismatch.
+      if (getType(AE->getDest())->is<LValueType>()) {
+        conversionsOrFixes.push_back(IgnoreAssignmentDestinationType::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+        return true;
+      }
     }
 
     return false;
   }
-
-  auto hasConversionOrRestriction = [&](ConversionRestrictionKind kind) {
-    return llvm::any_of(conversionsOrFixes,
-                        [kind](const RestrictionOrFix correction) {
-                          if (auto restriction = correction.getRestriction())
-                            return restriction == kind;
-                          return false;
-                        });
-  };
 
   auto elt = path.back();
   switch (elt.getKind()) {
@@ -2590,6 +2626,11 @@ bool ConstraintSystem::repairFailures(
         elt.castTo<LocatorPathElt::ApplyArgToParam>().getParamIdx() == 1)
       break;
 
+    if (auto *fix = ExpandArrayIntoVarargs::attempt(*this, lhs, rhs, locator)) {
+      conversionsOrFixes.push_back(fix);
+      break;
+    }
+
     if (auto *fix = ExplicitlyConstructRawRepresentable::attempt(
             *this, lhs, rhs, locator)) {
       conversionsOrFixes.push_back(fix);
@@ -2662,11 +2703,9 @@ bool ConstraintSystem::repairFailures(
     // But if `T.Element` didn't get resolved to `Void` we'd like
     // to diagnose this as a missing argument which can't be ignored.
     if (arg != getTypeVariables().end()) {
-      auto fnType = FunctionType::get({FunctionType::Param(lhs)},
-                                      getASTContext().TheEmptyTupleType);
-      conversionsOrFixes.push_back(AddMissingArguments::create(
-          *this, fnType, {FunctionType::Param(*arg)},
-          getConstraintLocator(anchor, path)));
+      conversionsOrFixes.push_back(
+          AddMissingArguments::create(*this, {FunctionType::Param(*arg)},
+                                      getConstraintLocator(anchor, path)));
     }
 
     if ((lhs->is<InOutType>() && !rhs->is<InOutType>()) ||
@@ -4662,7 +4701,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     auto decl = candidate.getDecl();
     
     // If the result is invalid, skip it.
-    TC.validateDecl(decl);
+    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+    (void)decl->getInterfaceType();
     if (decl->isInvalid()) {
       result.markErrorAlreadyDiagnosed();
       return;
@@ -5036,7 +5076,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
       auto *cand = entry.getValueDecl();
 
       // If the result is invalid, skip it.
-      TC.validateDecl(cand);
+      // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+      (void)cand->getInterfaceType();
       if (cand->isInvalid()) {
         result.markErrorAlreadyDiagnosed();
         return result;
@@ -7020,7 +7061,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
   // Record the 'dynamicallyCall` method overload set.
   SmallVector<OverloadChoice, 4> choices;
   for (auto candidate : candidates) {
-    TC.validateDecl(candidate);
+    // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
+    (void)candidate->getInterfaceType();
     if (candidate->isInvalid()) continue;
     choices.push_back(
       OverloadChoice(type2, candidate, FunctionRefKind::SingleApply));
@@ -7658,6 +7700,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
   case FixKind::UseWrappedValue:
+  case FixKind::ExpandArrayIntoVarargs:
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;

@@ -13,6 +13,7 @@
 #ifndef SWIFT_SIL_BRANCHPROPAGATEDUSER_H
 #define SWIFT_SIL_BRANCHPROPAGATEDUSER_H
 
+#include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/DenseMap.h"
@@ -27,74 +28,98 @@ namespace swift {
 /// BranchPropagatedUser and friends break all such critical edges.
 class BranchPropagatedUser {
   using InnerTy = llvm::PointerIntPair<SILInstruction *, 1>;
-  InnerTy User;
+  InnerTy user;
 
 public:
-  BranchPropagatedUser(SILInstruction *I) : User(I) {
-    assert(!isa<CondBranchInst>(I));
+  BranchPropagatedUser(Operand *op) : user() {
+    auto *opUser = op->getUser();
+    auto *cbi = dyn_cast<CondBranchInst>(opUser);
+    if (!cbi) {
+      user = InnerTy(opUser, 0);
+      return;
+    }
+    unsigned operandIndex = op->getOperandNumber();
+    if (cbi->isConditionOperandIndex(operandIndex)) {
+      // TODO: Is this correct?
+      user = InnerTy(cbi, CondBranchInst::TrueIdx);
+      return;
+    }
+    bool isTrueOperand = cbi->isTrueOperandIndex(operandIndex);
+    if (isTrueOperand) {
+      user = InnerTy(cbi, CondBranchInst::TrueIdx);
+    } else {
+      user = InnerTy(cbi, CondBranchInst::FalseIdx);
+    }
   }
+  BranchPropagatedUser(const Operand *op)
+      : BranchPropagatedUser(const_cast<Operand *>(op)) {}
 
-  BranchPropagatedUser(CondBranchInst *I) : User(I) {}
-
-  BranchPropagatedUser(CondBranchInst *I, unsigned SuccessorIndex)
-      : User(I, SuccessorIndex) {
-    assert(SuccessorIndex == CondBranchInst::TrueIdx ||
-           SuccessorIndex == CondBranchInst::FalseIdx);
-  }
-
-  BranchPropagatedUser(const BranchPropagatedUser &Other) : User(Other.User) {}
-  BranchPropagatedUser &operator=(const BranchPropagatedUser &Other) {
-    User = Other.User;
+  BranchPropagatedUser(const BranchPropagatedUser &other) : user(other.user) {}
+  BranchPropagatedUser &operator=(const BranchPropagatedUser &other) {
+    user = other.user;
     return *this;
   }
 
-  operator SILInstruction *() { return User.getPointer(); }
-  operator const SILInstruction *() const { return User.getPointer(); }
+  operator SILInstruction *() { return user.getPointer(); }
+  operator const SILInstruction *() const { return user.getPointer(); }
 
-  SILInstruction *getInst() const { return User.getPointer(); }
+  SILInstruction *getInst() const { return user.getPointer(); }
 
   SILBasicBlock *getParent() const {
     if (!isCondBranchUser()) {
       return getInst()->getParent();
     }
 
-    auto *CBI = cast<CondBranchInst>(getInst());
-    unsigned Number = getCondBranchSuccessorID();
-    if (Number == CondBranchInst::TrueIdx)
-      return CBI->getTrueBB();
-    return CBI->getFalseBB();
+    auto *cbi = cast<CondBranchInst>(getInst());
+    unsigned number = getCondBranchSuccessorID();
+    if (number == CondBranchInst::TrueIdx)
+      return cbi->getTrueBB();
+    return cbi->getFalseBB();
   }
 
   bool isCondBranchUser() const {
-    return isa<CondBranchInst>(User.getPointer());
+    return isa<CondBranchInst>(user.getPointer());
   }
 
   unsigned getCondBranchSuccessorID() const {
     assert(isCondBranchUser());
-    return User.getInt();
+    return user.getInt();
   }
 
   SILBasicBlock::iterator getIterator() const {
-    return User.getPointer()->getIterator();
+    return user.getPointer()->getIterator();
   }
 
   void *getAsOpaqueValue() const {
-    return llvm::PointerLikeTypeTraits<InnerTy>::getAsVoidPointer(User);
+    return llvm::PointerLikeTypeTraits<InnerTy>::getAsVoidPointer(user);
   }
 
   static BranchPropagatedUser getFromOpaqueValue(void *p) {
-    InnerTy TmpUser =
+    InnerTy tmpUser =
         llvm::PointerLikeTypeTraits<InnerTy>::getFromVoidPointer(p);
-    if (auto *CBI = dyn_cast<CondBranchInst>(TmpUser.getPointer())) {
-      return BranchPropagatedUser(CBI, TmpUser.getInt());
+    if (auto *cbi = dyn_cast<CondBranchInst>(tmpUser.getPointer())) {
+      return BranchPropagatedUser(cbi, tmpUser.getInt());
     }
-    return BranchPropagatedUser(TmpUser.getPointer());
+    return BranchPropagatedUser(tmpUser.getPointer());
   }
 
   enum {
     NumLowBitsAvailable =
         llvm::PointerLikeTypeTraits<InnerTy>::NumLowBitsAvailable
   };
+
+private:
+  BranchPropagatedUser(SILInstruction *inst) : user(inst) {
+    assert(!isa<CondBranchInst>(inst));
+  }
+
+  BranchPropagatedUser(CondBranchInst *cbi) : user(cbi) {}
+
+  BranchPropagatedUser(CondBranchInst *cbi, unsigned successorIndex)
+      : user(cbi, successorIndex) {
+    assert(successorIndex == CondBranchInst::TrueIdx ||
+           successorIndex == CondBranchInst::FalseIdx);
+  }
 };
 
 } // namespace swift

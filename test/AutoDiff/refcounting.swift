@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -Xllvm -debug-only=differentiation 2>&1 %s | %FileCheck %s -check-prefix=CHECK-DATA-STRUCTURES
-// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-skip-folding-autodiff-function-extraction %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -Xllvm -differentiation-skip-folding-differentiable-function-extraction %s | %FileCheck %s
 
 public class NonTrivialStuff : Equatable {
   public init() {}
@@ -83,8 +83,8 @@ _ = pullback(at: Vector.zero, in: testOwnedVector)
 // CHECK:   [[ADD:%.*]] = function_ref @Vector_plus
 // CHECK:   [[ADD_JVP:%.*]] = function_ref @{{.*}}Vector_plus__jvp_src_0_wrt_0_1{{.*}}
 // CHECK:   [[ADD_VJP:%.*]] = function_ref @{{.*}}Vector_plus__vjp_src_0_wrt_0_1{{.*}}
-// CHECK:   [[ADD_AD_FUNC:%.*]] = autodiff_function [wrt 0 1] [order 1] [[ADD]] {{.*}} with {[[ADD_JVP]] {{.*}}, [[ADD_VJP]] {{.*}}}
-// CHECK:   [[ADD_AD_FUNC_EXTRACT:%.*]] = autodiff_function_extract [vjp] [order 1] [[ADD_AD_FUNC]]
+// CHECK:   [[ADD_AD_FUNC:%.*]] = differentiable_function [wrt 0 1] [order 1] [[ADD]] {{.*}} with {[[ADD_JVP]] {{.*}}, [[ADD_VJP]] {{.*}}}
+// CHECK:   [[ADD_AD_FUNC_EXTRACT:%.*]] = differentiable_function_extract [vjp] [order 1] [[ADD_AD_FUNC]]
 // CHECK:   [[ADD_VJP_RESULT:%.*]] = apply [[ADD_AD_FUNC_EXTRACT]]({{.*}}, {{.*}}, {{.*}}) : $@convention(method) (@guaranteed Vector, @guaranteed Vector, @thin Vector.Type) -> (@owned Vector, @owned @callee_guaranteed (@in_guaranteed Vector) -> (@out Vector, @out Vector))
 // CHECK:   [[ADD_PULLBACK:%.*]] = tuple_extract [[ADD_VJP_RESULT]] : $(Vector, @callee_guaranteed (@in_guaranteed Vector) -> (@out Vector, @out Vector)), 1
 // CHECK-NOT:   release_value [[ADD_VJP_RESULT]]

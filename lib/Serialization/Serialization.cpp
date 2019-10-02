@@ -29,6 +29,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Dwarf.h"
@@ -784,8 +785,9 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_TWO_OPERANDS_EXTRA_ATTR);
   // SWIFT_ENABLE_TENSORFLOW
   BLOCK_RECORD(sil_block, SIL_DIFFERENTIABLE_ATTR);
-  BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION);
-  BLOCK_RECORD(sil_block, SIL_INST_AUTODIFF_FUNCTION_EXTRACT);
+  BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION);
+  BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   // These layouts can exist in both decl blocks and sil blocks.
 #define BLOCK_RECORD_WITH_NAMESPACE(K, X) emitRecordID(X, #X, nameBuffer)
@@ -2299,7 +2301,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     // SWIFT_ENABLE_TENSORFLOW
     case DAK_Differentiable: {
       auto abbrCode = S.DeclTypeAbbrCodes[DifferentiableDeclAttrLayout::Code];
-      auto attr = cast<DifferentiableAttr>(DA);
+      auto *attr = cast<DifferentiableAttr>(DA);
 
       IdentifierID jvpName = 0;
       DeclID jvpRef = 0;
@@ -2323,9 +2325,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
-          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef, indices);
-
-      S.writeGenericRequirements(attr->getRequirements(), S.DeclTypeAbbrCodes);
+          attr->isLinear(), jvpName, jvpRef, vjpName, vjpRef,
+          S.addGenericSignatureRef(attr->getDerivativeGenericSignature()),
+          indices);
       return;
     }
 
@@ -2865,7 +2867,7 @@ public:
 
     auto contextID = S.addDeclContextRef(typeAlias->getDeclContext());
 
-    auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
+    auto underlying = typeAlias->getUnderlyingType();
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
@@ -3329,10 +3331,10 @@ public:
     //
     // FIXME: Once accessor synthesis and getInterfaceType() itself are
     // request-ified this goes away.
-    if (!fn->hasValidSignature()) {
+    if (!fn->hasInterfaceType()) {
       assert(fn->isImplicit());
-      S.M->getASTContext().getLazyResolver()->resolveDeclSignature(
-          const_cast<AccessorDecl *>(fn));
+      // FIXME: Remove this one
+      (void)fn->getInterfaceType();
     }
 
     using namespace decls_block;
@@ -3796,7 +3798,7 @@ public:
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
+    auto underlyingType = typeAlias->getUnderlyingType();
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
     TypeAliasTypeLayout::emitRecord(

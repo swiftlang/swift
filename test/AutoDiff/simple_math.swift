@@ -1,4 +1,6 @@
 // RUN: %target-run-simple-swift
+// NOTE(TF-813): verify that enabling forward-mode does not affect reverse-mode.
+// RUN: %target_run_simple_swift_forward_mode_differentiation
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -307,6 +309,21 @@ SimpleMathTests.test("StructGeneric") {
     return generic.x * generic.y
   }
   expectEqual(405, gradient(at: 3, in: fifthPower))
+}
+
+SimpleMathTests.test("StructWithNoDerivativeProperty") {
+  struct NoDerivativeProperty : Differentiable {
+    var x: Float
+    @noDerivative var y: Float
+  }
+  expectEqual(
+    NoDerivativeProperty.TangentVector(x: 1),
+    gradient(at: NoDerivativeProperty(x: 1, y: 1)) { s -> Float in
+      var tmp = s
+      tmp.y = tmp.x
+      return tmp.x
+    }
+  )
 }
 
 SimpleMathTests.test("SubsetIndices") {

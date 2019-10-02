@@ -18,6 +18,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
@@ -2925,10 +2926,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case SILInstructionKind::AutoDiffFunctionInst: {
-    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T
+  case SILInstructionKind::DifferentiableFunctionInst: {
+    // e.g. differentiable_function [wrt 0 1 2] [order 2] %0 : $T
     //
-    // e.g. autodiff_function [wrt 0 1 2] [order 2] %0 : $T with
+    // e.g. differentiable_function [wrt 0 1 2] [order 2] %0 : $T with
     //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
@@ -3016,15 +3017,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     auto *parameterIndicesSubset =
         AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
                                  parameterIndices);
-    ResultVal = B.createAutoDiffFunction(InstLoc, parameterIndicesSubset, order,
-                                         original, associatedFunctions);
+    ResultVal = B.createDifferentiableFunction(
+        InstLoc, parameterIndicesSubset, order, original, associatedFunctions);
     break;
   }
   
-  case SILInstructionKind::AutoDiffFunctionExtractInst: {
-    // Parse the rest of the instruction: an associated function kind, a
-    // function operand, an order operand and a debug location.
-    AutoDiffFunctionExtractInst::Extractee extractee;
+  case SILInstructionKind::DifferentiableFunctionExtractInst: {
+    // Parse the rest of the instruction: an extractee, a differentiation order,
+    // a differentiable function operand, and a debug location.
+    DifferentiableFunctionExtractee extractee;
     StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
     unsigned order = 0;
     SILValue functionOperand;
@@ -3055,10 +3056,11 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createAutoDiffFunctionExtract(InstLoc, extractee, order,
-                                                functionOperand);
+    ResultVal = B.createDifferentiableFunctionExtract(
+        InstLoc, extractee, order, functionOperand);
     break;
   }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   case SILInstructionKind::DynamicFunctionRefInst: {
     SILFunction *Fn;
@@ -3403,7 +3405,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILType, 4> operandTypes;
     {
       Scope genericsScope(&P, ScopeKind::Generics);
-      generics = P.maybeParseGenericParams().getPtrOrNull();
+      generics = P.parseSILGenericParams().getPtrOrNull();
       patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
       
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
@@ -5825,7 +5827,14 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         FunctionState.convertRequirements(
             FunctionState.F, attr->getWhereClause()->getRequirements(),
             requirements);
-        attr->setRequirements(requirements);
+        auto *derivativeGenSig = evaluateOrDefault(
+            P.Context.evaluator,
+            AbstractGenericSignatureRequest{
+              FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+              /*addedGenericParams=*/{},
+              std::move(requirements)},
+              nullptr);
+        attr->setDerivativeGenericSignature(derivativeGenSig);
       }
 
       // Parse the basic block list.
@@ -6040,7 +6049,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   GenericEnvironment *patternEnv;
   Scope toplevelScope(&P, ScopeKind::TopLevel);
   Scope genericsScope(&P, ScopeKind::Generics);
-  generics = P.maybeParseGenericParams().getPtrOrNull();
+  generics = P.parseSILGenericParams().getPtrOrNull();
   patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
   
   if (patternEnv) {
@@ -6354,7 +6363,7 @@ Optional<ProtocolConformanceRef> SILParser::parseProtocolConformance(
   // Make sure we don't leave it uninitialized in the caller
   genericEnv = nullptr;
 
-  auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
+  auto *genericParams = P.parseSILGenericParams().getPtrOrNull();
   if (genericParams) {
     genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
   }

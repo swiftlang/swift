@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
 using namespace swift;
@@ -649,8 +650,10 @@ static Type lookupDefaultLiteralType(TypeChecker &TC, const DeclContext *dc,
   TypeDecl *TD = lookup.getSingleTypeResult();
   if (!TD)
     return Type();
-  TC.validateDecl(TD);
-
+  
+  // FIXME: Make isInvalid ask for the interface type.
+  (void)TD->getInterfaceType();
+  
   if (TD->isInvalid())
     return Type();
 

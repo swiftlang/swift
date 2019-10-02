@@ -51,30 +51,98 @@ BUILTIN_CAST_OR_BITCAST_OPERATION(SExtOrBitCast,  "sextOrBitCast",  "n")
 #undef BUILTIN_CAST_OR_BITCAST_OPERATION
 
 /// Binary operations have type (T,T) -> T.
+///
+/// We define two different sorts of operations varying when T is static,
+/// specifically:
+///
+/// 1. Overloaded statically typed operations. E.x:
+///
+///       builtin "add_Vec4xInt32"(Vec4xInt32, Vec4xInt32) : Vec4xInt32.
+///
+/// 2. Polymorphic typed operations that are valid only in raw SIL. By the time
+///    diagnostic constant propagation runs, these must have as its operand a
+///    fully specialized type. If the builtin has a type that is not one of its
+///    overloaded types, diagnostic constant propagation will emit a diagnostic
+///    saying the builtin's type has not been fully resolved. Otherwise,
+///    diagnostic constant propagation will transform the builtin to the
+///    relevant static overloaded builtin form. E.x.:
+///
+///       builtin "add"(Self, Self) : Self // *error*
+///
+///         OR
+///
+///       builtin "generic_add"(Vec4xInt32, Vec4xInt32) : Vec4xInt32
+///         ->
+///       builtin "add_Vec4xInt32"(Vec4xInt32, Vec4xInt32) : Vec4xInt32
+///
+/// NOTE: If a polymorphic typed operation is not static by the time guaranteed
+/// constant propagation runs, we emit a diagnostic to inform the user (who is
+/// assumed to be an expert user) to tell them the value was unspecialized. The
+/// typical way this specialization occurs today is via transparent inlining
+/// since the transparent inliner devirtualizes and specializes as it goes. Of
+/// course this means mandatory inlining must /always/ occur before diagnostic
+/// constant propagation.
+///
+/// NOTE: Often times the builtin infrastructure wants to treat all
+/// binary operation builtins generic or not the same way. To ensure
+/// we support all use cases in the compiler, we do not declare the
+/// operations as part of this builtin since often times this macro is
+/// used to generic code. Instead, we stamp this out using the
+/// overloaded_static, polymorphic, and all suffixed operations.
 #ifndef BUILTIN_BINARY_OPERATION
-#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs, Overload) \
-          BUILTIN(Id, Name, Attrs)
+#define BUILTIN_BINARY_OPERATION(Id, Name, Attrs) BUILTIN(Id, Name, Attrs)
 #endif
-BUILTIN_BINARY_OPERATION(Add,     "add",      "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(FAdd,    "fadd",     "n", FloatOrVector)
-BUILTIN_BINARY_OPERATION(And,     "and",      "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(AShr,    "ashr",     "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(LShr,    "lshr",     "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(Or,      "or",       "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(FDiv,    "fdiv",     "n", FloatOrVector)
-BUILTIN_BINARY_OPERATION(Mul,     "mul",      "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(FMul,    "fmul",     "n", FloatOrVector)
-BUILTIN_BINARY_OPERATION(SDiv,    "sdiv",     "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(ExactSDiv, "sdiv_exact", "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(Shl,     "shl",      "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(SRem,    "srem",     "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(Sub,     "sub",      "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(FSub,    "fsub",     "n", FloatOrVector)
-BUILTIN_BINARY_OPERATION(UDiv,    "udiv",     "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(ExactUDiv, "udiv_exact", "n", IntegerOrVector)
-BUILTIN_BINARY_OPERATION(URem,    "urem",     "n", Integer)
-BUILTIN_BINARY_OPERATION(FRem,    "frem",     "n", FloatOrVector)
-BUILTIN_BINARY_OPERATION(Xor,     "xor",      "n", IntegerOrVector)
+
+#ifdef BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR
+#error "Do not define BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR before including this .def file"
+#endif
+
+#define BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR(NAME) #NAME
+
+#ifndef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
+#define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Id, Name, Attrs, Overload) \
+  BUILTIN_BINARY_OPERATION(Id, Name, Attrs)
+#endif
+
+#ifndef BUILTIN_BINARY_OPERATION_POLYMORPHIC
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name, Attrs) \
+  BUILTIN_BINARY_OPERATION(Id, Name, Attrs)
+#endif
+
+// TODO: This needs a better name. We stringify generic_ in *_{OVERLOADED_STATIC,POLYMORPHIC}
+#ifndef BUILTIN_BINARY_OPERATION_ALL
+#define BUILTIN_BINARY_OPERATION_ALL(Id, Name, Attrs, Overload) \
+  BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Id, BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR(Name), Attrs, Overload) \
+  BUILTIN_BINARY_OPERATION_POLYMORPHIC(Generic##Id, BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR(generic_##Name), Attrs)
+#endif
+
+// NOTE: Here we need our name field to be bare. We stringify them as
+// appropriately in BUILTIN_BINARY_OPERATION_{OVERLOADED_STATIC,POLYMORPHIC}.
+BUILTIN_BINARY_OPERATION_ALL(Add,     add,      "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(FAdd,    fadd,     "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_ALL(And,     and,      "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(AShr,    ashr,     "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(LShr,    lshr,     "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(Or,      or,       "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(FDiv,    fdiv,     "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_ALL(Mul,     mul,      "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(FMul,    fmul,     "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_ALL(SDiv,    sdiv,     "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(ExactSDiv, sdiv_exact, "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(Shl,     shl,      "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(SRem,    srem,     "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(Sub,     sub,      "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(FSub,    fsub,     "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_ALL(UDiv,    udiv,     "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(ExactUDiv, udiv_exact, "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_ALL(URem,    urem,     "n", Integer)
+BUILTIN_BINARY_OPERATION_ALL(FRem,    frem,     "n", FloatOrVector)
+BUILTIN_BINARY_OPERATION_ALL(Xor,     xor,      "n", IntegerOrVector)
+BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Expect, "int_expect", "n", Integer)
+#undef BUILTIN_BINARY_OPERATION_ALL
+#undef BUILTIN_BINARY_OPERATION_POLYMORPHIC
+#undef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
+#undef BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR
 #undef BUILTIN_BINARY_OPERATION
 
 /// These builtins are analogous the similarly named llvm intrinsics. The

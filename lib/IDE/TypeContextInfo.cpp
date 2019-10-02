@@ -139,10 +139,8 @@ void ContextInfoCallbacks::getImplicitMembers(
       if (VD->isOperator())
         return false;
 
-      if (!VD->hasInterfaceType()) {
-        TypeResolver->resolveDeclSignature(VD);
-        if (!VD->hasInterfaceType())
-          return false;
+      if (!VD->getInterfaceType()) {
+        return false;
       }
 
       // Enum element decls can always be referenced by implicit member

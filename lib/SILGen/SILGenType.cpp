@@ -25,6 +25,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -89,7 +90,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   // SWIFT_ENABLE_TENSORFLOW
   } else if (auto *adafi = derived.autoDiffAssociatedFunctionIdentifier) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
-    // `autodiff_function` instruction, which is later filled during the
+    // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
     implFn = getOrCreateAutoDiffClassMethodThunk(
         derived, Types.getConstantInfo(derived).SILFnType);

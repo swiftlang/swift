@@ -3022,26 +3022,28 @@ public:
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-class AutoDiffFunctionExpr : public ImplicitConversionExpr {
+class DifferentiableFunctionExpr : public ImplicitConversionExpr {
 public:
-  AutoDiffFunctionExpr(Expr *subExpr, Type ty)
-      : ImplicitConversionExpr(ExprKind::AutoDiffFunction, subExpr, ty) {}
+  DifferentiableFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::DifferentiableFunction, subExpr, ty) {}
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::AutoDiffFunction;
+    return E->getKind() == ExprKind::DifferentiableFunction;
   }
 };
 
-class AutoDiffFunctionExtractOriginalExpr : public ImplicitConversionExpr {
+class DifferentiableFunctionExtractOriginalExpr
+    : public ImplicitConversionExpr {
 public:
-  AutoDiffFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
-      : ImplicitConversionExpr(ExprKind::AutoDiffFunctionExtractOriginal,
+  DifferentiableFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::DifferentiableFunctionExtractOriginal,
                                subExpr, ty) {}
 
   static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::AutoDiffFunctionExtractOriginal;
+    return E->getKind() == ExprKind::DifferentiableFunctionExtractOriginal;
   }
 };
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// Use an opaque type to abstract a value of the underlying concrete type.
 class UnderlyingToOpaqueExpr : public ImplicitConversionExpr {

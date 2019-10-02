@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ReferenceCounting.h"
@@ -1040,8 +1041,8 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     origFnArgVals.push_back(arg.getValue());
 
   // Get the associated function.
-  SILValue assocFn = SGF.B.createAutoDiffFunctionExtract(
-          loc, kind, /*differentiationOrder*/ 1, origFnVal);
+  SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, kind, /*differentiationOrder*/ 1, origFnVal);
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
 
   // We don't need to destroy the original function or retain the `assocFn`,

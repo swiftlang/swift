@@ -504,9 +504,10 @@ namespace {
     RValue visitTapExpr(TapExpr *E, SGFContext C);
 
     // SWIFT_ENABLE_TENSORFLOW
-    RValue visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E, SGFContext C);
-    RValue visitAutoDiffFunctionExtractOriginalExpr(
-        AutoDiffFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E,
+                                           SGFContext C);
+    RValue visitDifferentiableFunctionExtractOriginalExpr(
+        DifferentiableFunctionExtractOriginalExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -1549,8 +1550,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
 
   // C function pointers cannot capture anything from their context.
-  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
-    *constant.getAnyFunctionRef());
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
 
   if (captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||
@@ -2198,9 +2198,6 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
-
-  // TODO: Should apply the default arg generator's captures, but Sema doesn't
-  // track them.
   
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
@@ -2215,8 +2212,13 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
+
+  SmallVector<ManagedValue, 4> captures;
+  emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
+               captures);
+
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, captures, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -5385,24 +5387,25 @@ RValue RValueEmitter::visitUnevaluatedInstanceExpr(UnevaluatedInstanceExpr *E,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-RValue RValueEmitter::visitAutoDiffFunctionExpr(AutoDiffFunctionExpr *E,
-                                                SGFContext C) {
-  auto orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
+RValue RValueEmitter::visitDifferentiableFunctionExpr(
+    DifferentiableFunctionExpr *E, SGFContext C) {
+  auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
   // TODO(rxwei): Use the order specified in E's function type.
-  auto *diffFunc = SGF.B.createAutoDiffFunction(
+  auto *diffFunc = SGF.B.createDifferentiableFunction(
       E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
-      orig.forward(SGF));
+      origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 
-RValue RValueEmitter::visitAutoDiffFunctionExtractOriginalExpr(
-    AutoDiffFunctionExtractOriginalExpr *E, SGFContext C) {
+RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
+    DifferentiableFunctionExtractOriginalExpr *E, SGFContext C) {
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  auto *orig = SGF.B.createAutoDiffFunctionExtractOriginal(
+  auto *origFunc = SGF.B.createDifferentiableFunctionExtractOriginal(
       E, diffFunc.forward(SGF));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(orig));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(origFunc));
 }
+// SWIFT_ENABLE_TENSORFLOW END
 
 RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
   // This implementation is not very robust; if TapExpr were to ever become

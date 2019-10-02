@@ -695,11 +695,19 @@ public:
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1);
 
+  //-------------------------------------------------------------------------//
+  // Ignore token APIs.
+  // This is used when we skip gabage text in the source text. 
+
+  /// Ignore the current single token.
   void ignoreToken();
   void ignoreToken(tok Kind) {
+  /// Ignore the current single token asserting its kind.
     assert(Tok.is(Kind));
     ignoreToken();
   }
+  /// Conditionally ignore the current single token if it matches with the \p
+  /// Kind.
   bool ignoreIf(tok Kind) {
     if (!Tok.is(Kind))
       return false;
@@ -868,7 +876,7 @@ public:
   ///
   /// If the input is malformed, this emits the specified error diagnostic.
   bool parseToken(tok K, SourceLoc &TokLoc, const Diagnostic &D);
-  llvm::Optional<ParsedTokenSyntax> parseTokenSyntax(tok K,
+  llvm::Optional<ParsedTokenSyntax> parseTokenSyntax(tok K, SourceLoc &TokLoc,
                                                      const Diagnostic &D);
 
   template<typename ...DiagArgTypes, typename ...ArgTypes>
@@ -895,7 +903,8 @@ public:
                             const Diagnostic &D);
 
   llvm::Optional<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc);
+  parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
@@ -1209,7 +1218,8 @@ public:
   using TypeASTResult = ParserResult<TypeRepr>;
   using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
 
-  LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
+  ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
+  parseLayoutConstraintSyntax();
 
   TypeResult parseTypeSyntax();
   TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
@@ -1656,8 +1666,19 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics Parsing
 
+  ParserResult<GenericParamList> parseSILGenericParams();
+
+  ParserStatus parseSILGenericParamsSyntax(
+      Optional<ParsedGenericParameterClauseListSyntax> &result);
+
+  ParsedSyntaxResult<ParsedGenericParameterClauseSyntax>
+  parseGenericParameterClauseSyntax();
+
+  ParsedSyntaxResult<ParsedGenericWhereClauseSyntax>
+  parseGenericWhereClauseSyntax(bool &FirstTypeInComplete,
+                                bool AllowLayoutConstraints = false);
+
   ParserResult<GenericParamList> parseGenericParameters();
-  ParserResult<GenericParamList> parseGenericParameters(SourceLoc LAngleLoc);
   ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();

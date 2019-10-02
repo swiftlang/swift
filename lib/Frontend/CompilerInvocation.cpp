@@ -337,7 +337,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       Args.hasFlag(options::OPT_enable_astscope_lookup,
                    options::OPT_disable_astscope_lookup, Opts.EnableASTScopeLookup) ||
       Opts.DisableParserLookup;
-  Opts.CompareToASTScopeLookup |= Args.hasArg(OPT_compare_to_astscope_lookup);
+  Opts.CrosscheckUnqualifiedLookup |=
+      Args.hasArg(OPT_crosscheck_unqualified_lookup);
   Opts.StressASTScopeLookup |= Args.hasArg(OPT_stress_astscope_lookup);
   Opts.WarnIfASTScopeLookup |= Args.hasArg(OPT_warn_if_astscope_lookup);
   Opts.LazyASTScopes |= Args.hasArg(OPT_lazy_astscopes);
@@ -944,6 +945,8 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_tbd_install_name)) {
     Opts.InstallName = A->getValue();
   }
+
+  Opts.IsInstallAPI = Args.hasArg(OPT_tbd_is_installapi);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     if (auto vers = version::Version::parseVersionString(

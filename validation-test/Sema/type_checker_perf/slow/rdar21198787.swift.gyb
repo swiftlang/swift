@@ -1,5 +1,4 @@
 // RUN: %scale-test --invert-result --begin 1 --end 10 --step 1 --select NumLeafScopes %s
-// REQUIRES: OS=macosx
 // REQUIRES: asserts
 
 private let _: [Any?] = [[

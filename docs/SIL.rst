@@ -17,8 +17,10 @@ the Swift programming language. SIL accommodates the following use cases:
   such as definitive initialization of variables and constructors, code
   reachability, switch coverage.
 - High-level optimization passes, including retain/release optimization,
-  dynamic method devirtualization, closure inlining, memory allocation promotion,
-  and generic function instantiation.
+  dynamic method devirtualization, closure inlining, promoting heap allocations
+  to stack allocations, promoting stack allocations to SSA registers, scalar
+  replacement of aggregates (splitting aggregate allocations into multiple
+  smaller allocations), and generic function instantiation.
 - A stable distribution format that can be used to distribute "fragile"
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.
@@ -5598,30 +5600,32 @@ The rules on generic substitutions are identical to those of ``apply``.
 Automatic Differentiation
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-autodiff_function
+differentiable_function
 `````````````````
 
 ::
 
-  sil-instruction ::= 'autodiff_function'
-                      sil-autodiff-function-parameter-indices?
-                      sil-autodiff-function-order?
+  sil-instruction ::= 'differentiable_function'
+                      sil-differentiable-function-parameter-indices?
+                      sil-differentiable-function-order?
                       sil-value ':' sil-type
-                      sil-autodiff-associated-functions-clause?
+                      sil-differentiable-function-associated-functions-clause?
                       
-  sil-autodiff-function-parameter-indices ::= '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
-  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
-  sil-autodiff-associated-functions-clause ::= 'with' sil-autodiff-associated-function-list
-                                               (',' sil-autodiff-associated-function-list)*
-  sil-autodiff-associated-function-list ::= '{' sil-value ',' sil-value '}'
+  sil-differentiable-function-parameter-indices ::=
+      '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
+  sil-differentiable-function-order ::= '[' 'order' [0-9]+ ']'
+  sil-differentiable-associated-functions-clause ::=
+      'with' sil-differentiable-associated-function-list
+      (',' sil-differentiable-associated-function-list)*
+  sil-differentiable-function-associated-function-list ::=
+      '{' sil-value ',' sil-value '}'
 
-
-  autodiff_function [wrt 0] [order 1] %0 : $(T) -> T \
-    with {%1 : $(T) -> (T) -> T, %2 : $(T) -> (T) -> T}
+  differentiable_function [wrt 0] [order 1] %0 : $(T) -> T \
+    with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
 Bundles a function with its associated differentiation functions up to a
 specified differentiation order into an ``@differentiable`` function. There are
-2 associated functions per differentiation order: a Jacobian-vector products
+two associated functions per differentiation order: a Jacobian-vector products
 (JVP) function and a vector-Jacobian products (VJP) function.
 
 ``[wrt ...]`` specifies parameter indices that the original function is
@@ -5636,28 +5640,28 @@ with the original function. When a ``with`` clause is not specified, the first
 operand will be differentiated to produce associated functions, and a ``with``
 clause will be added to the instruction.
 
-In raw SIL, it is optional to provide a ``with`` clause. In canonical SIL, a
-``with`` clause is mandatory.
+In raw SIL, it is optional to provide an associated function ``with`` clause.
+In canonical SIL, a ``with`` clause is mandatory.
 
 
-autodiff_function_extract
+differentiable_function_extract
 `````````````````````````
 
 ::
 
-  sil-instruction ::= 'autodiff_function_extract'
-                      sil-autodiff-associated-function-kind
-                      sil-autodiff-function-order
+  sil-instruction ::= 'differentiable_function_extract'
+                      sil-differentiable-function-extractee
+                      sil-differentiable-function-order?
                       sil-value ':' sil-type
 
-  sil-autodiff-function-extractee ::= '[' sil-autodiff-function-extractee ']'
-  sil-autodiff-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
-  sil-autodiff-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
+  sil-differentiable-function-extractee ::=
+      '[' sil-differentiable-function-extractee ']'
+  sil-differentiable-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
+  sil-differentiable-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
 
-
-  autodiff_function_extract [original] %0 : $@differentiable (T) -> T
-  autodiff_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
-  autodiff_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [original] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
 
 Extracts the original function or an associated function from the given
 ``@differentiable`` function at a specific differentiation order. It must be
