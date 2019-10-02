@@ -488,7 +488,7 @@ class TransformRange {
   Operation Op;
 
 public:
-  using iterator = TransformIterator<typename Range::iterator, Operation>;
+  using iterator = TransformIterator<decltype(Rng.begin()), Operation>;
 
   TransformRange(Range range, Operation op)
     : Rng(range), Op(op) { }
@@ -496,6 +496,20 @@ public:
   iterator begin() const { return iterator(Rng.begin(), Op); }
   iterator end() const { return iterator(Rng.end(), Op); }
   bool empty() const { return begin() == end(); }
+
+  // The dummy template parameter keeps 'size()' from being eagerly
+  // instantiated.
+  template <typename Dummy = Range>
+  typename function_traits<decltype(&Dummy::size)>::result_type
+  size() const {
+    return Rng.size();
+  }
+
+  template <typename Index>
+  typename function_traits<Operation>::result_type
+  operator[](Index index) const {
+    return Op(Rng[index]);
+  }
 
   typename std::iterator_traits<iterator>::value_type front() const { 
     assert(!empty() && "Front of empty range");
