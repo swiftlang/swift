@@ -52,7 +52,7 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 }
 
 void TBDGenVisitor::addSymbol(StringRef name, SymbolKind kind) {
-  Symbols.addSymbol(kind, name, Archs);
+  Symbols.addSymbol(kind, name, Targets);
 
   if (StringSymbols && kind == SymbolKind::GlobalSymbol) {
     auto isNewValue = StringSymbols->insert(name).second;
@@ -606,8 +606,8 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
                                            const TBDGenOptions &opts) {
   auto &ctx = M->getASTContext();
   auto isWholeModule = singleFile == nullptr;
-  const auto &target = ctx.LangOpts.Target;
-  UniversalLinkageInfo linkInfo(target, opts.HasMultipleIGMs, false,
+  const auto &triple = ctx.LangOpts.Target;
+  UniversalLinkageInfo linkInfo(triple, opts.HasMultipleIGMs, false,
                                 isWholeModule);
 
   llvm::MachO::InterfaceFile file;
@@ -620,27 +620,10 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
+  llvm::MachO::Target target(triple);
+  file.addTarget(target);
 
-  auto getPlatformKind =
-      [](const llvm::Triple &Target) -> llvm::MachO::PlatformKind {
-    switch (Target.getOS()) {
-    default:
-      return llvm::MachO::PlatformKind::unknown;
-    case llvm::Triple::MacOSX:
-      return llvm::MachO::PlatformKind::macOS;
-    case llvm::Triple::IOS:
-      return llvm::MachO::PlatformKind::iOS;
-    case llvm::Triple::TvOS:
-      return llvm::MachO::PlatformKind::tvOS;
-    case llvm::Triple::WatchOS:
-      return llvm::MachO::PlatformKind::watchOS;
-    }
-  };
-  auto arch = llvm::MachO::getArchitectureFromName(target.getArchName());
-  file.addArch(arch);
-  file.setPlatform(getPlatformKind(target));
-
-  TBDGenVisitor visitor(file, arch, symbols, linkInfo, M, opts);
+  TBDGenVisitor visitor(file, {target}, symbols, linkInfo, M, opts);
 
   auto visitFile = [&](FileUnit *file) {
     if (file == M->getFiles()[0]) {
