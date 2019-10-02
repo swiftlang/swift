@@ -55,3 +55,23 @@ public struct NotImplicitDynamic {
 @_silgen_name("foobar")
 public func noImplicitDynamicFunc() {
 }
+
+@propertyWrapper
+public struct SomeWrapper {
+  private var value: Int
+
+  public init(wrappedValue: Int) {
+    value = wrappedValue
+  }
+
+  public var wrappedValue: Int {
+    get { value }
+    set { value = newValue }
+  }
+}
+
+public class SomeWrapperTests {
+  // CHECK: sil [ossa] @$s16implicit_dynamic16SomeWrapperTestsC04someD0Sivg
+  // CHECK: sil [ossa] @$s16implicit_dynamic16SomeWrapperTestsC04someD0Sivs
+  @SomeWrapper public var someWrapper: Int = 0
+}

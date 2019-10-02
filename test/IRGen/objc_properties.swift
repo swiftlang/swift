@@ -2,6 +2,7 @@
 
 // RUN: %swift -target x86_64-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NEW %s
 // RUN: %swift -target x86_64-apple-macosx10.10 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-OLD %s
+// RUN: %swift -target x86_64-apple-macosx10.11 %s -disable-target-os-checking -emit-ir -disable-objc-attr-requires-foundation-module -enable-implicit-dynamic
 
 // REQUIRES: OS=macosx
 // REQUIRES: objc_interop
@@ -78,6 +79,29 @@ class Class17127126 {
   static var sharedInstance: AnyObject { get set }
 }
 
+@propertyWrapper
+public struct SomeWrapper {
+  private var value: Int
+
+
+  public init(wrappedValue: Int) {
+    value = wrappedValue
+  }
+
+
+  public var wrappedValue: Int {
+    get { value }
+    set { value = newValue }
+  }
+}
+
+class SomeWrapperTests {
+  @objc @SomeWrapper var someWrapper: Int = 0
+
+  func testAssignment() {
+    someWrapper = 1000
+  }
+}
 // CHECK-NEW: [[SHARED_NAME:@.*]] = private unnamed_addr constant [11 x i8] c"sharedProp\00"
 // CHECK-NEW: [[SHARED_ATTRS:@.*]] = private unnamed_addr constant [5 x i8] c"Tq,N\00"
 

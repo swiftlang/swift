@@ -2873,6 +2873,9 @@ void TypeChecker::addImplicitDynamicAttribute(Decl *D) {
     // Don't add to implicit variables.
     if (VD->isImplicit())
       return;
+    // Properties with a property wrapper are not replaceable.
+    if (VD->getPropertyWrapperBackingPropertyInfo())
+      return;
   }
 
   if (!D->getAttrs().hasAttribute<DynamicAttr>() &&
