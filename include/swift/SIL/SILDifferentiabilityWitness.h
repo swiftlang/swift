@@ -92,6 +92,9 @@ public:
       AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
       GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized);
+
+  void print(llvm::raw_ostream &OS, bool verbose = false) const;
+  void dump() const;
 };
 
 } // end namespace swift

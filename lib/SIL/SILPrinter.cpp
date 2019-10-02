@@ -2704,6 +2704,32 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
     wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static void printSILDifferentiabilityWitnesses(
+    SILPrintContext &Ctx,
+    const SILModule::DifferentiabilityWitnessListType &diffWitnesses) {
+  if (!Ctx.sortSIL()) {
+    for (auto &dw : diffWitnesses)
+      dw.print(Ctx.OS(), Ctx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILDifferentiabilityWitness *> sortedDiffWitnesses;
+  sortedDiffWitnesses.reserve(diffWitnesses.size());
+  for (auto &dw : diffWitnesses)
+    sortedDiffWitnesses.push_back(&dw);
+  std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
+    [] (const SILDifferentiabilityWitness *w1,
+        const SILDifferentiabilityWitness *w2) -> bool {
+      return w1->getOriginalFunction()->getName()
+          .compare(w2->getOriginalFunction()->getName());
+    }
+  );
+  for (auto *dw : sortedDiffWitnesses)
+    dw->print(Ctx.OS(), Ctx.printVerbose());
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapCollectionType &CoverageMaps) {
@@ -2821,6 +2847,10 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
+  // SWIFT_ENABLE_TENSORFLOW
+  printSILDifferentiabilityWitnesses(PrintCtx,
+                                     getDifferentiabilityWitnessList());
+  // SWIFT_ENABLE_TENSORFLOW END
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
@@ -3034,6 +3064,50 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+void SILDifferentiabilityWitness::print(
+    llvm::raw_ostream &OS, bool verbose) const {
+  // TODO(TF-867): Test SIL differentiability witness round-trip printing and
+  // parsing. It is currently untested and certainly broken.
+
+  // sil_differentiability_witness @original-function-name
+  PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  OS << "sil_differentiability_witness @" << originalFunction->getName();
+  // wrt 0, 1, ...
+  OS << " wrt ";
+  interleave(parameterIndices->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ", "; });
+  // sources 0, 1, ...
+  OS << " sources ";
+  interleave(resultIndices->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ", "; });
+  // wrt 0, 1, ...
+  if (derivativeGenericSignature) {
+    OS << " derivative_generic_signature ";
+    // NOTE: This needs to be changed if there is no utility for parsing
+    // generic signatures. Idea: we could instead print the type of the original
+    // function substituted into this generic signature.
+    derivativeGenericSignature->print(OS);
+  }
+  // {
+  //   jvp: @jvp-function-name
+  //   vjp: @vjp-function-name
+  // }
+  OS << " {\n";
+  if (jvp)
+    OS << "  jvp: @" << jvp->getName() << "\n";
+  if (vjp)
+    OS << "  vjp: @" << vjp->getName() << "\n";
+  OS << "}\n\n";
+}
+
+void SILDifferentiabilityWitness::dump() const {
+  print(llvm::errs());
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();

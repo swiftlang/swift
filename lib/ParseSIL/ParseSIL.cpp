@@ -77,6 +77,9 @@ public:
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
+  // SWIFT_ENABLE_TENSORFLOW
+  bool parseSILDifferentiabilityWitness(Parser &P) override;
+  // SWIFT_ENABLE_TENSORFLOW END
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
@@ -6790,6 +6793,22 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 
   SILDefaultWitnessTable::create(M, *Linkage, protocol, witnessEntries);
   BodyScope.reset();
+  return false;
+}
+
+/// decl-sil-differentiability-witness ::=
+///   'sil_differentiability_witness'
+///   sil-function-name
+///   'wrt' autodiff-index-subset
+///   'sources' autodiff-index-subset
+///   ('derivative_generic_signature' generic-signature)?
+///   '{' ('jvp' sil-function-name)? ('vjp' sil-function-name)? '}'
+///
+/// autodiff-index-subset ::=
+///     [0-9]+ (',', [0-9]+)*
+bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
+  P.consumeToken(tok::kw_sil_differentiability_witness);
+  // TODO(TF-867): Implement parsing. Test round-tripping with printing.
   return false;
 }
 
