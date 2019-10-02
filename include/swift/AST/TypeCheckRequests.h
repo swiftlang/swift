@@ -1255,6 +1255,23 @@ public:
   void cacheResult(bool value) const;
 };
 
+class IsABICompatibleOverrideRequest
+    : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>
