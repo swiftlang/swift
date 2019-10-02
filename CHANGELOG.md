@@ -4,7 +4,7 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Contents               |            |             |
+| Version                | Released   | Toolchain   |
 | :--------------------- | :--------- | :---------- |
 | [Swift 5.2](#swift-52) |            |             |
 | [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
