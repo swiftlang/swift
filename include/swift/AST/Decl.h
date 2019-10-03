@@ -5824,11 +5824,6 @@ public:
     return getBodyKind() == BodyKind::MemberwiseInitializer;
   }
 
-  void setNeedsNewVTableEntry(bool value) {
-    LazySemanticInfo.NeedsNewVTableEntryComputed = true;
-    LazySemanticInfo.NeedsNewVTableEntry = value;
-  }
-
   /// For a method of a class, checks whether it will require a new entry in the
   /// vtable.
   bool needsNewVTableEntry() const;

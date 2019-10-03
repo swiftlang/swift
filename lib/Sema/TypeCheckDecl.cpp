@@ -1392,6 +1392,10 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
     if (!ctor->isRequired() && !ctor->isDesignatedInit()) {
       return false;
     }
+
+    // Stub constructors don't appear in the vtable.
+    if (ctor->hasStubImplementation())
+      return false;
   }
 
   if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
