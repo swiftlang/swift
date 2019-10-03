@@ -1649,56 +1649,6 @@ public:
   void tryDropArrayBracketsFixIt(Expr *anchor) const;
 };
 
-/// Diagnose a situation there is a mismatch between argument and parameter
-/// types e.g.:
-///
-/// ```swift
-/// func foo(_: String) {}
-/// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
-/// ```
-class ArgumentMismatchFailure : public ContextualFailure {
-public:
-  ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
-                          Type paramType, ConstraintLocator *locator)
-      : ContextualFailure(root, cs, argType, paramType, locator) {}
-
-  bool diagnoseAsError() override;
-  bool diagnoseAsNote() override;
-
-  /// If both argument and parameter are represented by `ArchetypeType`
-  /// produce a special diagnostic in case their names match.
-  bool diagnoseArchetypeMismatch() const;
-
-  /// Tailored diagnostic for pattern matching with `~=` operator.
-  bool diagnosePatternMatchingMismatch() const;
-
-  /// Tailored diagnostics for argument mismatches associated with
-  /// reference equality operators `===` and `!==`.
-  bool diagnoseUseOfReferenceEqualityOperator() const;
-
-protected:
-
-  /// Situations like this:
-  ///
-  /// func foo(_: Int, _: String) {}
-  /// foo("")
-  ///
-  /// Are currently impossible to fix correctly,
-  /// so we have to attend to that in diagnostics.
-  bool diagnoseMisplacedMissingArgument() const;
-
-  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
-
-  ValueDecl *getDecl() const {
-    auto selectedOverload = getChoiceFor(getLocator());
-    if (!selectedOverload)
-      return nullptr;
-
-    auto choice = selectedOverload->choice;
-    return choice.getDeclOrNull();
-  }
-};
-
 /// Provides information about the application of a function argument to a
 /// parameter.
 class FunctionArgApplyInfo {
@@ -1791,6 +1741,56 @@ public:
 
   ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
     return FnType->getParams()[idx].getParameterFlags();
+  }
+};
+
+/// Diagnose a situation there is a mismatch between argument and parameter
+/// types e.g.:
+///
+/// ```swift
+/// func foo(_: String) {}
+/// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
+/// ```
+class ArgumentMismatchFailure : public ContextualFailure {
+public:
+  ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  /// If both argument and parameter are represented by `ArchetypeType`
+  /// produce a special diagnostic in case their names match.
+  bool diagnoseArchetypeMismatch() const;
+
+  /// Tailored diagnostic for pattern matching with `~=` operator.
+  bool diagnosePatternMatchingMismatch() const;
+
+  /// Tailored diagnostics for argument mismatches associated with
+  /// reference equality operators `===` and `!==`.
+  bool diagnoseUseOfReferenceEqualityOperator() const;
+
+protected:
+
+  /// Situations like this:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// Are currently impossible to fix correctly,
+  /// so we have to attend to that in diagnostics.
+  bool diagnoseMisplacedMissingArgument() const;
+
+  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+
+  ValueDecl *getDecl() const {
+    auto selectedOverload = getChoiceFor(getLocator());
+    if (!selectedOverload)
+      return nullptr;
+
+    auto choice = selectedOverload->choice;
+    return choice.getDeclOrNull();
   }
 };
 
