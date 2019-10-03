@@ -813,29 +813,6 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
-static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
-                                                   DeclContext *DC,
-                                                   SourceLoc Loc) {
-  auto *methodContext = DC->getInnermostMethodContext();
-  if (!methodContext) {
-    P.diagnose(Loc, diag::super_not_in_class_method);
-    return nullptr;
-  }
-
-  // Do an actual lookup for 'self' in case it shows up in a capture list.
-  auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
-  if (lookupSelf && lookupSelf != methodSelf) {
-    // FIXME: This is the wrong diagnostic for if someone manually declares a
-    // variable named 'self' using backticks.
-    P.diagnose(Loc, diag::super_in_closure_with_capture);
-    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
-    return nullptr;
-  }
-
-  return methodSelf;
-}
-
 /// parseExprSuper
 ///
 ///   expr-super:
@@ -848,28 +825,36 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///     'super' '.' 'init'
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
-ParserResult<Expr> Parser::parseExprSuper() {
-  SyntaxParsingContext SuperCtxt(SyntaxContext, SyntaxContextKind::Expr);
-  // Parse the 'super' reference.
-  SourceLoc superLoc = consumeToken(tok::kw_super);
-  SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprSuperSyntax() {
+  auto superTok = consumeTokenSyntax(tok::kw_super);
 
   // 'super.' must be followed by a member ref, explicit initializer ref, or
   // subscript call.
   if (!Tok.isAny(tok::period, tok::period_prefix, tok::code_complete) &&
       !Tok.isFollowingLSquare()) {
-    if (!consumeIf(tok::unknown))
+    SmallVector<ParsedSyntax, 2> junk;
+    junk.emplace_back(std::move(superTok));
+    if (auto unknown = consumeTokenSyntaxIf(tok::unknown)) {
+      junk.emplace_back(std::move(*unknown));
+    } else {
       diagnose(Tok, diag::expected_dot_or_subscript_after_super);
-    return nullptr;
+    }
+
+    return makeParsedError(
+        ParsedSyntaxRecorder::makeUnknownExpr(junk, *SyntaxContext));
   }
 
-  VarDecl *selfDecl =
-      getImplicitSelfDeclForSuperContext(*this, CurDeclContext, superLoc);
-  if (!selfDecl)
-    return makeParserResult(new (Context) ErrorExpr(superLoc));
+  return makeParsedResult(ParsedSyntaxRecorder::makeSuperRefExpr(
+      std::move(superTok), *SyntaxContext));
+}
 
-  return makeParserResult(new (Context) SuperRefExpr(selfDecl, superLoc,
-                                                     /*Implicit=*/false));
+ParserResult<Expr> Parser::parseExprSuper() {
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseExprSuperSyntax();
+  SyntaxContext->addSyntax(parsed.get());
+  auto syntax = SyntaxContext->topNode<ExprSyntax>();
+  auto expr = Generator.generate(syntax, leadingLoc);
+  return makeParserResult(parsed.getStatus(), expr);
 }
 
 StringRef Parser::copyAndStripUnderscores(StringRef orig) {

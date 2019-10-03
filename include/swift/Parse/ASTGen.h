@@ -81,6 +81,7 @@ public:
 
   Expr *generate(const syntax::ExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::IdentifierExprSyntax &Expr, const SourceLoc Loc);
+  Expr *generate(const syntax::SuperRefExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::EditorPlaceholderExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::SpecializeExprSyntax &Expr, const SourceLoc Loc);

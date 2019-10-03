@@ -234,6 +234,8 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
 
   if (auto identifierExpr = E.getAs<IdentifierExprSyntax>())
     result = generate(*identifierExpr, Loc);
+  else if (auto superRefExpr = E.getAs<SuperRefExprSyntax>())
+    result = generate(*superRefExpr, Loc);
   else if (auto specializeExpr = E.getAs<SpecializeExprSyntax>())
     result = generate(*specializeExpr, Loc);
   else if (auto editorPlaceHolderExpr = E.getAs<EditorPlaceholderExprSyntax>())
@@ -256,8 +258,14 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*poundFunctionExpr, Loc);
   else if (auto poundDsohandleExpr = E.getAs<PoundDsohandleExprSyntax>())
     result = generate(*poundDsohandleExpr, Loc);
-  else
+  else if (auto unknownExpr = E.getAs<UnknownExprSyntax>())
+    result = generate(*unknownExpr, Loc);
+  else {
+#ifndef NDEBUG
+    E.dump();
     llvm_unreachable("unsupported expression");
+#endif
+  }
 
   return result;
 }
@@ -364,6 +372,39 @@ Expr *ASTGen::generate(const IdentifierExprSyntax &E, const SourceLoc Loc) {
   }
 
   return new (Context) DeclRefExpr(D, nameLoc, /*implicit=*/false);
+}
+
+static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
+                                                   DeclContext *DC,
+                                                   SourceLoc Loc) {
+  auto *methodContext = DC->getInnermostMethodContext();
+  if (!methodContext) {
+    P.diagnose(Loc, diag::super_not_in_class_method);
+    return nullptr;
+  }
+
+  // Do an actual lookup for 'self' in case it shows up in a capture list.
+  auto *methodSelf = methodContext->getImplicitSelfDecl();
+  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  if (lookupSelf && lookupSelf != methodSelf) {
+    // FIXME: This is the wrong diagnostic for if someone manually declares a
+    // variable named 'self' using backticks.
+    P.diagnose(Loc, diag::super_in_closure_with_capture);
+    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
+    return nullptr;
+  }
+
+  return methodSelf;
+}
+
+Expr *ASTGen::generate(const SuperRefExprSyntax &E, const SourceLoc Loc) {
+  auto superLoc = advanceLocBegin(Loc, E.getSuperKeyword());
+  VarDecl *selfDecl =
+      getImplicitSelfDeclForSuperContext(P, P.CurDeclContext, superLoc);
+  if (!selfDecl)
+    return new (Context) ErrorExpr(superLoc);
+
+  return new (Context) SuperRefExpr(selfDecl, superLoc, /*Implicit=*/false);
 }
 
 Expr *ASTGen::generate(const EditorPlaceholderExprSyntax &E, const SourceLoc Loc) {

@@ -1454,6 +1454,7 @@ public:
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprSuperSyntax();
   ParserResult<Expr> parseExprStringLiteral();
 
   // todo [gsoc]: create new result type for ParsedSyntax
