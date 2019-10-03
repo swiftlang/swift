@@ -447,7 +447,7 @@ template<typename Runtime>
 static std::pair<ReflectionContextOwner, TypeRefBuilder &>
 makeReflectionContextForMetadataReader(
                                    std::shared_ptr<ObjectMemoryReader> reader) {
-  using ReflectionContext = ReflectionContext<Runtime>;
+  using ReflectionContext = swift::reflection::ReflectionContext<Runtime>;
   auto context = new ReflectionContext(reader);
   auto &builder = context->getBuilder();
   for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
