@@ -2068,7 +2068,7 @@ public:
       const Optional<std::function<void()>> &invalidTypeCtxDiagnostic = None);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// Creates a `AutoDiffIndexSubset` for the given function type, representing
+  /// Creates an `AutoDiffIndexSubset` for the given function type, representing
   /// all inferred differentiation parameters.
   /// The differentiation parameters are inferred to be:
   /// - All parameters of the function type that conform to `Differentiable`.

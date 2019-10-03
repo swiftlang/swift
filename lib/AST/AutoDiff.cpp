@@ -91,7 +91,7 @@ autodiff::getLoweredParameterIndices(AutoDiffIndexSubset *indices,
 
 // TODO(TF-874): Simplify this helper and remove the `reverseCurryLevels` flag.
 // See TF-874 for WIP.
-void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *indexSet,
+void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *subset,
                                        AnyFunctionType *type,
                                        SmallVectorImpl<Type> &result,
                                        bool reverseCurryLevels) {
@@ -117,7 +117,7 @@ void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *indexSet,
     unsigned parameterIndexOffset =
         curryLevelParameterIndexOffsets[curryLevelIndex];
     for (unsigned paramIndex : range(curryLevel->getNumParams()))
-      if (indexSet->contains(parameterIndexOffset + paramIndex))
+      if (subset->contains(parameterIndexOffset + paramIndex))
         result.push_back(
             curryLevel->getParams()[paramIndex].getOldType());
   }

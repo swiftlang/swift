@@ -110,24 +110,24 @@ enum class SILLinkage : uint8_t;
 /// Builder for `AutoDiffIndexSubset`.
 class AutoDiffIndexSubsetBuilder {
   llvm::SmallBitVector parameters;
-  
+
 public:
   /// Creates a `AutoDiffIndexSubsetBuilder` for the given function type.
   AutoDiffIndexSubsetBuilder(AnyFunctionType *functionType);
-  
+
   /// Builds the `AutoDiffIndexSubset`, returning a pointer to an existing
   /// one if it has already been allocated in the `ASTContext`.
   AutoDiffIndexSubset *build(ASTContext &C) const;
-  
+
   /// Sets the parameter at `parameterIndex`.
   void setParameter(unsigned parameterIndex);
-  
+
   /// Sets the parameters at indices in the specified range.
   void setParameters(unsigned lowerBound, unsigned upperBound);
-  
+
   /// Returns the number of set parameters.
   unsigned count() { return parameters.count(); }
-  
+
   /// Returns the number of bits in the `parameters` bitvector.
   // TODO: After `getNumAutoDiffIndexSubset` in AutoDiff.cpp is fixed to
   // compute exact parameter count, update doc comment to:
@@ -135,7 +135,7 @@ public:
   unsigned size() { return parameters.size(); }
 };
 
-/// An efficient index subset data structure, uniqued in ASTContext.
+/// An efficient index subset data structure, uniqued in `ASTContext`.
 /// Stores a bit vector representing set indices and a total capacity.
 class AutoDiffIndexSubset : public llvm::FoldingSetNode {
 public:
