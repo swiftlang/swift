@@ -79,6 +79,12 @@ public let ObjectiveCBridging = [
   BenchmarkInfo(name: "UnicodeStringFromCodable",
                  runFunction: run_UnicodeStringFromCodable, tags: ts,
                  setUpFunction: setup_UnicodeStringFromCodable),
+  BenchmarkInfo(name: "RebridgeArrayOfNSStrings",
+                runFunction: run_rebridgeArrayOfNSStrings, tags: t,
+                setUpFunction: setup_rebridgeArrayOfNSStrings),
+  BenchmarkInfo(name: "BridgeNSArrayOfNSStrings",
+                runFunction: run_bridgeNSArrayOfNSStrings, tags: t,
+                setUpFunction: setup_bridgeNSArrayOfNSStrings),
 ]
 
 #if _runtime(_ObjC)
@@ -769,6 +775,59 @@ public func run_UnicodeStringFromCodable(_ N: Int) {
   for _ in 0 ..< N {
     for _ in 0..<100 {
       unicodeStringFromCodableDict[identity(unicodeStringFromCodable!)] = ()
+    }
+  }
+  #endif
+}
+
+// run_bridgeNSArrayOfNSStrings and run_rebridgeArrayOfNSStrings cover the
+// code paths found in https://bugs.swift.org/browse/SR-11558
+
+var nsArrayOfNSStrings:NSArray? = nil
+
+@inline(never)
+public func setup_bridgeNSArrayOfNSStrings() {
+  nsArrayOfNSStrings = "Hello world! Hello world! Hello world!".withCString {
+    [String(cString: $0),
+     String(cString: $0),
+     String(cString: $0),
+     String(cString: $0),
+     String(cString: $0)]
+  }
+}
+
+@inline(never)
+public func run_bridgeNSArrayOfNSStrings(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    for _ in 0..<100 {
+      blackHole(nsArrayOfNSStrings as! [String])
+    }
+  }
+  #endif
+}
+
+
+var bridgedArrayOfNSStrings:NSArray? = nil
+
+@inline(never)
+public func setup_rebridgeArrayOfNSStrings() {
+  let arr:[String] = "Hello world! Hello world! Hello world!".withCString {
+    [String(cString: $0),
+     String(cString: $0),
+     String(cString: $0),
+     String(cString: $0),
+     String(cString: $0)]
+  }
+  bridgedArrayOfNSStrings = arr as NSArray
+}
+
+@inline(never)
+public func run_rebridgeArrayOfNSStrings(_ N: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< N {
+    for _ in 0..<250 {
+      blackHole(bridgedArrayOfNSStrings as! [String])
     }
   }
   #endif
