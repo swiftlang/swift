@@ -556,7 +556,7 @@ public:
   void dump() const;
 };
 
-static_assert(sizeof(SymbolicValue) == 2 * sizeof(void *),
+static_assert(sizeof(SymbolicValue) == 2 * sizeof(uint64_t),
               "SymbolicValue should stay small");
 static_assert(std::is_pod<SymbolicValue>::value,
               "SymbolicValue should stay POD");
