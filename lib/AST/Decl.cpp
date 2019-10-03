@@ -4292,6 +4292,12 @@ bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
             "these should match up");
   return !isResilient(M, expansion);
 }
+      
+void EnumDecl::setHasFixedRawValues() {
+  auto flags = LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues;
+  LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+}
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
                            SourceLoc NameLoc, Identifier Name,
@@ -7196,6 +7202,32 @@ EnumCaseDecl *EnumElementDecl::getParentCase() const {
   }
 
   llvm_unreachable("enum element not in case of parent enum");
+}
+      
+LiteralExpr *EnumElementDecl::getRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
+      true);
+  return RawValueExpr;
+}
+
+LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
+      true);
+  return RawValueExpr;
+}
+
+void EnumElementDecl::setRawValueExpr(LiteralExpr *e) {
+  assert((!RawValueExpr || e == RawValueExpr || e->getType()) &&
+         "Illegal mutation of raw value expr");
+  RawValueExpr = e;
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {

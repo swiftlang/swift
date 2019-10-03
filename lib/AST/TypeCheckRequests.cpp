@@ -167,15 +167,15 @@ bool EnumRawTypeRequest::isCached() const {
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {
   auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.RawType.getInt())
-    return enumDecl->LazySemanticInfo.RawType.getPointer();
+  if (enumDecl->LazySemanticInfo.hasRawType())
+    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
 
   return None;
 }
 
 void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+  enumDecl->LazySemanticInfo.cacheRawType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -839,7 +839,7 @@ void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsImplicitlyUnwrappedOptionalRequest computation.
+// UnderlyingTypeRequest computation.
 //----------------------------------------------------------------------------//
 
 Optional<Type>
@@ -853,4 +853,37 @@ UnderlyingTypeRequest::getCachedResult() const {
 void UnderlyingTypeRequest::cacheResult(Type value) const {
   auto *typeAlias = std::get<0>(getStorage());
   typeAlias->UnderlyingTy.setType(value);
+}
+
+//----------------------------------------------------------------------------//
+// EnumRawValuesRequest computation.
+//----------------------------------------------------------------------------//
+
+bool EnumRawValuesRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
+}
+
+Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+  auto *ED = std::get<0>(getStorage());
+  if (ED->LazySemanticInfo.hasCheckedRawValues())
+    return true;
+  return None;
+}
+
+void EnumRawValuesRequest::cacheResult(bool) const {
+  auto *ED = std::get<0>(getStorage());
+  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues |
+      EnumDecl::HasFixedRawValuesAndTypes;
+  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+}
+
+void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // This request computes the raw type, and so participates in cycles involving
+  // it. For now, the raw type provides a rich enough circularity diagnostic
+  // that we can silence ourselves.
+}
+
+void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
+
 }

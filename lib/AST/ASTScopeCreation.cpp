@@ -1346,8 +1346,12 @@ void EnumElementScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   if (auto *pl = decl->getParameterList())
     scopeCreator.constructExpandAndInsertUncheckable<ParameterListScope>(
         this, pl, nullptr);
-  // might contain a closure
-  scopeCreator.addToScopeTree(decl->getRawValueExpr(), this);
+  // The invariant that the raw value expression can never introduce a new scope
+  // is checked in Parse.  However, this guarantee is not future-proof.  Compute
+  // and add the raw value expression anyways just to be defensive.
+  //
+  // FIXME: Re-enable this.  It currently crashes for malformed enum cases.
+  // scopeCreator.addToScopeTree(decl->getStructuralRawValueExpr(), this);
 }
 
 void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(

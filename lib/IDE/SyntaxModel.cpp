@@ -916,7 +916,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                          EnumElemD->getName().getLength());
         }
 
-        if (auto *E = EnumElemD->getRawValueExpr()) {
+        if (auto *E = EnumElemD->getRawValueUnchecked()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
                                  charSourceRangeFromSourceRange(SM, ElemRange));
