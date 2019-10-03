@@ -46,6 +46,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/APFloat.h"
@@ -1430,9 +1431,43 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
   llvm_unreachable("Unhandled AutomaticEnumValueKind in switch.");
 }
 
+static Optional<AutomaticEnumValueKind>
+computeAutomaticEnumValueKind(TypeChecker &TC, EnumDecl *ED) {
+  Type rawTy = ED->getRawType();
+  assert(rawTy && "Cannot compute value kind without raw type!");
+  
+  if (ED->getGenericEnvironmentOfContext() != nullptr)
+    rawTy = ED->mapTypeIntoContext(rawTy);
+  
+  // Swift enums require that the raw type is convertible from one of the
+  // primitive literal protocols.
+  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
+    ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
+    return TypeChecker::conformsToProtocol(rawTy, proto,
+                                           ED->getDeclContext(), None);
+  };
+  
+  static auto otherLiteralProtocolKinds = {
+    KnownProtocolKind::ExpressibleByFloatLiteral,
+    KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
+    KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
+  };
+  
+  if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
+    return AutomaticEnumValueKind::Integer;
+  } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
+    return AutomaticEnumValueKind::String;
+  } else if (std::any_of(otherLiteralProtocolKinds.begin(),
+                         otherLiteralProtocolKinds.end(),
+                         conformsToProtocol)) {
+    return AutomaticEnumValueKind::None;
+  } else {
+    return None;
+  }
+}
+
 static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   Type rawTy = ED->getRawType();
-
   if (!rawTy) {
     return;
   }
@@ -1442,44 +1477,11 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   if (rawTy->hasError())
     return;
 
-  AutomaticEnumValueKind valueKind;
-  // Swift enums require that the raw type is convertible from one of the
-  // primitive literal protocols.
-  auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-      ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-      return TypeChecker::conformsToProtocol(rawTy, proto,
-                                             ED->getDeclContext(), None);
-  };
-
-  static auto otherLiteralProtocolKinds = {
-    KnownProtocolKind::ExpressibleByFloatLiteral,
-    KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
-    KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
-  };
-
-  if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
-    valueKind = AutomaticEnumValueKind::Integer;
-  } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
-    valueKind = AutomaticEnumValueKind::String;
-  } else if (std::any_of(otherLiteralProtocolKinds.begin(),
-                         otherLiteralProtocolKinds.end(),
-                         conformsToProtocol)) {
-    valueKind = AutomaticEnumValueKind::None;
-  } else {
-    TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                diag::raw_type_not_literal_convertible,
-                rawTy);
-    ED->getInherited().front().setInvalidType(TC.Context);
+  // If we don't have a value kind, the decl checker will provide a diagnostic.
+  auto valueKind = computeAutomaticEnumValueKind(TC, ED);
+  if (!valueKind.hasValue())
     return;
-  }
-
-  // We need at least one case to have a raw value.
-  if (ED->getAllElements().empty()) {
-    TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                diag::empty_enum_raw_type);
-    return;
-  }
-
+  
   // Check the raw values of the cases.
   LiteralExpr *prevValue = nullptr;
   EnumElementDecl *lastExplicitValueElt = nullptr;
@@ -1489,82 +1491,43 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
 
   for (auto elt : ED->getAllElements()) {
     // Skip if the raw value expr has already been checked.
-    if (elt->getTypeCheckedRawValueExpr())
+    if (elt->hasRawValueExpr() && elt->getRawValueExpr()->getType()) {
+      prevValue = elt->getRawValueExpr();
       continue;
+    }
 
     // Make sure the element is checked out before we poke at it.
     // FIXME: Make isInvalid work with interface types
     (void)elt->getInterfaceType();
     if (elt->isInvalid())
       continue;
-
-    // We don't yet support raw values on payload cases.
-    if (elt->hasAssociatedValues()) {
-      TC.diagnose(elt->getLoc(),
-                  diag::enum_with_raw_type_case_with_argument);
-      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                  diag::enum_raw_type_here, rawTy);
-      elt->setInvalid();
-      continue;
-    }
     
-    // Check the raw value expr, if we have one.
-    if (auto *rawValue = elt->getRawValueExpr()) {
-      Expr *typeCheckedExpr = rawValue;
-      auto resultTy = TC.typeCheckExpression(typeCheckedExpr, ED,
-                                             TypeLoc::withoutLoc(rawTy),
-                                             CTP_EnumCaseRawValue);
-      if (resultTy) {
-        elt->setTypeCheckedRawValueExpr(typeCheckedExpr);
-      }
+    if (elt->hasRawValueExpr()) {
       lastExplicitValueElt = elt;
     } else {
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
-      auto nextValue = getAutomaticRawValueExpr(TC, valueKind, elt, prevValue);
+      auto nextValue = getAutomaticRawValueExpr(TC, *valueKind, elt, prevValue);
       if (!nextValue) {
         elt->setInvalid();
         break;
       }
       elt->setRawValueExpr(nextValue);
-      Expr *typeChecked = nextValue;
-      auto resultTy = TC.typeCheckExpression(
-          typeChecked, ED, TypeLoc::withoutLoc(rawTy), CTP_EnumCaseRawValue);
-      if (resultTy)
-        elt->setTypeCheckedRawValueExpr(typeChecked);
     }
     prevValue = elt->getRawValueExpr();
     assert(prevValue && "continued without setting raw value of enum case");
 
     // If we didn't find a valid initializer (maybe the initial value was
     // incompatible with the raw value type) mark the entry as being erroneous.
-    if (!elt->getTypeCheckedRawValueExpr()) {
+    TC.checkRawValueExpr(ED, elt);
+    if (!prevValue->getType() || prevValue->getType()->hasError()) {
       elt->setInvalid();
       continue;
     }
 
-    TC.checkEnumElementErrorHandling(elt);
-
-    // Find the type checked version of the LiteralExpr used for the raw value.
-    // this is unfortunate, but is needed because we're digging into the
-    // literals to get information about them, instead of accepting general
-    // expressions.
-    LiteralExpr *rawValue = elt->getRawValueExpr();
-    if (!rawValue->getType()) {
-      elt->getTypeCheckedRawValueExpr()->forEachChildExpr([&](Expr *E)->Expr* {
-        if (E->getKind() == rawValue->getKind())
-          rawValue = cast<LiteralExpr>(E);
-        return E;
-      });
-      elt->setRawValueExpr(rawValue);
-    }
-
-    prevValue = rawValue;
-    assert(prevValue && "continued without setting raw value of enum case");
-
     // Check that the raw value is unique.
-    RawValueKey key(rawValue);
+    RawValueKey key{prevValue};
     RawValueSource source{elt, lastExplicitValueElt};
 
     auto insertIterPair = uniqueRawValues.insert({key, source});
@@ -1613,15 +1576,15 @@ swift::findNonImplicitRequiredInit(const ConstructorDecl *CD) {
   return CD;
 }
 
-
 /// For building the higher-than component of the diagnostic path,
 /// we use the visited set, which we've embellished with information
 /// about how we reached a particular node.  This is reasonable because
 /// we need to maintain the set anyway.
-static void buildHigherThanPath(PrecedenceGroupDecl *last,
-                          const llvm::DenseMap<PrecedenceGroupDecl *,
-                                        PrecedenceGroupDecl *> &visitedFrom,
-                          raw_ostream &out) {
+static void buildHigherThanPath(
+    PrecedenceGroupDecl *last,
+    const llvm::DenseMap<PrecedenceGroupDecl *, PrecedenceGroupDecl *>
+        &visitedFrom,
+    raw_ostream &out) {
   auto it = visitedFrom.find(last);
   assert(it != visitedFrom.end());
   auto from = it->second;
@@ -1634,8 +1597,7 @@ static void buildHigherThanPath(PrecedenceGroupDecl *last,
 /// For building the lower-than component of the diagnostic path,
 /// we just do a depth-first search to find a path.
 static bool buildLowerThanPath(PrecedenceGroupDecl *start,
-                               PrecedenceGroupDecl *target,
-                               raw_ostream &out) {
+                               PrecedenceGroupDecl *target, raw_ostream &out) {
   if (start == target) {
     out << start->getName();
     return true;
@@ -1654,20 +1616,21 @@ static bool buildLowerThanPath(PrecedenceGroupDecl *start,
   return false;
 }
 
-static void checkPrecedenceCircularity(TypeChecker &TC,
+static void checkPrecedenceCircularity(DiagnosticEngine &D,
                                        PrecedenceGroupDecl *PGD) {
   // Don't diagnose if this group is already marked invalid.
-  if (PGD->isInvalid()) return;
+  if (PGD->isInvalid())
+    return;
 
   // The cycle doesn't necessarily go through this specific group,
   // so we need a proper visited set to avoid infinite loops.  We
   // also record a back-reference so that we can easily reconstruct
   // the cycle.
-  llvm::DenseMap<PrecedenceGroupDecl*, PrecedenceGroupDecl*> visitedFrom;
-  SmallVector<PrecedenceGroupDecl*, 4> stack;
+  llvm::DenseMap<PrecedenceGroupDecl *, PrecedenceGroupDecl *> visitedFrom;
+  SmallVector<PrecedenceGroupDecl *, 4> stack;
 
   // Fill out the targets set.
-  llvm::SmallPtrSet<PrecedenceGroupDecl*, 4> targets;
+  llvm::SmallPtrSet<PrecedenceGroupDecl *, 4> targets;
   stack.push_back(PGD);
   do {
     auto cur = stack.pop_back_val();
@@ -1681,7 +1644,8 @@ static void checkPrecedenceCircularity(TypeChecker &TC,
     targets.insert(cur);
 
     for (auto &rel : cur->getLowerThan()) {
-      if (!rel.Group) continue;
+      if (!rel.Group)
+        continue;
 
       // We can't have cycles in the lower-than relationship
       // because it has to point outside of the module.
@@ -1704,7 +1668,8 @@ static void checkPrecedenceCircularity(TypeChecker &TC,
     }
 
     for (auto &rel : cur->getHigherThan()) {
-      if (!rel.Group) continue;
+      if (!rel.Group)
+        continue;
 
       // Check whether we've reached a target declaration.
       if (!targets.count(rel.Group)) {
@@ -1730,54 +1695,35 @@ static void checkPrecedenceCircularity(TypeChecker &TC,
         // Build the lowerThan portion of the path (rel.Group -> PGD).
         buildLowerThanPath(PGD, rel.Group, str);
       }
-      
-      TC.diagnose(PGD->getHigherThanLoc(), diag::precedence_group_cycle, path);
+
+      D.diagnose(PGD->getHigherThanLoc(), diag::precedence_group_cycle, path);
       PGD->setInvalid();
       return;
     }
   } while (!stack.empty());
 }
 
-/// Do a primitive lookup for the given precedence group.  This does
-/// not validate the precedence group or diagnose if the lookup fails
-/// (other than via ambiguity); for that, use
-/// TypeChecker::lookupPrecedenceGroup.
-///
-/// Pass an invalid source location to suppress diagnostics.
-static PrecedenceGroupDecl *
-lookupPrecedenceGroupPrimitive(DeclContext *dc, Identifier name,
-                               SourceLoc nameLoc) {
-  if (auto sf = dc->getParentSourceFile()) {
-    bool cascading = dc->isCascadingContextForLookup(false);
-    return sf->lookupPrecedenceGroup(name, cascading, nameLoc);
-  } else {
-    return dc->getParentModule()->lookupPrecedenceGroup(name, nameLoc);
-  }
-}
-
-void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
-  checkDeclAttributes(PGD);
-
+static void validatePrecedenceGroup(PrecedenceGroupDecl *PGD) {
+  assert(PGD && "Cannot validate a null precedence group!");
   if (PGD->isInvalid() || PGD->hasValidationStarted())
     return;
   DeclValidationRAII IBV(PGD);
 
-  bool isInvalid = false;
-
+  auto &Diags = PGD->getASTContext().Diags;
+  
   // Validate the higherThan relationships.
   bool addedHigherThan = false;
   for (auto &rel : PGD->getMutableHigherThan()) {
     if (rel.Group) continue;
 
-    auto group = lookupPrecedenceGroupPrimitive(PGD->getDeclContext(),
-                                                rel.Name, rel.NameLoc);
+    auto group = TypeChecker::lookupPrecedenceGroup(PGD->getDeclContext(),
+                                                    rel.Name, rel.NameLoc);
     if (group) {
       rel.Group = group;
-      validateDecl(group);
       addedHigherThan = true;
     } else if (!PGD->isInvalid()) {
-      diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      isInvalid = true;
+      Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+      PGD->setInvalid();
     }
   }
 
@@ -1786,56 +1732,127 @@ void TypeChecker::validateDecl(PrecedenceGroupDecl *PGD) {
     if (rel.Group) continue;
 
     auto dc = PGD->getDeclContext();
-    auto group = lookupPrecedenceGroupPrimitive(dc, rel.Name, rel.NameLoc);
+    auto group = TypeChecker::lookupPrecedenceGroup(dc, rel.Name, rel.NameLoc);
     if (group) {
-      if (group->getDeclContext()->getParentModule()
-            == dc->getParentModule()) {
+      if (group->getDeclContext()->getParentModule() == dc->getParentModule()) {
         if (!PGD->isInvalid()) {
-          diagnose(rel.NameLoc, diag::precedence_group_lower_within_module);
-          diagnose(group->getNameLoc(), diag::kind_declared_here,
-                   DescriptiveDeclKind::PrecedenceGroup);
-          isInvalid = true;
+          Diags.diagnose(rel.NameLoc,
+                         diag::precedence_group_lower_within_module);
+          Diags.diagnose(group->getNameLoc(), diag::kind_declared_here,
+                         DescriptiveDeclKind::PrecedenceGroup);
+          PGD->setInvalid();
         }
       } else {
         rel.Group = group;
-        validateDecl(group);
       }
     } else if (!PGD->isInvalid()) {
-      diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
-      isInvalid = true;
+      Diags.diagnose(rel.NameLoc, diag::unknown_precedence_group, rel.Name);
+      PGD->setInvalid();
     }
   }
-
+  
   // Check for circularity.
   if (addedHigherThan) {
-    checkPrecedenceCircularity(*this, PGD);
+    checkPrecedenceCircularity(Diags, PGD);
+  }
+}
+
+static Optional<unsigned>
+getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
+  ArrayRef<ParamDecl *> params = paramList->getArray();
+  for (unsigned i = 0; i < params.size(); ++i) {
+    if (params[i] == decl) return i;
+  }
+  return None;
+}
+
+static void
+checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
+  if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
+    return;
+
+  auto *DC = PD->getInnermostDeclContext();
+  const SourceFile *SF = DC->getParentSourceFile();
+  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+         "explicit inherited default argument outside of a module interface?");
+
+  // The containing decl should be a designated initializer.
+  auto ctor = dyn_cast<ConstructorDecl>(DC);
+  if (!ctor || ctor->isConvenienceInit()) {
+    TC.diagnose(
+        PD, diag::inherited_default_value_not_in_designated_constructor);
+    return;
   }
 
-  if (isInvalid) PGD->setInvalid();
+  // The decl it overrides should also be a designated initializer.
+  auto overridden = ctor->getOverriddenDecl();
+  if (!overridden || overridden->isConvenienceInit()) {
+    TC.diagnose(
+        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
+    if (overridden)
+      TC.diagnose(overridden, diag::overridden_here);
+    return;
+  }
+
+  // The corresponding parameter should have a default value.
+  Optional<unsigned> idx = getParamIndex(ctor->getParameters(), PD);
+  assert(idx && "containing decl does not contain param?");
+  ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
+  if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
+    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
+    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
+  }
+}
+
+/// Check the default arguments that occur within this pattern.
+static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
+                                  ValueDecl *VD) {
+  for (auto *param : *params) {
+    checkInheritedDefaultValueRestrictions(tc, param);
+    if (!param->getDefaultValue() ||
+        !param->hasInterfaceType() ||
+        param->getInterfaceType()->hasError())
+      continue;
+
+    Expr *e = param->getDefaultValue();
+    auto *initContext = param->getDefaultArgumentInitContext();
+
+    auto resultTy =
+        tc.typeCheckParameterDefault(e, initContext, param->getType(),
+                                    /*isAutoClosure=*/param->isAutoClosure());
+
+    if (resultTy) {
+      param->setDefaultValue(e);
+    }
+
+    tc.checkInitializerErrorHandling(initContext, e);
+
+    // Walk the checked initializer and contextualize any closures
+    // we saw there.
+    (void)tc.contextualizeInitializer(initContext, e);
+  }
 }
 
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         Identifier name,
                                                         SourceLoc nameLoc) {
-  auto group = lookupPrecedenceGroupPrimitive(dc, name, nameLoc);
-  if (group) {
-    validateDecl(group);
-  } else if (nameLoc.isValid()) {
-    // FIXME: avoid diagnosing this multiple times per source file.
-    diagnose(nameLoc, diag::unknown_precedence_group, name);
-  }
+  auto *group = evaluateOrDefault(
+      dc->getASTContext().evaluator,
+      LookupPrecedenceGroupRequest({dc, name, nameLoc}), nullptr);
+  if (group)
+    validatePrecedenceGroup(group);
   return group;
 }
 
 static NominalTypeDecl *resolveSingleNominalTypeDecl(
-    DeclContext *DC, SourceLoc loc, Identifier ident, TypeChecker &tc,
+    DeclContext *DC, SourceLoc loc, Identifier ident, ASTContext &Ctx,
     TypeResolutionFlags flags = TypeResolutionFlags(0)) {
-  auto *TyR = new (tc.Context) SimpleIdentTypeRepr(loc, ident);
+  auto *TyR = new (Ctx) SimpleIdentTypeRepr(loc, ident);
   TypeLoc typeLoc = TypeLoc(TyR);
 
   TypeResolutionOptions options = TypeResolverContext::TypeAliasDecl;
   options |= flags;
-  if (TypeChecker::validateType(tc.Context, typeLoc,
+  if (TypeChecker::validateType(Ctx, typeLoc,
                                 TypeResolution::forInterface(DC), options))
     return nullptr;
 
@@ -1845,7 +1862,7 @@ static NominalTypeDecl *resolveSingleNominalTypeDecl(
 static bool checkDesignatedTypes(OperatorDecl *OD,
                                  ArrayRef<Identifier> identifiers,
                                  ArrayRef<SourceLoc> identifierLocs,
-                                 TypeChecker &TC) {
+                                 ASTContext &ctx) {
   assert(identifiers.size() == identifierLocs.size());
 
   SmallVector<NominalTypeDecl *, 1> designatedNominalTypes;
@@ -1853,7 +1870,7 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
 
   for (auto index : indices(identifiers)) {
     auto *decl = resolveSingleNominalTypeDecl(DC, identifierLocs[index],
-                                              identifiers[index], TC);
+                                              identifiers[index], ctx);
 
     if (!decl)
       return true;
@@ -1861,7 +1878,6 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
     designatedNominalTypes.push_back(decl);
   }
 
-  auto &ctx = TC.Context;
   OD->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
   return false;
 }
@@ -1871,85 +1887,70 @@ static bool checkDesignatedTypes(OperatorDecl *OD,
 /// This establishes key invariants, such as an InfixOperatorDecl's
 /// reference to its precedence group and the transitive validity of that
 /// group.
-void TypeChecker::validateDecl(OperatorDecl *OD) {
-  checkDeclAttributes(OD);
-
-  auto IOD = dyn_cast<InfixOperatorDecl>(OD);
-
+llvm::Expected<PrecedenceGroupDecl *>
+OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
+                                         InfixOperatorDecl *IOD) const {
   auto enableOperatorDesignatedTypes =
-      getLangOpts().EnableOperatorDesignatedTypes;
+      IOD->getASTContext().LangOpts.EnableOperatorDesignatedTypes;
 
-  // Pre- or post-fix operator?
-  if (!IOD) {
-    auto nominalTypes = OD->getDesignatedNominalTypes();
-    if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-      auto identifiers = OD->getIdentifiers();
-      auto identifierLocs = OD->getIdentifierLocs();
-      if (checkDesignatedTypes(OD, identifiers, identifierLocs, *this))
-        OD->setInvalid();
-    }
-    return;
-  }
+  auto &Diags = IOD->getASTContext().Diags;
+  PrecedenceGroupDecl *group = nullptr;
 
-  if (!IOD->getPrecedenceGroup()) {
-    PrecedenceGroupDecl *group = nullptr;
+  auto identifiers = IOD->getIdentifiers();
+  auto identifierLocs = IOD->getIdentifierLocs();
 
-    auto identifiers = IOD->getIdentifiers();
-    auto identifierLocs = IOD->getIdentifierLocs();
-
-    if (!identifiers.empty()) {
-      group = lookupPrecedenceGroupPrimitive(IOD->getDeclContext(),
-                                             identifiers[0], identifierLocs[0]);
-      if (group) {
-        identifiers = identifiers.slice(1);
-        identifierLocs = identifierLocs.slice(1);
-      } else {
-        // If we're either not allowing types, or we are allowing them
-        // and this identifier is not a type, emit an error as if it's
-        // a precedence group.
-        auto *DC = OD->getDeclContext();
-        if (!(enableOperatorDesignatedTypes &&
-              resolveSingleNominalTypeDecl(
-                  DC, identifierLocs[0], identifiers[0], *this,
-                  TypeResolutionFlags::SilenceErrors))) {
-          diagnose(identifierLocs[0], diag::unknown_precedence_group,
-                   identifiers[0]);
-          identifiers = identifiers.slice(1);
-          identifierLocs = identifierLocs.slice(1);
-        }
-      }
-    }
-
-    if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
-      assert(!group);
-      diagnose(identifierLocs[0], diag::unknown_precedence_group,
-               identifiers[0]);
-      identifiers = identifiers.slice(1);
-      identifierLocs = identifierLocs.slice(1);
-      assert(identifiers.empty() && identifierLocs.empty());
-    }
-
-    if (!group) {
-      group = lookupPrecedenceGroupPrimitive(
-          IOD->getDeclContext(), Context.Id_DefaultPrecedence, SourceLoc());
-    }
+  if (!identifiers.empty()) {
+    group = TypeChecker::lookupPrecedenceGroup(
+        IOD->getDeclContext(), identifiers[0], identifierLocs[0]);
 
     if (group) {
-      validateDecl(group);
-      IOD->setPrecedenceGroup(group);
+      identifiers = identifiers.slice(1);
+      identifierLocs = identifierLocs.slice(1);
     } else {
-      diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
-               Context.Id_DefaultPrecedence);
-    }
-
-    auto nominalTypes = IOD->getDesignatedNominalTypes();
-    if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
-      if (checkDesignatedTypes(IOD, identifiers, identifierLocs, *this)) {
-        IOD->setInvalid();
-        return;
+      // If we're either not allowing types, or we are allowing them
+      // and this identifier is not a type, emit an error as if it's
+      // a precedence group.
+      auto *DC = IOD->getDeclContext();
+      if (!(enableOperatorDesignatedTypes &&
+            resolveSingleNominalTypeDecl(DC, identifierLocs[0], identifiers[0],
+                                         IOD->getASTContext(),
+                                         TypeResolutionFlags::SilenceErrors))) {
+        Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
+                       identifiers[0]);
+        identifiers = identifiers.slice(1);
+        identifierLocs = identifierLocs.slice(1);
       }
     }
   }
+
+  if (!identifiers.empty() && !enableOperatorDesignatedTypes) {
+    assert(!group);
+    Diags.diagnose(identifierLocs[0], diag::unknown_precedence_group,
+                   identifiers[0]);
+    identifiers = identifiers.slice(1);
+    identifierLocs = identifierLocs.slice(1);
+    assert(identifiers.empty() && identifierLocs.empty());
+  }
+
+  if (!group) {
+    group = TypeChecker::lookupPrecedenceGroup(
+        IOD->getDeclContext(), IOD->getASTContext().Id_DefaultPrecedence,
+        SourceLoc());
+  }
+
+  if (!group) {
+    Diags.diagnose(IOD->getLoc(), diag::missing_builtin_precedence_group,
+                   IOD->getASTContext().Id_DefaultPrecedence);
+  }
+
+  auto nominalTypes = IOD->getDesignatedNominalTypes();
+  if (nominalTypes.empty() && enableOperatorDesignatedTypes) {
+    if (checkDesignatedTypes(IOD, identifiers, identifierLocs,
+                             IOD->getASTContext())) {
+      IOD->setInvalid();
+    }
+  }
+  return group;
 }
 
 llvm::Expected<SelfAccessKind>
@@ -2114,12 +2115,26 @@ public:
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {
-    TC.validateDecl(OD);
+    TC.checkDeclAttributes(OD);
+    auto &Ctx = OD->getASTContext();
+    if (auto *IOD = dyn_cast<InfixOperatorDecl>(OD)) {
+      (void)IOD->getPrecedenceGroup();
+    } else {
+      auto nominalTypes = OD->getDesignatedNominalTypes();
+      if (nominalTypes.empty() && Ctx.LangOpts.EnableOperatorDesignatedTypes) {
+        auto identifiers = OD->getIdentifiers();
+        auto identifierLocs = OD->getIdentifierLocs();
+        if (checkDesignatedTypes(OD, identifiers, identifierLocs, Ctx))
+          OD->setInvalid();
+      }
+      return;
+    }
     checkAccessControl(TC, OD);
   }
 
   void visitPrecedenceGroupDecl(PrecedenceGroupDecl *PGD) {
-    TC.validateDecl(PGD);
+    TC.checkDeclAttributes(PGD);
+    validatePrecedenceGroup(PGD);
     checkAccessControl(TC, PGD);
   }
 
@@ -2437,7 +2452,7 @@ public:
     (void) SD->getImplInfo();
 
     TC.checkParameterAttributes(SD->getIndices());
-    TC.checkDefaultArguments(SD->getIndices(), SD);
+    checkDefaultArguments(TC, SD->getIndices(), SD);
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -2587,10 +2602,27 @@ public:
 
     checkAccessControl(TC, ED);
 
-    if (ED->hasRawType() && !ED->isObjC()) {
+    TC.checkPatternBindingCaptures(ED);
+    
+    if (auto rawTy = ED->getRawType()) {
+      // The raw type must be one of the blessed literal convertible types.
+      if (!computeAutomaticEnumValueKind(TC, ED)) {
+        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                    diag::raw_type_not_literal_convertible,
+                    rawTy);
+        ED->getInherited().front().setInvalidType(TC.Context);
+      }
+      
+      // We need at least one case to have a raw value.
+      if (ED->getAllElements().empty()) {
+        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                    diag::empty_enum_raw_type);
+      }
+      
       // ObjC enums have already had their raw values checked, but pure Swift
       // enums haven't.
-      checkEnumRawValues(TC, ED);
+      if (!ED->isObjC())
+        checkEnumRawValues(TC, ED);
     }
 
     checkExplicitAvailability(ED);
@@ -2992,6 +3024,23 @@ public:
     return true;
   }
 
+
+  bool shouldSkipBodyTypechecking(const AbstractFunctionDecl *AFD) {
+    // Make sure we're in the mode that's skipping function bodies.
+    if (!TC.canSkipNonInlinableBodies())
+      return false;
+
+    // Make sure there even _is_ a body that we can skip.
+    if (!AFD->getBodySourceRange().isValid())
+      return false;
+
+    // If we're gonna serialize the body, we can't skip it.
+    if (AFD->getResilienceExpansion() == ResilienceExpansion::Minimal)
+      return false;
+
+    return true;
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     (void)FD->getInterfaceType();
 
@@ -3024,6 +3073,8 @@ public:
     } else if (FD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(FD);
+    } else if (shouldSkipBodyTypechecking(FD)) {
+      FD->setBodySkipped(FD->getBodySourceRange());
     } else {
       // Record the body.
       TC.definedFunctions.push_back(FD);
@@ -3033,6 +3084,8 @@ public:
 
     if (FD->getDeclContext()->getSelfClassDecl())
       checkDynamicSelfType(FD, FD->getResultInterfaceType());
+
+    checkDefaultArguments(TC, FD->getParameters(), FD);
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3043,14 +3096,33 @@ public:
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
     (void)EED->getInterfaceType();
+    auto *ED = EED->getParentEnum();
 
     TC.checkDeclAttributes(EED);
 
     if (auto *PL = EED->getParameterList()) {
       TC.checkParameterAttributes(PL);
-      TC.checkDefaultArguments(PL, EED);
+      checkDefaultArguments(TC, PL, EED);
     }
 
+    // We don't yet support raw values on payload cases.
+    if (EED->hasAssociatedValues()) {
+      if (auto rawTy = ED->getRawType()) {
+        TC.diagnose(EED->getLoc(),
+                    diag::enum_with_raw_type_case_with_argument);
+        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                    diag::enum_raw_type_here, rawTy);
+        EED->setInvalid();
+      }
+    }
+
+    // Yell if our parent doesn't have a raw type but we have a raw value.
+    if (EED->hasRawValueExpr() && !ED->hasRawType()) {
+      TC.diagnose(EED->getRawValueExpr()->getLoc(),
+                  diag::enum_raw_value_without_raw_type);
+      EED->setInvalid();
+    }
+    
     checkAccessControl(TC, EED);
   }
 
@@ -3058,7 +3130,7 @@ public:
     // Produce any diagnostics for the extended type.
     auto extType = ED->getExtendedType();
 
-    auto nominal = ED->getExtendedNominal();
+    auto nominal = ED->computeExtendedNominal();
     if (nominal == nullptr) {
       const bool wasAlreadyInvalid = ED->isInvalid();
       ED->setInvalid();
@@ -3086,10 +3158,7 @@ public:
 
     // Validate the nominal type declaration being extended.
     (void)nominal->getInterfaceType();
-    // Don't bother computing the generic signature if the extended nominal
-    // type didn't pass validation so we don't crash.
-    if (!nominal->isInvalid())
-      (void)ED->getGenericSignature();
+    (void)ED->getGenericSignature();
     ED->setValidationToChecked();
 
     if (extType && !extType->hasError()) {
@@ -3296,9 +3365,13 @@ public:
     } else if (CD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(CD);
+    } else if (shouldSkipBodyTypechecking(CD)) {
+      CD->setBodySkipped(CD->getBodySourceRange());
     } else {
       TC.definedFunctions.push_back(CD);
     }
+
+    checkDefaultArguments(TC, CD->getParameters(), CD);
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
@@ -3309,6 +3382,8 @@ public:
     if (DD->getDeclContext()->isLocalContext()) {
       // Check local function bodies right away.
       TC.typeCheckAbstractFunctionBody(DD);
+    } else if (shouldSkipBodyTypechecking(DD)) {
+      DD->setBodySkipped(DD->getBodySourceRange());
     } else {
       TC.definedFunctions.push_back(DD);
     }
@@ -3695,11 +3770,11 @@ static Type buildAddressorResultType(TypeChecker &TC,
   assert(addressor->getAccessorKind() == AccessorKind::Address ||
          addressor->getAccessorKind() == AccessorKind::MutableAddress);
 
-  Type pointerType =
+  PointerTypeKind pointerKind =
     (addressor->getAccessorKind() == AccessorKind::Address)
-      ? TC.getUnsafePointerType(addressor->getLoc(), valueType)
-      : TC.getUnsafeMutablePointerType(addressor->getLoc(), valueType);
-  return pointerType;
+      ? PTK_UnsafePointer
+      : PTK_UnsafeMutablePointer;
+  return valueType->wrapInPointer(pointerKind);
 }
 
 
@@ -3770,8 +3845,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         (void)nominal->getInterfaceType();
         
         // Eagerly validate the generic signature of the extension.
-        if (!nominal->isInvalid())
-          (void)ext->getGenericSignature();
+        (void)ext->getGenericSignature();
       }
     }
     if (ext->getValidationState() == Decl::ValidationState::Checking)
@@ -4138,22 +4212,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
                                                     EED->getParentEnum(),
                                                     ED->getGenericSignature()),
                              TypeResolverContext::EnumElementDecl);
-    }
-
-    // If we have a raw value, make sure there's a raw type as well.
-    if (auto *rawValue = EED->getRawValueExpr()) {
-      if (!ED->hasRawType()) {
-        diagnose(rawValue->getLoc(),diag::enum_raw_value_without_raw_type);
-        // Recover by setting the raw type as this element's type.
-        Expr *typeCheckedExpr = rawValue;
-        if (!typeCheckExpression(typeCheckedExpr, ED)) {
-          EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
-          checkEnumElementErrorHandling(EED);
-        }
-      } else {
-        // Wait until the second pass, when all the raw value expressions
-        // can be checked together.
-      }
     }
 
     // Now that we have an argument type we can set the element's declared

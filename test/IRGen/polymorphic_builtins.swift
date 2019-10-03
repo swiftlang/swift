@@ -27,14 +27,14 @@ public func _isConcrete<T>(type: T.Type) -> Bool {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s20polymorphic_builtins41calleeAddVectorsGenericTransparentGuardedyxx_xtlF"(
 // CHECK: br i1 false, label %[[CONCRETE_LABEL:[0-9][0-9]*]], label %[[NON_CONCRETE_LABEL:[0-9][0-9]*]]
 //
-// CHECK: <label>:[[CONCRETE_LABEL]]:
+// CHECK: [[CONCRETE_LABEL]]:
 // CHECK:   call void @llvm.trap()
 // CHECK:   br label %[[EPILOGUE_BLOCK:[0-9][0-9]*]]
 //
-// CHECK: <label>:[[NON_CONCRETE_LABEL]]
+// CHECK: [[NON_CONCRETE_LABEL]]
 // CHECK:   br label %[[EPILOGUE_BLOCK]]
 ///
-// CHECK: <label>:[[EPILOGUE_BLOCK]]:
+// CHECK: [[EPILOGUE_BLOCK]]:
 // CHECK:   ret void
 // CHECK-NEXT: }
 @_transparent

@@ -1788,8 +1788,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:

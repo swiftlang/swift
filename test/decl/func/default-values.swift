@@ -162,7 +162,7 @@ let fooThing4 = Foo(a: 0, b: true, d: 1, e: 2, f: false, g: 10, h: nil) // ok
 
 // Ensure that tuple init is not allowed
 // Here b = false and g = nil, but we're checking that e and f don't get a default value
-let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing argument for parameter 'e' in call}}
+let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing arguments for parameters 'e', 'f' in call}}
                                         // expected-note@-25 {{'init(a:b:d:e:f:g:h:)' declared here}}
 
 // Here b = false and g = nil, but we're checking that f doesn't get a default value

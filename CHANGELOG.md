@@ -81,7 +81,7 @@ Swift Next
       mutableSelf.someProperty = newValue // Okay
     }
   }
-```
+  ```
 
 * [SE-0253][]:
 
@@ -144,6 +144,8 @@ Swift Next
 
 Swift 5.1
 ---------
+
+### 2019-09-20 (Xcode 11.0)
 
 * [SR-8974][]:
 

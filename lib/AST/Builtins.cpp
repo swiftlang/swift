@@ -81,8 +81,6 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheRawPointerType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
-  if (Name == "UnknownObject")
-    return Context.TheUnknownObjectType;
   if (Name == "BridgeObject")
     return Context.TheBridgeObjectType;
   if (Name == "SILToken")
@@ -2216,9 +2214,6 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinNativeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);
-    break;
-  case BuiltinTypeKind::BuiltinUnknownObject:
-    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
     break;
   case BuiltinTypeKind::BuiltinBridgeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);

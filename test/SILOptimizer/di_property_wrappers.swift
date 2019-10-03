@@ -61,6 +61,12 @@ struct IntStruct {
      }
      wrapped = 27
   }
+
+  // Check that we don't crash if the function has unrelated generic parameters.
+  // SR-11484
+  mutating func setit<V>(_ v: V) {
+    wrapped = 5
+  }
 }
 
 final class IntClass {
@@ -142,8 +148,13 @@ func testIntStruct() {
 
   // CHECK-NEXT:   .. init 42
   // CHECK-NEXT:   .. set 27
-  let t1 = IntStruct()
+  var t1 = IntStruct()
   // CHECK-NEXT: 27
+  print(t1.wrapped)
+
+  // CHECK-NEXT:   .. set 5
+  t1.setit(false)
+  // CHECK-NEXT: 5
   print(t1.wrapped)
 
   // CHECK-NEXT:   .. init 42
@@ -380,6 +391,38 @@ func testDefaultNilOptIntStruct() {
   // CHECK-NEXT:   .. init nil
 }
 
+@propertyWrapper
+struct Wrapper2<T> {
+  var wrappedValue: T {
+    didSet {
+      print("  .. secondSet \(wrappedValue)")
+    }
+  }
+
+  init(before: Int = -10, wrappedValue initialValue: T, after: String = "end") {
+    print("  .. secondInit \(before), \(initialValue), \(after)")
+    self.wrappedValue = initialValue
+  }
+}
+
+struct HasComposed {
+  @Wrapper @Wrapper2 var x: Int
+
+  init() {
+    self.x = 17
+  }
+}
+
+func testComposed() {
+  // CHECK: ## Composed
+  print("\n## Composed")
+  _ = HasComposed()
+
+  // CHECK-NEXT: .. secondInit -10, 17, end
+  // CHECK-NEXT: .. init Wrapper2<Int>(wrappedValue: 17)
+}
+
+
 testIntStruct()
 testIntClass()
 testRefStruct()
@@ -387,3 +430,4 @@ testGenericClass()
 testDefaultInit()
 testOptIntStruct()
 testDefaultNilOptIntStruct()
+testComposed()

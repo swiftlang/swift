@@ -1524,6 +1524,7 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
+    case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer: {
       auto conv = DefaultConventions(NormalParameterConvention::Guaranteed);
@@ -2051,6 +2052,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -2281,6 +2283,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
+    case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
@@ -2855,6 +2858,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return nullptr;

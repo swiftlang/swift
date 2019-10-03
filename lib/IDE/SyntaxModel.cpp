@@ -525,13 +525,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     pushStructureNode(SN, E);
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
     auto *ParentE = Parent.getAsExpr();
-    if (isCurrentCallArgExpr(Tup)) {
-      for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
-        SourceLoc NameLoc = Tup->getElementNameLoc(I);
-        if (NameLoc.isValid())
-          passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
-      }
-    } else if (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE)) {
+    if (!isCurrentCallArgExpr(Tup) && (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE))) {
       SyntaxStructureNode SN;
       SN.Kind = SyntaxStructureKind::TupleExpression;
       SN.Range = charSourceRangeFromSourceRange(SM, Tup->getSourceRange());
@@ -792,6 +786,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, NTD);
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Normally bindExtension() would take care of computing the extended
+    // nominal. It must be done before asking for generic parameters.
+    ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;

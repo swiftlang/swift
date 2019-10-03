@@ -192,8 +192,8 @@ bb0:
   %C = alloc_ref $C
   // CHECK: unchecked_ref_cast %0 : $C to $Builtin.NativeObject
   %1 = unchecked_ref_cast %C : $C to $Builtin.NativeObject
-  // CHECK: unchecked_ref_cast %0 : $C to $Builtin.UnknownObject
-  %O = unchecked_ref_cast %C : $C to $Builtin.UnknownObject
+  // CHECK: unchecked_ref_cast %0 : $C to $AnyObject
+  %O = unchecked_ref_cast %C : $C to $Builtin.AnyObject
 
   // CHECK: class_method {{.*}} : $C, #C.doIt!1
   %2 = class_method %C : $C, #C.doIt!1 : (C) -> () -> (), $@convention(method) (@guaranteed C) -> ()
@@ -956,12 +956,11 @@ bb0(%0 : $AnyObject):
   %3 = alloc_box $<τ_0_0> { var τ_0_0 } <Optional<() -> ()>>
   %4 = load %1a : $*AnyObject
   strong_retain %4 : $AnyObject
-  // CHECK: open_existential_ref %{{.*}} : $AnyObject to $@opened({{.*}}) AnyObject
+  // CHECK: open_existential_ref %{{.*}} : $AnyObject to $@opened([[EXISTENTIAL_UUID:.*]]) AnyObject
   %6 = open_existential_ref %4 : $AnyObject to $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject
-  %7 = unchecked_ref_cast %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject to $Builtin.UnknownObject
-  // CHECK: dynamic_method_br %{{.*}} : $Builtin.UnknownObject, #X.f!1.foreign, bb{{.*}}, bb{{.*}}
-  dynamic_method_br %7 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
-bb1(%z : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+  // CHECK: dynamic_method_br %{{.*}} : $@opened([[EXISTENTIAL_UUID]]) AnyObject, #X.f!1.foreign, bb{{.*}}, bb{{.*}}
+  dynamic_method_br %6 : $@opened("01234567-89ab-cdef-0123-222222222222") AnyObject, #X.f!1.foreign, bb1, bb2
+bb1(%z : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-222222222222") AnyObject) -> ()):
   br bb3
 
 bb2:

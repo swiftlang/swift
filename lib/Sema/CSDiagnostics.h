@@ -794,7 +794,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -805,7 +805,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -1186,19 +1186,59 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  unsigned NumSynthesized;
+  SmallVector<Param, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          unsigned numSynthesized, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), NumSynthesized(numSynthesized) {}
+                          ArrayRef<Param> synthesizedArgs,
+                          ConstraintLocator *locator)
+      : FailureDiagnostic(root, cs, locator),
+        SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
+    assert(!SynthesizedArgs.empty() && "No missing arguments?!");
+  }
 
   bool diagnoseAsError() override;
+
+  bool diagnoseSingleMissingArgument() const;
 
 private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(ClosureExpr *closure);
+
+  /// Diagnose cases when instead of multiple distinct arguments
+  /// call got a single tuple argument with expected arity/types.
+  bool diagnoseInvalidTupleDestructuring() const;
+
+  /// Determine whether missing arguments are associated with
+  /// an implicit call to a property wrapper initializer e.g.
+  /// `@Foo(answer: 42) var question = "ultimate question"`
+  bool isPropertyWrapperInitialization() const;
+
+  /// Gather informatioin associated with expression that represents
+  /// a call - function, arguments, # of arguments and whether it has
+  /// a trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(Expr *anchor) const;
+
+  /// Transform given argument into format suitable for a fix-it
+  /// text e.g. `[<label>:]? <#<type#>`
+  void forFixIt(llvm::raw_svector_ostream &out,
+                const AnyFunctionType::Param &argument) const;
+
+public:
+  /// Due to the fact that `matchCallArgument` can't and
+  /// doesn't take types into consideration while matching
+  /// arguments to parameters, for cases where both arguments
+  /// are un-labeled, it's impossible to say which one is missing:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// In this case first argument is missing, but we end up with
+  /// two fixes - argument mismatch (for #1) and missing argument
+  /// (for #2), which is incorrect so it has to be handled specially.
+  static bool isMisplacedMissingArgument(ConstraintSystem &cs,
+                                         ConstraintLocator *locator);
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
@@ -1635,6 +1675,16 @@ public:
   bool diagnoseUseOfReferenceEqualityOperator() const;
 
 protected:
+
+  /// Situations like this:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// Are currently impossible to fix correctly,
+  /// so we have to attend to that in diagnostics.
+  bool diagnoseMisplacedMissingArgument() const;
+
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
 
   ValueDecl *getDecl() const {

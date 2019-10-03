@@ -41,6 +41,15 @@ struct SupplementaryOutputPaths {
   /// \sa swift::serialize
   std::string ModuleOutputPath;
 
+  /// The path to which we should emit a module source information file.
+  /// It is valid whenever there are any inputs.
+  ///
+  /// This binary format stores source locations and other information about the
+  /// declarations in a module.
+  ///
+  /// \sa swift::serialize
+  std::string ModuleSourceInfoOutputPath;
+
   /// The path to which we should emit a module documentation file.
   /// It is valid whenever there are any inputs.
   ///
@@ -132,7 +141,8 @@ struct SupplementaryOutputPaths {
            ModuleDocOutputPath.empty() && DependenciesFilePath.empty() &&
            ReferenceDependenciesFilePath.empty() &&
            SerializedDiagnosticsPath.empty() && LoadedModuleTracePath.empty() &&
-           TBDPath.empty() && ModuleInterfaceOutputPath.empty();
+           TBDPath.empty() && ModuleInterfaceOutputPath.empty() &&
+           ModuleSourceInfoOutputPath.empty();
   }
 };
 } // namespace swift

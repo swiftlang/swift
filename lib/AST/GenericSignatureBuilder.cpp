@@ -3784,16 +3784,17 @@ PotentialArchetype *GenericSignatureBuilder::realizePotentialArchetype(
   return pa;
 }
 
-static Type getStructuralType(TypeDecl *typeDecl) {
+static Type getStructuralType(TypeDecl *typeDecl, bool keepSugar) {
   if (auto typealias = dyn_cast<TypeAliasDecl>(typeDecl)) {
-    // When we're computing requirement signatures, the structural type
-    // suffices.  Otherwise we'll potentially try to validate incomplete
-    // requirements.
-    auto *proto = dyn_cast_or_null<ProtocolDecl>(
-        typealias->getDeclContext()->getAsDecl());
-    if (proto && proto->isComputingRequirementSignature())
-      return typealias->getStructuralType();
-    return typealias->getUnderlyingType();
+    if (typealias->getUnderlyingTypeRepr() != nullptr) {
+      auto type = typealias->getStructuralType();
+      if (!keepSugar)
+        if (auto *aliasTy = cast<TypeAliasType>(type.getPointer()))
+          return aliasTy->getSinglyDesugaredType();
+      return type;
+    }
+    if (!keepSugar)
+      return typealias->getUnderlyingType();
   }
 
   return typeDecl->getDeclaredInterfaceType();
@@ -3804,43 +3805,33 @@ static Type substituteConcreteType(GenericSignatureBuilder &builder,
                                    TypeDecl *concreteDecl) {
   assert(concreteDecl);
 
-  auto *proto = concreteDecl->getDeclContext()->getSelfProtocolDecl();
+  auto *dc = concreteDecl->getDeclContext();
+  auto *proto = dc->getSelfProtocolDecl();
 
   // Form an unsubstituted type referring to the given type declaration,
   // for use in an inferred same-type requirement.
-  auto type = getStructuralType(concreteDecl);
-  if (!type)
-    return Type();
+  auto type = getStructuralType(concreteDecl, /*keepSugar=*/true);
 
-  Type parentType;
   SubstitutionMap subMap;
   if (proto) {
     // Substitute in the type of the current PotentialArchetype in
     // place of 'Self' here.
-    parentType = basePA->getDependentType(builder.getGenericParams());
+    auto parentType = basePA->getDependentType(builder.getGenericParams());
 
     subMap = SubstitutionMap::getProtocolSubstitutions(
         proto, parentType, ProtocolConformanceRef(proto));
-
-    type = type.subst(subMap);
   } else {
     // Substitute in the superclass type.
     auto parentPA = basePA->getEquivalenceClassIfPresent();
-    parentType =
+    auto parentType =
         parentPA->concreteType ? parentPA->concreteType : parentPA->superclass;
     auto parentDecl = parentType->getAnyNominal();
 
-    subMap = parentType->getMemberSubstitutionMap(parentDecl->getParentModule(),
-                                                  concreteDecl);
-    type = type.subst(subMap);
+    subMap = parentType->getContextSubstitutionMap(
+        parentDecl->getParentModule(), dc);
   }
 
-  // If we had a typealias, form a sugared type.
-  if (auto *typealias = dyn_cast<TypeAliasDecl>(concreteDecl)) {
-    type = TypeAliasType::get(typealias, parentType, subMap, type);
-  }
-
-  return type;
+  return type.subst(subMap);
 };
 
 ResolvedType GenericSignatureBuilder::maybeResolveEquivalenceClass(
@@ -4215,11 +4206,8 @@ ConstraintResult GenericSignatureBuilder::expandConformanceRequirement(
   // An inferred same-type requirement between the two type declarations
   // within this protocol or a protocol it inherits.
   auto addInferredSameTypeReq = [&](TypeDecl *first, TypeDecl *second) {
-    Type firstType = getStructuralType(first);
-    if (!firstType) return;
-
-    Type secondType = getStructuralType(second);
-    if (!secondType) return;
+    Type firstType = getStructuralType(first, /*keepSugar=*/false);
+    Type secondType = getStructuralType(second, /*keepSugar=*/false);
 
     auto inferredSameTypeSource =
       FloatingRequirementSource::viaProtocolRequirement(
@@ -7707,7 +7695,7 @@ llvm::Expected<GenericSignature *>
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator, ModuleDecl *parentModule,
         GenericSignature *parentSig,
-        SmallVector<GenericParamList *, 2> gpLists,
+        GenericParamList *gpl,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeLoc, 2> inferenceSources,
         bool allowConcreteGenericParams) const {
@@ -7717,6 +7705,19 @@ InferredGenericSignatureRequest::evaluate(
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   builder.addGenericSignature(parentSig);
+
+  // Type check the generic parameters, treating all generic type
+  // parameters as dependent, unresolved.
+  SmallVector<GenericParamList *, 2> gpLists;
+  if (gpl->getOuterParameters() && !parentSig) {
+    for (auto *outerParams = gpl;
+         outerParams != nullptr;
+         outerParams = outerParams->getOuterParameters()) {
+      gpLists.push_back(outerParams);
+    }
+  } else {
+    gpLists.push_back(gpl);
+  }
 
   // The generic parameter lists MUST appear from innermost to outermost.
   // We walk them backwards to order outer requirements before

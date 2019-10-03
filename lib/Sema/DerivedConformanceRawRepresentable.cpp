@@ -83,14 +83,6 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
   assert(rawTy);
   rawTy = toRawDecl->mapTypeIntoContext(rawTy);
 
-#ifndef NDEBUG
-  for (auto elt : enumDecl->getAllElements()) {
-    assert(elt->getTypeCheckedRawValueExpr() &&
-           "Enum element has no literal - missing a call to checkEnumRawValues()");
-    assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
-  }
-#endif
-
   if (enumDecl->isObjC()) {
     // Special case: ObjC enums are represented by their raw value, so just use
     // a bitcast.
@@ -296,14 +288,6 @@ deriveBodyRawRepresentable_init(AbstractFunctionDecl *initDecl, void *) {
   Type rawTy = enumDecl->getRawType();
   assert(rawTy);
   rawTy = initDecl->mapTypeIntoContext(rawTy);
-
-#ifndef NDEBUG
-  for (auto elt : enumDecl->getAllElements()) {
-    assert(elt->getTypeCheckedRawValueExpr() &&
-           "Enum element has no literal - missing a call to checkEnumRawValues()");
-    assert(elt->getTypeCheckedRawValueExpr()->getType()->isEqual(rawTy));
-  }
-#endif
 
   bool isStringEnum =
     (rawTy->getNominalOrBoundGenericNominal() == C.getStringDecl());

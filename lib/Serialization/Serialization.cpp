@@ -4692,8 +4692,15 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     nextFile->getOpaqueReturnTypeDecls(opaqueReturnTypeDecls);
 
     for (auto TD : localTypeDecls) {
+
+      // FIXME: We should delay parsing function bodies so these type decls
+      //        don't even get added to the file.
+      if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+
       hasLocalTypes = true;
       Mangle::ASTMangler Mangler;
+
       std::string MangledName =
           evaluateOrDefault(M->getASTContext().evaluator,
                             MangleLocalTypeDeclRequest { TD },
@@ -4828,6 +4835,7 @@ void swift::serializeToBuffers(
   ModuleOrSourceFile DC, const SerializationOptions &options,
   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
   const SILModule *M) {
 
   assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
@@ -4863,6 +4871,22 @@ void swift::serializeToBuffers(
     if (moduleDocBuffer)
       *moduleDocBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
                            std::move(buf), options.DocOutputPath);
+  }
+
+  if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
+    SharedTimer timer("Serialization, swiftsourceinfo, to buffer");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    writeSourceInfoToStream(stream, DC);
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.SourceInfoOutputPath,
+                         [&](raw_ostream &out) {
+      out << stream.str();
+      return false;
+    });
+    if (moduleSourceInfoBuffer)
+      *moduleSourceInfoBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+        std::move(buf), options.SourceInfoOutputPath);
   }
 }
 
@@ -4918,6 +4942,16 @@ void swift::serialize(ModuleOrSourceFile DC,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
       writeDocToStream(out, DC, options.GroupInfoPath);
+      return false;
+    });
+  }
+
+  if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.SourceInfoOutputPath,
+                         [&](raw_ostream &out) {
+      SharedTimer timer("Serialization, swiftsourceinfo");
+      writeSourceInfoToStream(out, DC);
       return false;
     });
   }

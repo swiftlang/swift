@@ -129,6 +129,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   SerializationOptions serializationOpts;
   serializationOpts.OutputPath = outs.ModuleOutputPath.c_str();
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath.c_str();
+  serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath.c_str();
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
@@ -884,6 +885,9 @@ OptionSet<TypeCheckingFlags> CompilerInstance::computeTypeCheckingOptions() {
   }
   if (options.DebugTimeExpressionTypeChecking) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeExpressions;
+  }
+  if (options.SkipNonInlinableFunctionBodies) {
+    TypeCheckOptions |= TypeCheckingFlags::SkipNonInlinableFunctionBodies;
   }
   return TypeCheckOptions;
 }

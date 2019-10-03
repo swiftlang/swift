@@ -799,17 +799,16 @@ bb9:
 sil [ossa] @dynamic_method_br_test : $@convention(thin) (@owned AnyObject, @thick AnyObject.Type) -> () {
 bb0(%0 : @owned $AnyObject, %1 : $@thick AnyObject.Type):
   %2 = open_existential_ref %0 : $AnyObject to $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
-  %3 = unchecked_ref_cast %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject to $Builtin.UnknownObject
-  dynamic_method_br %3 : $Builtin.UnknownObject, #X.f!1.foreign, bb1, bb2
+  dynamic_method_br %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject, #X.f!1.foreign, bb1, bb2
 
-bb1(%4 : $@convention(objc_method) (Builtin.UnknownObject) -> ()):
+bb1(%4 : $@convention(objc_method) (@opened("01234567-89ab-cdef-0123-000000000000") AnyObject) -> ()):
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  destroy_value %3 : $Builtin.UnknownObject
+  destroy_value %2 : $@opened("01234567-89ab-cdef-0123-000000000000") AnyObject
   %5 = open_existential_metatype %1 : $@thick AnyObject.Type to $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type
   dynamic_method_br %5 : $@thick (@opened("01234567-89ab-cdef-0123-000000000001") AnyObject).Type, #X.g!1.foreign, bb4, bb5
 

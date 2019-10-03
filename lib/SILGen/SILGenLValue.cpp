@@ -1295,29 +1295,26 @@ namespace {
 
     bool hasPropertyWrapper() const {
       if (auto *VD = dyn_cast<VarDecl>(Storage)) {
-        // FIXME: Handle composition of property wrappers.
-        if (VD->getAttachedPropertyWrappers().size() == 1) {
-          auto wrapperInfo = VD->getAttachedPropertyWrapperTypeInfo(0);
-          
-          // If there is no init(wrapperValue:), we cannot rewrite an
-          // assignment into an initialization.
-          if (!wrapperInfo.wrappedValueInit)
-            return false;
+        // If this is not a wrapper property that can be initialized from
+        // a value of the wrapped type, we can't perform the initialization.
+        auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo();
+        if (!wrapperInfo.initializeFromOriginal)
+          return false;
 
-          // If we have a nonmutating setter on a value type, the call
-          // captures all of 'self' and we cannot rewrite an assignment
-          // into an initialization.
-          if (!VD->isSetterMutating() &&
-              VD->getDeclContext()->getSelfNominalTypeDecl() &&
-              VD->isInstanceMember() &&
-              !VD->getDeclContext()->getDeclaredInterfaceType()
-                  ->hasReferenceSemantics()) {
-            return false;
-          }
-
-          return true;
+        // If we have a nonmutating setter on a value type, the call
+        // captures all of 'self' and we cannot rewrite an assignment
+        // into an initialization.
+        if (!VD->isSetterMutating() &&
+            VD->getDeclContext()->getSelfNominalTypeDecl() &&
+            VD->isInstanceMember() &&
+            !VD->getDeclContext()->getDeclaredInterfaceType()
+                ->hasReferenceSemantics()) {
+          return false;
         }
+
+        return true;
       }
+
       return false;
     }
 
@@ -1404,31 +1401,36 @@ namespace {
           proj = std::move(SEC).project(SGF, loc, base);
         }
 
-        // Create the allocating initializer function. It captures the metadata.
-        // FIXME: Composition.
-        assert(field->getAttachedPropertyWrappers().size() == 1);
-        auto wrapperInfo = field->getAttachedPropertyWrapperTypeInfo(0);
-        auto ctor = wrapperInfo.wrappedValueInit;
-        SubstitutionMap subs = ValType->getMemberSubstitutionMap(
-                        SGF.getModule().getSwiftModule(), ctor);
+        // The property wrapper backing initializer forms an instance of
+        // the backing storage type from a wrapped value.
+        SILDeclRef initConstant(
+            field, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+        SILValue initFRef = SGF.emitGlobalFunctionRef(loc, initConstant);
 
-        Type ity = ctor->getInterfaceType();
-        AnyFunctionType *substIty =
-          ity.subst(subs)->getCanonicalType()->castTo<AnyFunctionType>();
+        SubstitutionMap initSubs;
+        if (auto genericSig = field->getInnermostDeclContext()
+                ->getGenericSignatureOfContext()) {
+          initSubs = SubstitutionMap::get(
+              genericSig,
+              [&](SubstitutableType *type) {
+                if (auto gp = type->getAs<GenericTypeParamType>()) {
+                  return SGF.F.mapTypeIntoContext(gp);
+                }
 
-        auto initRef = SILDeclRef(ctor, SILDeclRef::Kind::Allocator)
-          .asForeign(requiresForeignEntryPoint(ctor));
-        RValue initFuncRV =
-          SGF.emitApplyPropertyWrapperAllocator(loc, subs,initRef,
-                                                ValType,
-                                                CanAnyFunctionType(substIty));
-        ManagedValue initFn = std::move(initFuncRV).getAsSingleValue(SGF, loc);
+                return Type(type);
+              },
+              LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
+        }
+
+        PartialApplyInst *initPAI =
+          SGF.B.createPartialApply(loc, initFRef,
+                                   initSubs, ArrayRef<SILValue>(),
+                                   ParameterConvention::Direct_Guaranteed);
+        ManagedValue initFn = SGF.emitManagedRValueWithCleanup(initPAI);
 
         // Create the allocating setter function. It captures the base address.
         auto setterInfo = SGF.getConstantInfo(setter);
         SILValue setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
-        auto setterSubs = SGF.getFunction().getForwardingSubstitutionMap();
-
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
         SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
 
@@ -1442,7 +1444,7 @@ namespace {
 
         PartialApplyInst *setterPAI =
           SGF.B.createPartialApply(loc, setterFRef,
-                                   setterSubs, { capturedBase },
+                                   Substitutions, { capturedBase },
                                    ParameterConvention::Direct_Guaranteed);
         ManagedValue setterFn = SGF.emitManagedRValueWithCleanup(setterPAI);
 

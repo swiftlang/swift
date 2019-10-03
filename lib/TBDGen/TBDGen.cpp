@@ -21,7 +21,9 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/IRGen/IRGenPublic.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -341,6 +343,14 @@ void TBDGenVisitor::visitVarDecl(VarDecl *VD) {
       if (VD->isLazilyInitializedGlobal())
         addSymbol(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
     }
+
+    // Wrapped non-static member properties may have a backing initializer.
+    if (auto wrapperInfo = VD->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.initializeFromOriginal && !VD->isStatic()) {
+        addSymbol(
+            SILDeclRef(VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
+      }
+    }
   }
 
   visitAbstractStorageDecl(VD);
@@ -641,7 +651,7 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
   file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
   file.setTwoLevelNamespace();
-  file.setSwiftABIVersion(TAPI_SWIFT_ABI_VERSION);
+  file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setPlatform(tapi::internal::mapToSinglePlatform(target));
   auto arch = tapi::internal::getArchType(target.getArchName());
   file.setArch(arch);

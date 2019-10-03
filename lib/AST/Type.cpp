@@ -170,7 +170,6 @@ bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
     llvm_unreachable("sugared canonical type?");
 
   // These types are always class references.
-  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::Class:
@@ -624,6 +623,28 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   }
   return Type();
 }
+
+Type TypeBase::wrapInPointer(PointerTypeKind kind) {
+  ASTContext &ctx = getASTContext();
+  NominalTypeDecl *pointerDecl = ([&ctx, kind] {
+    switch (kind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
+      llvm_unreachable("these pointer types don't take arguments");
+    case PTK_UnsafePointer:
+      return ctx.getUnsafePointerDecl();
+    case PTK_UnsafeMutablePointer:
+      return ctx.getUnsafeMutablePointerDecl();
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return ctx.getAutoreleasingUnsafeMutablePointerDecl();
+    }
+    llvm_unreachable("bad kind");
+  }());
+
+  assert(pointerDecl);
+  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
+}
+
 
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
@@ -3261,7 +3282,23 @@ static Type substType(Type derivedType,
                              boxTy->getLayout(),
                              newSubMap);
     }
-    
+
+    // Special-case TypeAliasType; we need to substitute conformances.
+    if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
+      Type parentTy;
+      if (auto origParentTy = aliasTy->getParent())
+        parentTy = substType(origParentTy,
+                             substitutions, lookupConformances, options);
+      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
+                                    substitutions, lookupConformances, options);
+      if (parentTy && parentTy->isExistentialType())
+        return underlyingTy;
+      auto subMap = aliasTy->getSubstitutionMap()
+          .subst(substitutions, lookupConformances, options);
+      return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
+                                     subMap, underlyingTy));
+    }
+
     // We only substitute for substitutable types and dependent member types.
     
     // For dependent member types, we may need to look up the member if the
@@ -3963,33 +4000,29 @@ case TypeKind::Id:
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType && !oldParentType->hasTypeParameter() &&
-        !oldParentType->hasArchetype()) {
+    if (oldParentType) {
       newParentType = oldParentType.transformRec(fn);
       if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
     for (Type oldReplacementType : subMap.getReplacementTypes()) {
-      if (oldReplacementType->hasTypeParameter() ||
-          oldReplacementType->hasArchetype())
-        return newUnderlyingType;
-
       Type newReplacementType = oldReplacementType.transformRec(fn);
       if (!newReplacementType)
         return newUnderlyingType;
 
       // If anything changed with the replacement type, we lose the sugar.
       // FIXME: This is really unfortunate.
-      if (!newReplacementType->isEqual(oldReplacementType))
+      if (newReplacementType.getPointer() != oldReplacementType.getPointer())
         return newUnderlyingType;
     }
 
-    if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+    if (oldParentType.getPointer() == newParentType.getPointer() &&
+        oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
     return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
-                                   newUnderlyingType);
+                              newUnderlyingType);
   }
 
   case TypeKind::Paren: {
@@ -4335,9 +4368,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   case TypeKind::BuiltinBridgeObject:
     return ReferenceCounting::Bridge;
-
-  case TypeKind::BuiltinUnknownObject:
-    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
     return getClassReferenceCounting(cast<ClassType>(type)->getDecl());

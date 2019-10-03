@@ -31,6 +31,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallBitVector.h"

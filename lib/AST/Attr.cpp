@@ -23,6 +23,7 @@
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 // SWIFT_ENABLE_TENSORFLOW
 #include "swift/AST/ParameterList.h"

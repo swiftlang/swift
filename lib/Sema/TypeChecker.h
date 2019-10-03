@@ -616,6 +616,10 @@ private:
   /// when executing scripts.
   bool InImmediateMode = false;
 
+  /// Indicate that the type checker should skip type-checking non-inlinable
+  /// function bodies.
+  bool SkipNonInlinableFunctionBodies = false;
+
   /// Closure expressions whose bodies have already been prechecked as
   /// part of trying to apply a function builder.
   llvm::DenseMap<ClosureExpr *, FunctionBuilderClosurePreCheck>
@@ -707,6 +711,14 @@ public:
     SwitchCheckingInvocationThreshold = invocationCount;
   }
 
+  void setSkipNonInlinableBodies(bool skip) {
+    SkipNonInlinableFunctionBodies = skip;
+  }
+
+  bool canSkipNonInlinableBodies() const {
+    return SkipNonInlinableFunctionBodies;
+  }
+
   bool getInImmediateMode() {
     return InImmediateMode;
   }
@@ -723,8 +735,6 @@ public:
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
-  Type getUnsafePointerType(SourceLoc loc, Type pointeeType);
-  Type getUnsafeMutablePointerType(SourceLoc loc, Type pointeeType);
   Type getStringType(DeclContext *dc);
   Type getSubstringType(DeclContext *dc);
   Type getIntType(DeclContext *dc);
@@ -782,8 +792,6 @@ public:
                                              DeclContext *DC);
 
   void validateDecl(ValueDecl *D);
-  void validateDecl(OperatorDecl *decl);
-  void validateDecl(PrecedenceGroupDecl *decl);
 
   /// Validate the given extension declaration, ensuring that it
   /// properly extends the nominal type it names.
@@ -1012,9 +1020,9 @@ public:
   Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                    ReferenceOwnershipAttr *attr);
 
-  /// Check the default arguments that occur within this value decl.
-  void checkDefaultArguments(ParameterList *params, ValueDecl *VD);
-
+  /// Check the raw value expression in this enum element.
+  void checkRawValueExpr(EnumDecl *parent, EnumElementDecl *Elt);
+  
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
   }
@@ -1709,11 +1717,12 @@ public:
 
   /// Given an expression that's known to be an infix operator,
   /// look up its precedence group.
-  PrecedenceGroupDecl *
+  static PrecedenceGroupDecl *
   lookupPrecedenceGroupForInfixOperator(DeclContext *dc, Expr *op);
 
-  PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc, Identifier name,
-                                             SourceLoc nameLoc);
+  static PrecedenceGroupDecl *lookupPrecedenceGroup(DeclContext *dc,
+                                                    Identifier name,
+                                                    SourceLoc nameLoc);
 
   /// Given an pre-folded expression, find LHS from the expression if a binary
   /// operator \c name appended to the expression.
@@ -1801,25 +1810,25 @@ public:
     PropertyInitializer
   };
 
-  bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
-                                const DeclContext *DC,
-                                FragileFunctionKind Kind,
-                                bool TreatUsableFromInlineAsPublic);
+  static bool diagnoseInlinableDeclRef(SourceLoc loc, ConcreteDeclRef declRef,
+                                       const DeclContext *DC,
+                                       FragileFunctionKind Kind,
+                                       bool TreatUsableFromInlineAsPublic);
 
   Expr *buildDefaultInitializer(Type type);
   
 private:
-  bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
-                                      const DeclContext *DC,
-                                      FragileFunctionKind Kind,
-                                      bool TreatUsableFromInlineAsPublic);
+  static bool diagnoseInlinableDeclRefAccess(SourceLoc loc, const ValueDecl *D,
+                                             const DeclContext *DC,
+                                             FragileFunctionKind Kind,
+                                             bool TreatUsableFromInlineAsPublic);
 
   /// Given that a declaration is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if it cannot
   /// reasonably be shared.
-  bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
-                                    const DeclContext *DC,
-                                    FragileFunctionKind fragileKind);
+  static bool diagnoseDeclRefExportability(SourceLoc loc, ConcreteDeclRef declRef,
+                                           const DeclContext *DC,
+                                           FragileFunctionKind fragileKind);
 
   /// Given that a type is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if its
@@ -1861,7 +1870,7 @@ public:
   /// that could the passed-in location could be executing upon for
   /// the target platform. If MostRefined != nullptr, set to the most-refined
   /// TRC found while approximating.
-  AvailabilityContext
+  static AvailabilityContext
   overApproximateAvailabilityAtLocation(SourceLoc loc, const DeclContext *DC,
                                         const TypeRefinementContext **MostRefined=nullptr);
 
@@ -1869,18 +1878,18 @@ public:
   ///
   /// \param StartElem Where to start for incremental building of refinement
   /// contexts
-  void buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                           unsigned StartElem);
+  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
+                                                  unsigned StartElem);
 
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root
   /// TypeRefinementContext for the source file.
-  TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+  static TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 
   /// Returns a diagnostic indicating why the declaration cannot be annotated
   /// with an @available() attribute indicating it is potentially unavailable
   /// or None if this is allowed.
-  Optional<Diag<>>
+  static Optional<Diag<>>
   diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
   /// Checks whether a declaration is available when referred to at the given
@@ -1890,15 +1899,15 @@ public:
   /// If the declaration is not available, return false and write the
   /// declaration's availability info to the out parameter
   /// \p OutAvailableRange.
-  bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
-                       const DeclContext *referenceDC,
-                       AvailabilityContext &OutAvailableRange);
+  static bool isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
+                              const DeclContext *referenceDC,
+                              AvailabilityContext &OutAvailableRange);
 
   /// Checks whether a declaration should be considered unavailable when
   /// referred to at the given location and, if so, returns the reason why the
   /// declaration is unavailable. Returns None is the declaration is
   /// definitely available.
-  Optional<UnavailabilityReason>
+  static Optional<UnavailabilityReason>
   checkDeclarationAvailability(const Decl *D, SourceLoc referenceLoc,
                                const DeclContext *referenceDC);
 
@@ -1910,26 +1919,26 @@ public:
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location.
-  void diagnosePotentialUnavailability(const ValueDecl *D,
-                                       SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
-                                       const UnavailabilityReason &Reason);
+  static void diagnosePotentialUnavailability(const ValueDecl *D,
+                                              SourceRange ReferenceRange,
+                                              const DeclContext *ReferenceDC,
+                                              const UnavailabilityReason &Reason);
 
   // Emits a diagnostic, if necessary, for a reference to a declaration
   // that is potentially unavailable at the given source location, using
   // Name as the diagnostic name.
-  void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
-                                       SourceRange ReferenceRange,
-                                       const DeclContext *ReferenceDC,
-                                       const UnavailabilityReason &Reason);
+  static void diagnosePotentialUnavailability(const Decl *D, DeclName Name,
+                                              SourceRange ReferenceRange,
+                                              const DeclContext *ReferenceDC,
+                                              const UnavailabilityReason &Reason);
 
-  void diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
+  static void diagnosePotentialOpaqueTypeUnavailability(SourceRange ReferenceRange,
                                            const DeclContext *ReferenceDC,
                                            const UnavailabilityReason &Reason);
   
   /// Emits a diagnostic for a reference to a storage accessor that is
   /// potentially unavailable.
-  void diagnosePotentialAccessorUnavailability(
+  static void diagnosePotentialAccessorUnavailability(
       const AccessorDecl *Accessor, SourceRange ReferenceRange,
       const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
       bool ForInout);
@@ -1941,10 +1950,10 @@ public:
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   /// Callers can provide a lambda that adds additional information (such as a
   /// fixit hint) to the deprecation diagnostic, if it is emitted.
-  void diagnoseIfDeprecated(SourceRange SourceRange,
-                            const DeclContext *ReferenceDC,
-                            const ValueDecl *DeprecatedDecl,
-                            const ApplyExpr *Call);
+  static void diagnoseIfDeprecated(SourceRange SourceRange,
+                                   const DeclContext *ReferenceDC,
+                                   const ValueDecl *DeprecatedDecl,
+                                   const ApplyExpr *Call);
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl

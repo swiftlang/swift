@@ -89,7 +89,7 @@ extension OSLogArguments {
   /// by this instance.
   @usableFromInline
   internal mutating func append(_ value: @escaping () -> String) {
-    argumentClosures!.append({ $0.serialize(value()) })
+    argumentClosures.append({ serialize(value(), at: &$0, using: &$1) })
   }
 }
 
@@ -107,24 +107,28 @@ internal func sizeForEncoding() -> Int {
   return Int.bitWidth &>> logBitsPerByte
 }
 
-extension OSLogByteBufferBuilder {
-  /// Serialize a string at the buffer location pointed to by `position`. 
-  /// Record any auxiliary storage created for getting a stable pointer to the
-  /// parameter string in the `self.auxiliaryStorage` property, so that the
-  /// storage is alive for the lifetime of `self`.
-  @usableFromInline
-  internal mutating func serialize(_ stringValue: String) {
-    let (optionalStorage, bytePointer): (AnyObject?, UnsafeRawPointer) =
-      _convertConstStringToUTF8PointerArgument(
-        stringValue)
+/// Serialize a stable pointer to the string `stringValue` at the buffer location
+/// pointed by `bufferPosition`. When necessary, this function would copy the
+/// string contents to a storage with a stable pointer. If that happens, a reference
+/// to the storage will be added to `storageObjects`.
+@usableFromInline
+@_alwaysEmitIntoClient
+internal func serialize(
+  _ stringValue: String,
+  at bufferPosition: inout ByteBufferPointer,
+  using storageObjects: inout StorageObjects
+) {
+  let (optionalStorage, bytePointer): (AnyObject?, UnsafeRawPointer) =
+    _convertConstStringToUTF8PointerArgument(
+      stringValue)
 
-    if let storage = optionalStorage {
-      auxiliaryStorage.append(storage)
-    }
-
-    let byteCount = sizeForEncoding()
-    let dest = UnsafeMutableRawBufferPointer(start: position, count: byteCount)
-    withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }
-    position += byteCount
+  if let storage = optionalStorage {
+    storageObjects.append(storage)
   }
+
+  let byteCount = sizeForEncoding()
+  let dest =
+    UnsafeMutableRawBufferPointer(start: bufferPosition, count: byteCount)
+  withUnsafeBytes(of: bytePointer) { dest.copyMemory(from: $0) }
+  bufferPosition += byteCount
 }

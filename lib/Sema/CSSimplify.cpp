@@ -36,7 +36,10 @@ MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 void MatchCallArgumentListener::extraArgument(unsigned argIdx) { }
 
-void MatchCallArgumentListener::missingArgument(unsigned paramIdx) { }
+Optional<unsigned>
+MatchCallArgumentListener::missingArgument(unsigned paramIdx) {
+  return None;
+}
 
 bool MatchCallArgumentListener::missingLabel(unsigned paramIdx) { return true; }
 bool MatchCallArgumentListener::extraneousLabel(unsigned paramIdx) {
@@ -572,6 +575,7 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
   // If we have any unfulfilled parameters, check them now.
   if (haveUnfulfilledParams) {
+    bool hasSynthesizedArgs = false;
     for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
       // If we have a binding for this parameter, we're done.
       if (!parameterBindings[paramIdx].empty())
@@ -587,9 +591,19 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
       if (paramInfo.hasDefaultArgument(paramIdx))
         continue;
 
-      listener.missingArgument(paramIdx);
+      if (auto newArgIdx = listener.missingArgument(paramIdx)) {
+        parameterBindings[paramIdx].push_back(*newArgIdx);
+        hasSynthesizedArgs = true;
+        continue;
+      }
+
       return true;
     }
+
+    // If all of the missing arguments have been synthesized,
+    // let's stop since we have found the problem.
+    if (hasSynthesizedArgs)
+      return false;
   }
 
   // If any arguments were provided out-of-order, check whether we have
@@ -787,19 +801,62 @@ getCalleeDeclAndArgs(ConstraintSystem &cs,
 
 class ArgumentFailureTracker : public MatchCallArgumentListener {
   ConstraintSystem &CS;
-  ArrayRef<AnyFunctionType::Param> Arguments;
+  SmallVectorImpl<AnyFunctionType::Param> &Arguments;
   ArrayRef<AnyFunctionType::Param> Parameters;
   SmallVectorImpl<ParamBinding> &Bindings;
   ConstraintLocatorBuilder Locator;
 
+  unsigned NumSynthesizedArgs = 0;
+
 public:
   ArgumentFailureTracker(ConstraintSystem &cs,
-                         ArrayRef<AnyFunctionType::Param> args,
+                         SmallVectorImpl<AnyFunctionType::Param> &args,
                          ArrayRef<AnyFunctionType::Param> params,
                          SmallVectorImpl<ParamBinding> &bindings,
                          ConstraintLocatorBuilder locator)
       : CS(cs), Arguments(args), Parameters(params), Bindings(bindings),
         Locator(locator) {}
+
+  ~ArgumentFailureTracker() override {
+    if (NumSynthesizedArgs > 0) {
+      ArrayRef<AnyFunctionType::Param> argRef(Arguments);
+
+      auto *fix =
+          AddMissingArguments::create(CS, argRef.take_back(NumSynthesizedArgs),
+                                      CS.getConstraintLocator(Locator));
+
+      // Not having an argument is the same impact as having a type mismatch.
+      (void)CS.recordFix(fix, /*impact=*/NumSynthesizedArgs * 2);
+    }
+  }
+
+  Optional<unsigned> missingArgument(unsigned paramIdx) override {
+    if (!CS.shouldAttemptFixes())
+      return None;
+
+    const auto &param = Parameters[paramIdx];
+
+    unsigned newArgIdx = Arguments.size();
+    auto *argLoc = CS.getConstraintLocator(
+        Locator
+            .withPathElement(LocatorPathElt::ApplyArgToParam(
+                newArgIdx, paramIdx, param.getParameterFlags()))
+            .withPathElement(LocatorPathElt::SynthesizedArgument(newArgIdx)));
+
+    auto *argType =
+        CS.createTypeVariable(argLoc, TVO_CanBindToInOut | TVO_CanBindToLValue |
+                                          TVO_CanBindToNoEscape);
+
+    CS.recordHole(argType);
+    CS.addUnsolvedConstraint(
+        Constraint::create(CS, ConstraintKind::Defaultable, argType,
+                           CS.getASTContext().TheAnyType, argLoc));
+
+    Arguments.push_back(param.withType(argType));
+    ++NumSynthesizedArgs;
+
+    return newArgIdx;
+  }
 
   bool missingLabel(unsigned paramIndex) override {
     return !CS.shouldAttemptFixes();
@@ -878,21 +935,55 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   argsWithLabels.append(args.begin(), args.end());
   AnyFunctionType::relabelParams(argsWithLabels, argLabels);
 
+  // Special case when a single tuple argument if used
+  // instead of N distinct arguments e.g.:
+  //
+  // func foo(_ x: Int, _ y: Int) {}
+  // foo((1, 2)) // expected 2 arguments, got a single tuple with 2 elements.
+  if (cs.shouldAttemptFixes() && argsWithLabels.size() == 1 &&
+      llvm::count_if(indices(params), [&](unsigned paramIdx) {
+        return !paramInfo.hasDefaultArgument(paramIdx);
+      }) > 1) {
+    const auto &arg = argsWithLabels.front();
+    auto argTuple = arg.getPlainType()->getRValueType()->getAs<TupleType>();
+    // Don't explode a tuple in cases where first parameter is a tuple as
+    // well. That is a regular "missing argument case" even if their arity
+    // is different e.g.
+    //
+    // func foo(_: (Int, Int), _: Int) {}
+    // foo((1, 2)) // call is missing an argument for parameter #1
+    if (argTuple && argTuple->getNumElements() == params.size() &&
+        !params.front().getPlainType()->is<TupleType>()) {
+      argsWithLabels.pop_back();
+      // Let's make sure that labels associated with tuple elements
+      // line up with what is expected by argument list.
+      for (const auto &arg : argTuple->getElements()) {
+        argsWithLabels.push_back(
+            AnyFunctionType::Param(arg.getType(), arg.getName()));
+      }
+
+      (void)cs.recordFix(
+          AddMissingArguments::create(cs, argsWithLabels,
+                                      cs.getConstraintLocator(locator)),
+          /*impact=*/argsWithLabels.size() * 2);
+    }
+  }
+
   // Match up the call arguments to the parameters.
   SmallVector<ParamBinding, 4> parameterBindings;
-  ArgumentFailureTracker listener(cs, argsWithLabels, params, parameterBindings,
-                                  locator);
-  if (constraints::matchCallArguments(argsWithLabels, params,
-                                      paramInfo,
-                                      hasTrailingClosure,
-                                      cs.shouldAttemptFixes(), listener,
-                                      parameterBindings)) {
-    if (!cs.shouldAttemptFixes())
-      return cs.getTypeMatchFailure(locator);
+  {
+    ArgumentFailureTracker listener(cs, argsWithLabels, params,
+                                    parameterBindings, locator);
+    if (constraints::matchCallArguments(
+            argsWithLabels, params, paramInfo, hasTrailingClosure,
+            cs.shouldAttemptFixes(), listener, parameterBindings)) {
+      if (!cs.shouldAttemptFixes())
+        return cs.getTypeMatchFailure(locator);
 
-    if (AllowTupleSplatForSingleParameter::attempt(cs, argsWithLabels, params,
-                                                   parameterBindings, locator))
-      return cs.getTypeMatchFailure(locator);
+      if (AllowTupleSplatForSingleParameter::attempt(
+              cs, argsWithLabels, params, parameterBindings, locator))
+        return cs.getTypeMatchFailure(locator);
+    }
   }
 
   // If this application is part of an operator, then we allow an implicit
@@ -900,6 +991,15 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   // assignment operators.
   auto *anchor = locator.getAnchor();
   assert(anchor && "locator without anchor expression?");
+
+  auto isSynthesizedArgument = [](const AnyFunctionType::Param &arg) -> bool {
+    if (auto *typeVar = arg.getPlainType()->getAs<TypeVariableType>()) {
+      auto *locator = typeVar->getImpl().getLocator();
+      return locator->isLastElement(ConstraintLocator::SynthesizedArgument);
+    }
+
+    return false;
+  };
 
   for (unsigned paramIdx = 0, numParams = parameterBindings.size();
        paramIdx != numParams; ++paramIdx){
@@ -915,10 +1015,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
     for (auto argIdx : parameterBindings[paramIdx]) {
       auto loc = locator.withPathElement(LocatorPathElt::ApplyArgToParam(
           argIdx, paramIdx, param.getParameterFlags()));
-      auto argTy = argsWithLabels[argIdx].getOldType();
+      const auto &argument = argsWithLabels[argIdx];
+      auto argTy = argument.getOldType();
 
       bool matchingAutoClosureResult = param.isAutoClosure();
-      if (param.isAutoClosure()) {
+      if (param.isAutoClosure() && !isSynthesizedArgument(argument)) {
         auto &ctx = cs.getASTContext();
         auto *fnType = paramTy->castTo<FunctionType>();
         auto *argExpr = getArgumentExpr(locator.getAnchor(), argIdx);
@@ -957,7 +1058,11 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
       // If argument comes for declaration it should loose
       // `@autoclosure` flag, because in context it's used
       // as a function type represented by autoclosure.
-      assert(!argsWithLabels[argIdx].isAutoClosure());
+      //
+      // Special case here are synthesized arguments because
+      // they mirror parameter flags to ease diagnosis.
+      assert(!argsWithLabels[argIdx].isAutoClosure() ||
+             isSynthesizedArgument(argument));
 
       cs.addConstraint(
           subKind, argTy, paramTy,
@@ -1162,6 +1267,56 @@ static ConstraintFix *fixRequirementFailure(ConstraintSystem &cs, Type type1,
     return fixRequirementFailure(cs, type1, type2, anchor, path);
   }
   return nullptr;
+}
+
+static unsigned
+assessRequirementFailureImpact(ConstraintSystem &cs, Type requirementType,
+                               ConstraintLocatorBuilder locator) {
+  auto *anchor = locator.getAnchor();
+  if (!anchor)
+    return 1;
+
+  // If this requirement is associated with an overload choice let's
+  // tie impact to how many times this requirement type is mentioned.
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
+    if (!(requirementType && requirementType->is<TypeVariableType>()))
+      return 1;
+
+    unsigned choiceImpact = 0;
+    if (auto *choice = cs.findSelectedOverloadFor(ODRE)) {
+      auto *typeVar = requirementType->castTo<TypeVariableType>();
+      choice->ImpliedType.visit([&](Type type) {
+        if (type->isEqual(typeVar))
+          ++choiceImpact;
+      });
+    }
+
+    return choiceImpact == 0 ? 1 : choiceImpact;
+  }
+
+  // If this requirement is associated with a member reference and it
+  // was possible to check it before overload choice is bound, that means
+  // types came from the context (most likely Self, or associated type(s))
+  // and failing this constraint makes member unrelated/inaccessible, so
+  // the impact has to be adjusted accordingly in order for this fix not to
+  // interfere with other overload choices.
+  //
+  // struct S<T> {}
+  // extension S where T == AnyObject { func foo() {} }
+  //
+  // func bar(_ s: S<Int>) { s.foo() }
+  //
+  // In this case `foo` is only accessible if T == `AnyObject`, which makes
+  // fix for same-type requirement higher impact vs. requirement associated
+  // with method itself e.g. `func foo<U>() -> U where U : P {}` because
+  // `foo` is accessible from any `S` regardless of what `T` is.
+  if (isa<UnresolvedDotExpr>(anchor) || isa<UnresolvedMemberExpr>(anchor)) {
+    auto *calleeLoc = cs.getCalleeLocator(cs.getConstraintLocator(locator));
+    if (!cs.findSelectedOverloadFor(calleeLoc))
+      return 10;
+  }
+
+  return 1;
 }
 
 /// Attempt to fix missing arguments by introducing type variables
@@ -4130,20 +4285,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
 
       if (auto *fix =
               fixRequirementFailure(*this, type, protocolTy, anchor, path)) {
-        unsigned choiceImpact = 0;
-        // If this requirement is associated with overload choice let's
-        // tie impact to how many times this non-conforming type is mentioned.
-        if (auto *ODRE = dyn_cast_or_null<OverloadedDeclRefExpr>(anchor)) {
-          auto *choice = findSelectedOverloadFor(ODRE);
-          if (typeVar && choice) {
-            choice->ImpliedType.visit([&](Type type) {
-              if (type->isEqual(typeVar))
-                ++choiceImpact;
-            });
-          }
-        }
-
-        if (!recordFix(fix, choiceImpact == 0 ? 1 : choiceImpact)) {
+        auto impact = assessRequirementFailureImpact(*this, typeVar, locator);
+        if (!recordFix(fix, impact)) {
           // Record this conformance requirement as "fixed".
           recordFixedRequirement(type, RequirementKind::Conformance,
                                  protocolTy);
@@ -4823,7 +4966,9 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
     // to access the type with a protocol metatype base.
     } else if (instanceTy->isExistentialType() &&
                isa<TypeAliasDecl>(decl) &&
-               !cast<TypeAliasDecl>(decl)->getInterfaceType()->hasTypeParameter()) {
+               !cast<TypeAliasDecl>(decl)
+                  ->getUnderlyingType()->getCanonicalType()
+                    ->hasTypeParameter()) {
 
       /* We're OK */
 
@@ -7691,11 +7836,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
 
   case FixKind::InsertCall:
   case FixKind::RemoveReturn:
-  case FixKind::AddConformance:
   case FixKind::RemoveAddressOf:
   case FixKind::TreatRValueAsLValue:
-  case FixKind::SkipSameTypeRequirement:
-  case FixKind::SkipSuperclassRequirement:
   case FixKind::AddMissingArguments:
   case FixKind::SkipUnhandledConstructInFunctionBuilder:
   case FixKind::UsePropertyWrapper:
@@ -7704,6 +7846,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::UseValueTypeOfRawRepresentative:
   case FixKind::ExplicitlyConstructRawRepresentable: {
     return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
+  }
+
+  case FixKind::AddConformance:
+  case FixKind::SkipSameTypeRequirement:
+  case FixKind::SkipSuperclassRequirement: {
+    return recordFix(fix, assessRequirementFailureImpact(*this, type1,
+                                                         fix->getLocator()))
+               ? SolutionKind::Error
+               : SolutionKind::Solved;
   }
 
   case FixKind::AllowArgumentTypeMismatch: {

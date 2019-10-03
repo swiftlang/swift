@@ -717,6 +717,12 @@ public:
     PointerTypeKind Ignore;
     return getAnyPointerElementType(Ignore);
   }
+
+  /// Returns a type representing a pointer to \c this.
+  ///
+  /// \p kind must not be a raw pointer kind, since that would discard the
+  /// current type.
+  Type wrapInPointer(PointerTypeKind kind);
   
   /// Determine whether the given type is "specialized", meaning that
   /// it involves generic types for which generic arguments have been provided.
@@ -1334,19 +1340,6 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinBridgeObjectType, BuiltinType);
-
-/// BuiltinUnknownObjectType - The builtin opaque Objective-C pointer type.
-/// Useful for pushing an Objective-C type through swift.
-class BuiltinUnknownObjectType : public BuiltinType {
-  friend class ASTContext;
-  BuiltinUnknownObjectType(const ASTContext &C)
-    : BuiltinType(TypeKind::BuiltinUnknownObject, C) {}
-public:
-  static bool classof(const TypeBase *T) {
-    return T->getKind() == TypeKind::BuiltinUnknownObject;
-  }
-};
-DEFINE_EMPTY_CAN_TYPE_WRAPPER(BuiltinUnknownObjectType, BuiltinType);
 
 /// BuiltinUnsafeValueBufferType - The builtin opaque fixed-size value
 /// buffer type, into which storage for an arbitrary value can be

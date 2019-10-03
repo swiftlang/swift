@@ -1317,14 +1317,18 @@ public:
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
 struct SILDebugVariable {
+  StringRef Name;
+  unsigned ArgNo : 16;
+  unsigned Constant : 1;
+
   SILDebugVariable() : ArgNo(0), Constant(false) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
       : ArgNo(ArgNo), Constant(Constant) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
       : Name(Name), ArgNo(ArgNo), Constant(Constant) {}
-  StringRef Name;
-  unsigned ArgNo : 16;
-  unsigned Constant : 1;
+  bool operator==(const SILDebugVariable &V) {
+    return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name;
+  }
 };
 
 /// A DebugVariable where storage for the strings has been

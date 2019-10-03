@@ -25,8 +25,8 @@
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterOptions.h"
 #include "swift/Parse/Parser.h"
@@ -1728,13 +1728,14 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 }
 
 /// Returns true if it is expected that the macro is ignored.
-static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
+static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
+                              clang::Preprocessor &PP) {
   // Ignore include guards. Try not to ignore definitions of useful constants,
   // which may end up looking like include guards.
   if (macro->isUsedForHeaderGuard() && macro->getNumTokens() == 1) {
     auto tok = macro->tokens()[0];
-    if (tok.isLiteral()
-        && StringRef(tok.getLiteralData(), tok.getLength()) == "1")
+    if (tok.is(clang::tok::numeric_constant) && tok.getLength() == 1 &&
+        PP.getSpellingOfSingleCharacterNumericConstant(tok) == '1')
       return true;
   }
 
@@ -1760,14 +1761,15 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro) {
 
 bool ClangImporter::shouldIgnoreMacro(StringRef Name,
                                       const clang::MacroInfo *Macro) {
-  return ::shouldIgnoreMacro(Name, Macro);
+  return ::shouldIgnoreMacro(Name, Macro, Impl.getClangPreprocessor());
 }
 
 Identifier
 NameImporter::importMacroName(const clang::IdentifierInfo *clangIdentifier,
                               const clang::MacroInfo *macro) {
   // If we're supposed to ignore this macro, return an empty identifier.
-  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro))
+  if (::shouldIgnoreMacro(clangIdentifier->getName(), macro,
+                          getClangPreprocessor()))
     return Identifier();
 
   // No transformation is applied to the name.

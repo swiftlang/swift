@@ -89,9 +89,9 @@ sil @unknown_rc_box : $@convention(thin) () -> () {
 entry:
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 12, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
-  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>, 0
-  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.UnknownObject>
+  %a = alloc_box $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
+  %b = project_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>, 0
+  dealloc_box %a : $<τ_0_0> { var τ_0_0 } <Builtin.AnyObject>
   return undef : $()
 }
 

@@ -383,7 +383,7 @@ struct X28 : P2 {
 }
 
 // CHECK-LABEL: .P28@
-// CHECK-NEXT: Requirement signature: <Self where Self : P3, Self.P3Assoc == P28.P3Assoc>
+// CHECK-NEXT: Requirement signature: <Self where Self : P3, Self.P3Assoc == X28>
 // CHECK-NEXT: Canonical requirement signature: <τ_0_0 where τ_0_0 : P3, τ_0_0.P3Assoc == X28>
 protocol P28: P3 {
   typealias P3Assoc = X28   // expected-warning{{typealias overriding associated type}}

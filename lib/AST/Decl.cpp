@@ -480,16 +480,24 @@ SourceRange Decl::getSourceRangeIncludingAttrs() const {
   return Range;
 }
 
-SourceLoc Decl::getLoc() const {
+SourceLoc Decl::getLocFromSource() const {
   switch (getKind()) {
 #define DECL(ID, X) \
-static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 1, \
-              #ID "Decl is missing getLoc()"); \
-case DeclKind::ID: return cast<ID##Decl>(this)->getLoc();
+static_assert(sizeof(checkSourceLocType(&ID##Decl::getLocFromSource)) == 1, \
+              #ID "Decl is missing getLocFromSource()"); \
+case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
 #include "swift/AST/DeclNodes.def"
   }
 
   llvm_unreachable("Unknown decl kind");
+}
+
+SourceLoc Decl::getLoc() const {
+#define DECL(ID, X) \
+static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
+              #ID "Decl is re-defining getLoc()");
+#include "swift/AST/DeclNodes.def"
+  return getLocFromSource();
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {
@@ -1086,9 +1094,25 @@ ExtensionDecl::takeConformanceLoaderSlow() {
 }
 
 NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
+  assert((hasBeenBound() || canNeverBeBound()) &&
+         "Extension must have already been bound (by bindExtensions)");
+  return ExtendedNominal.getPointer();
+}
+
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-    ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)}, nullptr);
+  return evaluateOrDefault(
+      ctx.evaluator, ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)},
+      nullptr);
+}
+
+bool ExtensionDecl::canNeverBeBound() const {
+  // \c bindExtensions() only looks at valid parents for extensions.
+  return !hasValidParent();
+}
+
+bool ExtensionDecl::hasValidParent() const {
+  return getDeclContext()->canBeParentOfExtension();
 }
 
 bool ExtensionDecl::isConstrainedExtension() const {
@@ -3258,13 +3282,10 @@ Type TypeDecl::getDeclaredInterfaceType() const {
   }
 
   Type interfaceType = getInterfaceType();
-  if (interfaceType.isNull() || interfaceType->is<ErrorType>())
-    return interfaceType;
+  if (!interfaceType)
+    return ErrorType::get(getASTContext());
 
-  if (isa<ModuleDecl>(this))
-    return interfaceType;
-
-  return interfaceType->castTo<MetatypeType>()->getInstanceType();
+  return interfaceType->getMetatypeInstanceType();
 }
 
 int TypeDecl::compare(const TypeDecl *type1, const TypeDecl *type2) {
@@ -3628,15 +3649,16 @@ void TypeAliasDecl::computeType() {
   Type parent;
   auto parentDC = getDeclContext();
   if (parentDC->isTypeContext())
-    parent = parentDC->getDeclaredInterfaceType();
+    parent = parentDC->getSelfInterfaceType();
   auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
   setInterfaceType(MetatypeType::get(sugaredType, ctx));
 }
 
 Type TypeAliasDecl::getUnderlyingType() const {
-  return evaluateOrDefault(getASTContext().evaluator,
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
            UnderlyingTypeRequest{const_cast<TypeAliasDecl *>(this)},
-           Type());
+           ErrorType::get(ctx));
 }
       
 void TypeAliasDecl::setUnderlyingType(Type underlying) {
@@ -3666,10 +3688,11 @@ UnboundGenericType *TypeAliasDecl::getUnboundGenericType() const {
 }
 
 Type TypeAliasDecl::getStructuralType() const {
-  auto &context = getASTContext();
+  auto &ctx = getASTContext();
   return evaluateOrDefault(
-      context.evaluator,
-      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)}, Type());
+      ctx.evaluator,
+      StructuralTypeRequest{const_cast<TypeAliasDecl *>(this)},
+      ErrorType::get(ctx));
 }
 
 Type AbstractTypeParamDecl::getSuperclass() const {
@@ -5567,7 +5590,8 @@ bool VarDecl::hasAttachedPropertyWrapper() const {
   return !getAttachedPropertyWrappers().empty();
 }
 
-/// Whether all of the attached property wrappers have an init(initialValue:) initializer.
+/// Whether all of the attached property wrappers have an init(wrappedValue:)
+/// initializer.
 bool VarDecl::allAttachedPropertyWrappersHaveInitialValueInit() const {
   for (unsigned i : indices(getAttachedPropertyWrappers())) {
     if (!getAttachedPropertyWrapperTypeInfo(i).wrappedValueInit)
@@ -7556,6 +7580,28 @@ PrecedenceGroupDecl::PrecedenceGroupDecl(DeclContext *dc,
          higherThan.size() * sizeof(Relation));
   memcpy(getLowerThanBuffer(), lowerThan.data(),
          lowerThan.size() * sizeof(Relation));
+}
+
+llvm::Expected<PrecedenceGroupDecl *> LookupPrecedenceGroupRequest::evaluate(
+    Evaluator &eval, PrecedenceGroupDescriptor descriptor) const {
+  auto *dc = descriptor.dc;
+  PrecedenceGroupDecl *group = nullptr;
+  if (auto sf = dc->getParentSourceFile()) {
+    bool cascading = dc->isCascadingContextForLookup(false);
+    group = sf->lookupPrecedenceGroup(descriptor.ident, cascading,
+                                      descriptor.nameLoc);
+  } else {
+    group = dc->getParentModule()->lookupPrecedenceGroup(descriptor.ident,
+                                                         descriptor.nameLoc);
+  }
+  return group;
+}
+
+PrecedenceGroupDecl *InfixOperatorDecl::getPrecedenceGroup() const {
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      OperatorPrecedenceGroupRequest{const_cast<InfixOperatorDecl *>(this)},
+      nullptr);
 }
 
 bool FuncDecl::isDeferBody() const {

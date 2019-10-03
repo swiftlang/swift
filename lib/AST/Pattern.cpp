@@ -16,10 +16,11 @@
 
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Expr.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/Support/raw_ostream.h"

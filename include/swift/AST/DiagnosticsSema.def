@@ -1116,6 +1116,8 @@ ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,
       "missing argument for parameter #%0 in call", (unsigned))
+ERROR(missing_arguments_in_call,none,
+      "missing arguments for parameters %0 in call", (StringRef))
 ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,none,
@@ -3695,6 +3697,10 @@ ERROR(single_tuple_parameter_mismatch_normal,none,
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
+ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
+      "%0 %select{%1 |}2expects %3 separate arguments"
+      "%select{|; remove extra parentheses to change tuple into separate arguments}4",
+      (DescriptiveDeclKind, DeclName, bool, unsigned, bool))
 
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
@@ -3843,9 +3849,6 @@ ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
       "Error}0 type", (unsigned))
-ERROR(pointer_type_not_found,none,
-      "broken standard library: cannot find "
-      "%select{UnsafePointer|UnsafeMutablePointer}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
@@ -4745,8 +4748,6 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_wrapper_ambiguous_initial_value_init, none,
-  "property wrapper type %0 has multiple initial-value initializers", (Type))
 ERROR(property_wrapper_ambiguous_default_value_init, none,
   "property wrapper type %0 has multiple default-value initializers", (Type))
 ERROR(property_wrapper_type_requirement_not_accessible,none,

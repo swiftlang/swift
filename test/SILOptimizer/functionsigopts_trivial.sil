@@ -1,0 +1,2110 @@
+// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
+
+import Builtin
+import Swift
+
+// ==========================================================================={{
+// =============================================================================
+// =====                            SUPPORT                                =====
+// =============================================================================
+// =============================================================================
+
+class Klass {
+  var value : Builtin.Int2048
+}
+
+struct Wrapper {
+  var klass: Klass
+  var int: Int
+}
+
+struct Pair {
+  var klass1: Klass
+  var klass2: Klass
+}
+
+struct Quintuple {
+  var klass1: Klass
+  var klass2: Klass
+  var klass3: Klass
+  var klass4: Klass
+  var klass5: Klass
+}
+
+sil @take_nothing : $@convention(thin) () -> ()
+sil @take_klass : $@convention(thin) (Klass) -> ()
+sil @take_klass_and_klass : $@convention(thin) (Klass, Klass) -> ()
+sil @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+sil @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+sil @take_int : $@convention(thin) (Int) -> ()
+
+// =============================================================================
+// =============================================================================
+// =====                            SUPPORT                                =====
+// =============================================================================
+// ===========================================================================}}
+
+
+
+// ==========================================================================={{
+// =============================================================================
+// =====                             TESTS                                 =====
+// =============================================================================
+// =============================================================================
+
+
+
+// ==========================================================================={{
+// =                                WRAPPER                                    =
+// =============================================================================
+
+// struct Wrapper {
+//   var klass: Klass
+//   var int: Int
+// }
+
+// = Wrapper, #Wrapper.klass ================================================={{
+
+
+
+// TEST_WrKlPu: TYPE: Wrapper, FIELD: #Wrapper.klass, VISIBILITY: public
+// VERIFY: NO-EXPLODE
+// The function take_wrapper has a single argument of type Wrapper from which
+// it uses only the klass field.  The int field goes unused.  Argument explosion
+// should *not* result in a specialization in this case because (1) the
+// function could be used outside this module (so a thunk would be generated if
+// we specialized) and (2) specializing does not reduce ARC traffic because the
+// stripped field is trivial.
+//
+// CHECK-LABEL: sil [noinline] @take_wrapper : $@convention(thin) (Wrapper) -> () {
+// CHECK: [[KLASS:%.*]] = struct_extract {{%.*}} : $Wrapper, #Wrapper.klass
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper'
+// CHECK-NOT: sil shared [noinline] @$s12take_wrapperTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK-NOT: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK-NOT: [[RESULT:%.*]] = apply [[FUNCTION]](%0)
+// CHECK-NOT: return [[RESULT]] : $()
+// CHECK-NOT: } // end sil function '$s12take_wrapperTf4x_n'
+sil public [noinline] @take_wrapper : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %klass = struct_extract %wrapper : $Wrapper, #Wrapper.klass
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper'
+
+// CHECK-LABEL: sil @take_wrapper_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_wrapper
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[WRAPPER]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_caller'
+sil @take_wrapper_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_caller'
+
+
+
+// TEST_WrKlPuEx: TYPE: Wrapper, FIELD: #Wrapper.klass, VISIBILITY: public_external
+// VERIFY: NO-EXPLODE
+// The function take_wrapper has a single argument of type Wrapper from which
+// it uses only the klass field.  The int field goes unused.  Argument explosion
+// should *not* result in a specialization in this case because (1) the
+// function is definend outside this module (so a thunk would be generated if
+// we specialized) and (2) specializing does not reduce ARC traffic because the
+// stripped field is trivial.
+// 
+// CHECK-LABEL: sil public_external [noinline] @take_wrapper_public_external : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_wrapper_public_external'
+sil public_external [noinline] @take_wrapper_public_external : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %klass = struct_extract %wrapper : $Wrapper, #Wrapper.klass
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_public_external'
+
+// CHECK-LABEL: sil @take_wrapper_public_external_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_wrapper_public_external
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[WRAPPER]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_wrapper_public_external_caller'
+sil @take_wrapper_public_external_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_public_external : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_public_external_caller'
+
+
+
+// TEST_WrKlSh: TYPE: Wrapper, FIELD: #Wrapper.klass, VISIBILITY: shared
+// VERIFY: EXPLODE: (Wrapper) => (#Wrapper.klass)
+// The function take_wrapper_shared has a single argument of type Wrapper from
+// which it uses only the klass field.  The int field goes unused.  Argument
+// explosion should result in a specialization in this case because because 
+// there are dead leaves of the relevant sort, the relevant sort here being
+// potentially trivial because specializing the function will not result in a
+// thunk.
+//
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_wrapper_shared : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s19take_wrapper_sharedTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_shared'
+sil shared [noinline] @take_wrapper_shared : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %klass = struct_extract %wrapper : $Wrapper, #Wrapper.klass
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_shared'
+
+// CHECK-LABEL: sil @take_wrapper_shared_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s19take_wrapper_sharedTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_shared_caller'
+sil @take_wrapper_shared_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_shared : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_shared_caller'
+
+
+
+// TEST_WrKlHi: TYPE: Wrapper, FIELD: #Wrapper.klass, VISIBILITY: hidden
+// VERIFY: NO-EXPLODE
+// The function take_wrapper_hidden has a single argument of type Wrapper from
+// which it uses only the klass field.  The int field goes unused.  Argument
+// explosion should *not* result in a specialization in this case because, while
+// all the non-trivial leaves are live, there is only a single non-trivial
+// leaf, so there will be no downstream benefits from introducing a separate RC
+// identities for each leaf.
+//
+// CHECK-LABEL: sil hidden [noinline] @take_wrapper_hidden : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_hidden'
+sil hidden [noinline] @take_wrapper_hidden : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %klass = struct_extract %wrapper : $Wrapper, #Wrapper.klass
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_hidden'
+
+// CHECK-LABEL: sil @take_wrapper_hidden_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_wrapper_hidden
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[WRAPPER]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_hidden_caller'
+sil @take_wrapper_hidden_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_hidden : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil funcntion 'take_wrapper_hidden_caller'
+
+
+
+// TEST_WrKlPr: TYPE: Wrapper, FIELD: #Wrapper.klass, VISIBILITY: private
+// VERIFY: EXPLODE: (Wrapper) => (#Wrapper.klass)
+// The function take_wrapper_private has a single argument of type Wrapper from
+// which it uses only the klass field.  The int field goes unused.  Argument
+// explosion should result in a specialization in this case because, there are
+// dead leaves of the relevant sort, that being potentially trivial because
+// specializing the function will not result in a thunk.
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_wrapper_private : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_wrapper_privateTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_private'
+sil private [noinline] @take_wrapper_private : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %klass = struct_extract %wrapper : $Wrapper, #Wrapper.klass
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_private'
+
+// CHECK-LABEL: sil @take_wrapper_private_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_wrapper_privateTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_private_caller'
+sil @take_wrapper_private_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_private : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_private_caller'
+
+
+
+// = END: Wrapper, #Wrapper.klass ============================================}}
+
+
+
+// = Wrapper, #Wrapper.int ==================================================={{
+
+
+
+// TEST_WrInPu: TYPE: Wrapper, FIELD: #Wrapper.int, VISIBILITY: public
+// VERIFY: EXPLODE (Wrapper) => (#Wrapper.int)
+// The function take_wrapper_for_int has a single argument of type Wrapper from 
+// which it only uses the int field.  The klass field goes unused.  Without 
+// changes there would be needless ARC traffic around the klass field.  So, 
+// argument explosion *should* result in a specialization in this case.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_wrapper_for_int : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_wrapper_for_intTf4x_n
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_for_int'
+sil public [noinline] @take_wrapper_for_int : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %int = struct_extract %wrapper : $Wrapper, #Wrapper.int
+  %func = function_ref @take_int : $@convention(thin) (Int) -> ()
+  %result = apply %func(%int) : $@convention(thin) (Int) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int'
+
+// CHECK-LABEL: sil @take_wrapper_for_int_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_wrapper_for_intTf4x_n
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_for_int_caller'
+sil @take_wrapper_for_int_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_for_int : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_caller'
+
+
+
+// TEST_WrInPuEx: TYPE: Wrapper, FIELD: #Wrapper.int, VISIBILITY: public_external
+// VERIFY: EXPLODE (Wrapper) => (#Wrapper.int)
+// The function take_wrapper_for_int has a single argument of type Wrapper from 
+// which it only uses the int field.  The klass field goes unused.  Without 
+// changes there would be needless ARC traffic around the klass field.  So, 
+// argument explosion *should* result in a specialization in this case.
+//
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_wrapper_for_int_public_external : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_wrapper_for_int_public_externalTf4x_n
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_for_int_public_external'
+sil public_external [noinline] @take_wrapper_for_int_public_external : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %int = struct_extract %wrapper : $Wrapper, #Wrapper.int
+  %func = function_ref @take_int : $@convention(thin) (Int) -> ()
+  %result = apply %func(%int) : $@convention(thin) (Int) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_public_external'
+
+// CHECK-LABEL: sil @take_wrapper_for_int_public_external_caller : $@convention(thin) (Wrapper) -> () {
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_wrapper_for_int_public_externalTf4x_n
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_wrapper_for_int_public_external_caller'
+sil @take_wrapper_for_int_public_external_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_for_int_public_external : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_public_external_caller'
+
+
+
+// TEST_WrInHi: TYPE: Wrapper, FIELD: #Wrapper.int, VISIBILITY: hidden
+// VERIFY: EXPLODE (Wrapper) => (#Wrapper.int)
+// The function take_wrapper_for_int_hidden has a single argument of type
+// Wrapper from which it only uses the int field.  The klass field goes unused.
+// Without changes there would be needless ARC traffic around the klass field.
+// So, argument explosion *should* result in a specialization in this case.
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_wrapper_for_int_hidden
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_wrapper_for_int_hiddenTf4x_n : $@convention(thin) (Int) -> ()
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: // end sil function 'take_wrapper_for_int_hidden'
+sil hidden [noinline] @take_wrapper_for_int_hidden : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %int = struct_extract %wrapper : $Wrapper, #Wrapper.int
+  %func = function_ref @take_int : $@convention(thin) (Int) -> ()
+  %result = apply %func(%int) : $@convention(thin) (Int) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_hidden'
+
+// CHECK-LABEL: sil @take_wrapper_for_int_hidden_caller
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_wrapper_for_int_hiddenTf4x_n
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: // end sil function 'take_wrapper_for_int_hidden_caller'
+sil @take_wrapper_for_int_hidden_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_for_int_hidden : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_hidden_caller'
+
+
+
+// TEST_WrInPr: TYPE: Wrapper, FIELD: #Wrapper.int, VISIBILITY: private
+// VERIFY: EXPLODE (Wrapper) => (#Wrapper.int)
+// The function take_wrapper_for_int_private has a single argument of type
+// Wrapper from which it only uses the int field.  The klass field goes unused.
+// Without changes there would be needless ARC traffic around the klass field.
+// So, argument explosion *should* result in a specialization in this case.
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_wrapper_for_int_private
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_wrapper_for_int_privateTf4x_n : $@convention(thin) (Int) -> ()
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: // end sil function 'take_wrapper_for_int_private'
+sil private [noinline] @take_wrapper_for_int_private : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %int = struct_extract %wrapper : $Wrapper, #Wrapper.int
+  %func = function_ref @take_int : $@convention(thin) (Int) -> ()
+  %result = apply %func(%int) : $@convention(thin) (Int) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_private'
+
+// CHECK-LABEL: sil @take_wrapper_for_int_private_caller
+// CHECK: bb{{[0-9]*}}([[WRAPPER:%.*]] : $Wrapper)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_wrapper_for_int_privateTf4x_n
+// CHECK: [[INT:%.*]] = struct_extract [[WRAPPER]] : $Wrapper, #Wrapper.int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: // end sil function 'take_wrapper_for_int_private_caller'
+sil @take_wrapper_for_int_private_caller : $@convention(thin) (Wrapper) -> () {
+only(%wrapper : $Wrapper):
+  %func = function_ref @take_wrapper_for_int_private : $@convention(thin) (Wrapper) -> ()
+  %result = apply %func(%wrapper) : $@convention(thin) (Wrapper) -> ()
+  return %result : $()
+} // end sil function 'take_wrapper_for_int_private_caller'
+
+
+
+// = END: Wrapper, #Wrapper.int ==============================================}}
+
+
+
+// ===========================================================================}}
+// =                              END: WRAPPER                                 =
+// =============================================================================
+
+
+
+// ==========================================================================={{
+// =                                  PAIR                                     =
+// =============================================================================
+
+// struct Pair {
+//   var klass1: Klass
+//   var klass2: Klass
+// }
+
+// = Pair, No fields ========================================================={{
+
+
+
+// TEST_PaPu: TYPE: Pair, FIELD: , VISIBILITY: public
+// VERIFY: EXPLODE (Pair) => ()
+// The function take_pair_unused has a single argument of type Pair from which
+// it uses no fields.  Both the klass1 and klass2 fields go unused.  Argument
+// explosion *should* result in a specialization in this case because
+// specializing reduces ARC traffic on account of the fact that the stripped
+// fields are non-trivial.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_pair_unused : $@convention(thin) (Pair) -> ()
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s16take_pair_unusedTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: // end sil function 'take_pair_unused'
+sil public [noinline] @take_pair_unused : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_nothing : $@convention(thin) () -> ()
+  %result = apply %func() : $@convention(thin) () -> ()
+  return %result : $()
+} // end sil function 'take_pair_unused'
+
+// CHECK-LABEL: sil @take_pair_unused_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s16take_pair_unusedTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_caller'
+sil @take_pair_unused_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_unused : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_unused_caller'
+
+
+
+// TEST_PaPuEx: TYPE: Pair, FIELD: , VISIBILITY: public_external
+// VERIFY: EXPLODE (Pair) => ()
+// The function take_pair_unused has a single argument of type Pair from which
+// it uses no fields.  Both the klass1 and klass2 fields go unused.  Argument
+// explosion *should* result in a specialization in this case because
+// specializing reduces ARC traffic on account of the fact that the stripped
+// fields are non-trivial.
+//
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_pair_unused_public_external : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s32take_pair_unused_public_externalTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_public_external'
+sil public_external [noinline] @take_pair_unused_public_external : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_nothing : $@convention(thin) () -> ()
+  %result = apply %func() : $@convention(thin) () -> ()
+  return %result : $()
+} // end sil function 'take_pair_unused_public_external'
+
+// CHECK-LABEL: sil @take_pair_unused_public_external_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s32take_pair_unused_public_externalTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_public_external_caller'
+sil @take_pair_unused_public_external_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_unused_public_external : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_unused_public_external_caller'
+
+
+
+// TEST_PaHi: TYPE: Pair, FIELD: , VISIBILITY: hidden
+// VERIFY: EXPLODE: (Pair) => ()
+// The function take_pair_unused_hidden has a single argument of type Pair from
+// which it uses no fields.  Both the klass1 and klass2 fields go unused.
+// Argument explosion *should* result in a specialization in this case because
+// specializing reduces ARC traffic on account of the fact that the stripped
+// fields are non-trivial.
+//
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_pair_unused_hidden : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s23take_pair_unused_hiddenTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_hidden'
+sil hidden [noinline] @take_pair_unused_hidden : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_nothing : $@convention(thin) () -> ()
+  %result = apply %func() : $@convention(thin) () -> ()
+  return %result : $()
+} // end sil function 'take_pair_unused_hidden'
+
+// CHECK-LABEL: sil @take_pair_unused_hidden_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s23take_pair_unused_hiddenTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_hidden_caller'
+sil @take_pair_unused_hidden_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_unused_hidden : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_unused_hidden_caller'
+
+
+
+// TEST_PaPr: TYPE: Pair, FIELD: , VISIBILITY: private
+// VERIFY: EXPLODE: (Pair) => ()
+// The function take_pair_unused_private has a single argument of type Pair from
+// which it uses no fields.  Both the klass1 and klass2 fields go unused.
+// Argument explosion *should* result in a specialization in this case because
+// specializing reduces ARC traffic on account of the fact that the stripped
+// fields are non-trivial.
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_pair_unused_private : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s24take_pair_unused_privateTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_private'
+sil private [noinline] @take_pair_unused_private : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_nothing : $@convention(thin) () -> ()
+  %result = apply %func() : $@convention(thin) () -> ()
+  return %result : $()
+} // end sil function 'take_pair_unused_private'
+
+// CHECK-LABEL: sil @take_pair_unused_private_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s24take_pair_unused_privateTf4d_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_unused_private_caller'
+sil @take_pair_unused_private_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_unused_private : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_unused_private_caller'
+
+
+
+// = END: Pair, No fields ====================================================}}
+
+
+
+// = Pair, #Pair.klass1 ======================================================{{
+
+
+
+// TEST_PaK1Pu: TYPE: Pair, FIELD: #Pair.klass1, VISIBILITY: public
+// VERIFY: EXPLODE (Pair) => (#Pair.klass1)
+// The function take_pair_for_klass1 has a single argument of type Pair 
+// from which it uses only the klass1 field.  The klass2 field goes unused.  
+// Argument explosion *should* result in a specialization in this case because 
+// specializing reduces ARC traffic on account of the fact that the stripped
+// field is non-trivial.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_pair_for_klass1 : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_pair_for_klass1Tf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1'
+sil public [noinline] @take_pair_for_klass1 : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass1
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_pair_for_klass1Tf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract {{%.*}} : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_caller'
+sil @take_pair_for_klass1_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1 : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_caller'
+
+
+
+// TEST_PaK1PuEx: TYPE: Pair, FIELD: #Pair.klass1, VISIBILITY: public_external
+// VERIFY: EXPLODE (Pair) => (#Pair.klass1)
+// The function take_pair_for_klass1 has a single argument of type Pair 
+// from which it uses only the klass1 field.  The klass2 field goes unused.  
+// Argument explosion *should* result in a specialization in this case because 
+// specializing reduces ARC traffic on account of the fact that the stripped
+// field is non-trivial.
+//
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_pair_for_klass1_public_external : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_pair_for_klass1_public_externalTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_public_external'
+sil public_external [noinline] @take_pair_for_klass1_public_external : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass1
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_public_external'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_public_external_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_pair_for_klass1_public_externalTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_public_external_caller'
+sil @take_pair_for_klass1_public_external_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_public_external : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_public_external_caller'
+
+
+
+// TEST_PaK1Hi: TYPE: Pair, FIELD: #Pair.klass1, VISIBILITY: hidden
+// VERIFY: EXPLODE: (Pair) => (#Pair.klass1)
+// The function take_pair_for_klass1_hidden has a single argument of type Pair from
+// which it uses only the klass1 field.  The klass2 field goes unused.  Argument
+// explosion should result in a specialization in this case both because (1) the
+// function can *not* be used outside this module (so no thunk
+// will remain after dead code elimination) because it is hidden and because (2)
+// avoiding passing the full Pair with its unused field klass2 avoids extraneous
+// ARC traffic around that field (i.e. #Pair.klass2).
+//
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_pair_for_klass1_hidden : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_pair_for_klass1_hiddenTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_hidden'
+sil hidden [noinline] @take_pair_for_klass1_hidden : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass1
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_hidden'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_hidden_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_pair_for_klass1_hiddenTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_hidden_caller'
+sil @take_pair_for_klass1_hidden_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_hidden : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_for_klass1_hidden_caller'
+
+
+
+// TEST_PaK1Pr: TYPE: Pair, FIELD: #Pair.klass1, VISIBILITY: private
+// VERIFY: EXPLODE: (Pair) => (#Pair.klass1)
+// The function take_pair_for_klass1_private has a single argument of type Pair from
+// which it uses only the klass1 field.  The klass2 field goes unused.  Argument
+// explosion should result in a specialization in this case both because (1) the
+// function can *not* be used outside this module (so no thunk
+// will remain after dead code elimination) because it is private and because
+// (2) avoiding passing the full Pair with its unused field klass2 avoids
+// extraneous ARC traffic around that field (i.e. #Pair.klass2).
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_pair_for_klass1_private : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_pair_for_klass1_privateTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_private'
+sil private [noinline] @take_pair_for_klass1_private : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass1
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_private'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_private_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_pair_for_klass1_privateTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_private_caller'
+sil @take_pair_for_klass1_private_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_private : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_for_klass1_private_caller'
+
+
+
+// = END: Pair, #Pair.klass1 =================================================}}
+
+
+
+// = Pair, #Pair.klass2 ======================================================{{
+
+
+
+// TEST_PaK2Pu: TYPE: Pair, FIELD: #Pair.klass2, VISIBILITY: public
+// VERIFY: EXPLODE (Pair) => (#Pair.klass2)
+// The function take_pair_for_klass2 has a single argument of type Pair 
+// from which it uses only the klass2 field.  The klass1 field goes unused.  
+// Argument explosion *should* result in a specialization in this case because 
+// specializing reduces ARC traffic on account of the fact that the stripped
+// field is non-trivial.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_pair_for_klass2 : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_pair_for_klass2Tf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2'
+sil public [noinline] @take_pair_for_klass2 : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass2'
+
+// CHECK-LABEL: sil @take_pair_for_klass2_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s20take_pair_for_klass2Tf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract {{%.*}} : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_caller'
+sil @take_pair_for_klass2_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass2 : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass2_caller'
+
+
+
+// TEST_PaK2PuEx: TYPE: Pair, FIELD: #Pair.klass2, VISIBILITY: public_external
+// VERIFY: EXPLODE (Pair) => (#Pair.klass2)
+// The function take_pair_for_klass2 has a single argument of type Pair 
+// from which it uses only the klass2 field.  The klass1 field goes unused.  
+// Argument explosion *should* result in a specialization in this case because 
+// specializing reduces ARC traffic on account of the fact that the stripped
+// field is non-trivial.
+//
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_pair_for_klass2_public_external : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_pair_for_klass2_public_externalTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_public_external'
+sil public_external [noinline] @take_pair_for_klass2_public_external : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass2_public_external'
+
+// CHECK-LABEL: sil @take_pair_for_klass2_public_external_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s36take_pair_for_klass2_public_externalTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_public_external_caller'
+sil @take_pair_for_klass2_public_external_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass2_public_external : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass2_public_external_caller'
+
+
+
+// TEST_PaK2Hi: TYPE: Pair, FIELD: #Pair.klass2, VISIBILITY: hidden
+// VERIFY: EXPLODE: (Pair) => (#Pair.klass2)
+// The function take_pair_for_klass2_hidden has a single argument of type Pair from
+// which it uses only the klass2 field.  The klass1 field goes unused.  Argument
+// explosion should result in a specialization in this case both because (1) the
+// function can *not* be used outside this module (so no thunk
+// will remain after dead code elimination) because it is hidden and because (2)
+// avoiding passing the full Pair with its unused field klass1 avoids extraneous
+// ARC traffic around that field (i.e. #Pair.klass1).
+//
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_pair_for_klass2_hidden : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_pair_for_klass2_hiddenTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_hidden'
+sil hidden [noinline] @take_pair_for_klass2_hidden : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass2_hidden'
+
+// CHECK-LABEL: sil @take_pair_for_klass2_hidden_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s27take_pair_for_klass2_hiddenTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_hidden_caller'
+sil @take_pair_for_klass2_hidden_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass2_hidden : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_for_klass2_hidden_caller'
+
+
+
+// TEST_PaK2Pr: TYPE: Pair, FIELD: #Pair.klass2, VISIBILITY: private
+// VERIFY: EXPLODE: (Pair) => (#Pair.klass2)
+// The function take_pair_for_klass2_private has a single argument of type Pair from
+// which it uses only the klass2 field.  The klass1 field goes unused.  Argument
+// explosion should result in a specialization in this case both because (1) the
+// function can *not* be used outside this module (so no thunk
+// will remain after dead code elimination) because it is private and because
+// (2) avoiding passing the full Pair with its unused field klass1 avoids
+// extraneous ARC traffic around that field (i.e. #Pair.klass1).
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_pair_for_klass2_private : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_pair_for_klass2_privateTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_private'
+sil private [noinline] @take_pair_for_klass2_private : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+  %result = apply %func(%klass) : $@convention(thin) (Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass2_private'
+
+// CHECK-LABEL: sil @take_pair_for_klass2_private_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s28take_pair_for_klass2_privateTf4x_n
+// CHECK: [[KLASS:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass2_private_caller'
+sil @take_pair_for_klass2_private_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass2_private : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_for_klass2_private_caller'
+
+
+
+// = END: Pair, #Pair.klass2 =================================================}}
+
+
+
+// = Pair, #Pair.klass1, #Pair.klass2 ========================================{{
+
+
+
+// TEST_PaK1K2Pu: TYPE: Pair,  FIELD: #Pair.klass1 & #Pair.klass2, VISIBILITY: public
+// VERIFY: NO-EXPLODE
+// The function take_pair_for_klass1_and_klass2 has a single argument of type
+// Pair from which it uses both the klass1 and klass2 fields.  Argument
+// explosion should *not* result in a specialization in this case because (1)
+// specializing does not affect ARC traffic on account of the fact that no
+// fields are stripped and (2) specializing increases code size.
+//
+// CHECK-LABEL: sil [noinline] @take_pair_for_klass1_and_klass2 : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[KLASS1:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_and_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2'
+sil public [noinline] @take_pair_for_klass1_and_klass2 : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass1 = struct_extract %pair : $Pair, #Pair.klass1
+  %klass2 = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass_and_klass : $@convention(thin) (Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2) : $@convention(thin) (Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_and_klass2'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_and_klass2_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_pair_for_klass1_and_klass2
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[PAIR]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_caller'
+sil @take_pair_for_klass1_and_klass2_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_and_klass2 : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_and_klass2_caller'
+
+
+
+// TEST_PaK1K2PuEx: TYPE: Pair,  FIELD: #Pair.klass1 & #Pair.klass2, VISIBILITY: public_external
+// VERIFY: NO-EXPLODE
+// The function take_pair_for_klass1_and_klass2 has a single argument of type
+// Pair from which it uses both the klass1 and klass2 fields.  Argument
+// explosion should *not* result in a specialization in this case because (1)
+// specializing does not affect ARC traffic on account of the fact that no
+// fields are stripped and (2) specializing increases code size.
+//
+// CHECK-LABEL: sil public_external [noinline] @take_pair_for_klass1_and_klass2_public_external : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[KLASS1:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_public_external'
+sil public_external [noinline] @take_pair_for_klass1_and_klass2_public_external : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass1 = struct_extract %pair : $Pair, #Pair.klass1
+  %klass2 = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass_and_klass : $@convention(thin) (Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2) : $@convention(thin) (Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_and_klass2_public_external'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_and_klass2_public_external_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_pair_for_klass1_and_klass2_public_external
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[PAIR]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_public_external_caller'
+sil @take_pair_for_klass1_and_klass2_public_external_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_and_klass2_public_external : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_and_klass2_public_external_caller'
+
+
+
+// TEST_PaK1K2Hi: TYPE: Pair,  FIELD: #Pair.klass1 & #Pair.klass2, VISIBILITY: hidden
+// VERIFY: NO-EXPLODE
+// The function take_pair_for_klass1_and_klass2_hidden has a single argument of
+// type Pair from which it uses both the klass1 and klass2 fields.  Argument
+// explosion should *not* result in a specialization in this case because there
+// are no dead leaves.
+//
+// CHECK-LABEL: sil hidden [noinline] @take_pair_for_klass1_and_klass2_hidden : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[KLASS1:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_and_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_hidden'
+sil hidden [noinline] @take_pair_for_klass1_and_klass2_hidden : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass1 = struct_extract %pair : $Pair, #Pair.klass1
+  %klass2 = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass_and_klass : $@convention(thin) (Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2) : $@convention(thin) (Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_and_klass2_hidden'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_and_klass2_hidden_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_pair_for_klass1_and_klass2_hidden
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[PAIR]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_hidden_caller'
+sil @take_pair_for_klass1_and_klass2_hidden_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_and_klass2_hidden : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_for_klass1_and_klass2_hidden_caller'
+
+
+
+// TEST_PaK1K2Pr: TYPE: Pair,  FIELD: #Pair.klass1 & #Pair.klass2, VISIBILITY: private
+// VERIFY: NO-EXPLODE
+// The function take_pair_for_klass1_and_klass2_private has a single argument of
+// type Pair from which it uses both the klass1 and klass2 fields.  Argument
+// explosion should *not* result in a specialization in this case because there 
+// are no dead leaves.
+//
+// CHECK-LABEL: sil private [noinline] @take_pair_for_klass1_and_klass2_private : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair):
+// CHECK: [[KLASS1:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[PAIR]] : $Pair, #Pair.klass2
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_and_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_private'
+sil private [noinline] @take_pair_for_klass1_and_klass2_private : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %klass1 = struct_extract %pair : $Pair, #Pair.klass1
+  %klass2 = struct_extract %pair : $Pair, #Pair.klass2
+  %func = function_ref @take_klass_and_klass : $@convention(thin) (Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2) : $@convention(thin) (Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_pair_for_klass1_and_klass2_private'
+
+// CHECK-LABEL: sil @take_pair_for_klass1_and_klass2_private_caller : $@convention(thin) (Pair) -> () {
+// CHECK: bb{{[0-9]*}}([[PAIR:%.*]] : $Pair)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_pair_for_klass1_and_klass2_private
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[PAIR]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_pair_for_klass1_and_klass2_private_caller'
+sil @take_pair_for_klass1_and_klass2_private_caller : $@convention(thin) (Pair) -> () {
+only(%pair : $Pair):
+  %func = function_ref @take_pair_for_klass1_and_klass2_private : $@convention(thin) (Pair) -> ()
+  %result = apply %func(%pair) : $@convention(thin) (Pair) -> ()
+  return %result : $()
+} // end sil funcntion 'take_pair_for_klass1_and_klass2_private_caller'
+
+
+
+// = END: Pair, #Pair.klass1, #Pair.klass2 ===================================}}
+
+
+
+// ===========================================================================}}
+// =                               END: PAIR                                   =
+// =============================================================================
+
+
+
+// ==========================================================================={{
+// =                                QUINTUPLE                                  =
+// =============================================================================
+
+
+
+// = Quintuple, #.klass1, #.klass2, #.klass3 ================================={{
+
+
+
+// TEST_QuK1K2K3Pu: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3, VISIBILITY: public
+// VERIFY: EXPLODE: (Quintuple) => (#Quintuple.klass1, #Quintuple.klass2, #Quintuple.klass3)
+// The function take_quintuple_for_klass1_through_3 has a single argument of
+// type Quintuple from which it uses the klass1, klass2, and klass3 fields.
+// The klass4 and klass5 fields goes unused.  Argument explosion *should*
+// result in specialization because there are only three (the heuristic for max
+// explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3 : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s35take_quintuple_for_klass1_through_3Tf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3'
+sil public [noinline] @take_quintuple_for_klass1_through_3 : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_3_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s35take_quintuple_for_klass1_through_3Tf4x_n
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_caller'
+sil @take_quintuple_for_klass1_through_3_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3 : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_caller'
+
+// TEST_QuK1K2K3PuEx: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3, VISIBILITY: public_external
+// VERIFY: EXPLODE: (Quintuple) => (#Quintuple.klass1, #Quintuple.klass2, #Quintuple.klass3)
+// The function take_quintuple_for_klass1_through_3 has a single argument of
+// type Quintuple from which it uses the klass1, klass2, and klass3 fields.
+// The klass4 and klass5 fields goes unused.  Argument explosion *should*
+// result in specialization because there are only three (the heuristic for max
+// explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_public_external : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s51take_quintuple_for_klass1_through_3_public_externalTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_public_external'
+sil public_external [noinline] @take_quintuple_for_klass1_through_3_public_external : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_public_external'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_3_public_external_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s51take_quintuple_for_klass1_through_3_public_externalTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_public_external_caller'
+sil @take_quintuple_for_klass1_through_3_public_external_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_public_external : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_public_external_caller'
+
+// TEST_QuK1K2K3Sh: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3, VISIBILITY: shared
+// VERIFY: NO-EXPLODE
+// The function take_quintuple_for_klass1_through_3 has a single argument of
+// type Quintuple from which it uses the klass1, klass2, and klass3 fields.
+// The klass4 and klass5 fields goes unused.  Argument explosion *should*
+// result in specialization because there are only three (the heuristic for max
+// explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_shared : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_3_sharedTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_shared'
+sil shared [noinline] @take_quintuple_for_klass1_through_3_shared : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_shared'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_3_shared_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_3_sharedTf4x_n
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_shared_caller'
+sil @take_quintuple_for_klass1_through_3_shared_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_shared : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_shared_caller'
+
+// TEST_QuK1K2K3Hi: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3, VISIBILITY: hidden
+// VERIFY: NO-EXPLODE
+// The function take_quintuple_for_klass1_through_3 has a single argument of
+// type Quintuple from which it uses the klass1, klass2, and klass3 fields.
+// The klass4 and klass5 fields goes unused.  Argument explosion *should*
+// result in specialization because there are only three (the heuristic for max
+// explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_hidden : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_3_hiddenTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_hidden'
+sil hidden [noinline] @take_quintuple_for_klass1_through_3_hidden : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_hidden'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_3_hidden_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_3_hiddenTf4x_n
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_hidden_caller'
+sil @take_quintuple_for_klass1_through_3_hidden_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_hidden : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_hidden_caller'
+
+// TEST_QuK1K2K3Pr: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3, VISIBILITY: private
+// VERIFY: NO-EXPLODE
+// The function take_quintuple_for_klass1_through_3 has a single argument of
+// type Quintuple from which it uses the klass1, klass2, and klass3 fields.
+// The klass4 and klass5 fields goes unused.  Argument explosion *should*
+// result in specialization because there are only three (the heuristic for max
+// explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_private : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s43take_quintuple_for_klass1_through_3_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_private'
+sil private [noinline] @take_quintuple_for_klass1_through_3_private : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_private'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_3_private_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s43take_quintuple_for_klass1_through_3_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_private_caller'
+sil @take_quintuple_for_klass1_through_3_private_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_private : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_private_caller'
+
+
+
+// = END: Quintuple, #.klass1, #.klass2, #.klass3 ============================}}
+
+
+
+// = Quintuple, #.klass1, #.klass2, #.klass3, #.klass4 ======================={{
+
+
+
+// TEST_QuK1K2K3K4Pu: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & #.klass4, VISIBILITY: public
+// VERIFY: NO-EXPLODE
+// The function take_quintuple_for_klass1_through_4 has a single argument of 
+// type Quintuple from which it uses the klass1, klass2, klass3, and klass4
+// fields.  The klass5 field goes unused.  Argument explosion should *not* 
+// result in specialization because there are more than three (the heuristic
+// for max explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil [noinline] @take_quintuple_for_klass1_through_4 : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4'
+sil public [noinline] @take_quintuple_for_klass1_through_4 : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %func = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3, %klass4) : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_4_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_quintuple_for_klass1_through_4
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[QUINTUPLE]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_caller'
+sil @take_quintuple_for_klass1_through_4_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_4 : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_caller'
+
+// TEST_QuK1K2K3K4PuEx: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & #.klass4, VISIBILITY: public_external
+// VERIFY: NO-EXPLODE
+// The function take_quintuple_for_klass1_through_4 has a single argument of 
+// type Quintuple from which it uses the klass1, klass2, klass3, and klass4
+// fields.  The klass5 field goes unused.  Argument explosion should *not* 
+// result in specialization because there are more than three (the heuristic
+// for max explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil public_external [noinline] @take_quintuple_for_klass1_through_4_public_external : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_public_external'
+sil public_external [noinline] @take_quintuple_for_klass1_through_4_public_external : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %func = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3, %klass4) : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_public_external'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_4_public_external_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_quintuple_for_klass1_through_4_public_external
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[QUINTUPLE]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_public_external_caller'
+sil @take_quintuple_for_klass1_through_4_public_external_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_4_public_external : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_public_external_caller'
+
+// TEST_QuK1K2K3K4Sh: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & #.klass4, VISIBILITY: shared
+// VERIFY: EXPLODE (Quintuple) => (#Quintuple.klass1, #Quintuple.klass2, #Quintuple.klass3, #Quintuple.klass4)
+// The function take_quintuple_for_klass1_through_4 has a single argument of 
+// type Quintuple from which it uses the klass1, klass2, klass3, and klass4
+// fields.  The klass5 field goes unused.  Argument explosion *should*
+// result in specialization because there are dead leaves and there are fewer 
+// live than the limit imposed by the heuristic, six because the specializing
+// the function will not result in a thunk.
+//
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_4_shared : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_4_sharedTf4x_n : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_shared'
+sil shared [noinline] @take_quintuple_for_klass1_through_4_shared : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %func = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3, %klass4) : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_shared'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_4_shared_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s42take_quintuple_for_klass1_through_4_sharedTf4x_n : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_shared_caller'
+sil @take_quintuple_for_klass1_through_4_shared_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_4_shared : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_shared_caller'
+
+
+
+// TEST_QuK1K2K3K4Hi: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & #.klass4, VISIBILITY: hidden
+// VERIFY: NO-EXPLODE
+// The function take_quintuple_for_klass1_through_4 has a single argument of 
+// type Quintuple from which it uses the klass1, klass2, klass3, and klass4
+// fields.  The klass5 field goes unused.  Argument explosion should *not* 
+// result in specialization because there are more than three (the heuristic
+// for max explosion size) live nodes in the type-tree.
+//
+// CHECK-LABEL: sil hidden [noinline] @take_quintuple_for_klass1_through_4_hidden : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_hidden'
+sil hidden [noinline] @take_quintuple_for_klass1_through_4_hidden : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %func = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3, %klass4) : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_hidden'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_4_hidden_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_quintuple_for_klass1_through_4_hidden
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[QUINTUPLE]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_hidden_caller'
+sil @take_quintuple_for_klass1_through_4_hidden_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_4_hidden : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_hidden_caller'
+
+// TEST_QuK1K2K3K4Pr: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & #.klass4, VISIBILITY: private
+// VERIFY: EXPLODE (Quintuple) => (#Quintuple.klass1, #Quintuple.klass2, #Quintuple.klass3, #Quintuple.klass4)
+// The function take_quintuple_for_klass1_through_4 has a single argument of 
+// type Quintuple from which it uses the klass1, klass2, klass3, and klass4
+// fields.  The klass5 field goes unused.  Argument explosion *should*
+// result in specialization because there are dead leaves and there are fewer 
+// live than the limit imposed by the heuristic, six because the specializing
+// the function will not result in a thunk.
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_4_private : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s43take_quintuple_for_klass1_through_4_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_private'
+sil private [noinline] @take_quintuple_for_klass1_through_4_private : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %func = function_ref @take_klass_four_times : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  %result = apply %func(%klass1, %klass2, %klass3, %klass4) : $@convention(thin) (Klass, Klass, Klass, Klass) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_private'
+
+// CHECK-LABEL: sil @take_quintuple_for_klass1_through_4_private_caller : $@convention(thin) (Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s43take_quintuple_for_klass1_through_4_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass, Klass) -> () 
+// CHECK: [[KLASS4:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass4
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]], [[KLASS4]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_4_private_caller'
+sil @take_quintuple_for_klass1_through_4_private_caller : $@convention(thin) (Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_4_private : $@convention(thin) (Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_4_private_caller'
+
+
+
+// = END: Quintuple, #.klass1, #.klass2, #.klass3, #.klass4 ==================}}
+
+
+
+// = Quintuple, #.klass1, #.klass2, #.klass3; owned #.klass4, #.klass5 ======={{
+
+
+
+// TEST_QuK1K2K3OwK4OwK5Pu: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & owned #.klass4 & owned #.klass5, VISIBILITY: public
+// VERIFY: EXPLODE: (Quintuple) -> (#Quintuple.klass1, #Quintuple.klass2, #Quintuple.klaass3)
+// The function take_quintuple_for_klass1_through_3_owned_klass4_through_5 has a 
+// single argument of type Quintuple from which it uses the klass1, klass2,
+// klass3 fields and releases the klass4 and klass5 fields.  Argument explosion
+// *should* result in specialization because there are only three live leaves in
+// the type tree after considering the owned-to-guaranteed transformation.
+//
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5 : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E2_5Tf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5'
+sil public [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5 : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %klass5 = struct_extract %quintuple : $Quintuple, #Quintuple.klass5
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  strong_release %klass4 : $Klass
+  strong_release %klass5 : $Klass
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5'
+
+// CHECK-LABEL: sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_caller : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E2_5Tf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_caller'
+sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_caller : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_owned_klass4_through_5 : $@convention(thin) (@owned Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (@owned Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_caller'
+
+
+
+// TEST_QuK1K2K3OwK4OwK5PuEx: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & owned #.klass4 & owned #.klass5, VISIBILITY: public_external
+// VERIFY: EXPLODE: (Quintuple) -> (#Quintuple.klass1, #Quintuple.klass2, #Quintuple.klaass3)
+// The function take_quintuple_for_klass1_through_3_owned_klass4_through_5 has a 
+// single argument of type Quintuple from which it uses the klass1, klass2,
+// klass3 fields and releases the klass4 and klass5 fields.  Argument explosion
+// *should* result in specialization because there are only three live leaves in
+// the type tree after considering the owned-to-guaranteed transformation.
+//
+// CHECK-LABEL: sil public_external [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E18_5_public_externalTf4x_nTf4nnndd_n : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () 
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external'
+sil public_external [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %klass5 = struct_extract %quintuple : $Quintuple, #Quintuple.klass5
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  strong_release %klass4 : $Klass
+  strong_release %klass5 : $Klass
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external'
+
+// CHECK-LABEL: sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external_caller : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E18_5_public_externalTf4x_nTf4nnndd_n : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () 
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external_caller'
+sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external_caller : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external : $@convention(thin) (@owned Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (@owned Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_public_external_caller'
+
+
+
+// TEST_QuK1K2K3OwK4OwK5Sh: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & owned #.klass4 & owned #.klass5, VISIBILITY: shared
+// VERIFY: EXPLODE
+// The function
+// take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared has a
+// single argument of type Quintuple from which it uses the klass1, klass2,
+// klass3 fields and releases the klass4 and klass5 fields.  Argument explosion
+// *should* result in specialization because there are only three live leaves
+// in the type tree after considering the owned-to-guaranteed transformation.
+//
+// CHECK-LABEL: sil shared [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_sharedTf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared'
+sil shared [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %klass5 = struct_extract %quintuple : $Quintuple, #Quintuple.klass5
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  strong_release %klass4 : $Klass
+  strong_release %klass5 : $Klass
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared'
+
+// CHECK-LABEL: sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared_caller : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_sharedTf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared_caller'
+sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared_caller : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared : $@convention(thin) (@owned Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (@owned Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_shared_caller'
+
+
+
+// TEST_QuK1K2K3OwK4OwK5Hi: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & owned #.klass4 & owned #.klass5, VISIBILITY: hidden
+// VERIFY: EXPLODE
+// The function
+// take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden has a
+// single argument of type Quintuple from which it uses the klass1, klass2,
+// klass3 fields and releases the klass4 and klass5 fields.  Argument explosion
+// *should* result in specialization because there are only three live leaves
+// in the type tree after considering the owned-to-guaranteed transformation.
+//
+// CHECK-LABEL: sil hidden [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_hiddenTf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden'
+sil hidden [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %klass5 = struct_extract %quintuple : $Quintuple, #Quintuple.klass5
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  strong_release %klass4 : $Klass
+  strong_release %klass5 : $Klass
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden'
+
+// CHECK-LABEL: sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden_caller : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_hiddenTf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden_caller'
+sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden_caller : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden : $@convention(thin) (@owned Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (@owned Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_hidden_caller'
+
+
+
+// TEST_QuK1K2K3OwK4OwK5Pr: TYPE: Quintuple, FIELD: #.klass1 & #.klass2 & #.klass3 & owned #.klass4 & owned #.klass5, VISIBILITY: private
+// VERIFY: EXPLODE
+// The function
+// take_quintuple_for_klass1_through_3_owned_klass4_through_5_private has a
+// single argument of type Quintuple from which it uses the klass1, klass2,
+// klass3 fields and releases the klass4 and klass5 fields.  Argument explosion
+// *should* result in specialization because there are only three live leaves
+// in the type tree after considering the owned-to-guaranteed transformation.
+//
+// CHECK-LABEL: sil private [signature_optimized_thunk] [always_inline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E10_5_privateTf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]]
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_private'
+sil private [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+  %klass1 = struct_extract %quintuple : $Quintuple, #Quintuple.klass1
+  %klass2 = struct_extract %quintuple : $Quintuple, #Quintuple.klass2
+  %klass3 = struct_extract %quintuple : $Quintuple, #Quintuple.klass3
+  %klass4 = struct_extract %quintuple : $Quintuple, #Quintuple.klass4
+  %klass5 = struct_extract %quintuple : $Quintuple, #Quintuple.klass5
+  %result = apply %func(%klass1, %klass2, %klass3) : $@convention(thin) (Klass, Klass, Klass) -> ()
+  strong_release %klass4 : $Klass
+  strong_release %klass5 : $Klass
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_private'
+
+// CHECK-LABEL: sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private_caller : $@convention(thin) (@owned Quintuple) -> () {
+// CHECK: bb{{[0-9]+}}([[QUINTUPLE:%.*]] : $Quintuple):
+// CHECK: [[KLASS3:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass3
+// CHECK: [[KLASS2:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass2
+// CHECK: [[KLASS1:%.*]] = struct_extract [[QUINTUPLE]] : $Quintuple, #Quintuple.klass1
+// CHECK: [[FUNCTION:%.*]] = function_ref @$s049take_quintuple_for_klass1_through_3_owned_klass4_E10_5_privateTf4x_nTf4nnndd_n
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_private_caller'
+sil [noinline] @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private_caller : $@convention(thin) (@owned Quintuple) -> () {
+only(%quintuple : $Quintuple):
+  %func = function_ref @take_quintuple_for_klass1_through_3_owned_klass4_through_5_private : $@convention(thin) (@owned Quintuple) -> ()
+  %result = apply %func(%quintuple) : $@convention(thin) (@owned Quintuple) -> ()
+  return %result : $()
+} // end sil function 'take_quintuple_for_klass1_through_3_owned_klass4_through_5_private_caller'
+
+
+
+// = END: Quintuple, #.klass1, #.klass2, #.klass3; owned #.klass4, #.klass5 ==}}
+
+
+
+// ===========================================================================}}
+// =                             END: QUINTUPLE                                =
+// =============================================================================
+
+
+// =============================================================================
+// =============================================================================
+// =====                          END: TESTS                               =====
+// =============================================================================
+// ===========================================================================}}
+
+
+
+// ==========================================================================={{
+// =============================================================================
+// =====                       SPECIALIZATIONS                             =====
+// ===== All the specializations are added at the bottom of the output.    =====
+// ===== The tests around them follow.  They are tied back to the original =====
+// ===== code via a TEST_<FOO> identifier.                                 =====
+// =============================================================================
+// =============================================================================
+
+
+// TEST_WrKlPu:
+// Nothing to check.
+
+// TEST_WrKlPuEx:
+// Nothig to check.
+
+// TEST_WrKlSh:
+// CHECK: sil shared [noinline] @$s19take_wrapper_sharedTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]](%0)
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function '$s19take_wrapper_sharedTf4x_n'
+
+// TEST_WrKlHi:
+// CHECK-NOT: sil shared [noinline] @$s19take_wrapper_hiddenTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK-NOT: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK-NOT: [[RESULT:%.*]] = apply [[FUNCTION]](%0)
+// CHECK-NOT: return [[RESULT]] : $()
+// CHECK-NOT: } // end sil function '$s19take_wrapper_hiddenTf4x_n'
+
+// TEST_WrKlPr:
+// CHECK: sil private [noinline] @$s20take_wrapper_privateTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]](%0)
+// CHECK: return [[RESULT]] : $()
+// CHECK: } // end sil function '$s20take_wrapper_privateTf4x_n'
+
+// TEST_WrInPu:
+// CHECK-LABEL: sil shared [noinline] @$s20take_wrapper_for_intTf4x_n : $@convention(thin) (Int) -> () {
+// CHECK: bb{{[0-9]*}}([[INT:%.*]] : $Int)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s20take_wrapper_for_intTf4x_n'
+
+// TEST_WrInPuEx:
+// CHECK-LABEL: sil shared [noinline] @$s36take_wrapper_for_int_public_externalTf4x_n : $@convention(thin) (Int) -> () {
+// CHECK: bb{{[0-9]*}}([[INT:%.*]] : $Int)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s36take_wrapper_for_int_public_externalTf4x_n'
+
+// TEST_WrInHi:
+// CHECK-LABEL: sil shared [noinline] @$s27take_wrapper_for_int_hiddenTf4x_n : $@convention(thin) (Int) -> () {
+// CHECK: bb{{[0-9]*}}([[INT:%.*]] : $Int)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s27take_wrapper_for_int_hiddenTf4x_n'
+
+// TEST_WrInPr:
+// CHECK-LABEL: sil private [noinline] @$s28take_wrapper_for_int_privateTf4x_n : $@convention(thin) (Int) -> () {
+// CHECK: bb{{[0-9]*}}([[INT:%.*]] : $Int)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_int
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[INT]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s28take_wrapper_for_int_privateTf4x_n'
+
+// TEST_PaPu:
+// CHECK-LABEL: sil shared [noinline] @$s16take_pair_unusedTf4d_n : $@convention(thin) () -> () {
+// CHECK: bb{{[0-9]*}}
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_nothing : $@convention(thin) () -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s16take_pair_unusedTf4d_n'
+
+// TEST_PaPuEx:
+// CHECK-LABEL: sil shared [noinline] @$s32take_pair_unused_public_externalTf4d_n
+// CHECK: bb{{[0-9]*}}
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_nothing : $@convention(thin) () -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s32take_pair_unused_public_externalTf4d_n'
+
+// TEST_PaHi: 
+// CHECK-LABEL: sil shared [noinline] @$s23take_pair_unused_hiddenTf4d_n : $@convention(thin) () -> () {
+// CHECK: bb{{[0-9]*}}
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_nothing : $@convention(thin) () -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s23take_pair_unused_hiddenTf4d_n'
+
+// TEST_PaPr:
+// CHECK-LABEL: sil private [noinline] @$s24take_pair_unused_privateTf4d_n : $@convention(thin) () -> () {
+// CHECK: bb{{[0-9]*}}
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_nothing : $@convention(thin) () -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]()
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s24take_pair_unused_privateTf4d_n'
+
+// TEST_PaK1Pu:
+// CHECK-LABEL: sil shared [noinline] @$s20take_pair_for_klass1Tf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}([[KLASS:%.*]] : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s20take_pair_for_klass1Tf4x_n'
+
+// TEST_PaK1PuEx:
+// CHECK-LABEL: sil shared [noinline] @$s36take_pair_for_klass1_public_externalTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}([[KLASS:%.*]] : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s36take_pair_for_klass1_public_externalTf4x_n'
+
+// TEST_PaK1Hi: 
+// CHECK-LABEL: sil shared [noinline] @$s27take_pair_for_klass1_hiddenTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s27take_pair_for_klass1_hiddenTf4x_n'
+
+// TEST_PaK1Pr:
+// CHECK-LABEL: sil private [noinline] @$s28take_pair_for_klass1_privateTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s28take_pair_for_klass1_privateTf4x_n'
+
+// TEST_PaK2Pu:
+// CHECK-LABEL: sil shared [noinline] @$s20take_pair_for_klass2Tf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s20take_pair_for_klass2Tf4x_n'
+
+// TEST_PaK2PuEx:
+// CHECK-LABEL: sil shared [noinline] @$s36take_pair_for_klass2_public_externalTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s36take_pair_for_klass2_public_externalTf4x_n'
+
+// TEST_PaK2Hi: 
+// CHECK-LABEL: sil shared [noinline] @$s27take_pair_for_klass2_hiddenTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s27take_pair_for_klass2_hiddenTf4x_n'
+
+// TEST_PaK2Pr:
+// CHECK-LABEL: sil private [noinline] @$s28take_pair_for_klass2_privateTf4x_n : $@convention(thin) (Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass)
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass : $@convention(thin) (Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s28take_pair_for_klass2_privateTf4x_n'
+
+// TEST_PaK1K2Pu:
+// Nothing to check.
+
+// TEST_PaK1K2PuEx:
+// Nothing to check.
+
+// TEST_PaK1K2Hi: 
+// Nothing to check.
+
+// TEST_PaK1K2Pr:
+// Nothing to check.
+
+
+// TEST_QuK1K2K3Pu:
+// CHECK-LABEL: sil shared [noinline] @$s35take_quintuple_for_klass1_through_3Tf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass, {{%.*}} : $Klass, {{%.*}} : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}}, {{%.*}}, {{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s35take_quintuple_for_klass1_through_3Tf4x_n'
+// Nothing to check.
+
+// TEST_QuK1K2K3PuEx:
+// FIXME: THIS CHANGED
+
+// TEST_QuK1K2K3Sh:
+// CHECK-LABEL: sil shared [noinline] @$s42take_quintuple_for_klass1_through_3_sharedTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass, {{%.*}} : $Klass, {{%.*}} : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}}, {{%.*}}, {{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s42take_quintuple_for_klass1_through_3_sharedTf4x_n'
+
+// Nothing to check.
+
+// TEST_QuK1K2K3Hi:
+// CHECK-LABEL: sil shared [noinline] @$s42take_quintuple_for_klass1_through_3_hiddenTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass, {{%.*}} : $Klass, {{%.*}} : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}}, {{%.*}}, {{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s42take_quintuple_for_klass1_through_3_hiddenTf4x_n'
+
+// TEST_QuK1K2K3Pr:
+// CHECK-LABEL: sil private [noinline] @$s43take_quintuple_for_klass1_through_3_privateTf4x_n : $@convention(thin) (Klass, Klass, Klass) -> () {
+// CHECK: bb{{[0-9]*}}({{%.*}} : $Klass, {{%.*}} : $Klass, {{%.*}} : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]({{%.*}}, {{%.*}}, {{%.*}})
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s43take_quintuple_for_klass1_through_3_privateTf4x_n'
+
+// TEST_QuK1K2K3K4Pu:
+// Nothing to check.
+
+// TEST_QuK1K2K3K4PuEx:
+// Nothing to check.
+
+// TEST_QuK1K2K3K4Sh:
+// FIXME: THIS CHANGED
+// Nothing to check.
+
+// TEST_QuK1K2K3K4Hi:
+// Nothing to check.
+
+// TEST_QuK1K2K3K4Pr:
+// Nothing to check.
+
+// TEST_QuK1K2K3OwK4OwK5Pu:
+// CHECK-LABEL: sil shared [noinline] @$s049take_quintuple_for_klass1_through_3_owned_klass4_E2_5Tf4x_nTf4nnndd_n : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+// CHECK: bb{{[0-9]*}}([[KLASS1:%.*]] : $Klass, [[KLASS2:%.*]] : $Klass, [[KLASS3:%.*]] : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s049take_quintuple_for_klass1_through_3_owned_klass4_E2_5Tf4x_nTf4nnndd_n'
+
+// TEST_QuK1K2K3OwK4OwK5PuEx:
+// FIXME: THIS CHANGED
+
+// TEST_QuK1K2K3OwK4OwK5Sh:
+// CHECK-LABEL: sil shared [noinline] @$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_sharedTf4x_nTf4nnndd_n : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+// CHECK: bb{{[0-9]*}}([[KLASS1:%.*]] : $Klass, [[KLASS2:%.*]] : $Klass, [[KLASS3:%.*]] : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_sharedTf4x_nTf4nnndd_n'
+
+// TEST_QuK1K2K3OwK4OwK5Hi:
+// CHECK-LABEL: sil shared [noinline] @$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_hiddenTf4x_nTf4nnndd_n : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+// CHECK: bb{{[0-9]*}}([[KLASS1:%.*]] : $Klass, [[KLASS2:%.*]] : $Klass, [[KLASS3:%.*]] : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s049take_quintuple_for_klass1_through_3_owned_klass4_E9_5_hiddenTf4x_nTf4nnndd_n'
+
+// TEST_QuK1K2K3OwK4OwK5Pr:
+// CHECK-LABEL: sil private [noinline] @$s049take_quintuple_for_klass1_through_3_owned_klass4_E10_5_privateTf4x_nTf4nnndd_n : $@convention(thin) (@owned Klass, @owned Klass, @owned Klass) -> () {
+// CHECK: bb{{[0-9]*}}([[KLASS1:%.*]] : $Klass, [[KLASS2:%.*]] : $Klass, [[KLASS3:%.*]] : $Klass):
+// CHECK: [[FUNCTION:%.*]] = function_ref @take_klass_three_times : $@convention(thin) (Klass, Klass, Klass) -> ()
+// CHECK: [[RESULT:%.*]] = apply [[FUNCTION]]([[KLASS1]], [[KLASS2]], [[KLASS3]])
+// CHECK: return [[RESULT]] : $()
+// CHECK-LABEL: } // end sil function '$s049take_quintuple_for_klass1_through_3_owned_klass4_E10_5_privateTf4x_nTf4nnndd_n'
+
+// =============================================================================
+// =============================================================================
+// =====                    END: SPECIALIZATIONS                           =====
+// =============================================================================
+// ===========================================================================}}

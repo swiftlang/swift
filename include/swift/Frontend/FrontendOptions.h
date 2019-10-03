@@ -180,6 +180,8 @@ public:
   /// \sa swift::SharedTimer
   bool DebugTimeCompilation = false;
 
+  bool SkipNonInlinableFunctionBodies = false;
+
   /// The path to which we should output statistics files.
   std::string StatsOutputDir;
 
@@ -339,6 +341,7 @@ private:
 
 public:
   static bool doesActionGenerateSIL(ActionType);
+  static bool doesActionGenerateIR(ActionType);
   static bool doesActionProduceOutput(ActionType);
   static bool doesActionProduceTextualOutput(ActionType);
   static bool needsProperModuleName(ActionType);

@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -1497,8 +1498,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
           ParsedSyntaxRecorder::makeIdentifierPattern(
                                   SyntaxContext->popToken(), *SyntaxContext);
       ParsedExprSyntax ExprNode =
-          ParsedSyntaxRecorder::deferUnresolvedPatternExpr(std::move(PatternNode),
-                                                           *SyntaxContext);
+          ParsedSyntaxRecorder::makeUnresolvedPatternExpr(std::move(PatternNode),
+                                                          *SyntaxContext);
       SyntaxContext->addSyntax(std::move(ExprNode));
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }

@@ -137,9 +137,9 @@ func test20770032() {
 
 func tuple_splat1(_ a : Int, _ b : Int) { // expected-note 2 {{'tuple_splat1' declared here}}
   let x = (1,2)
-  tuple_splat1(x)          // expected-error {{missing argument for parameter #2 in call}}
+  tuple_splat1(x)          // expected-error {{global function 'tuple_splat1' expects 2 separate arguments}}
   tuple_splat1(1, 2)       // Ok.
-  tuple_splat1((1, 2))     // expected-error {{missing argument for parameter #2 in call}}
+  tuple_splat1((1, 2))     // expected-error {{global function 'tuple_splat1' expects 2 separate arguments; remove extra parentheses to change tuple into separate arguments}} {{16-17=}} {{21-22=}}
 }
 
 // This take a tuple as a value, so it isn't a tuple splat.

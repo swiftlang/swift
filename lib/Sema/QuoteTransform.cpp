@@ -1285,7 +1285,7 @@ Type TypeChecker::getTypeOfQuoteExpr(Type exprType, SourceLoc loc) {
     for (auto param : fnExprType->getParams()) {
       auto paramType = param.getPlainType();
       if (param.isInOut()) {
-        paramType = getUnsafeMutablePointerType(SourceLoc(), paramType);
+        paramType = paramType->wrapInPointer(PTK_UnsafeMutablePointer);
       }
       typeArgs.push_back(paramType);
     }

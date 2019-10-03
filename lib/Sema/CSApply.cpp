@@ -2513,28 +2513,37 @@ namespace {
                                          baseTyUnwrapped,
                                          memberName,
                                          defaultMemberLookupOptions);
-          
-          // Lookup didn't find anything, so return
+
+          // Filter out any functions, instance members, enum cases with
+          // associated values or variables whose type does not match the
+          // contextual type.
+          results.filter([&](const LookupResultEntry entry, bool isOuter) {
+            if (auto member = entry.getValueDecl()) {
+              if (isa<FuncDecl>(member))
+                return false;
+              if (member->isInstanceMember())
+                return false;
+              if (auto EED = dyn_cast<EnumElementDecl>(member)) {
+                return !EED->hasAssociatedValues();
+              }
+              if (auto VD = dyn_cast<VarDecl>(member)) {
+                auto baseType = DSCE->getType()->lookThroughAllOptionalTypes();
+                return VD->getInterfaceType()->isEqual(baseType);
+              }
+            }
+
+            // Filter out anything that's not one of the above. We don't care
+            // if we have a typealias named 'none' or a struct/class named
+            // 'none'.
+            return false;
+          });
+
           if (results.empty()) {
             return;
           }
           
           if (auto member = results.front().getValueDecl()) {
-            // Lookup returned a member that is an instance member,
-            // so return
-            if (member->isInstanceMember()) {
-              return;
-            }
-            
-            // Return if the member is an enum case w/ assoc values, as we only
-            // care (for now) about cases with no assoc values (like none)
-            if (auto EED = dyn_cast<EnumElementDecl>(member)) {
-              if (EED->hasAssociatedValues()) {
-                return;
-              }
-            }
-            
-            // Emit a diagnostic with some fixits
+            // Emit a diagnostic with some fix-its
             auto baseTyName = baseTy->getCanonicalType().getString();
             auto baseTyUnwrappedName = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
@@ -7462,7 +7471,7 @@ bool swift::exprNeedsParensInsideFollowingOperator(
     TypeChecker &TC, DeclContext *DC, Expr *expr,
     PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
-    auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
+    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
 
     return TC.Context.associateInfixOperators(exprPG, followingPG)
@@ -7496,7 +7505,8 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
       return false;
 
   if (parent->isInfixOperator()) {
-    auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
+    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
+                                                                       parent);
     if (!parentPG) return true;
 
     // If the index is 0, this is on the LHS of the parent.
@@ -7515,10 +7525,10 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
                                                      DeclContext *DC,
                                                      Expr *expr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
+  auto asPG = TypeChecker::lookupPrecedenceGroup(
+      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
+  if (!asPG)
+    return true;
   return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
 }
 
@@ -7526,9 +7536,8 @@ bool swift::exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
                                                     DeclContext *DC,
                                                     Expr *expr,
                                                     Expr *rootExpr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
-                             SourceLoc());
+  auto asPG = TypeChecker::lookupPrecedenceGroup(
+      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
   if (!asPG) return true;
   return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }
