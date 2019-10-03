@@ -2679,6 +2679,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS=(
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
+                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
                     )
                 else
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
