@@ -1044,8 +1044,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
       origFnTy->getExtInfo().withNoEscape(false));
-  auto *paramIndices = AutoDiffParameterIndices::get(
-      SmallBitVector(origFnTy->getNumParams(), true), Context);
+  auto *paramIndices = AutoDiffIndexSubset::get(
+      Context, SmallBitVector(origFnTy->getNumParams(), true));
   // Generator for the resultant function type, i.e. the AD associated function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {

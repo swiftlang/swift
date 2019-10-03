@@ -4298,8 +4298,8 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     if (auto *autoDiffFuncId = witness.autoDiffAssociatedFunctionIdentifier) {
       auto originalFn = SGF.emitGlobalFunctionRef(
           loc, witness.asAutoDiffOriginalFunction());
-      auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
-          SGF.getASTContext(),
+      auto loweredIndices = autodiff::getLoweredParameterIndices(
+          autoDiffFuncId->getParameterIndices(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
       auto autoDiffFn = SGF.B.createDifferentiableFunction(
           loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);

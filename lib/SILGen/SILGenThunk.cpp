@@ -136,8 +136,8 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto loc = assocFnDeclRef.getAsRegularLocation();
   SGF.collectThunkParams(loc, params);
   auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
-  auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
-      SGF.getASTContext(),
+  auto *loweredIndices = autodiff::getLoweredParameterIndices(
+      autoDiffFuncId->getParameterIndices(),
       assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
   auto diffFn = SGF.B.createDifferentiableFunction(
       loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);

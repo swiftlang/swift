@@ -1552,7 +1552,7 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffParameterIndices *ParameterIndices = nullptr;
+  AutoDiffIndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1571,8 +1571,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              bool linear,
-                              AutoDiffParameterIndices *indices,
+                              bool linear, AutoDiffIndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature *derivativeGenericSignature);
@@ -1588,8 +1587,7 @@ public:
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear,
-                                    AutoDiffParameterIndices *indices,
+                                    bool linear, AutoDiffIndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature *derivativeGenSig);
@@ -1604,10 +1602,10 @@ public:
   /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffParameterIndices *getParameterIndices() const {
+  AutoDiffIndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffParameterIndices *pi) {
+  void setParameterIndices(AutoDiffIndexSubset *pi) {
     ParameterIndices = pi;
   }
 
@@ -1642,7 +1640,7 @@ public:
 
   bool parametersMatch(const DifferentiableAttr &other) const {
     assert(ParameterIndices && other.ParameterIndices);
-    return ParameterIndices->parameters == other.ParameterIndices->parameters;
+    return ParameterIndices == other.ParameterIndices;
   }
 
   /// Get the derivative generic environment for the given `@differentiable`
@@ -1683,7 +1681,7 @@ class DifferentiatingAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffParameterIndices *ParameterIndices = nullptr;
+  AutoDiffIndexSubset *ParameterIndices = nullptr;
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
@@ -1693,7 +1691,7 @@ class DifferentiatingAttr final
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
                                DeclNameWithLoc original, bool linear,
-                               AutoDiffParameterIndices *indices);
+                               AutoDiffIndexSubset *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
@@ -1704,7 +1702,7 @@ public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
                                      DeclNameWithLoc original, bool linear,
-                                     AutoDiffParameterIndices *indices);
+                                     AutoDiffIndexSubset *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
                                       
@@ -1725,10 +1723,10 @@ public:
     return NumParsedParameters;
   }
 
-  AutoDiffParameterIndices *getParameterIndices() const {
+  AutoDiffIndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffParameterIndices *pi) {
+  void setParameterIndices(AutoDiffIndexSubset *pi) {
     ParameterIndices = pi;
   }
 

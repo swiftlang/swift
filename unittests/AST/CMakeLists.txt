@@ -1,7 +1,7 @@
 add_swift_unittest(SwiftASTTests
   ArithmeticEvaluator.cpp
   # SWIFT_ENABLE_TENSORFLOW
-  AutoDiffIndexSubset.cpp
+  AutoDiffIndexSubsetTests.cpp
   DiagnosticConsumerTests.cpp
   SourceLocTests.cpp
   TestContext.cpp
