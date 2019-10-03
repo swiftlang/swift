@@ -329,7 +329,7 @@ namespace swift {
 
     /// Whether to enable experimental differentiable programming features:
     /// `@differentiable` declaration attribute, etc.
-    bool EnableExperimentalDifferentiableProgramming = false;
+    bool EnableExperimentalDifferentiableProgramming = true;
 
     /// Whether to enable #quote, #unquote and @quoted.
     bool EnableExperimentalQuasiquotes = false;
