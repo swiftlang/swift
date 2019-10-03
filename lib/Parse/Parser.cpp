@@ -1276,18 +1276,6 @@ Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
   return makeParserError();
 }
 
-Optional<ParsedTokenSyntax>
-Parser::parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
-                                 SourceLoc OtherLoc) {
-  TokLoc = Tok.getLoc();
-  auto result = parseMatchingTokenSyntax(K, ErrorDiag, OtherLoc);
-  if (result.isNull()) {
-    TokLoc = getLocForMissingMatchingToken();
-    return None;
-  }
-  return result.get();
-}
-
 SourceLoc Parser::getLocForMissingMatchingToken() const {
   // At present, use the same location whether it's an error or whether
   // the matching token is missing.
@@ -1333,7 +1321,6 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
 ParserStatus
 Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
                         Optional<ParsedTokenSyntax> &LastComma,
-                        SourceLoc &RightLoc,
                         Optional<ParsedTokenSyntax> &Right,
                         SmallVectorImpl<ParsedSyntax>& Junk,
                         bool AllowSepAfterLast, Diag<> ErrorDiag,
@@ -1343,13 +1330,11 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
   };
 
   if (Tok.is(RightK)) {
-    RightLoc = Tok.getLoc();
     Right = consumeTokenSyntax(RightK);
     return makeParserSuccess();
   }
   if (TokIsStringInterpolationEOF()) {
     Tok.setKind(RightK);
-    RightLoc = Tok.getLoc();
     Right = consumeTokenSyntax();
     return makeParserSuccess();
   }
@@ -1372,7 +1357,6 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
     // Just accept the ")" and build the tuple as we usually do.
     if (TokIsStringInterpolationEOF()) {
       Tok.setKind(RightK);
-      RightLoc = Tok.getLoc();
       Right = consumeTokenSyntax();
       return Status;
     }
@@ -1409,20 +1393,10 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
     Status.setIsParseError();
   }
 
-  if (Status.isError()) {
-    // If we've already got errors, don't emit missing RightK diagnostics.
-    if (Tok.is(RightK)) {
-      RightLoc = Tok.getLoc();
-      Right = consumeTokenSyntax(RightK);
-    } else {
-      RightLoc = getLocForMissingMatchingToken();
-    }
-  } else {
-    Right = parseMatchingTokenSyntax(RightK, RightLoc, ErrorDiag, LeftLoc);
-    if (!Right)
-      Status.setIsParseError();
-  }
-
+  auto RightResult = parseMatchingTokenSyntax(RightK, ErrorDiag, LeftLoc,
+                                              Status.isError());
+  Status |= RightResult.getStatus();
+  Right = RightResult.getOrNull();
   return Status;
 }
 

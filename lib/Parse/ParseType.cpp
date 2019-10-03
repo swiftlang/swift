@@ -976,11 +976,10 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeTupleBody() {
 
   Optional<ParsedTokenSyntax> Comma;
 
-  SourceLoc RParenLoc;
   Optional<ParsedTokenSyntax> RParen;
 
   ParserStatus Status =
-      parseListSyntax(tok::r_paren, LParenLoc, Comma, RParenLoc, RParen, Junk,
+      parseListSyntax(tok::r_paren, LParenLoc, Comma, RParen, Junk,
                       false, diag::expected_rparen_tuple_type_list, [&]() {
     Optional<BacktrackingScope> Backtracking;
     SmallVector<ParsedSyntax, 0> LocalJunk;
