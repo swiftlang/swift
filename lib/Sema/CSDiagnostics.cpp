@@ -5042,13 +5042,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsNote() {
-  auto *locator = getLocator();
-  auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
-  assert(argToParam);
-
   if (auto *callee = getCallee()) {
     emitDiagnostic(callee, diag::candidate_has_invalid_argument_at_position,
-                   getToType(), argToParam->getParamIdx());
+                   getToType(), getParamPosition());
     return true;
   }
 
