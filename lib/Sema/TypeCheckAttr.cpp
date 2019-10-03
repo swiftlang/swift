@@ -2668,6 +2668,16 @@ static bool tangentVectorEqualSelf(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
+static unsigned getUncurriedParameterCount(AnyFunctionType *fnTy) {
+  // TODO: For exact counting, we need to know whether the function type is a
+  // curried method type or not.
+  unsigned numParameters = fnTy->getNumParams();
+  if (auto *innerFn = fnTy->getResult()->getAs<AnyFunctionType>())
+    numParameters += innerFn->getNumParams();
+  return numParameters;
+}
+
+// SWIFT_ENABLE_TENSORFLOW
 /// Creates a `AutoDiffIndexSubset` for the given function type, representing
 /// all inferred differentiation parameters.
 /// The differentiation parameters are inferred to be:
@@ -2680,7 +2690,8 @@ TypeChecker::inferDifferentiableParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
   auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-  AutoDiffIndexSubsetBuilder builder(functionType);
+  llvm::SmallBitVector parameterBits(
+      getUncurriedParameterCount(functionType));
   SmallVector<Type, 4> allParamTypes;
 
   // Returns true if the i-th parameter type is differentiable.
@@ -2714,11 +2725,11 @@ TypeChecker::inferDifferentiableParameters(
     allParamTypes.push_back(param.getPlainType());
 
   // Set differentiation parameters.
-  for (unsigned i : range(builder.size()))
+  for (unsigned i : range(parameterBits.size()))
     if (isDifferentiableParam(i))
-      builder.setParameter(i);
+      parameterBits.set(i);
 
-  return builder.build(ctx);
+  return AutoDiffIndexSubset::get(ctx, parameterBits);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -2931,7 +2942,8 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
         function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  AutoDiffIndexSubsetBuilder builder(functionType);
+  llvm::SmallBitVector parameterBits(
+      getUncurriedParameterCount(functionType));
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
@@ -2954,7 +2966,7 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
                       diag::diff_params_clause_params_not_original_order);
           return nullptr;
         }
-        builder.setParameter(index);
+        parameterBits.set(index);
         lastIndex = index;
         break;
       }
@@ -2970,7 +2982,7 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
           TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
           return nullptr;
         }
-        builder.setParameter(builder.size() - 1);
+        parameterBits.set(parameterBits.size() - 1);
         break;
       }
       case ParsedAutoDiffParameter::Kind::Ordered: {
@@ -2985,13 +2997,13 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
               diag::diff_params_clause_params_not_original_order);
           return nullptr;
         }
-        builder.setParameter(index);
+        parameterBits.set(index);
         lastIndex = index;
         break;
       }
     }
   }
-  return builder.build(TC.Context);
+  return AutoDiffIndexSubset::get(TC.Context, parameterBits);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

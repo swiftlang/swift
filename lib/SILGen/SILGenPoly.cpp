@@ -3281,12 +3281,17 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
       outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
 
-  AutoDiffIndexSubsetBuilder paramIndicesBuilder(inputSubstType);
+  auto numUncurriedParams = inputSubstType->getNumParams();
+  if (auto *resultFnType =
+          inputSubstType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  llvm::SmallBitVector parameterBits(numUncurriedParams);
   for (auto i : range(inputSubstType->getNumParams()))
     if (!inputSubstType->getParams()[i].isNonDifferentiable())
-      paramIndicesBuilder.setParameter(i);
-  auto *parameterIndices =
-      paramIndicesBuilder.build(inputSubstType->getASTContext());
+      parameterBits.set(i);
+  auto *parameterIndices = AutoDiffIndexSubset::get(
+      SGF.getASTContext(), parameterBits);
 
   auto getAssocFnTy =
       [&](CanAnyFunctionType fnTy, AutoDiffAssociatedFunctionKind kind)

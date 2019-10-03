@@ -646,13 +646,11 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
           C, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, {}, None, None, derivativeGenSig);
       member->getAttrs().add(diffableAttr);
-      // Compute getter parameter indices.
-      auto *getterType = member->getAccessor(AccessorKind::Get)
-                             ->getInterfaceType()
-                             ->castTo<AnyFunctionType>();
-      AutoDiffIndexSubsetBuilder builder(getterType);
-      builder.setParameter(0);
-      diffableAttr->setParameterIndices(builder.build(C));
+      // Set getter `@differentiable` attribute parameter indices.
+      llvm::SmallBitVector parameters(1);
+      parameters.set(0);
+      auto *getterParamIndices = AutoDiffIndexSubset::get(C, parameters);
+      diffableAttr->setParameterIndices(getterParamIndices);
     }
   }
 
