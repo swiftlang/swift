@@ -86,12 +86,12 @@ static inline BOOL NSStringBridgeTestEqual(NSString * _Nonnull a, NSString * _No
 }
 
 static inline NSString *getNSStringWithUnpairedSurrogate() {
-  unichar chars[16] = {
+  unichar chars[19] = {
     0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
     0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
     0x0020, 0x0020, 0x0020, 0x0020, 0x0020, 0x0020,
     0xD800 };
-  return [NSString stringWithCharacters:chars length:1];
+  return [NSString stringWithCharacters:chars length:19];
 }
 
 NS_ASSUME_NONNULL_END
