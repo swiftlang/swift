@@ -62,6 +62,8 @@ ATTRIBUTE_NODES = [
                              kind='ImplementsAttributeArguments'),
                        Child('NamedAttributeString',
                              kind='NamedAttributeStringArgument'),
+                       Child('OpaqueReturnTypeOfArguments',
+                             kind='OpaqueReturnTypeOfAttributeArguments'),
                    ], description='''
                    The arguments of the attribute. In case the attribute  \
                    takes multiple arguments, they are gather in the \
@@ -79,6 +81,7 @@ ATTRIBUTE_NODES = [
 
     # attribute-list -> attribute attribute-list?
     Node('AttributeList', kind='SyntaxCollection',
+         omit_when_empty=True,
          element='Syntax', element_name='Attribute',
          element_choices=[
              'Attribute',
@@ -139,12 +142,15 @@ ATTRIBUTE_NODES = [
              ]),
          ]),
     Node('DeclName', kind='Syntax', children=[
-         Child('DeclBaseName', kind='Syntax', description='''
+         Child('DeclBaseName', kind='Token', description='''
                The base name of the protocol\'s requirement.
                ''',
-               node_choices=[
-                   Child('Identifier', kind='IdentifierToken'),
-                   Child('Operator', kind='PrefixOperatorToken'),
+               token_choices=[
+                   'IdentifierToken',
+                   'PrefixOperatorToken',
+                   'PostfixOperatorToken',
+                   'SpacedBinaryOperatorToken',
+                   'UnspacedBinaryOperatorToken',
                ]),
          Child('DeclNameArguments', kind='DeclNameArguments',
                is_optional=True, description='''
@@ -196,5 +202,23 @@ ATTRIBUTE_NODES = [
          ]),
 
     # objc-selector -> objc-selector-piece objc-selector?
-    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece')
+    Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece'),
+
+    # opaque-return-type-of-attr-arguments -> string-literal ','
+    # integer-literal
+    Node('OpaqueReturnTypeOfAttributeArguments', kind='Syntax',
+         description='''
+         The argument for the `@_opaqueReturnTypeOf` type attribute of the \
+         form `<mangled name>, <index number>`.
+         ''',
+         children=[
+             Child('MangledName', kind='StringLiteralToken', description='''
+                   The mangled name of the opaque function/property which the
+                   the type represents.
+                   '''),
+             Child('Comma', kind='CommaToken'),
+             Child('Index', kind='IntegerLiteralToken', description='''
+                   The index of the return type.
+                   '''),
+         ]),
 ]

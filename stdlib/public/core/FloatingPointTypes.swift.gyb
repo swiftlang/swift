@@ -755,7 +755,7 @@ extension ${Self}: BinaryFloatingPoint {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public mutating func formRemainder(dividingBy other: ${Self}) {
-    self = _swift_stdlib_remainder${cFuncSuffix}(self, other)
+    self = _stdlib_remainder${cFuncSuffix}(self, other)
   }
 
   @inlinable // FIXME(inline-always)
@@ -766,7 +766,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @_transparent
   public mutating func formSquareRoot( ) {
-    self = _swift_stdlib_squareRoot${cFuncSuffix}(self)
+    self = _stdlib_squareRoot${cFuncSuffix}(self)
   }
 
   @_transparent
@@ -1263,7 +1263,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
 
 ${SelfDocComment}
 @frozen
-@available(*, unavailable, message: "Float80 is only available on non-Windows x86 targets.")
+@available(*, unavailable, message: "Float80 is not available on target platform.")
 public struct ${Self} {
   /// Creates a value initialized to zero.
   @_transparent

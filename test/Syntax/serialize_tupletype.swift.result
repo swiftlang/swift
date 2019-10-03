@@ -1,23 +1,23 @@
 {
-  "id": 24,
+  "id": 23,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 23,
+      "id": 22,
       "kind": "CodeBlockItemList",
       "layout": [
         {
-          "id": 21,
+          "id": 20,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 20,
+              "id": 19,
               "kind": "TypealiasDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 1,
+                  "id": 17,
                   "tokenKind": {
                     "kind": "kw_typealias"
                   },
@@ -48,7 +48,7 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 2,
+                  "id": 18,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "x"
@@ -64,11 +64,11 @@
                 },
                 null,
                 {
-                  "id": 19,
+                  "id": 16,
                   "kind": "TypeInitializerClause",
                   "layout": [
                     {
-                      "id": 3,
+                      "id": 1,
                       "tokenKind": {
                         "kind": "equal"
                       },
@@ -82,11 +82,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 18,
+                      "id": 15,
                       "kind": "TupleType",
                       "layout": [
                         {
-                          "id": 4,
+                          "id": 2,
                           "tokenKind": {
                             "kind": "l_paren"
                           },
@@ -95,30 +95,16 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 16,
+                          "id": 13,
                           "kind": "TupleTypeElementList",
                           "layout": [
                             {
-                              "id": 11,
+                              "id": 8,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 5,
-                                  "tokenKind": {
-                                    "kind": "kw__"
-                                  },
-                                  "leadingTrivia": [],
-                                  "trailingTrivia": [
-                                    {
-                                      "kind": "Space",
-                                      "value": 1
-                                    }
-                                  ],
-                                  "presence": "Present"
-                                },
-                                {
-                                  "id": 6,
+                                  "id": 3,
                                   "tokenKind": {
                                     "kind": "identifier",
                                     "text": "b"
@@ -127,8 +113,9 @@
                                   "trailingTrivia": [],
                                   "presence": "Present"
                                 },
+                                null,
                                 {
-                                  "id": 7,
+                                  "id": 4,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -142,11 +129,11 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 9,
+                                  "id": 6,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 8,
+                                      "id": 5,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "Int"
@@ -162,7 +149,7 @@
                                 null,
                                 null,
                                 {
-                                  "id": 10,
+                                  "id": 7,
                                   "tokenKind": {
                                     "kind": "comma"
                                   },
@@ -179,12 +166,12 @@
                               "presence": "Present"
                             },
                             {
-                              "id": 15,
+                              "id": 12,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 12,
+                                  "id": 9,
                                   "tokenKind": {
                                     "kind": "kw__"
                                   },
@@ -194,7 +181,7 @@
                                 },
                                 null,
                                 {
-                                  "id": 7,
+                                  "id": 4,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -208,11 +195,11 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 14,
+                                  "id": 11,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 13,
+                                      "id": 10,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "String"
@@ -235,7 +222,7 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 17,
+                          "id": 14,
                           "tokenKind": {
                             "kind": "r_paren"
                           },
@@ -262,7 +249,7 @@
       "presence": "Present"
     },
     {
-      "id": 22,
+      "id": 21,
       "tokenKind": {
         "kind": "eof",
         "text": ""

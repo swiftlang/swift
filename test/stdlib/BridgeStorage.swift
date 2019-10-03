@@ -155,6 +155,7 @@ allTests.test("_BridgeStorage") {
   // Add a reference and verify that it's still native but no longer unique
   var c = b
   expectFalse(b.isUniquelyReferencedNative())
+  _fixLifetime(b) // make sure b is not killed early
   _fixLifetime(c) // make sure c is not killed early
 
   let n = C()

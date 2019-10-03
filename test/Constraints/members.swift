@@ -602,8 +602,10 @@ func rdar50679161() {
         var _ = Q(
           a: v + foo.w,
           // expected-error@-1 {{instance member 'w' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
           b: v + foo.h
           // expected-error@-1 {{instance member 'h' cannot be used on type 'S'}}
+          // expected-error@-2 {{cannot convert value of type 'Point' to expected argument type 'Int'}}
         )
       }
     }
@@ -618,13 +620,14 @@ func rdar_50467583_and_50909555() {
 
   // rdar://problem/50909555
   struct S {
-    static subscript(x: Int, y: Int) -> Int {
+    static subscript(x: Int, y: Int) -> Int { // expected-note {{'subscript(_:_:)' declared here}}
       return 1
     }
   }
 
   func test(_ s: S) {
     s[1] // expected-error {{static member 'subscript' cannot be used on instance of type 'S'}} {{5-6=S}}
+    // expected-error@-1 {{missing argument for parameter #2 in call}} {{8-8=, <#Int#>}}
   }
 }
 

@@ -177,8 +177,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     }
 
     // Retrieve the requirement.
-    auto results = proto->lookupDirect(name);
-    return results.empty() ? nullptr : results.front();
+    return proto->getSingleRequirement(name);
   };
 
   // Properties.
@@ -313,8 +312,7 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
-  if (auto env = parentDC->getGenericEnvironmentOfContext())
-    getterDecl->setGenericEnvironment(env);
+  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
   getterDecl->copyFormalAccessFrom(property);

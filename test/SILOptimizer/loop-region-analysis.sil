@@ -659,7 +659,126 @@ bb5:
 //         --------        --------
 //
 // CHECK-LABEL: Start @two_separate_natural_loops_separated_by_diamond@
-// CHECK(region id:6 kind:func ucfh:false ucft:false
+// CHECK: (region id:9 kind:func ucfh:false ucft:false
+// CHECK:     (preds)
+// CHECK:     (succs)
+// CHECK:     (subregs
+// CHECK:         (region id:0)
+// CHECK:         (region id:10)
+// CHECK:         (region id:3)
+// CHECK:         (region id:4)
+// CHECK:         (region id:11)
+// CHECK:         (region id:7))
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:7 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:11))
+// CHECK:     (succs)
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:11 kind:loop ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:3)
+// CHECK:         (region id:4))
+// CHECK:     (succs
+// CHECK:         (region id:7))
+// CHECK:     (subregs
+// CHECK:         (region id:5)
+// CHECK:         (region id:6))
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs
+// CHECK:         (region id:6))
+// CHECK:     (backedge-regs
+// CHECK:         (region id:6)))
+// CHECK: (region id:6 kind:bb   ucfh:false ucft:false parent:11
+// CHECK:     (preds
+// CHECK:         (region id:5))
+// CHECK:     (succs)
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs
+// CHECK:         (parentindex:0))
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:5 kind:bb   ucfh:false ucft:false parent:11
+// CHECK:     (preds)
+// CHECK:     (succs
+// CHECK:         (region id:6))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:4 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:10))
+// CHECK:     (succs
+// CHECK:         (region id:11))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:3 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:10))
+// CHECK:     (succs
+// CHECK:         (region id:11))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:10 kind:loop ucfh:false ucft:false parent:9
+// CHECK:     (preds
+// CHECK:         (region id:0))
+// CHECK:     (succs
+// CHECK:         (region id:3)
+// CHECK:         (region id:4))
+// CHECK:     (subregs
+// CHECK:         (region id:1)
+// CHECK:         (region id:2)
+// CHECK:         (region id:8))
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs
+// CHECK:         (region id:2))
+// CHECK:     (backedge-regs
+// CHECK:         (region id:8)))
+// CHECK: (region id:8 kind:bb   ucfh:false ucft:false parent:10
+// CHECK:     (preds
+// CHECK:         (region id:2))
+// CHECK:     (succs)
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:2 kind:bb   ucfh:false ucft:false parent:10
+// CHECK:     (preds
+// CHECK:         (region id:1))
+// CHECK:     (succs
+// CHECK:         (region id:8))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs
+// CHECK:         (parentindex:0)
+// CHECK:         (parentindex:1))
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:1 kind:bb   ucfh:false ucft:false parent:10
+// CHECK:     (preds)
+// CHECK:     (succs
+// CHECK:         (region id:2))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
+// CHECK: (region id:0 kind:bb   ucfh:false ucft:false parent:9
+// CHECK:     (preds)
+// CHECK:     (succs
+// CHECK:         (region id:10))
+// CHECK:     (subregs)
+// CHECK:     (non-local-succs)
+// CHECK:     (exiting-subregs)
+// CHECK:     (backedge-regs))
 // CHECK: End @two_separate_natural_loops_separated_by_diamond@
 sil @two_separate_natural_loops_separated_by_diamond : $@convention(thin) () -> () {
 bb0:

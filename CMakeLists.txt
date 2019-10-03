@@ -219,7 +219,7 @@ set(SWIFT_NATIVE_CLANG_TOOLS_PATH "" CACHE STRING
 set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
    "Path to the directory that contains Swift tools that are executable on the build machine")
 
-option(SWIFT_ENABLE_PARSEABLE_MODULE_INTERFACES
+option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        TRUE)
 
@@ -499,6 +499,18 @@ include(CMakePushCheckState)
 
 print_versions()
 
+include(SwiftSharedCMakeConfig)
+
+# NOTE: We include this before SwiftComponents as it relies on some LLVM CMake
+# functionality.
+# Support building Swift as a standalone project, using LLVM as an
+# external library.
+if(SWIFT_BUILT_STANDALONE)
+  swift_common_standalone_build_config(SWIFT)
+else()
+  swift_common_unified_build_config(SWIFT)
+endif()
+
 include(SwiftComponents)
 include(SwiftHandleGybSources)
 include(SwiftSetIfArchBitness)
@@ -525,16 +537,6 @@ if(NOT CMAKE_CROSSCOMPILING AND CMAKE_SYSTEM_PROCESSOR STREQUAL "i386")
       COMMAND "uname" "-m"
       OUTPUT_VARIABLE CMAKE_SYSTEM_PROCESSOR
       OUTPUT_STRIP_TRAILING_WHITESPACE)
-endif()
-
-include(SwiftSharedCMakeConfig)
-
-# Support building Swift as a standalone project, using LLVM as an
-# external library.
-if(SWIFT_BUILT_STANDALONE)
-  swift_common_standalone_build_config(SWIFT)
-else()
-  swift_common_unified_build_config(SWIFT)
 endif()
 
 get_filename_component(SWIFT_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR} REALPATH)
@@ -994,6 +996,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                         -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                         -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+                        -DCMAKE_INSTALL_LIBDIR=lib
                         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                         -DCMAKE_LINKER=${CMAKE_LINKER}
                         -DCMAKE_RANLIB=${CMAKE_RANLIB}
@@ -1051,6 +1054,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
   else()
     set(SOURCEKIT_RUNTIME_DIR lib)
   endif()
+  add_dependencies(sourcekit-inproc BlocksRuntime dispatch)
   swift_install_in_component(FILES
                                $<TARGET_FILE:dispatch>
                                $<TARGET_FILE:BlocksRuntime>

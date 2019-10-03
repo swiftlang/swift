@@ -504,8 +504,11 @@ func testLabeledSubscript() {
   let k = \AA.[labeled: 0]
 
   // TODO: These ought to work without errors.
-  let _ = \AA.[keyPath: k] // expected-error{{}}
-  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error{{}}
+  let _ = \AA.[keyPath: k] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
+
+  let _ = \AA.[keyPath: \AA.[labeled: 0]] // expected-error {{incorrect argument label in call (have 'keyPath:', expected 'labeled:')}}
+  // expected-error@-1 {{cannot convert value of type 'KeyPath<AA, Int>' to expected argument type 'Int'}}
 }
 
 func testInvalidKeyPathComponents() {
@@ -541,23 +544,19 @@ func testImplicitConversionInSubscriptIndex() {
   _ = \BassSubscript.["hello"] // expected-error{{must be Hashable}}
 }
 
-// Crash in diagnostics
-struct AmbiguousSubscript {
+// Crash in diagnostics + SR-11438
+struct UnambiguousSubscript {
   subscript(sub: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(_:)' declared here}}
-
   subscript(y y: Sub) -> Int { get { } set { } }
-  // expected-note@-1 {{'subscript(y:)' declared here}}
 }
 
-func useAmbiguousSubscript(_ sub: Sub) {
-  let _: PartialKeyPath<AmbiguousSubscript> = \.[sub]
-  // expected-error@-1 {{ambiguous reference to member 'subscript'}}
+func useUnambiguousSubscript(_ sub: Sub) {
+  let _: PartialKeyPath<UnambiguousSubscript> = \.[sub]
 }
 
 struct BothUnavailableSubscript {
   @available(*, unavailable)
-  subscript(sub: Sub) -> Int { get { } set { } }
+  subscript(sub: Sub) -> Int { get { } set { } } // expected-note {{'subscript(_:)' has been explicitly marked unavailable here}}
 
   @available(*, unavailable)
   subscript(y y: Sub) -> Int { get { } set { } }
@@ -565,7 +564,7 @@ struct BothUnavailableSubscript {
 
 func useBothUnavailableSubscript(_ sub: Sub) {
   let _: PartialKeyPath<BothUnavailableSubscript> = \.[sub]
-  // expected-error@-1 {{type of expression is ambiguous without more context}}
+  // expected-error@-1 {{'subscript(_:)' is unavailable}}
 }
 
 // SR-6106
@@ -832,6 +831,34 @@ func test_keypath_inference_with_optionals() {
 
     var foo: Int? = nil
   }
+}
+
+func sr11562() {
+  struct S1 {
+    subscript(x x: Int) -> Int { x }
+  }
+
+  _ = \S1.[5] // expected-error {{missing argument label 'x:' in call}} {{12-12=x: }}
+
+  struct S2 {
+    subscript(x x: Int) -> Int { x } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(x:)')}}
+    subscript(y y: Int) -> Int { y } // expected-note {{incorrect labels for candidate (have: '(_:)', expected: '(y:)')}}
+  }
+
+  _ = \S2.[5] // expected-error {{no exact matches in call to subscript}}
+
+  struct S3 {
+    subscript(x x: Int, y y: Int) -> Int { x }
+  }
+
+  _ = \S3.[y: 5, x: 5] // expected-error {{argument 'x' must precede argument 'y'}}
+
+  struct S4 {
+    subscript(x: (Int, Int)) -> Int { x.0 }
+  }
+
+  _ = \S4.[1, 4] // expected-error {{subscript expects a single parameter of type '(Int, Int)'}} {{12-12=(}} {{16-16=)}}
+  // expected-error@-1 {{subscript index of type '(Int, Int)' in a key path must be Hashable}}
 }
 
 func testSyntaxErrors() { // expected-note{{}}

@@ -24,6 +24,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -439,11 +440,8 @@ static bool findNonMembers(TypeChecker &TC,
     if (!isValid(D))
       return false;
 
-    if (!D->hasInterfaceType())
-      TC.validateDecl(D);
-
     // FIXME: Circularity hack.
-    if (!D->hasInterfaceType()) {
+    if (!D->getInterfaceType()) {
       AllDeclRefs = false;
       continue;
     }
@@ -896,12 +894,6 @@ namespace {
         continue;
       }
 
-      // Coercions can be used for disambiguation.
-      if (auto coerce = dyn_cast<CoerceExpr>(callee)) {
-        callee = coerce->getSubExpr();
-        continue;
-      }
-
       // We're done.
       break;
     }
@@ -1139,8 +1131,9 @@ namespace {
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
         if (!PlaceholderE->getTypeLoc().isNull()) {
-          if (!TC.validateType(PlaceholderE->getTypeLoc(),
-                               TypeResolution::forContextual(DC), None))
+          if (!TypeChecker::validateType(TC.Context, PlaceholderE->getTypeLoc(),
+                                         TypeResolution::forContextual(DC),
+                                         None))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
         return finish(true, expr);
@@ -1374,8 +1367,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TC.validateType(closure->getExplicitResultTypeLoc(), resolution,
-                      TypeResolverContext::InExpression)) {
+      TypeChecker::validateType(TC.Context, closure->getExplicitResultTypeLoc(),
+                                resolution,
+                                TypeResolverContext::InExpression)) {
     return false;
   }
 
@@ -1389,7 +1383,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
 
   // Update the current DeclContext to be the closure we're about to
   // recurse into.
-  assert(DC == closure->getParent() && "Decl context isn't correct");
+  assert((closure->getParent() == DC ||
+          closure->getParent()->isChildContextOf(DC)) &&
+         "Decl context isn't correct");
   DC = closure;
   return true;
 }
@@ -1984,7 +1980,8 @@ Expr *PreCheckExpression::simplifyTypeConstructionWithLiteralArg(Expr *E) {
 
     auto &typeLoc = typeExpr->getTypeLoc();
     bool hadError =
-        TC.validateType(typeLoc, TypeResolution::forContextual(DC), options);
+        TypeChecker::validateType(TC.Context, typeLoc,
+                                  TypeResolution::forContextual(DC), options);
 
     if (hadError)
       return nullptr;
@@ -2139,7 +2136,7 @@ private:
 
   void maybeProduceFallbackDiagnostic(Expr *expr) const {
     if (Options.contains(TypeCheckExprFlags::SubExpressionDiagnostics) ||
-        Options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+        DiagnosticSuppression::isEnabled(TC.Diags))
       return;
 
     // Before producing fatal error here, let's check if there are any "error"
@@ -2181,7 +2178,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   // Construct a constraint system from this expression.
   ConstraintSystemOptions csOptions = ConstraintSystemFlags::AllowFixes;
 
-  if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
+  if (DiagnosticSuppression::isEnabled(Diags))
     csOptions |= ConstraintSystemFlags::SuppressDiagnostics;
 
   if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
@@ -2232,7 +2229,7 @@ Type TypeChecker::typeCheckExpressionImpl(Expr *&expr, DeclContext *dc,
   if (options.contains(TypeCheckExprFlags::ExpressionTypeMustBeOptional)) {
     assert(!convertTo && "convertType and type check options conflict");
     auto *convertTypeLocator =
-        cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+        cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
     Type var = cs.createTypeVariable(convertTypeLocator, TVO_CanBindToNoEscape);
     convertTo = getOptionalType(expr->getLoc(), var);
   }
@@ -2627,7 +2624,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                           emptyLocator);
         return propertyType;
       }
-      
+
       // Otherwise, compute the wrapped value type directly.
       return computeWrappedValueType(wrappedVar, initType);
     }
@@ -2636,8 +2633,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
       assert(!expr->isSemanticallyInOutExpr());
 
       // Save the locator we're using for the expression.
-      Locator =
-          cs.getConstraintLocator(expr, LocatorPathElt::getContextualType());
+      Locator = cs.getConstraintLocator(expr, LocatorPathElt::ContextualType());
 
       // Collect constraints from the pattern.
       Type patternType = cs.generateConstraints(pattern, Locator);
@@ -2649,10 +2645,10 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
         // is the initialization of the property wrapper instance.
         initType = cs.getType(expr);
 
-        // Add a conversion constraint between the pattern type and the
+        // Add an equal constraint between the pattern type and the
         // property wrapper's "value" type.
-        cs.addConstraint(ConstraintKind::Conversion, patternType,
-                         getPatternInitType(&cs), Locator, /*isFavored*/true);
+        cs.addConstraint(ConstraintKind::Equal, patternType,
+                         getPatternInitType(&cs), Locator, /*isFavored*/ true);
       } else {
         // The initializer type is the type of the pattern.
         initType = patternType;
@@ -2927,9 +2923,8 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
         return true;
       }
 
-      auto elementAssocType =
-        cast<AssociatedTypeDecl>(
-          sequenceProto->lookupDirect(tc.Context.Id_Element).front());
+      auto elementAssocType = sequenceProto->getAssociatedType(
+        tc.Context.Id_Element);
 
       SequenceType = cs.createTypeVariable(Locator, TVO_CanBindToNoEscape);
       cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
@@ -3005,31 +3000,13 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     return !resultTy;
   }
 
-  /// Expression type checking listener for conditions.
-  class ConditionListener : public ExprTypeCheckListener {
-    Expr *OrigExpr = nullptr;
+  auto *boolDecl = Context.getBoolDecl();
+  if (!boolDecl)
+    return true;
 
-  public:
-    // Add the appropriate Boolean constraint.
-    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
-      // Save the original expression.
-      OrigExpr = expr;
-      
-      // Otherwise, the result must be convertible to Bool.
-      auto boolDecl = cs.getASTContext().getBoolDecl();
-      if (!boolDecl)
-        return true;
-      
-      // Condition must convert to Bool.
-      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
-                       boolDecl->getDeclaredType(),
-                       cs.getConstraintLocator(expr));
-      return false;
-    }
-  };
-
-  ConditionListener listener;
-  auto resultTy = typeCheckExpression(expr, dc, &listener);
+  auto resultTy = typeCheckExpression(
+      expr, dc, TypeLoc::withoutLoc(boolDecl->getDeclaredType()),
+      CTP_Condition);
   return !resultTy;
 }
 
@@ -3161,9 +3138,32 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
   
   Expr *matchCall = new (Context) BinaryExpr(matchOp, matchArgs,
                                              /*Implicit=*/true);
-  
+
   // Check the expression as a condition.
-  bool hadError = typeCheckCondition(matchCall, DC);
+  //
+  // TODO: Type-check of `~=` operator can't (yet) use `typeCheckCondition`
+  // because that utilizes contextual type which interferes with diagnostics.
+  // We don't yet have a full access to pattern-matching context in
+  // constraint system, which is required to enable these situations
+  // to be properly diagnosed.
+  struct ConditionListener : public ExprTypeCheckListener {
+    // Add the appropriate Boolean constraint.
+    bool builtConstraints(ConstraintSystem &cs, Expr *expr) override {
+      // Otherwise, the result must be convertible to Bool.
+      auto boolDecl = cs.getASTContext().getBoolDecl();
+      if (!boolDecl)
+        return true;
+
+      // Condition must convert to Bool.
+      cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                       boolDecl->getDeclaredType(),
+                       cs.getConstraintLocator(expr));
+      return false;
+    }
+  };
+
+  ConditionListener listener;
+  bool hadError = !typeCheckExpression(matchCall, DC, &listener);
   // Save the type-checked expression in the pattern.
   EP->setMatchExpr(matchCall);
   // Set the type on the pattern.
@@ -4040,10 +4040,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   }
 
   // Check for casts between specific concrete types that cannot succeed.
-  ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
-
-  if (auto toElementType = cs.isArrayType(toType)) {
-    if (auto fromElementType = cs.isArrayType(fromType)) {
+  if (auto toElementType = ConstraintSystem::isArrayType(toType)) {
+    if (auto fromElementType = ConstraintSystem::isArrayType(fromType)) {
       switch (typeCheckCheckedCast(*fromElementType, *toElementType,
                                    CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange())) {
@@ -4065,8 +4063,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  if (auto toKeyValue = cs.isDictionaryType(toType)) {
-    if (auto fromKeyValue = cs.isDictionaryType(fromType)) {
+  if (auto toKeyValue = ConstraintSystem::isDictionaryType(toType)) {
+    if (auto fromKeyValue = ConstraintSystem::isDictionaryType(fromType)) {
       bool hasCoercion = false;
       enum { NoBridging, BridgingCoercion }
         hasBridgingConversion = NoBridging;
@@ -4129,8 +4127,8 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     }
   }
 
-  if (auto toElementType = cs.isSetType(toType)) {
-    if (auto fromElementType = cs.isSetType(fromType)) {
+  if (auto toElementType = ConstraintSystem::isSetType(toType)) {
+    if (auto fromElementType = ConstraintSystem::isSetType(fromType)) {
       switch (typeCheckCheckedCast(*fromElementType, *toElementType,
                                    CheckedCastContextKind::None, dc,
                                    SourceLoc(), nullptr, SourceRange())) {
@@ -4253,9 +4251,9 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool toExistentialMetatype = false;
   bool fromExistentialMetatype = false;
   if (auto toMetatype = toType->getAs<AnyMetatypeType>()) {
-    toExistentialMetatype = toMetatype->is<ExistentialMetatypeType>();
     if (auto fromMetatype = fromType->getAs<AnyMetatypeType>()) {
-      fromExistentialMetatype = fromMetatype->is<ExistentialMetatypeType>();
+      toExistentialMetatype = toType->is<ExistentialMetatypeType>();
+      fromExistentialMetatype = fromType->is<ExistentialMetatypeType>();
       toType = toMetatype->getInstanceType();
       fromType = fromMetatype->getInstanceType();
     }
@@ -4265,23 +4263,43 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
   bool fromArchetype = fromType->is<ArchetypeType>();
   bool toExistential = toType->isExistentialType();
   bool fromExistential = fromType->isExistentialType();
+
+  bool toRequiresClass;
+  if (toType->isExistentialType())
+    toRequiresClass = toType->getExistentialLayout().requiresClass();
+  else
+    toRequiresClass = toType->mayHaveSuperclass();
+
+  bool fromRequiresClass;
+  if (fromType->isExistentialType())
+    fromRequiresClass = fromType->getExistentialLayout().requiresClass();
+  else
+    fromRequiresClass = fromType->mayHaveSuperclass();
   
-  // If we're doing a metatype cast, it can only be existential if we're
-  // casting to/from the existential metatype. 'T.self as P.Protocol'
-  // can only succeed if T is exactly the type P, so is a concrete cast,
-  // whereas 'T.self as P.Type' succeeds for types conforming to the protocol
-  // P, and is an existential cast.
+  // Casts between protocol metatypes only succeed if the type is existential.
   if (metatypeCast) {
-    toExistential &= toExistentialMetatype;
-    fromExistential &= fromExistentialMetatype;
+    if (toExistential || fromExistential)
+      return failed();
   }
+
+  // Casts from an existential metatype to a protocol metatype always fail,
+  // except when the existential type is 'Any'.
+  if (fromExistentialMetatype &&
+      !fromType->isAny() &&
+      !toExistentialMetatype &&
+      toExistential)
+    return failed();
 
   // Casts to or from generic types can't be statically constrained in most
   // cases, because there may be protocol conformances we don't statically
   // know about.
-  if (toExistential || fromExistential || fromArchetype || toArchetype) {
+  if (toExistential || fromExistential || fromArchetype || toArchetype ||
+      toRequiresClass || fromRequiresClass) {
     // Cast to and from AnyObject always succeed.
-    if (toType->isAnyObject() || fromType->isAnyObject())
+    if (!metatypeCast &&
+        !fromExistentialMetatype &&
+        !toExistentialMetatype &&
+        (toType->isAnyObject() || fromType->isAnyObject()))
       return CheckedCastKind::ValueCast;
 
     // A cast from an existential type to a concrete type does not succeed. For
@@ -4297,9 +4315,13 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
     //     print("Caught bar error")
     //   }
     // }
-    if (fromExistential) {
+    //
+    // Note: we relax the restriction if the type we're casting to is a
+    // non-final class because it's possible that we might have a subclass
+    // that conforms to the protocol.
+    if (fromExistential && !toExistential) {
       if (auto NTD = toType->getAnyNominal()) {
-        if (!isa<ProtocolDecl>(NTD)) {
+        if (!toType->is<ClassType>() || NTD->isFinal()) {
           auto protocolDecl =
               dyn_cast_or_null<ProtocolDecl>(fromType->getAnyNominal());
           if (protocolDecl &&
@@ -4310,18 +4332,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         }
       }
     }
-
-    bool toRequiresClass;
-    if (toType->isExistentialType())
-      toRequiresClass = toType->getExistentialLayout().requiresClass();
-    else
-      toRequiresClass = toType->mayHaveSuperclass();
-
-    bool fromRequiresClass;
-    if (fromType->isExistentialType())
-      fromRequiresClass = fromType->getExistentialLayout().requiresClass();
-    else
-      fromRequiresClass = fromType->mayHaveSuperclass();
 
     // If neither type is class-constrained, anything goes.
     if (!fromRequiresClass && !toRequiresClass)
@@ -4368,44 +4378,29 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
         return CheckedCastKind::ValueCast;
 
       // Compare superclass bounds.
-      if (typesSatisfyConstraint(toSuperclass, fromSuperclass,
-                                 /*openArchetypes=*/true,
-                                 ConstraintKind::Subtype, dc))
+      if (fromSuperclass->isBindableToSuperclassOf(toSuperclass))
         return CheckedCastKind::ValueCast;
 
       // An upcast is also OK.
-      if (typesSatisfyConstraint(fromSuperclass, toSuperclass,
-                                 /*openArchetypes=*/true,
-                                 ConstraintKind::Subtype, dc))
+      if (toSuperclass->isBindableToSuperclassOf(fromSuperclass))
         return CheckedCastKind::ValueCast;
     }
   }
 
-  if (cs.isAnyHashableType(toType) || cs.isAnyHashableType(fromType)) {
+  if (ConstraintSystem::isAnyHashableType(toType) ||
+      ConstraintSystem::isAnyHashableType(fromType)) {
     return CheckedCastKind::ValueCast;
   }
 
   // If the destination type can be a supertype of the source type, we are
   // performing what looks like an upcast except it rebinds generic
   // parameters.
-  if (!metatypeCast &&
-      typesSatisfyConstraint(fromType, toType,
-                             /*openArchetypes=*/true,
-                             ConstraintKind::Subtype, dc)) {
+  if (fromType->isBindableTo(toType))
     return CheckedCastKind::ValueCast;
-  }
-
-  // If the destination type can be a subtype of the source type, we have
-  // a downcast.
-  if (typesSatisfyConstraint(toType, fromType,
-                             /*openArchetypes=*/true,
-                             ConstraintKind::Subtype, dc)) {
-    return CheckedCastKind::ValueCast;
-  }
   
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
   // so casts from NSObject to potentially-class metatypes may succeed.
-  if (auto nsObject = cs.TC.getNSObjectType(dc)) {
+  if (auto nsObject = getNSObjectType(dc)) {
     if (fromType->isEqual(nsObject)) {
       if (auto toMeta = toType->getAs<MetatypeType>()) {
         if (toMeta->getInstanceType()->mayHaveSuperclass()
@@ -4426,11 +4421,6 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
                              ConformanceCheckFlags::InExpression)) {
         auto nsError = Context.getNSErrorDecl();
         if (nsError) {
-          if (!nsError->hasInterfaceType()) {
-            auto resolver = Context.getLazyResolver();
-            assert(resolver);
-            resolver->resolveDeclSignature(nsError);
-          }
           Type NSErrorTy = nsError->getDeclaredInterfaceType();
           if (isSubtypeOf(fromType, NSErrorTy, dc)
               // Don't mask "always true" warnings if NSError is cast to

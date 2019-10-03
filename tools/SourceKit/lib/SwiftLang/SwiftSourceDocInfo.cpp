@@ -57,11 +57,13 @@ public:
     :XMLEscapingPrinter(OS) { }
 
 private:
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     printXML("<Type usr=\"");
     SwiftLangSupport::printUSR(TD, OS);
     printXML("\">");
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
     printXML("</Type>");
   }
 };
@@ -272,11 +274,13 @@ private:
       closeTag(tag);
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     auto tag = getTagForDecl(TD, /*isRef=*/true);
     openTagWithUSRForDecl(tag, TD);
     insideRef = true;
-    XMLEscapingPrinter::printTypeRef(T, TD, name);
+    XMLEscapingPrinter::printTypeRef(T, TD, name, NameContext);
     insideRef = false;
     closeTag(tag);
   }
@@ -453,7 +457,7 @@ void SwiftLangSupport::printFullyAnnotatedDeclaration(const ValueDecl *VD,
 }
 
 void SwiftLangSupport::printFullyAnnotatedGenericReq(
-    const swift::GenericSignature *Sig, llvm::raw_ostream &OS) {
+    const swift::GenericSignature Sig, llvm::raw_ostream &OS) {
   assert(Sig);
   FullyAnnotatedDeclarationPrinter Printer(OS);
   PrintOptions PO = PrintOptions::printQuickHelpDeclaration();
@@ -493,9 +497,7 @@ void walkRelatedDecls(const ValueDecl *VD, const FnTy &Fn) {
   // if VD is an initializer, we should extract other initializers etc.
   // For now we use UnqualifiedLookup to fetch other declarations with the same
   // base name.
-  auto TypeResolver = VD->getASTContext().getLazyResolver();
-  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext(),
-                           TypeResolver);
+  UnqualifiedLookup Lookup(VD->getBaseName(), VD->getDeclContext());
   for (auto result : Lookup.Results) {
     ValueDecl *RelatedVD = result.getValueDecl();
     if (RelatedVD->getAttrs().isUnavailable(VD->getASTContext()))
@@ -776,11 +778,11 @@ static bool passCursorInfoForDecl(SourceFile* SF,
   unsigned USREnd = SS.size();
 
   unsigned TypenameBegin = SS.size();
-  if (VD->hasInterfaceType()) {
+  if (auto vdType = VD->getInterfaceType()) {
     llvm::raw_svector_ostream OS(SS);
     PrintOptions Options;
     Options.PrintTypeAliasUnderlyingType = true;
-    VD->getInterfaceType().print(OS, Options);
+    vdType.print(OS, Options);
   }
   unsigned TypenameEnd = SS.size();
 

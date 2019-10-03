@@ -75,6 +75,7 @@ import ErrorHandling
 import Exclusivity
 import ExistentialPerformance
 import Fibonacci
+import FindStringNaive
 import FlattenList
 import FloatingPointParsing
 import FloatingPointPrinting
@@ -124,6 +125,7 @@ import PopFrontGeneric
 import Prefix
 import PrefixWhile
 import Prims
+import PrimsNonStrongRef
 import PrimsSplit
 import ProtocolDispatch
 import ProtocolDispatch2
@@ -146,6 +148,7 @@ import SequenceAlgos
 import SetTests
 import SevenBoom
 import Sim2DArray
+import SortArrayInClass
 import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
@@ -252,6 +255,7 @@ registerBenchmark(ErrorHandling)
 registerBenchmark(Exclusivity)
 registerBenchmark(ExistentialPerformance)
 registerBenchmark(Fibonacci)
+registerBenchmark(FindStringNaive)
 registerBenchmark(FlattenListLoop)
 registerBenchmark(FlattenListFlatMap)
 registerBenchmark(FloatingPointParsing)
@@ -302,6 +306,7 @@ registerBenchmark(PopFrontArrayGeneric)
 registerBenchmark(Prefix)
 registerBenchmark(PrefixWhile)
 registerBenchmark(Prims)
+registerBenchmark(PrimsNonStrongRef)
 registerBenchmark(PrimsSplit)
 registerBenchmark(ProtocolDispatch)
 registerBenchmark(ProtocolDispatch2)
@@ -325,6 +330,7 @@ registerBenchmark(SequenceAlgos)
 registerBenchmark(SetTests)
 registerBenchmark(SevenBoom)
 registerBenchmark(Sim2DArray)
+registerBenchmark(SortArrayInClass)
 registerBenchmark(SortIntPyramids)
 registerBenchmark(SortLargeExistentials)
 registerBenchmark(SortLettersInPlace)

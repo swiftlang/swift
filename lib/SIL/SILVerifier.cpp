@@ -500,7 +500,27 @@ struct ImmutableAddressUseVerifier {
       if (inst->isTypeDependentOperand(*use))
         continue;
 
+      // TODO: Can this switch be restructured so break -> error, continue ->
+      // next iteration, return -> return the final result.
       switch (inst->getKind()) {
+      case SILInstructionKind::BuiltinInst: {
+        // If we are processing a polymorphic builtin that takes an address,
+        // skip the builtin. This is because the builtin must be specialized to
+        // a non-memory reading builtin that works on trivial object values
+        // before the diagnostic passes end (or be DCEed) or we emit a
+        // diagnostic.
+        if (auto builtinKind = cast<BuiltinInst>(inst)->getBuiltinKind()) {
+          if (isPolymorphicBuiltin(*builtinKind)) {
+            break;
+          }
+        }
+
+        // Otherwise this is a builtin that we are not expecting to see, so bail
+        // and assert.
+        llvm::errs() << "Unhandled, unexpected builtin instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
+        break;
+      }
       case SILInstructionKind::MarkDependenceInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DebugValueAddrInst:
@@ -1630,8 +1650,10 @@ public:
 
   void checkBuiltinInst(BuiltinInst *BI) {
     // Check for special constraints on llvm intrinsics.
-    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)
+    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic) {
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
+      return;
+    }
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
@@ -2083,40 +2105,41 @@ public:
             "Operand of " #name "_to_ref does not have the " \
             "operand's type as its referent type"); \
   }
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure) \
-  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) { \
-    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
-                                "Operand of strong_retain_" #name); \
-    closure(); \
-    (void)ty; \
-    require(!F.hasOwnership(), "strong_retain_" #name " is only in " \
-                                        "functions with unqualified " \
-                                        "ownership"); \
-  } \
-  void check##Name##RetainInst(Name##RetainInst *RI) { \
-    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
-                                "Operand of " #name "_retain"); \
-    closure(); \
-    (void)ty; \
-    require(!F.hasOwnership(), \
-            #name "_retain is only in functions with unqualified ownership"); \
-  } \
-  void check##Name##ReleaseInst(Name##ReleaseInst *RI) { \
-    auto ty = requireObjectType(Name##StorageType, RI->getOperand(), \
-                                "Operand of " #name "_release"); \
-    closure(); \
-    (void)ty; \
-    require(!F.hasOwnership(), \
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, closure)        \
+  void checkStrongRetain##Name##Inst(StrongRetain##Name##Inst *RI) {           \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(),           \
+                                "Operand of strong_retain_" #name);            \
+    closure();                                                                 \
+    (void)ty;                                                                  \
+    require(!F.hasOwnership(), "strong_retain_" #name " is only in "           \
+                               "functions with unqualified "                   \
+                               "ownership");                                   \
+  }                                                                            \
+  void check##Name##RetainInst(Name##RetainInst *RI) {                         \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(),           \
+                                "Operand of " #name "_retain");                \
+    closure();                                                                 \
+    (void)ty;                                                                  \
+    require(!F.hasOwnership(),                                                 \
+            #name "_retain is only in functions with unqualified ownership");  \
+  }                                                                            \
+  void check##Name##ReleaseInst(Name##ReleaseInst *RI) {                       \
+    auto ty = requireObjectType(Name##StorageType, RI->getOperand(),           \
+                                "Operand of " #name "_release");               \
+    closure();                                                                 \
+    (void)ty;                                                                  \
+    require(!F.hasOwnership(),                                                 \
             #name "_release is only in functions with unqualified ownership"); \
-  } \
-  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) { \
-    auto ty = requireObjectType(Name##StorageType, I->getOperand(), \
-                                "Operand of " #name "_retain"); \
-    closure(); \
-    (void)ty; \
+  }                                                                            \
+  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+    auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
+                                "Operand of " #name "_retain");                \
+    closure();                                                                 \
+    (void)ty;                                                                  \
     /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
-    /* pipeline even though it is a higher level instruction. */ \
+    /* pipeline even though it is a higher level instruction. */               \
   }
+
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   LOADABLE_REF_STORAGE_HELPER(Name, name) \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, []{})
@@ -2127,8 +2150,16 @@ public:
     require(ty->isLoadable(ResilienceExpansion::Maximal), \
             "'" #name "' type must be loadable"); \
   })
-#define UNCHECKED_REF_STORAGE(Name, name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name, name)
+#define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
+  LOADABLE_REF_STORAGE_HELPER(Name, name)                                      \
+  void checkCopy##Name##ValueInst(Copy##Name##ValueInst *I) {                  \
+    auto ty = requireObjectType(Name##StorageType, I->getOperand(),            \
+                                "Operand of " #name "_retain");                \
+    (void)ty;                                                                  \
+    /* *NOTE* We allow copy_##name##_value to be used throughout the entire */ \
+    /* pipeline even though it is a higher level instruction. */               \
+  }
+
 #include "swift/AST/ReferenceStorage.def"
 #undef LOADABLE_REF_STORAGE_HELPER
 #undef ALWAYS_LOADABLE_CHECKED_REF_STORAGE_HELPER
@@ -2286,8 +2317,8 @@ public:
             "project_box operand should be a value");
     auto boxTy = I->getOperand()->getType().getAs<SILBoxType>();
     require(boxTy, "project_box operand should be a @box type");
-    require(I->getType() == boxTy->getFieldType(F.getModule(),
-                                                I->getFieldIndex()),
+    require(I->getType() == getSILBoxFieldType(boxTy, F.getModule().Types,
+                                               I->getFieldIndex()),
             "project_box result should be address of boxed type");
 
     // If we have a mark_uninitialized as a user, the mark_uninitialized must be
@@ -2307,7 +2338,7 @@ public:
     require(operandType.isObject(),
             "project_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Boxed),
             "project_existential_box operand must be boxed existential");
 
@@ -2572,7 +2603,8 @@ public:
             "result of alloc_box must be an object");
     for (unsigned field : indices(AI->getBoxType()->getLayout()->getFields())) {
       verifyOpenedArchetype(AI,
-                   AI->getBoxType()->getFieldLoweredType(F.getModule(), field));
+        getSILBoxFieldLoweredType(AI->getBoxType(), F.getModule().Types,
+                                  field));
     }
 
     // An alloc_box with a mark_uninitialized user can not have any other users.
@@ -3047,7 +3079,7 @@ public:
     SILType operandType = OEI->getOperand()->getType();
     require(operandType.isAddress(),
             "open_existential_addr must be applied to address");
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                         ExistentialRepresentation::Opaque),
            "open_existential_addr must be applied to opaque existential");
 
@@ -3078,7 +3110,7 @@ public:
     require(operandType.isObject(),
             "open_existential_ref operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Class),
             "open_existential_ref operand must be class existential");
 
@@ -3100,7 +3132,7 @@ public:
     require(operandType.isObject(),
             "open_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
@@ -3122,7 +3154,7 @@ public:
     require(operandType.isObject(),
             "open_existential_box operand must not be address");
 
-    require(operandType.canUseExistentialRepresentation(F.getModule(),
+    require(operandType.canUseExistentialRepresentation(
                                               ExistentialRepresentation::Boxed),
             "open_existential_box operand must be boxed existential");
 
@@ -3190,7 +3222,7 @@ public:
     require(!operandType.isAddress(),
             "open_existential_value must not be applied to address");
     require(operandType.canUseExistentialRepresentation(
-                F.getModule(), ExistentialRepresentation::Opaque),
+                ExistentialRepresentation::Opaque),
             "open_existential_value must be applied to opaque existential");
 
     require(!OEI->getType().isAddress(),
@@ -3208,7 +3240,7 @@ public:
     SILType exType = AEBI->getExistentialType();
     require(exType.isObject(),
             "alloc_existential_box #0 result should be a value");
-    require(exType.canUseExistentialRepresentation(F.getModule(),
+    require(exType.canUseExistentialRepresentation(
                                              ExistentialRepresentation::Boxed,
                                              AEBI->getFormalConcreteType()),
             "alloc_existential_box must be used with a boxed existential "
@@ -3224,7 +3256,7 @@ public:
     SILType exType = AEI->getOperand()->getType();
     require(exType.isAddress(),
             "init_existential_addr must be applied to an address");
-    require(exType.canUseExistentialRepresentation(F.getModule(),
+    require(exType.canUseExistentialRepresentation(
                                        ExistentialRepresentation::Opaque,
                                        AEI->getFormalConcreteType()),
             "init_existential_addr must be used with an opaque "
@@ -3283,7 +3315,7 @@ public:
     SILType concreteType = IEI->getOperand()->getType();
     require(concreteType.getASTType()->isBridgeableObjectType(),
             "init_existential_ref operand must be a class instance");
-    require(IEI->getType().canUseExistentialRepresentation(F.getModule(),
+    require(IEI->getType().canUseExistentialRepresentation(
                                      ExistentialRepresentation::Class,
                                      IEI->getFormalConcreteType()),
             "init_existential_ref must be used with a class existential type");
@@ -3315,7 +3347,7 @@ public:
     require(exType.isAddress(),
             "deinit_existential_addr must be applied to an address");
     require(exType.canUseExistentialRepresentation(
-                F.getModule(), ExistentialRepresentation::Opaque),
+                ExistentialRepresentation::Opaque),
             "deinit_existential_addr must be applied to an opaque existential");
   }
 
@@ -3325,7 +3357,7 @@ public:
             "deinit_existential_value must not be applied to an address");
     require(
         exType.canUseExistentialRepresentation(
-            F.getModule(), ExistentialRepresentation::Opaque),
+            ExistentialRepresentation::Opaque),
         "deinit_existential_value must be applied to an opaque existential");
   }
   
@@ -3333,7 +3365,7 @@ public:
     SILType exType = DEBI->getOperand()->getType();
     require(exType.isObject(),
             "dealloc_existential_box must be applied to a value");
-    require(exType.canUseExistentialRepresentation(F.getModule(),
+    require(exType.canUseExistentialRepresentation(
                                        ExistentialRepresentation::Boxed),
             "dealloc_existential_box must be applied to a boxed "
             "existential");

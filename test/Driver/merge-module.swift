@@ -93,7 +93,6 @@
 // MERGE_1: -o [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend -merge-modules -emit-module [[PARTIAL_MODULE_A]].swiftmodule{{"?}} [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: -parse-as-library
-// MERGE_1: -emit-module-doc-path /tmp/modules.swiftdoc
+// MERGE_1: -emit-module-doc-path {{"?}}/tmp{{(/|\\\\)}}modules.swiftdoc{{"?}}
 // MERGE_1: -module-name merge
 // MERGE_1: -o /tmp/modules
-

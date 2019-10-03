@@ -14,7 +14,7 @@
 #include "swift/SILOptimizer/Analysis/TypeExpansionAnalysis.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;

@@ -115,6 +115,7 @@ void IRGenModule::setTrueConstGlobal(llvm::GlobalVariable *var) {
   case llvm::Triple::ELF:
     var->setSection(".rodata");
     break;
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     var->setSection(".rdata");
     break;
@@ -288,7 +289,7 @@ namespace {
     void addFlags() {
       B.addInt32(
         ContextDescriptorFlags(asImpl().getContextKind(),
-                               asImpl().getGenericSignature() != nullptr,
+                               !asImpl().getGenericSignature().isNull(),
                                asImpl().isUniqueDescriptor(),
                                asImpl().getVersion(),
                                asImpl().getKindSpecificFlags())
@@ -324,7 +325,7 @@ namespace {
     }
     
     void addGenericParameters() {
-      GenericSignature *sig = asImpl().getGenericSignature();
+      GenericSignature sig = asImpl().getGenericSignature();
       assert(sig);
       auto canSig = sig->getCanonicalSignature();
 
@@ -398,7 +399,7 @@ namespace {
     // bool isUniqueDescriptor();
     // llvm::Constant *getParent();
     // ContextDescriptorKind getContextKind();
-    // GenericSignature *getGenericSignature();
+    // GenericSignature getGenericSignature();
     // void emit();
   };
   
@@ -435,7 +436,7 @@ namespace {
       return ContextDescriptorKind::Module;
     }
     
-    GenericSignature *getGenericSignature() {
+    GenericSignature getGenericSignature() {
       return nullptr;
     }
         
@@ -493,7 +494,7 @@ namespace {
       return ContextDescriptorKind::Extension;
     }
     
-    GenericSignature *getGenericSignature() {
+    GenericSignature getGenericSignature() {
       return E->getGenericSignature();
     }
       
@@ -548,7 +549,7 @@ namespace {
       return ContextDescriptorKind::Anonymous;
     }
     
-    GenericSignature *getGenericSignature() {
+    GenericSignature getGenericSignature() {
       return getInnermostDeclContext()->getGenericSignatureOfContext();
     }
     
@@ -620,7 +621,7 @@ namespace {
       return ContextDescriptorKind::Protocol;
     }
 
-    GenericSignature *getGenericSignature() {
+    GenericSignature getGenericSignature() {
       return nullptr;
     }
 
@@ -1074,7 +1075,7 @@ namespace {
                Type, /*fromAnonymousContext=*/false);
     }
     
-    GenericSignature *getGenericSignature() {
+    GenericSignature getGenericSignature() {
       return Type->getGenericSignature();
     }
     
@@ -1593,7 +1594,7 @@ namespace {
 
       // TargetRelativeDirectPointer<Runtime, const char> SuperclassType;
       if (auto superclassType = getType()->getSuperclass()) {
-        GenericSignature *genericSig = getType()->getGenericSignature();
+        GenericSignature genericSig = getType()->getGenericSignature();
         B.addRelativeAddress(IGM.getTypeRef(superclassType->getCanonicalType(),
                                             genericSig,
                                             MangledTypeRefRole::Metadata)
@@ -1683,11 +1684,16 @@ namespace {
     }
     
     void addUnderlyingTypeAndConformances() {
+      auto sig = O->getOpaqueInterfaceGenericSignature();
       auto underlyingType = Type(O->getUnderlyingInterfaceType())
         .subst(*O->getUnderlyingTypeSubstitutions())
-        ->getCanonicalType(O->getOpaqueInterfaceGenericSignature());
+        ->getCanonicalType(sig);
+      
+      auto contextSig = O->getGenericSignature()
+        ? O->getGenericSignature()->getCanonicalSignature()
+        : CanGenericSignature();
 
-      B.addRelativeAddress(IGM.getTypeRef(underlyingType,
+      B.addRelativeAddress(IGM.getTypeRef(underlyingType, contextSig,
                                           MangledTypeRefRole::Metadata).first);
       
       auto opaqueType = O->getDeclaredInterfaceType()
@@ -1701,7 +1707,7 @@ namespace {
         
         auto witnessTableRef = IGM.emitWitnessTableRefString(
                                           underlyingType, underlyingConformance,
-                                          O->getGenericSignature(),
+                                          contextSig,
                                           /*setLowBit*/ false);
         B.addRelativeAddress(witnessTableRef);
       }
@@ -1726,7 +1732,7 @@ namespace {
       llvm_unreachable("covered switch");
     }
     
-    GenericSignature *getGenericSignature() {
+    GenericSignature getGenericSignature() {
       return O->getOpaqueInterfaceGenericSignature();
     }
     
@@ -2609,7 +2615,7 @@ namespace {
       case ClassMetadataStrategy::Fixed: {
         // FIXME: Should this check HasImported instead?
         auto type = (Target->checkAncestry(AncestryFlags::ObjC)
-                    ? IGM.Context.TheUnknownObjectType
+                    ? IGM.Context.getAnyObjectType()
                     : IGM.Context.TheNativeObjectType);
         auto wtable = IGM.getAddrOfValueWitnessTable(type);
         B.add(wtable);
@@ -4006,7 +4012,7 @@ namespace {
       // Without Objective-C interop, foreign classes must still use
       // Swift native reference counting.
       auto type = (IGM.ObjCInterop
-                   ? IGM.Context.TheUnknownObjectType
+                   ? IGM.Context.getAnyObjectType()
                    : IGM.Context.TheNativeObjectType);
       auto wtable = IGM.getAddrOfValueWitnessTable(type);
       B.add(wtable);
@@ -4263,7 +4269,7 @@ void IRGenModule::emitProtocolDecl(ProtocolDecl *protocol) {
 /// Add a generic requirement to the given constant struct builder.
 static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
                                   GenericRequirementsMetadata &metadata,
-                                  GenericSignature *sig,
+                                  GenericSignature sig,
                                   GenericRequirementFlags flags,
                                   Type paramType,
                                   llvm::function_ref<void ()> addReference) {
@@ -4281,7 +4287,7 @@ static void addGenericRequirement(IRGenModule &IGM, ConstantStructBuilder &B,
 
 GenericRequirementsMetadata irgen::addGenericRequirements(
                                    IRGenModule &IGM, ConstantStructBuilder &B,
-                                   GenericSignature *sig,
+                                   GenericSignature sig,
                                    ArrayRef<Requirement> requirements) {
   assert(sig);
   GenericRequirementsMetadata metadata;

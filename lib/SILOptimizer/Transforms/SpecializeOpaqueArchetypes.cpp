@@ -18,10 +18,10 @@
 
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -254,6 +254,21 @@ protected:
         Inst, getBuilder().createCopyAddr(getOpLocation(Inst->getLoc()), src,
                                           dst, Inst->isTakeOfSrc(),
                                           Inst->isInitializationOfDest()));
+  }
+
+  SILValue remapResultType(SILLocation loc, SILValue val) {
+    auto specializedTy = remapType(val->getType());
+    if (val->getType() == specializedTy)
+      return val;
+    return createCast(loc, val, specializedTy);
+  }
+
+  void visitThinToThickFunctionInst(ThinToThickFunctionInst *Inst) {
+    getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+    auto loc = getOpLocation(Inst->getLoc());
+    auto opd = remapResultType(loc, getOpValue(Inst->getOperand()));
+    recordClonedInstruction(Inst, getBuilder().createThinToThickFunction(
+                                      loc, opd, getOpType(Inst->getType())));
   }
 
   void visitStoreInst(StoreInst *Inst) {

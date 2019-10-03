@@ -761,13 +761,14 @@ public:
 
   /// Unconditionally emit a stack shadow copy of an \c llvm::Value.
   llvm::Value *emitShadowCopy(llvm::Value *Storage, const SILDebugScope *Scope,
-                              StringRef Name, unsigned ArgNo, Alignment Align) {
+                              SILDebugVariable VarInfo, Alignment Align) {
     if (Align.isZero())
       Align = IGM.getPointerAlignment();
 
-    auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, Name}}];
+    unsigned ArgNo = VarInfo.ArgNo;
+    auto &Alloca = ShadowStackSlots[{ArgNo, {Scope, VarInfo.Name}}];
     if (!Alloca.isValid())
-      Alloca = createAlloca(Storage->getType(), Align, Name+".debug");
+      Alloca = createAlloca(Storage->getType(), Align, VarInfo.Name + ".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress()));
 
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
@@ -781,7 +782,7 @@ public:
   /// shadow copies, we lose the precise lifetime.
   llvm::Value *emitShadowCopyIfNeeded(llvm::Value *Storage,
                                       const SILDebugScope *Scope,
-                                      StringRef Name, unsigned ArgNo,
+                                      SILDebugVariable VarInfo,
                                       bool IsAnonymous,
                                       Alignment Align = Alignment(0)) {
     // Never emit shadow copies when optimizing, or if already on the stack.
@@ -792,7 +793,7 @@ public:
       return Storage;
 
     // Always emit shadow copies for function arguments.
-    if (ArgNo == 0)
+    if (VarInfo.ArgNo == 0)
       // Otherwise only if debug value range extension is not feasible.
       if (!needsShadowCopy(Storage)) {
         // Mark for debug value range extension unless this is a constant, or
@@ -809,22 +810,22 @@ public:
 
         return Storage;
       }
-    return emitShadowCopy(Storage, Scope, Name, ArgNo, Align);
+    return emitShadowCopy(Storage, Scope, VarInfo, Align);
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an \c Address instead of an
   /// \c llvm::Value.
   llvm::Value *emitShadowCopyIfNeeded(Address Storage,
                                       const SILDebugScope *Scope,
-                                      StringRef Name, unsigned ArgNo,
+                                      SILDebugVariable VarInfo,
                                       bool IsAnonymous) {
-    return emitShadowCopyIfNeeded(Storage.getAddress(), Scope, Name, ArgNo,
+    return emitShadowCopyIfNeeded(Storage.getAddress(), Scope, VarInfo,
                                   IsAnonymous, Storage.getAlignment());
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an exploded value.
   void emitShadowCopyIfNeeded(SILValue &SILVal, const SILDebugScope *Scope,
-                              StringRef Name, unsigned ArgNo, bool IsAnonymous,
+                              SILDebugVariable VarInfo, bool IsAnonymous,
                               llvm::SmallVectorImpl<llvm::Value *> &copy) {
     Explosion e = getLoweredExplosion(SILVal);
 
@@ -840,13 +841,13 @@ public:
       auto vals = e.claimAll();
       for (auto val : vals)
         copy.push_back(
-            emitShadowCopyIfNeeded(val, Scope, Name, ArgNo, IsAnonymous));
+            emitShadowCopyIfNeeded(val, Scope, VarInfo, IsAnonymous));
       return;
     }
 
     SILType Type = SILVal->getType();
     auto &LTI = cast<LoadableTypeInfo>(IGM.getTypeInfo(Type));
-    auto Alloca = LTI.allocateStack(*this, Type, Name+".debug");
+    auto Alloca = LTI.allocateStack(*this, Type, VarInfo.Name + ".debug");
     zeroInit(cast<llvm::AllocaInst>(Alloca.getAddress().getAddress()));
     ArtificialLocation AutoRestore(Scope, IGM.DebugInfo.get(), Builder);
     LTI.initialize(*this, e, Alloca.getAddress(), false /* isOutlined */);
@@ -867,22 +868,18 @@ public:
   
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
-  void emitDebugVariableDeclaration(StorageType Storage,
-                                    DebugTypeInfo Ty,
-                                    SILType SILTy,
-                                    const SILDebugScope *DS,
-                                    VarDecl *VarDecl,
-                                    StringRef Name,
-                                    unsigned ArgNo = 0,
+  void emitDebugVariableDeclaration(StorageType Storage, DebugTypeInfo Ty,
+                                    SILType SILTy, const SILDebugScope *DS,
+                                    VarDecl *VarDecl, SILDebugVariable VarInfo,
                                     IndirectionKind Indirection = DirectValue) {
     assert(IGM.DebugInfo && "debug info not enabled");
-    if (ArgNo) {
+    if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
-                                             Name, ArgNo, Indirection);
+                                             VarInfo, Indirection);
     } else
       IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, Ty, DS, VarDecl,
-                                             Name, 0, Indirection);
+                                             VarInfo, Indirection);
   }
 
   void emitFailBB() {
@@ -1123,19 +1120,18 @@ public:
   
   void visitKeyPathInst(KeyPathInst *I);
 
-
-#define LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitRefTo##Name##Inst(RefTo##Name##Inst *i); \
-  void visit##Name##ToRefInst(Name##ToRefInst *i);
+#define LOADABLE_REF_STORAGE_HELPER(Name)                                      \
+  void visitRefTo##Name##Inst(RefTo##Name##Inst *i);                           \
+  void visit##Name##ToRefInst(Name##ToRefInst *i);                             \
+  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   void visitLoad##Name##Inst(Load##Name##Inst *i); \
   void visitStore##Name##Inst(Store##Name##Inst *i);
-#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-  LOADABLE_REF_STORAGE_HELPER(Name) \
-  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i); \
-  void visit##Name##RetainInst(Name##RetainInst *i); \
-  void visit##Name##ReleaseInst(Name##ReleaseInst *i); \
-  void visitCopy##Name##ValueInst(Copy##Name##ValueInst *i);
+#define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
+  LOADABLE_REF_STORAGE_HELPER(Name)                                            \
+  void visitStrongRetain##Name##Inst(StrongRetain##Name##Inst *i);             \
+  void visit##Name##RetainInst(Name##RetainInst *i);                           \
+  void visit##Name##ReleaseInst(Name##ReleaseInst *i);
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
@@ -1643,9 +1639,6 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
-  if (CurSILFn->isThunk())
-    IGM.setHasFramePointer(CurFn, false);
-  
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 
@@ -2037,7 +2030,7 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   SILValue op = i->getOperand();
   SILType opType = op->getType();
 
-  switch (opType.getPreferredExistentialRepresentation(IGM.getSILModule())) {
+  switch (opType.getPreferredExistentialRepresentation()) {
   case ExistentialRepresentation::Metatype: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfMetatype(*this, existential, opType, result);
@@ -3650,17 +3643,16 @@ void IRGenSILFunction::emitErrorResultVar(SILResultInfo ErrorInfo,
   auto ErrorResultSlot = getErrorResultSlot(IGM.silConv.getSILType(ErrorInfo));
   auto Var = DbgValue->getVarInfo();
   assert(Var && "error result without debug info");
-  auto Storage =
-      emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(), getDebugScope(),
-                             Var->Name, Var->ArgNo, false);
+  auto Storage = emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(),
+                                        getDebugScope(), *Var, false);
   if (!IGM.DebugInfo)
     return;
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getType(), ErrorResultSlot->getType(), IGM.getPointerSize(),
       IGM.getPointerAlignment());
-  IGM.DebugInfo->emitVariableDeclaration(
-      Builder, Storage, DbgTy, getDebugScope(), nullptr, Var->Name, Var->ArgNo,
-      IndirectValue, ArtificialValue);
+  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
+                                         getDebugScope(), nullptr, *Var,
+                                         IndirectValue, ArtificialValue);
 }
 
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
@@ -3681,7 +3673,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   }
 
   bool IsAnonymous = false;
-  StringRef Name = getVarName(i, IsAnonymous);
+  VarInfo->Name = getVarName(i, IsAnonymous);
   DebugTypeInfo DbgTy;
   SILType SILTy = SILVal->getType();
   auto RealTy = SILVal->getType().getASTType();
@@ -3689,7 +3681,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     DbgTy = DebugTypeInfo::getLocalVariable(
         Decl, RealTy, getTypeInfo(SILVal->getType()));
   } else if (i->getFunction()->isBare() &&
-             !SILTy.hasArchetype() && !Name.empty()) {
+             !SILTy.hasArchetype() && !VarInfo->Name.empty()) {
     // Preliminary support for .sil debug information.
     DbgTy = DebugTypeInfo::getFromTypeInfo(RealTy, getTypeInfo(SILTy));
   } else
@@ -3697,14 +3689,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   // Put the value into a stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
-  emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), Name, VarInfo->ArgNo,
-                         IsAnonymous, Copy);
+  emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
+                         Copy);
   bindArchetypes(DbgTy.getType());
   if (!IGM.DebugInfo)
     return;
 
   emitDebugVariableDeclaration(Copy, DbgTy, SILTy, i->getDebugScope(),
-                               i->getDecl(), Name, VarInfo->ArgNo);
+                               i->getDecl(), *VarInfo);
 }
 
 void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -3723,7 +3715,7 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   assert(VarInfo && "debug_value_addr without debug info");
   bool IsAnonymous = false;
   bool IsLoadablyByAddress = isa<AllocStackInst>(SILVal);
-  StringRef Name = getVarName(i, IsAnonymous);
+  VarInfo->Name = getVarName(i, IsAnonymous);
   auto Addr = getLoweredAddress(SILVal).getAddress();
   SILType SILTy = SILVal->getType();
   auto RealType = SILTy.getASTType();
@@ -3737,9 +3729,8 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   // Put the value's address into a stack slot at -Onone and emit a debug
   // intrinsic.
   emitDebugVariableDeclaration(
-      emitShadowCopyIfNeeded(Addr, i->getDebugScope(), Name, VarInfo->ArgNo,
-                             IsAnonymous),
-      DbgTy, SILType(), i->getDebugScope(), Decl, Name, VarInfo->ArgNo,
+      emitShadowCopyIfNeeded(Addr, i->getDebugScope(), *VarInfo, IsAnonymous),
+      DbgTy, SILType(), i->getDebugScope(), Decl, *VarInfo,
       (IsLoadablyByAddress) ? DirectValue : IndirectValue);
 }
 
@@ -3878,6 +3869,31 @@ static const ReferenceTypeInfo &getReferentTypeInfo(IRGenFunction &IGF,
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, name, ...) \
   NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...") \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, name, "...")
+#define UNCHECKED_REF_STORAGE(Name, name, ...)                                 \
+  void IRGenSILFunction::visitCopy##Name##ValueInst(                           \
+      swift::Copy##Name##ValueInst *i) {                                       \
+    Explosion in = getLoweredExplosion(i->getOperand());                       \
+    auto silTy = i->getOperand()->getType();                                   \
+    auto ty = cast<Name##StorageType>(silTy.getASTType());                     \
+    auto isOptional = bool(ty.getReferentType()->getOptionalObjectType());     \
+    auto &ti = getReferentTypeInfo(*this, silTy);                              \
+    /* Since we are unchecked, we just use strong retain here. We do not       \
+     * perform any checks */                                                   \
+    ti.strongRetain(*this, in, irgen::Atomicity::Atomic);                      \
+    /* Semantically we are just passing through the input parameter but as a   \
+     */                                                                        \
+    /* strong reference... at LLVM IR level these type differences don't */    \
+    /* matter. So just set the lowered explosion appropriately. */             \
+    Explosion output = getLoweredExplosion(i->getOperand());                   \
+    if (isOptional) {                                                          \
+      auto values = output.claimAll();                                         \
+      output.reset();                                                          \
+      for (auto value : values) {                                              \
+        output.add(Builder.CreatePtrToInt(value, IGM.IntPtrTy));               \
+      }                                                                        \
+    }                                                                          \
+    setLoweredExplosion(i, output);                                            \
+  }
 #include "swift/AST/ReferenceStorage.def"
 #undef COMMON_CHECKED_REF_STORAGE
 
@@ -3889,8 +3905,7 @@ static bool hasReferenceSemantics(IRGenSILFunction &IGF,
   return (objType->mayHaveSuperclass()
           || objType->isClassExistentialType()
           || objType->is<BuiltinNativeObjectType>()
-          || objType->is<BuiltinBridgeObjectType>()
-          || objType->is<BuiltinUnknownObjectType>());
+          || objType->is<BuiltinBridgeObjectType>());
 }
 
 static llvm::Value *emitIsUnique(IRGenSILFunction &IGF, SILValue operand,
@@ -3977,7 +3992,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     return;
   
   bool IsAnonymous = false;
-  StringRef Name = getVarName(i, IsAnonymous);
+  VarInfo->Name = getVarName(i, IsAnonymous);
 
   // At this point addr must be an alloca or an undef.
   assert(isa<llvm::AllocaInst>(addr) || isa<llvm::UndefValue>(addr) ||
@@ -3988,8 +4003,7 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     if (auto *Alloca = dyn_cast<llvm::AllocaInst>(addr))
       if (!Alloca->isStaticAlloca()) {
         // Store the address of the dynamic alloca on the stack.
-        addr = emitShadowCopy(addr, DS, Name, VarInfo->ArgNo,
-                              IGM.getPointerAlignment());
+        addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment());
         Indirection = IndirectValue;
       }
 
@@ -4008,8 +4022,8 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
 
   bindArchetypes(DbgTy.getType());
   if (IGM.DebugInfo)
-    emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, Name,
-                                 VarInfo->ArgNo, Indirection);
+    emitDebugVariableDeclaration(addr, DbgTy, SILTy, DS, Decl, *VarInfo,
+                                 Indirection);
 }
 
 void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
@@ -4030,6 +4044,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   // Generate Debug Info.
   if (!Decl)
     return;
+
+  assert(i->getVarInfo() && "alloc_stack without debug info");
 
   Type Desugared = Decl->getType()->getDesugaredType();
   if (Desugared->getClassOrBoundGenericClass() ||
@@ -4164,8 +4180,8 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(i->getBoxType()
-                                      ->getFieldType(IGM.getSILModule(), 0));
+  const TypeInfo &type = getTypeInfo(
+      getSILBoxFieldType(i->getBoxType(), IGM.getSILModule().Types, 0));
 
   // Derive name from SIL location.
   bool IsAnonymous = false;
@@ -4190,6 +4206,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   if (!Decl)
     return;
+
+  assert(i->getVarInfo() && "alloc_box without debug info");
+  
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -4200,20 +4219,22 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 
   assert(i->getBoxType()->getLayout()->getFields().size() == 1 &&
          "box for a local variable should only have one field");
-  auto SILTy = i->getBoxType()->getFieldType(IGM.getSILModule(), 0);
+  auto SILTy = getSILBoxFieldType(i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
   auto DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type);
 
+  auto VarInfo = i->getVarInfo();
+  assert(VarInfo && "debug_value without debug info");
+
   auto Storage = emitShadowCopyIfNeeded(
-      boxWithAddr.getAddress(), i->getDebugScope(), Name, 0, IsAnonymous);
+      boxWithAddr.getAddress(), i->getDebugScope(), *VarInfo, IsAnonymous);
 
   if (!IGM.DebugInfo)
     return;
 
-  IGM.DebugInfo->emitVariableDeclaration(
-      Builder,
-      Storage,
-      DbgTy, i->getDebugScope(), Decl, Name, 0, IndirectValue);
+  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
+                                         i->getDebugScope(), Decl, *VarInfo,
+                                         IndirectValue);
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {

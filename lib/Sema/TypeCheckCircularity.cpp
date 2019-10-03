@@ -249,14 +249,10 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
       S->getModuleContext(), S);
 
   for (auto field: S->getStoredProperties()) {
-    if (!field->hasInterfaceType()) {
-      TC.validateDecl(field);
-      if (!field->hasInterfaceType())
-        continue;
-    }
+    if (!field->getInterfaceType())
+      continue;
 
-    auto fieldType =field->getInterfaceType().subst(
-      subMap, SubstFlags::UseErrorType);
+    auto fieldType =field->getInterfaceType().subst(subMap);
     if (addMember(type, field, fieldType, depth))
       return true;
   }
@@ -287,14 +283,10 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (!elt->hasAssociatedValues())
       continue;
 
-    if (!elt->hasInterfaceType()) {
-      TC.validateDecl(elt);
-      if (!elt->hasInterfaceType())
-        continue;
-    }
+    if (!elt->getInterfaceType())
+      continue;
 
-    auto eltType = elt->getArgumentInterfaceType().subst(
-      subMap, SubstFlags::UseErrorType);
+    auto eltType = elt->getArgumentInterfaceType().subst(subMap);
     if (addMember(type, elt, eltType, depth))
       return true;
   }
@@ -622,11 +614,8 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
       return false;
 
     for (auto elt: elts) {
-      if (!elt->hasInterfaceType()) {
-        TC.validateDecl(elt);
-        if (!elt->hasInterfaceType())
-          return false;
-      }
+      if (!elt->getInterfaceType())
+        return false;
 
       if (!elt->isIndirect() && !E->isIndirect())
         return false;

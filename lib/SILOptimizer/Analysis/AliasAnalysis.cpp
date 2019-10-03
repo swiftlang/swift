@@ -12,18 +12,18 @@
 
 #define DEBUG_TYPE "sil-aa"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
-#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
-#include "swift/SIL/SILValue.h"
-#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/EscapeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ValueTracking.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
@@ -463,8 +463,7 @@ static bool typedAccessTBAAMayAlias(SILType LTy, SILType RTy,
 
   // The Builtin reference types can alias any class instance.
   if (LTyClass) {
-    if (RTy.is<BuiltinUnknownObjectType>() ||
-        RTy.is<BuiltinNativeObjectType>()  ||
+    if (RTy.is<BuiltinNativeObjectType>()  ||
         RTy.is<BuiltinBridgeObjectType>()) {
       return true;
     }

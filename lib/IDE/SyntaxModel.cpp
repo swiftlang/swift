@@ -18,6 +18,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
@@ -242,6 +243,7 @@ class ModelASTWalker : public ASTWalker {
   const LangOptions &LangOpts;
   const SourceManager &SM;
   unsigned BufferID;
+  ASTContext &Ctx;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
   static const std::regex &getURLRegex(StringRef Protocol);
@@ -262,6 +264,7 @@ public:
         LangOpts(File.getASTContext().LangOpts),
         SM(File.getASTContext().SourceMgr),
         BufferID(File.getBufferID().getValue()),
+        Ctx(File.getASTContext()),
         Walker(Walker) { }
 
   // FIXME: Remove this
@@ -521,13 +524,8 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
-    if (isCurrentCallArgExpr(Tup)) {
-      for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
-        SourceLoc NameLoc = Tup->getElementNameLoc(I);
-        if (NameLoc.isValid())
-          passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
-      }
-    } else {
+    auto *ParentE = Parent.getAsExpr();
+    if (!isCurrentCallArgExpr(Tup) && (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE))) {
       SyntaxStructureNode SN;
       SN.Kind = SyntaxStructureKind::TupleExpression;
       SN.Range = charSourceRangeFromSourceRange(SM, Tup->getSourceRange());
@@ -562,6 +560,18 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
       subExpr->walk(*this);
     }
     return { false, walkToExprPost(SE) };
+  } else if (auto *ISL = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
+    // Don't visit the child expressions directly. Instead visit the arguments
+    // of each appendStringLiteral/appendInterpolation CallExpr so we don't
+    // try to output structure nodes for those calls.
+    llvm::SaveAndRestore<ASTWalker::ParentTy> SetParent(Parent, E);
+    ISL->forEachSegment(Ctx, [&](bool isInterpolation, CallExpr *CE) {
+      if (isInterpolation) {
+        if (auto *Arg = CE->getArg())
+          Arg->walk(*this);
+      }
+    });
+    return { false, walkToExprPost(E) };
   }
 
   return { true, E };
@@ -776,12 +786,17 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, NTD);
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Normally bindExtension() would take care of computing the extended
+    // nominal. It must be done before asking for generic parameters.
+    ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;
     SN.Range = charSourceRangeFromSourceRange(SM, ED->getSourceRange());
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, ED->getBraces());
-    SourceRange NSR = ED->getExtendedTypeLoc().getSourceRange();
+    SourceRange NSR = SourceRange();
+    if (auto *repr = ED->getExtendedTypeRepr())
+      NSR = repr->getSourceRange();
     SN.NameRange = charSourceRangeFromSourceRange(SM, NSR);
 
     for (const TypeLoc &TL : ED->getInherited()) {
@@ -901,7 +916,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                          EnumElemD->getName().getLength());
         }
 
-        if (auto *E = EnumElemD->getRawValueExpr()) {
+        if (auto *E = EnumElemD->getRawValueUnchecked()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
                                  charSourceRangeFromSourceRange(SM, ElemRange));
@@ -1164,7 +1179,8 @@ bool ModelASTWalker::shouldPassBraceStructureNode(BraceStmt *S) {
   return (!dyn_cast_or_null<AbstractFunctionDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<TopLevelCodeDecl>(Parent.getAsDecl()) &&
           !dyn_cast_or_null<CaseStmt>(Parent.getAsStmt()) &&
-          S->getSourceRange().isValid());
+          S->getSourceRange().isValid() &&
+          !S->isImplicit());
 }
 
 ModelASTWalker::PassUntilResult

@@ -1320,7 +1320,7 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
     SGM.SwiftModule, toDecl);
 
   // Form type parameter substitutions.
-  auto *genericSig = fn->getGenericSignature();
+  auto genericSig = fn->getGenericSignature();
   unsigned fromParamCount = fromDecl->getGenericSignature()
     ->getGenericParams().size();
 
@@ -1541,8 +1541,7 @@ ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
   SILConstantInfo constantInfo = SGF.getConstantInfo(constant);
 
   // C function pointers cannot capture anything from their context.
-  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(
-    *constant.getAnyFunctionRef());
+  auto captures = SGF.SGM.Types.getLoweredLocalCaptures(constant);
 
   if (captures.hasGenericParamCaptures() ||
       captures.hasDynamicSelfCapture() ||
@@ -2190,9 +2189,6 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   SILDeclRef generator 
     = SILDeclRef::getDefaultArgGenerator(defaultArgsOwner.getDecl(),
                                          destIndex);
-
-  // TODO: Should apply the default arg generator's captures, but Sema doesn't
-  // track them.
   
   auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc,generator));
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
@@ -2207,8 +2203,13 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   ResultPlanPtr resultPtr =
       ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
   ArgumentScope argScope(*this, loc);
+
+  SmallVector<ManagedValue, 4> captures;
+  emitCaptures(loc, generator, CaptureEmission::ImmediateApplication,
+               captures);
+
   return emitApply(std::move(resultPtr), std::move(argScope), loc, fnRef,
-                   subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+                   subs, captures, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
@@ -2232,6 +2233,46 @@ RValue SILGenFunction::emitApplyOfStoredPropertyInitializer(
   ArgumentScope argScope(*this, loc);
   return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef,
                    subs, {}, calleeTypeInfo, ApplyOptions::None, C);
+}
+
+RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
+    SILLocation loc,
+    VarDecl *var,
+    RValue &&originalValue,
+    SGFContext C) {
+  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+  auto fnRef = ManagedValue::forUnmanaged(emitGlobalFunctionRef(loc, constant));
+  auto fnType = fnRef.getType().castTo<SILFunctionType>();
+
+  SubstitutionMap subs;
+  auto varDC = var->getInnermostDeclContext();
+  if (auto genericSig = varDC->getGenericSignatureOfContext()) {
+    subs = SubstitutionMap::get(
+        genericSig,
+        [&](SubstitutableType *type) {
+          if (auto gp = type->getAs<GenericTypeParamType>()) {
+            return F.mapTypeIntoContext(gp);
+          }
+
+          return Type(type);
+        },
+        LookUpConformanceInModule(varDC->getParentModule()));
+  }
+
+  auto substFnType = fnType->substGenericArgs(SGM.M, subs);
+
+  CanType resultType =
+      F.mapTypeIntoContext(var->getPropertyWrapperBackingPropertyType())
+        ->getCanonicalType();
+  AbstractionPattern origResultType(resultType);
+  CalleeTypeInfo calleeTypeInfo(substFnType, origResultType, resultType);
+  ResultPlanPtr resultPlan =
+      ResultPlanBuilder::computeResultPlan(*this, calleeTypeInfo, loc, C);
+  ArgumentScope argScope(*this, loc);
+  SmallVector<ManagedValue, 2> args;
+  std::move(originalValue).getAll(args);
+  return emitApply(std::move(resultPlan), std::move(argScope), loc, fnRef, subs,
+                   args, calleeTypeInfo, ApplyOptions::None, C);
 }
 
 RValue RValueEmitter::visitDestructureTupleExpr(DestructureTupleExpr *E,
@@ -3019,7 +3060,8 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     // Compare each pair of index values using the == witness from the
     // conformance.
     auto equatableProtocol = C.getProtocol(KnownProtocolKind::Equatable);
-    auto equalsMethod = equatableProtocol->lookupDirect(C.Id_EqualsOperator)[0];
+    auto equalsMethod = equatableProtocol->getSingleRequirement(
+      C.Id_EqualsOperator);
     auto equalsRef = SILDeclRef(equalsMethod);
     auto equalsTy = subSGF.SGM.Types.getConstantType(equalsRef);
     
@@ -3196,7 +3238,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       }
 
       VarDecl *hashValueVar =
-        cast<VarDecl>(hashableProto->lookupDirect(C.Id_hashValue)[0]);
+        cast<VarDecl>(hashableProto->getSingleRequirement(C.Id_hashValue));
 
       auto formalTy = index.FormalType;
       auto hashable = index.Hashable;
@@ -3204,7 +3246,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         formalTy = genericEnv->mapTypeIntoContext(formalTy)->getCanonicalType();
         hashable = hashable.subst(index.FormalType,
           [&](Type t) -> Type { return genericEnv->mapTypeIntoContext(t); },
-          LookUpConformanceInSignature(*genericSig));
+          LookUpConformanceInSignature(genericSig.getPointer()));
       }
 
       // Set up a substitution of Self => IndexType.
@@ -5269,7 +5311,7 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
   auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
       M, getPointerProtocol());
 
-  auto *genericSig = converter->getGenericSignature();
+  auto genericSig = converter->getGenericSignature();
   auto subMap = SubstitutionMap::combineSubstitutionMaps(
       firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
       genericSig);

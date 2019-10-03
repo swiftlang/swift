@@ -39,12 +39,12 @@ func funcdecl5(_ a: Int, y: Int) {
   x = y
   (x) = y
 
-  1 = x        // expected-error {{cannot assign to a literal value}}
-  (1) = x      // expected-error {{cannot assign to a literal value}}
-  "string" = "other"    // expected-error {{cannot assign to a literal value}}
+  1 = x        // expected-error {{cannot assign to value: literals are not mutable}}
+  (1) = x      // expected-error {{cannot assign to value: literals are not mutable}}
+  "string" = "other"    // expected-error {{cannot assign to value: literals are not mutable}}
   [1, 1, 1, 1] = [1, 1] // expected-error {{cannot assign to immutable expression of type '[Int]}}
   1.0 = x               // expected-error {{cannot assign to a literal value}}
-  nil = 1               // expected-error {{cannot assign to a literal value}}
+  nil = 1               // expected-error {{cannot assign to value: literals are not mutable}}
 
   (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
   var tup : (x:Int, y:Int)
@@ -59,7 +59,7 @@ func funcdecl5(_ a: Int, y: Int) {
   }
 
   // This diagnostic is terrible - rdar://12939553
-  if x {}   // expected-error {{'Int' is not convertible to 'Bool'}}
+  if x {}   // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
   if true {
     if (B) {
@@ -99,7 +99,7 @@ struct infloopbool {
 }
 
 func infloopbooltest() {
-  if (infloopbool()) {} // expected-error {{'infloopbool' is not convertible to 'Bool'}}
+  if (infloopbool()) {} // expected-error {{cannot convert value of type 'infloopbool' to expected condition type 'Bool'}}
 }
 
 // test "builder" API style
@@ -566,9 +566,10 @@ func fn(x: Int) {
 }
 
 func bad_if() {
-  if 1 {} // expected-error {{'Int' is not convertible to 'Bool'}}
-  if (x: false) {} // expected-error {{'(x: Bool)' is not convertible to 'Bool'}}
-  if (x: 1) {} // expected-error {{'(x: Int)' is not convertible to 'Bool'}}
+  if 1 {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
+  if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
+  if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
+  if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
 }
 
 // Typo correction for loop labels
@@ -637,6 +638,6 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=out
 
 // Errors in case syntax
 class
-case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected pattern}}
-case  // expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}} expected-error {{expected pattern}}
+case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}}
+case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser

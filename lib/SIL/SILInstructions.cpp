@@ -284,6 +284,10 @@ AllocBoxInst *AllocBoxInst::create(SILDebugLocation Loc,
                                   hasDynamicLifetime);
 }
 
+SILType AllocBoxInst::getAddressType() const {
+  return getSILBoxFieldType(getBoxType(), getModule().Types, 0).getAddressType();
+}
+
 VarDecl *AllocBoxInst::getDecl() const {
   return getLoc().getAsASTNode<VarDecl>();
 }

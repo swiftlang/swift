@@ -22,7 +22,7 @@
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 
@@ -152,8 +152,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
       continue;
 
     auto ExistentialRepr =
-        CalleeArg->getType().getPreferredExistentialRepresentation(
-            F->getModule());
+        CalleeArg->getType().getPreferredExistentialRepresentation();
     if (ExistentialRepr != ExistentialRepresentation::Opaque &&
           ExistentialRepr != ExistentialRepresentation::Class)
       continue;

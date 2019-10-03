@@ -98,10 +98,6 @@ enum class FixKind : uint8_t {
   /// Swift version 5.
   AutoClosureForwarding,
 
-  /// Allow invalid pointer conversions for autoclosure result types as if the
-  /// pointer type is a function parameter rather than an autoclosure result.
-  AllowAutoClosurePointerConversion,
-
   /// Remove `!` or `?` because base is not an optional type.
   RemoveUnwrap,
 
@@ -193,12 +189,24 @@ enum class FixKind : uint8_t {
   /// when base is an r-value type.
   AllowMutatingMemberOnRValueBase,
 
-  /// Fix the type of the default argument
-  DefaultArgumentTypeMismatch,
-  
   /// Allow a single tuple parameter to be matched with N arguments
   /// by forming all of the given arguments into a single tuple.
   AllowTupleSplatForSingleParameter,
+
+  /// Allow a single argument type mismatch. This is the most generic
+  /// failure related to argument-to-parameter conversions.
+  AllowArgumentTypeMismatch,
+
+  /// Explicitly construct type conforming to `RawRepresentable` protocol
+  /// via forming `Foo(rawValue:)` instead of using its `RawValue` directly.
+  ExplicitlyConstructRawRepresentable,
+
+  /// Use raw value type associated with raw representative accessible
+  /// using `.rawValue` member.
+  UseValueTypeOfRawRepresentative,
+  /// If an array was passed to a variadic argument, give a specific diagnostic
+  /// and offer to drop the brackets if it's a literal.
+  ExpandArrayIntoVarargs,
 };
 
 class ConstraintFix {
@@ -569,22 +577,21 @@ public:
 /// let _:F<Int> = F<Bool>()
 /// ```
 class GenericArgumentsMismatch final
-    : public ConstraintFix,
+    : public ContextualMismatch,
       private llvm::TrailingObjects<GenericArgumentsMismatch, unsigned> {
   friend TrailingObjects;
-
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
 
   unsigned NumMismatches;
 
 protected:
-  GenericArgumentsMismatch(ConstraintSystem &cs, BoundGenericType *actual,
-                           BoundGenericType *required,
+  GenericArgumentsMismatch(ConstraintSystem &cs, Type actual, Type required,
                            llvm::ArrayRef<unsigned> mismatches,
                            ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::GenericArgumentsMismatch, locator),
-        Actual(actual), Required(required), NumMismatches(mismatches.size()) {
+      : ContextualMismatch(cs, FixKind::GenericArgumentsMismatch, actual,
+                           required, locator),
+        NumMismatches(mismatches.size()) {
+    assert(actual->is<BoundGenericType>());
+    assert(required->is<BoundGenericType>());
     std::uninitialized_copy(mismatches.begin(), mismatches.end(),
                             getMismatchesBuf().begin());
   }
@@ -594,18 +601,14 @@ public:
     return "fix generic argument mismatch";
   }
 
-  BoundGenericType *getActual() const { return Actual; }
-  BoundGenericType *getRequired() const { return Required; }
-
   ArrayRef<unsigned> getMismatches() const {
     return {getTrailingObjects<unsigned>(), NumMismatches};
   }
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static GenericArgumentsMismatch *create(ConstraintSystem &cs,
-                                          BoundGenericType *actual,
-                                          BoundGenericType *required,
+  static GenericArgumentsMismatch *create(ConstraintSystem &cs, Type actual,
+                                          Type required,
                                           llvm::ArrayRef<unsigned> mismatches,
                                           ConstraintLocator *locator);
 
@@ -663,11 +666,12 @@ public:
                                        ConstraintLocator *locator);
 };
 
+/// Allow invalid pointer conversions for autoclosure result types as if the
+/// pointer type is a function parameter rather than an autoclosure result.
 class AllowAutoClosurePointerConversion final : public ContextualMismatch {
   AllowAutoClosurePointerConversion(ConstraintSystem &cs, Type pointeeType,
                                     Type pointerType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, FixKind::AllowAutoClosurePointerConversion,
-                           pointeeType, pointerType, locator) {}
+      : ContextualMismatch(cs, pointeeType, pointerType, locator) {}
 
 public:
   std::string getName() const override {
@@ -1000,13 +1004,12 @@ class AddMissingArguments final
 
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
   unsigned NumSynthesized;
 
-  AddMissingArguments(ConstraintSystem &cs, FunctionType *funcType,
-                      llvm::ArrayRef<AnyFunctionType::Param> synthesizedArgs,
+  AddMissingArguments(ConstraintSystem &cs,
+                      llvm::ArrayRef<Param> synthesizedArgs,
                       ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AddMissingArguments, locator), Fn(funcType),
+      : ConstraintFix(cs, FixKind::AddMissingArguments, locator),
         NumSynthesized(synthesizedArgs.size()) {
     std::uninitialized_copy(synthesizedArgs.begin(), synthesizedArgs.end(),
                             getSynthesizedArgumentsBuf().begin());
@@ -1021,7 +1024,7 @@ public:
 
   bool diagnose(Expr *root, bool asNote = false) const override;
 
-  static AddMissingArguments *create(ConstraintSystem &cs, FunctionType *fnType,
+  static AddMissingArguments *create(ConstraintSystem &cs,
                                      llvm::ArrayRef<Param> synthesizedArgs,
                                      ConstraintLocator *locator);
 
@@ -1029,27 +1032,6 @@ private:
   MutableArrayRef<Param> getSynthesizedArgumentsBuf() {
     return {getTrailingObjects<Param>(), NumSynthesized};
   }
-};
-
-class IgnoreDefaultArgumentTypeMismatch final : public ConstraintFix {
-  Type FromType;
-  Type ToType;
-
-  IgnoreDefaultArgumentTypeMismatch(ConstraintSystem &cs, Type fromType,
-                                    Type toType, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::DefaultArgumentTypeMismatch, locator),
-        FromType(fromType), ToType(toType) {}
-
-public:
-  std::string getName() const override {
-    return "ignore default argument type mismatch";
-  }
-
-  bool diagnose(Expr *root, bool asNote = false) const override;
-
-  static IgnoreDefaultArgumentTypeMismatch *create(ConstraintSystem &cs,
-                                                   Type fromType, Type toType,
-                                                   ConstraintLocator *locator);
 };
 
 class MoveOutOfOrderArgument final : public ConstraintFix {
@@ -1318,6 +1300,118 @@ public:
   static IgnoreContextualType *create(ConstraintSystem &cs, Type resultTy,
                                       Type specifiedTy,
                                       ConstraintLocator *locator);
+};
+
+class IgnoreAssignmentDestinationType final : public ContextualMismatch {
+  IgnoreAssignmentDestinationType(ConstraintSystem &cs, Type sourceTy,
+                                  Type destTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, sourceTy, destTy, locator) {}
+
+public:
+  std::string getName() const override {
+    return "ignore type of the assignment destination";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static IgnoreAssignmentDestinationType *create(ConstraintSystem &cs,
+                                                 Type sourceTy, Type destTy,
+                                                 ConstraintLocator *locator);
+};
+
+/// If this is an argument-to-parameter conversion which is associated with
+/// `inout` parameter, subtyping is not permitted, types have to
+/// be identical.
+class AllowInOutConversion final : public ContextualMismatch {
+  AllowInOutConversion(ConstraintSystem &cs, Type argType, Type paramType,
+                       ConstraintLocator *locator)
+      : ContextualMismatch(cs, argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow conversions between argument/parameter marked as `inout`";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowInOutConversion *create(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator);
+};
+
+class AllowArgumentMismatch : public ContextualMismatch {
+protected:
+  AllowArgumentMismatch(ConstraintSystem &cs, Type argType, Type paramType,
+                        ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::AllowArgumentTypeMismatch, argType,
+                              paramType, locator) {}
+
+  AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
+                        Type paramType, ConstraintLocator *locator)
+      : ContextualMismatch(cs, kind, argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "allow argument to parameter type conversion mismatch";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static AllowArgumentMismatch *create(ConstraintSystem &cs, Type argType,
+                                       Type paramType,
+                                       ConstraintLocator *locator);
+};
+
+class ExpandArrayIntoVarargs final : public AllowArgumentMismatch {
+
+  ExpandArrayIntoVarargs(ConstraintSystem &cs, Type argType, Type paramType,
+                         ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::ExpandArrayIntoVarargs, argType,
+                              paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "cannot pass Array elements as variadic arguments";
+  }
+
+  bool diagnose(Expr *root, bool asNote = false) const override;
+
+  static ExpandArrayIntoVarargs *attempt(ConstraintSystem &cs, Type argType,
+                                         Type paramType,
+                                         ConstraintLocatorBuilder locator);
+};
+
+class ExplicitlyConstructRawRepresentable final : public AllowArgumentMismatch {
+  ExplicitlyConstructRawRepresentable(ConstraintSystem &cs, Type argType,
+                                      Type paramType,
+                                      ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::ExplicitlyConstructRawRepresentable,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "explicitly construct a raw representable type";
+  }
+
+  static ExplicitlyConstructRawRepresentable *
+  attempt(ConstraintSystem &cs, Type argType, Type paramType,
+          ConstraintLocatorBuilder locator);
+};
+
+class UseValueTypeOfRawRepresentative final : public AllowArgumentMismatch {
+  UseValueTypeOfRawRepresentative(ConstraintSystem &cs, Type argType,
+                                  Type paramType, ConstraintLocator *locator)
+      : AllowArgumentMismatch(cs, FixKind::UseValueTypeOfRawRepresentative,
+                              argType, paramType, locator) {}
+
+public:
+  std::string getName() const override {
+    return "use `.rawValue` of a raw representable type";
+  }
+
+  static UseValueTypeOfRawRepresentative *
+  attempt(ConstraintSystem &cs, Type argType, Type paramType,
+          ConstraintLocatorBuilder locator);
 };
 
 } // end namespace constraints

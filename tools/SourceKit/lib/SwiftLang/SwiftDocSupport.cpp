@@ -21,6 +21,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
@@ -241,10 +242,12 @@ public:
     deinitDefaultMapToUse(D);
   }
 
-  void printTypeRef(Type T, const TypeDecl *TD, Identifier Name) override {
+  void printTypeRef(
+      Type T, const TypeDecl *TD, Identifier Name,
+      PrintNameContext NameContext = PrintNameContext::Normal) override {
     unsigned StartOffset = OS.tell();
     References.emplace_back(TD, StartOffset, Name.str().size());
-    StreamPrinter::printTypeRef(T, TD, Name);
+    StreamPrinter::printTypeRef(T, TD, Name, NameContext);
   }
 };
 
@@ -261,7 +264,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info) {
   if (DC == nullptr || !DC->isInnermostContextGeneric())
     return;
 
-  GenericSignature *GenericSig = DC->getGenericSignatureOfContext();
+  GenericSignature GenericSig = DC->getGenericSignatureOfContext();
 
   if (!GenericSig)
     return;
@@ -398,7 +401,7 @@ static bool initDocEntityInfo(const Decl *D,
       else
         SwiftLangSupport::printFullyAnnotatedDeclaration(VD, Type(), OS);
     } else if (auto *E = dyn_cast<ExtensionDecl>(D)) {
-      if (auto *Sig = E->getGenericSignature()) {
+      if (auto Sig = E->getGenericSignature()) {
         // The extension under printing is potentially part of a synthesized
         // extension. Thus it's hard to print the fully annotated decl. We
         // need to at least print the generic signature here.
@@ -531,10 +534,9 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
-    if (TAD->hasInterfaceType()) {
+    if (auto Ty = TAD->getDeclaredInterfaceType()) {
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
-      auto Ty = TAD->getDeclaredInterfaceType();
       if (auto NM = Ty->getAnyNominal()) {
         passInherits(NM->getInherited(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),

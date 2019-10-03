@@ -20,3 +20,4 @@ struct S {
 enum E {
 protocol P {
 extension P {
+public init(a: (Int || String))

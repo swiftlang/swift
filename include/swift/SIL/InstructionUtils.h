@@ -142,6 +142,49 @@ bool onlyUsedByAssignByWrapper(PartialApplyInst *PAI);
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);
 
+/// Given a polymorphic builtin \p bi that may be generic and thus have in/out
+/// params, stash all of the information needed for either specializing while
+/// inlining or propagating the type in constant propagation.
+///
+/// NOTE: If we perform this transformation, our builtin will no longer have any
+/// substitutions since we only substitute to concrete static overloads.
+struct PolymorphicBuiltinSpecializedOverloadInfo {
+  const BuiltinInfo *builtinInfo;
+  Identifier staticOverloadIdentifier;
+  SmallVector<SILType, 8> argTypes;
+  SILType resultType;
+  bool hasOutParam;
+
+private:
+  bool isInitialized;
+
+public:
+  PolymorphicBuiltinSpecializedOverloadInfo()
+      : builtinInfo(nullptr), staticOverloadIdentifier(), argTypes(),
+        resultType(), hasOutParam(false), isInitialized(false) {}
+
+  /// Returns true if we were able to map the polymorphic builtin to a static
+  /// overload. False otherwise.
+  ///
+  /// NOTE: This does not mean that the static overload actually exists.
+  bool init(BuiltinInst *bi);
+
+  bool doesOverloadExist() const {
+    CanBuiltinType builtinType = argTypes.front().getAs<BuiltinType>();
+    return canBuiltinBeOverloadedForType(builtinInfo->ID, builtinType);
+  }
+
+private:
+  bool init(SILFunction *fn, BuiltinValueKind builtinKind,
+            ArrayRef<SILType> oldOperandTypes, SILType oldResultType);
+};
+
+/// Given a polymorphic builtin \p bi, analyze its types and create a builtin
+/// for the static overload that the builtin corresponds to. If \p bi is not a
+/// polymorphic builtin or does not have any available overload for these types,
+/// return SILValue().
+SILValue getStaticOverloadForSpecializedPolymorphicBuiltin(BuiltinInst *bi);
+
 } // end namespace swift
 
 #endif

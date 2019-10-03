@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
@@ -28,6 +29,15 @@
 using namespace swift;
 
 DiagnosticConsumer::~DiagnosticConsumer() = default;
+
+DiagnosticInfo::FixIt::FixIt(CharSourceRange R, StringRef Str,
+                             ArrayRef<DiagnosticArgument> Args) : Range(R) {
+  // FIXME: Defer text formatting to later in the pipeline.
+  llvm::raw_string_ostream OS(Text);
+  DiagnosticEngine::formatDiagnosticText(OS, Str, Args,
+                                         DiagnosticFormatOptions::
+                                         formatForFixIts());
+}
 
 llvm::SMLoc DiagnosticConsumer::getRawLoc(SourceLoc loc) {
   return loc.Value;

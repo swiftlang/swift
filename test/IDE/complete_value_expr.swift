@@ -199,6 +199,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_ARRAY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_1 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_DICTIONARY_LITERAL_2 | %FileCheck %s -check-prefix=SIMPLE_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=COMPLETE_CALL_RESULT | %FileCheck %s -check-prefix=COMPLETE_CALL_RESULT
 
 // Test code completion of expressions that produce a value.
 
@@ -1671,22 +1672,19 @@ func checkOverrideInclusion2(_ arg: Override3) {
 // CHECK_NODUP_RESTATED_REQ-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    doo[#Int#]; name=doo
 // CHECK_NODUP_RESTATED_REQ: End completions
 
-// CHECK_NODUP_RESTATED_REQ_NODOT: Begin completions
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg1: Int#})[#Void#];
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#(arg): Bool#}][#Bool#]; name=[arg: Bool]
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
-// CHECK_NODUP_RESTATED_REQ_NODOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg2: Int#})[#Void#];
-// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
-// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[Subscript]/{{Super|CurrNominal}}:      [{#Bool#}][#Bool#]; name=[Bool]
-// CHECK_NODUP_RESTATED_REQ_NODOT-NOT: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT: Begin completions, 6 items
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: .foo()[#Void#]; name=foo()
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg1: Int#})[#Void#];
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[Subscript]/{{Super|CurrNominal}}:      [{#(arg): Bool#}][#Bool#]; name=[arg: Bool]
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceVar]/{{Super|CurrNominal}}:    .doo[#Int#]; name=doo
+// CHECK_NODUP_RESTATED_REQ_NODOT-DAG: Decl[InstanceMethod]/{{Super|CurrNominal}}: .roo({#arg2: Int#})[#Void#];
 // CHECK_NODUP_RESTATED_REQ_NODOT: End completions
 
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Begin completions, 6 items
-// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: foo({#(self): NoDupReq6#})[#() -> Void#]; name=foo(self: NoDupReq6)
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/Super: roo({#(self): NoDupReq6#})[#(arg1: Int) -> Void#]; name=roo(self: NoDupReq6)
-// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[AssociatedType]/Super: E; name=E
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/CurrNominal: foo({#(self): NoDupReq6#})[#() -> Void#]; name=foo(self: NoDupReq6)
 // CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[InstanceMethod]/CurrNominal: roo({#(self): NoDupReq6#})[#(arg2: Int) -> Void#]; name=roo(self: NoDupReq6)
+// CHECK_NODUP_RESTATED_REQ_TYPE1: Decl[AssociatedType]/CurrNominal: E; name=E
 // CHECK_NODUP_RESTATED_REQ_TYPE1: End completions
 
 // CHECK_NODUP_RESTATED_REQ_TYPE2: Begin completions, 6 items
@@ -2172,4 +2170,18 @@ func testInCollectionLiteral(value: SimpleStruct) {
   let _: [String: String] = [
     value.#^IN_DICTIONARY_LITERAL_2^# : "test"
   ]
+}
+
+// rdar://problem/54047322
+struct Resolver<T> {
+  func fulfill(_ value: T) {}
+}
+func wrapSuccess<T>(_ onSuccess: @escaping (T) -> Void) -> (T, Bool) -> Void {
+  fatalError()
+}
+func testWrapSuccess(promise: Int, seal: Resolver<Void>) {
+  wrapSuccess(seal.fulfill)#^COMPLETE_CALL_RESULT^#
+  // COMPLETE_CALL_RESULT: Begin completions
+  // COMPLETE_CALL_RESULT: Pattern/CurrModule:                 ({#Void#}, {#Bool#})[#Void#]; name=(Void, Bool)
+  // COMPLETE_CALL_RESULT: End completions
 }

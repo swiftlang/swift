@@ -17,7 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) -
     return true
   }
 
-  return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}} expected-note {{expected an argument list of type '(T)'}}
+  return t1.isEqual(u) // expected-error {{cannot convert value of type 'U' to expected argument type 'T'}}
 }
 
 protocol MethodLessComparable {
@@ -36,8 +36,7 @@ func min<T : MethodLessComparable>(_ x: T, y: T) -> T {
 func existential<T : EqualComparable, U : EqualComparable>(_ t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
-  if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
-  // expected-note @-1 {{expected an argument list of type '(T)'}}
+  if t1.isEqual(eqComp) {} // expected-error{{cannot convert value of type 'EqualComparable' to expected argument type 'T'}}
   if eqComp.isEqual(t2) {} // expected-error{{member 'isEqual' cannot be used on value of protocol type 'EqualComparable'; use a generic constraint instead}}
 }
 
@@ -75,8 +74,8 @@ protocol Overload {
   associatedtype B
   func getA() -> A
   func getB() -> B
-  func f1(_: A) -> A
-  func f1(_: B) -> B
+  func f1(_: A) -> A // expected-note {{candidate expects value of type 'OtherOvl.A' at position #0}}
+  func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' at position #0}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
   func f3(_: Int) -> Int // expected-note {{found this candidate}}
@@ -106,9 +105,8 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(_ ovl: Ovl, ovl2: Ovl,
   a = ovl2.f2(17)
   a = ovl2.f1(a)
 
-  other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
-  // expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
-                                                        
+  other.f1(a) // expected-error{{no exact matches in call to instance method 'f1'}}
+
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3
   var f3f : (Float) -> Float = ovl.f3
@@ -171,7 +169,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(_ t: T, u: U) {
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
 
-  T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}} expected-note {{expected an argument list of type '(T, y: T)'}}
+  T.isEqual(t, y: u) // expected-error{{cannot convert value of type 'U' to expected argument type 'T'}}
 }
 
 //===----------------------------------------------------------------------===//

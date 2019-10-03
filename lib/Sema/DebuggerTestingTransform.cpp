@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Subsystems.h"
 

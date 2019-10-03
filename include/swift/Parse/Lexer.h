@@ -105,7 +105,7 @@ class Lexer {
   Token NextToken;
   
   /// The kind of source we're lexing. This either enables special behavior for
-  /// parseable interfaces, or enables things like the 'sil' keyword if lexing
+  /// module interfaces, or enables things like the 'sil' keyword if lexing
   /// a .sil file.
   const LexerMode LexMode;
 
@@ -200,8 +200,8 @@ public:
            ParsedTrivia &TrailingTriviaResult) {
     Result = NextToken;
     if (TriviaRetention == TriviaRetentionMode::WithTrivia) {
-      LeadingTriviaResult = {LeadingTrivia};
-      TrailingTriviaResult = {TrailingTrivia};
+      std::swap(LeadingTriviaResult, LeadingTrivia);
+      std::swap(TrailingTriviaResult, TrailingTrivia);
     }
     if (Result.isNot(tok::eof))
       lexImpl();

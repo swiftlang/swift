@@ -490,14 +490,17 @@ struct PrintOptions {
     return result;
   }
 
-  /// Retrieve the set of options suitable for parseable module interfaces.
+  /// Retrieve the set of options suitable for module interfaces.
   ///
   /// This is a format that will be parsed again later, so the output must be
   /// consistent and well-formed.
   ///
-  /// \see swift::emitParseableInterface
-  static PrintOptions printParseableInterfaceFile(bool preferTypeRepr);
+  /// \see swift::emitSwiftInterface
+  static PrintOptions printSwiftInterfaceFile(bool preferTypeRepr);
 
+  /// Retrieve the set of options suitable for "Generated Interfaces", which
+  /// are a prettified representation of the public API of a module, to be
+  /// displayed to users in an editor.
   static PrintOptions printModuleInterface();
   static PrintOptions printTypeInterface(Type T);
 

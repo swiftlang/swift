@@ -64,12 +64,12 @@
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoadStoreOptUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/BitVector.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -147,6 +147,8 @@ static inline bool isPerformingDSE(DSEKind Kind) {
 /// general sense but are inert from a load store perspective.
 static bool isDeadStoreInertInstruction(SILInstruction *Inst) {
   switch (Inst->getKind()) {
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Name##RetainInst: \
   case SILInstructionKind::StrongRetain##Name##Inst: \

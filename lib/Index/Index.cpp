@@ -19,6 +19,8 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
@@ -30,6 +32,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
+#include <tuple>
 
 using namespace swift;
 using namespace swift::index;
@@ -82,7 +85,10 @@ static SourceLoc getLocForExtension(ExtensionDecl *D) {
   // Use the 'End' token of the range, in case it is a compound name, e.g.
   //   extension A.B {}
   // we want the location of 'B' token.
-  return D->getExtendedTypeLoc().getSourceRange().End;
+  if (auto *repr = D->getExtendedTypeRepr()) {
+    return repr->getSourceRange().End;
+  }
+  return SourceLoc();
 }
 
 namespace {
@@ -472,7 +478,7 @@ private:
       return true;
 
     IndexSymbol Info;
-    std::tie(Info.line, Info.column) = getLineCol(Loc);
+    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
     Info.roles |= (unsigned)SymbolRole::Reference;
     Info.symInfo = getSymbolInfoForModule(Mod);
     getModuleNameAndUSR(Mod, Info.name, Info.USR);
@@ -584,10 +590,13 @@ private:
 
   bool indexComment(const Decl *D);
 
-  std::pair<unsigned, unsigned> getLineCol(SourceLoc Loc) {
+  std::tuple<unsigned, unsigned, Optional<unsigned>>
+  getLineColAndOffset(SourceLoc Loc) {
     if (Loc.isInvalid())
-      return std::make_pair(0, 0);
-    return SrcMgr.getLineAndColumn(Loc, BufferID);
+      return std::make_tuple(0, 0, None);
+    auto lineAndColumn = SrcMgr.getLineAndColumn(Loc, BufferID);
+    unsigned offset = SrcMgr.getLocOffsetInBuffer(Loc, BufferID);
+    return std::make_tuple(lineAndColumn.first, lineAndColumn.second, offset);
   }
 
   bool shouldIndex(ValueDecl *D, bool IsRef) const {
@@ -918,7 +927,7 @@ bool IndexSwiftASTWalker::reportRelatedTypeRef(const TypeLoc &Ty, SymbolRoleSet 
         IndexSymbol Info;
         if (!reportRef(TAD, IdLoc, Info, None))
           return false;
-        if (auto Ty = TAD->getUnderlyingTypeLoc().getType()) {
+        if (auto Ty = TAD->getUnderlyingType()) {
           NTD = Ty->getAnyNominal();
           isImplicit = true;
         }
@@ -1079,7 +1088,7 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
           return false;
         if (!reportPseudoSetterDecl(VarD))
           return false;
-      } 
+      }
 
       for (auto accessor : StoreD->getAllAccessors()) {
         // Don't include the implicit getter and setter if we added pseudo
@@ -1224,7 +1233,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ValueDecl *D, SourceLoc Loc,
   if (getNameAndUSR(D, /*ExtD=*/nullptr, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column) = getLineCol(Loc);
+  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
   if (!IsRef) {
     if (auto Group = D->getGroupName())
       Info.group = Group.getValue();
@@ -1245,7 +1254,7 @@ bool IndexSwiftASTWalker::initIndexSymbol(ExtensionDecl *ExtD, ValueDecl *Extend
   if (getNameAndUSR(ExtendedD, ExtD, Info.name, Info.USR))
     return true;
 
-  std::tie(Info.line, Info.column) = getLineCol(Loc);
+  std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(Loc);
   if (auto Group = ExtD->getGroupName())
     Info.group = Group.getValue();
   return false;
@@ -1401,7 +1410,7 @@ bool IndexSwiftASTWalker::initVarRefIndexSymbols(Expr *CurrentE, ValueDecl *D,
   case swift::AccessKind::Write:
     Info.roles |= (unsigned)SymbolRole::Write;
   }
-  
+
   return false;
 }
 
@@ -1452,7 +1461,7 @@ bool IndexSwiftASTWalker::indexComment(const Decl *D) {
       OS << "t:" << tagName;
       Info.USR = stringStorage.copyString(OS.str());
     }
-    std::tie(Info.line, Info.column) = getLineCol(loc);
+    std::tie(Info.line, Info.column, Info.offset) = getLineColAndOffset(loc);
     if (!IdxConsumer.startSourceEntity(Info) || !IdxConsumer.finishSourceEntity(Info.symInfo, Info.roles)) {
       Cancelled = true;
       break;

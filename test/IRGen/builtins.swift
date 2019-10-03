@@ -316,17 +316,17 @@ func testStaticReport(_ b: Bool, ptr: Builtin.RawPointer) -> () {
 func testCondFail(_ b: Bool, c: Bool) {
   // CHECK: br i1 %0, label %[[FAIL:.*]], label %[[CONT:.*]]
   Builtin.condfail_message(b, StaticString("message").unsafeRawPointer)
-  // CHECK: <label>:[[CONT]]
+  // CHECK: [[CONT]]
   // CHECK: br i1 %1, label %[[FAIL2:.*]], label %[[CONT:.*]]
   Builtin.condfail_message(c, StaticString("message").unsafeRawPointer)
-  // CHECK: <label>:[[CONT]]
+  // CHECK: [[CONT]]
   // CHECK: ret void
 
-  // CHECK: <label>:[[FAIL]]
+  // CHECK: [[FAIL]]:
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 
-  // CHECK: <label>:[[FAIL2]]
+  // CHECK: [[FAIL2]]:
   // CHECK: call void @llvm.trap()
   // CHECK: unreachable
 }
@@ -615,30 +615,32 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins27acceptsBuiltinUnknownObjectyyBOSgzF"([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
-func acceptsBuiltinUnknownObject(_ ref: inout Builtin.UnknownObject?) {}
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"([[OPTIONAL_ANYOBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
+func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BOSgzF"({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: bitcast [[BUILTIN_UNKNOWN_OBJECT_TY]]* %0 to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
-// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %1
-// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC([[UNKNOWN_OBJECT]]* %2)
-// CHECK-native-NEXT: call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* %2)
-// CHECK-NEXT: ret i1 %3
-func isUnique(_ ref: inout Builtin.UnknownObject?) -> Bool {
+// CHECK-NEXT: [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY]], [[OPTIONAL_ANYOBJECT_TY]]* %0, i32 0, i32 0
+// CHECK-NEXT: [[CASTED:%.+]] = bitcast {{.+}}* [[ADDR]] to [[UNKNOWN_OBJECT:%objc_object|%swift\.refcounted]]**
+// CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[CASTED]]
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferencedNonObjC([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_native([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-NEXT: ret i1 [[RESULT]]
+func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
 // ObjC nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BOzF"
-// CHECK-SAME:    ([[UNKNOWN_OBJECT]]** nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
+// CHECK-SAME:    (%AnyObject* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK-NEXT: load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** %0
-// CHECK-objc-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* %1)
-// CHECK-native-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* %1)
-// CHECK-NEXT: ret i1 %2
-func isUnique(_ ref: inout Builtin.UnknownObject) -> Bool {
+// CHECK-NEXT: [[ADDR:%.+]] = getelementptr inbounds %AnyObject, %AnyObject* %0, i32 0, i32 0
+// CHECK-NEXT: [[REF:%.+]] = load [[UNKNOWN_OBJECT]]*, [[UNKNOWN_OBJECT]]** [[ADDR]]
+// CHECK-objc-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferencedNonObjC_nonNull([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-native-NEXT: [[RESULT:%.+]] = call i1 @swift_isUniquelyReferenced_nonNull_native([[UNKNOWN_OBJECT]]* [[REF]])
+// CHECK-NEXT: ret i1 [[RESULT]]
+func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 

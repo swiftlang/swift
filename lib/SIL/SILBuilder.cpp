@@ -96,6 +96,16 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   return SILType::getPrimitiveObjectType(appliedFnType);
 }
 
+ProjectBoxInst *SILBuilder::createProjectBox(SILLocation Loc,
+                                             SILValue boxOperand,
+                                             unsigned index) {
+  auto boxTy = boxOperand->getType().castTo<SILBoxType>();
+  auto fieldTy = getSILBoxFieldType(boxTy, getModule().Types, index);
+
+  return insert(new (getModule()) ProjectBoxInst(
+      getSILDebugLocation(Loc), boxOperand, index, fieldTy));
+}
+
 // If legal, create an unchecked_ref_cast from the given operand and result
 // type, otherwise return null.
 SingleValueInstruction *
@@ -280,6 +290,9 @@ static bool couldReduceStrongRefcount(SILInstruction *Inst) {
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst: \
   ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, "...")
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  case SILInstructionKind::Copy##Name##ValueInst:                              \
+    return false;
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::StoreInst:

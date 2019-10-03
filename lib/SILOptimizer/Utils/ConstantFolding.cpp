@@ -14,16 +14,17 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 
-#define DEBUG_TYPE "constant-folding"
+#define DEBUG_TYPE "sil-constant-folding"
 
 using namespace swift;
 
@@ -580,6 +581,20 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   // Add the literal instruction to represent the result of the division.
   SILBuilderWithScope B(BI);
   return B.createIntegerLiteral(BI->getLoc(), BI->getType(), ResVal);
+}
+
+static SILValue specializePolymorphicBuiltin(BuiltinInst *bi,
+                                             BuiltinValueKind id) {
+  // If we are not a polymorphic builtin, return an empty SILValue()
+  // so we keep on scanning.
+  if (!isPolymorphicBuiltin(id))
+    return SILValue();
+
+  // Otherwise, try to perform the mapping.
+  if (auto newBuiltin = getStaticOverloadForSpecializedPolymorphicBuiltin(bi))
+    return newBuiltin;
+
+  return SILValue();
 }
 
 /// Fold binary operations.
@@ -1166,6 +1181,18 @@ static SILValue foldFPTrunc(BuiltinInst *BI, const BuiltinInfo &Builtin,
   return B.createFloatLiteral(Loc, BI->getType(), truncVal);
 }
 
+static SILValue constantFoldIsConcrete(BuiltinInst *BI) {
+  if (BI->getOperand(0)->getType().hasArchetype()) {
+    return SILValue();
+  }
+  SILBuilderWithScope builder(BI);
+  auto *inst = builder.createIntegerLiteral(
+      BI->getLoc(), SILType::getBuiltinIntegerType(1, builder.getASTContext()),
+      true);
+  BI->replaceAllUsesWith(inst);
+  return inst;
+}
+
 static SILValue constantFoldBuiltin(BuiltinInst *BI,
                                     Optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
@@ -1189,9 +1216,8 @@ static SILValue constantFoldBuiltin(BuiltinInst *BI,
 #include "swift/AST/Builtins.def"
     return constantFoldBinaryWithOverflow(BI, Builtin.ID, ResultsInError);
 
-#define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
-case BuiltinValueKind::id:
+#define BUILTIN(id, name, attrs)
+#define BUILTIN_BINARY_OPERATION(id, name, attrs) case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
       return constantFoldBinary(BI, Builtin.ID, ResultsInError);
 
@@ -1501,7 +1527,11 @@ static bool
 constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
                                             bool enableDiagnostics) {
   // Look through string initializer to extract the string_literal instruction.
-  SILValue builtinOperand = bi->getOperand(0);
+  //
+  // We allow for a single borrow to be stripped here if we are here in
+  // [ossa]. The begin borrow occurs b/c SILGen treats builtins as having
+  // arguments with a +0 convention (implying a borrow).
+  SILValue builtinOperand = stripBorrow(bi->getOperand(0));
   SILFunction *caller = bi->getFunction();
 
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);
@@ -1563,7 +1593,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
         continue;
       }
 
-      if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer)) {
+      if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer) ||
+          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete)) {
         WorkList.insert(inst);
         continue;
       }
@@ -1579,6 +1610,15 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
       if (isApplyOfStringConcat(*inst)) {
         WorkList.insert(inst);
         continue;
+      }
+
+      if (auto *bi = dyn_cast<BuiltinInst>(inst)) {
+        if (auto kind = bi->getBuiltinKind()) {
+          if (isPolymorphicBuiltin(kind.getValue())) {
+            WorkList.insert(bi);
+            continue;
+          }
+        }
       }
 
       // If we have nominal type literals like struct, tuple, enum visit them
@@ -1779,6 +1819,32 @@ ConstantFolder::processWorkList() {
         }
       }
       continue;
+    }
+
+    if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
+      if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
+        // Here, the bulitin instruction got folded, so clean it up.
+        recursivelyDeleteTriviallyDeadInstructions(
+            I, /*force*/ true,
+            [&](SILInstruction *DeadI) { WorkList.remove(DeadI); });
+        InvalidateInstructions = true;
+      }
+      continue;
+    }
+
+    if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+      if (auto kind = bi->getBuiltinKind()) {
+        if (SILValue v = specializePolymorphicBuiltin(bi, kind.getValue())) {
+          // If bi had a result, RAUW.
+          if (bi->getResult(0)->getType() !=
+              bi->getModule().Types.getEmptyTupleType())
+            bi->replaceAllUsesWith(v);
+          // Then delete no matter what.
+          bi->eraseFromParent();
+          InvalidateInstructions = true;
+          continue;
+        }
+      }
     }
 
     // Go through all users of the constant and try to fold them.

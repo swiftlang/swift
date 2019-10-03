@@ -26,15 +26,15 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -487,26 +487,6 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
   (void)conf;
 
   // Generate code to invoke _bridgeToObjectiveC
-
-  auto *ntd = sourceType.getNominalOrBoundGenericNominal();
-  assert(ntd);
-  auto members = ntd->lookupDirect(mod.getASTContext().Id_bridgeToObjectiveC);
-  if (members.empty()) {
-    SmallVector<ValueDecl *, 4> foundMembers;
-    if (ntd->getDeclContext()->lookupQualified(
-            ntd, mod.getASTContext().Id_bridgeToObjectiveC,
-            NLOptions::NL_ProtocolMembers, foundMembers)) {
-      // Returned members are starting with the most specialized ones.
-      // Thus, the first element is what we are looking for.
-      members.push_back(foundMembers.front());
-    }
-  }
-
-  // There should be exactly one implementation of _bridgeToObjectiveC.
-  if (members.size() != 1)
-    return None;
-
-  auto bridgeFuncDecl = members.front();
   ModuleDecl *modDecl =
       mod.getASTContext().getLoadedModule(mod.getASTContext().Id_Foundation);
   if (!modDecl)
@@ -532,7 +512,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
 
   // Get substitutions, if source is a bound generic type.
   auto subMap = sourceType->getContextSubstitutionMap(
-      mod.getSwiftModule(), bridgeFuncDecl->getDeclContext());
+      mod.getSwiftModule(), resultDecl->getDeclContext());
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
@@ -1235,8 +1215,8 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   if (Inst->isExact())
     return nullptr;
 
-  // Local helper we use to simplify replacing a checked_cast_branch with an
-  // optimized checked cast branch.
+  // InstOptUtils.helper we use to simplify replacing a checked_cast_branch with
+  // an optimized checked cast branch.
   auto replaceCastHelper = [](SILBuilderWithScope &B,
                               SILDynamicCastInst dynamicCast,
                               MetatypeInst *mi) -> SILInstruction * {
@@ -1552,7 +1532,7 @@ static bool optimizeStaticallyKnownProtocolConformance(
         Ctx.AllocateCopy(NewConformances);
 
     auto ExistentialRepr =
-        Dest->getType().getPreferredExistentialRepresentation(Mod, SourceType);
+        Dest->getType().getPreferredExistentialRepresentation(SourceType);
 
     switch (ExistentialRepr) {
     default:

@@ -1,0 +1,78 @@
+//===--- BuiltinMath.swift.gyb --------------------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+
+# Don't need 64-bit (Double/CDouble) overlays. The ordinary C imports work fine.
+overlayFloatBits = [32, 80]
+allFloatBits = [32, 64, 80]
+
+def floatName(bits):
+    if bits == 32:
+        return 'Float'
+    if bits == 64:
+        return 'Double'
+    if bits == 80:
+        return 'Float80'
+
+def cFloatName(bits):
+    if bits == 32:
+        return 'CFloat'
+    if bits == 64:
+        return 'CDouble'
+    if bits == 80:
+        return 'CLongDouble'
+
+def cFuncSuffix(bits):
+    if bits == 32:
+        return 'f'
+    if bits == 64:
+        return ''
+    if bits == 80:
+        return 'l'
+
+# Each of the following lists is ordered to match math.h
+
+# These functions have a corresponding LLVM intrinsic
+# Note, keep this up to date with Darwin/tgmath.swift.gyb
+UnaryIntrinsicFunctions = [
+    'cos', 'sin',
+    'exp', 'exp2',
+    'log', 'log10', 'log2',
+    'nearbyint', 'rint',
+]
+
+def TypedUnaryIntrinsicFunctions():
+    for ufunc in UnaryIntrinsicFunctions:
+        for bits in allFloatBits:
+            yield floatName(bits), cFloatName(bits), bits, ufunc
+
+}%
+
+// Unary intrinsic functions
+// Note these have a corresponding LLVM intrinsic
+% for T, CT, bits, ufunc in TypedUnaryIntrinsicFunctions():
+%  if bits == 80:
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%  end
+@_transparent
+public func _${ufunc}(_ x: ${T}) -> ${T} {
+  return ${T}(Builtin.int_${ufunc}_FPIEEE${bits}(x._value))
+}
+%  if bits == 80:
+#endif
+%  end
+% end
+
+// ${'Local Variables'}:
+// eval: (read-only-mode 1)
+// End:

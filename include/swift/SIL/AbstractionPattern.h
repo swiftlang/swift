@@ -402,6 +402,7 @@ public:
     case Kind::Tuple:
       return false;
     }
+    llvm_unreachable("Unhandled AbstractionPatternKind in switch");
   }
 
   CanGenericSignature getGenericSignature() const {

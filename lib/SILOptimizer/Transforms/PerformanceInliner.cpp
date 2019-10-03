@@ -17,7 +17,7 @@
 #include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
@@ -261,8 +261,6 @@ bool SILPerformanceInliner::isProfitableToInline(
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
   assert(Callee);
   bool IsGeneric = AI.hasSubstitutions();
-
-  assert(EnableSILInliningOfGenerics || !IsGeneric);
 
   // Start with a base benefit.
   int BaseBenefit = RemovedCallBenefit;
@@ -555,15 +553,24 @@ static Optional<bool> shouldInlineGeneric(FullApplySite AI) {
   if (Callee->getInlineStrategy() == AlwaysInline || Callee->isTransparent())
     return true;
 
-  // All other generic functions should not be inlined if this kind of inlining
-  // is disabled.
-  if (!EnableSILInliningOfGenerics)
-    return false;
-
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
   if (!AI.getSubstitutionMap().hasArchetypes())
+    return false;
+
+  if (Callee->getLoweredFunctionType()->getCoroutineKind() !=
+      SILCoroutineKind::None) {
+    // Co-routines are so expensive (e.g. Array.subscript.read) that we always
+    // enable inlining them in a generic context. Though the final inlining
+    // decision is done by the usual heuristics. Therefore we return None and
+    // not true.
+    return None;
+  }
+
+  // All other generic functions should not be inlined if this kind of inlining
+  // is disabled.
+  if (!EnableSILInliningOfGenerics)
     return false;
 
   // It is not clear yet if this function should be decided or not.

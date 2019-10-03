@@ -26,6 +26,7 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -80,140 +81,405 @@ template <typename T> static T unwrap(llvm::Expected<T> value) {
   exit(EXIT_FAILURE);
 }
 
-static void reportError(std::error_code EC) {
-  assert(EC);
-  llvm::errs() << "swift-reflection-test error: " << EC.message() << ".\n";
-  exit(EXIT_FAILURE);
-}
-
-using NativeReflectionContext =
-    swift::reflection::ReflectionContext<External<RuntimeTarget<sizeof(uintptr_t)>>>;
-
 using ReadBytesResult = swift::remote::MemoryReader::ReadBytesResult;
 
-static uint64_t getSectionAddress(SectionRef S) {
-  // See COFFObjectFile.cpp for the implementation of 
-  // COFFObjectFile::getSectionAddress. The image base address is added
-  // to all the addresses of the sections, thus the behavior is slightly different from
-  // the other platforms.
-  if (auto C = dyn_cast<COFFObjectFile>(S.getObject()))
-    return S.getAddress() - C->getImageBase();
-  return S.getAddress();
-}
-
-static bool needToRelocate(SectionRef S) {
-  if (!getSectionAddress(S))
-    return false;
-
-  if (auto EO = dyn_cast<ELFObjectFileBase>(S.getObject())) {
-    static const llvm::StringSet<> ELFSectionsList = {
-      ".data", ".rodata", "swift5_protocols", "swift5_protocol_conformances",
-      "swift5_typeref", "swift5_reflstr", "swift5_assocty", "swift5_replace",
-      "swift5_type_metadata", "swift5_fieldmd", "swift5_capture", "swift5_builtin"
-    };
-    StringRef Name;
-    if (auto EC = S.getName(Name))
-      reportError(EC);
-    return ELFSectionsList.count(Name);
-  }
-
-  return true;
-}
-
+// Since ObjectMemoryReader maintains ownership of the ObjectFiles and their
+// raw data, we can vend ReadBytesResults with no-op destructors.
+static void no_op_destructor(const void*) {}
 
 class Image {
-  std::vector<char> Memory;
+private:
+  struct Segment {
+    uint64_t Addr;
+    StringRef Contents;
+  };
+  const ObjectFile *O;
+  uint64_t HeaderAddress;
+  std::vector<Segment> Segments;
+  llvm::DenseMap<uint64_t, StringRef> DynamicRelocations;
+  
+  void scanMachO(const MachOObjectFile *O) {
+    using namespace llvm::MachO;
+
+    HeaderAddress = UINT64_MAX;
+    
+    // Collect the segment preferred vm mappings.
+    for (const auto &Load : O->load_commands()) {
+      if (Load.C.cmd == LC_SEGMENT_64) {
+        auto Seg = O->getSegment64LoadCommand(Load);
+        if (Seg.filesize == 0)
+          continue;
+        
+        auto contents = O->getData().slice(Seg.fileoff,
+                                           Seg.fileoff + Seg.filesize);
+        
+        if (contents.empty() || contents.size() != Seg.filesize)
+          continue;
+        
+        Segments.push_back({Seg.vmaddr, contents});
+        HeaderAddress = std::min(HeaderAddress, Seg.vmaddr);
+      } else if (Load.C.cmd == LC_SEGMENT) {
+        auto Seg = O->getSegmentLoadCommand(Load);
+        if (Seg.filesize == 0)
+          continue;
+        
+        auto contents = O->getData().slice(Seg.fileoff,
+                                           Seg.fileoff + Seg.filesize);
+        
+        if (contents.empty() || contents.size() != Seg.filesize)
+          continue;
+        
+        Segments.push_back({Seg.vmaddr, contents});
+        HeaderAddress = std::min(HeaderAddress, (uint64_t)Seg.vmaddr);
+      }
+    }
+    
+    // Walk through the bindings list to collect all the external references
+    // in the image.
+    llvm::Error error = llvm::Error::success();
+    auto OO = const_cast<MachOObjectFile*>(O);
+
+    for (auto bind : OO->bindTable(error)) {
+      if (error) {
+        llvm::consumeError(std::move(error));
+        break;
+      }
+      DynamicRelocations.insert({bind.address(), bind.symbolName()});
+    }
+    if (error) {
+      llvm::consumeError(std::move(error));
+    }
+  }
+  
+  template<typename ELFT>
+  void scanELFType(const ELFObjectFile<ELFT> *O) {
+    using namespace llvm::ELF;
+
+    HeaderAddress = UINT64_MAX;
+
+    auto phdrs = O->getELFFile()->program_headers();
+    if (!phdrs) {
+      llvm::consumeError(phdrs.takeError());
+      return;
+    }
+
+    for (auto &ph : *phdrs) {
+      if (ph.p_filesz == 0)
+        continue;
+      
+      auto contents = O->getData().slice(ph.p_offset,
+                                         ph.p_offset + ph.p_filesz);
+      if (contents.empty() || contents.size() != ph.p_filesz)
+        continue;
+      
+      Segments.push_back({ph.p_vaddr, contents});
+      HeaderAddress = std::min(HeaderAddress, (uint64_t)ph.p_vaddr);
+    }
+  }
+  
+  void scanELF(const ELFObjectFileBase *O) {
+    if (auto le32 = dyn_cast<ELFObjectFile<ELF32LE>>(O)) {
+      scanELFType(le32);
+    } else if (auto be32 = dyn_cast<ELFObjectFile<ELF32BE>>(O)) {
+      scanELFType(be32);
+    } else if (auto le64 = dyn_cast<ELFObjectFile<ELF64LE>>(O)) {
+      scanELFType(le64);
+    } else if (auto be64 = dyn_cast<ELFObjectFile<ELF64BE>>(O)) {
+      scanELFType(be64);
+    }
+    
+    // FIXME: ReflectionContext tries to read bits of the ELF structure that
+    // aren't normally mapped by a phdr. Until that's fixed,
+    // allow access to the whole file 1:1 in address space that isn't otherwise
+    // mapped.
+    Segments.push_back({HeaderAddress, O->getData()});
+  }
+  
+  void scanCOFF(const COFFObjectFile *O) {
+    HeaderAddress = O->getImageBase();
+    
+    for (auto SectionRef : O->sections()) {
+      auto Section = O->getCOFFSection(SectionRef);
+      
+      if (Section->SizeOfRawData == 0)
+        continue;
+      
+      auto SectionBase = O->getImageBase() + Section->VirtualAddress;
+      auto SectionContent =
+        O->getData().slice(Section->PointerToRawData,
+                           Section->PointerToRawData + Section->SizeOfRawData);
+      if (SectionContent.empty()
+          || SectionContent.size() != Section->SizeOfRawData)
+        continue;
+      
+      Segments.push_back({SectionBase, SectionContent});
+    }
+    
+    Segments.push_back({HeaderAddress, O->getData()});
+  }
 
 public:
-  explicit Image(const ObjectFile *O) {
-    uint64_t VASize = O->getData().size();
-    for (SectionRef S : O->sections()) {
-      if (auto SectionAddr = getSectionAddress(S))
-        VASize = std::max(VASize, SectionAddr + S.getSize());
+  explicit Image(const ObjectFile *O) : O(O) {
+    // Unfortunately llvm doesn't provide a uniform interface for iterating
+    // loadable segments or dynamic relocations in executable images yet.
+    if (auto macho = dyn_cast<MachOObjectFile>(O)) {
+      scanMachO(macho);
+    } else if (auto elf = dyn_cast<ELFObjectFileBase>(O)) {
+      scanELF(elf);
+    } else if (auto coff = dyn_cast<COFFObjectFile>(O)) {
+      scanCOFF(coff);
+    } else {
+      fputs("unsupported image format\n", stderr);
+      abort();
     }
-    Memory.resize(VASize);
-    std::memcpy(&Memory[0], O->getData().data(), O->getData().size());
+  }
+  
+  unsigned getBytesInAddress() const {
+    return O->getBytesInAddress();
+  }
+    
+  uint64_t getStartAddress() const {
+    return HeaderAddress;
+  }
+  
+  uint64_t getEndAddress() const {
+    uint64_t max = 0;
+    for (auto &Segment : Segments) {
+      max = std::max(max, Segment.Addr + Segment.Contents.size());
+    }
+    return max;
+  }
 
-    for (SectionRef S : O->sections()) {
-      if (!needToRelocate(S))
+  StringRef getContentsAtAddress(uint64_t Addr, uint64_t Size) const {
+    for (auto &Segment : Segments) {
+      auto addrInSegment = Segment.Addr <= Addr
+        && Addr + Size <= Segment.Addr + Segment.Contents.size();
+      
+      if (!addrInSegment)
         continue;
-      StringRef Content;
-      if (auto EC = S.getContents(Content))
-        reportError(EC);
-      std::memcpy(&Memory[getSectionAddress(S)], Content.data(),
-                  Content.size());
+
+      auto offset = Addr - Segment.Addr;
+      auto result = Segment.Contents.drop_front(offset);
+      return result;
     }
+    return {};
   }
-
-  RemoteAddress getStartAddress() const {
-    return RemoteAddress((uintptr_t)Memory.data());
-  }
-
-  bool isAddressValid(RemoteAddress Addr, uint64_t Size) const {
-    return (uintptr_t)Memory.data() <= Addr.getAddressData() &&
-           Addr.getAddressData() + Size <=
-               (uintptr_t)Memory.data() + Memory.size();
-  }
-
-  ReadBytesResult readBytes(RemoteAddress Addr, uint64_t Size) {
-    if (!isAddressValid(Addr, Size))
-      return ReadBytesResult(nullptr, [](const void *) {});
-    return ReadBytesResult((const void *)(Addr.getAddressData()),
-                           [](const void *) {});
+  
+  RemoteAbsolutePointer
+  resolvePointer(uint64_t Addr, uint64_t pointerValue) const {
+    auto found = DynamicRelocations.find(Addr);
+    RemoteAbsolutePointer result;
+    if (found == DynamicRelocations.end())
+      result = RemoteAbsolutePointer("", pointerValue);
+    else
+      result = RemoteAbsolutePointer(found->second, pointerValue);
+    return result;
   }
 };
 
+/// MemoryReader that reads from the on-disk representation of an executable
+/// or dynamic library image.
+///
+/// This reader uses a remote addressing scheme where the most significant
+/// 16 bits of the address value serve as an index into the array of loaded images,
+/// and the low 48 bits correspond to the preferred virtual address mapping of
+/// the image.
 class ObjectMemoryReader : public MemoryReader {
-  std::vector<Image> Images;
+  struct ImageEntry {
+    Image TheImage;
+    uint64_t Slide;
+  };
+  std::vector<ImageEntry> Images;
+  
+  std::pair<const Image *, uint64_t>
+  decodeImageIndexAndAddress(uint64_t Addr) const {
+    for (auto &Image : Images) {
+      if (Image.TheImage.getStartAddress() + Image.Slide <= Addr
+          && Addr < Image.TheImage.getEndAddress() + Image.Slide) {
+        return {&Image.TheImage, Addr - Image.Slide};
+      }
+    }
+    return {nullptr, 0};
+  }
+  
+  uint64_t
+  encodeImageIndexAndAddress(const Image *image, uint64_t imageAddr) const {
+    auto entry = (const ImageEntry*)image;
+    return imageAddr + entry->Slide;
+  }
 
+  StringRef getContentsAtAddress(uint64_t Addr, uint64_t Size) {
+    const Image *image;
+    uint64_t imageAddr;
+    std::tie(image, imageAddr) = decodeImageIndexAndAddress(Addr);
+
+    if (!image)
+      return StringRef();
+    
+    return image->getContentsAtAddress(imageAddr, Size);
+  }
+  
 public:
   explicit ObjectMemoryReader(
       const std::vector<const ObjectFile *> &ObjectFiles) {
-    for (const ObjectFile *O : ObjectFiles)
-      Images.emplace_back(O);
+    if (ObjectFiles.empty()) {
+      fputs("no object files provided\n", stderr);
+      abort();
+    }
+    unsigned WordSize = 0;
+    for (const ObjectFile *O : ObjectFiles) {
+      // All the object files we look at should share a word size.
+      if (!WordSize) {
+        WordSize = O->getBytesInAddress();
+      } else if (WordSize != O->getBytesInAddress()) {
+        fputs("object files must all be for the same architecture\n", stderr);
+        abort();
+      }
+      Images.push_back({Image(O), 0});
+    }
+    
+    // If there is more than one image loaded, try to fit them into one address
+    // space.
+    if (Images.size() > 1) {
+      uint64_t NextAddrSpace = 0;
+      for (auto &Image : Images) {
+        Image.Slide = NextAddrSpace - Image.TheImage.getStartAddress();
+        NextAddrSpace +=
+          Image.TheImage.getEndAddress() - Image.TheImage.getStartAddress();
+        NextAddrSpace = (NextAddrSpace + 16383) & ~16383;
+      }
+      
+      if (WordSize < 8 && NextAddrSpace > 0xFFFFFFFFu) {
+        fputs("object files did not fit in address space", stderr);
+        abort();
+      }
+    }
   }
 
-  const std::vector<Image> &getImages() const { return Images; }
+  ArrayRef<ImageEntry> getImages() const { return Images; }
 
   bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
                        void *outBuffer) override {
+    auto wordSize = Images.front().TheImage.getBytesInAddress();
     switch (type) {
     case DLQ_GetPointerSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
-      *result = sizeof(void *);
+      *result = wordSize;
       return true;
     }
     case DLQ_GetSizeSize: {
       auto result = static_cast<uint8_t *>(outBuffer);
-      *result = sizeof(size_t);
+      *result = wordSize;
       return true;
     }
     }
 
     return false;
   }
+  
+  RemoteAddress getImageStartAddress(unsigned i) const {
+    assert(i < Images.size());
+    
+    return RemoteAddress(
+           encodeImageIndexAndAddress(&Images[i].TheImage,
+                                      Images[i].TheImage.getStartAddress()));
+  }
 
+  // TODO: We could consult the dynamic symbol tables of the images to
+  // implement this.
   RemoteAddress getSymbolAddress(const std::string &name) override {
     return RemoteAddress(nullptr);
   }
 
   ReadBytesResult readBytes(RemoteAddress Addr, uint64_t Size) override {
-    auto I = std::find_if(Images.begin(), Images.end(), [=](const Image &I) {
-      return I.isAddressValid(Addr, Size);
-    });
-    return I == Images.end() ? ReadBytesResult(nullptr, [](const void *) {})
-                             : I->readBytes(Addr, Size);
+    auto addrValue = Addr.getAddressData();
+    auto resultBuffer = getContentsAtAddress(addrValue, Size);
+    return ReadBytesResult(resultBuffer.data(), no_op_destructor);
   }
 
   bool readString(RemoteAddress Addr, std::string &Dest) override {
-    ReadBytesResult R = readBytes(Addr, 1);
-    if (!R)
+    auto addrValue = Addr.getAddressData();
+    auto resultBuffer = getContentsAtAddress(addrValue, 1);
+    if (resultBuffer.empty())
       return false;
-    StringRef Str((const char *)R.get());
-    Dest.append(Str.begin(), Str.end());
+    
+    // Make sure there's a null terminator somewhere in the contents.
+    unsigned i = 0;
+    for (unsigned e = resultBuffer.size(); i < e; ++i) {
+      if (resultBuffer[i] == 0)
+        goto found_terminator;
+    }
+    return false;
+    
+  found_terminator:
+    Dest.append(resultBuffer.begin(), resultBuffer.begin() + i);
     return true;
   }
+  
+  RemoteAbsolutePointer resolvePointer(RemoteAddress Addr,
+                                       uint64_t pointerValue) override {
+    auto addrValue = Addr.getAddressData();
+    const Image *image;
+    uint64_t imageAddr;
+    std::tie(image, imageAddr) =
+      decodeImageIndexAndAddress(addrValue);
+    
+    if (!image)
+      return RemoteAbsolutePointer();
+    
+    auto resolved = image->resolvePointer(imageAddr, pointerValue);
+    
+    if (resolved && resolved.isResolved()) {
+      // Mix in the image index again to produce a remote address pointing into
+      // the same image.
+      return RemoteAbsolutePointer("", encodeImageIndexAndAddress(image,
+                               resolved.getResolvedAddress().getAddressData()));
+    }
+    // If the pointer is relative to an unresolved relocation, leave it as is.
+    return resolved;
+  }
 };
+
+using ReflectionContextOwner
+  = std::unique_ptr<void, void (*)(void*)>;
+
+template<typename Runtime>
+static std::pair<ReflectionContextOwner, TypeRefBuilder &>
+makeReflectionContextForMetadataReader(
+                                   std::shared_ptr<ObjectMemoryReader> reader) {
+  using ReflectionContext = ReflectionContext<Runtime>;
+  auto context = new ReflectionContext(reader);
+  auto &builder = context->getBuilder();
+  for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
+    context->addImage(reader->getImageStartAddress(i));
+  }
+  return {ReflectionContextOwner(context,
+                                 [](void *x){ delete (ReflectionContext*)x; }),
+          builder};
+}
+                                          
+
+static std::pair<ReflectionContextOwner, TypeRefBuilder &>
+makeReflectionContextForObjectFiles(
+                          const std::vector<const ObjectFile *> &objectFiles) {
+  auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
+
+  uint8_t pointerSize;
+  Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
+                          nullptr, &pointerSize);
+  
+  switch (pointerSize) {
+  case 4:
+    return makeReflectionContextForMetadataReader<External<RuntimeTarget<4>>>
+                                                            (std::move(Reader));
+  case 8:
+    return makeReflectionContextForMetadataReader<External<RuntimeTarget<8>>>
+                                                            (std::move(Reader));
+  default:
+    fputs("unsupported word size in object file\n", stderr);
+    abort();
+  }
+}
 
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
                                     StringRef Arch, ActionType Action,
@@ -243,16 +509,14 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     ObjectOwners.push_back(std::move(ObjectOwner));
     ObjectFiles.push_back(O);
   }
-
-  auto Reader = std::make_shared<ObjectMemoryReader>(ObjectFiles);
-  NativeReflectionContext Context(Reader);
-  for (const Image &I : Reader->getImages())
-    Context.addImage(I.getStartAddress());
+  
+  auto context = makeReflectionContextForObjectFiles(ObjectFiles);
+  auto &builder = context.second;
 
   switch (Action) {
   case ActionType::DumpReflectionSections:
     // Dump everything
-    Context.getBuilder().dumpAllSections(OS);
+    builder.dumpAllSections(OS);
     break;
   case ActionType::DumpTypeLowering: {
     for (std::string Line; std::getline(std::cin, Line);) {
@@ -265,15 +529,14 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       Demangle::Demangler Dem;
       auto Demangled = Dem.demangleType(Line);
       auto *TypeRef =
-          swift::Demangle::decodeMangledType(Context.getBuilder(), Demangled);
+          swift::Demangle::decodeMangledType(builder, Demangled);
       if (TypeRef == nullptr) {
         OS << "Invalid typeref: " << Line << "\n";
         continue;
       }
 
       TypeRef->dump(OS);
-      auto *TypeInfo =
-          Context.getBuilder().getTypeConverter().getTypeInfo(TypeRef);
+      auto *TypeInfo = builder.getTypeConverter().getTypeInfo(TypeRef);
       if (TypeInfo == nullptr) {
         OS << "Invalid lowering\n";
         continue;

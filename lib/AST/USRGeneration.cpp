@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/AST/ASTMangler.h"
@@ -240,11 +241,12 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
     }
   }
 
-  if (!D->hasInterfaceType())
+  auto declIFaceTy = D->getInterfaceType();
+  if (!declIFaceTy)
     return std::string();
 
   // Invalid code.
-  if (D->getInterfaceType().findIf([](Type t) -> bool {
+  if (declIFaceTy.findIf([](Type t) -> bool {
         return t->is<ModuleType>();
       }))
     return std::string();

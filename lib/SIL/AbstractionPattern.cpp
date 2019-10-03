@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/SIL/TypeLowering.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -367,7 +368,7 @@ AbstractionPattern::getCXXMethodSelfPattern(CanType selfType) const {
     // insufficient --- if we have interesting bridging to do to
     // 'self' --- we have the right information to be more exact.
     auto clangSelfType =
-        CXXMethod->getThisType(CXXMethod->getASTContext()).getTypePtr();
+        CXXMethod->getThisType().getTypePtr();
     return AbstractionPattern(getGenericSignatureForFunctionComponent(),
                               selfType, clangSelfType);
   }

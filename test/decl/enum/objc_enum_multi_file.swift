@@ -24,7 +24,7 @@
 }
 
 #elseif NO_CASES
-// NO_CASES: :[[@LINE+1]]:22: error: an enum with no cases cannot declare a raw type
+// NO_CASES: :[[@LINE+1]]:12: error: an enum with no cases cannot declare a raw type
 @objc enum TheEnum : Int32 {
   static var A: TheEnum! { return nil }
 }

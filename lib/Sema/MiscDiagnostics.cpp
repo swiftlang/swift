@@ -22,6 +22,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -29,6 +30,8 @@
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/SaveAndRestore.h"
+
+#define DEBUG_TYPE "Sema"
 using namespace swift;
 
 /// Return true if this expression is an implicit promotion from T to T?.
@@ -470,8 +473,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         isExistential = instanceTy->isExistentialType();
         if (!isExistential &&
             instanceTy->mayHaveMembers() &&
-            !TC.lookupConstructors(const_cast<DeclContext *>(DC),
-                                   instanceTy).empty()) {
+            !TypeChecker::lookupConstructors(const_cast<DeclContext *>(DC),
+                                             instanceTy).empty()) {
           TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
             .fixItInsertAfter(E->getEndLoc(), "()");
         }
@@ -525,7 +528,7 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
       }
 
       DeclContext *topLevelContext = DC->getModuleScopeContext();
-      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
+      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext,
                                /*Loc=*/SourceLoc(),
                                UnqualifiedLookup::Flags::KnownPrivate);
 
@@ -629,10 +632,8 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
         return;
 
       auto subMap = DRE->getDeclRef().getSubstitutions();
-      auto fromTy =
-        Type(GenericTypeParamType::get(0, 0, TC.Context)).subst(subMap);
-      auto toTy =
-        Type(GenericTypeParamType::get(0, 1, TC.Context)).subst(subMap);
+      auto fromTy = subMap.getReplacementTypes()[0];
+      auto toTy = subMap.getReplacementTypes()[1];
 
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
@@ -1571,9 +1572,13 @@ bool TypeChecker::getDefaultGenericArgumentsString(
     genericParamText << contextTy;
   };
 
-  interleave(typeDecl->getInnermostGenericParamTypes(),
-             printGenericParamSummary, [&]{ genericParamText << ", "; });
-
+  // FIXME: We can potentially be in the middle of creating a generic signature
+  // if we get here.  Break this cycle.
+  if (typeDecl->hasComputedGenericSignature()) {
+    interleave(typeDecl->getInnermostGenericParamTypes(),
+               printGenericParamSummary, [&]{ genericParamText << ", "; });
+  }
+  
   genericParamText << ">";
   return true;
 }
@@ -2088,6 +2093,10 @@ class VarDeclUsageChecker : public ASTWalker {
   /// This is a mapping from VarDecls to the if/while/guard statement that they
   /// occur in, when they are in a pattern in a StmtCondition.
   llvm::SmallDenseMap<VarDecl*, LabeledConditionalStmt*> StmtConditionForVD;
+
+#ifndef NDEBUG
+  llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
+#endif
   
   bool sawError = false;
   
@@ -2828,12 +2837,18 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 
 /// The heavy lifting happens when visiting expressions.
 std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
+  STATISTIC(VarDeclUsageCheckerExprVisits,
+            "# of times VarDeclUsageChecker::walkToExprPre is called");
+  ++VarDeclUsageCheckerExprVisits;
+
   // Sema leaves some subexpressions null, which seems really unfortunate.  It
   // should replace them with ErrorExpr.
   if (E == nullptr || !E->getType() || E->getType()->hasError()) {
     sawError = true;
     return { false, E };
   }
+
+  assert(AllExprsSeen.insert(E).second && "duplicate traversal");
 
   // If this is a DeclRefExpr found in a random place, it is a load of the
   // vardecl.
@@ -2879,9 +2894,13 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     return { false, E };
   }
   
-  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
-  if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
+  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
+  // and only walk the subexpr.
+  if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
     OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
+    oee->getSubExpr()->walk(*this);
+    return { false, E };
+  }
 
   // Visit bindings.
   if (auto ove = dyn_cast<OpaqueValueExpr>(E)) {
@@ -4036,7 +4055,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   if (!TC.Context.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
-    diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+    diagAvailability(E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
@@ -4249,10 +4268,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasInterfaceType())
-    validateDecl(afd);
-
-  if (afd->isInvalid() || isa<DestructorDecl>(afd))
+  if (!afd->getInterfaceType() || afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -4332,10 +4348,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->hasInterfaceType())
-    validateDecl(var);
-
-  if (var->isInvalid() || !var->hasInterfaceType())
+  if (!var->getInterfaceType() || var->isInvalid())
     return None;
 
   if (var->getName().empty())

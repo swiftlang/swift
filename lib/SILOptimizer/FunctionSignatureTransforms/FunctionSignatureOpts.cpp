@@ -34,7 +34,6 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
@@ -42,8 +41,9 @@
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
@@ -65,10 +65,16 @@ using ArgumentIndexMap = llvm::SmallDenseMap<int, int>;
 //===----------------------------------------------------------------------===//
 
 /// Set to true to enable the support for partial specialization.
-llvm::cl::opt<bool>
+static llvm::cl::opt<bool>
     FSOEnableGenerics("sil-fso-enable-generics", llvm::cl::init(true),
                       llvm::cl::desc("Support function signature optimization "
                                      "of generic functions"));
+
+static llvm::cl::opt<bool>
+    FSOOptimizeIfNotCalled("sil-fso-optimize-if-not-called",
+                           llvm::cl::init(false),
+                           llvm::cl::desc("Optimize even if a function isn't "
+                                          "called. For testing only!"));
 
 static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
                                           bool OptForPartialApply) {
@@ -89,7 +95,7 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep,
   llvm_unreachable("Unhandled SILFunctionTypeRepresentation in switch.");
 }
 
-/// Returns true if F is a function which the pass know show to specialize
+/// Returns true if F is a function which the pass knows how to specialize
 /// function signatures for.
 static bool canSpecializeFunction(SILFunction *F,
                                   const CallerAnalysis::FunctionInfo *FuncInfo,
@@ -387,7 +393,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionType() {
   // proper interface type. This is required for generic functions.
   mapInterfaceTypes(F, InterfaceParams, InterfaceResults, InterfaceErrorResult);
 
-  GenericSignature *GenericSig =
+  GenericSignature GenericSig =
       UsesGenerics ? FTy->getGenericSignature() : nullptr;
 
   return SILFunctionType::get(
@@ -616,7 +622,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
 
 // Run the optimization.
 bool FunctionSignatureTransform::run(bool hasCaller) {
-  bool Changed = false;
+  // We use a reference here on purpose so our transformations can know if we
+  // are going to make a thunk and thus should just optimize.
+  bool &Changed = TransformDescriptor.Changed;
+  bool hasOnlyDirectInModuleCallers =
+      TransformDescriptor.hasOnlyDirectInModuleCallers;
   SILFunction *F = TransformDescriptor.OriginalFunction;
 
   // Never repeat the same function signature optimization on the same function.
@@ -631,6 +641,9 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
     LLVM_DEBUG(llvm::dbgs() << "  FSO already performed on this thunk\n");
     return false;
   }
+
+  // If we are asked to assume a caller for testing purposes, set the flag.
+  hasCaller |= FSOOptimizeIfNotCalled;
 
   if (!hasCaller && (F->getDynamicallyReplacedFunction() ||
                      canBeCalledIndirectly(F->getRepresentation()))) {
@@ -648,7 +661,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // Run DeadArgument elimination transformation. We only specialize
   // if this function has a caller inside the current module or we have
   // already created a thunk.
-  if ((hasCaller || Changed) && DeadArgumentAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectInModuleCallers) &&
+      DeadArgumentAnalyzeParameters()) {
     Changed = true;
     LLVM_DEBUG(llvm::dbgs() << "  remove dead arguments\n");
     DeadArgumentTransformFunction();
@@ -666,7 +680,8 @@ bool FunctionSignatureTransform::run(bool hasCaller) {
   // In order to not miss any opportunity, we send the optimized function
   // to the passmanager to optimize any opportunities exposed by argument
   // explosion.
-  if ((hasCaller || Changed) && ArgumentExplosionAnalyzeParameters()) {
+  if ((hasCaller || Changed || hasOnlyDirectInModuleCallers) &&
+      ArgumentExplosionAnalyzeParameters()) {
     Changed = true;
   }
 
@@ -821,7 +836,8 @@ public:
     SILOptFunctionBuilder FuncBuilder(*this);
     // Owned to guaranteed optimization.
     FunctionSignatureTransform FST(FuncBuilder, F, RCIA, EA, Mangler, AIM,
-                                   ArgumentDescList, ResultDescList);
+                                   ArgumentDescList, ResultDescList,
+                                   FuncInfo.foundAllCallers());
 
     bool Changed = false;
     if (OptForPartialApply) {

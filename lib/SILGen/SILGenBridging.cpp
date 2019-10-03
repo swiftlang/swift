@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILArgument.h"
@@ -103,7 +104,6 @@ emitBridgeNativeToObjectiveC(SILGenFunction &SGF,
   if (!objcTypeReq) return None;
 
   Type objcType = conformance->getTypeWitness(objcTypeReq);
-  assert(objcType);
 
   // Create a reference to the witness.
   SILDeclRef witnessConstant(witness);
@@ -192,7 +192,6 @@ emitBridgeObjectiveCToNative(SILGenFunction &SGF,
 
   // Retrieve the _ObjectiveCType witness.
   auto objcType = conformance->getTypeWitness(objcTypeRequirement);
-  assert(objcType);
 
   // Create a reference to the witness.
   SILDeclRef witnessConstant(witness.getDecl());
@@ -713,7 +712,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // Call into the stdlib intrinsic.
   if (auto bridgeAnything =
         SGF.getASTContext().getBridgeAnythingToObjectiveC()) {
-    auto *genericSig = bridgeAnything->getGenericSignature();
+    auto genericSig = bridgeAnything->getGenericSignature();
     auto subMap = SubstitutionMap::get(
       genericSig,
       [&](SubstitutableType *t) -> Type {

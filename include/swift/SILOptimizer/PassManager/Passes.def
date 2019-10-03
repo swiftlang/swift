@@ -112,6 +112,8 @@ PASS(ConditionForwarding, "condition-forwarding",
      "Conditional Branch Forwarding to Fold SIL switch_enum")
 PASS(ConstantEvaluatorTester, "test-constant-evaluator",
       "Test constant evaluator")
+PASS(ConstantEvaluableSubsetChecker, "test-constant-evaluable-subset",
+     "Test Swift code snippets expected to be constant evaluable")
 PASS(CopyForwarding, "copy-forwarding",
      "Copy Forwarding to Remove Redundant Copies")
 PASS(CopyPropagation, "copy-propagation",
@@ -132,6 +134,8 @@ PASS(DeadObjectElimination, "deadobject-elim",
      "Dead Object Elimination for Classes with Trivial Destruction")
 PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
+PASS(DestroyHoisting, "destroy-hoisting",
+     "Hoisting of value destroys")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
@@ -307,9 +311,14 @@ PASS(SimplifyUnreachableContainingBlocks, "simplify-unreachable-containing-block
      "Utility pass. Removes all non-term insts from blocks with unreachable terms")
 PASS(SerializeSILPass, "serialize-sil",
      "Utility pass. Serializes the current SILModule")
+PASS(NonInlinableFunctionSkippingChecker, "check-non-inlinable-function-skipping",
+     "Utility pass to ensure -experimental-skip-non-inlinable-function-bodies "
+     "skips everything it should")
 PASS(YieldOnceCheck, "yield-once-check",
     "Check correct usage of yields in yield-once coroutines")
 PASS(OSLogOptimization, "os-log-optimization", "Optimize os log calls")
+PASS(MandatoryCombine, "mandatory-combine",
+    "Perform mandatory peephole combines")
 PASS(BugReducerTester, "bug-reducer-tester",
      "sil-bug-reducer Tool Testing by Asserting on a Sentinel Function")
 PASS_RANGE(AllPasses, AADumper, BugReducerTester)

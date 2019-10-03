@@ -281,7 +281,7 @@ class TypeResolution {
     /// The generic signature
     struct {
       /// The generic signature to use for type resolution.
-      GenericSignature *genericSig;
+      GenericSignature genericSig;
 
       /// The generic signature builder that will answer queries about
       /// generic types.
@@ -310,7 +310,7 @@ public:
   /// Form a type resolution for an interface type, which is a complete
   /// description of the type using generic parameters.
   static TypeResolution forInterface(DeclContext *dc,
-                                     GenericSignature *genericSig,
+                                     GenericSignature genericSig,
                                      LazyResolver *resolver = nullptr);
 
   /// Form a type resolution for a contextual type, which is a complete
@@ -336,7 +336,7 @@ public:
 
   /// Retrieves the generic signature for the context, or NULL if there is
   /// no generic signature to resolve types.
-  GenericSignature *getGenericSignature() const;
+  GenericSignature getGenericSignature() const;
 
   /// Resolves a TypeRepr to a type.
   ///

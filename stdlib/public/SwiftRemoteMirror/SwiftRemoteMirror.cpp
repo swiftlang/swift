@@ -114,12 +114,44 @@ void swift_reflection_destroyReflectionContext(SwiftReflectionContextRef Context
   delete ContextRef;
 }
 
+template<typename Iterator>
+ReflectionSection<Iterator> sectionFromInfo(const swift_reflection_info_t &Info,
+                              const swift_reflection_section_pair_t &Section) {
+  auto RemoteSectionStart = (uint64_t)(uintptr_t)Section.section.Begin
+    - Info.LocalStartAddress
+    + Info.RemoteStartAddress;
+  
+  auto Start = RemoteRef<void>(RemoteSectionStart, Section.section.Begin);
+  
+  return ReflectionSection<Iterator>(Start,
+             (uintptr_t)Section.section.End - (uintptr_t)Section.section.Begin);
+}
+
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
   auto Context = ContextRef->nativeContext;
   
-  Context->addReflectionInfo(*reinterpret_cast<ReflectionInfo *>(&Info));
+  // The `offset` fields must be zero.
+  if (Info.field.offset != 0
+      || Info.associated_types.offset != 0
+      || Info.builtin_types.offset != 0
+      || Info.capture.offset != 0
+      || Info.type_references.offset != 0
+      || Info.reflection_strings.offset != 0) {
+    fprintf(stderr, "reserved field in swift_reflection_info_t is not zero\n");
+    abort();
+  }
+  
+  ReflectionInfo ContextInfo{
+    sectionFromInfo<FieldDescriptorIterator>(Info, Info.field),
+    sectionFromInfo<AssociatedTypeIterator>(Info, Info.associated_types),
+    sectionFromInfo<BuiltinTypeDescriptorIterator>(Info, Info.builtin_types),
+    sectionFromInfo<CaptureDescriptorIterator>(Info, Info.capture),
+    sectionFromInfo<const void *>(Info, Info.type_references),
+    sectionFromInfo<const void *>(Info, Info.reflection_strings)};
+  
+  Context->addReflectionInfo(ContextInfo);
 }
 
 int

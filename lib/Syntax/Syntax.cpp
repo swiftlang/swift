@@ -13,11 +13,12 @@
 #include "swift/Syntax/Syntax.h"
 #include "swift/Syntax/SyntaxData.h"
 #include "swift/Syntax/SyntaxVisitor.h"
+#include "swift/Syntax/TokenSyntax.h"
 
 using namespace swift;
 using namespace swift::syntax;
 
-RC<RawSyntax> Syntax::getRaw() const {
+const RC<RawSyntax> &Syntax::getRaw() const {
   return Data->getRaw();
 }
 
@@ -95,4 +96,16 @@ llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
   if (!ChildData)
     return llvm::None;
   return Syntax {Root, ChildData.get()};
+}
+
+Optional<TokenSyntax> Syntax::getFirstToken() const {
+  if (auto tok = getData().getFirstToken())
+    return TokenSyntax(Root, tok.get());
+  return None;
+}
+
+Optional<TokenSyntax> Syntax::getLastToken() const {
+  if (auto tok = getData().getLastToken())
+    return TokenSyntax(Root, tok.get());
+  return None;
 }

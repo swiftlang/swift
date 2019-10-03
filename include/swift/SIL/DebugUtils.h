@@ -42,14 +42,22 @@
 namespace swift {
 
 class SILInstruction;
-  
-/// Deletes all of the debug instructions that use \p Inst.
-inline void deleteAllDebugUses(ValueBase *Inst) {
-  for (auto UI = Inst->use_begin(), E = Inst->use_end(); UI != E;) {
-    auto *Inst = UI->getUser();
-    UI++;
-    if (Inst->isDebugInstruction())
-      Inst->eraseFromParent();
+
+/// Deletes all of the debug instructions that use \p value.
+inline void deleteAllDebugUses(SILValue value) {
+  for (auto ui = value->use_begin(), ue = value->use_end(); ui != ue;) {
+    auto *inst = ui->getUser();
+    ++ui;
+    if (inst->isDebugInstruction()) {
+      inst->eraseFromParent();
+    }
+  }
+}
+
+/// Deletes all of the debug uses of any result of \p inst.
+inline void deleteAllDebugUses(SILInstruction *inst) {
+  for (SILValue v : inst->getResults()) {
+    deleteAllDebugUses(v);
   }
 }
 

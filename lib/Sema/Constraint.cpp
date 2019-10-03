@@ -588,9 +588,11 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
 Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
                                Type first, Type second, Type third,
-                               ConstraintLocator *locator) {
+                               ConstraintLocator *locator,
+                               ArrayRef<TypeVariableType *> extraTypeVars) {
   // Collect type variables.
-  SmallVector<TypeVariableType *, 4> typeVars;
+  SmallVector<TypeVariableType *, 4> typeVars(extraTypeVars.begin(),
+                                              extraTypeVars.end());
   if (first->hasTypeVariable())
     first->getTypeVariables(typeVars);
   if (second->hasTypeVariable())

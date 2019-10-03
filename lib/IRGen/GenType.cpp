@@ -1288,7 +1288,7 @@ void TypeConverter::popGenericContext(CanGenericSignature signature) {
 
 GenericEnvironment *TypeConverter::getGenericEnvironment() {
   auto genericSig = IGM.getSILTypes().getCurGenericContext();
-  return genericSig->getCanonicalSignature().getGenericEnvironment();
+  return genericSig->getCanonicalSignature()->getGenericEnvironment();
 }
 
 GenericEnvironment *IRGenModule::getGenericEnvironment() {
@@ -1562,7 +1562,7 @@ ArchetypeType *TypeConverter::getExemplarArchetype(ArchetypeType *t) {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment();
+  auto canGenericEnv = canGenericSig->getGenericEnvironment();
   if (canGenericEnv == genericEnv) return t;
 
   // Map the archetype out of its own generic environment and into the
@@ -1788,8 +1788,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -1920,9 +1918,6 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
-        if (!field->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(field);
-
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
@@ -1946,9 +1941,6 @@ namespace {
       for (auto elt : decl->getAllElements()) {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
-
-        if (!elt->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
 
         if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
@@ -2277,7 +2269,7 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
   // Dig out the canonical generic environment.
   auto genericSig = genericEnv->getGenericSignature();
   auto canGenericSig = genericSig->getCanonicalSignature();
-  auto canGenericEnv = canGenericSig.getGenericEnvironment();
+  auto canGenericEnv = canGenericSig->getGenericEnvironment();
 
   // If this archetype is in the canonical generic environment, it's an
   // exemplar archetype.

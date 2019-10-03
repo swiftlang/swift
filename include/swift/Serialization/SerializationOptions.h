@@ -29,11 +29,12 @@ namespace swift {
 
     const char *OutputPath = nullptr;
     const char *DocOutputPath = nullptr;
+    const char *SourceInfoOutputPath = nullptr;
 
     StringRef GroupInfoPath;
     StringRef ImportedHeader;
     StringRef ModuleLinkName;
-    StringRef ParseableInterface;
+    StringRef ModuleInterface;
     ArrayRef<std::string> ExtraClangOptions;
 
     /// Describes a single-file dependency for this module, along with the

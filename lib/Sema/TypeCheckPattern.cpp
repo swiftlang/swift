@@ -705,7 +705,7 @@ static bool validateTypedPattern(TypeChecker &TC,
       hadError = true;
     }
   } else {
-    hadError = TC.validateType(TL, resolution, options);
+    hadError = TypeChecker::validateType(TC.Context, TL, resolution, options);
   }
 
   if (hadError) {
@@ -765,7 +765,7 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
   // We might have a null typeLoc if this is a closure parameter list,
   // where parameters are allowed to elide their types.
   if (!TL.isNull()) {
-    hadError |= TC.validateType(TL, resolution, options);
+    hadError |= TypeChecker::validateType(TC.Context, TL, resolution, options);
   }
 
   Type Ty = TL.getType();
@@ -796,8 +796,6 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
   bool hadError = false;
   
   for (auto param : *PL) {
-    checkDeclAttributesEarly(param);
-
     auto typeRepr = param->getTypeLoc().getTypeRepr();
     if (!typeRepr &&
         param->hasInterfaceType()) {
@@ -1298,7 +1296,7 @@ recur:
 
     // Type-check the type parameter.
     TypeResolutionOptions paramOptions(TypeResolverContext::InExpression); 
-    if (validateType(IP->getCastTypeLoc(), resolution, paramOptions))
+    if (validateType(Context, IP->getCastTypeLoc(), resolution, paramOptions))
       return true;
 
     auto castType = IP->getCastTypeLoc().getType();
@@ -1407,11 +1405,11 @@ recur:
                 EEP->getName().str() == "Some") {
               SmallString<4> Rename;
               camel_case::toLowercaseWord(EEP->getName().str(), Rename);
-              diagnose(EEP->getLoc(),
-                       diag::availability_decl_unavailable_rename,
-                       /*"getter" prefix*/2, EEP->getName(), /*replaced*/false,
-                       /*special kind*/0, Rename.str())
-                .fixItReplace(EEP->getLoc(), Rename.str());
+              diagnose(
+                  EEP->getLoc(), diag::availability_decl_unavailable_rename,
+                  /*"getter" prefix*/ 2, EEP->getName(), /*replaced*/ false,
+                  /*special kind*/ 0, Rename.str(), /*message*/ StringRef())
+                  .fixItReplace(EEP->getLoc(), Rename.str());
 
               return true;
             }
@@ -1499,7 +1497,7 @@ recur:
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    validateDeclForNameLookup(elt);
+    auto argType = elt->getArgumentInterfaceType();
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
@@ -1512,7 +1510,7 @@ recur:
       }
       
       Type elementType;
-      if (auto argType = elt->getArgumentInterfaceType())
+      if (argType)
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
@@ -1526,7 +1524,7 @@ recur:
       if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);
-    } else if (auto argType = elt->getArgumentInterfaceType()) {
+    } else if (argType) {
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.

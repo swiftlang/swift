@@ -144,13 +144,7 @@ protected:
   /// by the constraint solver.
   ResolvedOverloadSetListItem *
   getResolvedOverload(ConstraintLocator *locator) const {
-    auto resolvedOverload = CS.getResolvedOverloadSets();
-    while (resolvedOverload) {
-      if (resolvedOverload->Locator == locator)
-        return resolvedOverload;
-      resolvedOverload = resolvedOverload->Previous;
-    }
-    return nullptr;
+    return CS.findSelectedOverloadFor(locator);
   }
 
   /// Retrive the constraint locator for the given anchor and
@@ -172,11 +166,15 @@ protected:
   /// `x.foo` or `x[0]` extract and return its base expression.
   Expr *getBaseExprFor(Expr *anchor) const;
 
-  /// \returns An argument expression if given anchor is a call, member
-  /// reference or subscript, nullptr otherwise.
-  Expr *getArgumentExprFor(Expr *anchor) const;
+  /// For a given locator describing an argument application, or a constraint
+  /// within an argument application, returns the argument list for that
+  /// application. If the locator is not for an argument application, or
+  /// the argument list cannot be found, returns \c nullptr.
+  Expr *getArgumentListExprFor(ConstraintLocator *locator) const;
 
-  Optional<SelectedOverload> getChoiceFor(Expr *) const;
+  /// \returns The overload choice made by the constraint system for the callee
+  /// of a given locator's anchor, or \c None if no such choice can be found.
+  Optional<SelectedOverload> getChoiceFor(ConstraintLocator *) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -214,7 +212,7 @@ protected:
   /// The source of the requirement, if available. One exception
   /// is failure associated with conditional requirement where
   /// underlying conformance is specialized.
-  const GenericSignature *Signature;
+  GenericSignature Signature;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -236,14 +234,13 @@ public:
     assert(locator);
     assert(isConditional() || Signature);
     assert(AffectedDecl);
+    assert(getRequirementDC() &&
+           "Couldn't find where the requirement came from?");
+    assert(getGenericContext() &&
+           "Affected decl not within a generic context?");
 
-    auto path = locator->getPath();
-    assert(!path.empty());
-
-    auto &last = path.back();
-    assert(last.isTypeParameterRequirement() ||
-           last.isConditionalRequirement());
-    assert(static_cast<RequirementKind>(last.getValue2()) == kind);
+    auto reqElt = locator->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    assert(reqElt.getRequirementKind() == kind);
 
     // It's possible sometimes not to have no base expression.
     if (!expr)
@@ -254,13 +251,9 @@ public:
   }
 
   unsigned getRequirementIndex() const {
-    auto path = getLocator()->getPath();
-    assert(!path.empty());
-
-    auto &requirementLoc = path.back();
-    assert(requirementLoc.isTypeParameterRequirement() ||
-           requirementLoc.isConditionalRequirement());
-    return requirementLoc.getValue();
+    auto reqElt =
+        getLocator()->castLastElementTo<LocatorPathElt::AnyRequirement>();
+    return reqElt.getIndex();
   }
 
   /// The generic base type where failing requirement comes from.
@@ -294,41 +287,23 @@ protected:
   virtual DiagInReference getDiagnosticInRereference() const = 0;
   virtual DiagAsNote getDiagnosticAsNote() const = 0;
 
-  /// Determine whether it would be possible to diagnose
-  /// current requirement failure.
-  bool canDiagnoseFailure() const {
-    // If this is a conditional requirement failure,
-    // we have a lot more information compared to
-    // type requirement case, because we know that
-    // underlying conformance requirement matched.
-    if (isConditional())
-      return true;
-
-    // For static/initializer calls there is going to be
-    // a separate fix, attached to the argument, which is
-    // much easier to diagnose.
-    // For operator calls we can't currently produce a good
-    // diagnostic, so instead let's refer to expression diagnostics.
-    return !(Apply && isOperator(Apply));
-  }
-
   static bool isOperator(const ApplyExpr *apply) {
     return isa<PrefixUnaryExpr>(apply) || isa<PostfixUnaryExpr>(apply) ||
            isa<BinaryExpr>(apply);
   }
+
+  /// Determine whether given declaration represents a static
+  /// or instance property/method, excluding operators.
+  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 
 private:
   /// Retrieve declaration associated with failing generic requirement.
   ValueDecl *getDeclRef() const;
 
   /// Retrieve generic signature where this parameter originates from.
-  GenericSignature *getSignature(ConstraintLocator *locator);
+  GenericSignature getSignature(ConstraintLocator *locator);
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
-
-  /// Determine whether given declaration represents a static
-  /// or instance property/method, excluding operators.
-  static bool isStaticOrInstanceMember(const ValueDecl *decl);
 
   /// If this is a failure in conditional requirement, retrieve
   /// conformance information.
@@ -354,6 +329,14 @@ public:
   bool diagnoseAsError() override;
 
 protected:
+  /// Check whether this requirement is associated with one of the
+  /// operator overloads, in cases like that sometimes it makes more
+  /// sense to produce a generic diagnostic about operator reference
+  /// instead of conformance, because it could be something like
+  /// `true + true`, and it doesn't make much sense to suggest to
+  /// add a conformance from one library type to another.
+  bool diagnoseAsAmbiguousOperatorRef();
+
   DiagOnDecl getDiagnosticOnDecl() const override {
     return diag::type_does_not_conform_decl_owner;
   }
@@ -365,45 +348,10 @@ protected:
   DiagAsNote getDiagnosticAsNote() const override {
     return diag::candidate_types_conformance_requirement;
   }
-};
-
-/// Diagnostics for mismatched generic arguments e.g
-/// ```swift
-/// struct F<G> {}
-/// let _:F<Int> = F<Bool>()
-/// ```
-class GenericArgumentsMismatchFailure final : public FailureDiagnostic {
-  BoundGenericType *Actual;
-  BoundGenericType *Required;
-  ArrayRef<unsigned> Mismatches;
-
-public:
-  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
-                                  BoundGenericType *actual,
-                                  BoundGenericType *required,
-                                  ArrayRef<unsigned> mismatches,
-                                  ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator), Actual(actual),
-        Required(required), Mismatches(mismatches) {}
-
-  bool diagnoseAsError() override;
 
 private:
-  void emitNotesForMismatches() {
-    for (unsigned position : Mismatches) {
-      emitNoteForMismatch(position);
-    }
-  }
-
-  void emitNoteForMismatch(int mismatchPosition);
-
-  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
-
-  /// The actual type being used.
-  BoundGenericType *getActual() const { return Actual; }
-
-  /// The type needed by the generic requirement.
-  BoundGenericType *getRequired() const { return Required; }
+  bool diagnoseTypeCannotConform(Expr *anchor, Type nonConformingType,
+                                 Type protocolType) const;
 };
 
 /// Diagnose failures related to same-type generic requirements, e.g.
@@ -618,9 +566,6 @@ public:
   bool diagnoseAsError() override;
 
 private:
-  void fixItChangeInoutArgType(const Expr *arg, Type actualType,
-                               Type neededType) const;
-
   /// Given an expression that has a non-lvalue type, dig into it until
   /// we find the part of the expression that prevents the entire subexpression
   /// from being mutable.  For example, in a sequence like "x.v.v = 42" we want
@@ -655,13 +600,17 @@ public:
                     ContextualTypePurpose purpose, Type lhs, Type rhs,
                     ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), CTP(purpose),
-        FromType(resolve(lhs)), ToType(resolve(rhs)) {}
+        FromType(resolve(lhs)->getRValueType()),
+        ToType(resolve(rhs)->getRValueType()) {}
 
   Type getFromType() const { return FromType; }
 
   Type getToType() const { return ToType; }
 
   bool diagnoseAsError() override;
+
+  /// If we're trying to convert something to `nil`.
+  bool diagnoseConversionToNil() const;
 
   // If we're trying to convert something of type "() -> T" to T,
   // then we probably meant to call the value.
@@ -673,6 +622,14 @@ public:
   /// Produce a specialized diagnostic if this is an attempt to initialize
   /// or convert an array literal to a dictionary e.g. `let _: [String: Int] = ["A", 0]`
   bool diagnoseConversionToDictionary() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to throw
+  /// something with doesn't conform to `Error`.
+  bool diagnoseThrowsTypeMismatch() const;
+
+  /// Produce a specialized diagnostic if this is an attempt to `yield`
+  /// something of incorrect type.
+  bool diagnoseYieldByReferenceMismatch() const;
 
   /// Attempt to attach any relevant fix-its to already produced diagnostic.
   void tryFixIts(InFlightDiagnostic &diagnostic) const;
@@ -717,14 +674,16 @@ protected:
   /// conversion is possible.
   bool tryTypeCoercionFixIt(InFlightDiagnostic &diagnostic) const;
 
+  /// Try to add a fix-it to conform the decl context (if it's a type) to the
+  /// protocol
+  bool tryProtocolConformanceFixIt(InFlightDiagnostic &diagnostic) const;
+
   /// Check whether this contextual failure represents an invalid
   /// conversion from array literal to dictionary.
   static bool isInvalidDictionaryConversion(ConstraintSystem &cs, Expr *anchor,
                                             Type contextualType);
 
 private:
-  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
-
   Type resolve(Type rawType) {
     auto type = resolveType(rawType)->getWithoutSpecifierType();
     if (auto *BGT = type->getAs<BoundGenericType>()) {
@@ -749,8 +708,53 @@ private:
   bool isIntegerToStringIndexConversion() const;
 
 protected:
+  ContextualTypePurpose getContextualTypePurpose() const { return CTP; }
+
   static Optional<Diag<Type, Type>>
   getDiagnosticFor(ContextualTypePurpose context, bool forProtocol);
+};
+
+/// Diagnostics for mismatched generic arguments e.g
+/// ```swift
+/// struct F<G> {}
+/// let _:F<Int> = F<Bool>()
+/// ```
+class GenericArgumentsMismatchFailure final : public ContextualFailure {
+  ArrayRef<unsigned> Mismatches;
+
+public:
+  GenericArgumentsMismatchFailure(Expr *expr, ConstraintSystem &cs,
+                                  Type actualType, Type requiredType,
+                                  ArrayRef<unsigned> mismatches,
+                                  ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, actualType, requiredType, locator),
+        Mismatches(mismatches) {
+    assert(actualType->is<BoundGenericType>());
+    assert(requiredType->is<BoundGenericType>());
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  void emitNotesForMismatches() {
+    for (unsigned position : Mismatches) {
+      emitNoteForMismatch(position);
+    }
+  }
+
+  void emitNoteForMismatch(int mismatchPosition);
+
+  Optional<Diag<Type, Type>> getDiagnosticFor(ContextualTypePurpose context);
+
+  /// The actual type being used.
+  BoundGenericType *getActual() const {
+    return getFromType()->castTo<BoundGenericType>();
+  }
+
+  /// The type needed by the generic requirement.
+  BoundGenericType *getRequired() const {
+    return getToType()->castTo<BoundGenericType>();
+  }
 };
 
 /// Diagnose failures related to conversion between throwing function type
@@ -792,7 +796,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -803,7 +807,7 @@ private:
     auto *DC = getDC();
     auto &TC = getTypeChecker();
 
-    auto asPG = TC.lookupPrecedenceGroup(
+    auto asPG = TypeChecker::lookupPrecedenceGroup(
         DC, DC->getASTContext().Id_CastingPrecedence, SourceLoc());
     if (!asPG)
       return true;
@@ -1184,38 +1188,59 @@ public:
 class MissingArgumentsFailure final : public FailureDiagnostic {
   using Param = AnyFunctionType::Param;
 
-  FunctionType *Fn;
-  unsigned NumSynthesized;
+  SmallVector<Param, 4> SynthesizedArgs;
 
 public:
   MissingArgumentsFailure(Expr *root, ConstraintSystem &cs,
-                          FunctionType *funcType,
-                          unsigned numSynthesized,
+                          ArrayRef<Param> synthesizedArgs,
                           ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), Fn(funcType),
-        NumSynthesized(numSynthesized) {}
+      : FailureDiagnostic(root, cs, locator),
+        SynthesizedArgs(synthesizedArgs.begin(), synthesizedArgs.end()) {
+    assert(!SynthesizedArgs.empty() && "No missing arguments?!");
+  }
 
   bool diagnoseAsError() override;
+
+  bool diagnoseSingleMissingArgument() const;
 
 private:
-  /// If missing arguments come from trailing closure,
+  /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
-  bool diagnoseTrailingClosure(ClosureExpr *closure);
-};
+  bool diagnoseClosure(ClosureExpr *closure);
 
-class DefaultArgumentTypeMismatch final : public FailureDiagnostic {
-  using Param = AnyFunctionType::Param;
+  /// Diagnose cases when instead of multiple distinct arguments
+  /// call got a single tuple argument with expected arity/types.
+  bool diagnoseInvalidTupleDestructuring() const;
 
-  Type FromType;
-  Type ToType;
+  /// Determine whether missing arguments are associated with
+  /// an implicit call to a property wrapper initializer e.g.
+  /// `@Foo(answer: 42) var question = "ultimate question"`
+  bool isPropertyWrapperInitialization() const;
+
+  /// Gather informatioin associated with expression that represents
+  /// a call - function, arguments, # of arguments and whether it has
+  /// a trailing closure.
+  std::tuple<Expr *, Expr *, unsigned, bool> getCallInfo(Expr *anchor) const;
+
+  /// Transform given argument into format suitable for a fix-it
+  /// text e.g. `[<label>:]? <#<type#>`
+  void forFixIt(llvm::raw_svector_ostream &out,
+                const AnyFunctionType::Param &argument) const;
 
 public:
-  DefaultArgumentTypeMismatch(Expr *root, ConstraintSystem &cs, Type fromType,
-                              Type toType, ConstraintLocator *locator)
-      : FailureDiagnostic(root, cs, locator), FromType(fromType),
-        ToType(toType) {}
-
-  bool diagnoseAsError() override;
+  /// Due to the fact that `matchCallArgument` can't and
+  /// doesn't take types into consideration while matching
+  /// arguments to parameters, for cases where both arguments
+  /// are un-labeled, it's impossible to say which one is missing:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// In this case first argument is missing, but we end up with
+  /// two fixes - argument mismatch (for #1) and missing argument
+  /// (for #2), which is incorrect so it has to be handled specially.
+  static bool isMisplacedMissingArgument(ConstraintSystem &cs,
+                                         ConstraintLocator *locator);
 };
 
 class OutOfOrderArgumentFailure final : public FailureDiagnostic {
@@ -1499,6 +1524,24 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose a conversion mismatch between object types of `inout`
+/// argument/parameter e.g. `'inout S' argument conv 'inout P'`.
+///
+/// Even if `S` conforms to `P` there is no subtyping rule for
+/// argument type of `inout` parameter, they have to be equal.
+class InOutConversionFailure final : public ContextualFailure {
+public:
+  InOutConversionFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                         Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+
+protected:
+  /// Suggest to change a type of the argument if possible.
+  void fixItChangeArgumentType() const;
+};
+
 /// Diagnose generic argument omission e.g.
 ///
 /// ```swift
@@ -1585,8 +1628,75 @@ public:
                                               Type paramTy,
                                               ConstraintLocator *locator)
       : FailureDiagnostic(root, cs, locator), ParamType(paramTy) {}
+  bool diagnoseAsError() override;
+};
+
+/// Diagnose situation when an array is passed instead of varargs.
+///
+/// ```swift
+/// func foo(_ x: Int...) {}
+/// foo([1,2,3]]) // foo expects varags like foo(1,2,3) instead.
+/// ```
+class ExpandArrayIntoVarargsFailure final : public ContextualFailure {
+public:
+  ExpandArrayIntoVarargsFailure(Expr *root, ConstraintSystem &cs, Type lhs,
+                                Type rhs, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, lhs, rhs, locator) {}
 
   bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  void tryDropArrayBracketsFixIt(Expr *anchor) const;
+};
+
+/// Diagnose a situation there is a mismatch between argument and parameter
+/// types e.g.:
+///
+/// ```swift
+/// func foo(_: String) {}
+/// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
+/// ```
+class ArgumentMismatchFailure : public ContextualFailure {
+public:
+  ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
+                          Type paramType, ConstraintLocator *locator)
+      : ContextualFailure(root, cs, argType, paramType, locator) {}
+
+  bool diagnoseAsError() override;
+  bool diagnoseAsNote() override;
+
+  /// If both argument and parameter are represented by `ArchetypeType`
+  /// produce a special diagnostic in case their names match.
+  bool diagnoseArchetypeMismatch() const;
+
+  /// Tailored diagnostic for pattern matching with `~=` operator.
+  bool diagnosePatternMatchingMismatch() const;
+
+  /// Tailored diagnostics for argument mismatches associated with
+  /// reference equality operators `===` and `!==`.
+  bool diagnoseUseOfReferenceEqualityOperator() const;
+
+protected:
+
+  /// Situations like this:
+  ///
+  /// func foo(_: Int, _: String) {}
+  /// foo("")
+  ///
+  /// Are currently impossible to fix correctly,
+  /// so we have to attend to that in diagnostics.
+  bool diagnoseMisplacedMissingArgument() const;
+
+  SourceLoc getLoc() const { return getAnchor()->getLoc(); }
+
+  ValueDecl *getDecl() const {
+    auto selectedOverload = getChoiceFor(getLocator());
+    if (!selectedOverload)
+      return nullptr;
+
+    auto choice = selectedOverload->choice;
+    return choice.getDeclOrNull();
+  }
 };
 
 /// Provides information about the application of a function argument to a
@@ -1677,6 +1787,10 @@ public:
   /// to.
   ParameterTypeFlags getParameterFlags() const {
     return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
   }
 };
 

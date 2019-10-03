@@ -198,7 +198,7 @@ public:
     llvm_unreachable("unexpected AnyFunctionRef representation");
   }
 
-  GenericSignature *getGenericSignature() const {
+  GenericSignature getGenericSignature() const {
     if (auto afd = TheFunction.dyn_cast<AbstractFunctionDecl *>()) {
       return afd->getGenericSignature();
     }

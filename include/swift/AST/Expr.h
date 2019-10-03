@@ -19,13 +19,13 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Availability.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -40,7 +40,9 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class AvailabilitySpec;
+  class IdentTypeRepr;
   class Type;
+  class TypeRepr;
   class ValueDecl;
   class Decl;
   class DeclRefExpr;
@@ -927,10 +929,12 @@ public:
   void setBody(BraceStmt * b) { Body = b; }
 
   SourceLoc getLoc() const { return SubExpr ? SubExpr->getLoc() : SourceLoc(); }
-
-  SourceRange getSourceRange() const {
-    return SubExpr ? SubExpr->getSourceRange() : SourceRange();
+  
+  SourceLoc getStartLoc() const {
+    return SubExpr ? SubExpr->getStartLoc() : SourceLoc();
   }
+
+  SourceLoc getEndLoc() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Tap;
@@ -1028,6 +1032,8 @@ public:
     // token, so the range should be (Start == End).
     return Loc;
   }
+  
+  /// Could also be computed by relexing.
   SourceLoc getTrailingQuoteLoc() const {
     return TrailingQuoteLoc;
   }
@@ -4676,7 +4682,8 @@ public:
   }
   SourceLoc getEndLoc() const {
     if (!isFolded()) return EqualLoc;
-    return (Src->getEndLoc().isValid() ? Src->getEndLoc() : Dest->getEndLoc());
+    auto SrcEnd = Src->getEndLoc();
+    return (SrcEnd.isValid() ? SrcEnd : Dest->getEndLoc());
   }
   
   /// True if the node has been processed by binary expression folding.

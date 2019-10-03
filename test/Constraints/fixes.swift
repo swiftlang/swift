@@ -321,3 +321,18 @@ func test_explicit_call_with_overloads() {
   foo(S().foo)
   // expected-error@-1 {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{14-14=()}}
 }
+
+// SR-11476
+func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
+  struct S {
+    subscript(x: Int) -> Int { x }
+  }
+
+  var i: Int?
+  _ = \S.[i] // expected-error {{value of optional type 'Int?' must be unwrapped to a value of type 'Int'}}
+  // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{12-12= ?? <#default value#>}}
+  // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
+
+  _ = \S.[nil] // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+  _ = \S.[fn] // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}} {{13-13=()}}
+}

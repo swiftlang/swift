@@ -27,15 +27,16 @@
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/ImportCache.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Timer.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "swift/Strings.h"
@@ -56,18 +57,9 @@ TypeChecker &TypeChecker::createForContext(ASTContext &ctx) {
 }
 
 TypeChecker::TypeChecker(ASTContext &Ctx)
-  : Context(Ctx), Diags(Ctx.Diags)
-{
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->setTypeResolver(*this);
-}
+  : Context(Ctx), Diags(Ctx.Diags) {}
 
-TypeChecker::~TypeChecker() {
-  auto clangImporter =
-    static_cast<ClangImporter *>(Context.getClangModuleLoader());
-  clangImporter->clearTypeResolver();
-}
+TypeChecker::~TypeChecker() {}
 
 ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
   auto protocol = Context.getProtocol(kind);
@@ -76,8 +68,7 @@ ProtocolDecl *TypeChecker::getProtocol(SourceLoc loc, KnownProtocolKind kind) {
              Context.getIdentifier(getProtocolName(kind)));
   }
 
-  if (protocol && !protocol->hasInterfaceType()) {
-    validateDecl(protocol);
+  if (protocol && !protocol->getInterfaceType()) {
     if (protocol->isInvalid())
       return nullptr;
   }
@@ -218,17 +209,11 @@ Type TypeChecker::getObjectLiteralParameterType(ObjectLiteralExpr *expr,
 }
 
 ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
-  if (StdlibModule)
-    return StdlibModule;
-
-  StdlibModule = Context.getStdlibModule();
-
-  if (!StdlibModule) {
-    return dc->getParentModule();
+  if (auto *stdlib = Context.getStdlibModule()) {
+    return stdlib;
   }
 
-  assert(StdlibModule && "no main module found");
-  return StdlibModule;
+  return dc->getParentModule();
 }
 
 /// Bind the given extension to the given nominal type.
@@ -237,7 +222,6 @@ static void bindExtensionToNominal(ExtensionDecl *ext,
   if (ext->alreadyBoundToNominal())
     return;
 
-  ext->createGenericParamsIfMissing(nominal);
   nominal->addExtension(ext);
 }
 
@@ -245,7 +229,9 @@ static void bindExtensions(SourceFile &SF) {
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
-    if (auto nominal = ext->getExtendedNominal()) {
+    assert(!ext->canNeverBeBound() &&
+           "Only extensions that can ever be bound get here.");
+    if (auto nominal = ext->computeExtendedNominal()) {
       bindExtensionToNominal(ext, nominal);
       return true;
     }
@@ -259,7 +245,7 @@ static void bindExtensions(SourceFile &SF) {
 
   // FIXME: The current source file needs to be handled specially, because of
   // private extensions.
-  SF.forAllVisibleModules([&](ModuleDecl::ImportedModule import) {
+  for (auto import : namelookup::getAllImports(&SF)) {
     // FIXME: Respect the access path?
     for (auto file : import.second->getFiles()) {
       auto SF = dyn_cast<SourceFile>(file);
@@ -272,7 +258,7 @@ static void bindExtensions(SourceFile &SF) {
             worklist.push_back(ED);
       }
     }
-  });
+  }
 
   // Phase 2 - repeatedly go through the worklist and attempt to bind each
   // extension there, removing it from the worklist if we succeed.
@@ -367,6 +353,15 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   if (SF.ASTStage == SourceFile::TypeChecked)
     return;
 
+  // Eagerly build the top-level scopes tree before type checking
+  // because type-checking expressions mutates the AST and that throws off the
+  // scope-based lookups. Only the top-level scopes because extensions have not
+  // been bound yet.
+  if (SF.getASTContext().LangOpts.EnableASTScopeLookup &&
+      SF.isSuitableForASTScopes())
+    SF.getScope()
+        .buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
+
   auto &Ctx = SF.getASTContext();
   BufferIndirectlyCausingDiagnosticRAII cpr(SF);
 
@@ -399,6 +394,13 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
     if (Options.contains(TypeCheckingFlags::ForImmediateMode))
       TC.setInImmediateMode(true);
+
+    if (Options.contains(TypeCheckingFlags::SkipNonInlinableFunctionBodies))
+      // Disable this optimization if we're compiling SwiftOnoneSupport, because
+      // we _definitely_ need to look inside every declaration to figure out
+      // what gets prespecialized.
+      if (!SF.getParentModule()->isOnoneSupportModule())
+        TC.setSkipNonInlinableBodies(true);
 
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
@@ -606,7 +608,7 @@ bool swift::performTypeLocChecking(ASTContext &Ctx, TypeLoc &T,
   if (!ProduceDiagnostics)
     suppression.emplace(Ctx.Diags);
   TypeChecker &TC = createTypeChecker(Ctx);
-  return TC.validateType(T, resolution, options);
+  return TypeChecker::validateType(TC.Context, T, resolution, options);
 }
 
 /// Expose TypeChecker's handling of GenericParamList to SIL parsing.
@@ -620,12 +622,16 @@ void swift::typeCheckCompletionDecl(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   DiagnosticSuppression suppression(Ctx.Diags);
-  TypeChecker &TC = createTypeChecker(Ctx);
-
-  if (auto ext = dyn_cast<ExtensionDecl>(D))
-    TC.validateExtension(ext);
-  else
-    TC.validateDecl(cast<ValueDecl>(D));
+  (void)createTypeChecker(Ctx);
+  if (auto ext = dyn_cast<ExtensionDecl>(D)) {
+    if (auto *nominal = ext->computeExtendedNominal()) {
+      // FIXME(InterfaceTypeRequest): Remove this.
+      (void)nominal->getInterfaceType();
+    }
+  } else {
+    // FIXME(InterfaceTypeRequest): Remove this.
+    (void)cast<ValueDecl>(D)->getInterfaceType();
+  }
 }
 
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
@@ -714,8 +720,7 @@ bool swift::typeCheckExpression(DeclContext *DC, Expr *&parsedExpr) {
   TypeChecker &TC = createTypeChecker(ctx);
 
   auto resultTy = TC.typeCheckExpression(parsedExpr, DC, TypeLoc(),
-                                    ContextualTypePurpose::CTP_Unused,
-                                    TypeCheckExprFlags::SuppressDiagnostics);
+                                         ContextualTypePurpose::CTP_Unused);
   return !resultTy;
 }
 

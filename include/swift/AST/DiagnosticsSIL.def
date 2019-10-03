@@ -360,27 +360,32 @@ ERROR(pound_assert_failure,none,
 NOTE(constexpr_unknown_reason_default,none,
     "cannot evaluate expression as constant here", ())
 NOTE(constexpr_unevaluable_operation,none,
-    "cannot constant evaluate operation", ())
+    "cannot constant evaluate operation%select{| used by this call}0", (bool))
 
 NOTE(constexpr_too_many_instructions,none,
      "exceeded instruction limit: %0 when evaluating the expression "
      "at compile time", (unsigned))
-NOTE(constexpr_limit_exceeding_instruction,none, "limit exceeded here", ())
+NOTE(constexpr_limit_exceeding_instruction,none, "limit exceeded "
+     "%select{here|during this call}0", (bool))
 
 NOTE(constexpr_loop_found_note,none,
     "control-flow loop found during evaluation ", ())
-NOTE(constexpr_loop_instruction,none, "found loop here", ())
+NOTE(constexpr_loop_instruction,none, "found loop "
+    "%select{here|inside this call}0", (bool))
 
 NOTE(constexpr_overflow,none, "integer overflow detected", ())
-NOTE(constexpr_overflow_operation,none, "operation overflows", ())
+NOTE(constexpr_overflow_operation,none, "operation"
+     "%select{| performed during this call}0 overflows", (bool))
 
-NOTE(constexpr_trap,none, "trap detected", ())
-NOTE(constexpr_trap_operation,none, "operation traps", ())
+NOTE(constexpr_trap, none, "%0", (StringRef))
+NOTE(constexpr_trap_operation, none, "operation"
+     "%select{| performed during this call}0 traps", (bool))
 
 NOTE(constexpr_invalid_operand_seen, none,
     "operation with invalid operands encountered during evaluation",())
 NOTE(constexpr_operand_invalid_here, none,
-    "operation with invalid operands encountered here",())
+    "operation with invalid operands encountered "
+    "%select{here|during this call}0", (bool))
 
 NOTE(constexpr_value_unknown_at_top_level,none,
     "cannot evaluate top-level value as constant here",())
@@ -388,26 +393,31 @@ NOTE(constexpr_multiple_writers_found_at_top_level,none,
      "top-level value has multiple assignments",())
 
 NOTE(constexpr_unsupported_instruction_found, none,
-    "encountered operation not supported by the evaluator", ())
-NOTE(constexpr_unsupported_instruction_found_here,none,
-    "operation not supported by the evaluator", ())
+    "encountered operation not supported by the evaluator: %0", (StringRef))
+NOTE(constexpr_unsupported_instruction_found_here,none, "operation"
+     "%select{| used by this call is}0 not supported by the evaluator", (bool))
 
-NOTE(constexpr_unknown_function_called, none,
-    "encountered call to a function whose body is not available", ())
-NOTE(constexpr_unknown_function_called_here, none,
-    "call to a function whose body is not available", ())
+NOTE(constexpr_found_callee_with_no_body, none,
+    "encountered call to '%0' whose body is not available. "
+    "Imported functions must be marked '@inlinable' to constant evaluate.",
+    (StringRef))
+NOTE(constexpr_callee_with_no_body, none,
+    "%select{|calls a }0function whose body is not available", (bool))
 
 NOTE(constexpr_untracked_sil_value_use_found, none,
     "encountered use of a variable not tracked by the evaluator", ())
 NOTE(constexpr_untracked_sil_value_used_here, none,
-    "untracked variable used here", ())
+    "untracked variable used %select{here|by this call}0", (bool))
 
-NOTE(constexpr_witness_call_with_no_conformance_found, none,
-    "cannot find concrete conformance for a witness method call", ())
-NOTE(constexpr_witness_call_with_no_target_found, none,
-    "cannot resolve a witness method call to a concrete function", ())
-NOTE(constexpr_witness_call_found_here, none,
-    "witness method call found here", ())
+NOTE(constexpr_unresolvable_witness_call, none,
+    "encountered unresolvable witness method call: '%0'", (StringRef))
+NOTE(constexpr_no_witness_table_entry, none, "cannot find witness table entry "
+    "%select{for this call|for a witness-method invoked during this call}0",
+    (bool))
+NOTE(constexpr_witness_call_with_no_conformance, none,
+    "cannot find concrete conformance "
+    "%select{for this call|for a witness-method invoked during this call}0",
+    (bool))
 
 NOTE(constexpr_unknown_control_flow_due_to_skip,none, "branch depends on "
      "non-constant value produced by an unevaluated instructions", ())
@@ -415,6 +425,10 @@ NOTE(constexpr_returned_by_unevaluated_instruction,none,
      "return value of an unevaluated instruction is not a constant", ())
 NOTE(constexpr_mutated_by_unevaluated_instruction,none, "value mutable by an "
     "unevaluated instruction is not a constant", ())
+
+ERROR(not_constant_evaluable, none, "not constant evaluable", ())
+ERROR(constexpr_imported_func_not_onone, none, "imported constant evaluable "
+      "function '%0' must be annotated '@_optimize(none)'", (StringRef))
 
 ERROR(non_physical_addressof,none,
       "addressof only works with purely physical lvalues; "
@@ -507,6 +521,16 @@ ERROR(oslog_property_not_constant, none, "'OSLogInterpolation.%0' is not a "
 
 ERROR(global_string_pointer_on_non_constant, none, "globalStringTablePointer "
       "builtin must used only on string literals", ())
+
+ERROR(polymorphic_builtin_passed_non_trivial_non_builtin_type, none, "Argument "
+      "of type %0 can not be passed as an argument to a Polymorphic "
+      "builtin. Polymorphic builtins can only be passed arguments that are "
+      "trivial builtin typed", (Type))
+
+ERROR(polymorphic_builtin_passed_type_without_static_overload, none, "Static"
+      " overload %0 does not exist for polymorphic builtin '%1'. Static "
+      "overload implied by passing argument of type %2",
+      (Identifier, StringRef, Type))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

@@ -72,11 +72,11 @@ class RequirementEnvironment {
   /// The witness thunk emitted by SILGen uses the synthetic signature.
   /// Therefore one invariant we preserve is that the witness thunk is
   /// ABI compatible with the requirement's function type.
-  GenericSignature *syntheticSignature = nullptr;
+  GenericSignature syntheticSignature = GenericSignature();
   GenericEnvironment *syntheticEnvironment = nullptr;
 
   /// The generic signature of the protocol requirement member.
-  GenericSignature *reqSig = nullptr;
+  GenericSignature reqSig = GenericSignature();
 
   /// A substitution map mapping the requirement signature to the
   /// generic parameters of the synthetic signature.
@@ -97,7 +97,7 @@ public:
   /// \param conformance The protocol conformance, or null if there is no
   /// conformance (because we're finding default implementations).
   RequirementEnvironment(DeclContext *conformanceDC,
-                         GenericSignature *reqSig,
+                         GenericSignature reqSig,
                          ProtocolDecl *proto,
                          ClassDecl *covariantSelf,
                          ProtocolConformance *conformance);
@@ -108,7 +108,7 @@ public:
   }
 
   /// Retrieve the generic signature of the requirement.
-  const GenericSignature *getRequirementSignature() const {
+  GenericSignature getRequirementSignature() const {
     return reqSig;
   }
 

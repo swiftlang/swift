@@ -863,7 +863,7 @@ static bool hasDependentTypeWitness(
             return false;
 
           // RESILIENCE: this could be an opaque conformance
-          return type->hasTypeParameter();
+          return type->getCanonicalType()->hasTypeParameter();
        },
        /*useResolver=*/true)) {
     return true;
@@ -2959,11 +2959,6 @@ NecessaryBindings::forFunctionInvocations(IRGenModule &IGM,
 GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  NominalTypeDecl *typeDecl)
     : TheDecl(typeDecl) {
-
-  // FIXME: Remove this once getGenericSignature() is a request.
-  if (!typeDecl->hasInterfaceType())
-    IGM.Context.getLazyResolver()->resolveDeclSignature(typeDecl);
-
   // We only need to do something here if the declaration context is
   // somehow generic.
   auto ncGenerics = typeDecl->getGenericSignatureOfContext();

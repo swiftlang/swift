@@ -442,6 +442,9 @@ extension String {
   @_effects(releasenone)
   public // SPI(Foundation)
   func _bridgeToObjectiveCImpl() -> AnyObject {
+    
+    _connectOrphanedFoundationSubclassesIfNeeded()
+    
     // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
     if _guts.isSmallASCII {
       let maybeTagged = _guts.asSmall.withUTF8 { bufPtr in
@@ -453,6 +456,7 @@ extension String {
       }
       if let tagged = maybeTagged { return tagged }
     }
+    
     if _guts.isSmall {
         // We can't form a tagged pointer String, so grow to a non-small String,
         // and bridge that instead. Also avoids CF deleting any BOM that may be
@@ -478,6 +482,31 @@ extension String {
   }
 }
 
+@available(macOS, introduced: 9999, deprecated)
+@available(iOS, introduced: 9999, deprecated)
+@available(watchOS, introduced: 9999, deprecated)
+@available(tvOS, introduced: 9999, deprecated)
+@available(*, deprecated)
+@_cdecl("_SwiftCreateBridgedString")
+@usableFromInline
+internal func _SwiftCreateBridgedString(
+  bytes: UnsafePointer<UInt8>,
+  length: Int,
+  encoding: _swift_shims_CFStringEncoding
+) -> Unmanaged<AnyObject> {
+  let bufPtr = UnsafeBufferPointer(start: bytes, count: length)
+  let str:String
+  switch encoding {
+  case kCFStringEncodingUTF8:
+    str = String(decoding: bufPtr, as: Unicode.UTF8.self)
+  case kCFStringEncodingASCII:
+    str = String(decoding: bufPtr, as: Unicode.ASCII.self)
+  default:
+    fatalError("Unsupported encoding in shim")
+  }
+  return Unmanaged<AnyObject>.passRetained(str._bridgeToObjectiveCImpl())
+}
+
 // At runtime, this class is derived from `__SwiftNativeNSStringBase`,
 // which is derived from `NSString`.
 //
@@ -495,6 +524,17 @@ class __SwiftNativeNSString {
 @_silgen_name("swift_stdlib_getDescription")
 public func _getDescription<T>(_ x: T) -> AnyObject {
   return String(reflecting: x)._bridgeToObjectiveCImpl()
+}
+
+@_silgen_name("swift_stdlib_NSStringFromUTF8")
+@usableFromInline //this makes the symbol available to the runtime :(
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
+internal func _NSStringFromUTF8(_ s: UnsafePointer<UInt8>, _ len: Int)
+  -> AnyObject {
+  return String(
+    decoding: UnsafeBufferPointer(start: s, count: len),
+    as: UTF8.self
+  )._bridgeToObjectiveCImpl()
 }
 
 #else // !_runtime(_ObjC)

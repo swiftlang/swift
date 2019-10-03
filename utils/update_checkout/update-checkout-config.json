@@ -53,7 +53,7 @@
         "swift-format": {
             "remote": { "id": "apple/swift-format" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project-v1" } }
+            "remote": { "id": "apple/llvm-project-v2" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
@@ -77,7 +77,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "clang-tools-extra": "stable",
                 "libcxx": "stable",
                 "indexstore-db": "master",
@@ -102,7 +102,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -129,7 +129,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "clang-tools-extra": "upstream-with-swift",
                 "libcxx": "upstream-with-swift",
                 "indexstore-db": "master",
@@ -153,7 +153,7 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "indexstore-db": "master",
                 "sourcekit-lsp": "master"
             }
@@ -403,16 +403,17 @@
                 "sourcekit-lsp": "swift-5.1-branch"
             }
         },
-        "master-rebranch" : {
+        "master-20190619" : {
             "aliases": ["apple/stable/20190619",
-                        "master-rebranch-apple-stable-20190619",
-                        "master-rebranch"],
+                        "master-apple-stable-20190619",
+                        "master-20190619"
+                       ],
             "repos": {
                 "llvm": "apple/stable/20190619",
                 "clang": "apple/stable/20190619",
                 "compiler-rt": "apple/stable/20190619",
-                "swift": "master-rebranch",
-                "lldb": "upstream-with-swift",
+                "swift": "master",
+                "lldb": "stable",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",
@@ -425,11 +426,12 @@
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
-                "cmake": "v3.15.0",
+                "cmake": "v3.15.1",
                 "clang-tools-extra": "apple/stable/20190619",
                 "libcxx": "apple/stable/20190619",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "stdlib_standalone" : {

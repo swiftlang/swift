@@ -168,8 +168,7 @@ public:
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
                                DebugTypeInfo Ty, const SILDebugScope *DS,
-                               ValueDecl *VarDecl, StringRef Name,
-                               unsigned ArgNo = 0,
+                               ValueDecl *VarDecl, SILDebugVariable VarInfo,
                                IndirectionKind = DirectValue,
                                ArtificialKind = RealValue);
   void emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,
@@ -309,7 +308,7 @@ private:
     // reports back a size.
     while (isa<llvm::DIDerivedType>(Ty) && !Ty->getSizeInBits()) {
       auto *DT = cast<llvm::DIDerivedType>(Ty);
-      Ty = DT->getBaseType().resolve();
+      Ty = DT->getBaseType();
       if (!Ty)
         return 0;
     }
@@ -320,7 +319,7 @@ private:
 
   /// Return the size reported by the variable's type.
   static unsigned getSizeInBits(const llvm::DILocalVariable *Var) {
-    llvm::DIType *Ty = Var->getType().resolve();
+    llvm::DIType *Ty = Var->getType();
     return getSizeInBits(Ty);
   }
 
@@ -734,6 +733,8 @@ private:
         NoLoc, NoLoc, IGM.Context.getIdentifier(ArchetypeName), NoLoc,
         /*genericparams*/ nullptr, IGM.Context.TheBuiltinModule);
     Entry->setUnderlyingType(IGM.Context.TheRawPointerType);
+    Entry->setValidationToChecked();
+    Entry->computeType();
     return Entry;
   }
 
@@ -1205,18 +1206,6 @@ private:
       break;
     }
 
-    case TypeKind::BuiltinUnknownObject: {
-      // The builtin opaque Objective-C pointer type. Useful for pushing
-      // an Objective-C type through swift.
-      unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
-      auto IdTy = DBuilder.createForwardDecl(llvm::dwarf::DW_TAG_structure_type,
-                                             MangledName, Scope, File, 0,
-                                             llvm::dwarf::DW_LANG_ObjC, 0, 0);
-      return DBuilder.createPointerType(IdTy, PtrSize, 0,
-                                        /* DWARFAddressSpace */ None,
-                                        MangledName);
-    }
-
     case TypeKind::BuiltinNativeObject: {
       unsigned PtrSize = CI.getTargetInfo().getPointerWidth(0);
       auto PTy =
@@ -1601,15 +1590,19 @@ private:
       auto Idx = ClangDecl->getOwningModuleID();
       auto SubModuleDesc = Reader.getSourceDescriptor(Idx);
       auto TopLevelModuleDesc = getClangModule(*TypeDecl->getModuleContext());
-      if (SubModuleDesc && TopLevelModuleDesc) {
-        // Describe the submodule, but substitute the cached ASTFile from
-        // the toplevel module. The ASTFile pointer in SubModule may be
-        // dangling and cant be trusted.
-        Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
-                                   SubModuleDesc->getPath(),
-                                   TopLevelModuleDesc->getASTFile(),
-                                   TopLevelModuleDesc->getSignature()},
-                                  SubModuleDesc->getModuleOrNull());
+      if (SubModuleDesc) {
+        if (TopLevelModuleDesc)
+          // Describe the submodule, but substitute the cached ASTFile from
+          // the toplevel module. The ASTFile pointer in SubModule may be
+          // dangling and cant be trusted.
+          Scope = getOrCreateModule({SubModuleDesc->getModuleName(),
+                                     SubModuleDesc->getPath(),
+                                     TopLevelModuleDesc->getASTFile(),
+                                     TopLevelModuleDesc->getSignature()},
+                                    SubModuleDesc->getModuleOrNull());
+        else if (SubModuleDesc->getModuleOrNull() == nullptr)
+          // This is (bridging header) PCH.
+          Scope = getOrCreateModule(*SubModuleDesc, nullptr);
       }
     }
     if (!Scope)
@@ -2139,12 +2132,9 @@ void IRGenDebugInfoImpl::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name, unsigned ArgNo,
+    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
     IndirectionKind Indirection, ArtificialKind Artificial) {
-  // FIXME: Make this an assertion.
-  // assert(DS && "variable has no scope");
-  if (!DS)
-    return;
+  assert(DS && "variable has no scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
@@ -2162,7 +2152,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
-  if (ArgNo > 0) {
+  if (VarInfo.ArgNo > 0) {
     while (isa<llvm::DILexicalBlock>(Scope))
       Scope = cast<llvm::DILexicalBlock>(Scope)->getScope();
   }
@@ -2170,11 +2160,13 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   llvm::DIFile *Unit = getFile(Scope);
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   assert(DITy && "could not determine debug type of variable");
+  if (VarInfo.Constant)
+    DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
   unsigned Line = Loc.Line;
 
   // Self is always an artificial argument, so are variables without location.
-  if (!Line || (ArgNo > 0 && Name == IGM.Context.Id_self.str()))
+  if (!Line || (VarInfo.ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
@@ -2185,10 +2177,11 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   bool Optimized = false;
   // Create the descriptor for the variable.
   llvm::DILocalVariable *Var =
-      (ArgNo > 0) ? DBuilder.createParameterVariable(
-                        Scope, Name, ArgNo, Unit, Line, DITy, Optimized, Flags)
-                  : DBuilder.createAutoVariable(Scope, Name, Unit, Line, DITy,
-                                                Optimized, Flags);
+      (VarInfo.ArgNo > 0)
+          ? DBuilder.createParameterVariable(Scope, VarInfo.Name, VarInfo.ArgNo,
+                                             Unit, Line, DITy, Optimized, Flags)
+          : DBuilder.createAutoVariable(Scope, VarInfo.Name, Unit, Line, DITy,
+                                        Optimized, Flags);
 
   // Running variables for the current/previous piece.
   bool IsPiece = Storage.size() > 1;
@@ -2272,8 +2265,14 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  llvm::DIType *Ty = getOrCreateType(DbgTy);
-  if (Ty->isArtificial() || Ty == InternalType || !Loc)
+  llvm::DIType *DITy = getOrCreateType(DbgTy);
+  VarDecl *VD = nullptr;
+  if (Loc)
+    VD = dyn_cast_or_null<VarDecl>(Loc->getAsASTNode<Decl>());
+  if (!VD || VD->isLet())
+    DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
+
+  if (DITy->isArtificial() || DITy == InternalType || !Loc)
     // FIXME: Really these should be marked as artificial, but LLVM
     // currently has no support for flags to be put on global
     // variables. In the mean time, elide these variables, they
@@ -2281,7 +2280,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     return;
 
   if (InFixedBuffer)
-    Ty = createFixedValueBufferStruct(Ty);
+    DITy = createFixedValueBufferStruct(DITy);
 
   auto L = getStartLocation(Loc);
   auto File = getOrCreateFile(L.Filename);
@@ -2291,7 +2290,7 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (!Var)
     Expr = DBuilder.createConstantValueExpression(0);
   auto *GV = DBuilder.createGlobalVariableExpression(
-      MainModule, Name, LinkageName, File, L.Line, Ty, IsLocalToUnit, Expr);
+      MainModule, Name, LinkageName, File, L.Line, DITy, IsLocalToUnit, Expr);
   if (Var)
     Var->addDebugInfo(GV);
 }
@@ -2317,7 +2316,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Metadata->getType(), Size(CI.getTargetInfo().getPointerWidth(0)),
       Alignment(CI.getTargetInfo().getPointerAlign(0)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          nullptr, OS.str().str(), 0,
+                          nullptr, {OS.str().str(), 0, false},
                           // swift.type is already a pointer type,
                           // having a shadow copy doesn't add another
                           // layer of indirection.
@@ -2416,11 +2415,10 @@ void IRGenDebugInfo::emitArtificialFunction(IRBuilder &Builder,
 
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, ValueDecl *VarDecl, StringRef Name,
-    unsigned ArgNo, IndirectionKind Indirection,
-      ArtificialKind Artificial) {
+    const SILDebugScope *DS, ValueDecl *VarDecl, SILDebugVariable VarInfo,
+    IndirectionKind Indirection, ArtificialKind Artificial) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarDecl, Name, ArgNo, Indirection, Artificial);
+      Builder, Storage, Ty, DS, VarDecl, VarInfo, Indirection, Artificial);
 }
 
 void IRGenDebugInfo::emitDbgIntrinsic(IRBuilder &Builder, llvm::Value *Storage,

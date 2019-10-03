@@ -501,13 +501,6 @@
           key.usr: <usr>,
           key.line: 55,
           key.column: 15
-        },
-        {
-          key.kind: source.lang.swift.ref.protocol,
-          key.name: "Prot",
-          key.usr: <usr>,
-          key.line: 55,
-          key.column: 19
         }
       ],
       key.entities: [
@@ -533,17 +526,10 @@
           key.column: 15
         },
         {
-          key.kind: source.lang.swift.ref.protocol,
-          key.name: "Prot",
-          key.usr: <usr>,
-          key.line: 55,
-          key.column: 19
-        },
-        {
           key.kind: source.lang.swift.decl.function.constructor,
           key.usr: <usr>,
           key.line: 55,
-          key.column: 24,
+          key.column: 18,
           key.is_implicit: 1,
           key.related: [
             {

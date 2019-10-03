@@ -523,6 +523,16 @@ public:
     getAllOperands()[Num1].swap(getAllOperands()[Num2]);
   }
 
+private:
+  /// Predicate used to filter OperandTypeRange.
+  struct OperandToType;
+
+public:
+  using OperandTypeRange =
+      OptionalTransformRange<ArrayRef<Operand>, OperandToType>;
+  // NOTE: We always skip type dependent operands.
+  OperandTypeRange getOperandTypes() const;
+
   /// Return the list of results produced by this instruction.
   bool hasResults() const { return !getResults().empty(); }
   SILInstructionResultArray getResults() const { return getResultsImpl(); }
@@ -698,6 +708,22 @@ SILInstruction::getOperandValues(bool skipTypeDependentOperands) const
     -> OperandValueRange {
   return OperandValueRange(getAllOperands(),
                            OperandToValue(*this, skipTypeDependentOperands));
+}
+
+struct SILInstruction::OperandToType {
+  const SILInstruction &i;
+
+  OperandToType(const SILInstruction &i) : i(i) {}
+
+  Optional<SILType> operator()(const Operand &use) const {
+    if (i.isTypeDependentOperand(use))
+      return None;
+    return use.get()->getType();
+  }
+};
+
+inline auto SILInstruction::getOperandTypes() const -> OperandTypeRange {
+  return OperandTypeRange(getAllOperands(), OperandToType(*this));
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -1289,14 +1315,18 @@ public:
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
 struct SILDebugVariable {
+  StringRef Name;
+  unsigned ArgNo : 16;
+  unsigned Constant : 1;
+
   SILDebugVariable() : ArgNo(0), Constant(false) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
       : ArgNo(ArgNo), Constant(Constant) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
       : Name(Name), ArgNo(ArgNo), Constant(Constant) {}
-  StringRef Name;
-  unsigned ArgNo : 16;
-  unsigned Constant : 1;
+  bool operator==(const SILDebugVariable &V) {
+    return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name;
+  }
 };
 
 /// A DebugVariable where storage for the strings has been
@@ -1643,9 +1673,7 @@ public:
   bool hasDynamicLifetime() const { return dynamicLifetime; }
 
   // Return the type of the memory stored in the alloc_box.
-  SILType getAddressType() const {
-    return getBoxType()->getFieldType(getModule(), 0).getAddressType();
-  }
+  SILType getAddressType() const;
 
   /// Return the underlying variable declaration associated with this
   /// allocation, or null if this is a temporary allocation.
@@ -1837,7 +1865,8 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
-  SILValue getCallee() const { return getAllOperands()[Callee].get(); }
+  const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
 
   /// Gets the origin of the callee by looking through function type conversions
   /// until we find a function_ref, partial_apply, or unrecognized value.
@@ -3009,7 +3038,7 @@ public:
 
   /// Looks up the BuiltinKind of this builtin. Returns None if this is
   /// not a builtin.
-  llvm::Optional<BuiltinValueKind> getBuiltinKind() const {
+  Optional<BuiltinValueKind> getBuiltinKind() const {
     auto I = getBuiltinInfo();
     if (I.ID == BuiltinValueKind::None)
       return None;
@@ -3240,6 +3269,9 @@ public:
     return LoadOwnershipQualifier(
       SILInstruction::Bits.LoadInst.OwnershipQualifier);
   }
+  void setOwnershipQualifier(LoadOwnershipQualifier qualifier) {
+    SILInstruction::Bits.LoadInst.OwnershipQualifier = unsigned(qualifier);
+  }
 };
 
 // *NOTE* When serializing, we can only represent up to 4 values here. If more
@@ -3279,19 +3311,12 @@ public:
     return StoreOwnershipQualifier(
       SILInstruction::Bits.StoreInst.OwnershipQualifier);
   }
+  void setOwnershipQualifier(StoreOwnershipQualifier qualifier) {
+    SILInstruction::Bits.StoreInst.OwnershipQualifier = unsigned(qualifier);
+  }
 };
 
 class EndBorrowInst;
-
-struct UseToEndBorrow {
-  Optional<EndBorrowInst *> operator()(Operand *use) const {
-    if (auto endBorrow = dyn_cast<EndBorrowInst>(use->getUser())) {
-      return endBorrow;
-    } else {
-      return None;
-    }
-  }
-};
 
 /// Represents a load of a borrowed value. Must be paired with an end_borrow
 /// instruction in its use-def list.
@@ -3306,14 +3331,14 @@ public:
                              LValue->getType().getObjectType()) {}
 
   using EndBorrowRange =
-      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+      decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
 };
 
 inline auto LoadBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
+  return getUsersOfType<EndBorrowInst>();
 }
 
 /// Represents the begin scope of a borrowed value. Must be paired with an
@@ -3329,7 +3354,7 @@ class BeginBorrowInst
 
 public:
   using EndBorrowRange =
-      OptionalTransformRange<use_range, UseToEndBorrow, use_iterator>;
+      decltype(std::declval<ValueBase>().getUsersOfType<EndBorrowInst>());
 
   /// Return a range over all EndBorrow instructions for this BeginBorrow.
   EndBorrowRange getEndBorrows() const;
@@ -3344,7 +3369,7 @@ public:
 };
 
 inline auto BeginBorrowInst::getEndBorrows() const -> EndBorrowRange {
-  return EndBorrowRange(getUses(), UseToEndBorrow());
+  return getUsersOfType<EndBorrowInst>();
 }
 
 /// Represents a store of a borrowed value into an address. Returns the borrowed
@@ -3483,6 +3508,8 @@ enum class SILAccessEnforcement : uint8_t {
 };
 StringRef getSILAccessEnforcementName(SILAccessEnforcement enforcement);
 
+class EndAccessInst;
+
 /// Begins an access scope. Must be paired with an end_access instruction
 /// along every path.
 class BeginAccessInst
@@ -3554,13 +3581,8 @@ public:
     return getOperand();
   }
 
-private:
-    /// Predicate used to filter EndAccessRange.
-  struct UseToEndAccess;
-
-public:
   using EndAccessRange =
-    OptionalTransformRange<use_range, UseToEndAccess, use_iterator>;
+      decltype(std::declval<ValueBase>().getUsersOfType<EndAccessInst>());
 
   /// Find all the associated end_access instructions for this begin_access.
   EndAccessRange getEndAccesses() const;
@@ -3601,18 +3623,8 @@ public:
   }
 };
 
-struct BeginAccessInst::UseToEndAccess {
-  Optional<EndAccessInst *> operator()(Operand *use) const {
-    if (auto access = dyn_cast<EndAccessInst>(use->getUser())) {
-      return access;
-    } else {
-      return None;
-    }
-  }
-};
-
 inline auto BeginAccessInst::getEndAccesses() const -> EndAccessRange {
-  return EndAccessRange(getUses(), UseToEndAccess());
+  return getUsersOfType<EndAccessInst>();
 }
 
 /// Begins an access without requiring a paired end_access.
@@ -6468,15 +6480,25 @@ class CopyValueInst
       : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
 };
 
-#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
-class Copy##Name##ValueInst \
-    : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
-                                  SingleValueInstruction> { \
-  friend class SILBuilder; \
-  Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand, \
-                        SILType type) \
-      : UnaryInstructionBase(DebugLoc, operand, type) {} \
-};
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  class Copy##Name##ValueInst                                                  \
+      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
+                                    SingleValueInstruction> {                  \
+    friend class SILBuilder;                                                   \
+    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
+                          SILType type)                                        \
+        : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
+  };
+
+#define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
+  class Copy##Name##ValueInst                                                  \
+      : public UnaryInstructionBase<SILInstructionKind::Copy##Name##ValueInst, \
+                                    SingleValueInstruction> {                  \
+    friend class SILBuilder;                                                   \
+    Copy##Name##ValueInst(SILDebugLocation DebugLoc, SILValue operand,         \
+                          SILType type)                                        \
+        : UnaryInstructionBase(DebugLoc, operand, type) {}                     \
+  };
 #include "swift/AST/ReferenceStorage.def"
 
 class DestroyValueInst
@@ -7195,7 +7217,10 @@ private:
          ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
-  SILValue getCondition() const { return getAllOperands()[ConditionIdx].get(); }
+  const Operand *getConditionOperand() const {
+    return &getAllOperands()[ConditionIdx];
+  }
+  SILValue getCondition() const { return getConditionOperand()->get(); }
   void setCondition(SILValue newCondition) {
     getAllOperands()[ConditionIdx].set(newCondition);
   }
@@ -7239,6 +7264,11 @@ public:
   MutableArrayRef<Operand> getFalseOperands() {
     // The remaining arguments are 'false' operands.
     return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
+
+  /// Returns true if \p op is mapped to the condition operand of the cond_br.
+  bool isConditionOperand(Operand *op) const {
+    return getConditionOperand() == op;
   }
 
   bool isConditionOperandIndex(unsigned OpIndex) const {

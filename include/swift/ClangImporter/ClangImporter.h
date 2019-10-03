@@ -23,6 +23,7 @@
 
 namespace llvm {
   class Triple;
+  class FileCollector;
   template<typename Fn> class function_ref;
 }
 
@@ -51,11 +52,13 @@ class ClangModuleUnit;
 class ClangNode;
 class Decl;
 class DeclContext;
+class EnumDecl;
 class ImportDecl;
 class IRGenOptions;
 class LazyResolver;
 class ModuleDecl;
 class NominalTypeDecl;
+class StructDecl;
 class TypeDecl;
 class VisibleDeclConsumer;
 enum class SelectorSplitKind;
@@ -87,7 +90,9 @@ public:
   virtual ~DWARFImporterDelegate() = default;
   /// Perform a qualified lookup of a Clang type with this name.
   /// \param kind  Only return results with this type kind.
+  /// \param inModule only return results from this module.
   virtual void lookupValue(StringRef name, llvm::Optional<ClangTypeKind> kind,
+                           StringRef inModule,
                            SmallVectorImpl<clang::Decl *> &results) {}
   /// vtable anchor.
   virtual void anchor();
@@ -145,7 +150,8 @@ public:
   /// Create a new clang::DependencyCollector customized to
   /// ClangImporter's specific uses.
   static std::shared_ptr<clang::DependencyCollector>
-  createDependencyCollector(bool TrackSystemDeps);
+  createDependencyCollector(bool TrackSystemDeps,
+                            std::shared_ptr<llvm::FileCollector> FileCollector);
 
   /// Append visible module names to \p names. Note that names are possibly
   /// duplicated, and not guaranteed to be ordered in any way.
@@ -210,6 +216,10 @@ public:
   lookupRelatedEntity(StringRef clangName, ClangTypeKind kind,
                       StringRef relatedEntityKind,
                       llvm::function_ref<void(TypeDecl *)> receiver) override;
+
+  /// Just like Decl::getClangNode() except we look through to the 'Code'
+  /// enum of an error wrapper struct.
+  ClangNode getEffectiveClangNode(const Decl *decl) const;
 
   /// Look for textually included declarations from the bridging header.
   ///
@@ -328,9 +338,6 @@ public:
   bool hasTypedef(const clang::Decl *typeDecl) const;
 
   void verifyAllModules() override;
-
-  void setTypeResolver(LazyResolver &resolver);
-  void clearTypeResolver();
 
   clang::TargetInfo &getTargetInfo() const;
   clang::ASTContext &getClangASTContext() const override;

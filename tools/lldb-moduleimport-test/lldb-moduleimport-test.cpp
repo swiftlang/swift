@@ -173,10 +173,15 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
           (ELF && Name == swift::ELFASTSectionName) ||
           (COFF && Name == swift::COFFASTSectionName)) {
         uint64_t Size = Section.getSize();
-        StringRef ContentsReference;
-        Section.getContents(ContentsReference);
+
+        llvm::Expected<llvm::StringRef> ContentsReference = Section.getContents();
+        if (!ContentsReference) {
+          llvm::errs() << "error: " << name << " "
+            << errorToErrorCode(OF.takeError()).message() << "\n";
+          return false;
+        }
         char *Module = Alloc.Allocate<char>(Size);
-        std::memcpy(Module, (void *)ContentsReference.begin(), Size);
+        std::memcpy(Module, (void *)ContentsReference->begin(), Size);
         Modules.push_back({Module, Size});
       }
     }

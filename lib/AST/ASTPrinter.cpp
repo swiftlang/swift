@@ -22,6 +22,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -95,7 +96,7 @@ static bool contributesToParentTypeStorage(const AbstractStorageDecl *ASD) {
   return !ND->isResilient() && ASD->hasStorage() && !ASD->isStatic();
 }
 
-PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
+PrintOptions PrintOptions::printSwiftInterfaceFile(bool preferTypeRepr) {
   PrintOptions result;
   result.PrintLongAttrsOnSeparateLines = true;
   result.TypeDefinitions = true;
@@ -118,14 +119,18 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
 
   result.FunctionBody = [](const ValueDecl *decl, ASTPrinter &printer) {
     auto AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->hasInlinableBodyText()) return;
+    if (!AFD)
+      return;
     if (AFD->getResilienceExpansion() != ResilienceExpansion::Minimal)
       return;
+    if (!AFD->hasInlinableBodyText())
+      return;
+
     SmallString<128> scratch;
     printer << " " << AFD->getInlinableBodyText(scratch);
   };
 
-  class ShouldPrintForParseableInterface : public ShouldPrintChecker {
+  class ShouldPrintForModuleInterface : public ShouldPrintChecker {
     bool shouldPrint(const Decl *D, const PrintOptions &options) override {
       // Skip anything that is marked `@_implementationOnly` itself.
       if (D->getAttrs().hasAttribute<ImplementationOnlyAttr>())
@@ -185,7 +190,7 @@ PrintOptions PrintOptions::printParseableInterfaceFile(bool preferTypeRepr) {
     }
   };
   result.CurrentPrintabilityChecker =
-      std::make_shared<ShouldPrintForParseableInterface>();
+      std::make_shared<ShouldPrintForModuleInterface>();
 
   // FIXME: We don't really need 'public' on everything; we could just change
   // the default to 'public' and mark the 'internal' things.
@@ -281,8 +286,8 @@ void ASTPrinter::printEscapedStringLiteral(StringRef str) {
   printTextImpl(escapeBuf.str());
 }
 
-void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name) {
-  PrintNameContext Context = PrintNameContext::Normal;
+void ASTPrinter::printTypeRef(Type T, const TypeDecl *RefTo, Identifier Name,
+                              PrintNameContext Context) {
   if (isa<GenericTypeParamDecl>(RefTo)) {
     Context = PrintNameContext::GenericParameter;
   } else if (T && T->is<DynamicSelfType>()) {
@@ -672,8 +677,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
           M, cast<ValueDecl>(Current));
       }
 
-      T = T.subst(subMap,
-                  SubstFlags::DesugarMemberTypes | SubstFlags::UseErrorType);
+      T = T.subst(subMap, SubstFlags::DesugarMemberTypes);
     }
 
     printTypeWithOptions(T, options);
@@ -752,10 +756,10 @@ public:
                                                 Decl *attachingTo);
   void printTrailingWhereClause(TrailingWhereClause *whereClause);
 
-  void printGenericSignature(const GenericSignature *genericSig,
+  void printGenericSignature(GenericSignature genericSig,
                              unsigned flags);
   void
-  printGenericSignature(const GenericSignature *genericSig, unsigned flags,
+  printGenericSignature(GenericSignature genericSig, unsigned flags,
                         llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
       TypeArrayView<GenericTypeParamType> genericParams,
@@ -1323,7 +1327,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
   llvm_unreachable("bad RequirementKind");
 }
 
-static void getRequirementsAtDepth(const GenericSignature *genericSig,
+static void getRequirementsAtDepth(GenericSignature genericSig,
                                    unsigned depth,
                                    SmallVectorImpl<Requirement> &result) {
   for (auto reqt : genericSig->getRequirements()) {
@@ -1334,7 +1338,7 @@ static void getRequirementsAtDepth(const GenericSignature *genericSig,
   }
 }
 
-void PrintAST::printGenericSignature(const GenericSignature *genericSig,
+void PrintAST::printGenericSignature(GenericSignature genericSig,
                                      unsigned flags) {
   printGenericSignature(genericSig, flags,
                         // print everything
@@ -1342,7 +1346,7 @@ void PrintAST::printGenericSignature(const GenericSignature *genericSig,
 }
 
 void PrintAST::printGenericSignature(
-    const GenericSignature *genericSig, unsigned flags,
+    GenericSignature genericSig, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   auto requirements = genericSig->getRequirements();
 
@@ -1447,10 +1451,12 @@ void PrintAST::printSingleDepthOfGenericSignature(
         second = req.getSecondType();
 
       if (!subMap.empty()) {
-        if (Type subFirst = substParam(first))
+        Type subFirst = substParam(first);
+        if (!subFirst->hasError())
           first = subFirst;
         if (second) {
-          if (Type subSecond = substParam(second))
+          Type subSecond = substParam(second);
+          if (!subSecond->hasError())
             second = subSecond;
           if (!(first->is<ArchetypeType>() || first->isTypeParameter()) &&
               !(second->is<ArchetypeType>() || second->isTypeParameter()))
@@ -1969,7 +1975,7 @@ void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
 void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
   if (decl->isGeneric()) {
     if (auto genericSig = decl->getGenericSignature()) {
-      auto *baseGenericSig = decl->getParent()
+      auto baseGenericSig = decl->getParent()
           ->getGenericSignatureOfContext();
       printGenericSignature(genericSig, PrintRequirements,
                             [baseGenericSig](const Requirement &req) {
@@ -2106,17 +2112,23 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     recordDeclLoc(decl, [&]{
       // We cannot extend sugared types.
       Type extendedType = decl->getExtendedType();
-      if (!extendedType || !extendedType->getAnyNominal()) {
+      if (!extendedType) {
         // Fallback to TypeRepr.
-        printTypeLoc(decl->getExtendedTypeLoc());
+        printTypeLoc(decl->getExtendedTypeRepr());
+        return;
+      }
+      if (!extendedType->getAnyNominal()) {
+        // Fallback to the type.  This usually means we're trying to print an
+        // UnboundGenericType.
+        printTypeLoc(TypeLoc::withoutLoc(extendedType));
         return;
       }
       printExtendedTypeName(extendedType, Printer, Options);
     });
     printInherited(decl);
 
-    if (auto *genericSig = decl->getGenericSignature()) {
-      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+    if (auto genericSig = decl->getGenericSignature()) {
+      auto baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
       printGenericSignature(genericSig, PrintRequirements,
@@ -2265,7 +2277,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
       printGenericDeclGenericParams(decl);
     });
   bool ShouldPrint = true;
-  Type Ty = decl->getUnderlyingTypeLoc().getType();
+  Type Ty = decl->getUnderlyingType();
 
   // If the underlying type is private, don't print it.
   if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
@@ -2283,7 +2295,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     // preserving sugar.
     llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
                                                 decl->getGenericEnvironment());
-    printTypeLoc(decl->getUnderlyingTypeLoc());
+    printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printGenericDeclGenericRequirements(decl);
   }
 }
@@ -2881,7 +2893,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
-  auto *raw = elt->getRawValueExpr();
+  auto *raw = elt->getStructuralRawValueExpr();
   if (!raw || raw->isImplicit())
     return;
 
@@ -3479,9 +3491,10 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
   }
 
   template <typename T>
-  void printTypeDeclName(T *Ty) {
+  void printTypeDeclName(
+      T *Ty, PrintNameContext NameContext = PrintNameContext::Normal) {
     TypeDecl *TD = Ty->getDecl();
-    Printer.printTypeRef(Ty, TD, TD->getName());
+    Printer.printTypeRef(Ty, TD, TD->getName(), NameContext);
   }
 
   // FIXME: we should have a callback that would tell us
@@ -3537,6 +3550,24 @@ public:
   TypePrinter(ASTPrinter &Printer, const PrintOptions &PO)
       : Printer(Printer), Options(PO) {}
 
+  template <typename T>
+  void printQualifiedType(T *Ty) {
+    PrintNameContext NameContext = PrintNameContext::Normal;
+
+    // If we printed a parent type or a module qualification, let the printer
+    // know we're printing a type member so it escapes `Type` and `Protocol`.
+    if (auto parent = Ty->getParent()) {
+      visitParentType(parent);
+      Printer << ".";
+      NameContext = PrintNameContext::TypeMember;
+    } else if (shouldPrintFullyQualified(Ty)) {
+      printModuleContext(Ty);
+      NameContext = PrintNameContext::TypeMember;
+    }
+
+    printTypeDeclName(Ty, NameContext);
+  }
+
   void visit(Type T) {
     Printer.printTypePre(TypeLoc::withoutLoc(T));
     SWIFT_DEFER { Printer.printTypePost(TypeLoc::withoutLoc(T)); };
@@ -3570,7 +3601,6 @@ public:
   }
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawPointerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinNativeObjectType)
-  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnknownObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinBridgeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnsafeValueBufferType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerLiteralType)
@@ -3589,14 +3619,7 @@ public:
       return;
     }
 
-    if (auto parent = T->getParent()) {
-      visit(parent);
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
+    printQualifiedType(T);
     printGenericArgs(T->getInnermostGenericArgs());
   }
 
@@ -3643,13 +3666,7 @@ public:
   }
 
   void visitUnboundGenericType(UnboundGenericType *T) {
-    if (auto ParentType = T->getParent()) {
-      visit(ParentType);
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-    printTypeDeclName(T);
+    printQualifiedType(T);
   }
 
   void visitBoundGenericType(BoundGenericType *T) {
@@ -3676,14 +3693,7 @@ public:
         return;
       }
     }
-    if (auto ParentType = T->getParent()) {
-      visit(ParentType);
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
+    printQualifiedType(T);
     printGenericArgs(T->getGenericArgs());
   }
 
@@ -3698,36 +3708,15 @@ public:
   }
 
   void visitEnumType(EnumType *T) {
-    if (auto ParentType = T->getParent()) {
-      visitParentType(ParentType);
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
+    printQualifiedType(T);
   }
 
   void visitStructType(StructType *T) {
-    if (auto ParentType = T->getParent()) {
-      visitParentType(ParentType);
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
+    printQualifiedType(T);
   }
 
   void visitClassType(ClassType *T) {
-    if (auto ParentType = T->getParent()) {
-      visitParentType(ParentType);
-      Printer << ".";
-    } else if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
+    printQualifiedType(T);
   }
 
   void visitAnyMetatypeType(AnyMetatypeType *T) {
@@ -3927,7 +3916,7 @@ public:
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
-  void printGenericSignature(const GenericSignature *genericSig,
+  void printGenericSignature(GenericSignature genericSig,
                              unsigned flags) {
     PrintAST(Printer, Options).printGenericSignature(genericSig, flags);
   }
@@ -4118,11 +4107,7 @@ public:
   }
 
   void visitProtocolType(ProtocolType *T) {
-    if (shouldPrintFullyQualified(T)) {
-      printModuleContext(T);
-    }
-
-    printTypeDeclName(T);
+    printQualifiedType(T);
   }
 
   void visitProtocolCompositionType(ProtocolCompositionType *T) {
@@ -4363,13 +4348,24 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   }
 }
 
+void GenericSignatureImpl::print(raw_ostream &OS, PrintOptions PO) const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(OS, PO);
+}
+void GenericSignatureImpl::print(ASTPrinter &Printer, PrintOptions PO) const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(Printer, PO);
+}
+
 void GenericSignature::print(raw_ostream &OS, PrintOptions Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
 
 void GenericSignature::print(ASTPrinter &Printer, PrintOptions Opts) const {
-  PrintAST(Printer, Opts).printGenericSignature(this,
+  if (isNull()) {
+    Printer << "<null>";
+    return;
+  }
+  PrintAST(Printer, Opts).printGenericSignature(*this,
                                                 PrintAST::PrintParams |
                                                 PrintAST::PrintRequirements);
 }
@@ -4414,6 +4410,11 @@ void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
 
 void Requirement::print(ASTPrinter &printer, const PrintOptions &opts) const {
   PrintAST(printer, opts).printRequirement(*this);
+}
+
+std::string GenericSignatureImpl::getAsString() const {
+  return GenericSignature(const_cast<GenericSignatureImpl *>(this))
+      .getAsString();
 }
 
 std::string GenericSignature::getAsString() const {

@@ -97,10 +97,26 @@ Most diagnostics have no reason to change behavior under editor mode. An example
 
 - `%0`, `%1`, etc - Formats the specified diagnostic argument based on its type.
 
-- `%select{a|b|c}0` - Chooses from a list of alternatives, separated by vertical bars, based on the value of the given argument. In this example, a value of 2 in diagnostic argument 0 would result in "c" being output.
+- `%select{a|b|c}0` - Chooses from a list of alternatives, separated by vertical bars, based on the value of the given argument. In this example, a value of 2 in diagnostic argument 0 would result in "c" being output. The argument to the %select may be an integer, enum, or StringRef. If it's a StringRef, the specifier acts as an emptiness check.
 
 - `%s0` - Produces an "s" if the given argument is anything other than 1, as meant for an English plural. This isn't particularly localizable without a more general `%plural` form, but most diagnostics try to avoid cases where a plural/singular distinction would be necessary in the first place.
 
 - `%error` - Represents a branch in a `%select` that should never be taken. In debug builds of the compiler this produces an assertion failure.
 
 - `%%` - Emits a literal percent sign.
+
+### Diagnostic Verifier ###
+
+(This section is specific to the Swift compiler's diagnostic engine.)
+
+If the `-verify` frontend flag is used, the Swift compiler will check emitted diagnostics against specially formatted comments in the source. This feature is used extensively throughout the test suite to ensure diagnostics are emitted with the correct message and source location.
+
+An expected diagnostic is denoted by a comment which begins with `expected-error`, `expected-warning`, `expected-note`, or `expected-remark`. It is followed by:
+
+- (Optional) Location information. By default, the comment will match any diagnostic emitted on the same line. However, it's possible to override this behavior and/or specify column information as well. `// expected-error@-1 ...` looks for an error on the previous line, `// expected-warning@+1:3 ...` looks for a warning on the next line at the third column, and `// expected-note@:7 ...` looks for a note on the same line at the seventh column.
+
+- (Optional) A match count which specifies how many times the diagnostic is expected to appear. This may be a positive integer or `*`, which allows for zero or more matches. The match count must be surrounded by whitespace if present. For example, `// expected-error 2 ...` looks for two matching errors, and `// expected-warning * ...` looks for any number of matching warnings.
+
+- (Required) The expected error message. The message should be enclosed in double curly braces and should not include the `error:`/`warning:`/`note:`/`remark:` prefix. For example, `// expected-error {{invalid redeclaration of 'y'}}` would match an error with that message on the same line. The expected message does not need to match the emitted message verbatim. As long as the expected message is a substring of the original message, they will match.
+
+- (Optional) Expected fix-its. These are each enclosed in double curly braces and appear after the expected message. An expected fix-it consists of a column range followed by the text it's expected to be replaced with. For example, `let r : Int i = j // expected-error{{consecutive statements}} {{12-12=;}}` will match a fix-it attached to the consecutive statements error which inserts a semicolon at column 12, just after the 't' in 'Int'. The special {{none}} specifier is also supported, which will cause the diagnostic match to fail if unexpected fix-its are produced.

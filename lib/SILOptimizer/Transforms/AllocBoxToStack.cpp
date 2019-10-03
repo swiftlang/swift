@@ -11,16 +11,17 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "allocbox-to-stack"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallSet.h"
@@ -436,7 +437,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "rewriting multi-field box not implemented");
   auto *ASI = Builder.createAllocStack(
-      ABI->getLoc(), ABI->getBoxType()->getFieldType(ABI->getModule(), 0),
+      ABI->getLoc(),
+      getSILBoxFieldType(ABI->getBoxType(), ABI->getModule().Types, 0),
       ABI->getVarInfo(), ABI->hasDynamicLifetime());
 
   // Transfer a mark_uninitialized if we have one.
@@ -453,7 +455,8 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
   assert(ABI->getBoxType()->getLayout()->getFields().size() == 1
          && "promoting multi-field box not implemented");
   auto &Lowering = ABI->getFunction()
-    ->getTypeLowering(ABI->getBoxType()->getFieldType(ABI->getModule(), 0));
+    ->getTypeLowering(
+      getSILBoxFieldType(ABI->getBoxType(), ABI->getModule().Types, 0));
   auto Loc = CleanupLocation::get(ABI->getLoc());
 
   for (auto LastRelease : FinalReleases) {
@@ -581,9 +584,10 @@ initCloned(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
              && "promoting compound box not implemented");
       SILType paramTy;
       {
-        Lowering::GenericContextScope scope(Orig->getModule().Types,
+        auto &TC = Orig->getModule().Types;
+        Lowering::GenericContextScope scope(TC,
                                             OrigFTI->getGenericSignature());
-        paramTy = boxTy->getFieldType(Orig->getModule(), 0);
+        paramTy = getSILBoxFieldType(boxTy, TC, 0);
       }
       auto promotedParam = SILParameterInfo(paramTy.getASTType(),
                                   ParameterConvention::Indirect_InoutAliasable);
@@ -647,7 +651,7 @@ PromotedParamCloner::populateCloned() {
       auto boxTy = (*I)->getType().castTo<SILBoxType>();
       assert(boxTy->getLayout()->getFields().size() == 1
              && "promoting multi-field boxes not implemented yet");
-      auto promotedTy = boxTy->getFieldType(Cloned->getModule(), 0);
+      auto promotedTy = getSILBoxFieldType(boxTy, Cloned->getModule().Types, 0);
       auto *promotedArg =
           ClonedEntryBB->createFunctionArgument(promotedTy, (*I)->getDecl());
       OrigPromotedParameters.insert(*I);

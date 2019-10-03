@@ -481,7 +481,7 @@ ide::replacePlaceholders(std::unique_ptr<llvm::MemoryBuffer> InputBuf,
 static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
   auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!BufOrErr) {
-    llvm::errs() << BufOrErr.getError().message() << '\n';
+    llvm::errs() << "could not open '" << Path << "': " << BufOrErr.getError().message() << '\n';
     return {};
   }
 
@@ -954,23 +954,9 @@ bool swift::ide::isFromClang(const Decl *D) {
 }
 
 ClangNode swift::ide::getEffectiveClangNode(const Decl *decl) {
-  // Directly...
-  if (auto clangNode = decl->getClangNode())
-    return clangNode;
-
-  // Or via the nested "Code" enum.
-  if (auto nominal =
-      const_cast<NominalTypeDecl *>(dyn_cast<NominalTypeDecl>(decl))) {
-    auto &ctx = nominal->getASTContext();
-    auto flags = OptionSet<NominalTypeDecl::LookupDirectFlags>();
-    flags |= NominalTypeDecl::LookupDirectFlags::IgnoreNewExtensions;
-    for (auto code : nominal->lookupDirect(ctx.Id_Code, flags)) {
-      if (auto clangDecl = code->getClangDecl())
-        return clangDecl;
-    }
-  }
-
-  return ClangNode();
+  auto &ctx = decl->getASTContext();
+  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  return importer->getEffectiveClangNode(decl);
 }
 
 /// Retrieve the Clang node for the given extension, if it has one.

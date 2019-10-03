@@ -273,9 +273,8 @@ static void collectPossibleCalleesByQualifiedLookup(
   bool isOnMetaType = baseTy->is<AnyMetatypeType>();
 
   SmallVector<ValueDecl *, 2> decls;
-  auto resolver = DC.getASTContext().getLazyResolver();
   if (!DC.lookupQualified(baseTy->getMetatypeInstanceType(), name,
-                          NL_QualifiedDefault | NL_ProtocolMembers, resolver,
+                          NL_QualifiedDefault | NL_ProtocolMembers,
                           decls))
     return;
 
@@ -285,10 +284,10 @@ static void collectPossibleCalleesByQualifiedLookup(
       continue;
     if (!isMemberDeclApplied(&DC, baseTy->getMetatypeInstanceType(), VD))
       continue;
-    resolver->resolveDeclSignature(VD);
-    if (!VD->hasInterfaceType())
-      continue;
     Type declaredMemberType = VD->getInterfaceType();
+    if (!declaredMemberType) {
+      continue;
+    }
     if (!declaredMemberType->is<AnyFunctionType>())
       continue;
     if (VD->getDeclContext()->isTypeContext()) {
@@ -312,7 +311,7 @@ static void collectPossibleCalleesByQualifiedLookup(
     auto subs = baseTy->getMetatypeInstanceType()->getMemberSubstitutionMap(
         DC.getParentModule(), VD,
         VD->getInnermostDeclContext()->getGenericEnvironmentOfContext());
-    auto fnType = declaredMemberType.subst(subs, SubstFlags::UseErrorType);
+    auto fnType = declaredMemberType.subst(subs);
     if (!fnType)
       continue;
 
@@ -383,6 +382,11 @@ static bool collectPossibleCalleesForApply(
   } else if (auto *UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     collectPossibleCalleesByQualifiedLookup(
         DC, UDE->getBase(), UDE->getName().getBaseName(), candidates);
+  } else if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr)) {
+    if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
+    collectPossibleCalleesByQualifiedLookup(
+        DC, DSCE->getArg(), DRE->getDecl()->getBaseName(), candidates);
+    }
   }
 
   if (candidates.empty()) {
@@ -893,7 +897,7 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
   if (VD->isOperator())
     return false;
 
-  if (!VD->hasInterfaceType())
+  if (!VD->getInterfaceType())
     return false;
 
   if (T->getOptionalObjectType() &&

@@ -332,8 +332,8 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // If the two generic signatures are identical, neither is as specialized
   // as the other.
-  GenericSignature *sig1 = dc1->getGenericSignatureOfContext();
-  GenericSignature *sig2 = dc2->getGenericSignatureOfContext();
+  GenericSignature sig1 = dc1->getGenericSignatureOfContext();
+  GenericSignature sig2 = dc2->getGenericSignatureOfContext();
   if (sig1->getCanonicalSignature() == sig2->getCanonicalSignature())
     return false;
 
@@ -822,17 +822,27 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         continue;
       }
 
-      // Dynamic member lookup through a keypath is better than one using string
-      // because it carries more type information.
-      if (choice1.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup &&
-          choice2.getKind() == OverloadChoiceKind::DynamicMemberLookup) {
-        score1 += weight;
+      if (choice1.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (choice2.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+          // Dynamic member lookup through a keypath is better than one using
+          // string because it carries more type information.
+          score1 += weight;
+        else
+          // Otherwise let's prefer non-dynamic declaration.
+          score2 += weight;
+
         continue;
       }
 
-      if (choice1.getKind() == OverloadChoiceKind::DynamicMemberLookup &&
-          choice2.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
-        score2 += weight;
+      if (choice2.getKind() == OverloadChoiceKind::KeyPathDynamicMemberLookup) {
+        if (choice1.getKind() == OverloadChoiceKind::DynamicMemberLookup)
+          // Dynamic member lookup through a keypath is better than one using
+          // string because it carries more type information.
+          score2 += weight;
+        else
+          // Otherwise let's prefer non-dynamic declaration.
+          score1 += weight;
+
         continue;
       }
 

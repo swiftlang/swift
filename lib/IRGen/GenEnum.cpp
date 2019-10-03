@@ -1128,7 +1128,7 @@ namespace {
     int64_t getDiscriminatorIndex(EnumElementDecl *target) const override {
       // The elements are assigned discriminators ABI-compatible with their
       // raw values from C.
-      assert(target->hasRawValueExpr()
+      assert(target->getRawValueExpr()
              && "c-compatible enum elt has no raw value?!");
       auto intExpr = cast<IntegerLiteralExpr>(target->getRawValueExpr());
       auto intType = getDiscriminatorType();
@@ -5395,8 +5395,7 @@ namespace {
       llvm::BasicBlock *conditionalBlock = nullptr;
       llvm::BasicBlock *afterConditionalBlock = nullptr;
       llvm::BasicBlock *beforeNullPtrCheck = nullptr;
-      if (Case->isWeakImported(IGM.getSwiftModule(),
-                               IGM.getAvailabilityContext())) {
+      if (Case->isWeakImported(IGM.getSwiftModule())) {
         beforeNullPtrCheck = IGF.Builder.GetInsertBlock();
         auto address = IGM.getAddrOfEnumCase(Case, NotForDefinition);
         conditionalBlock = llvm::BasicBlock::Create(C);
@@ -5778,10 +5777,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
-
-    if (!elt->hasInterfaceType())
-      TC.IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
-
+    
     // Compute whether this gives us an apparent payload or dynamic layout.
     // Note that we do *not* apply substitutions from a bound generic instance
     // yet. We want all instances of a generic enum to share an implementation

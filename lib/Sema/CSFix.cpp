@@ -247,14 +247,14 @@ AllowTupleTypeMismatch::create(ConstraintSystem &cs, Type lhs, Type rhs,
 }
 
 bool GenericArgumentsMismatch::diagnose(Expr *root, bool asNote) const {
-  auto failure = GenericArgumentsMismatchFailure(root, getConstraintSystem(),
-                                                 getActual(), getRequired(),
-                                                 getMismatches(), getLocator());
+  auto &cs = getConstraintSystem();
+  GenericArgumentsMismatchFailure failure(root, cs, getFromType(), getToType(),
+                                          getMismatches(), getLocator());
   return failure.diagnose(asNote);
 }
 
 GenericArgumentsMismatch *GenericArgumentsMismatch::create(
-    ConstraintSystem &cs, BoundGenericType *actual, BoundGenericType *required,
+    ConstraintSystem &cs, Type actual, Type required,
     llvm::ArrayRef<unsigned> mismatches, ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<unsigned>(mismatches.size());
   void *mem =
@@ -477,33 +477,19 @@ AllowClosureParamDestructuring::create(ConstraintSystem &cs,
 }
 
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
-  MissingArgumentsFailure failure(root, getConstraintSystem(), Fn,
-                                  NumSynthesized, getLocator());
-  return failure.diagnose(asNote);
-}
-
-IgnoreDefaultArgumentTypeMismatch *
-IgnoreDefaultArgumentTypeMismatch::create(ConstraintSystem &cs, Type fromType,
-                                          Type toType,
-                                          ConstraintLocator *locator) {
-  return new (cs.getAllocator())
-      IgnoreDefaultArgumentTypeMismatch(cs, fromType, toType, locator);
-}
-
-bool IgnoreDefaultArgumentTypeMismatch::diagnose(Expr *root,
-                                                 bool asNote) const {
-  DefaultArgumentTypeMismatch failure(root, getConstraintSystem(), FromType,
-                                      ToType, getLocator());
+  auto &cs = getConstraintSystem();
+  MissingArgumentsFailure failure(root, cs, getSynthesizedArguments(),
+                                  getLocator());
   return failure.diagnose(asNote);
 }
 
 AddMissingArguments *
-AddMissingArguments::create(ConstraintSystem &cs, FunctionType *funcType,
+AddMissingArguments::create(ConstraintSystem &cs,
                             llvm::ArrayRef<Param> synthesizedArgs,
                             ConstraintLocator *locator) {
   unsigned size = totalSizeToAlloc<Param>(synthesizedArgs.size());
   void *mem = cs.getAllocator().Allocate(size, alignof(AddMissingArguments));
-  return new (mem) AddMissingArguments(cs, funcType, synthesizedArgs, locator);
+  return new (mem) AddMissingArguments(cs, synthesizedArgs, locator);
 }
 
 bool MoveOutOfOrderArgument::diagnose(Expr *root, bool asNote) const {
@@ -772,4 +758,132 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
                                                    ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
+}
+
+bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto *AE = cast<AssignExpr>(getAnchor());
+  auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
+                                               : CTP_AssignSource;
+
+  ContextualFailure failure(
+      root, cs, CTP, getFromType(), getToType(),
+      cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
+  return failure.diagnose(asNote);
+}
+
+IgnoreAssignmentDestinationType *
+IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
+                                        Type destTy,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
+}
+
+bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  InOutConversionFailure failure(root, cs, getFromType(), getToType(),
+                                 getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowInOutConversion *AllowInOutConversion::create(ConstraintSystem &cs,
+                                                   Type argType, Type paramType,
+                                                   ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInOutConversion(cs, argType, paramType, locator);
+}
+
+/// Check whether given `value` type is indeed a the same type as a `RawValue`
+/// type of a given raw representable type.
+static bool isValueOfRawRepresentable(ConstraintSystem &cs,
+                                      Type rawRepresentableType,
+                                      Type valueType) {
+  auto rawType = isRawRepresentable(cs, rawRepresentableType);
+  if (!rawType)
+    return false;
+
+  KnownProtocolKind protocols[] = {
+      KnownProtocolKind::ExpressibleByStringLiteral,
+      KnownProtocolKind::ExpressibleByIntegerLiteral};
+
+  for (auto protocol : protocols) {
+    if (conformsToKnownProtocol(cs, valueType, protocol) &&
+        valueType->isEqual(rawType))
+      return true;
+  }
+
+  return false;
+}
+
+ExpandArrayIntoVarargs *
+ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
+                                Type paramType,
+                                ConstraintLocatorBuilder locator) {
+  auto constraintLocator = cs.getConstraintLocator(locator);
+  auto elementType = cs.isArrayType(argType);
+  if (elementType &&
+      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
+          ->getParameterFlags()
+          .isVariadic()) {
+    auto options = ConstraintSystem::TypeMatchOptions(
+        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
+        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
+    auto result =
+        cs.matchTypes(*elementType, paramType,
+                      ConstraintKind::ArgumentConversion, options, locator);
+    if (result.isSuccess())
+      return new (cs.getAllocator())
+          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
+  }
+
+  return nullptr;
+}
+
+bool ExpandArrayIntoVarargs::diagnose(Expr *root, bool asNote) const {
+  ExpandArrayIntoVarargsFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
+}
+
+ExplicitlyConstructRawRepresentable *
+ExplicitlyConstructRawRepresentable::attempt(ConstraintSystem &cs, Type argType,
+                                             Type paramType,
+                                             ConstraintLocatorBuilder locator) {
+  auto rawRepresentableType = paramType->lookThroughAllOptionalTypes();
+  auto valueType = argType->lookThroughAllOptionalTypes();
+
+  if (isValueOfRawRepresentable(cs, rawRepresentableType, valueType))
+    return new (cs.getAllocator()) ExplicitlyConstructRawRepresentable(
+        cs, valueType, rawRepresentableType, cs.getConstraintLocator(locator));
+
+  return nullptr;
+}
+
+UseValueTypeOfRawRepresentative *
+UseValueTypeOfRawRepresentative::attempt(ConstraintSystem &cs, Type argType,
+                                         Type paramType,
+                                         ConstraintLocatorBuilder locator) {
+  auto rawRepresentableType = argType->lookThroughAllOptionalTypes();
+  auto valueType = paramType->lookThroughAllOptionalTypes();
+
+  if (isValueOfRawRepresentable(cs, rawRepresentableType, valueType))
+    return new (cs.getAllocator()) UseValueTypeOfRawRepresentative(
+        cs, rawRepresentableType, valueType, cs.getConstraintLocator(locator));
+
+  return nullptr;
+}
+
+bool AllowArgumentMismatch::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  ArgumentMismatchFailure failure(root, cs, getFromType(), getToType(),
+                                  getLocator());
+  return failure.diagnose(asNote);
+}
+
+AllowArgumentMismatch *
+AllowArgumentMismatch::create(ConstraintSystem &cs, Type argType,
+                              Type paramType, ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowArgumentMismatch(cs, argType, paramType, locator);
 }

@@ -161,10 +161,7 @@ class r22409190ManagedBuffer<Value, Element> {
 class MyArrayBuffer<Element>: r22409190ManagedBuffer<UInt, Element> {
   deinit {
     self.withUnsafeMutablePointerToElements { elems -> Void in
-      // FIXME(diagnostics): Diagnostic regressed here from `cannot convert value of type 'UInt' to expected argument type 'Int'`.
-      // Once argument-to-parameter mismatch diagnostics are moved to the new diagnostic framework, we'll be able to restore
-      // original contextual conversion failure diagnostic here. Note that this only happens in Swift 4 mode.
-      elems.deinitialize(count: self.value)  // expected-error {{ambiguous reference to member 'deinitialize(count:)'}}
+      elems.deinitialize(count: self.value)  // expected-error {{cannot convert value of type 'UInt' to expected argument type 'Int'}}
     }
   }
 }
@@ -191,7 +188,8 @@ func r22459135() {
 
 // <rdar://problem/19710848> QoI: Friendlier error message for "[] as Set"
 // <rdar://problem/22326930> QoI: "argument for generic parameter 'Element' could not be inferred" lacks context
-_ = [] as Set  // expected-error {{protocol type 'Any' cannot conform to 'Hashable' because only concrete types can conform to protocols}}
+_ = [] as Set  // expected-error {{value of protocol type 'Any' cannot conform to 'Hashable'; only struct/enum/class types can conform to protocols}}
+// expected-note@-1 {{required by generic struct 'Set' where 'Element' = 'Any'}}
 
 
 //<rdar://problem/22509125> QoI: Error when unable to infer generic archetype lacks greatness
@@ -714,7 +712,7 @@ protocol Q {
 }
 
 struct SR10694 {
-  init<T : P>(_ x: T) {} // expected-note 2{{where 'T' = 'T'}}
+  init<T : P>(_ x: T) {} // expected-note 3{{where 'T' = 'T'}}
   func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
     SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
 
@@ -725,6 +723,10 @@ struct SR10694 {
     // expected-error@-1 {{protocol type 'Q' cannot be instantiated}}
 
     type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
+
+    var srTy = SR10694.self
+    srTy(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
   }
 }
@@ -814,4 +816,23 @@ func test_correct_identification_of_requirement_source() {
   // expected-error@-1 {{generic struct 'X' requires that 'Int' conform to 'P'}}
   _ = X(A(), 17)
   // expected-error@-1 {{initializer 'init(_:_:)' requires that 'Int' conform to 'P'}}
+}
+
+struct SR11435<T> {
+  subscript<U : P & Hashable>(x x: U) -> U { x } // expected-note {{where 'U' = 'Int'}}
+}
+
+extension SR11435 where T : P { // expected-note {{where 'T' = 'Int'}}
+  var foo: Int { 0 }
+}
+
+func test_identification_of_key_path_component_callees() {
+  _ = \SR11435<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
+  _ = \SR11435<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
+}
+
+func sr_11491(_ value: [String]) {
+  var arr: Set<String> = []
+  arr.insert(value)
+  // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
 }

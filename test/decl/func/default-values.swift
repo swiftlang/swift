@@ -162,18 +162,9 @@ let fooThing4 = Foo(a: 0, b: true, d: 1, e: 2, f: false, g: 10, h: nil) // ok
 
 // Ensure that tuple init is not allowed
 // Here b = false and g = nil, but we're checking that e and f don't get a default value
-let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing argument for parameter 'e' in call}}
+let fooThing5 = Foo(a: 0, d: 1, h: nil) // expected-error {{missing arguments for parameters 'e', 'f' in call}}
                                         // expected-note@-25 {{'init(a:b:d:e:f:g:h:)' declared here}}
 
 // Here b = false and g = nil, but we're checking that f doesn't get a default value
 let fooThing6 = Foo(a: 0, d: 1, e: 2, h: nil) // expected-error {{missing argument for parameter 'f' in call}}
                                               // expected-note@-29 {{'init(a:b:d:e:f:g:h:)' declared here}}
-
-// SR-11074
-
-func sr_11074(x: Int) {}
-func sr_11074(line: String = #line) {} // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
-sr_11074() // expected-error {{cannot call global function 'sr_11074(line:)' because default argument of type 'Int' cannot be converted to type 'String'}}
-
-class SR_11074_C { init(line: String = #line) {} } // expected-error {{default argument value of type 'Int' cannot be converted to type 'String'}}
-let _ = SR_11074_C() // expected-error {{cannot call initializer 'init(line:)' because default argument of type 'Int' cannot be converted to type 'String'}}
