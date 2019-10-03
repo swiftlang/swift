@@ -558,8 +558,8 @@ public:
 
 static_assert(sizeof(SymbolicValue) == 2 * sizeof(void *),
               "SymbolicValue should stay small");
-static_assert(std::is_pod<SymbolicValue>::value,
-              "SymbolicValue should stay POD");
+static_assert(std::is_trivial<SymbolicValue>::value,
+              "SymbolicValue should stay trivial");
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os, SymbolicValue val) {
   val.print(os);
