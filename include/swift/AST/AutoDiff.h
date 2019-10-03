@@ -26,7 +26,7 @@ namespace swift {
 
 class AnyFunctionType;
 class AutoDiffIndexSubset;
-class AutoDiffParameterIndicesBuilder;
+class AutoDiffIndexSubsetBuilder;
 class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 class Type;
@@ -108,14 +108,14 @@ class SILModule;
 enum class SILLinkage : uint8_t;
 
 /// Builder for `AutoDiffIndexSubset`.
-class AutoDiffParameterIndicesBuilder {
+class AutoDiffIndexSubsetBuilder {
   llvm::SmallBitVector parameters;
   
 public:
-  /// Creates a `AutoDiffParameterIndicesBuilder` for the given function type.
-  AutoDiffParameterIndicesBuilder(AnyFunctionType *functionType);
+  /// Creates a `AutoDiffIndexSubsetBuilder` for the given function type.
+  AutoDiffIndexSubsetBuilder(AnyFunctionType *functionType);
   
-  /// Builds the `AutoDiffParameterIndices`, returning a pointer to an existing
+  /// Builds the `AutoDiffIndexSubset`, returning a pointer to an existing
   /// one if it has already been allocated in the `ASTContext`.
   AutoDiffIndexSubset *build(ASTContext &C) const;
   
@@ -129,8 +129,9 @@ public:
   unsigned count() { return parameters.count(); }
   
   /// Returns the number of bits in the `parameters` bitvector.
-  // TODO: After `getNumAutoDiffParameterIndices` is fixed to compute exact
-  // parameter count, update doc comment to "Returns the number of parameters".
+  // TODO: After `getNumAutoDiffIndexSubset` in AutoDiff.cpp is fixed to
+  // compute exact parameter count, update doc comment to:
+  //  "Returns the number of parameters".
   unsigned size() { return parameters.size(); }
 };
 

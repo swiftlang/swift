@@ -650,7 +650,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
       auto *getterType = member->getAccessor(AccessorKind::Get)
                              ->getInterfaceType()
                              ->castTo<AnyFunctionType>();
-      AutoDiffParameterIndicesBuilder builder(getterType);
+      AutoDiffIndexSubsetBuilder builder(getterType);
       builder.setParameter(0);
       diffableAttr->setParameterIndices(builder.build(C));
     }

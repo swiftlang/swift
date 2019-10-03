@@ -202,29 +202,30 @@ SILLinkage autodiff::getAutoDiffAssociatedFunctionLinkage(
 }
 
 static unsigned getNumAutoDiffParameterIndices(AnyFunctionType *fnTy) {
-  // TODO: For more correct counting, we still need to know whether it's a
-  // method or not.
+  // TODO: For exact counting, we need to know whether the function type is a
+  // curried method type or not. After counting is made exact, update doc
+  // comment for `AutoDiffIndexSubsetBuilder::size()`.
   unsigned numParameters = fnTy->getNumParams();
   if (auto *innerFn = fnTy->getResult()->getAs<AnyFunctionType>())
     numParameters += innerFn->getNumParams();
   return numParameters;
 }
 
-AutoDiffParameterIndicesBuilder::AutoDiffParameterIndicesBuilder(
+AutoDiffIndexSubsetBuilder::AutoDiffIndexSubsetBuilder(
     AnyFunctionType *functionType)
     : parameters(getNumAutoDiffParameterIndices(functionType)) {}
 
 AutoDiffIndexSubset *
-AutoDiffParameterIndicesBuilder::build(ASTContext &C) const {
+AutoDiffIndexSubsetBuilder::build(ASTContext &C) const {
   return AutoDiffIndexSubset::get(C, parameters);
 }
 
-void AutoDiffParameterIndicesBuilder::setParameter(unsigned paramIndex) {
-  assert(paramIndex < parameters.size() && "paramIndex out of bounds");
+void AutoDiffIndexSubsetBuilder::setParameter(unsigned paramIndex) {
+  assert(paramIndex < parameters.size() && "Parameter index out of bounds");
   parameters.set(paramIndex);
 }
 
-void AutoDiffParameterIndicesBuilder::setParameters(unsigned lowerBound,
+void AutoDiffIndexSubsetBuilder::setParameters(unsigned lowerBound,
                                                     unsigned upperBound) {
   parameters.set(lowerBound, upperBound);
 }

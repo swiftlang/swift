@@ -2680,7 +2680,7 @@ TypeChecker::inferDifferentiableParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
   auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-  AutoDiffParameterIndicesBuilder builder(functionType);
+  AutoDiffIndexSubsetBuilder builder(functionType);
   SmallVector<Type, 4> allParamTypes;
 
   // Returns true if the i-th parameter type is differentiable.
@@ -2877,7 +2877,7 @@ static bool checkFunctionSignature(
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-// Computes `AutoDiffParameterIndices` from the given parsed differentiation
+// Computes `AutoDiffIndexSubset` from the given parsed differentiation
 // parameters (possibly empty) for the given function and derivative generic
 // environment, then verifies that the parameter indices are valid.
 // - If parsed parameters are empty, infer parameter indices.
@@ -2931,7 +2931,7 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
         function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  AutoDiffParameterIndicesBuilder builder(functionType);
+  AutoDiffIndexSubsetBuilder builder(functionType);
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
@@ -2995,9 +2995,9 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Computes `AutoDiffIndexSubset` from the given parsed transposing
-// parameters (possibly empty) for the given function, then verifies
-// that the parameter indices are valid.
+// Computes `AutoDiffIndexSubset` from the given parsed transposing parameters
+// (possibly empty) for the given function, then verifies that the parameter
+// indices are valid.
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
@@ -3101,8 +3101,8 @@ static AutoDiffIndexSubset *computeTransposingParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Checks if the given `AutoDiffParameterIndices` instance is valid for the
-// given function type in the given derivative generic environment and module
+// Checks if the given `AutoDiffIndexSubset` instance is valid for the given
+// function type in the given derivative generic environment and module
 // context. Returns true on error.
 // The parsed differentiation parameters and attribute location are used in
 // diagnostics.

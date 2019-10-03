@@ -3281,7 +3281,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       SGF, loc, managedOriginal, inputOrigTypeNotDiff, inputSubstTypeNotDiff,
       outputOrigTypeNotDiff, outputSubstTypeNotDiff, expectedTLNotDiff);
 
-  AutoDiffParameterIndicesBuilder paramIndicesBuilder(inputSubstType);
+  AutoDiffIndexSubsetBuilder paramIndicesBuilder(inputSubstType);
   for (auto i : range(inputSubstType->getNumParams()))
     if (!inputSubstType->getParams()[i].isNonDifferentiable())
       paramIndicesBuilder.setParameter(i);
