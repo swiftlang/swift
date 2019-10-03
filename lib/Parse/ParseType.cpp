@@ -130,18 +130,15 @@ Parser::parseLayoutConstraintSyntax() {
     return false;
   };
 
-  if (parseTrivialConstraintBody()) {
+  auto hasError = parseTrivialConstraintBody();
+  if (hasError)
     ignoreUntil(tok::r_paren);
-    if (Tok.is(tok::r_paren))
-      builder.useRightParen(consumeTokenSyntax(tok::r_paren));
-  } else {
-    SourceLoc rParenLoc;
-    auto rParen = parseMatchingTokenSyntax(tok::r_paren, rParenLoc,
-                             diag::expected_rparen_layout_constraint,
-                             lParenLoc);
-    if (rParen)
-      builder.useRightParen(std::move(*rParen));
-  }
+  auto rParen = parseMatchingTokenSyntax(
+      tok::r_paren, diag::expected_rparen_layout_constraint, lParenLoc,
+      /*silenceDiag=*/hasError);
+  if (!rParen.isNull())
+    builder.useRightParen(rParen.get());
+
   return makeParsedResult(builder.build());
 }
 
@@ -1231,11 +1228,11 @@ Parser::parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc) {
   // Ignore integer literal between '[' and ']'
   ignoreIf(tok::integer_literal);
 
-  SourceLoc RSquareLoc;
+  auto RSquareLoc = Tok.getLoc();
   auto RSquare = parseMatchingTokenSyntax(
-      tok::r_square, RSquareLoc, diag::expected_rbracket_array_type, LSquareLoc);
+      tok::r_square, diag::expected_rbracket_array_type, LSquareLoc);
 
-  if (RSquare) {
+  if (!RSquare.isNull()) {
     // If we parsed something valid, diagnose it with a fixit to rewrite it to
     // Swift syntax.
     diagnose(LSquareLoc, diag::new_array_syntax)
@@ -1247,11 +1244,9 @@ Parser::parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc) {
   ParserStatus status;
 
   builder.useElementType(std::move(Base));
-  if (RSquare) {
-    builder.useRightSquareBracket(std::move(*RSquare));
-  } else {
-    status.setIsParseError();
-  }
+  if (!RSquare.isNull())
+    builder.useRightSquareBracket(RSquare.get());
+  status |= RSquare.getStatus();
 
   return makeParsedResult(builder.build(), status);
 }
@@ -1289,11 +1284,8 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollection() {
   auto Diag = Colon ? diag::expected_rbracket_dictionary_type
                     : diag::expected_rbracket_array_type;
 
-  SourceLoc RSquareLoc;
-  auto RSquare =
-      parseMatchingTokenSyntax(tok::r_square, RSquareLoc, Diag, LSquareLoc);
-  if (!RSquare)
-    Status.setIsParseError();
+  auto RSquare = parseMatchingTokenSyntax(tok::r_square, Diag, LSquareLoc);
+  Status |= RSquare.getStatus();
 
   if (Colon) {
     ParsedDictionaryTypeSyntaxBuilder builder(*SyntaxContext);
@@ -1301,15 +1293,15 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollection() {
     builder.useKeyType(std::move(*ElementType));
     builder.useColon(std::move(*Colon));
     builder.useValueType(std::move(*ValueType));
-    if (RSquare)
-      builder.useRightSquareBracket(std::move(*RSquare));
+    if (!RSquare.isNull())
+      builder.useRightSquareBracket(RSquare.get());
     return makeParsedResult(builder.build(), Status);
   } else {
     ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
     builder.useLeftSquareBracket(std::move(LSquare));
     builder.useElementType(std::move(*ElementType));
-    if (RSquare)
-      builder.useRightSquareBracket(std::move(*RSquare));
+    if (!RSquare.isNull())
+      builder.useRightSquareBracket(RSquare.get());
     return makeParsedResult(builder.build(), Status);
   }
 }

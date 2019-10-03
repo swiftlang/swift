@@ -895,6 +895,10 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
+  ParsedSyntaxResult<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                           bool silenceDiag = false);
+
   llvm::Optional<ParsedTokenSyntax>
   parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                            SourceLoc OtherLoc);
