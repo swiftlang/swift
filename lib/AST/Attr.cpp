@@ -1581,7 +1581,7 @@ TransposingAttr::TransposingAttr(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  TypeRepr *baseType, DeclNameWithLoc original,
                                  AutoDiffIndexSubset *indices)
-    : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
+    : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
       BaseType(baseType), Original(std::move(original)),
       ParameterIndexSubset(indices) {}
 
