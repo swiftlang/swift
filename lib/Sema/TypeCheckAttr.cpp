@@ -2668,16 +2668,6 @@ static bool tangentVectorEqualSelf(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-static unsigned getUncurriedParameterCount(AnyFunctionType *fnTy) {
-  // TODO: For exact counting, we need to know whether the function type is a
-  // curried method type or not.
-  unsigned numParameters = fnTy->getNumParams();
-  if (auto *innerFn = fnTy->getResult()->getAs<AnyFunctionType>())
-    numParameters += innerFn->getNumParams();
-  return numParameters;
-}
-
-// SWIFT_ENABLE_TENSORFLOW
 /// Creates a `AutoDiffIndexSubset` for the given function type, representing
 /// all inferred differentiation parameters.
 /// The differentiation parameters are inferred to be:
@@ -2690,8 +2680,12 @@ TypeChecker::inferDifferentiableParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
   auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-  llvm::SmallBitVector parameterBits(
-      getUncurriedParameterCount(functionType));
+  auto numUncurriedParams = functionType->getNumParams();
+  if (auto *resultFnType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  llvm::SmallBitVector parameterBits(numUncurriedParams);
   SmallVector<Type, 4> allParamTypes;
 
   // Returns true if the i-th parameter type is differentiable.
@@ -2942,8 +2936,12 @@ static AutoDiffIndexSubset *computeDifferentiationParameters(
         function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  llvm::SmallBitVector parameterBits(
-      getUncurriedParameterCount(functionType));
+  auto numUncurriedParams = functionType->getNumParams();
+  if (auto *resultFnType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  llvm::SmallBitVector parameterBits(numUncurriedParams);
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
