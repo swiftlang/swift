@@ -391,12 +391,15 @@ class ModuleInterfaceLoaderImpl {
     // anyways.
     H = hash_combine(H, interfacePath);
 
-    // Include the target CPU architecture. In practice, .swiftinterface files
-    // will be in architecture-specific subdirectories and would have
-    // architecture-specific pieces #if'd out. However, it doesn't hurt to
+    // Include the normalized target triple. In practice, .swiftinterface files
+    // will be in target-specific subdirectories and would have
+    // target-specific pieces #if'd out. However, it doesn't hurt to
     // include it, and it guards against mistakenly reusing cached modules
-    // across architectures.
-    H = hash_combine(H, SubInvocation.getLangOptions().Target.getArchName());
+    // across targets. Note that this normalization explicitly doesn't
+    // include the minimum deployment target (e.g. the '12.0' in 'ios12.0').
+    auto normalizedTargetTriple =
+        getTargetSpecificModuleTriple(SubInvocation.getLangOptions().Target);
+    H = hash_combine(H, normalizedTargetTriple.str());
 
     // The SDK path is going to affect how this module is imported, so include
     // it.
