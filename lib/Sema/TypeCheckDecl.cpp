@@ -3901,11 +3901,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
 
-    DeclValidationRAII IBV(assocType);
-
-    // Finally, set the interface type.
-    if (!assocType->hasInterfaceType())
-      assocType->computeType();
+    assocType->computeType();
+    assocType->setValidationToChecked();
 
     break;
   }
@@ -3913,11 +3910,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
 
-    DeclValidationRAII IBV(typeAlias);
-
-    // Finally, set the interface type.
-    if (!typeAlias->hasInterfaceType())
-      typeAlias->computeType();
+    typeAlias->computeType();
+    typeAlias->setValidationToChecked();
     
     break;
   }
@@ -3953,8 +3947,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Protocol: {
     auto proto = cast<ProtocolDecl>(D);
-    if (!proto->hasInterfaceType())
-      proto->computeType();
+    proto->computeType();
     proto->setValidationToChecked();
 
     break;
