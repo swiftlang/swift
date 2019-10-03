@@ -36,6 +36,9 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
+              bool (EnumDecl *, TypeResolutionStage), SeparatelyCached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *, TypeResolutionStage), SeparatelyCached,
               NoLocationInfo)

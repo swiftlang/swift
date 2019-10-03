@@ -1023,9 +1023,6 @@ public:
   Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                    ReferenceOwnershipAttr *attr);
 
-  /// Check the raw value expression in this enum element.
-  void checkRawValueExpr(EnumDecl *parent, EnumElementDecl *Elt);
-  
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
   }
@@ -1905,7 +1902,7 @@ public:
   void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
   void checkFunctionErrorHandling(AbstractFunctionDecl *D);
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
-  void checkEnumElementErrorHandling(EnumElementDecl *D);
+  void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
   void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                           Expr *expr);
 

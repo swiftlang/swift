@@ -3342,7 +3342,7 @@ public:
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       rawValueKind = EnumElementRawValueKind::IntegerLiteral;
-      auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
+      auto ILE = cast<IntegerLiteralExpr>(elem->getStructuralRawValueExpr());
       RawValueText = ILE->getDigitsText();
       isNegative = ILE->isNegative();
       isRawValueImplicit = ILE->isImplicit();
