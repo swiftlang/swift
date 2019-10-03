@@ -2248,6 +2248,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                    )
+                fi
+
                 # Command-line parameters override any autodetection that we
                 # might have done.
                 if [[ "${NATIVE_LLVM_TOOLS_PATH}" ]] ; then
