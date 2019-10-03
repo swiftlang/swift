@@ -40,8 +40,8 @@ SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
   Bits.SILArgument.VOKind = static_cast<unsigned>(OwnershipKind);
   // Function arguments need to have a decl.
   assert(
-    !ParentBB->getParent()->isBare() &&
-    ParentBB->getParent()->size() == 1
+    !ParentBB->getFunction()->isBare() &&
+    ParentBB->getFunction()->size() == 1
           ? D != nullptr
           : true);
   ParentBB->insertArgument(Pos, this);
@@ -49,11 +49,11 @@ SILArgument::SILArgument(ValueKind ChildKind, SILBasicBlock *ParentBB,
 
 
 SILFunction *SILArgument::getFunction() {
-  return getParent()->getParent();
+  return getParent()->getFunction();
 }
 
 const SILFunction *SILArgument::getFunction() const {
-  return getParent()->getParent();
+  return getParent()->getFunction();
 }
 
 SILModule &SILArgument::getModule() const {

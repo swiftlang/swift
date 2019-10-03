@@ -210,7 +210,7 @@ void swift::getEdgeArgs(TermInst *T, unsigned edgeIdx, SILBasicBlock *newEdgeBB,
 SILBasicBlock *swift::splitEdge(TermInst *T, unsigned edgeIdx,
                                 DominanceInfo *DT, SILLoopInfo *LI) {
   auto *srcBB = T->getParent();
-  auto *F = srcBB->getParent();
+  auto *F = srcBB->getFunction();
 
   SILBasicBlock *destBB = T->getSuccessors()[edgeIdx];
 

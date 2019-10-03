@@ -440,7 +440,7 @@ public:
   /// with nesting level \p LoopDepth. If \p LoopDepth is 0 ir returns the
   /// shortest path in the function.
   int getScopeLength(SILBasicBlock *BB, int LoopDepth) {
-    assert(BB->getParent() == F);
+    assert(BB->getFunction() == F);
 
     // Return a conservative default if the analysis was not done due to a high number of blocks.
     if (BlockInfos.empty())

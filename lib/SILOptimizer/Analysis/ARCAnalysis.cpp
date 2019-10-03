@@ -570,7 +570,7 @@ findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V) {
   for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
     // Handle self-recursion.
     if (auto *AI = dyn_cast<ApplyInst>(&*II))
-      if (AI->getCalleeFunction() == BB->getParent()) 
+      if (AI->getCalleeFunction() == BB->getFunction())
         return std::make_pair(FindRetainKind::Recursion, AI);
     
     // If we do not have a retain_value or strong_retain...

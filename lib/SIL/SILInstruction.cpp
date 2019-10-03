@@ -102,10 +102,10 @@ transferNodesFromList(llvm::ilist_traits<SILInstruction> &L2,
 #include "swift/SIL/SILNodes.def"
 
 SILFunction *SILInstruction::getFunction() {
-  return getParent()->getParent();
+  return getParent()->getFunction();
 }
 const SILFunction *SILInstruction::getFunction() const {
-  return getParent()->getParent();
+  return getParent()->getFunction();
 }
 
 SILModule &SILInstruction::getModule() const {

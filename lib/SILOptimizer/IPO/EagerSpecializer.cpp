@@ -83,7 +83,7 @@ static bool isTrivialReturnBlock(SILBasicBlock *RetBB) {
 /// propagates NewRetVal to the return instruction.
 static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
                                SILValue NewRetVal) {
-  auto *F = NewRetBB->getParent();
+  auto *F = NewRetBB->getFunction();
 
   SILBuilder Builder(*F);
   Builder.setCurrentDebugScope(F->getDebugScope());
@@ -140,7 +140,7 @@ static void addReturnValue(SILBasicBlock *NewRetBB, SILBasicBlock *OldRetBB,
 
 /// Adds a CFG edge from the unterminated NewThrowBB to a merged "throw" block.
 static void addThrowValue(SILBasicBlock *NewThrowBB, SILValue NewErrorVal) {
-  auto *ThrowBB = &*NewThrowBB->getParent()->findThrowBB();
+  auto *ThrowBB = &*NewThrowBB->getFunction()->findThrowBB();
   addReturnValueImpl(ThrowBB, NewThrowBB, NewErrorVal);
 }
 

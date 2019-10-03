@@ -122,7 +122,7 @@ bool ColdBlockInfo::isCold(const SILBasicBlock *BB, int recursionDepth) {
     return I->second;
 
   typedef llvm::DomTreeNodeBase<SILBasicBlock> DomTreeNode;
-  DominanceInfo *DT = DA->get(const_cast<SILFunction*>(BB->getParent()));
+  DominanceInfo *DT = DA->get(const_cast<SILFunction *>(BB->getFunction()));
   DomTreeNode *Node = DT->getNode(const_cast<SILBasicBlock*>(BB));
   // Always consider unreachable code cold.
   if (!Node)

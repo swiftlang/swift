@@ -389,7 +389,7 @@ void SILGlobalOpt::collectOnceCall(BuiltinInst *BI) {
 
 /// return true if this block is inside a loop.
 bool SILGlobalOpt::isInLoop(SILBasicBlock *CurBB) {
-  SILFunction *F = CurBB->getParent();
+  SILFunction *F = CurBB->getFunction();
   // Catch the common case in which we've already hoisted the initializer.
   if (CurBB == &F->front())
     return false;

@@ -411,7 +411,7 @@ class COWArrayOpt {
   SILValue CurrentArrayAddr;
 public:
   COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
-      : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
+      : RCIA(RCIA), Function(L->getHeader()->getFunction()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
         ColdBlocks(DA), CachedSafeLoop(false, false) {}
 
@@ -1280,7 +1280,7 @@ class ArrayPropertiesAnalysis {
   SmallPtrSet<SILBasicBlock *, 16> CachedExitingBlocks;
 public:
   ArrayPropertiesAnalysis(SILLoop *L, DominanceAnalysis *DA)
-      : Fun(L->getHeader()->getParent()), Loop(L), Preheader(nullptr),
+      : Fun(L->getHeader()->getFunction()), Loop(L), Preheader(nullptr),
         DomTree(DA->get(Fun)) {}
 
   bool run() {
@@ -1551,7 +1551,7 @@ class RegionCloner : public SILCloner<RegionCloner> {
 
 public:
   RegionCloner(SILBasicBlock *EntryBB, DominanceInfo &DT)
-      : SILCloner<RegionCloner>(*EntryBB->getParent()), DomTree(DT),
+      : SILCloner<RegionCloner>(*EntryBB->getFunction()), DomTree(DT),
         StartBB(EntryBB) {}
 
   SILBasicBlock *cloneRegion(ArrayRef<SILBasicBlock *> exitBBs) {
@@ -1673,7 +1673,7 @@ public:
   }
 
   SILLoop *getLoop() {
-    auto *LoopInfo = LoopAnalysis->get(HoistableLoopPreheader->getParent());
+    auto *LoopInfo = LoopAnalysis->get(HoistableLoopPreheader->getFunction());
     return LoopInfo->getLoopFor(
         HoistableLoopPreheader->getSingleSuccessorBlock());
   }
@@ -1854,7 +1854,7 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
     replaceArrayPropsCall(B2, C);
 
   // We have potentially cloned a loop - invalidate loop info.
-  LoopAnalysis->invalidate(Header->getParent(),
+  LoopAnalysis->invalidate(Header->getFunction(),
                            SILAnalysis::InvalidationKind::FunctionBody);
 }
 

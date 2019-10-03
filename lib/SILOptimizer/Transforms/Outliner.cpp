@@ -363,13 +363,13 @@ BridgedProperty::outline(SILModule &M) {
     return std::make_pair(nullptr, std::prev(StartBB->end()));
   }
 
-  if (!OutlinedEntryBB->getParent()->hasOwnership())
+  if (!OutlinedEntryBB->getFunction()->hasOwnership())
     Fun->setOwnershipEliminated();
 
   Fun->setInlineStrategy(NoInline);
 
   // Move the blocks into the new function.
-  auto &FromBlockList = OutlinedEntryBB->getParent()->getBlocks();
+  auto &FromBlockList = OutlinedEntryBB->getFunction()->getBlocks();
   Fun->getBlocks().splice(Fun->begin(), FromBlockList, OldMergeBB);
   Fun->getBlocks().splice(Fun->begin(), FromBlockList, switchInfo.NoneBB);
   Fun->getBlocks().splice(Fun->begin(), FromBlockList, switchInfo.SomeBB);
@@ -859,7 +859,7 @@ void BridgedReturn::outline(SILFunction *Fun, ApplyInst *NewOutlinedCall) {
   assert(Fun->begin() != Fun->end() &&
          "The entry block must already have been created");
   SILBasicBlock *EntryBB = &*Fun->begin();
-  auto &FromBlockList = OutlinedEntryBB->getParent()->getBlocks();
+  auto &FromBlockList = OutlinedEntryBB->getFunction()->getBlocks();
   Fun->getBlocks().splice(Fun->begin(), FromBlockList, OldMergeBB);
   OldMergeBB->moveAfter(EntryBB);
 	auto InsertPt = SILFunction::iterator(OldMergeBB);

@@ -279,7 +279,7 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   auto *preheader = loop->getLoopPreheader();
   if (!preheader) {
     LLVM_DEBUG(llvm::dbgs() << *loop << " no preheader\n");
-    LLVM_DEBUG(loop->getHeader()->getParent()->dump());
+    LLVM_DEBUG(loop->getHeader()->getFunction()->dump());
     return false;
   }
 
@@ -296,7 +296,7 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // The header needs to exit the loop.
   if (!loop->isLoopExiting(header)) {
     LLVM_DEBUG(llvm::dbgs() << *loop << " not an exiting header\n");
-    LLVM_DEBUG(loop->getHeader()->getParent()->dump());
+    LLVM_DEBUG(loop->getHeader()->getFunction()->dump());
     return false;
   }
 
@@ -404,11 +404,11 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   if (shouldVerify) {
     domInfo->verify();
     loopInfo->verify();
-    latch->getParent()->verify();
+    latch->getFunction()->verify();
   }
 
   LLVM_DEBUG(llvm::dbgs() << "  to " << *loop);
-  LLVM_DEBUG(loop->getHeader()->getParent()->dump());
+  LLVM_DEBUG(loop->getHeader()->getFunction()->dump());
   return true;
 }
 

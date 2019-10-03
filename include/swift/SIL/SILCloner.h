@@ -583,7 +583,7 @@ void SILCloner<ImplClass>::cloneReachableBlocks(
   SILBasicBlock *insertAfterBB,
   bool havePrepopulatedFunctionArgs) {
 
-  SILFunction *F = startBB->getParent();
+  SILFunction *F = startBB->getFunction();
   assert(F == &Builder.getFunction()
          && "cannot clone region across functions.");
   assert(BBMap.empty() && "This API does not allow clients to map blocks.");
@@ -614,7 +614,8 @@ void SILCloner<ImplClass>::cloneFunctionBody(SILFunction *F,
                                              SILBasicBlock *clonedEntryBB,
                                              ArrayRef<SILValue> entryArgs) {
 
-  assert(F != clonedEntryBB->getParent() && "Must clone into a new function.");
+  assert(F != clonedEntryBB->getFunction() &&
+         "Must clone into a new function.");
   assert(BBMap.empty() && "This API does not allow clients to map blocks.");
   assert(ValueMap.empty() && "Stale ValueMap.");
 

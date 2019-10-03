@@ -455,10 +455,10 @@ void GlobalPropertyOpt::replacePropertyCalls() {
       assert(
         (semCall.getKind() == ArrayCallKind::kArrayPropsIsNativeTypeChecked) &&
              "invalid semantics type");
-  
-      LLVM_DEBUG(llvm::dbgs() << "  remove property check in function "
-                              << AI->getParent()->getParent()->getName()
-                              << ": " << *AI);
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "  remove property check in function "
+                 << AI->getParent()->getFunction()->getName() << ": " << *AI);
       SILBuilder B(AI);
       SILType IntBoolTy = SILType::getBuiltinIntegerType(1, B.getASTContext());
       auto C1 = B.createIntegerLiteral(AI->getLoc(), IntBoolTy, 1);

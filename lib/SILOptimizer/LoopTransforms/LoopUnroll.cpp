@@ -43,7 +43,7 @@ class LoopCloner : public SILCloner<LoopCloner> {
 
 public:
   LoopCloner(SILLoop *Loop)
-      : SILCloner<LoopCloner>(*Loop->getHeader()->getParent()), Loop(Loop) {}
+      : SILCloner<LoopCloner>(*Loop->getHeader()->getFunction()), Loop(Loop) {}
 
   /// Clone the basic blocks in the loop.
   void cloneLoop();
@@ -183,7 +183,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
   const uint64_t InsnsPerBB = 4;
   // Use command-line threshold for unrolling.
   const uint64_t SILLoopUnrollThreshold = Loop->getBlocks().empty() ? 0 : 
-    (Loop->getBlocks())[0]->getParent()->getModule().getOptions().UnrollThreshold;
+    (Loop->getBlocks())[0]->getFunction()->getModule().getOptions().UnrollThreshold;
   for (auto *BB : Loop->getBlocks()) {
     for (auto &Inst : *BB) {
       if (!Loop->canDuplicate(&Inst))
@@ -353,7 +353,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
-  SILModule &M = Preheader->getParent()->getModule();
+  SILModule &M = Preheader->getFunction()->getModule();
 
   auto *Latch = Loop->getLoopLatch();
   if (!Latch)
@@ -378,7 +378,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
       return false;
 
   LLVM_DEBUG(llvm::dbgs() << "Unrolling loop in "
-                          << Header->getParent()->getName()
+                          << Header->getFunction()->getName()
                           << " " << *Loop << "\n");
 
   SmallVector<SILBasicBlock *, 16> Headers;

@@ -91,7 +91,7 @@ template <typename DerivedT> class Remark {
 protected:
   Remark(StringRef Identifier, SILInstruction &I)
       : Identifier(Identifier), Location(I.getLoc().getSourceLoc()),
-        Function(I.getParent()->getParent()) {}
+        Function(I.getParent()->getFunction()) {}
 
 public:
   DerivedT &operator<<(StringRef S) {

@@ -1025,7 +1025,7 @@ static bool hoistChecksInLoop(DominanceInfo *DT, DominanceInfoNode *DTNode,
     Changed = true;
   }
 
-  LLVM_DEBUG(Preheader->getParent()->dump());
+  LLVM_DEBUG(Preheader->getFunction()->dump());
   // Traverse the children in the dominator tree.
   for (auto Child: *DTNode)
     Changed |= hoistChecksInLoop(DT, Child, ABC, IndVars, Preheader,
@@ -1112,7 +1112,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
 
   LLVM_DEBUG(llvm::dbgs() << "Attempting to remove redundant checks in "
                           << *Loop);
-  LLVM_DEBUG(Header->getParent()->dump());
+  LLVM_DEBUG(Header->getFunction()->dump());
 
   // Collect safe arrays. Arrays are safe if there is no function call that
   // could mutate their size in the loop.
@@ -1157,7 +1157,7 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     } else return Changed;
   }
 
-  LLVM_DEBUG(Preheader->getParent()->dump());
+  LLVM_DEBUG(Preheader->getFunction()->dump());
 
   // Find canonical induction variables.
   InductionAnalysis IndVars(DT, IVs, Preheader, Header, ExitingBlk, ExitBlk);
@@ -1229,13 +1229,13 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
     }
   }
 
-  LLVM_DEBUG(Preheader->getParent()->dump());
+  LLVM_DEBUG(Preheader->getFunction()->dump());
 
   // Hoist bounds checks.
   Changed |= hoistChecksInLoop(DT, DT->getNode(Header), ABC, IndVars,
                                Preheader, Header, SingleExitingBlk);
   if (Changed) {
-    Preheader->getParent()->verify();
+    Preheader->getFunction()->verify();
   }
   return Changed;
 }

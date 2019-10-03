@@ -359,7 +359,7 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
   SILBasicBlock *BB = &*NewF->begin();
   SILBuilder Builder(BB->begin());
-  Builder.setCurrentDebugScope(BB->getParent()->getDebugScope());
+  Builder.setCurrentDebugScope(BB->getFunction()->getDebugScope());
   unsigned TotalArgIndex = 0;
   for (ArgumentDescriptor &AD : TransformDescriptor.ArgumentDescList) {
     // If this argument descriptor was dead and we removed it, just skip it. Do
@@ -401,14 +401,14 @@ void FunctionSignatureTransform::ArgumentExplosionFinalizeOptimizedFunction() {
     // Then go through the projection tree constructing aggregates and replacing
     // uses.
     AD.ProjTree.replaceValueUsesWithLeafUses(
-        Builder, BB->getParent()->getLocation(), LeafValues);
+        Builder, BB->getFunction()->getLocation(), LeafValues);
 
     // We ignored debugvalue uses when we constructed the new arguments, in
     // order to preserve as much information as possible, we construct a new
     // value for OrigArg from the leaf values and use that in place of the
     // OrigArg.
     SILValue NewOrigArgValue = AD.ProjTree.computeExplodedArgumentValue(
-        Builder, BB->getParent()->getLocation(), LeafValues);
+        Builder, BB->getFunction()->getLocation(), LeafValues);
 
     // Replace all uses of the original arg with the new value.
     SILArgument *OrigArg = BB->getArgument(OldArgIndex);

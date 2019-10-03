@@ -1732,7 +1732,7 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     // tuple-typed argument.
     assert(caseBB->getNumArguments() == 1);
 
-    if (caseBB->getParent()->hasOwnership() &&
+    if (caseBB->getFunction()->hasOwnership() &&
         switchInst->getDefaultBBOrNull() == caseBB) {
       // If we are visiting the default block and we are in ossa, then we may
       // have uses of the failure parameter. That means we need to map the

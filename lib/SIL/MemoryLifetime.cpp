@@ -415,7 +415,7 @@ void MemoryDataflow::entryReachabilityAnalysis() {
   llvm::SmallVector<BlockState *, 16> workList;
   BlockState *entryState = &blockStates[0];
   assert(entryState ==
-         block2State[entryState->block->getParent()->getEntryBlock()]);
+         block2State[entryState->block->getFunction()->getEntryBlock()]);
   entryState->reachableFromEntry = true;
   workList.push_back(entryState);
 

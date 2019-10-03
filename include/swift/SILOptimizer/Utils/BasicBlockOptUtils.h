@@ -84,7 +84,7 @@ public:
 
   // Clone blocks starting at `origBB`, within the same function.
   BasicBlockCloner(SILBasicBlock *origBB)
-      : SILCloner(*origBB->getParent()), origBB(origBB) {}
+      : SILCloner(*origBB->getFunction()), origBB(origBB) {}
 
   void cloneBlock(SILBasicBlock *insertAfterBB = nullptr) {
     SmallVector<SILBasicBlock *, 4> successorBBs;

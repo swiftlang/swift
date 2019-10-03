@@ -1007,7 +1007,7 @@ void EscapeAnalysis::initialize(SILPassManager *PM) {
 /// Returns true if we need to add defer edges for the arguments of a block.
 static bool linkBBArgs(SILBasicBlock *BB) {
   // Don't need to handle function arguments.
-  if (BB == &BB->getParent()->front())
+  if (BB == &BB->getFunction()->front())
     return false;
   // We don't need to link to the try_apply's normal result argument, because
   // we handle it separately in setAllEscaping() and mergeCalleeGraph().
@@ -1907,8 +1907,8 @@ static SILFunction *getCommonFunction(SILValue V1, SILValue V2) {
   if (!BB1 || !BB2)
     return nullptr;
 
-  SILFunction *F = BB1->getParent();
-  assert(BB2->getParent() == F && "values not in same function");
+  SILFunction *F = BB1->getFunction();
+  assert(BB2->getFunction() == F && "values not in same function");
   return F;
 }
 
@@ -2033,7 +2033,7 @@ void EscapeAnalysis::handleDeleteNotification(SILNode *node) {
   if (!value) return;
 
   if (SILBasicBlock *Parent = node->getParentBlock()) {
-    SILFunction *F = Parent->getParent();
+    SILFunction *F = Parent->getFunction();
     if (FunctionInfo *FInfo = Function2Info.lookup(F)) {
       if (FInfo->isValid()) {
         FInfo->Graph.removeFromGraph(value);

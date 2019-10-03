@@ -174,7 +174,7 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
               << "ExistentialSpecializer Pass: Bail! cannot find ConcreteType "
                  "for call argument to:"
               << F->getName() << " in caller:"
-              << Apply.getInstruction()->getParent()->getParent()->getName()
+              << Apply.getInstruction()->getParent()->getFunction()->getName()
               << "\n";);
       continue;
     }

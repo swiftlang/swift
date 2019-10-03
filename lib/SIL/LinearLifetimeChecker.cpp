@@ -216,7 +216,8 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
     return;
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+    llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
+                 << "'\n"
                  << "Found over consume?!\n";
     if (auto v = value) {
       llvm::errs() << "Value: " << *value;
@@ -246,7 +247,7 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
   // the cond branch user is in a previous block. So just bail early.
   if (consumingUser.isCondBranchUser()) {
     error.handleUseAfterFree([&]() {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
                    << "'\n"
                    << "Found use after free?!\n"
                    << "Value: ";
@@ -279,7 +280,7 @@ void State::checkForSameBlockUseAfterFree(BranchPropagatedUser consumingUser,
                      return nonConsumingUser == &i;
                    }) != userBlock->end()) {
     error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
                    << "'\n"
                    << "Found use after free?!\n"
                    << "Value: ";
@@ -317,7 +318,8 @@ void State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
   }
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+    llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
+                 << "'\n"
                  << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
@@ -347,7 +349,8 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
   }
 
   error.handleOverConsume([&] {
-    llvm::errs() << "Function: '" << beginBlock->getParent()->getName() << "'\n"
+    llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
+                 << "'\n"
                  << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
@@ -448,7 +451,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
 
     // If we are supposed to error on leaks, do so now.
     error.handleLeak([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
                    << "'\n"
                    << "Error! Found a leak due to a consuming post-dominance "
                       "failure!\n";
@@ -482,7 +485,7 @@ void State::checkDataflowEndState(DeadEndBlocks &deBlocks) {
     }
 
     error.handleUseAfterFree([&] {
-      llvm::errs() << "Function: '" << beginBlock->getParent()->getName()
+      llvm::errs() << "Function: '" << beginBlock->getFunction()->getName()
                    << "'\n"
                    << "Found use after free due to unvisited non lifetime "
                       "ending uses?!\n"

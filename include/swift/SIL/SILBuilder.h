@@ -148,8 +148,8 @@ public:
 
   explicit SILBuilder(SILBasicBlock *BB,
                       SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0)
-      : TempContext(BB->getParent()->getModule(), InsertedInstrs),
-        C(TempContext), F(BB->getParent()) {
+      : TempContext(BB->getFunction()->getModule(), InsertedInstrs),
+        C(TempContext), F(BB->getFunction()) {
     setInsertionPoint(BB);
   }
 
@@ -158,8 +158,8 @@ public:
 
   SILBuilder(SILBasicBlock *BB, SILBasicBlock::iterator InsertPt,
              SmallVectorImpl<SILInstruction *> *InsertedInstrs = 0)
-      : TempContext(BB->getParent()->getModule(), InsertedInstrs),
-        C(TempContext), F(BB->getParent()) {
+      : TempContext(BB->getFunction()->getModule(), InsertedInstrs),
+        C(TempContext), F(BB->getFunction()) {
     setInsertionPoint(BB, InsertPt);
   }
 
@@ -179,7 +179,7 @@ public:
   ///
   /// SILBuilderContext must outlive this SILBuilder instance.
   SILBuilder(SILBasicBlock *BB, const SILDebugScope *DS, SILBuilderContext &C)
-      : TempContext(C.getModule()), C(C), F(BB->getParent()) {
+      : TempContext(C.getModule()), C(C), F(BB->getFunction()) {
     assert(DS && "block has no debug scope");
     setCurrentDebugScope(DS);
     setInsertionPoint(BB);
@@ -347,7 +347,7 @@ public:
   /// moveBlockTo - Move a block to immediately before the given iterator.
   void moveBlockTo(SILBasicBlock *BB, SILFunction::iterator IP) {
     assert(SILFunction::iterator(BB) != IP && "moving block before itself?");
-    SILFunction *F = BB->getParent();
+    SILFunction *F = BB->getFunction();
     auto &Blocks = F->getBlocks();
     Blocks.remove(BB);
     Blocks.insert(IP, BB);
@@ -360,7 +360,7 @@ public:
 
   /// moveBlockToEnd - Reorder a block to the end of its containing function.
   void moveBlockToEnd(SILBasicBlock *BB) {
-    moveBlockTo(BB, BB->getParent()->end());
+    moveBlockTo(BB, BB->getFunction()->end());
   }
 
   /// Move the insertion point to the end of the given block.

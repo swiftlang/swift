@@ -39,7 +39,7 @@ static void diagnose(ASTContext &Context, SourceLoc loc, Diag<T...> diag,
 static void diagnoseMissingReturn(const UnreachableInst *UI,
                                   ASTContext &Context) {
   const SILBasicBlock *BB = UI->getParent();
-  const SILFunction *F = BB->getParent();
+  const SILFunction *F = BB->getFunction();
   SILLocation FLoc = F->getLocation();
 
   Type ResTy;

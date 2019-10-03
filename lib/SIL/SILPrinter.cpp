@@ -568,7 +568,7 @@ public:
 
     // If SIL ownership is enabled and the given function has not had ownership
     // stripped out, print out ownership of SILArguments.
-    if (BB->getParent()->hasOwnership()) {
+    if (BB->getFunction()->hasOwnership()) {
       *this << getIDAndTypeAndOwnership(Args[0]);
       for (SILArgument *Arg : Args.drop_front()) {
         *this << ", " << getIDAndTypeAndOwnership(Arg);
@@ -2229,7 +2229,7 @@ void SILBasicBlock::print(raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
 
   // Print the debug scope (and compute if we didn't do it already).
-  auto &SM = this->getParent()->getModule().getASTContext().SourceMgr;
+  auto &SM = this->getFunction()->getModule().getASTContext().SourceMgr;
   for (auto &I : *this) {
     SILPrinter P(Ctx);
     P.printDebugScope(I.getDebugScope(), SM);
@@ -3123,7 +3123,7 @@ void SILPrintContext::initBlockIDs(ArrayRef<const SILBasicBlock *> Blocks) {
   if (Blocks.empty())
     return;
 
-  setContext(Blocks[0]->getParent());
+  setContext(Blocks[0]->getFunction());
 
   // Initialize IDs so our IDs are in RPOT as well. This is a hack.
   for (unsigned Index : indices(Blocks))
@@ -3131,14 +3131,14 @@ void SILPrintContext::initBlockIDs(ArrayRef<const SILBasicBlock *> Blocks) {
 }
 
 ID SILPrintContext::getID(const SILBasicBlock *Block) {
-  setContext(Block->getParent());
+  setContext(Block->getFunction());
 
   // Lazily initialize the Blocks-to-IDs mapping.
   // If we are asked to emit sorted SIL, print out our BBs in RPOT order.
   if (BlocksToIDMap.empty()) {
     if (sortSIL()) {
       std::vector<SILBasicBlock *> RPOT;
-      auto *UnsafeF = const_cast<SILFunction *>(Block->getParent());
+      auto *UnsafeF = const_cast<SILFunction *>(Block->getFunction());
       std::copy(po_begin(UnsafeF), po_end(UnsafeF), std::back_inserter(RPOT));
       std::reverse(RPOT.begin(), RPOT.end());
       // Initialize IDs so our IDs are in RPOT as well. This is a hack.
@@ -3146,7 +3146,7 @@ ID SILPrintContext::getID(const SILBasicBlock *Block) {
         BlocksToIDMap[RPOT[Index]] = Index;
     } else {
       unsigned idx = 0;
-      for (const SILBasicBlock &B : *Block->getParent())
+      for (const SILBasicBlock &B : *Block->getFunction())
         BlocksToIDMap[&B] = idx++;
     }
   }
@@ -3162,7 +3162,7 @@ ID SILPrintContext::getID(const SILNode *node) {
     return {ID::SILUndef, 0};
   
   SILBasicBlock *BB = node->getParentBlock();
-  if (SILFunction *F = BB->getParent()) {
+  if (SILFunction *F = BB->getFunction()) {
     setContext(F);
     // Lazily initialize the instruction -> ID mapping.
     if (ValueToIDMap.empty())

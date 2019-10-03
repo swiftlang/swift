@@ -416,7 +416,7 @@ void ShortestPathAnalysis::analyzeLoopsRecursively(SILLoop *Loop, int LoopDepth)
 
 ShortestPathAnalysis::Weight ShortestPathAnalysis::
 getWeight(SILBasicBlock *BB, Weight CallerWeight) {
-  assert(BB->getParent() == F);
+  assert(BB->getFunction() == F);
 
   // Return a conservative default if the analysis was not done due to a high number of blocks.
   if (BlockInfos.empty())

@@ -971,7 +971,7 @@ static SILValue findValueShallowRoot(const SILValue &In) {
       // object references. For example: func f(x : C.Type) -> Any {return x}
       // Here we check that the uncasted reference is reference counted.
       SILValue V = CCBI->getOperand();
-      if (V->getType().isReferenceCounted(Pred->getParent()->getModule())) {
+      if (V->getType().isReferenceCounted(Pred->getFunction()->getModule())) {
         return V;
       }
     }
@@ -1230,7 +1230,7 @@ static bool sinkArgument(EnumCaseDataflowContext &Context, SILBasicBlock *BB, un
     Clones.push_back(SI);
   }
 
-  auto *Undef = SILUndef::get(FSI->getType(), *BB->getParent());
+  auto *Undef = SILUndef::get(FSI->getType(), *BB->getFunction());
 
   // Delete the debug info of the instruction that we are about to sink.
   deleteAllDebugUses(FSI);

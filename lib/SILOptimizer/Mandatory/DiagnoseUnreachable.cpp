@@ -598,7 +598,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
     return;
 
   SILBasicBlock *BB = I->getParent();
-  auto *F = BB->getParent();
+  auto *F = BB->getFunction();
 
   // Replace all uses outside of I's basic block by undef.
   llvm::SmallVector<Operand *, 16> Uses;

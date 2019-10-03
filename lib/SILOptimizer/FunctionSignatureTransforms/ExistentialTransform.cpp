@@ -396,10 +396,10 @@ void ExistentialTransform::populateThunkBody() {
   SILBuilder Builder(ThunkBody);
   SILOpenedArchetypesTracker OpenedArchetypesTracker(F);
   Builder.setOpenedArchetypesTracker(&OpenedArchetypesTracker);
-  Builder.setCurrentDebugScope(ThunkBody->getParent()->getDebugScope());
+  Builder.setCurrentDebugScope(ThunkBody->getFunction()->getDebugScope());
 
   /// Location to insert new instructions.
-  auto Loc = ThunkBody->getParent()->getLocation();
+  auto Loc = ThunkBody->getFunction()->getLocation();
 
   /// Create the function_ref instruction to the NewF.
   auto *FRI = Builder.createFunctionRefFor(Loc, NewF);
@@ -525,7 +525,7 @@ void ExistentialTransform::populateThunkBody() {
   /// If the original function has error results,  we need to generate a
   /// try_apply to call a function with an error result.
   if (FunctionTy->hasErrorResult()) {
-    SILFunction *Thunk = ThunkBody->getParent();
+    SILFunction *Thunk = ThunkBody->getFunction();
     SILBasicBlock *NormalBlock = Thunk->createBasicBlock();
     ReturnValue =
         NormalBlock->createPhiArgument(ResultType, ValueOwnershipKind::Owned);

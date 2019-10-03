@@ -208,7 +208,7 @@ findDominatingNonPayloadedEdge(SILBasicBlock *IncomingEdgeBB,
 
   // Now we know that RCIdentityBB and IncomingEdgeBB are different. Prove that
   // RCIdentityBB dominates IncomingEdgeBB.
-  SILFunction *F = RCIdentityBB->getParent();
+  SILFunction *F = RCIdentityBB->getFunction();
 
   // First make sure that IncomingEdgeBB dominates NonPayloadedEnumBB. If not,
   // return false.

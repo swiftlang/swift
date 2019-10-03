@@ -4878,7 +4878,7 @@ public:
     // This check only makes sense at -Onone. Optimizations,
     // e.g. inlining, can move scopes around.
     llvm::DenseSet<const SILDebugScope *> AlreadySeenScopes;
-    if (BB->getParent()->getEffectiveOptimizationMode() !=
+    if (BB->getFunction()->getEffectiveOptimizationMode() !=
         OptimizationMode::NoOptimization)
       return;
 

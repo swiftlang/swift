@@ -25,8 +25,7 @@
 using namespace swift;
 
 static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
-  auto *Preheader =
-      Header->getParent()->createBasicBlockBefore(Header);
+  auto *Preheader = Header->getFunction()->createBasicBlockBefore(Header);
 
   // Clone the arguments from header into the pre-header.
   llvm::SmallVector<SILValue, 8> Args;
@@ -102,7 +101,7 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
          "this function");
 
   SILBasicBlock *Header = L->getHeader();
-  SILFunction *F = Header->getParent();
+  SILFunction *F = Header->getFunction();
 
   // Figure out which basic blocks contain back-edges to the loop header.
   SmallVector<SILBasicBlock*, 4> BackedgeBlocks;

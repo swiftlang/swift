@@ -65,12 +65,12 @@ static void InsertCFGDiamond(SILValue Cond, SILLocation Loc, SILBuilder &B,
   // Start by splitting the current block.
   ContBB = StartBB->split(B.getInsertionPoint());
 
-  TrueBB = StartBB->getParent()->createBasicBlock();
+  TrueBB = StartBB->getFunction()->createBasicBlock();
   B.moveBlockTo(TrueBB, ContBB);
   B.setInsertionPoint(TrueBB);
   B.createBranch(Loc, ContBB);
 
-  FalseBB = StartBB->getParent()->createBasicBlock();
+  FalseBB = StartBB->getFunction()->createBasicBlock();
   B.moveBlockTo(FalseBB, ContBB);
   B.setInsertionPoint(FalseBB);
   B.createBranch(Loc, ContBB);
@@ -584,7 +584,7 @@ bool LifetimeChecker::isBlockIsReachableFromEntry(const SILBasicBlock *BB) {
   // error.
   if (BlocksReachableFromEntry.empty()) {
     SmallVector<const SILBasicBlock*, 128> Worklist;
-    Worklist.push_back(&BB->getParent()->front());
+    Worklist.push_back(&BB->getFunction()->front());
     BlocksReachableFromEntry.insert(Worklist.back());
     
     // Collect all reachable blocks by walking the successors.

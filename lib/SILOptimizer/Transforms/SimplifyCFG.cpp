@@ -1154,7 +1154,7 @@ static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
 static bool isReachable(SILBasicBlock *Block) {
   SmallPtrSet<SILBasicBlock *, 16> Visited;
   llvm::SmallVector<SILBasicBlock *, 16> Worklist;
-  SILBasicBlock *EntryBB = &*Block->getParent()->begin();
+  SILBasicBlock *EntryBB = &*Block->getFunction()->begin();
   Worklist.push_back(EntryBB);
   Visited.insert(EntryBB);
 
@@ -2892,7 +2892,7 @@ bool ArgumentSplitter::createNewArguments() {
 
   {
     SILBuilder B(ParentBB->begin());
-    B.setCurrentDebugScope(ParentBB->getParent()->getDebugScope());
+    B.setCurrentDebugScope(ParentBB->getFunction()->getDebugScope());
 
     // Reform the original structure
     //
@@ -3661,7 +3661,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
   // Okay, we'll replace the BB arg with one with the right type, replace
   // the uses in this block, and then rewrite the branch operands.
   LLVM_DEBUG(llvm::dbgs() << "unwrap argument:" << *A);
-  A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getParent()));
+  A->replaceAllUsesWith(SILUndef::get(A->getType(), *BB->getFunction()));
   auto *NewArg =
       BB->replacePhiArgument(i, proj->getType(), ValueOwnershipKind::Owned);
   proj->replaceAllUsesWith(NewArg);

@@ -212,7 +212,7 @@ SILValue SILSSAUpdater::GetValueInMiddleOfBlock(SILBasicBlock *BB) {
 
   // Return undef for blocks without predecessor.
   if (PredVals.empty())
-    return SILUndef::get(ValType, *BB->getParent());
+    return SILUndef::get(ValType, *BB->getFunction());
 
   if (SingularValue)
     return SingularValue;
@@ -304,7 +304,7 @@ public:
 
   static SILValue GetUndefVal(SILBasicBlock *BB,
                               SILSSAUpdater *Updater) {
-    return SILUndef::get(Updater->ValType, *BB->getParent());
+    return SILUndef::get(Updater->ValType, *BB->getFunction());
   }
 
   /// Add an Argument to the basic block.

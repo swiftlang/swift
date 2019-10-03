@@ -70,8 +70,8 @@ public:
   ///          debug output.
   int getDebugID() const;
 
-  SILFunction *getParent() { return Parent; }
-  const SILFunction *getParent() const { return Parent; }
+  SILFunction *getFunction() { return Parent; }
+  const SILFunction *getFunction() const { return Parent; }
 
   SILModule &getModule() const;
 
