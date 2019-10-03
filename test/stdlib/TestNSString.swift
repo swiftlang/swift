@@ -60,6 +60,7 @@ class TestNSString : TestNSStringSuper {
   func test_unpairedSurrogates() {
     let evil = getNSStringWithUnpairedSurrogate();
     print("\(evil)")
+    print(evil.data(using: .utf8))
   }
   
 }

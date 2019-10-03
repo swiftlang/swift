@@ -95,6 +95,7 @@ internal func _cocoaStringUTF8Count(
   _ target: _CocoaString,
   range: Range<Int>
 ) -> Int? {
+  if range.isEmpty { return 0 }
   var count = 0
   let len = _stdlib_binary_CFStringGetLength(target)
   let converted = _swift_stdlib_CFStringGetBytes(
