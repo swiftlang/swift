@@ -380,8 +380,7 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return hash_combine(hash_value(owner.dc),
-                        hash_value(owner.source.getOpaqueValue()));
+    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,

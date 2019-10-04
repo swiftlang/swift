@@ -46,17 +46,15 @@ CompilerInstance::CompilerInstance() = default;
 CompilerInstance::~CompilerInstance() = default;
 
 std::string CompilerInvocation::getPCHHash() const {
-  using llvm::hash_code;
-  using llvm::hash_value;
   using llvm::hash_combine;
 
-  auto Code = hash_value(LangOpts.getPCHHashComponents());
-  Code = hash_combine(Code, FrontendOpts.getPCHHashComponents());
-  Code = hash_combine(Code, ClangImporterOpts.getPCHHashComponents());
-  Code = hash_combine(Code, SearchPathOpts.getPCHHashComponents());
-  Code = hash_combine(Code, DiagnosticOpts.getPCHHashComponents());
-  Code = hash_combine(Code, SILOpts.getPCHHashComponents());
-  Code = hash_combine(Code, IRGenOpts.getPCHHashComponents());
+  auto Code = hash_combine(LangOpts.getPCHHashComponents(),
+                           FrontendOpts.getPCHHashComponents(),
+                           ClangImporterOpts.getPCHHashComponents(),
+                           SearchPathOpts.getPCHHashComponents(),
+                           DiagnosticOpts.getPCHHashComponents(),
+                           SILOpts.getPCHHashComponents(),
+                           IRGenOpts.getPCHHashComponents());
 
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
