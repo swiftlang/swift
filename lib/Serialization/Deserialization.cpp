@@ -2274,8 +2274,6 @@ public:
       if (!filenameForPrivate.empty())
         MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
-
-    decl->setValidationToChecked();
   }
 
   /// Deserializes decl attribute and attribute-like records from
@@ -2326,7 +2324,6 @@ public:
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
     alias->computeType();
-    alias->setValidationToChecked();
     
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);

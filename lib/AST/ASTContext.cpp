@@ -3407,8 +3407,6 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
 LValueType *LValueType::get(Type objectTy) {
-  assert(!objectTy->hasError() &&
-         "cannot have ErrorType wrapped inside LValueType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "cannot have 'inout' or @lvalue wrapped inside an @lvalue");
 

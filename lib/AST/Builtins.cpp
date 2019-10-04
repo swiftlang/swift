@@ -162,7 +162,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
         ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), Identifier(), DC);
     PD->setInterfaceType(argType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -179,7 +178,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->computeType(Info);
-  FD->setValidationToChecked();
   FD->setImplicit();
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -209,7 +207,6 @@ getBuiltinGenericFunction(Identifier Id,
                                       Identifier(), SourceLoc(),
                                       Identifier(), DC);
     PD->setInterfaceType(paramIfaceType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -228,7 +225,6 @@ getBuiltinGenericFunction(Identifier Id,
 
   func->setGenericSignature(Sig);
   func->computeType();
-  func->setValidationToChecked();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
 

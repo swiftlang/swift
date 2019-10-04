@@ -12,6 +12,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -853,6 +854,13 @@ UnderlyingTypeRequest::getCachedResult() const {
 void UnderlyingTypeRequest::cacheResult(Type value) const {
   auto *typeAlias = std::get<0>(getStorage());
   typeAlias->UnderlyingTy.setType(value);
+}
+
+void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
 }
 
 //----------------------------------------------------------------------------//
