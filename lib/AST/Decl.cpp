@@ -1361,7 +1361,6 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
                                     C.Id_self, this);
       SelfParam->setImplicit();
       SelfParam->setInterfaceType(DC->getSelfInterfaceType());
-      SelfParam->setValidationToChecked();
     }
   }
 
@@ -3864,7 +3863,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
 
   DD->setImplicit();
-  DD->setValidationToChecked();
 
   // Synthesize an empty body for the destructor as needed.
   DD->setBodySynthesizer(synthesizeEmptyFunctionBody);
@@ -6664,8 +6662,6 @@ void AbstractFunctionDecl::computeSelfDeclType() {
                        ? ParamDecl::Specifier::InOut
                        : ParamDecl::Specifier::Default;
   selfDecl->setSpecifier(specifier);
-
-  selfDecl->setValidationToChecked();
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {

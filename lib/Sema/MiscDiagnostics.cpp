@@ -2140,6 +2140,12 @@ public:
       }
     }
 
+    // Don't walk into implicit accessors, since eg. an observer's setter
+    // references the variable, but we don't want to consider it as a real
+    // "use".
+    if (isa<AccessorDecl>(D) && D->isImplicit())
+      return false;
+
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
       // variables.

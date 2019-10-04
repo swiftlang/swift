@@ -1209,6 +1209,7 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 class OperatorPrecedenceGroupRequest
