@@ -298,7 +298,33 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
   GroupNames.emit(Scratch, BlobStream.str());
 }
 
-static bool shouldIncludeDecl(Decl *D) {
+static bool hasDoubleUnderscore(Decl *D) {
+  // Exclude decls with double-underscored names, either in arguments or
+  // base names.
+  static StringRef Prefix = "__";
+
+  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // If it's a function with a parameter with leading double underscore,
+    // it's a private function.
+    if (AFD->getParameters()->hasInternalParameter(Prefix))
+      return true;
+  }
+
+  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+    if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
+      return true;
+  }
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    auto Name = VD->getBaseName();
+    if (!Name.isSpecial() &&
+        Name.getIdentifier().str().startswith(Prefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
   if (auto *VD = dyn_cast<ValueDecl>(D)) {
     // Skip the decl if it's not visible to clients. The use of
     // getEffectiveAccess is unusual here; we want to take the testability
@@ -308,30 +334,11 @@ static bool shouldIncludeDecl(Decl *D) {
     if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
       return false;
   }
-  // Exclude decls with double-underscored names, either in arguments or
-  // base names.
-  StringRef Prefix = "__";
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return shouldIncludeDecl(ED->getExtendedNominal());
+    return shouldIncludeDecl(ED->getExtendedNominal(), ExcludeDoubleUnderscore);
   }
-
-  if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    // If it's a function with a parameter with leading double underscore,
-    // it's a private function.
-    if (AFD->getParameters()->hasInternalParameter(Prefix))
-      return false;
-  }
-
-  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
-    if (SubscriptD->getIndices()->hasInternalParameter(Prefix))
-      return false;
-  }
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    auto Name = VD->getBaseName();
-    if (!Name.isSpecial() &&
-        Name.getIdentifier().str().startswith(Prefix)) {
-      return false;
-    }
+  if (ExcludeDoubleUnderscore && hasDoubleUnderscore(D)) {
+    return false;
   }
   return true;
 }
@@ -393,7 +400,7 @@ static void writeDeclCommentTable(
     }
 
     bool walkToDeclPre(Decl *D) override {
-      if (!shouldIncludeDecl(D))
+      if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/true))
         return false;
       if (!shouldSerializeDoc(D))
         return true;
@@ -789,7 +796,10 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 
   bool walkToDeclPre(Decl *D) override {
     // We shouldn't expose any Decls that .swiftdoc file isn't willing to expose.
-    if (!shouldIncludeDecl(D))
+    // .swiftdoc doesn't include comments for double underscored symbols, but for .swiftsourceinfo,
+    // having the source location for these symbols isn't a concern becuase these
+    // symbols are in .swiftinterface anyway.
+    if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
       return false;
     if (!shouldSerializeSourceLoc(D))
       return true;
