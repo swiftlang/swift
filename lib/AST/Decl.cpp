@@ -6880,7 +6880,14 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                              const_cast<FuncDecl *>(this)
                            },
                            nullptr);
- }
+}
+
+bool FuncDecl::isStatic() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    IsStaticRequest{const_cast<FuncDecl *>(this)},
+    false);
+}
 
 AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,

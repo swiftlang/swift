@@ -1239,6 +1239,12 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 }
 
 llvm::Expected<bool>
+IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
+  return (decl->getStaticLoc().isValid() ||
+          decl->getStaticSpelling() != StaticSpellingKind::None);
+}
+
+llvm::Expected<bool>
 IsDynamicRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we can't infer dynamic here, don't.
   if (!DeclAttribute::canAttributeAppearOnDecl(DAK_Dynamic, decl))

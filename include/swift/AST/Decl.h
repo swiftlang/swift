@@ -418,7 +418,10 @@ protected:
     HasSingleExpressionBody : 1
   );
 
-  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+2+1+1+2,
+  SWIFT_INLINE_BITFIELD(FuncDecl, AbstractFunctionDecl, 1+1+2+1+1+2,
+    /// Whether we've computed the 'static' flag yet.
+    IsStaticComputed : 1,
+
     /// Whether this function is a 'static' method.
     IsStatic : 1,
 
@@ -5960,6 +5963,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 class FuncDecl : public AbstractFunctionDecl {
   friend class AbstractFunctionDecl;
   friend class SelfAccessKindRequest;
+  friend class IsStaticRequest;
 
   SourceLoc StaticLoc;  // Location of the 'static' token or invalid.
   SourceLoc FuncLoc;    // Location of the 'func' token.
@@ -5981,14 +5985,14 @@ protected:
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
-    Bits.FuncDecl.IsStatic =
-      StaticLoc.isValid() || StaticSpelling != StaticSpellingKind::None;
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
     Bits.FuncDecl.ForcedStaticDispatch = false;
     Bits.FuncDecl.SelfAccess =
       static_cast<unsigned>(SelfAccessKind::NonMutating);
     Bits.FuncDecl.SelfAccessComputed = false;
+    Bits.FuncDecl.IsStaticComputed = false;
+    Bits.FuncDecl.IsStatic = false;
   }
 
 private:
@@ -6004,6 +6008,13 @@ private:
   Optional<SelfAccessKind> getCachedSelfAccessKind() const {
     if (Bits.FuncDecl.SelfAccessComputed)
       return static_cast<SelfAccessKind>(Bits.FuncDecl.SelfAccess);
+
+    return None;
+  }
+
+  Optional<bool> getCachedIsStatic() const {
+    if (Bits.FuncDecl.IsStaticComputed)
+      return Bits.FuncDecl.IsStatic;
 
     return None;
   }
@@ -6030,9 +6041,8 @@ public:
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
-  bool isStatic() const {
-    return Bits.FuncDecl.IsStatic;
-  }
+  bool isStatic() const;
+
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
     return static_cast<StaticSpellingKind>(Bits.FuncDecl.StaticSpelling);
@@ -6040,6 +6050,7 @@ public:
   /// \returns the way 'static'/'class' should be spelled for this declaration.
   StaticSpellingKind getCorrectStaticSpelling() const;
   void setStatic(bool IsStatic = true) {
+    Bits.FuncDecl.IsStaticComputed = true;
     Bits.FuncDecl.IsStatic = IsStatic;
   }
 
