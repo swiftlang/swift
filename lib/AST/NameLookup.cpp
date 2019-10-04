@@ -487,9 +487,9 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       // If the decl is currently being validated, this is likely a recursive
       // reference and we'll want to skip ahead so as to avoid having its type
       // attempt to desugar itself.
-      auto ifaceType = decl->getInterfaceType();
-      if (!ifaceType)
+      if (decl->isRecursiveValidation())
         continue;
+      auto ifaceType = decl->getInterfaceType();
 
       // FIXME: the canonical type makes a poor signature, because we don't
       // canonicalize away default arguments.

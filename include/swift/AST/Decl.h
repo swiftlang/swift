@@ -857,17 +857,6 @@ public:
     return getValidationState() > ValidationState::Unchecked;
   }
 
-  /// Manually indicate that validation is complete for the declaration. For
-  /// example: during importing, code synthesis, or derived conformances.
-  ///
-  /// For normal code validation, please use DeclValidationRAII instead.
-  ///
-  /// FIXME -- Everything should use DeclValidationRAII instead of this.
-  void setValidationToChecked() {
-    if (!isBeingValidated())
-      Bits.Decl.ValidationState = unsigned(ValidationState::Checked);
-  }
-
   bool escapedFromIfConfig() const {
     return Bits.Decl.EscapedFromIfConfig;
   }

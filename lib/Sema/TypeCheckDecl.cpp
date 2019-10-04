@@ -3226,10 +3226,8 @@ public:
       return;
     }
 
-    // Validate the nominal type declaration being extended.
-    (void)nominal->getInterfaceType();
-    (void)ED->getGenericSignature();
-    ED->setValidationToChecked();
+    // Produce any diagnostics for the generic signature.
+    (void) ED->getGenericSignature();
 
     if (extType && !extType->hasError()) {
       // The first condition catches syntactic forms like
@@ -3865,53 +3863,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // Handling validation failure due to re-entrancy is left
   // up to the caller, who must call hasInterfaceType() to
   // check that validateDecl() returned a fully-formed decl.
-  if (D->hasValidationStarted() || D->hasInterfaceType())
+  if (D->isBeingValidated() || D->hasInterfaceType())
     return;
-
-  // FIXME: It would be nicer if Sema would always synthesize fully-typechecked
-  // declarations, but for now, you can make an imported type conform to a
-  // protocol with property requirements, which requires synthesizing getters
-  // and setters, etc.
-  if (!isa<VarDecl>(D) && !isa<AccessorDecl>(D)) {
-    assert(isa<SourceFile>(D->getDeclContext()->getModuleScopeContext()) &&
-           "Should not validate imported or deserialized declarations");
-  }
 
   PrettyStackTraceDecl StackTrace("validating", D);
   FrontendStatsTracer StatsTracer(Context.Stats, "validate-decl", D);
 
   checkForForbiddenPrefix(D);
-
-  // Validate the context.
-  auto dc = D->getDeclContext();
-  if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
-    if (!nominal->getInterfaceType())
-      return;
-  } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-    // If we're currently validating, or have already validated this extension,
-    // there's nothing more to do now.
-    if (!ext->hasValidationStarted()) {
-      DeclValidationRAII IBV(ext);
-
-      if (auto *nominal = ext->getExtendedNominal()) {
-        // Validate the nominal type declaration being extended.
-        // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
-        (void)nominal->getInterfaceType();
-        
-        // Eagerly validate the generic signature of the extension.
-        (void)ext->getGenericSignature();
-      }
-    }
-    if (ext->getValidationState() == Decl::ValidationState::Checking)
-      return;
-  }
-
-  // Validating the parent may have triggered validation of this declaration,
-  // so just return if that was the case.
-  if (D->hasValidationStarted() || D->hasInterfaceType()) {
-    assert(D->hasInterfaceType());
-    return;
-  }
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsValidated++;

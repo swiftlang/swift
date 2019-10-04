@@ -2706,7 +2706,7 @@ bool ValueDecl::hasInterfaceType() const {
 }
 
 bool ValueDecl::isRecursiveValidation() const {
-  if (hasValidationStarted() || !hasInterfaceType())
+  if (hasValidationStarted() && !hasInterfaceType())
     return true;
 
   if (auto *vd = dyn_cast<VarDecl>(this))

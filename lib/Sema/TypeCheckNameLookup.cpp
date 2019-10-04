@@ -504,10 +504,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      // If we're validating the protocol recursively, bail out.
-      if (!protocol->hasInterfaceType())
-        continue;
-
       auto conformance = conformsToProtocol(type, protocol, dc,
                                             conformanceOptions);
       if (!conformance) {
