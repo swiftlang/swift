@@ -7881,10 +7881,27 @@ ConstraintSystem::simplifyRestrictedConstraint(
                                        ConstraintLocatorBuilder locator) {
   switch (simplifyRestrictedConstraintImpl(restriction, type1, type2,
                                            matchKind, flags, locator)) {
-  case SolutionKind::Solved:
+  case SolutionKind::Solved: {
+    // If we have an application of a non-ephemeral parameter, then record a
+    // fix if we have to treat an ephemeral conversion as non-ephemeral. It's
+    // important that this is solved as an independant constraint, as the
+    // solving of this restriction may be required in order to evaluate it. For
+    // example, when solving `foo(&.x)`, we need to first match types for the
+    // inout-to-pointer conversion, which then allows us to resolve the overload
+    // of `x`, which may or may not produce an ephemeral pointer.
+    if (locator.isNonEphemeralParameterApplication()) {
+      bool downgradeToWarning =
+          !getASTContext().LangOpts.DiagnoseInvalidEphemeralnessAsError;
+
+      auto *fix = TreatEphemeralAsNonEphemeral::create(
+          *this, getConstraintLocator(locator), type1, type2, restriction,
+          downgradeToWarning);
+      addFixConstraint(fix, matchKind, type1, type2, locator);
+    }
+
     ConstraintRestrictions.push_back(std::make_tuple(type1, type2, restriction));
     return SolutionKind::Solved;
-
+  }
   case SolutionKind::Unsolved:
     return SolutionKind::Unsolved;
 
@@ -7961,6 +7978,17 @@ void ConstraintSystem::recordHole(TypeVariableType *typeVar) {
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     ConstraintFix *fix, Type type1, Type type2, ConstraintKind matchKind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+
+  // Local function to form an unsolved result.
+  auto formUnsolved = [&] {
+    if (flags.contains(TMF_GenerateConstraints)) {
+      addUnsolvedConstraint(Constraint::createFixed(
+          *this, matchKind, fix, type1, type2, getConstraintLocator(locator)));
+      return SolutionKind::Solved;
+    }
+    return SolutionKind::Unsolved;
+  };
+
   // Try with the fix.
   TypeMatchOptions subflags =
     getDefaultDecompositionOptions(flags) | TMF_ApplyingFix;
@@ -8048,6 +8076,46 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
     if (recordFix(fix))
       return SolutionKind::Error;
     return matchTupleTypes(matchingType, smaller, matchKind, subflags, locator);
+  }
+
+  case FixKind::TreatEphemeralAsNonEphemeral: {
+    auto *theFix = static_cast<TreatEphemeralAsNonEphemeral *>(fix);
+    // If we have a non-ephemeral locator for an ephemeral conversion, make a
+    // note of the fix.
+    auto conversion = theFix->getConversionKind();
+    switch (isConversionEphemeral(conversion, locator)) {
+    case ConversionEphemeralness::Ephemeral: {
+      if (recordFix(fix))
+        return SolutionKind::Error;
+
+      // FIXME: Currently, as a performance hack, we short-circuit disjunctions
+      // such that we favour array-to-pointer conversions over inout-to-pointer
+      // conversions. However we don't do this when fixes are involved.
+      // Therefore in order to improve diagnostics for cases where both
+      // array-to-pointer and inout-to-pointer are viable with fixes, increase
+      // the score of inout-to-pointer by 1. This means we'll complain about
+      // the use of array-to-pointer, which is more likely to be what the user
+      // was trying to do.
+      //
+      // Ideally, we would either have a proper ranking rule that favors
+      // array-to-pointer over inout-to-pointer (not just within a disjunction),
+      // or we would have some logic to merge solutions with fixes that would
+      // be better diagnosed by a single fix rather than an ambiguity error
+      // with notes from fixes.
+      if (!theFix->isWarning() &&
+          conversion == ConversionRestrictionKind::InoutToPointer)
+        increaseScore(SK_ValueToPointerConversion);
+
+      return SolutionKind::Solved;
+    }
+    case ConversionEphemeralness::NonEphemeral:
+      return SolutionKind::Solved;
+    case ConversionEphemeralness::Unresolved:
+      // It's possible we don't yet have enough information to know whether
+      // the conversion is ephemeral or not, for example if we're dealing with
+      // an overload that hasn't yet been resolved.
+      return formUnsolved();
+    }
   }
 
   case FixKind::InsertCall:

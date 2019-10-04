@@ -1009,3 +1009,25 @@ AllowInvalidUseOfTrailingClosure::create(ConstraintSystem &cs, Type argType,
   return new (cs.getAllocator())
       AllowInvalidUseOfTrailingClosure(cs, argType, paramType, locator);
 }
+
+bool TreatEphemeralAsNonEphemeral::diagnose(Expr *root, bool asNote) const {
+  NonEphemeralConversionFailure failure(
+      root, getConstraintSystem(), getLocator(), getFromType(), getToType(),
+      ConversionKind, isWarning());
+  return failure.diagnose(asNote);
+}
+
+TreatEphemeralAsNonEphemeral *TreatEphemeralAsNonEphemeral::create(
+    ConstraintSystem &cs, ConstraintLocator *locator, Type srcType,
+    Type dstType, ConversionRestrictionKind conversionKind,
+    bool downgradeToWarning) {
+  return new (cs.getAllocator()) TreatEphemeralAsNonEphemeral(
+      cs, locator, srcType, dstType, conversionKind, downgradeToWarning);
+}
+
+std::string TreatEphemeralAsNonEphemeral::getName() const {
+  llvm::SmallString<32> name;
+  name += "treat ephemeral as non-ephemeral for ";
+  name += ::getName(ConversionKind);
+  return name.c_str();
+}
