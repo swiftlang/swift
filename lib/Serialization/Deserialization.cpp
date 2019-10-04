@@ -854,7 +854,7 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   }
 }
 
-GenericSignature *ModuleFile::getGenericSignature(
+GenericSignature ModuleFile::getGenericSignature(
     serialization::GenericSignatureID ID) {
   auto signature = getGenericSignatureChecked(ID);
   if (!signature)
@@ -862,7 +862,7 @@ GenericSignature *ModuleFile::getGenericSignature(
   return signature.get();
 }
 
-Expected<GenericSignature *>
+Expected<GenericSignature>
 ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   using namespace decls_block;
 
@@ -1120,11 +1120,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 
     if (isType != isa<TypeDecl>(value))
       return true;
-    auto ifaceTy = value->getInterfaceType();
-    if (!ifaceTy)
-      return true;
-    if (canTy && ifaceTy->getCanonicalType() != canTy)
-      return true;
+
+    // If we're expecting a type, make sure this decl has the expected type.
+    if (canTy)  {
+      auto ifaceTy = value->getInterfaceType();
+      if (!ifaceTy || !ifaceTy->isEqual(canTy))
+        return true;
+    }
+
     if (value->isStatic() != isStatic)
       return true;
     if (value->hasClangNode() != importedFromClang)
@@ -1368,7 +1371,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   // Filters for values discovered in the remaining path pieces.
   ModuleDecl *M = nullptr;
-  CanGenericSignature genericSig = nullptr;
+  CanGenericSignature genericSig = CanGenericSignature();
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
@@ -1597,7 +1600,7 @@ giveUpFastPath:
 
       ValueDecl *base = values.front();
 
-      GenericSignature *currentSig = nullptr;
+      GenericSignature currentSig = GenericSignature();
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
@@ -2242,8 +2245,6 @@ public:
       if (!filenameForPrivate.empty())
         MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
-
-    decl->setValidationToChecked();
   }
 
   /// Deserializes decl attribute and attribute-like records from
@@ -2288,13 +2289,12 @@ public:
                                               SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
-    auto *genericSig = MF.getGenericSignature(genericSigID);
+    auto genericSig = MF.getGenericSignature(genericSigID);
     alias->setGenericSignature(genericSig);
 
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
     alias->computeType();
-    alias->setValidationToChecked();
     
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
@@ -3484,6 +3484,11 @@ public:
       MF.fatal();
 
     theEnum->setAddedImplicitInitializers();
+    // @objc enums have all their raw values checked.
+    if (isObjC) {
+      theEnum->setHasFixedRawValues();
+    }
+    
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -4575,7 +4580,7 @@ public:
     TypeID resultID;
     uint8_t rawRepresentation;
     bool noescape = false, throws;
-    GenericSignature *genericSig = nullptr;
+    GenericSignature genericSig = GenericSignature();
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
@@ -4638,11 +4643,11 @@ public:
     }
 
     if (!isGeneric) {
-      assert(genericSig == nullptr);
+      assert(genericSig.isNull());
       return FunctionType::get(params, resultTy.get(), info);
     }
 
-    assert(genericSig != nullptr);
+    assert(!genericSig.isNull());
     return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
   }
 
@@ -5051,7 +5056,7 @@ public:
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
-    GenericSignature *genericSig = MF.getGenericSignature(rawGenericSig);
+    GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
 
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),

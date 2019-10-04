@@ -2342,7 +2342,7 @@ bool SerializedASTFile::hasEntryPoint() const {
 }
 
 bool SerializedASTFile::getAllGenericSignatures(
-                       SmallVectorImpl<GenericSignature*> &genericSignatures) {
+                       SmallVectorImpl<GenericSignature> &genericSignatures) {
   genericSignatures.clear();
   for (unsigned index : indices(File.GenericSignatures)) {
     if (auto genericSig = File.getGenericSignature(index + 1))

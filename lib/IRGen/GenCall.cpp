@@ -869,6 +869,21 @@ namespace {
       case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
         llvm_unreachable("OpenCL type in ABI lowering");
 
+      // We should never see the SVE types at all.
+      case clang::BuiltinType::SveInt8:
+      case clang::BuiltinType::SveInt16:
+      case clang::BuiltinType::SveInt32:
+      case clang::BuiltinType::SveInt64:
+      case clang::BuiltinType::SveUint8:
+      case clang::BuiltinType::SveUint16:
+      case clang::BuiltinType::SveUint32:
+      case clang::BuiltinType::SveUint64:
+      case clang::BuiltinType::SveFloat16:
+      case clang::BuiltinType::SveFloat32:
+      case clang::BuiltinType::SveFloat64:
+      case clang::BuiltinType::SveBool:
+        llvm_unreachable("SVE type in ABI lowering");
+
       // Handle all the integer types as opaque values.
 #define BUILTIN_TYPE(Id, SingletonId)
 #define SIGNED_TYPE(Id, SingletonId) \
@@ -1607,7 +1622,7 @@ llvm::CallSite CallEmission::emitCallSite() {
                                       { opaqueCallee });
     opaqueCallee =
       IGF.Builder.CreateBitCast(opaqueCallee, origCallee->getType());
-    call->setCalledFunction(opaqueCallee);
+    call->setCalledFunction(fn.getFunctionType(), opaqueCallee);
 
     // Reset the insert point to after the call.
     IGF.Builder.SetInsertPoint(call->getParent());

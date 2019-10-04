@@ -178,13 +178,15 @@ namespace {
       return IR;
     }
 
+    ImportResult VisitType(const Type*) = delete;
+
 #define DEPENDENT_TYPE(Class, Base)                               \
     ImportResult Visit##Class##Type(const clang::Class##Type *) { \
       llvm_unreachable("Dependent types cannot be converted");    \
     }
 #define TYPE(Class, Base)
 #include "clang/AST/TypeNodes.def"
-    
+
     // Given a loaded type like CInt, look through the type alias sugar that the
     // stdlib uses to show the underlying type.  We want to import the signature
     // of the exit(3) libc function as "func exit(Int32)", not as
@@ -318,9 +320,29 @@ namespace {
       // OpenMP types that don't have Swift equivalents.
       case clang::BuiltinType::OMPArraySection:
         return Type();
+
+      // SVE builtin types that don't have Swift equivalents.
+      case clang::BuiltinType::SveInt8:
+      case clang::BuiltinType::SveInt16:
+      case clang::BuiltinType::SveInt32:
+      case clang::BuiltinType::SveInt64:
+      case clang::BuiltinType::SveUint8:
+      case clang::BuiltinType::SveUint16:
+      case clang::BuiltinType::SveUint32:
+      case clang::BuiltinType::SveUint64:
+      case clang::BuiltinType::SveFloat16:
+      case clang::BuiltinType::SveFloat32:
+      case clang::BuiltinType::SveFloat64:
+      case clang::BuiltinType::SveBool:
+        return Type();
       }
 
       llvm_unreachable("Invalid BuiltinType.");
+    }
+
+    ImportResult VisitPipeType(const clang::PipeType *) {
+      // OpenCL types are not supported in Swift.
+      return Type();
     }
 
     ImportResult VisitComplexType(const clang::ComplexType *type) {
@@ -584,7 +606,7 @@ namespace {
     importObjCTypeParamDecl(const clang::ObjCTypeParamDecl *objcTypeParamDecl) {
       // Pull the corresponding generic type parameter from the imported class.
       const auto *typeParamContext = objcTypeParamDecl->getDeclContext();
-      GenericSignature *genericSig = nullptr;
+      GenericSignature genericSig = GenericSignature();
       if (auto *category =
             dyn_cast<clang::ObjCCategoryDecl>(typeParamContext)) {
         auto ext = cast_or_null<ExtensionDecl>(
@@ -768,12 +790,11 @@ namespace {
     SUGAR_TYPE(SubstTemplateTypeParm)
     SUGAR_TYPE(TemplateSpecialization)
     SUGAR_TYPE(Auto)
+    SUGAR_TYPE(DeducedTemplateSpecialization)
     SUGAR_TYPE(Adjusted)
     SUGAR_TYPE(PackExpansion)
-
-    ImportResult VisitAttributedType(const clang::AttributedType *type) {
-      return Visit(type->desugar());
-    }
+    SUGAR_TYPE(Attributed)
+    SUGAR_TYPE(MacroQualified)
 
     ImportResult VisitDecayedType(const clang::DecayedType *type) {
       clang::ASTContext &clangCtx = Impl.getClangASTContext();
@@ -932,27 +953,32 @@ namespace {
             return {};
           }
           if (nsObjectTy && importedType->isEqual(nsObjectTy)) {
-            SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
-              type->qual_begin(), type->qual_end()
-            };
-            auto *nsObjectProto =
-                Impl.getNSObjectProtocolType()->getAnyNominal();
-            if (!nsObjectProto) {
-              // Input is malformed
-              return {};
-            }
-            auto *clangProto =
-                cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
-            protocols.push_back(
-                const_cast<clang::ObjCProtocolDecl *>(clangProto));
+            // Skip if there is no NSObject protocol.
+            auto nsObjectProtoType =
+                Impl.getNSObjectProtocolType();
+            if (nsObjectProtoType) {
+              auto *nsObjectProto = nsObjectProtoType->getAnyNominal();
+              if (!nsObjectProto) {
+                // Input is malformed
+                return {};
+              }
 
-            clang::ASTContext &clangCtx = Impl.getClangASTContext();
-            clang::QualType protosOnlyType =
-                clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
-                                           /*type args*/{},
-                                           protocols,
-                                           /*kindof*/false);
-            return Visit(clangCtx.getObjCObjectPointerType(protosOnlyType));
+              SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
+                type->qual_begin(), type->qual_end()
+              };
+              auto *clangProto =
+                  cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
+              protocols.push_back(
+                  const_cast<clang::ObjCProtocolDecl *>(clangProto));
+
+              clang::ASTContext &clangCtx = Impl.getClangASTContext();
+              clang::QualType protosOnlyType =
+                  clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
+                                             /*type args*/{},
+                                             protocols,
+                                             /*kindof*/false);
+              return Visit(clangCtx.getObjCObjectPointerType(protosOnlyType));
+            }
           }
         }
 

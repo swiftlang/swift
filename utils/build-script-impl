@@ -53,9 +53,7 @@ KNOWN_SETTINGS=(
     ninja-bin                   ""               "the path to Ninja tool"
     cmark-build-type            "Debug"          "the CMake build variant for CommonMark (Debug, RelWithDebInfo, Release, MinSizeRel).  Defaults to Debug."
     lldb-extra-cmake-args       ""               "extra command line args to pass to lldb cmake"
-    lldb-extra-xcodebuild-args  ""               "extra command line args to pass to lldb xcodebuild"
     lldb-test-cc                ""               "CC to use for building LLDB testsuite test inferiors.  Defaults to just-built, in-tree clang.  If set to 'host-toolchain', sets it to same as host-cc."
-    lldb-test-with-curses       ""               "run test lldb test runner using curses terminal control"
     lldb-test-swift-only        "0"              "when running lldb tests, only include Swift-specific tests"
     lldb-no-debugserver         ""               "delete debugserver after building it, and don't try to codesign it"
     lldb-use-system-debugserver ""               "don't try to codesign debugserver, and use the system's debugserver instead"
@@ -74,7 +72,6 @@ KNOWN_SETTINGS=(
     swift-stdlib-enable-assertions "1"           "enable assertions in Swift"
     swift-stdlib-use-nonatomic-rc "0"            "build the Swift stdlib and overlays with nonatomic reference count operations enabled"
     lldb-build-type             "Debug"          "the CMake build variant for LLDB"
-    lldb-build-with-xcode       "0"              "Use xcodebuild to build LLDB, instead of CMake"
     llbuild-build-type          "Debug"          "the CMake build variant for llbuild"
     foundation-build-type       "Debug"          "the build variant for Foundation"
     libdispatch-build-type      "Debug"          "the build variant for libdispatch"
@@ -1929,64 +1926,6 @@ function set_swiftevolve_build_command() {
     swiftevolve_build_command=("${stresstester_build_script_helper_command[@]}")
 }
 
-# Construct the appropriate options to pass to an Xcode
-# build of any LLDB target.
-function set_lldb_xcodebuild_options() {
-    llvm_build_dir=$(build_directory ${host} llvm)
-    cmark_build_dir=$(build_directory ${host} cmark)
-    lldb_build_dir=$(build_directory ${host} lldb)
-    swift_build_dir=$(build_directory ${host} swift)
-
-    lldb_xcodebuild_options=(
-        LLDB_PATH_TO_LLVM_SOURCE="${LLVM_SOURCE_DIR}"
-        LLDB_PATH_TO_CLANG_SOURCE="${CLANG_SOURCE_DIR}"
-        LLDB_PATH_TO_SWIFT_SOURCE="${SWIFT_SOURCE_DIR}"
-        LLDB_PATH_TO_LLVM_BUILD="${llvm_build_dir}"
-        LLDB_PATH_TO_CLANG_BUILD="${llvm_build_dir}"
-        LLDB_PATH_TO_SWIFT_BUILD="${swift_build_dir}"
-        LLDB_IS_BUILDBOT_BUILD="${LLDB_IS_BUILDBOT_BUILD}"
-        LLDB_BUILD_DATE="\"${LLDB_BUILD_DATE}\""
-        SYMROOT="${lldb_build_dir}"
-        OBJROOT="${lldb_build_dir}"
-        -UseNewBuildSystem=NO
-        ${LLDB_EXTRA_XCODEBUILD_ARGS}
-        MACOSX_DEPLOYMENT_TARGET=10.13
-    )
-    if [[ "${LLDB_NO_DEBUGSERVER}" ]] ; then
-        lldb_xcodebuild_options=(
-            "${lldb_xcodebuild_options[@]}"
-            DEBUGSERVER_DISABLE_CODESIGN="1"
-            DEBUGSERVER_DELETE_AFTER_BUILD="1"
-        )
-    fi
-    if [[ "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-        lldb_xcodebuild_options=(
-            "${lldb_xcodebuild_options[@]}"
-            DEBUGSERVER_USE_FROM_SYSTEM="1"
-        )
-    fi
-    if [[ "${ENABLE_ASAN}" ]] ; then
-	lldb_xcodebuild_options=(
-	    "${lldb_xcodebuild_options[@]}"
-	    ENABLE_ADDRESS_SANITIZER="YES"
-	    -enableAddressSanitizer=YES
-	)
-    fi
-    if [[ "${ENABLE_UBSAN}" ]] ; then
-	lldb_xcodebuild_options=(
-	    "${lldb_xcodebuild_options[@]}"
-	    ENABLE_UNDEFINED_BEHAVIOR_SANITIZER="YES"
-	    -enableUndefinedBehaviorSanitizer=YES
-	)
-    fi
-    if [[ "$(true_false ${LLDB_ASSERTIONS})" == "FALSE" ]]; then
-	lldb_xcodebuild_options=(
-	    "${lldb_xcodebuild_options[@]}"
-	    OTHER_CFLAGS="-DNDEBUG"
-	)
-    fi
-}
-
 #
 # Configure and build each product
 #
@@ -2157,7 +2096,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${SKIP_BUILD_LLVM}" ] ; then
                     # We can't skip the build completely because the standalone
                     # build of Swift depend on these for building and testing.
-                    build_targets=(llvm-tblgen clang-headers intrinsics_gen clang-tablegen-targets)
+                    build_targets=(llvm-tblgen clang-resource-headers intrinsics_gen clang-tablegen-targets)
                     # If we are not performing a toolchain only build, then we
                     # also want to include FileCheck and not for testing
                     # purposes.
@@ -2307,6 +2246,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_perf_testsuite_this_time=$(true_false "$(not ${SKIP_BUILD_BENCHMARKS})")
                     build_external_perf_testsuite_this_time=$(false_true "${SKIP_BUILD_EXTERNAL_BENCHMARKS}")
                     build_tests_this_time=${SWIFT_INCLUDE_TESTS}
+                fi
+
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                    )
                 fi
 
                 # Command-line parameters override any autodetection that we
@@ -2500,13 +2446,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${lldb_cmake_options[@]}"
                     )
 
-                if [ ! -z "${LLDB_EXTRA_CMAKE_ARGS}" ]; then
-                    cmake_options=(
-                        "${cmake_options[@]}"
-                        ${LLDB_EXTRA_CMAKE_ARGS}
-                        )
-                fi
-
                 # Figure out if we think this is a buildbot build.
                 # This will influence the lldb version line.
                 if [ ! -z "${JENKINS_HOME}" -a ! -z "${JOB_NAME}" -a ! -z "${BUILD_NUMBER}" ]; then
@@ -2515,53 +2454,83 @@ for host in "${ALL_HOSTS[@]}"; do
                     LLDB_IS_BUILDBOT_BUILD=0
                 fi
 
-                # Get the build date
+                # Get the build date.
                 LLDB_BUILD_DATE=$(date +%Y-%m-%d)
 
-                using_xcodebuild="FALSE"
-                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
-                    using_xcodebuild="TRUE"
+                # Pick the right cache.
+                if [[ "$(uname -s)" == "Darwin" ]] ; then
+                  cmake_cache="Apple-lldb-macOS.cmake"
+                else
+                  cmake_cache="Apple-lldb-Linux.cmake"
                 fi
 
-                if [[ "${using_xcodebuild}" == "TRUE" ]] ; then
-                  # Set up flags to pass to xcodebuild
-                  set_lldb_xcodebuild_options
-                  set_lldb_build_mode
-                  with_pushd ${source_dir} \
-                      call xcodebuild -target desktop -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                  continue
+                # Options to find the just-built libddispatch and Foundation.
+                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
+                    DOTEST_EXTRA=""
                 else
-                  if [[ "$(uname -s)" == "Darwin" ]] ; then
-                    cmake_cache="Apple-lldb-macOS.cmake"
-                  else
-                    cmake_cache="Apple-lldb-linux.cmake"
-                  fi
+                    # This assumes that there are no spaces in any on these paths.
+                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
+                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
+                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
+                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
+                fi
 
-                  cmake_options=(
-                      "${cmake_options[@]}"
-                      -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
-                      -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
-                      -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
-                      -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
-                      -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
-                      -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
-                      -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
-                      -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
-                      -DLLDB_PATH_TO_CLANG_BUILD:PATH="${llvm_build_dir}"
-                      -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
-                      -DLLDB_PATH_TO_SWIFT_BUILD:PATH="${swift_build_dir}"
-                      -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
-                      -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
-                      -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=1
-                      -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
+                # Watchpoint testing is currently disabled: see rdar://38566150.
+                LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
+
+                # Skip DWO to speed up swift testing.
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
+                    LLDB_TEST_CATEGORIES="${LLDB_TEST_CATEGORIES};--skip-category=dwo"
+                fi
+
+                # Construct dotest arguments. We use semicolons so CMake interprets this as a list.
+                DOTEST_ARGS="--build-dir;${lldb_build_dir}/lldb-test-build.noindex;${LLDB_TEST_CATEGORIES};-t"
+
+                # Only set the extra arguments if they're not empty.
+                if [[ -n "${DOTEST_EXTRA}" ]]; then
+                    DOTEST_ARGS="${DOTEST_ARGS};-E;${DOTEST_EXTRA}"
+                fi
+
+                cmake_options=(
+                    "${cmake_options[@]}"
+                    -C${LLDB_SOURCE_DIR}/cmake/caches/${cmake_cache}
+                    -DCMAKE_BUILD_TYPE:STRING="${LLDB_BUILD_TYPE}"
+                    -DLLDB_SWIFTC:PATH="$(build_directory ${LOCAL_HOST} swift)/bin/swiftc"
+                    -DLLDB_SWIFT_LIBS:PATH="$(build_directory ${LOCAL_HOST} swift)/lib/swift"
+                    -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                    -DLLDB_FRAMEWORK_INSTALL_DIR="$(get_host_install_prefix ${host})../System/Library/PrivateFrameworks"
+                    -DLLVM_DIR:PATH=${llvm_build_dir}/lib/cmake/llvm
+                    -DClang_DIR:PATH=${llvm_build_dir}/lib/cmake/clang
+                    -DSwift_DIR:PATH=${swift_build_dir}/lib/cmake/swift
+                    -DLLDB_PATH_TO_SWIFT_SOURCE:PATH="${SWIFT_SOURCE_DIR}"
+                    -DLLDB_IS_BUILDBOT_BUILD:BOOL="${LLDB_IS_BUILDBOT_BUILD}"
+                    -DLLDB_BUILD_DATE:STRING="\"${LLDB_BUILD_DATE}\""
+                    -DLLDB_ALLOW_STATIC_BINDINGS:BOOL=1
+                    -DLLDB_INCLUDE_TESTS:BOOL=$(false_true ${BUILD_TOOLCHAIN_ONLY})
+                    -DLLDB_TEST_USER_ARGS="${DOTEST_ARGS}"
+                )
+
+                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_USE_SYSTEM_DEBUGSERVER})" == "TRUE" ]]; then
+                  cmake_options+=(
+                    -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
                   )
+                fi
 
-                  if [[ "$(uname -s)" == "Darwin" ]] ; then
-                    cmake_options+=(
-                      -DLLDB_CODESIGN_IDENTITY=""
-                      -DLLDB_USE_SYSTEM_DEBUGSERVER:BOOL="${LLDB_USE_SYSTEM_DEBUGSERVER}"
-                    )
-                  fi
+                # Add the extra CMake args at the end so they can override
+                # values set earlier.
+                if [ ! -z "${LLDB_EXTRA_CMAKE_ARGS}" ]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        ${LLDB_EXTRA_CMAKE_ARGS}
+                        )
                 fi
                 ;;
             llbuild)
@@ -2658,7 +2627,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
                   cmake_options=(
                     ${cmake_options[@]}
-                    -DCMAKE_BUILD_TYPE:STRING="${LIBDISPATCH_BUILD_TYPE}"
+                    -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
                     -DCMAKE_C_COMPILER:PATH="${LLVM_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${LLVM_BIN}/clang++"
                     -DCMAKE_SWIFT_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
@@ -2717,6 +2686,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS=(
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
+                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
                     )
                 else
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
@@ -2740,6 +2710,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_C_COMPILER:PATH=${LLVM_BIN}/clang
                   -DCMAKE_CXX_COMPILER:PATH=${LLVM_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
+                  -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
@@ -3055,181 +3026,43 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
                 llvm_build_dir=$(build_directory ${host} llvm)
                 lldb_build_dir=$(build_directory ${host} lldb)
-                swift_build_dir=$(build_directory ${host} swift)
-                module_cache="${build_dir}/module-cache"
-
-                using_xcodebuild="FALSE"
-                if [[ "$(uname -s)" == "Darwin" && "$(true_false ${LLDB_BUILD_WITH_XCODE})" == "TRUE" ]] ; then
-                    using_xcodebuild="TRUE"
-                fi
-
-
-                # Run the unittests.
-                # FIXME: The xcode build project currently doesn't know how to run the lit style tests.
-                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
-                    set_lldb_xcodebuild_options
-                    set_lldb_build_mode
-                    # Run the LLDB unittests (gtests).
-                    with_pushd ${LLDB_SOURCE_DIR} \
-                               call xcodebuild -scheme lldb-gtest -configuration ${LLDB_BUILD_MODE} ${lldb_xcodebuild_options[@]}
-                    rc=$?
-                    if [[ "$rc" -ne 0 ]] ; then
-                        >&2 echo "error: LLDB gtests failed"
-                        exit 1
-                    fi
-                fi
-
-                # Setup lldb executable path
-                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
-                    lldb_executable="${lldb_build_dir}"/${LLDB_BUILD_MODE}/lldb
-                else
-                    lldb_executable="${lldb_build_dir}"/bin/lldb
-                fi
-
                 results_dir="${lldb_build_dir}/test-results"
 
-                # Handle test results formatter
-                if [[ "${LLDB_TEST_WITH_CURSES}" ]]; then
-                    # Setup the curses results formatter.
-                    LLDB_FORMATTER_OPTS="\
-                                       --results-formatter lldbsuite.test_event.formatter.curses.Curses \
-                                       --results-file /dev/stdout"
-                else
-                    LLDB_FORMATTER_OPTS="\
-                                       --results-formatter lldbsuite.test_event.formatter.xunit.XunitFormatter \
-                                       --results-file ${results_dir}/results.xml \
-                                       -O--xpass=success \
-                                       -O--xfail=success"
-                    # Setup the xUnit results formatter.
-                    if [[ "$(uname -s)" != "Darwin" ]] ; then
-                        # On non-Darwin, we ignore skipped tests entirely
-                        # so that they don't pollute our xUnit results with
-                        # non-actionable content.
-                        LLDB_FORMATTER_OPTS="${LLDB_FORMATTER_OPTS} -O-ndsym -O-rdebugserver -O-rlibc\\\\+\\\\+ -O-rlong.running -O-rbenchmarks -O-rrequires.one?.of.darwin"
-                    fi
-                fi
-
-                # Optionally specify a test subdirectory and category filters.
-                # Watchpoint testing is currently disabled: see rdar://38566150.
-                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-                    LLDB_TEST_SUBDIR_CLAUSE="--test-subdir lang/swift"
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint --skip-category=dwo"
-                else
-                    LLDB_TEST_SUBDIR_CLAUSE=""
-                    LLDB_TEST_CATEGORIES="--skip-category=watchpoint"
-                fi
-
-                # figure out which C/C++ compiler we should use for building test inferiors.
-                if [[ "${LLDB_TEST_CC}" == "host-toolchain" ]]; then
-                    # Use the host toolchain: i.e. the toolchain specified by HOST_CC
-                    LLDB_DOTEST_CC_OPTS="-C ${HOST_CC}"
-                elif [[ -n "${LLDB_TEST_CC}" ]]; then
-                    # Use exactly the compiler path specified by the user.
-                    LLDB_DOTEST_CC_OPTS="-C ${LLDB_TEST_CC}"
-                else
-                    # Use the clang that was just built in the tree.
-                    LLDB_DOTEST_CC_OPTS="-C $(build_directory $LOCAL_HOST llvm)"/bin/clang
-                fi
-
-                # If we need to use the system debugserver, do so explicitly.
-                if [[ "$(uname -s)" == "Darwin" && "${LLDB_USE_SYSTEM_DEBUGSERVER}" ]] ; then
-                    LLDB_TEST_DEBUG_SERVER="--server $(xcode-select -p)/../SharedFrameworks/LLDB.framework/Resources/debugserver --out-of-tree-debugserver"
-                else
-                    LLDB_TEST_DEBUG_SERVER=""
-                fi
-
-                # Options to find the just-built libddispatch and Foundation.
-                if [[ "$(uname -s)" == "Darwin" || "${SKIP_BUILD_FOUNDATION}" ]] ; then
-                    DOTEST_EXTRA=""
-                else
-                    # This assumes that there are no spaces in any on these paths.
-                    LIBDISPATCH_BUILD_DIR="$(build_directory ${host} libdispatch)"
-                    FOUNDATION_BUILD_DIR=$(build_directory ${host} foundation)
-                    DOTEST_EXTRA="-I${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xcc -F${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${FOUNDATION_BUILD_DIR}/swift"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -I${LIBDISPATCH_SOURCE_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${FOUNDATION_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -L${LIBDISPATCH_BUILD_DIR}/src"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}/src"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${LIBDISPATCH_BUILD_DIR}"
-                    DOTEST_EXTRA="${DOTEST_EXTRA} -Xlinker -rpath -Xlinker ${FOUNDATION_BUILD_DIR}"
-                fi
                 call mkdir -p "${results_dir}"
-
-                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
-                    LLDB_DOTEST_CC_OPTS="${LLDB_DOTEST_CC_OPTS} --filecheck $(build_directory $LOCAL_HOST llvm)/bin/FileCheck --dsymutil $(build_directory $LOCAL_HOST llvm)/bin/dsymutil"
-                fi
-
-                # Prefer to use lldb-dotest, as building it guarantees that we build all
-                # test dependencies. Ultimately we want to delete as much lldb-specific logic
-                # from this file as possible and just have a single call to lldb-dotest.
+                LLVM_LIT_ARG="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
                     LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -j $(sysctl hw.physicalcpu | awk -v N=${BUILD_JOBS} '{ print (N < $2) ? N : $2 }')"
                 fi
 
-		if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
-		    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
-		fi
+                if [[ "$(true_false ${LLDB_TEST_SWIFT_ONLY})" == "TRUE" ]]; then
+                    LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --filter=[sS]wift"
+                fi
 
                 # Record the times test took and report the slowest.
                 LLVM_LIT_ARGS="${LLVM_LIT_ARGS} -v --time-tests"
-                if [[ "$using_xcodebuild" == "FALSE" ]] ; then
-                    with_pushd ${lldb_build_dir} \
-                        call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
-                    with_pushd ${lldb_build_dir} \
-                        call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
-                    with_pushd ${results_dir} \
-                        call "${llvm_build_dir}/bin/llvm-lit" \
-                             "${lldb_build_dir}/lit" \
-                             ${LLVM_LIT_ARGS} \
-                             --xunit-xml-output=${results_dir}/results.xml \
-                             --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -t -E \"${DOTEST_EXTRA}\""
-                    if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
-                        echo "Running LLDB swift compatibility tests against" \
-                             "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                        with_pushd ${results_dir} \
-                           call "${llvm_build_dir}/bin/llvm-lit" \
-                                "${lldb_build_dir}/lit" \
-                                ${LLVM_LIT_ARGS} \
-                                --xunit-xml-output=${results_dir}/results.xml \
-                                --param dotest-args="--build-dir ${lldb_build_dir}/lldb-test-build.noindex ${LLDB_TEST_SUBDIR_CLAUSE} ${LLDB_TEST_CATEGORIES} -G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\" -t -E \"${DOTEST_EXTRA}\"" --filter=compat
-                    fi
-                else
-                    with_pushd "${results_dir}" \
-                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                        SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                        "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                        --executable "${lldb_executable}" \
-                        ${LLDB_TEST_DEBUG_SERVER} \
-                        ${LLDB_TEST_SUBDIR_CLAUSE} \
-                        ${LLDB_TEST_CATEGORIES} \
-                        ${LLDB_DOTEST_CC_OPTS} \
-                        ${LLDB_FORMATTER_OPTS} \
-                        --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                        -t -E "${DOTEST_EXTRA}"
-                    if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
-                        echo "Running LLDB swift compatibility tests against" \
-                             "${LLDB_TEST_SWIFT_COMPATIBILITY}"
-                        call env SWIFTC="$(build_directory $LOCAL_HOST swift)/bin/swiftc" \
-                             SWIFTLIBS="${swift_build_dir}/lib/swift" \
-                             "${LLDB_SOURCE_DIR}"/test/dotest.py \
-                             --executable "${lldb_executable}" \
-                             ${LLDB_TEST_DEBUG_SERVER} \
-                             ${LLDB_TEST_SUBDIR_CLAUSE} \
-                             ${LLDB_TEST_CATEGORIES} \
-                             ${LLDB_DOTEST_CC_OPTS} \
-                             ${LLDB_FORMATTER_OPTS} \
-                             --build-dir "${lldb_build_dir}/lldb-test-build.noindex" \
-                             -G swift-history \
-                             --swift-compiler "${LLDB_TEST_SWIFT_COMPATIBILITY}" \
-                             -t -E "${DOTEST_EXTRA}"
-                    fi
-                fi
 
+                with_pushd ${lldb_build_dir} \
+                    call ${NINJA_BIN} -j ${BUILD_JOBS} unittests/LLDBUnitTests
+                with_pushd ${lldb_build_dir} \
+                    call ${NINJA_BIN} -j ${BUILD_JOBS} lldb-test-deps
+                with_pushd ${results_dir} \
+                    call "${llvm_build_dir}/bin/llvm-lit" \
+                         "${lldb_build_dir}/lit" \
+                         ${LLVM_LIT_ARGS}
+
+                if [[ -x "${LLDB_TEST_SWIFT_COMPATIBILITY}" ]] ; then
+                    echo "Running LLDB swift compatibility tests against" \
+                         "${LLDB_TEST_SWIFT_COMPATIBILITY}"
+                    DOTEST_ARGS="-G swift-history --swift-compiler \"${LLDB_TEST_SWIFT_COMPATIBILITY}\""
+                    with_pushd ${results_dir} \
+                       call "${llvm_build_dir}/bin/llvm-lit" \
+                            "${lldb_build_dir}/lit" \
+                            ${LLVM_LIT_ARGS} \
+                            --param dotest-args="${DOTEST_ARGS}" \
+                            --filter=compat
+                fi
                 continue
                 ;;
             llbuild)
@@ -3370,6 +3203,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   -DCMAKE_C_COMPILER:PATH=${LLVM_BIN}/clang
                   -DCMAKE_CXX_COMPILER:PATH=${LLVM_BIN}/clang++
                   -DCMAKE_SWIFT_COMPILER:PATH=${SWIFTC_BIN}
+                  -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}
                   -DCMAKE_INSTALL_PREFIX:PATH=$(get_host_install_prefix ${host})
 
                   ${LIBICU_BUILD_ARGS[@]}
@@ -3580,25 +3414,6 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [[ -z "${INSTALL_DESTDIR}" ]] ; then
                     echo "--install-destdir is required to install products."
                     exit 1
-                fi
-                if [[ "$using_xcodebuild" == "TRUE" ]] ; then
-                    case ${host} in
-                        linux-*)
-                        ;;
-                        freebsd-*)
-                        ;;
-                        cygwin-*)
-                        ;;
-                        haiku-*)
-                        ;;
-                        macosx-*)
-                            set_lldb_xcodebuild_options
-                            set_lldb_build_mode
-                            with_pushd ${LLDB_SOURCE_DIR} \
-                                       call xcodebuild -target toolchain -configuration ${LLDB_BUILD_MODE} install ${lldb_xcodebuild_options[@]} DSTROOT="${host_install_destdir}" LLDB_TOOLCHAIN_PREFIX="${TOOLCHAIN_PREFIX}"
-                            continue
-                        ;;
-                    esac
                 fi
                 ;;
             swiftpm)

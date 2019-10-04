@@ -166,9 +166,11 @@ protected:
   /// `x.foo` or `x[0]` extract and return its base expression.
   Expr *getBaseExprFor(Expr *anchor) const;
 
-  /// \returns An argument expression if given anchor is a call, member
-  /// reference or subscript, nullptr otherwise.
-  Expr *getArgumentExprFor(Expr *anchor) const;
+  /// For a given locator describing an argument application, or a constraint
+  /// within an argument application, returns the argument list for that
+  /// application. If the locator is not for an argument application, or
+  /// the argument list cannot be found, returns \c nullptr.
+  Expr *getArgumentListExprFor(ConstraintLocator *locator) const;
 
   /// \returns The overload choice made by the constraint system for the callee
   /// of a given locator's anchor, or \c None if no such choice can be found.
@@ -210,7 +212,7 @@ protected:
   /// The source of the requirement, if available. One exception
   /// is failure associated with conditional requirement where
   /// underlying conformance is specialized.
-  const GenericSignature *Signature;
+  GenericSignature Signature;
 
   const ValueDecl *AffectedDecl;
   /// If possible, find application expression associated
@@ -299,7 +301,7 @@ private:
   ValueDecl *getDeclRef() const;
 
   /// Retrieve generic signature where this parameter originates from.
-  GenericSignature *getSignature(ConstraintLocator *locator);
+  GenericSignature getSignature(ConstraintLocator *locator);
 
   void emitRequirementNote(const Decl *anchor, Type lhs, Type rhs) const;
 

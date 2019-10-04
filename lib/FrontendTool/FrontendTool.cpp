@@ -406,7 +406,8 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
   if (!OS) return true;
   SM.print(*OS, EmitVerboseSIL, M, SortSIL);
-  return false;
+
+  return M->getASTContext().hadError();
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,

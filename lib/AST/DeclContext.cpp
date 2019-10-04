@@ -154,7 +154,7 @@ unsigned DeclContext::getGenericContextDepth() const {
   return depth;
 }
 
-GenericSignature *DeclContext::getGenericSignatureOfContext() const {
+GenericSignature DeclContext::getGenericSignatureOfContext() const {
   auto dc = this;
   do {
     if (auto decl = dc->getAsDecl())
@@ -487,6 +487,10 @@ bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
       return PD->getAttrs().hasAttribute<ObjCAttr>();
 
   return false;
+}
+
+bool DeclContext::canBeParentOfExtension() const {
+  return isa<SourceFile>(this);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {

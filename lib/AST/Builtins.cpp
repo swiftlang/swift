@@ -162,7 +162,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
         ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), Identifier(), DC);
     PD->setInterfaceType(argType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -179,7 +178,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->computeType(Info);
-  FD->setValidationToChecked();
   FD->setImplicit();
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -191,7 +189,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericSignature *Sig) {
+                          GenericSignature Sig) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -209,7 +207,6 @@ getBuiltinGenericFunction(Identifier Id,
                                       Identifier(), SourceLoc(),
                                       Identifier(), DC);
     PD->setInterfaceType(paramIfaceType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -228,7 +225,6 @@ getBuiltinGenericFunction(Identifier Id,
 
   func->setGenericSignature(Sig);
   func->computeType();
-  func->setValidationToChecked();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
 
@@ -457,7 +453,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericSignature *GenericSig = nullptr;
+    GenericSignature GenericSig = GenericSignature();
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -477,7 +473,7 @@ namespace {
           ctx.evaluator,
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
-          nullptr);
+          GenericSignature());
     }
 
     template <class G>
@@ -1378,6 +1374,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
+  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
     // These types cannot be expressed in swift yet.
     return Type();

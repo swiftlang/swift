@@ -902,7 +902,7 @@ public:
       }
     }
 
-    auto *locator = CS.getConstraintLocator(anchor);
+    auto *locator = CS.getConstraintLocator(Locator);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
     CS.recordFix(fix);
     // Re-labeling fixes with extraneous labels should take
@@ -995,7 +995,7 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
   auto isSynthesizedArgument = [](const AnyFunctionType::Param &arg) -> bool {
     if (auto *typeVar = arg.getPlainType()->getAs<TypeVariableType>()) {
       auto *locator = typeVar->getImpl().getLocator();
-      return locator->isLastElement(ConstraintLocator::SynthesizedArgument);
+      return locator->isLastElement<LocatorPathElt::SynthesizedArgument>();
     }
 
     return false;
@@ -3233,7 +3233,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           // TODO(diagnostics): Only binding here for function types, because
           // doing so for KeyPath types leaves the constraint system in an
           // unexpected state for key path diagnostics should we fail.
-          if (locator->isLastElement(ConstraintLocator::KeyPathType) &&
+          if (locator->isLastElement<LocatorPathElt::KeyPathType>() &&
               type2->is<AnyFunctionType>())
             return matchTypesBindTypeVar(typeVar1, type2, kind, flags, locator,
                                          formUnsolvedResult);

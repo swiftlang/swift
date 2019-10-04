@@ -64,7 +64,7 @@ TypeResolution TypeResolution::forInterface(DeclContext *dc,
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature *genericSig,
+                                            GenericSignature genericSig,
                                             LazyResolver *resolver) {
   TypeResolution result(dc, TypeResolutionStage::Interface);
   result.Resolver = resolver;
@@ -98,7 +98,7 @@ GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   return complete.builder;
 }
 
-GenericSignature *TypeResolution::getGenericSignature() const {
+GenericSignature TypeResolution::getGenericSignature() const {
   switch (stage) {
   case TypeResolutionStage::Contextual:
     return dc->getGenericSignatureOfContext();
@@ -214,22 +214,16 @@ Type TypeResolution::resolveDependentMemberType(
     ref->setValue(singleType, nullptr);
   }
 
+  auto *concrete = ref->getBoundDecl();
+
   // If the nested type has been resolved to an associated type, use it.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(ref->getBoundDecl())) {
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(concrete)) {
     return DependentMemberType::get(baseTy, assocType);
   }
 
   // Otherwise, the nested type comes from a concrete type,
   // or it's a typealias declared in protocol or protocol extension.
   // Substitute the base type into it.
-  auto concrete = ref->getBoundDecl();
-  if (!concrete->getInterfaceType()) {
-    ctx.Diags.diagnose(ref->getIdLoc(), diag::recursive_decl_reference,
-                       concrete->getDescriptiveKind(), concrete->getName());
-    concrete->diagnose(diag::kind_declared_here,
-                       DescriptiveDeclKind::Type);
-    return ErrorType::get(ctx);
-  }
 
   // Make sure that base type didn't get replaced along the way.
   assert(baseTy->isTypeParameter());
@@ -600,7 +594,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
         // extension.
         //
         // Get the superclass of the 'Self' type parameter.
-        auto *sig = foundDC->getGenericSignatureOfContext();
+        auto sig = foundDC->getGenericSignatureOfContext();
         if (!sig)
           return ErrorType::get(ctx);
         auto superclassType = sig->getSuperclassBound(selfType);
@@ -713,16 +707,6 @@ Type TypeChecker::applyGenericArguments(Type type,
     }  
   }
 
-  // Cannot extend a bound generic type.
-  if (options.is(TypeResolverContext::ExtensionBinding)) {
-    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
-      diags.diagnose(loc, diag::extension_specialization,
-               genericDecl->getName())
-        .highlight(generic->getSourceRange());
-    }
-    return ErrorType::get(ctx);
-  }
-
   // FIXME: More principled handling of circularity.
   if (!genericDecl->getGenericSignature()) {
     diags.diagnose(loc, diag::recursive_decl_reference,
@@ -771,7 +755,7 @@ Type TypeChecker::applyUnboundGenericArguments(
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
-  assert(genericSig != nullptr);
+  assert(!genericSig.isNull());
 
   TypeSubstitutionMap subs;
 
@@ -934,33 +918,6 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *foundDC, TypeResolution resolution,
                             GenericIdentTypeRepr *generic,
                             TypeResolutionOptions options) {
-  auto fromDC = resolution.getDeclContext();
-  assert(fromDC && "No declaration context for type resolution?");
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  auto &diags = ctx.Diags;
-
-  // Hack: Don't validate nested typealiases if we only need the structural
-  // type.
-  auto prevalidatingAlias = [](TypeDecl *typeDecl, TypeResolution res) {
-    return isa<TypeAliasDecl>(typeDecl)
-        && !typeDecl->hasInterfaceType()
-        && typeDecl->getDeclContext()->isTypeContext()
-        && res.getStage() == TypeResolutionStage::Structural;
-  };
-
-  // Don't validate nominal type declarations during extension binding.
-  if ((!options.is(TypeResolverContext::ExtensionBinding) ||
-       !isa<NominalTypeDecl>(typeDecl)) &&
-      !prevalidatingAlias(typeDecl, resolution)) {
-    // If we were not able to validate recursively, bail out.
-    if (!typeDecl->getInterfaceType()) {
-      diags.diagnose(loc, diag::recursive_decl_reference,
-                     typeDecl->getDescriptiveKind(), typeDecl->getName());
-      typeDecl->diagnose(diag::kind_declared_here, DescriptiveDeclKind::Type);
-      return ErrorType::get(ctx);
-    }
-  }
 
   // Resolve the type declaration to a specific type. How this occurs
   // depends on the current context and where the type was found.
@@ -971,11 +928,13 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, SourceLoc loc,
       !options.is(TypeResolverContext::TypeAliasDecl) &&
       !options.contains(TypeResolutionFlags::AllowUnboundGenerics)) {
     diagnoseUnboundGenericType(type, loc);
-    return ErrorType::get(ctx);
+    return ErrorType::get(typeDecl->getASTContext());
   }
 
   if (type->hasError() && foundDC &&
       (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
+    auto fromDC = resolution.getDeclContext();
+    assert(fromDC && "No declaration context for type resolution?");
     maybeDiagnoseBadConformanceRef(fromDC, foundDC->getDeclaredInterfaceType(),
                                    loc, typeDecl);
   }
@@ -3477,8 +3436,6 @@ public:
         T->setInvalid();
       }
     } else if (auto *alias = dyn_cast_or_null<TypeAliasDecl>(comp->getBoundDecl())) {
-      if (!alias->hasInterfaceType())
-        return;
       auto type = Type(alias->getDeclaredInterfaceType()->getDesugaredType());
       type.findIf([&](Type type) -> bool {
         if (T->isInvalid())

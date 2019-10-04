@@ -387,6 +387,18 @@ public:
           NumLowBitsAvailable
   };
 
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  SILInstruction *getDefiningInstruction() {
+    return Value->getDefiningInstruction();
+  }
+
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  const SILInstruction *getDefiningInstruction() const {
+    return Value->getDefiningInstruction();
+  }
+
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value
   /// without any Ownership Semantics.

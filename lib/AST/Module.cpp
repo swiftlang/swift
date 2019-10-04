@@ -103,7 +103,6 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
       TAD->setAccess(AccessLevel::Public);
-      TAD->setValidationToChecked();
       TAD->computeType();
       Entry = TAD;
     }
@@ -398,9 +397,6 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   ctx.addDestructorCleanup(*this);
   setImplicit();
   setInterfaceType(ModuleType::get(this));
-
-  // validateDecl() should return immediately given a ModuleDecl.
-  setValidationToChecked();
 
   setAccess(AccessLevel::Public);
 }

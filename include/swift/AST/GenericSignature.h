@@ -20,6 +20,7 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/AnyValue.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -77,7 +78,7 @@ private:
 
   ConformanceAccessPath(ArrayRef<Entry> path) : path(path) {}
 
-  friend class GenericSignature;
+  friend class GenericSignatureImpl;
 
 public:
   typedef const Entry *const_iterator;
@@ -91,13 +92,111 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dump() const, "only for use in a debugger");
 };
 
+class GenericSignatureImpl;
+class GenericTypeParamType;
+
 /// Describes the generic signature of a particular declaration, including
 /// both the generic type parameters and the requirements placed on those
 /// generic parameters.
-class alignas(1 << TypeAlignInBits) GenericSignature final
+class GenericSignature {
+  GenericSignatureImpl *Ptr;
+
+public:
+  /// Create a new generic signature with the given type parameters and
+  /// requirements.
+  static GenericSignature get(ArrayRef<GenericTypeParamType *> params,
+                              ArrayRef<Requirement> requirements,
+                              bool isKnownCanonical = false);
+  static GenericSignature get(TypeArrayView<GenericTypeParamType> params,
+                              ArrayRef<Requirement> requirements,
+                              bool isKnownCanonical = false);
+
+public:
+  static ASTContext &getASTContext(TypeArrayView<GenericTypeParamType> params,
+                                   ArrayRef<Requirement> requirements);
+
+public:
+  /*implicit*/ GenericSignature(GenericSignatureImpl *P = 0) : Ptr(P) {}
+
+  GenericSignatureImpl *getPointer() const { return Ptr; }
+
+  bool isNull() const { return Ptr == 0; }
+
+  GenericSignatureImpl *operator->() const { return Ptr; }
+
+  explicit operator bool() const { return Ptr != 0; }
+
+  /// Whether the given set of requirements involves a type variable.
+  static bool hasTypeVariable(ArrayRef<Requirement> requirements);
+
+  friend llvm::hash_code hash_value(GenericSignature sig) {
+    using llvm::hash_value;
+    return hash_value(sig.getPointer());
+  }
+
+  void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
+  void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
+  void dump() const;
+  std::string getAsString() const;
+
+  // Support for FoldingSet.
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &ID,
+                      TypeArrayView<GenericTypeParamType> genericParams,
+                      ArrayRef<Requirement> requirements);
+public:
+  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
+
+private:
+  // Direct comparison is disabled for generic signatures.  Canonicalize them
+  // first, or use isEqual.
+  void operator==(GenericSignature T) const = delete;
+  void operator!=(GenericSignature T) const = delete;
+};
+
+/// A reference to a canonical generic signature.
+class CanGenericSignature : public GenericSignature {
+  bool isActuallyCanonicalOrNull() const;
+
+public:
+  /// Create a new generic signature with the given type parameters and
+  /// requirements, first canonicalizing the types.
+  static CanGenericSignature
+  getCanonical(TypeArrayView<GenericTypeParamType> params,
+               ArrayRef<Requirement> requirements, bool skipValidation = false);
+
+public:
+  CanGenericSignature(std::nullptr_t) : GenericSignature(nullptr) {}
+
+  explicit CanGenericSignature(GenericSignatureImpl *P = 0)
+      : GenericSignature(P) {
+    assert(isActuallyCanonicalOrNull() &&
+           "Forming a CanGenericSignature out of a non-canonical signature!");
+  }
+  explicit CanGenericSignature(GenericSignature S) : GenericSignature(S) {
+    assert(isActuallyCanonicalOrNull() &&
+           "Forming a CanGenericSignature out of a non-canonical signature!");
+  }
+
+  ArrayRef<CanTypeWrapper<GenericTypeParamType>> getGenericParams() const;
+
+  bool operator==(CanGenericSignature S) const {
+    return getPointer() == S.getPointer();
+  }
+  bool operator!=(CanGenericSignature S) const { return !operator==(S); }
+};
+
+/// The underlying implementation of generic signatures.
+class alignas(1 << TypeAlignInBits) GenericSignatureImpl final
   : public llvm::FoldingSetNode,
-    private llvm::TrailingObjects<GenericSignature, Type, Requirement> {
+    private llvm::TrailingObjects<GenericSignatureImpl, Type, Requirement> {
+  friend class ASTContext;
+  friend GenericSignature;
   friend TrailingObjects;
+
+  GenericSignatureImpl(const GenericSignatureImpl&) = delete;
+  void operator=(const GenericSignatureImpl&) = delete;
 
   unsigned NumGenericParams;
   unsigned NumRequirements;
@@ -125,15 +224,14 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
     return {getTrailingObjects<Requirement>(), NumRequirements};
   }
 
-  GenericSignature(TypeArrayView<GenericTypeParamType> params,
-                   ArrayRef<Requirement> requirements,
-                   bool isKnownCanonical);
+  GenericSignatureImpl(TypeArrayView<GenericTypeParamType> params,
+                       ArrayRef<Requirement> requirements,
+                       bool isKnownCanonical);
 
-  mutable llvm::PointerUnion<GenericSignature *, ASTContext *>
+  // FIXME: Making this a CanGenericSignature reveals callers are violating
+  // the interface's invariants.
+  mutable llvm::PointerUnion<GenericSignatureImpl *, ASTContext *>
     CanonicalSignatureOrASTContext;
-  
-  static ASTContext &getASTContext(TypeArrayView<GenericTypeParamType> params,
-                                   ArrayRef<Requirement> requirements);
 
   void buildConformanceAccessPath(
       SmallVectorImpl<ConformanceAccessPath::Entry> &path,
@@ -145,25 +243,9 @@ class alignas(1 << TypeAlignInBits) GenericSignature final
   friend class ArchetypeType;
 
 public:
-  /// Create a new generic signature with the given type parameters and
-  /// requirements.
-  static GenericSignature *get(ArrayRef<GenericTypeParamType *> params,
-                               ArrayRef<Requirement> requirements,
-                               bool isKnownCanonical = false);
-  static GenericSignature *get(TypeArrayView<GenericTypeParamType> params,
-                               ArrayRef<Requirement> requirements,
-                               bool isKnownCanonical = false);
-
-  /// Create a new generic signature with the given type parameters and
-  /// requirements, first canonicalizing the types.
-  static CanGenericSignature getCanonical(
-                                     TypeArrayView<GenericTypeParamType> params,
-                                     ArrayRef<Requirement> requirements,
-                                     bool skipValidation = false);
-
   /// Retrieve the generic parameters.
   TypeArrayView<GenericTypeParamType> getGenericParams() const {
-    auto temp = const_cast<GenericSignature*>(this);
+    auto temp = const_cast<GenericSignatureImpl *>(this);
     return TypeArrayView<GenericTypeParamType>(temp->getGenericParamsBuffer());
   }
 
@@ -175,7 +257,7 @@ public:
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const {
-    return const_cast<GenericSignature *>(this)->getRequirementsBuffer();
+    return const_cast<GenericSignatureImpl *>(this)->getRequirementsBuffer();
   }
 
   /// Only allow allocation by doing a placement new.
@@ -210,6 +292,9 @@ public:
     return result;
   }
 
+  /// Return true if these two generic signatures are equal.
+  bool isEqual(GenericSignature Other);
+
   /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;
   
@@ -237,10 +322,9 @@ public:
   /// Determine the superclass bound on the given dependent type.
   Type getSuperclassBound(Type type);
 
-  using ConformsToArray = SmallVector<ProtocolDecl *, 2>;
   /// Determine the set of protocols to which the given dependent type
   /// must conform.
-  ConformsToArray getConformsTo(Type type);
+  GenericSignature::ConformsToArray getConformsTo(Type type);
 
   /// Determine whether the given dependent type conforms to this protocol.
   bool conformsToProtocol(Type type, ProtocolDecl *proto);
@@ -276,7 +360,7 @@ public:
   /// \param otherSig Another generic signature whose generic parameters are
   /// equivalent to or a subset of the generic parameters in this signature.
   SmallVector<Requirement, 4> requirementsNotSatisfiedBy(
-                                               GenericSignature *otherSig);
+                                               GenericSignature otherSig);
 
   /// Return the canonical version of the given type under this generic
   /// signature.
@@ -318,9 +402,6 @@ public:
   /// Whether this generic signature involves a type variable.
   bool hasTypeVariable() const;
 
-  /// Whether the given set of requirements involves a type variable.
-  static bool hasTypeVariable(ArrayRef<Requirement> requirements);
-
   static void Profile(llvm::FoldingSetNodeID &ID,
                       TypeArrayView<GenericTypeParamType> genericParams,
                       ArrayRef<Requirement> requirements);
@@ -330,16 +411,77 @@ public:
   void dump() const;
   std::string getAsString() const;
 };
-  
-inline
-CanGenericSignature::CanGenericSignature(GenericSignature *Signature)
-  : Signature(Signature)
-{
-  assert(!Signature || Signature->isCanonical());
+
+void simple_display(raw_ostream &out, GenericSignature sig);
+
+inline bool CanGenericSignature::isActuallyCanonicalOrNull() const {
+  return getPointer() == nullptr ||
+         getPointer() ==
+             llvm::DenseMapInfo<GenericSignatureImpl *>::getEmptyKey() ||
+         getPointer() ==
+             llvm::DenseMapInfo<GenericSignatureImpl *>::getTombstoneKey() ||
+         getPointer()->isCanonical();
 }
 
-void simple_display(raw_ostream &out, const GenericSignature *sig);
-
 } // end namespace swift
+
+namespace llvm {
+static inline raw_ostream &operator<<(raw_ostream &OS,
+                                      swift::GenericSignature Sig) {
+  Sig.print(OS);
+  return OS;
+}
+
+// A GenericSignature casts like a GenericSignatureImpl*.
+template <> struct simplify_type<const ::swift::GenericSignature> {
+  typedef ::swift::GenericSignatureImpl *SimpleType;
+  static SimpleType getSimplifiedValue(const ::swift::GenericSignature &Val) {
+    return Val.getPointer();
+  }
+};
+template <>
+struct simplify_type<::swift::GenericSignature>
+    : public simplify_type<const ::swift::GenericSignature> {};
+
+template <> struct DenseMapInfo<swift::GenericSignature> {
+  static swift::GenericSignature getEmptyKey() {
+    return llvm::DenseMapInfo<swift::GenericSignatureImpl *>::getEmptyKey();
+  }
+  static swift::GenericSignature getTombstoneKey() {
+    return llvm::DenseMapInfo<swift::GenericSignatureImpl *>::getTombstoneKey();
+  }
+  static unsigned getHashValue(swift::GenericSignature Val) {
+    return DenseMapInfo<swift::GenericSignatureImpl *>::getHashValue(
+        Val.getPointer());
+  }
+  static bool isEqual(swift::GenericSignature LHS,
+                      swift::GenericSignature RHS) {
+    return LHS.getPointer() == RHS.getPointer();
+  }
+};
+
+// A GenericSignature is "pointer like".
+template <> struct PointerLikeTypeTraits<swift::GenericSignature> {
+public:
+  static inline swift::GenericSignature getFromVoidPointer(void *P) {
+    return (swift::GenericSignatureImpl *)P;
+  }
+  static inline void *getAsVoidPointer(swift::GenericSignature S) {
+    return (void *)S.getPointer();
+  }
+  enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+};
+
+template <> struct PointerLikeTypeTraits<swift::CanGenericSignature> {
+public:
+  static inline swift::CanGenericSignature getFromVoidPointer(void *P) {
+    return swift::CanGenericSignature((swift::GenericSignatureImpl *)P);
+  }
+  static inline void *getAsVoidPointer(swift::CanGenericSignature S) {
+    return (void *)S.getPointer();
+  }
+  enum { NumLowBitsAvailable = swift::TypeAlignInBits };
+};
+} // end namespace llvm
 
 #endif // SWIFT_AST_GENERIC_SIGNATURE_H

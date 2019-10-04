@@ -338,7 +338,7 @@ void SILGenFunction::bindParametersForForwarding(const ParameterList *params,
 }
 
 static void emitCaptureArguments(SILGenFunction &SGF,
-                                 GenericSignature *origGenericSig,
+                                 GenericSignature origGenericSig,
                                  CapturedValue capture,
                                  uint16_t ArgNo) {
 
@@ -517,7 +517,7 @@ uint16_t SILGenFunction::emitProlog(ParameterList *paramList,
                                     bool throws,
                                     SourceLoc throwsLoc) {
   // Create the indirect result parameters.
-  auto *genericSig = DC->getGenericSignatureOfContext();
+  auto genericSig = DC->getGenericSignatureOfContext();
   resultType = resultType->getCanonicalType(genericSig);
 
   emitIndirectResultParameters(*this, resultType, DC);

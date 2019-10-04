@@ -94,18 +94,19 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
   return E ? E->getParentMap()[subExpr] : nullptr;
 }
 
-Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
-      return call->getArg();
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    return UME->getArgument();
-  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
-    return call->getArg();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
-    return SE->getIndex();
-  }
-  return nullptr;
+Expr *
+FailureDiagnostic::getArgumentListExprFor(ConstraintLocator *locator) const {
+  auto path = locator->getPath();
+  auto iter = path.begin();
+  if (!locator->findFirst<LocatorPathElt::ApplyArgument>(iter))
+    return nullptr;
+
+  // Form a new locator that ends at the ApplyArgument element, then simplify
+  // to get the argument list.
+  auto newPath = ArrayRef<LocatorPathElt>(path.begin(), iter + 1);
+  auto &cs = getConstraintSystem();
+  auto argListLoc = cs.getConstraintLocator(locator->getAnchor(), newPath);
+  return simplifyLocatorToAnchor(argListLoc);
 }
 
 Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
@@ -388,7 +389,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
       do {
         if (auto *parent = DC->getAsDecl()) {
           if (auto *GC = parent->getAsGenericContext()) {
-            if (GC->getGenericSignature() != Signature)
+            // FIXME: Is this intending an exact match?
+            if (GC->getGenericSignature().getPointer() != Signature.getPointer())
               continue;
 
             // If this is a signature if an extension
@@ -410,7 +412,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   return getAffectedDeclFromType(getOwnerType());
 }
 
-GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
+GenericSignature RequirementFailure::getSignature(ConstraintLocator *locator) {
   if (isConditional())
     return Conformance->getGenericSignature();
 
@@ -436,7 +438,7 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   auto *DC = AffectedDecl->getDeclContext();
 
   do {
-    if (auto *sig = DC->getGenericSignatureOfContext()) {
+    if (auto sig = DC->getGenericSignatureOfContext()) {
       if (sig->isRequirementSatisfied(req))
         return DC;
     }
@@ -767,8 +769,8 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   // to parameter conversions, let's use parameter type as a source of
   // generic parameter information.
   auto paramSourceTy =
-      locator->isLastElement(ConstraintLocator::ApplyArgToParam) ? getRequired()
-                                                                 : getActual();
+      locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ? getRequired()
+                                                                : getActual();
 
   auto genericTypeDecl = paramSourceTy->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
@@ -835,21 +837,18 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 }
 
 bool LabelingFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
-  auto *anchor = getRawAnchor();
-
-  auto *argExpr = getArgumentExprFor(anchor);
+  auto *argExpr = getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
+  auto &cs = getConstraintSystem();
+  auto *anchor = getRawAnchor();
   return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
                                     isa<SubscriptExpr>(anchor));
 }
 
 bool LabelingFailure::diagnoseAsNote() {
-  auto *anchor = getRawAnchor();
-
-  auto *argExpr = getArgumentExprFor(anchor);
+  auto *argExpr = getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
@@ -1246,7 +1245,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   // r-value adjustment because base could be an l-value type.
   // We want to fix both cases by only diagnose one of them,
   // otherwise this is just going to result in a duplcate diagnostic.
-  if (getLocator()->isLastElement(ConstraintLocator::UnresolvedMember))
+  if (getLocator()->isLastElement<LocatorPathElt::UnresolvedMember>())
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
@@ -2035,7 +2034,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 
   Optional<ContextualTypePurpose> CTP;
   // Easy case were failure has been identified as contextual already.
-  if (locator->isLastElement(ConstraintLocator::ContextualType)) {
+  if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     CTP = getContextualTypePurpose();
   } else {
     // Here we need to figure out where where `nil` is located.
@@ -3596,7 +3595,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   //
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
-  if (locator->isLastElement(ConstraintLocator::ApplyArgToParam)) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     auto info = *getFunctionArgApplyInfo(locator);
 
     auto *argExpr = info.getArgExpr();
@@ -3612,7 +3611,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // func foo() {}
   // let _: (Int) -> Void = foo
   // ```
-  if (locator->isLastElement(ConstraintLocator::ContextualType)) {
+  if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     auto &cs = getConstraintSystem();
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
                    getType(anchor), resolveType(cs.getContextualType()));
@@ -3885,7 +3884,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
 
 bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   auto *locator = getLocator();
-  if (!locator->isLastElement(ConstraintLocator::ApplyArgument))
+  if (!locator->isLastElement<LocatorPathElt::ApplyArgument>())
     return false;
 
   if (SynthesizedArgs.size() < 2)
@@ -4180,7 +4179,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
 
 bool OutOfOrderArgumentFailure::diagnoseAsError() {
   auto *anchor = getRawAnchor();
-  auto *argExpr = isa<TupleExpr>(anchor) ? anchor : getArgumentExprFor(anchor);
+  auto *argExpr = isa<TupleExpr>(anchor) ? anchor
+                                         : getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
@@ -4829,7 +4829,7 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
 
   auto *choice = selectedOverload->choice.getDecl();
 
-  auto *argExpr = getArgumentExprFor(getRawAnchor());
+  auto *argExpr = getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 

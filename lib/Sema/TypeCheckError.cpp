@@ -1662,11 +1662,9 @@ void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
 /// ensures correctness if those restrictions are ever loosened,
 /// perhaps accidentally, and (2) allows the verifier to assert that
 /// all calls have been checked.
-void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
-  if (auto *rawValue = elt->getRawValueExpr()) {
-    CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
-    rawValue->walk(checker);
-  }
+void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt, Expr *E) {
+  CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
+  E->walk(checker);
 }
 
 void TypeChecker::checkPropertyWrapperErrorHandling(

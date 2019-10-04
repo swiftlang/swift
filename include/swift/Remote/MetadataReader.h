@@ -22,6 +22,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/ABI/TypeIdentity.h"
@@ -181,6 +182,75 @@ private:
     std::unique_ptr<const TargetContextDescriptor<Runtime>,
                     delete_with_free>;
 
+  /// A reference to a context descriptor that may be in an unloaded image.
+  class ParentContextDescriptorRef {
+    bool IsResolved;
+    using Payloads = ExternalUnionMembers<std::string, ContextDescriptorRef>;
+    static typename Payloads::Index getPayloadIndex(bool IsResolved) {
+      return IsResolved ? Payloads::template indexOf<ContextDescriptorRef>()
+                        : Payloads::template indexOf<std::string>();
+    }
+    
+    ExternalUnion<bool, Payloads, getPayloadIndex> Payload;
+    
+  public:
+    explicit ParentContextDescriptorRef(StringRef Symbol)
+      : IsResolved(false)
+    {
+      Payload.template emplace<std::string>(IsResolved, Symbol);
+    }
+    
+    explicit ParentContextDescriptorRef(ContextDescriptorRef Resolved)
+      : IsResolved(true)
+    {
+      Payload.template emplace<ContextDescriptorRef>(IsResolved, Resolved);
+    }
+    
+    ParentContextDescriptorRef()
+      : ParentContextDescriptorRef(ContextDescriptorRef())
+    {}
+    
+    ParentContextDescriptorRef(const ParentContextDescriptorRef &o)
+      : IsResolved(o.IsResolved)
+    {
+      Payload.copyConstruct(IsResolved, o.Payload);
+    }
+    
+    ParentContextDescriptorRef(ParentContextDescriptorRef &&o)
+      : IsResolved(o.IsResolved)
+    {
+      Payload.moveConstruct(IsResolved, std::move(o.Payload));
+    }
+    
+    ~ParentContextDescriptorRef() {
+      Payload.destruct(IsResolved);
+    }
+
+    ParentContextDescriptorRef &operator=(const ParentContextDescriptorRef &o) {
+      Payload.copyAssign(IsResolved, o.IsResolved, o.Payload);
+      IsResolved = o.isResolved();
+      return *this;
+    }
+    ParentContextDescriptorRef &operator=(ParentContextDescriptorRef &&o) {
+      Payload.moveAssign(IsResolved, o.IsResolved, std::move(o.Payload));
+      IsResolved = o.isResolved();
+      return *this;
+    }
+
+    bool isResolved() const { return IsResolved; }
+    
+    StringRef getSymbol() const {
+      return Payload.template get<std::string>(IsResolved);
+    }
+    
+    ContextDescriptorRef getResolved() const {
+      return Payload.template get<ContextDescriptorRef>(IsResolved);
+    }
+
+    explicit operator bool() const {
+      return !isResolved() || getResolved();
+    }
+  };
   /// A cache of read nominal type descriptors, keyed by the address of the
   /// nominal type descriptor.
   std::unordered_map<StoredPointer, OwnedContextDescriptorRef>
@@ -310,30 +380,34 @@ public:
       auto remoteAddress =
         mangledName.getAddressData() + offsetInMangledName + offset;
 
+      RemoteAbsolutePointer resolved;
       if (directness == Directness::Indirect) {
-        if (auto indirectAddress = readPointerValue(remoteAddress)) {
-          remoteAddress = *indirectAddress;
+        if (auto indirectAddress = readPointer(remoteAddress)) {
+          resolved = *indirectAddress;
         } else {
           return nullptr;
         }
+      } else {
+        resolved = RemoteAbsolutePointer("", remoteAddress);
       }
 
       switch (kind) {
       case Demangle::SymbolicReferenceKind::Context: {
-          auto context = readContextDescriptor(remoteAddress);
-          if (!context)
-            return nullptr;
-          // Try to preserve a reference to an OpaqueTypeDescriptor
-          // symbolically, since we'd like to read out and resolve the type ref
-          // to the underlying type if available.
-          if (useOpaqueTypeSymbolicReferences
-              && context->getKind() == ContextDescriptorKind::OpaqueType) {
-            return dem.createNode(
-                              Node::Kind::OpaqueTypeDescriptorSymbolicReference,
-                              context.getAddressData());
-          }
-            
-          return buildContextMangling(context, dem);
+        auto context = readContextDescriptor(resolved);
+        if (!context)
+          return nullptr;
+        // Try to preserve a reference to an OpaqueTypeDescriptor
+        // symbolically, since we'd like to read out and resolve the type ref
+        // to the underlying type if available.
+        if (useOpaqueTypeSymbolicReferences
+           && context.isResolved()
+           && context.getResolved()->getKind() == ContextDescriptorKind::OpaqueType){
+          return dem.createNode(
+                            Node::Kind::OpaqueTypeDescriptorSymbolicReference,
+                            context.getResolved().getAddressData());
+        }
+          
+        return buildContextMangling(context, dem);
       }
       case Demangle::SymbolicReferenceKind::AccessorFunctionReference: {
         // The symbolic reference points at a resolver function, but we can't
@@ -424,14 +498,6 @@ public:
       return None;
 
     return start;
-  }
-
-  /// Given a pointer to an address, attemp to read the pointer value.
-  Optional<StoredPointer> readPointerValue(StoredPointer Address) {
-    StoredPointer PointerVal;
-    if (!Reader->readInteger(RemoteAddress(Address), &PointerVal))
-      return None;
-    return Optional<StoredPointer>(PointerVal);
   }
 
   /// Given a pointer to the metadata, attempt to read the value
@@ -821,6 +887,23 @@ public:
       Dem.demangleSymbol(StringRef(MangledTypeName, Length));
     return decodeMangledType(Demangled);
   }
+
+  /// Given the address of a context descriptor, attempt to read it, or
+  /// represent it symbolically.
+  ParentContextDescriptorRef
+  readContextDescriptor(const RemoteAbsolutePointer &address) {
+    // Map an unresolved pointer to an unresolved context ref.
+    if (!address.isResolved()) {
+      // We can only handle references to a symbol without an offset currently.
+      if (address.getOffset() != 0) {
+        return ParentContextDescriptorRef();
+      }
+      return ParentContextDescriptorRef(address.getSymbol());
+    }
+    
+    return ParentContextDescriptorRef(
+          readContextDescriptor(address.getResolvedAddress().getAddressData()));
+  }
   
   /// Given the address of a context descriptor, attempt to read it.
   ContextDescriptorRef
@@ -954,6 +1037,44 @@ public:
     return ContextDescriptorRef(address, descriptor);
   }
   
+  /// Demangle the entity represented by a symbolic reference to a given symbol name.
+  Demangle::NodePointer
+  buildContextManglingForSymbol(StringRef symbol, Demangler &dem) {
+    auto demangledSymbol = dem.demangleSymbol(symbol);
+    if (demangledSymbol->getKind() == Demangle::Node::Kind::Global) {
+      demangledSymbol = demangledSymbol->getChild(0);
+    }
+    
+    switch (demangledSymbol->getKind()) {
+    // Pointers to nominal type or protocol descriptors would demangle to
+    // the type they represent.
+    case Demangle::Node::Kind::NominalTypeDescriptor:
+    case Demangle::Node::Kind::ProtocolDescriptor:
+      demangledSymbol = demangledSymbol->getChild(0);
+      assert(demangledSymbol->getKind() == Demangle::Node::Kind::Type);
+      break;
+    // We don't handle pointers to other symbols yet.
+    // TODO: Opaque type descriptors could be useful.
+    default:
+      return nullptr;
+    }
+    return demangledSymbol;
+  }
+  
+  /// Given a read context descriptor, attempt to build a demangling tree
+  /// for it.
+  Demangle::NodePointer
+  buildContextMangling(const ParentContextDescriptorRef &descriptor,
+                       Demangler &dem) {
+    if (descriptor.isResolved()) {
+      return buildContextMangling(descriptor.getResolved(), dem);
+    }
+
+    // Try to demangle the symbol name to figure out what context it would
+    // point to.
+    return buildContextManglingForSymbol(descriptor.getSymbol(), dem);
+  }
+
   /// Given a read context descriptor, attempt to build a demangling tree
   /// for it.
   Demangle::NodePointer
@@ -1331,47 +1452,40 @@ public:
     auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
     return heapMeta->OffsetToFirstCapture;
   }
+  
+  Optional<RemoteAbsolutePointer> readPointer(StoredPointer address) {
+    return Reader->readPointer(RemoteAddress(address), sizeof(StoredPointer));
+  }
+  
+  Optional<StoredPointer> readResolvedPointerValue(StoredPointer address) {
+    if (auto pointer = readPointer(address)) {
+      if (!pointer->isResolved())
+        return None;
+      return (StoredPointer)pointer->getResolvedAddress().getAddressData();
+    }
+    return None;
+  }
+  
+  template<typename T, typename U>
+  RemoteAbsolutePointer resolvePointerField(RemoteRef<T> base,
+                                            const U &field) {
+    auto pointerRef = base.getField(field);
+    return Reader->resolvePointer(RemoteAddress(getAddress(pointerRef)),
+                                  *pointerRef.getLocalBuffer());
+  }
 
   /// Given a remote pointer to class metadata, attempt to read its superclass.
-  Optional<StoredPointer>
+  Optional<RemoteAbsolutePointer>
   readCaptureDescriptorFromMetadata(StoredPointer MetadataAddress) {
     auto meta = readMetadata(MetadataAddress);
     if (!meta || meta->getKind() != MetadataKind::HeapLocalVariable)
       return None;
 
     auto heapMeta = cast<TargetHeapLocalVariableMetadata<Runtime>>(meta);
-    return heapMeta->CaptureDescription;
+    return resolvePointerField(meta, heapMeta->CaptureDescription);
   }
 
 protected:
-  template<typename Offset>
-  Optional<StoredPointer>
-  resolveNullableRelativeIndirectableOffset(StoredPointer targetAddress) {
-    Offset relative;
-    if (!Reader->readInteger(RemoteAddress(targetAddress), &relative))
-      return None;
-    if (relative == 0)
-      return 0;
-    bool indirect = relative & 1;
-    relative &= ~1u;
-    
-    using SignedOffset = typename std::make_signed<Offset>::type;
-    using SignedPointer = typename std::make_signed<StoredPointer>::type;
-    auto signext = (SignedPointer)(SignedOffset)relative;
-    
-    StoredPointer resultAddress = targetAddress + signext;
-    
-    // Low bit set in the offset indicates that the offset leads to the absolute
-    // address in memory.
-    if (indirect) {
-      if (!Reader->readBytes(RemoteAddress(resultAddress),
-                             (uint8_t *)&resultAddress,
-                             sizeof(StoredPointer)))
-        return None;
-    }
-    return resultAddress;
-  }
-
   template<typename Base>
   StoredPointer getAddress(RemoteRef<Base> base) {
     return (StoredPointer)base.getAddressData();
@@ -1384,14 +1498,14 @@ protected:
   }
   
   template<typename Base, typename Field>
-  Optional<StoredPointer> resolveRelativeIndirectableField(
+  Optional<RemoteAbsolutePointer> resolveRelativeIndirectableField(
                             RemoteRef<Base> base, const Field &field) {
     auto fieldRef = base.getField(field);
     int32_t offset;
     memcpy(&offset, fieldRef.getLocalBuffer(), sizeof(int32_t));
     
     if (offset == 0)
-      return 0;
+      return Optional<RemoteAbsolutePointer>(nullptr);
     bool indirect = offset & 1;
     offset &= ~1u;
     
@@ -1402,14 +1516,10 @@ protected:
     // Low bit set in the offset indicates that the offset leads to the absolute
     // address in memory.
     if (indirect) {
-      if (!Reader->readBytes(RemoteAddress(resultAddress),
-                             (uint8_t *)&resultAddress,
-                             sizeof(StoredPointer))) {
-        return None;
-      }
+      return readPointer(resultAddress);
     }
     
-    return resultAddress;
+    return RemoteAbsolutePointer("", resultAddress);
   }
 
   /// Given a pointer to an Objective-C class, try to read its class name.
@@ -1612,17 +1722,26 @@ private:
     }
   }
   
-  /// Returns Optional(nullptr) if there's no parent descriptor.
+  /// Returns Optional(ParentContextDescriptorRef()) if there's no parent descriptor.
   /// Returns None if there was an error reading the parent descriptor.
-  Optional<ContextDescriptorRef>
+  Optional<ParentContextDescriptorRef>
   readParentContextDescriptor(ContextDescriptorRef base) {
     auto parentAddress = resolveRelativeIndirectableField(base, base->Parent);
     if (!parentAddress)
       return None;
-    if (!*parentAddress)
-      return ContextDescriptorRef(nullptr);
-    if (auto parentDescriptor = readContextDescriptor(*parentAddress))
-      return parentDescriptor;
+    if (!parentAddress->isResolved()) {
+      // Currently we can only handle references directly to a symbol without
+      // an offset.
+      if (parentAddress->getOffset() != 0) {
+        return None;
+      }
+      return ParentContextDescriptorRef(parentAddress->getSymbol());
+    }
+    auto addr = parentAddress->getResolvedAddress();
+    if (!addr)
+      return ParentContextDescriptorRef();
+    if (auto parentDescriptor = readContextDescriptor(addr.getAddressData()))
+      return ParentContextDescriptorRef(parentDescriptor);
     return None;
   }
 
@@ -1807,13 +1926,20 @@ private:
   /// produce a mangled node describing the name of \c context.
   Demangle::NodePointer
   adoptAnonymousContextName(ContextDescriptorRef contextRef,
-                            Optional<ContextDescriptorRef> &parentContextRef,
-                            Demangler &dem,
-                            Demangle::NodePointer &outerNode) {
+                        Optional<ParentContextDescriptorRef> &parentContextRef,
+                        Demangler &dem,
+                        Demangle::NodePointer &outerNode) {
     outerNode = nullptr;
 
-    if (!parentContextRef || !*parentContextRef)
+    // Bail if there is no parent, or if the parent is in another image.
+    // (Anonymous contexts should always be emitted in the same image as their
+    // children.)
+    if (!parentContextRef
+        || !*parentContextRef
+        || !parentContextRef->isResolved())
       return nullptr;
+    
+    auto parentContextLocalRef = parentContextRef->getResolved();
 
     auto context = contextRef.getLocalBuffer();
     auto typeContext = dyn_cast<TargetTypeContextDescriptor<Runtime>>(context);
@@ -1822,11 +1948,11 @@ private:
       return nullptr;
 
     auto anonymousParent = dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
-            parentContextRef->getLocalBuffer());
+            parentContextLocalRef.getLocalBuffer());
     if (!anonymousParent)
       return nullptr;
 
-    auto mangledNode = demangleAnonymousContextName(*parentContextRef, dem);
+    auto mangledNode = demangleAnonymousContextName(parentContextLocalRef, dem);
     if (!mangledNode)
       return nullptr;
 
@@ -1863,7 +1989,7 @@ private:
 
     // We have a match. Update the parent context to skip the anonymous
     // context entirely.
-    parentContextRef = readParentContextDescriptor(*parentContextRef);
+    parentContextRef = readParentContextDescriptor(parentContextLocalRef);
 
     // The outer node is the first child.
     outerNode = mangledNode->getChild(0);
@@ -1912,6 +2038,26 @@ private:
       resultAddress |= 0x1;
 
     return resultAddress;
+  }
+
+  Demangle::NodePointer
+  buildContextDescriptorMangling(const ParentContextDescriptorRef &descriptor,
+                                 Demangler &dem) {
+    if (descriptor.isResolved()) {
+      return buildContextDescriptorMangling(descriptor.getResolved(), dem);
+    }
+    
+    // Try to demangle the symbol name to figure out what context it would
+    // point to.
+    auto demangledSymbol = buildContextManglingForSymbol(descriptor.getSymbol(),
+                                                         dem);
+    if (!demangledSymbol)
+      return nullptr;
+    // Look through Type notes since we're building up a mangling here.
+    if (demangledSymbol->getKind() == Demangle::Node::Kind::Type){
+      demangledSymbol = demangledSymbol->getChild(0);
+    }
+    return demangledSymbol;
   }
 
   Demangle::NodePointer
@@ -2184,17 +2330,13 @@ private:
     case ContextDescriptorKind::OpaqueType: {
       // The opaque type may have a named anonymous context for us to map
       // back to its defining decl.
-      if (!parentDescriptorResult)
-        return nullptr;
-      
-      auto anonymous =
-        dyn_cast_or_null<TargetAnonymousContextDescriptor<Runtime>>(
-                                    parentDescriptorResult->getLocalBuffer());
-      if (!anonymous)
+      if (!parentDescriptorResult
+          || !*parentDescriptorResult
+          || !parentDescriptorResult->isResolved())
         return nullptr;
       
       auto mangledNode =
-                    demangleAnonymousContextName(*parentDescriptorResult, dem);
+       demangleAnonymousContextName(parentDescriptorResult->getResolved(), dem);
       if (!mangledNode)
         return nullptr;
       if (mangledNode->getKind() == Node::Kind::Global)

@@ -529,7 +529,7 @@ LocalDeclContextID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
 }
 
 GenericSignatureID
-Serializer::addGenericSignatureRef(const GenericSignature *sig) {
+Serializer::addGenericSignatureRef(GenericSignature sig) {
   if (!sig)
     return 0;
   return GenericSignaturesToSerialize.addRef(sig);
@@ -1170,7 +1170,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
-void Serializer::writeASTBlockEntity(const GenericSignature *sig) {
+void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
   assert(sig);
@@ -3342,7 +3342,7 @@ public:
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       rawValueKind = EnumElementRawValueKind::IntegerLiteral;
-      auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
+      auto ILE = cast<IntegerLiteralExpr>(elem->getStructuralRawValueExpr());
       RawValueText = ILE->getDigitsText();
       isNegative = ILE->isNegative();
       isRawValueImplicit = ILE->isImplicit();
@@ -3896,7 +3896,7 @@ public:
     using namespace decls_block;
     assert(!fnTy->isNoEscape());
 
-    auto *genericSig = fnTy->getGenericSignature();
+    auto genericSig = fnTy->getGenericSignature();
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),

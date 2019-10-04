@@ -357,7 +357,7 @@ public:
 
   /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
-  GenericSignature *getGenericSignatureOfContext() const;
+  GenericSignature getGenericSignatureOfContext() const;
 
   /// Retrieve the innermost archetypes of this context or any
   /// of its parents.
@@ -469,6 +469,10 @@ public:
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;
+
+  /// Extensions are only allowed at the level in a file
+  /// FIXME: do this for Protocols, too someday
+  bool canBeParentOfExtension() const;
 
   /// Returns true if lookups within this context could affect downstream files.
   ///

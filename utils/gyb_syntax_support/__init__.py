@@ -156,7 +156,7 @@ def create_node_map():
     """
     Creates a lookup table to find nodes by their kind.
     """
-    return {node.syntax_kind: node for node in SYNTAX_NODES}
+    return {node.syntax_kind: node for node in SYNTAX_NODES + PARSEONLY_NODES}
 
 
 def is_visitable(node):

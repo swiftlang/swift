@@ -1126,7 +1126,7 @@ SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause,
                                bool exported,
                                SpecializationKind kind,
-                               GenericSignature *specializedSignature)
+                               GenericSignature specializedSignature)
     : DeclAttribute(DAK_Specialize, atLoc, range,
                     /*Implicit=*/clause == nullptr),
       trailingWhereClause(clause),
@@ -1144,7 +1144,7 @@ SpecializeAttr *SpecializeAttr::create(ASTContext &Ctx, SourceLoc atLoc,
                                        TrailingWhereClause *clause,
                                        bool exported,
                                        SpecializationKind kind,
-                                       GenericSignature *specializedSignature) {
+                                       GenericSignature specializedSignature) {
   return new (Ctx) SpecializeAttr(atLoc, range, clause, exported, kind,
                                   specializedSignature);
 }

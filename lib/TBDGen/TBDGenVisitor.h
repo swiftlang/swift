@@ -29,8 +29,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/Triple.h"
-
-#include "tapi/InterfaceFile.h"
+#include "llvm/TextAPI/MachO/InterfaceFile.h"
 
 using namespace swift::irgen;
 using StringSet = llvm::StringSet<>;
@@ -43,8 +42,8 @@ namespace tbdgen {
 
 class TBDGenVisitor : public ASTVisitor<TBDGenVisitor> {
 public:
-  tapi::internal::InterfaceFile &Symbols;
-  tapi::internal::ArchitectureSet Archs;
+  llvm::MachO::InterfaceFile &Symbols;
+  llvm::MachO::ArchitectureSet Archs;
   StringSet *StringSymbols;
 
   const UniversalLinkageInfo &UniversalLinkInfo;
@@ -52,8 +51,8 @@ public:
   const TBDGenOptions &Opts;
 
 private:
-  void addSymbol(StringRef name, tapi::internal::SymbolKind kind =
-                                     tapi::internal::SymbolKind::GlobalSymbol);
+  void addSymbol(StringRef name, llvm::MachO::SymbolKind kind =
+                                     llvm::MachO::SymbolKind::GlobalSymbol);
 
   void addSymbol(SILDeclRef declRef);
 
@@ -71,8 +70,8 @@ private:
   void addBaseConformanceDescriptor(BaseConformance conformance);
 
 public:
-  TBDGenVisitor(tapi::internal::InterfaceFile &symbols,
-                tapi::internal::ArchitectureSet archs, StringSet *stringSymbols,
+  TBDGenVisitor(llvm::MachO::InterfaceFile &symbols,
+                llvm::MachO::ArchitectureSet archs, StringSet *stringSymbols,
                 const UniversalLinkageInfo &universalLinkInfo,
                 ModuleDecl *swiftModule, const TBDGenOptions &opts)
       : Symbols(symbols), Archs(archs), StringSymbols(stringSymbols),

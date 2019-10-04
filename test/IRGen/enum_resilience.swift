@@ -220,31 +220,31 @@ public func constructResilientEnumPayload(_ s: Size) -> Medium {
 // CHECK:  [[PAMPHLET_CASE:%.*]] = icmp eq i32 [[TAG]], [[PAMPHLET_CASE_TAG]]
 // CHECK:  br i1 [[PAMPHLET_CASE]], label %[[PAMPHLET_CASE_LABEL:.*]], label %[[PAPER_CHECK:.*]]
 
-// CHECK:  <label>:[[PAPER_CHECK]]:
+// CHECK:  [[PAPER_CHECK]]:
 // CHECK:  [[PAPER_CASE_TAG:%.*]] = load i32, i32* @"$s14resilient_enum6MediumO5PaperyA2CmFWC"
 // CHECK:  [[PAPER_CASE:%.*]] = icmp eq i32 [[TAG]], [[PAPER_CASE_TAG]]
 // CHECK:  br i1 [[PAPER_CASE]], label %[[PAPER_CASE_LABEL:.*]], label %[[CANVAS_CHECK:.*]]
 
-// CHECK:  <label>:[[CANVAS_CHECK]]:
+// CHECK:  [[CANVAS_CHECK]]:
 // CHECK:  [[CANVAS_CASE_TAG:%.*]] = load i32, i32* @"$s14resilient_enum6MediumO6CanvasyA2CmFWC"
 // CHECK:  [[CANVAS_CASE:%.*]] = icmp eq i32 [[TAG]], [[CANVAS_CASE_TAG]]
 // CHECK:  br i1 [[CANVAS_CASE]], label %[[CANVAS_CASE_LABEL:.*]], label %[[DEFAULT_CASE:.*]]
 
-// CHECK: ; <label>:[[PAPER_CASE_LABEL]]
+// CHECK: [[PAPER_CASE_LABEL]]:
 // CHECK: br label %[[END:.*]]
 
-// CHECK: ; <label>:[[CANVAS_CASE_LABEL]]
+// CHECK: [[CANVAS_CASE_LABEL]]:
 // CHECK: br label %[[END]]
 
-// CHECK: ; <label>:[[PAMPHLET_CASE_LABEL]]
+// CHECK: [[PAMPHLET_CASE_LABEL]]:
 // CHECK: swift_projectBox
 // CHECK: br label %[[END]]
 
-// CHECK: ; <label>:[[DEFAULT_CASE]]
+// CHECK: [[DEFAULT_CASE]]:
 // CHeCK: call void %destroy
 // CHECK: br label %[[END]]
 
-// CHECK: ; <label>:[[END]]
+// CHECK: [[END]]:
 // CHECK: = phi [[INT]] [ 3, %[[DEFAULT_CASE]] ], [ {{.*}}, %[[PAMPHLET_CASE_LABEL]] ], [ 2, %[[CANVAS_CASE_LABEL]] ], [ 1, %[[PAPER_CASE_LABEL]] ]
 // CHECK: ret
 

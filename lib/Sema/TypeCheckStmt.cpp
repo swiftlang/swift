@@ -1835,20 +1835,6 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
   return BS;
 }
 
-void TypeChecker::checkRawValueExpr(EnumDecl *ED, EnumElementDecl *EED) {
-  Type rawTy = ED->getRawType();
-  Expr *rawValue = EED->getRawValueExpr();
-  assert((rawTy && rawValue) && "Cannot check missing raw value!");
-
-  if (ED->getGenericEnvironmentOfContext() != nullptr)
-    rawTy = ED->mapTypeIntoContext(rawTy);
-
-  if (typeCheckExpression(rawValue, ED, TypeLoc::withoutLoc(rawTy),
-                          CTP_EnumCaseRawValue)) {
-    checkEnumElementErrorHandling(EED);
-  }
-}
-
 static Type getFunctionBuilderType(FuncDecl *FD) {
   Type builderType = FD->getFunctionBuilderType();
 

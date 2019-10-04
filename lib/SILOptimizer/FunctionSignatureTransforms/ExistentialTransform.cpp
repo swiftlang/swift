@@ -23,10 +23,9 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallVector.h"
@@ -307,7 +306,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   auto FTy = F->getLoweredFunctionType();
   SILModule &M = F->getModule();
   auto &Ctx = M.getASTContext();
-  GenericSignature *NewGenericSig;
+  GenericSignature NewGenericSig;
   GenericEnvironment *NewGenericEnv;
 
   /// If the original function is generic, then maintain the same.
@@ -323,8 +322,9 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   NewGenericSig = evaluateOrDefault(
       Ctx.evaluator,
       AbstractGenericSignatureRequest{
-        OrigGenericSig, std::move(GenericParams), std::move(Requirements)},
-      nullptr);
+        OrigGenericSig.getPointer(), std::move(GenericParams),
+        std::move(Requirements)},
+      GenericSignature());
 
   NewGenericEnv = NewGenericSig->getGenericEnvironment();
 
