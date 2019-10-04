@@ -233,3 +233,11 @@ module ConditionallyFoo {
 module ForwardDeclarationsHelper {
   header "ForwardDeclarationsHelper.h"
 }
+
+module LocalVsFileScopeBase {
+  header "LocalVsFileScopeBase.h"
+}
+module LocalVsFileScope {
+  header "LocalVsFileScope.h"
+  export *
+}

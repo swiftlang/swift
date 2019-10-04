@@ -77,6 +77,17 @@ importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   return None;
 }
 
+const clang::Decl *
+importer::getFirstNonLocalDecl(const clang::Decl *D) {
+  D = D->getCanonicalDecl();
+  auto iter = llvm::find_if(D->redecls(), [](const clang::Decl *next) -> bool {
+    return !next->isLexicallyWithinFunctionOrMethod();
+  });
+  if (iter == D->redecls_end())
+    return nullptr;
+  return *iter;
+}
+
 Optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
@@ -91,7 +102,7 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
   }
 
   if (!actual)
-    actual = D->getCanonicalDecl();
+    actual = getFirstNonLocalDecl(D);
 
   return actual->getImportedOwningModule();
 }
