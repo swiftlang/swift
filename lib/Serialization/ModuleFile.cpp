@@ -1255,6 +1255,7 @@ public:
 
   data_type ReadData(internal_key_type key, const uint8_t *data,
                      unsigned length) {
+    static uint32_t INVALID_VALUE = UINT32_MAX;
     data_type result;
     result.SourceFilePath =
       F.getSourceFilePathById(endian::readNext<uint32_t, little, unaligned>(data));
@@ -1262,7 +1263,7 @@ public:
       LineColumn Result;
       Result.Line = endian::readNext<uint32_t, little, unaligned>(data);
       Result.Column = endian::readNext<uint32_t, little, unaligned>(data);
-      if (Result.Line == UINT32_MAX || Result.Column == UINT32_MAX) {
+      if (Result.Line == INVALID_VALUE || Result.Column == INVALID_VALUE) {
         return None;
       }
       return Result;

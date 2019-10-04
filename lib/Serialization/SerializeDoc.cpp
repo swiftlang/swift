@@ -503,9 +503,10 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 namespace {
+static uint32_t INVALID_VALUE = UINT32_MAX;
 struct LineColoumn {
-  uint32_t Line = UINT32_MAX;
-  uint32_t Column = UINT32_MAX;
+  uint32_t Line = INVALID_VALUE;
+  uint32_t Column = INVALID_VALUE;
 };
 
 struct DeclLocationsTableData {
@@ -613,6 +614,7 @@ public:
 class DeclUSRsTableWriter {
   llvm::StringMap<uint32_t> USRMap;
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
+  // 0 is never used as an Id.
   uint32_t CurId = 0;
 public:
   uint32_t getUSRID(StringRef USR) {
@@ -674,6 +676,7 @@ public:
 class FilePathTableWriter {
   llvm::StringMap<uint32_t> PathIDMap;
   llvm::OnDiskChainedHashTableGenerator<FilePathsTableInfo> generator;
+  // 0 is never used as an Id.
   uint32_t CurId = 0;
 public:
   uint32_t getFileID(StringRef Path) {
@@ -736,6 +739,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
       return None;
     auto &SM = D->getASTContext().SourceMgr;
     DeclLocationsTableData Result;
+    // Use getDisplayNameForLoc could give use file name specified by #sourceLocation
     SmallString<128> SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
     Result.SourceFileID = FWriter.getFileID(SourceFilePath);
     Result.Loc = getLineColumn(SM, D->getLoc());
@@ -754,8 +758,10 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   Optional<DeclLocationsTableData> getLocData(Decl *D) {
     auto *File = D->getDeclContext()->getModuleScopeContext();
     if (auto *SF = dyn_cast<SourceFile>(File)) {
+      // Get location from source when we have access to the source.
       return getLocDataFromSource(D, SF);
     } else {
+      // Merge modules.
       auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
       if (!Locs.hasValue())
         return None;
@@ -782,6 +788,7 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   }
 
   bool walkToDeclPre(Decl *D) override {
+    // We shouldn't expose any Decls that .swiftdoc file isn't willing to expose.
     if (!shouldIncludeDecl(D))
       return false;
     if (!shouldSerializeSourceLoc(D))
@@ -827,7 +834,7 @@ public:
   using SerializerBase::Out;
   using SerializerBase::M;
   using SerializerBase::SF;
-  /// Writes the BLOCKINFO block for the module documentation file.
+  /// Writes the BLOCKINFO block for the module sourceinfo file.
   void writeSourceInfoBlockInfoBlock() {
     BCBlockRAII restoreBlock(Out, llvm::bitc::BLOCKINFO_BLOCK_ID, 2);
 
@@ -882,7 +889,13 @@ void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile 
       DeclUSRsTableWriter USRWriter;
       FilePathTableWriter FPWriter;
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
+      // Emit USR table mapping from a USR to USR Id.
+      // The basic locs record uses USR Id instead of actual USR, so that we don't need to repeat
+      // USR texts for newly added records.
       USRWriter.emitUSRsRecord(S.Out);
+      // Emit source file table mapping from a source file ID to actual source file name.
+      // The basic locs record uses source file Id instead of actual source file name, so that
+      // we don't need to repeat file names.
       FPWriter.emitSourceFilesRecord(S.Out);
     }
   }
