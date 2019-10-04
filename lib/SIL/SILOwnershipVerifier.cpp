@@ -642,10 +642,20 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   if (DisableOwnershipVerification)
     return;
 
+  // Do not validate SILUndef values.
+  if (isa<SILUndef>(Value))
+    return;
+
 #ifdef NDEBUG
   // When compiling without asserts enabled, only verify ownership if
   // -sil-verify-all is set.
-  if (!getModule().getOptions().VerifyAll)
+  //
+  // NOTE: We purposely return if we do can not look up a module here to ensure
+  // that if we run into something that we do not understand, we do not assert
+  // in user code even tohugh we aren't going to actually verify (the default
+  // behavior when -sil-verify-all is disabled).
+  auto *Mod = Value->getModule();
+  if (!Mod || !Mod->getOptions().VerifyAll)
     return;
 #endif
 
