@@ -1240,8 +1240,21 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
 llvm::Expected<bool>
 IsStaticRequest::evaluate(Evaluator &evaluator, FuncDecl *decl) const {
-  return (decl->getStaticLoc().isValid() ||
-          decl->getStaticSpelling() != StaticSpellingKind::None);
+  bool result = (decl->getStaticLoc().isValid() ||
+                 decl->getStaticSpelling() != StaticSpellingKind::None);
+  auto *dc = decl->getDeclContext();
+  if (!result &&
+      decl->isOperator() &&
+      dc->isTypeContext()) {
+    auto operatorName = decl->getFullName().getBaseIdentifier();
+    decl->diagnose(diag::nonstatic_operator_in_type,
+                   operatorName, dc->getDeclaredInterfaceType())
+        .fixItInsert(decl->getAttributeInsertionLoc(/*forModifier=*/true),
+                     "static ");
+    result = true;
+  }
+
+  return result;
 }
 
 llvm::Expected<bool>
@@ -3070,7 +3083,9 @@ public:
   }
 
   void visitFuncDecl(FuncDecl *FD) {
-    (void)FD->getInterfaceType();
+    // Force these requests in case they emit diagnostics.
+    (void) FD->getInterfaceType();
+    (void) FD->getOperatorDecl();
 
     if (!FD->isInvalid()) {
       checkGenericParams(FD->getGenericParams(), FD, TC);
@@ -3114,6 +3129,33 @@ public:
       checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
     checkDefaultArguments(TC, FD->getParameters(), FD);
+
+    // Validate 'static'/'class' on functions in extensions.
+    auto StaticSpelling = FD->getStaticSpelling();
+    if (StaticSpelling != StaticSpellingKind::None &&
+        isa<ExtensionDecl>(FD->getDeclContext())) {
+      if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
+        if (!isa<ClassDecl>(NTD)) {
+          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
+            FD->diagnose(diag::class_func_not_in_class, false)
+                .fixItReplace(FD->getStaticLoc(), "static");
+            NTD->diagnose(diag::extended_type_declared_here);
+          }
+        }
+      }
+    }
+
+    // Member functions need some special validation logic.
+    if (FD->getDeclContext()->isTypeContext()) {
+      if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
+        auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
+        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
+        // We did not find 'Self'. Complain.
+        FD->diagnose(diag::operator_in_unrelated_type,
+                     FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
+                     FD->getFullName());
+      }
+    }
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -3604,16 +3646,10 @@ FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   // Check for static/final/class when we're in a type.
   auto dc = FD->getDeclContext();
   if (dc->isTypeContext()) {
-    if (!FD->isStatic()) {
-      FD->diagnose(diag::nonstatic_operator_in_type,
-                   operatorName, dc->getDeclaredInterfaceType())
-        .fixItInsert(FD->getAttributeInsertionLoc(/*forModifier=*/true),
-                     "static ");
-
-      FD->setStatic();
-    } else if (auto classDecl = dc->getSelfClassDecl()) {
+    if (auto classDecl = dc->getSelfClassDecl()) {
       // For a class, we also need the function or class to be 'final'.
       if (!classDecl->isFinal() && !FD->isFinal() &&
+          FD->getStaticLoc().isValid() &&
           FD->getStaticSpelling() != StaticSpellingKind::KeywordStatic) {
         FD->diagnose(diag::nonfinal_operator_in_class,
                      operatorName, dc->getDeclaredInterfaceType())
@@ -3987,24 +4023,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(FD);
 
-    // Force computing the operator decl in case it emits diagnostics.
-    (void) FD->getOperatorDecl();
-    
-    // Validate 'static'/'class' on functions in extensions.
-    auto StaticSpelling = FD->getStaticSpelling();
-    if (StaticSpelling != StaticSpellingKind::None &&
-        isa<ExtensionDecl>(FD->getDeclContext())) {
-      if (auto *NTD = FD->getDeclContext()->getSelfNominalTypeDecl()) {
-        if (!isa<ClassDecl>(NTD)) {
-          if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-            diagnose(FD, diag::class_func_not_in_class, false)
-                .fixItReplace(FD->getStaticLoc(), "static");
-            diagnose(NTD, diag::extended_type_declared_here);
-          }
-        }
-      }
-    }
-
     // Accessors should pick up various parts of their type signatures
     // directly from the storage declaration instead of re-deriving them.
     // FIXME: should this include the generic signature?
@@ -4085,18 +4103,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
-
-    // Member functions need some special validation logic.
-    if (FD->getDeclContext()->isTypeContext()) {
-      if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
-        auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
-        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
-        // We did not find 'Self'. Complain.
-        diagnose(FD, diag::operator_in_unrelated_type,
-                 FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
-                 FD->getFullName());
-      }
-    }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
