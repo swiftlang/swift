@@ -594,11 +594,15 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
   SmallVector<TupleTypeReprElement, 4> TupleElements;
 
   SourceLoc EllipsisLoc;
-  unsigned EllipsisIdx = Elements.size();
+  unsigned EllipsisIdx;
 
-  for (unsigned i = 0; i < Elements.getNumChildren(); i++) {
-    auto Element = Elements.getChild(i)->castTo<TupleTypeElementSyntax>();
+  for (unsigned i = 0; i < Elements.size(); i++) {
+    auto Element = Elements[i];
     TupleTypeReprElement ElementAST;
+    ElementAST.Type = generate(Element.getType(), Loc);
+    if (!ElementAST.Type)
+      continue;
+
     if (auto Name = Element.getName()) {
       ElementAST.NameLoc = generate(*Name, Loc);
       ElementAST.Name = Name->getText() == "_"
@@ -620,7 +624,7 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
         ElementAST.NameLoc = ElementAST.SecondNameLoc;
       }
     }
-    ElementAST.Type = generate(Element.getType(), Loc);
+
     if (auto InOut = Element.getInOut()) {
       // don't apply multiple inout specifiers to a type: that's invalid and was
       // already reported in the parser, handle gracefully
@@ -632,13 +636,17 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
     }
     if (auto Comma = Element.getTrailingComma())
       ElementAST.TrailingCommaLoc = generate(*Comma, Loc);
+
     if (auto Ellipsis = Element.getEllipsis()) {
-      EllipsisLoc = generate(*Ellipsis, Loc);
-      if (EllipsisIdx == Elements.size())
+      if (EllipsisLoc.isInvalid()) {
+        EllipsisLoc = generate(*Ellipsis, Loc);
         EllipsisIdx = i;
+      }
     }
     TupleElements.push_back(ElementAST);
   }
+  if (EllipsisLoc.isInvalid())
+    EllipsisIdx = TupleElements.size();
 
   return TupleTypeRepr::create(Context, TupleElements, {LPLoc, RPLoc},
                                EllipsisLoc, EllipsisIdx);
@@ -1083,24 +1091,6 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
     if (Keyword && isTokenKeyword(Keyword->getTokenKind())) {
       auto ErrorLoc = generate(*Keyword, Loc);
       return new (Context) ErrorTypeRepr(ErrorLoc);
-    }
-  }
-
-  // Create empty TupleTypeRepr for types starting with `(`.
-  if (ChildrenCount >= 1) {
-    auto LParen = Type.getChild(0)->getAs<TokenSyntax>();
-    if (LParen && LParen->getTokenKind() == tok::l_paren) {
-      // generate child 'TypeSyntax' anyway to trigger the side effects e.g.
-      // code-completion.
-      for (size_t i = 1; i != ChildrenCount; ++i) {
-        auto elem = *Type.getChild(i);
-        if (auto ty = elem.getAs<TypeSyntax>())
-          (void)generate(*ty, Loc);
-      }
-      auto LParenLoc = advanceLocBegin(Loc, *LParen);
-      auto EndLoc =
-          advanceLocBegin(Loc, *Type.getChild(Type.getNumChildren() - 1));
-      return TupleTypeRepr::createEmpty(Context, {LParenLoc, EndLoc});
     }
   }
 

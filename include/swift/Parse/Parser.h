@@ -917,12 +917,12 @@ public:
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
                          llvm::function_ref<ParserStatus()> callback);
-  ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
-                               llvm::Optional<ParsedTokenSyntax> &LastComma,
-                               llvm::Optional<ParsedTokenSyntax> &Right,
-                               llvm::SmallVectorImpl<ParsedSyntax>& Junk,
-                               bool AllowSepAfterLast, Diag<> ErrorDiag,
-                               llvm::function_ref<ParserStatus()> callback);
+  template <typename ParsedNode>
+  ParserStatus parseListSyntax(
+      SmallVectorImpl<ParsedNode> &elements, bool AllowEmpty,
+      bool AllowSepAfterLast, llvm::function_ref<bool()> isAtCloseTok,
+      llvm::function_ref<ParserStatus(typename ParsedNode::Builder &)>
+          callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);
