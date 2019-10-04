@@ -38,8 +38,7 @@ struct DeclApplicabilityOwner {
     DC(DC), Ty(Ty), ExtensionOrMember(VD) {}
 
   friend llvm::hash_code hash_value(const DeclApplicabilityOwner &CI) {
-    return hash_combine(hash_value(CI.Ty.getPointer()),
-                        hash_value(CI.ExtensionOrMember));
+    return llvm::hash_combine(CI.Ty.getPointer(), CI.ExtensionOrMember);
   }
 
   friend bool operator==(const DeclApplicabilityOwner &lhs,
@@ -96,8 +95,8 @@ struct TypePair {
   TypePair(Type FirstTy, Type SecondTy): FirstTy(FirstTy), SecondTy(SecondTy) {}
   TypePair(): TypePair(Type(), Type()) {}
   friend llvm::hash_code hash_value(const TypePair &TI) {
-    return hash_combine(hash_value(TI.FirstTy.getPointer()),
-                        hash_value(TI.SecondTy.getPointer()));
+    return llvm::hash_combine(TI.FirstTy.getPointer(),
+                              TI.SecondTy.getPointer());
   }
 
   friend bool operator==(const TypePair &lhs,
@@ -133,9 +132,7 @@ struct TypeRelationCheckInput {
     OpenArchetypes(OpenArchetypes) {}
 
   friend llvm::hash_code hash_value(const TypeRelationCheckInput &TI) {
-    return hash_combine(hash_value(TI.Pair),
-                        hash_value(TI.Relation),
-                        hash_value(TI.OpenArchetypes));
+    return llvm::hash_combine(TI.Pair, TI.Relation, TI.OpenArchetypes);
   }
 
   friend bool operator==(const TypeRelationCheckInput &lhs,
