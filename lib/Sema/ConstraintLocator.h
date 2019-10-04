@@ -122,6 +122,10 @@ public:
     /// Does this path involve a function conversion, i.e. a
     /// FunctionArgument or FunctionResult node?
     IsFunctionConversion = 0x1,
+
+    /// Does this path involve an argument being applied to a non-ephemeral
+    /// parameter?
+    IsNonEphemeralParam = 0x2,
   };
 
   /// One element in the path of a locator, which can include both
@@ -328,6 +332,12 @@ public:
   /// conversion.
   bool isFunctionConversion() const {
     return (getSummaryFlags() & IsFunctionConversion);
+  }
+
+  /// Checks whether this locator is describing an argument application for a
+  /// non-ephemeral parameter.
+  bool isNonEphemeralParameterApplication() const {
+    return (getSummaryFlags() & IsNonEphemeralParam);
   }
 
   /// Determine whether given locator points to the subscript reference
@@ -863,6 +873,12 @@ public:
       return last->getKind() == ConstraintLocator::AutoclosureResult;
 
     return false;
+  }
+
+  /// Checks whether this locator is describing an argument application for a
+  /// non-ephemeral parameter.
+  bool isNonEphemeralParameterApplication() const {
+    return (getSummaryFlags() & ConstraintLocator::IsNonEphemeralParam);
   }
 
   /// Retrieve the base constraint locator, on which this builder's

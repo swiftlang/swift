@@ -1910,6 +1910,36 @@ public:
   bool diagnoseAsError() override;
 };
 
+/// Diagnose the invalid conversion of a temporary pointer argument generated
+/// from an X-to-pointer conversion to an @_nonEphemeral parameter.
+///
+/// ```swift
+/// func foo(@_nonEphemeral _ ptr: UnsafePointer<Int>) {}
+///
+/// foo([1, 2, 3])
+/// ```
+class NonEphemeralConversionFailure final : public ArgumentMismatchFailure {
+  ConversionRestrictionKind ConversionKind;
+  bool DowngradeToWarning;
+
+public:
+  NonEphemeralConversionFailure(Expr *expr, ConstraintSystem &cs,
+                                ConstraintLocator *locator,
+                                Type fromType, Type toType,
+                                ConversionRestrictionKind conversionKind,
+                                bool downgradeToWarning)
+      : ArgumentMismatchFailure(expr, cs, fromType, toType, locator),
+        ConversionKind(conversionKind), DowngradeToWarning(downgradeToWarning) {
+  }
+
+  bool diagnoseAsError() override;
+
+private:
+  /// Emits a note explaining to the user that an ephemeral conversion is only
+  /// valid for the duration of the call, and suggests an alternative to use.
+  void emitSuggestionNotes() const;
+};
+
 } // end namespace constraints
 } // end namespace swift
 

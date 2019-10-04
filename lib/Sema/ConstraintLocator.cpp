@@ -98,7 +98,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   switch (getKind()) {
   case ConstraintLocator::ApplyArgument:
   case ConstraintLocator::ApplyFunction:
-  case ConstraintLocator::ApplyArgToParam:
   case ConstraintLocator::SequenceElementType:
   case ConstraintLocator::ClosureResult:
   case ConstraintLocator::ConstructorMember:
@@ -137,6 +136,11 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::FunctionArgument:
   case ConstraintLocator::FunctionResult:
     return IsFunctionConversion;
+
+  case ConstraintLocator::ApplyArgToParam: {
+    auto flags = castTo<LocatorPathElt::ApplyArgToParam>().getParameterFlags();
+    return flags.isNonEphemeral() ? IsNonEphemeralParam : 0;
+  }
   }
 
   llvm_unreachable("Unhandled PathElementKind in switch.");
