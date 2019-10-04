@@ -2608,6 +2608,9 @@ public:
   /// if the base declaration is \c open, the override might have to be too.
   bool hasOpenAccess(const DeclContext *useDC) const;
 
+  /// FIXME: This is deprecated.
+  bool isRecursiveValidation() const;
+
   /// Retrieve the "interface" type of this value, which uses
   /// GenericTypeParamType if the declaration is generic. For a generic
   /// function, this will have a GenericFunctionType with a

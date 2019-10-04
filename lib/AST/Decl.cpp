@@ -2705,6 +2705,27 @@ bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
 
+bool ValueDecl::isRecursiveValidation() const {
+  if (hasValidationStarted() || !hasInterfaceType())
+    return true;
+
+  if (auto *vd = dyn_cast<VarDecl>(this))
+    if (auto *pbd = vd->getParentPatternBinding())
+      if (pbd->isBeingValidated())
+        return true;
+
+  auto *dc = getDeclContext();
+  while (isa<NominalTypeDecl>(dc))
+    dc = dc->getParent();
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (ext->isComputingGenericSignature())
+      return true;
+  }
+
+  return false;
+}
+
 Type ValueDecl::getInterfaceType() const {
   if (!hasInterfaceType()) {
     // Our clients that don't register the lazy resolver are relying on the
