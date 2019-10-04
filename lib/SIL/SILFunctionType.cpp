@@ -2350,8 +2350,8 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
   if (auto *autoDiffFuncId = constant.autoDiffAssociatedFunctionIdentifier) {
     auto origFnConstantInfo =
         getConstantInfo(constant.asAutoDiffOriginalFunction());
-    auto loweredIndices = autoDiffFuncId->getParameterIndices()
-        ->getLowered(Context, formalInterfaceType);
+    auto loweredIndices = autodiff::getLoweredParameterIndices(
+        autoDiffFuncId->getParameterIndices(), formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffAssociatedFunctionType(
         loweredIndices, /*resultIndex*/ 0,
         autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),

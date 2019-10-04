@@ -359,16 +359,15 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 // Returns the differentiation parameters clause string for the given function,
 // parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
-    const AbstractFunctionDecl *function, AutoDiffParameterIndices *indices,
+    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   bool isInstanceMethod = function && function->isInstanceMember();
-
   std::string result;
   llvm::raw_string_ostream printer(result);
 
-  // Use parameters from `AutoDiffParameterIndices`, if specified.
+  // Use parameter indices from `AutoDiffIndexSubset`, if specified.
   if (indices) {
-    SmallBitVector parameters(indices->parameters);
+    auto parameters = indices->getBitVector();
     auto parameterCount = parameters.count();
     printer << "wrt: ";
     if (parameterCount > 1)
@@ -1457,7 +1456,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
-                                       AutoDiffParameterIndices *indices,
+                                       AutoDiffIndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature *derivativeGenSig)
@@ -1485,8 +1484,7 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
-                           bool linear,
-                           AutoDiffParameterIndices *indices,
+                           bool linear, AutoDiffIndexSubset *indices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature *derivativeGenSig) {
@@ -1540,9 +1538,10 @@ DifferentiatingAttr::DifferentiatingAttr(
 
 DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, bool linear, AutoDiffParameterIndices *indices)
+    DeclNameWithLoc original, bool linear, AutoDiffIndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-    Original(std::move(original)), linear(linear), ParameterIndices(indices) {}
+      Original(std::move(original)), linear(linear), ParameterIndices(indices) {
+}
 
 DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit,
@@ -1559,7 +1558,7 @@ DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit,
                             SourceLoc atLoc, SourceRange baseRange,
                             DeclNameWithLoc original, bool linear,
-                            AutoDiffParameterIndices *indices) {
+                            AutoDiffIndexSubset *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) DifferentiatingAttr(context, implicit, atLoc, baseRange,

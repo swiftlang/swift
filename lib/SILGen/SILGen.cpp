@@ -764,10 +764,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
     for (auto pair : llvm::zip(diffAttrs, silDiffAttrs)) {
       auto *diffAttr = const_cast<DifferentiableAttr *>(std::get<0>(pair));
       auto *silDiffAttr = std::get<1>(pair);
-      // Compute autodiff indices.
-      auto paramIndices = diffAttr->getParameterIndices();
-      auto loweredParamIndices = paramIndices->getLowered(
-          getASTContext(), origFnType);
+      // Compute lowered parameter indices.
+      auto *paramIndices = diffAttr->getParameterIndices();
+      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+          paramIndices, origFnType);
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       assert(silDiffAttr->getIndices() == indices &&
              "Expected matching @differentiable and [differentiable]");

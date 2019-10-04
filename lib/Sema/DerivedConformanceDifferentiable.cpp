@@ -646,13 +646,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
           C, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, {}, None, None, derivativeGenSig);
       member->getAttrs().add(diffableAttr);
-      // Compute getter parameter indices.
-      auto *getterType = member->getAccessor(AccessorKind::Get)
-                             ->getInterfaceType()
-                             ->castTo<AnyFunctionType>();
-      AutoDiffParameterIndicesBuilder builder(getterType);
-      builder.setParameter(0);
-      diffableAttr->setParameterIndices(builder.build(C));
+      // Set getter `@differentiable` attribute parameter indices.
+      diffableAttr->setParameterIndices(AutoDiffIndexSubset::get(C, 1, {0}));
     }
   }
 

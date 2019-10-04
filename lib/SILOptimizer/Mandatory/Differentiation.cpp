@@ -1048,9 +1048,8 @@ public:
     auto *indexSet = indices.parameters;
     for (auto *da : original->getAttrs().getAttributes<DifferentiableAttr>()) {
       auto *daParamIndices = da->getParameterIndices();
-      auto *daIndexSet = daParamIndices->getLowered(
-          getASTContext(),
-          original->getInterfaceType()->castTo<AnyFunctionType>());
+      auto *daIndexSet = autodiff::getLoweredParameterIndices(
+          daParamIndices, original->getInterfaceType()->castTo<AnyFunctionType>());
       // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
       // indices than our current candidate and a primitive VJP, then `da` is
       // our new candidate.
