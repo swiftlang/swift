@@ -79,7 +79,7 @@ protected:
   std::error_code
   openModuleFiles(AccessPathElem ModuleID,
                   StringRef ModulePath, StringRef ModuleDocPath,
-                  StringRef ModuleSourceInfoPath,
+                  StringRef ModuleSourceInfoName,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
@@ -92,7 +92,7 @@ protected:
   std::error_code
   openModuleSourceInfoFile(AccessPathElem ModuleID,
                            StringRef ModulePath,
-                           StringRef ModuleSourceInfoPath,
+                           StringRef ModuleSourceInfoFileName,
                            std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for

@@ -89,3 +89,12 @@ extension first_decl_class_1 : P1 {}
 // SECOND: Inputs/def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
 // SECOND: Inputs/def_comments.swift:28:25: Var/decl_var_3 RawComment=none BriefComment=none DocCommentAsXML=none
 // SECOND: NonExistingSource.swift:100000:13: Func/functionAfterPoundSourceLoc
+
+// Test the case when we have to import via a .swiftinterface file.
+//
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/Hidden)
+// RUN: %target-swift-frontend -module-name comments -emit-module -emit-module-path %t/Hidden/comments.swiftmodule -emit-module-interface-path %t/comments.swiftinterface -emit-module-doc -emit-module-doc-path %t/comments.swiftdoc -emit-module-source-info-path %t/comments.swiftsourceinfo %s -enable-library-evolution -swift-version 5
+// RUN: llvm-bcanalyzer %t/comments.swiftdoc | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: llvm-bcanalyzer %t/comments.swiftsourceinfo | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %target-swift-ide-test -print-module-comments -module-to-print=comments -source-filename %s -I %t -swift-version 5 | %FileCheck %s -check-prefix=FIRST

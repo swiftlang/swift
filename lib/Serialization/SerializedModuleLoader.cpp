@@ -266,37 +266,45 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFile(
 std::error_code
 SerializedModuleLoaderBase::openModuleSourceInfoFile(AccessPathElem ModuleID,
                                                      StringRef ModulePath,
-                                                     StringRef ModuleSourceInfoPath,
+                                                     StringRef ModuleSourceInfoFilename,
                                    std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   if (!ModuleSourceInfoBuffer)
     return std::error_code();
 
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
+  {
+    llvm::SmallString<128> PrivatePath(ModulePath);
+    llvm::sys::path::remove_filename(PrivatePath);
+    llvm::sys::path::append(PrivatePath, "Private");
+    llvm::sys::path::append(PrivatePath, ModuleSourceInfoFilename);
 
-  // Try to open the module source info file.  If it does not exist, ignore
-  // the error.  However, pass though all other errors.
-  if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
-    FS.getBufferForFile(ModuleSourceInfoPath)) {
-    *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
-    return std::error_code();
+    // Try to open the module source info file.  If it does not exist, ignore
+    // the error.  However, pass though all other errors.
+    if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
+      FS.getBufferForFile(PrivatePath)) {
+      *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
+      return std::error_code();
+    }
   }
-  llvm::SmallString<128> Path(ModulePath);
-  llvm::sys::path::replace_extension(Path,
-                                     file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
+  {
+    llvm::SmallString<128> NonPrivatePath(ModulePath);
+    llvm::sys::path::remove_filename(NonPrivatePath);
+    llvm::sys::path::append(NonPrivatePath, ModuleSourceInfoFilename);
 
-  // Try to open the module source info file adjacent to the .swiftmodule file.
-  if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
-      FS.getBufferForFile(Path.str())) {
-     *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
-     return std::error_code();
-   }
+    // Try to open the module source info file adjacent to the .swiftmodule file.
+    if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
+      FS.getBufferForFile(NonPrivatePath)) {
+      *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
+      return std::error_code();
+    }
+  }
   // Failing to load .swiftsourceinfo file isn't critical, so don't return any errors.
   return std::error_code();
 }
 
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
     AccessPathElem ModuleID, StringRef ModulePath, StringRef ModuleDocPath,
-    StringRef ModuleSourceInfoPath,
+    StringRef ModuleSourceInfoFileName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
@@ -333,7 +341,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
     return ModuleDocErr;
 
   auto ModuleSourceInfoErr =
-    openModuleSourceInfoFile(ModuleID, ModulePath, ModuleSourceInfoPath, ModuleSourceInfoBuffer);
+    openModuleSourceInfoFile(ModuleID, ModulePath, ModuleSourceInfoFileName, ModuleSourceInfoBuffer);
   if (ModuleSourceInfoErr)
     return ModuleSourceInfoErr;
 
@@ -344,7 +352,7 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
 
 std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
     AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
-    StringRef ModuleDocFilename, StringRef ModuleSourceInfoFilename,
+    StringRef ModuleDocFilename, StringRef ModuleSourceInfoFileName,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
     std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
@@ -355,13 +363,10 @@ std::error_code SerializedModuleLoader::findModuleFilesInDirectory(
   llvm::sys::path::append(ModulePath, ModuleFilename);
   llvm::SmallString<256> ModuleDocPath{DirPath};
   llvm::sys::path::append(ModuleDocPath, ModuleDocFilename);
-  llvm::SmallString<256> ModuleSourceInfoPath{DirPath};
-  llvm::sys::path::append(ModuleSourceInfoPath, "Private");
-  llvm::sys::path::append(ModuleSourceInfoPath, ModuleSourceInfoFilename);
   return SerializedModuleLoaderBase::openModuleFiles(ModuleID,
                                                      ModulePath,
                                                      ModuleDocPath,
-                                                     ModuleSourceInfoPath,
+                                                     ModuleSourceInfoFileName,
                                                      ModuleBuffer,
                                                      ModuleDocBuffer,
                                                      ModuleSourceInfoBuffer);
