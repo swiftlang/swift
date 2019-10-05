@@ -17,44 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if !(defined(DIAG) || (defined(ERROR) && defined(WARNING) && defined(NOTE) && defined(REMARK)))
-#  error Must define either DIAG or the set {ERROR,WARNING,NOTE,REMARK}
-#endif
-
-#ifndef ERROR
-#  define ERROR(ID,Options,Text,Signature)   \
-  DIAG(ERROR,ID,Options,Text,Signature)
-#endif
-
-#ifndef WARNING
-#  define WARNING(ID,Options,Text,Signature) \
-  DIAG(WARNING,ID,Options,Text,Signature)
-#endif
-
-#ifndef NOTE
-#  define NOTE(ID,Options,Text,Signature) \
-  DIAG(NOTE,ID,Options,Text,Signature)
-#endif
-
-#ifndef REMARK
-#  define REMARK(ID,Options,Text,Signature) \
-  DIAG(REMARK,ID,Options,Text,Signature)
-#endif
-
-#ifndef PUBLICERROR
-#  define PUBLICERROR(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
-  ERROR(ID, OPTIONS, TEXT, SIGNATURE)
-#endif
-
-#ifndef PUBLICWARNING
-#  define PUBLICWARNING(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
-  WARNING(ID, OPTIONS, TEXT, SIGNATURE)
-#endif
-
-#ifndef PUBLICNOTE
-#  define PUBLICNOTE(PUBLICID, ID, OPTIONS, TEXT, SIGNATURE) \
-  NOTE(ID, OPTIONS, TEXT, SIGNATURE)
-#endif
+#include "swift/AST/DiagnosticsDefMacros.h"
 
 WARNING(warning_from_clang,none,
   "%0", (StringRef))
@@ -106,15 +69,4 @@ WARNING(implicit_bridging_header_imported_from_module,none,
         "is deprecated and will be removed in a later version of Swift",
         (StringRef, Identifier))
 
-#ifndef DIAG_NO_UNDEF
-# if defined(DIAG)
-#  undef DIAG
-# endif
-# undef NOTE
-# undef WARNING
-# undef ERROR
-# undef REMARK
-# undef PUBLICERROR
-# undef PUBLICWARNING
-# undef PUBLICNOTE
-#endif
+#include "swift/AST/DiagnosticsUndefMacros.h"
