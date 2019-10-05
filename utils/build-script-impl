@@ -2929,23 +2929,24 @@ for host in "${ALL_HOSTS[@]}"; do
             if [[ "${product}" == "llvm" && "${BUILD_LLVM}" == "1" ]]; then
                 if [[ "$(uname -s)" == "Darwin" ]] ; then
                     HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-                    HOST_CXX_BUILTINS_VERSION=$(ls "$HOST_CXX_DIR/../lib/clang" | awk '{print $0}')
-                    HOST_CXX_BUILTINS_DIR="$HOST_CXX_DIR/../lib/clang/$HOST_CXX_BUILTINS_VERSION/lib/darwin"
                     DEST_CXX_BUILTINS_VERSION=$(ls "$(build_directory_bin ${host} llvm)/../lib/clang" | awk '{print $0}')
                     DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
                     if [ -d "$DEST_BUILTINS_DIR" ]; then
-                        echo "copying compiler-rt embedded builtins into the local clang build directory $DEST_BUILTINS_DIR."
+                        for HOST_CXX_BUILTINS_PATH in "$HOST_CXX_DIR/../lib/clang"/*; do
+                            HOST_CXX_BUILTINS_DIR="$HOST_CXX_BUILTINS_PATH/lib/darwin"
+                            echo "copying compiler-rt embedded builtins from $HOST_CXX_BUILTINS_DIR into the local clang build directory $DEST_BUILTINS_DIR."
 
-                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" ]; then
-                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.ios.a" "$DEST_BUILTINS_DIR/libclang_rt.ios.a"
-                        fi
-                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" ]; then
-                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.watchos.a" "$DEST_BUILTINS_DIR/libclang_rt.watchos.a"
-                        fi
-                        if [ -f "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" ]; then
-                            call cp "$HOST_CXX_BUILTINS_DIR/libclang_rt.tvos.a" "$DEST_BUILTINS_DIR/libclang_rt.tvos.a"
-                        fi
+                            for OS in ios watchos tvos; do
+                                LIB_NAME="libclang_rt.$OS.a"
+                                HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
+                                if [ -f "$HOST_LIB_PATH" ]; then
+                                    call cp "$HOST_LIB_PATH" "$DEST_BUILTINS_DIR/$LIB_NAME"
+                                elif [[ "${VERBOSE_BUILD}" ]]; then
+                                    echo "no file exists at $HOST_LIB_PATH"
+                                fi
+                            done
+                        done
                     fi
                 fi
             fi
