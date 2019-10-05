@@ -1,4 +1,4 @@
-//===--- AutoDiff.cpp - Swift Automatic Differentiation -------------------===//
+//===--- AutoDiff.cpp - Swift Differentiable Programming ------------------===//
 //
 // This source file is part of the Swift.org open source project
 //

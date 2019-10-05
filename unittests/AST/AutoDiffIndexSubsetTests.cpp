@@ -71,6 +71,50 @@ TEST(AutoDiffIndexSubset, Equality) {
                                      /*indices*/ {}));
 }
 
+TEST(AutoDiffIndexSubset, Initializers) {
+  TestContext ctx;
+  // Default init.
+  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
+                                            /*includeAll*/ true),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 1, 2, 3, 4}));
+  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
+                                            /*includeAll*/ false),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
+                                            /*includeAll*/ true),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+                                     /*indices*/ {}));
+  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
+                                            /*includeAll*/ false),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+  // Bit vector init.
+  {
+    llvm::SmallBitVector bitVec(6);
+    bitVec.set(1, 4);
+    EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, bitVec),
+              AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 6,
+                                       /*indices*/ {1, 2, 3}));
+  }
+  {
+    llvm::SmallBitVector bitVec(0);
+    EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, bitVec),
+              AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+                                       /*indices*/ {}));
+  }
+  // String init.
+  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, "SSSSS"),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 1, 2, 3, 4}));
+  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, "UUUUU"),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, "SUSUS"),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+                                     /*indices*/ {0, 2, 4}));
+  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, ""),
+            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+}
+
 TEST(AutoDiffIndexSubset, Bits) {
   TestContext ctx;
   auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,

@@ -1,4 +1,4 @@
-//===--- AutoDiff.h - Swift Automatic Differentiation ---------------------===//
+//===--- AutoDiff.h - Swift Differentiable Programming --------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 //  SWIFT_ENABLE_TENSORFLOW
-//  This file defines AST support for automatic differentiation.
+//  This file defines AST support for the experimental differentiable
+//  programming feature.
 //
 //===----------------------------------------------------------------------===//
 
