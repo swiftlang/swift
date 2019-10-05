@@ -258,6 +258,19 @@ extension Tracked where T : Differentiable & FloatingPoint, T == T.TangentVector
 }
 
 // Differential operators for `Tracked<Float>`.
+public func gradient(
+  at x: Tracked<Float>, in f: @differentiable (Tracked<Float>) -> Tracked<Float>
+) -> Tracked<Float> {
+  return pullback(at: x, in: f)(1)
+}
+
+public func gradient(
+  at x: Tracked<Float>, _ y: Tracked<Float>,
+  in f: @differentiable (Tracked<Float>, Tracked<Float>) -> Tracked<Float>
+) -> (Tracked<Float>, Tracked<Float>) {
+  return pullback(at: x, y, in: f)(1)
+}
+
 public extension Differentiable {
   @inlinable
   func gradient(

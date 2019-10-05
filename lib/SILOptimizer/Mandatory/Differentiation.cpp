@@ -6176,6 +6176,56 @@ public:
            "Functions without returns must have been diagnosed");
     auto *origExit = &*origExitIt;
 
+    SmallVector<SILValue, 8> origFormalResults;
+    collectAllFormalResultsInTypeOrder(original, origFormalResults);
+    auto origResult = origFormalResults[getIndices().source];
+
+    // If original result is non-varied, it will always have a zero derivative.
+    // Skip full pullback generation and simply return zero for wrt parameters.
+    //
+    // NOTE(TF-876): This shortcut is currently necessary for functions
+    // returning non-varied result with >1 basic block where some basic blocks
+    // have no dominated active values; control flow differentiation does not
+    // handle this case. See TF-876 for context.
+    if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
+      /*
+      // TODO(TF-788): Re-enable non-varied result warning.
+      // Emit fixit if original result has a valid source location.
+      auto startLoc = origResult.getLoc().getStartSourceLoc();
+      auto endLoc = origResult.getLoc().getEndSourceLoc();
+      if (startLoc.isValid() && endLoc.isValid()) {
+        getContext().diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+            .fixItInsert(startLoc, "withoutDerivative(at:")
+            .fixItInsertAfter(endLoc, ")");
+      }
+      */
+      LLVM_DEBUG(getADDebugStream() << original.getName()
+                                    << " has non-varied result, returning zero"
+                                       " for all pullback results");
+      auto *pullbackEntry = pullback.createBasicBlock();
+      createEntryArguments(&pullback);
+      builder.setInsertionPoint(pullbackEntry);
+      // Destroy all owned arguments.
+      for (auto *arg : pullbackEntry->getArguments())
+        if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+          builder.emitDestroyOperation(pbLoc, arg);
+      // Return zero for each result.
+      getRemappedTangentType(origResult->getType());
+      SmallVector<SILValue, 4> directResults;
+      auto indirectResultIt = pullback.getIndirectResults().begin();
+      for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
+        if (resultInfo.isFormalDirect()) {
+          directResults.push_back(emitZeroDirect(resultInfo.getType(), pbLoc));
+        } else {
+          emitZeroIndirect(resultInfo.getType(), *indirectResultIt++, pbLoc);
+        }
+      }
+      builder.createReturn(pbLoc, joinElements(directResults, builder, pbLoc));
+      LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
+                                    << original.getName() << ":\n" << pullback);
+      return errorOccurred;
+    }
+
     // Get dominated active values in original blocks.
     // Adjoint values of dominated active values are passed as pullback block
     // arguments.
@@ -6252,7 +6302,7 @@ public:
       // create entry arguments and continue to the next block.
       if (origBB == origExit) {
         assert(pullbackBB->isEntry());
-        createEntryArguments(&getPullback());
+        createEntryArguments(&pullback);
         auto *mainPullbackStruct = pullbackBB->getArguments().back();
         assert(mainPullbackStruct->getType() == pbStructLoweredType);
         pullbackStructArguments[origBB] = mainPullbackStruct;
@@ -6326,24 +6376,6 @@ public:
     seed = pbParamArgs[0];
 
     // Assign adjoint for original result.
-    SmallVector<SILValue, 8> origFormalResults;
-    collectAllFormalResultsInTypeOrder(original, origFormalResults);
-    auto origResult = origFormalResults[getIndices().source];
-    // TODO(TF-788): Re-enable non-varied result warning.
-    /*
-    // Emit a warning and fixit if original result is not varied, because it
-    // will always have a zero derivative.
-    if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
-      // Emit fixit if original result has a valid source location.
-      auto startLoc = origResult.getLoc().getStartSourceLoc();
-      auto endLoc = origResult.getLoc().getEndSourceLoc();
-      if (startLoc.isValid() && endLoc.isValid()) {
-        getContext().diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
-            .fixItInsert(startLoc, "withoutDerivative(at:")
-            .fixItInsertAfter(endLoc, ")");
-      }
-    }
-    */
     builder.setInsertionPoint(
         pullbackEntry, getNextFunctionLocalAllocationInsertionPoint());
     if (seed->getType().isAddress()) {
