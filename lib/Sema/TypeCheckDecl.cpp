@@ -631,15 +631,16 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   if (current->alreadyCheckedRedeclaration())
     return;
 
-  // If there's no type yet, come back to it later.
-  if (!current->hasInterfaceType())
-    return;
-  
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
+  // FIXME: Computes isInvalid() below.
+  (void) current->getInterfaceType();
+
   // Ignore invalid and anonymous declarations.
-  if (current->isInvalid() || !current->hasName())
+  if (current->isInvalid() ||
+      !current->hasInterfaceType() ||
+      !current->hasName())
     return;
 
   // If this declaration isn't from a source file, don't check it.
@@ -685,6 +686,13 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (currentModule != other->getModuleContext())
       continue;
 
+    // If both declarations are in the same file, only diagnose the second one.
+    if (currentFile == other->getDeclContext()->getParentSourceFile())
+      if (current->getLoc().isValid() &&
+          tc.Context.SourceMgr.isBeforeInBuffer(
+            current->getLoc(), other->getLoc()))
+        continue;
+
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
@@ -696,13 +704,11 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // Validate the declaration but only if it came from a different context.
-    if (other->getDeclContext() != current->getDeclContext())
-      (void)other->getInterfaceType();
+    // FIXME: Computes isInvalid() below.
+    (void) other->getInterfaceType();
 
-    // Skip invalid or not yet seen declarations.
-    // FIXME(InterfaceTypeRequest): Delete this.
-    if (other->isInvalid() || !other->hasInterfaceType())
+    // Skip invalid declarations.
+    if (other->isInvalid())
       continue;
 
     // Skip declarations in other files.
@@ -1127,7 +1133,6 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      (void)valueMember->getInterfaceType();
       if (!decl->isAvailableInExistential(valueMember))
         return false;
     }
@@ -1511,8 +1516,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   
   Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
+    // FIXME: Computes isInvalid() below.
+    (void) elt->getInterfaceType();
+
     // If the element has been diagnosed up to now, skip it.
-    (void)elt->getInterfaceType();
     if (elt->isInvalid())
       continue;
 
@@ -2466,10 +2473,10 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    (void)SD->getInterfaceType();
+    // Force requests that can emit diagnostics.
+    (void) SD->getInterfaceType();
+    (void) SD->getGenericSignature();
 
-    // Force creation of the generic signature.
-    (void)SD->getGenericSignature();
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
       checkGenericParams(SD->getGenericParams(), SD, TC);
@@ -2516,31 +2523,24 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    (void)TAD->getInterfaceType();
+    // Force requests that can emit diagnostics.
+    (void) TAD->getGenericSignature();
+    (void) TAD->getUnderlyingType();
 
     TC.checkDeclAttributes(TAD);
-
-    // Force the generic signature to be computed in case it emits diagnostics.
-    (void)TAD->getGenericSignature();
-    // Force computing the underlying type in case it emits diagnostics.
-    (void)TAD->getUnderlyingType();
-
     checkAccessControl(TC, TAD);
 
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    (void)OTD->getInterfaceType();
+    // Force requests that can emit diagnostics.
+    (void) OTD->getGenericSignature();
+
     TC.checkDeclAttributes(OTD);
-    
-    // Force the generic signature to be computed in case it emits diagnostics.
-    (void)OTD->getGenericSignature();
-    
     checkAccessControl(TC, OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    (void)AT->getInterfaceType();
     TC.checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
@@ -2558,7 +2558,7 @@ public:
     checkAccessControl(TC, AT);
 
     // Trigger the checking for overridden declarations.
-    (void)AT->getOverriddenDecls();
+    (void) AT->getOverriddenDecls();
 
     auto defaultType = AT->getDefaultDefinitionType();
     if (defaultType && !defaultType->hasError()) {
@@ -2628,7 +2628,10 @@ public:
 
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
-    (void)ED->getInterfaceType();
+
+    // FIXME: Remove this once we clean up the mess involving raw values.
+    (void) ED->getInterfaceType();
+
     checkGenericParams(ED->getGenericParams(), ED, TC);
 
     {
@@ -2675,7 +2678,6 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    (void)SD->getInterfaceType();
     checkGenericParams(SD->getGenericParams(), SD, TC);
 
     // Force lowering of stored properties.
@@ -2796,9 +2798,9 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     checkUnsupportedNestedType(CD);
 
-    (void)CD->getInterfaceType();
     // Force creation of the generic signature.
-    (void)CD->getGenericSignature();
+    (void) CD->getGenericSignature();
+
     checkGenericParams(CD->getGenericParams(), CD, TC);
 
     {
@@ -2950,10 +2952,6 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
-
-    // FIXME: Circularity?
-    if (!PD->getInterfaceType())
-      return;
 
     auto *SF = PD->getParentSourceFile();
     {
@@ -3165,7 +3163,7 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    (void)EED->getInterfaceType();
+    (void) EED->getInterfaceType();
     auto *ED = EED->getParentEnum();
 
     TC.checkDeclAttributes(EED);
@@ -3309,7 +3307,7 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    (void)CD->getInterfaceType();
+    (void) CD->getInterfaceType();
 
     // Compute these requests in case they emit diagnostics.
     (void) CD->getInitKind();
@@ -3436,8 +3434,6 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    (void)DD->getInterfaceType();
-
     TC.checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
@@ -3971,13 +3967,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Func:
   case DeclKind::Accessor: {
     auto *FD = cast<FuncDecl>(D);
-
-    // Bail out if we're in a recursive validation situation.
-    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-      auto *storage = accessor->getStorage();
-      if (!storage->getInterfaceType())
-        return;
-    }
 
     DeclValidationRAII IBV(FD);
 

@@ -334,7 +334,7 @@ swift::matchWitness(
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->getInterfaceType())
+  if (witness->isRecursiveValidation())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.

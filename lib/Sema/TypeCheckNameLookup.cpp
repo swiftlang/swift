@@ -430,12 +430,6 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
   for (auto decl : decls) {
     auto *typeDecl = cast<TypeDecl>(decl);
 
-    // FIXME: This should happen before we attempt shadowing checks.
-    if (!typeDecl->getInterfaceType()) {
-      // FIXME: recursion-breaking hack
-      continue;
-    }
-
     auto memberType = typeDecl->getDeclaredInterfaceType();
 
     if (isUnsupportedMemberTypeAccess(type, typeDecl)) {

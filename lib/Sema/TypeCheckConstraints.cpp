@@ -440,12 +440,6 @@ static bool findNonMembers(TypeChecker &TC,
     if (!isValid(D))
       return false;
 
-    // FIXME: Circularity hack.
-    if (!D->getInterfaceType()) {
-      AllDeclRefs = false;
-      continue;
-    }
-
     if (matchesDeclRefKind(D, refKind))
       ResultValues.push_back(D);
   }

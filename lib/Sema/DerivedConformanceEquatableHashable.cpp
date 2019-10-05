@@ -47,8 +47,8 @@ associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->getInterfaceType())
-      continue;
+    // FIXME: Remove this once getInterfaceType() on a ParamDecl works.
+    (void) elt->getInterfaceType();
     
     auto PL = elt->getParameterList();
     if (!PL)

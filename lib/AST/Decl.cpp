@@ -2731,8 +2731,11 @@ Type ValueDecl::getInterfaceType() const {
     // Our clients that don't register the lazy resolver are relying on the
     // fact that they can't pull an interface type out to avoid doing work.
     // This is a necessary evil until we can wean them off.
-    if (auto resolver = getASTContext().getLazyResolver())
+    if (auto resolver = getASTContext().getLazyResolver()) {
       resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
+      if (!hasInterfaceType())
+        return ErrorType::get(getASTContext());
+    }
   }
   return TypeAndAccess.getPointer();
 }
