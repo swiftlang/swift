@@ -548,11 +548,11 @@ struct S <TypeInheritanceClause>: <InheritedType><SimpleTypeIdentifier>Q</Simple
 struct ReadModify <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>st0 </IdentifierPattern><InitializerClause>= <TupleExpr>(<TupleExprElement><StringLiteralExpr>"<StringSegment>a</StringSegment>"</StringLiteralExpr>, </TupleExprElement><TupleExprElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr></TupleExprElement>)</TupleExpr></InitializerClause></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>rm0</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
-    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<TupleExpr>(<TupleExprElement><StringLiteralExpr>"<StringSegment>a</StringSegment>"</StringLiteralExpr>, </TupleExprElement><TupleExprElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr></TupleExprElement>)</TupleExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl><AccessorDecl>
+    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<TupleExprElement><TupleExpr>(<TupleExprElement><StringLiteralExpr>"<StringSegment>a</StringSegment>"</StringLiteralExpr>, </TupleExprElement><TupleExprElement><StringLiteralExpr>"<StringSegment>b</StringSegment>"</StringLiteralExpr></TupleExprElement>)</TupleExpr></TupleExprElement>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl><AccessorDecl>
     _modify <CodeBlock>{ <YieldStmt>yield <InOutExpr>&<IdentifierExpr>st0 </IdentifierExpr></InOutExpr></YieldStmt>}</CodeBlock></AccessorDecl>
   }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem><MemberDeclListItem><VariableDecl>
   var <PatternBinding><IdentifierPattern>rm1</IdentifierPattern><TypeAnnotation>: <TupleType>(<TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier>, </TupleTypeElement><TupleTypeElement><SimpleTypeIdentifier>String</SimpleTypeIdentifier></TupleTypeElement>) </TupleType></TypeAnnotation><AccessorBlock>{<AccessorDecl>
-    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<IdentifierExpr>st0</IdentifierExpr>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl>
+    _read <CodeBlock>{ <YieldStmt>yield <YieldList>(<TupleExprElement><IdentifierExpr>st0</IdentifierExpr></TupleExprElement>) </YieldList></YieldStmt>}</CodeBlock></AccessorDecl>
   }</AccessorBlock></PatternBinding></VariableDecl></MemberDeclListItem>
 }</MemberDeclBlock></StructDecl><StructDecl><CustomAttribute>
 
@@ -562,9 +562,9 @@ struct ReadModify <MemberDeclBlock>{<MemberDeclListItem><VariableDecl>
 
 func foo<FunctionSignature><ParameterClause>() </ParameterClause></FunctionSignature><CodeBlock>{}</CodeBlock></FunctionDecl><PoundSourceLocation>
 
-#sourceLocation()</PoundSourceLocation>
+#sourceLocation()</PoundSourceLocation><StringLiteralExpr>
 
-"<StringSegment>abc </StringSegment>\( } )<StringSegment> def</StringSegment>"<PoundAssertStmt>
+"<StringSegment>abc </StringSegment><ExpressionSegment>\( <TupleExprElement></TupleExprElement>} )</ExpressionSegment><StringSegment> def</StringSegment>"</StringLiteralExpr><PoundAssertStmt>
 
 #assert(<BooleanLiteralExpr>true</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>
 #assert(<BooleanLiteralExpr>false</BooleanLiteralExpr>)</PoundAssertStmt><PoundAssertStmt>

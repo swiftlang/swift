@@ -1558,8 +1558,11 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
-                                   syntax::SyntaxKind Kind);
+  ParserResult<Expr> parseExprParenOrTuple();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprTupleSyntax();
+  ParserStatus parseExprTupleElementListSyntax(
+      SmallVectorImpl<ParsedTupleExprElementSyntax> &elements,
+      llvm::function_ref<bool()> isAtCloseTok);
 
   /// Parse an expression list, keeping all of the pieces separated.
   ParserStatus parseExprList(tok leftTok, tok rightTok,
@@ -1570,8 +1573,7 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure,
-                             syntax::SyntaxKind Kind);
+                             Expr *&trailingClosure);
 
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
 

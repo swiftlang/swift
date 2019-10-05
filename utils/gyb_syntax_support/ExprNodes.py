@@ -218,8 +218,12 @@ EXPR_NODES = [
     Node('TupleExprElement', kind='Syntax',
          traits=['WithTrailingComma'],
          children=[
-             Child('Label', kind='IdentifierToken',
-                   is_optional=True),
+             Child('Label', kind='Token',
+                   is_optional=True,
+                   token_choices=[
+                       'IdentifierToken',
+                       'WildcardToken'
+                   ]),
              Child('Colon', kind='ColonToken',
                    is_optional=True),
              Child('Expression', kind='Expr'),
