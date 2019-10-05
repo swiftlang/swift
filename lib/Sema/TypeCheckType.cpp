@@ -58,16 +58,13 @@ TypeResolution TypeResolution::forStructural(DeclContext *dc) {
   return TypeResolution(dc, TypeResolutionStage::Structural);
 }
 
-TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            LazyResolver *resolver) {
-  return forInterface(dc, dc->getGenericSignatureOfContext(), resolver);
+TypeResolution TypeResolution::forInterface(DeclContext *dc) {
+  return forInterface(dc, dc->getGenericSignatureOfContext());
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature genericSig,
-                                            LazyResolver *resolver) {
+                                            GenericSignature genericSig) {
   TypeResolution result(dc, TypeResolutionStage::Interface);
-  result.Resolver = resolver;
   result.complete.genericSig = genericSig;
   result.complete.builder = nullptr;
   return result;

@@ -3808,8 +3808,7 @@ static void validateResultType(ValueDecl *decl,
         : ErrorType::get(decl->getASTContext()));
   } else {
     auto *dc = decl->getInnermostDeclContext();
-    auto resolution = TypeResolution::forInterface(
-      dc, dc->getGenericSignatureOfContext());
+    auto resolution = TypeResolution::forInterface(dc);
     TypeChecker::validateType(dc->getASTContext(),
                               resultTyLoc, resolution,
                               TypeResolverContext::FunctionResult);
@@ -4074,8 +4073,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    auto resolution = TypeResolution::forInterface(FD,
-                                                   FD->getGenericSignature());
+    auto resolution = TypeResolution::forInterface(FD);
     typeCheckParameterList(FD->getParameters(), resolution,
                            TypeResolverContext::AbstractFunctionDecl);
     validateResultType(FD, FD->getBodyResultTypeLoc());
@@ -4114,7 +4112,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    auto res = TypeResolution::forInterface(CD, CD->getGenericSignature());
+    auto res = TypeResolution::forInterface(CD);
     typeCheckParameterList(CD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
@@ -4126,7 +4124,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    auto res = TypeResolution::forInterface(DD, DD->getGenericSignature());
+    auto res = TypeResolution::forInterface(DD);
     typeCheckParameterList(DD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     DD->computeType();
@@ -4138,7 +4136,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    auto res = TypeResolution::forInterface(SD, SD->getGenericSignature());
+    auto res = TypeResolution::forInterface(SD);
     typeCheckParameterList(SD->getIndices(), res,
                            TypeResolverContext::SubscriptDecl);
     validateResultType(SD, SD->getElementTypeLoc());
@@ -4154,7 +4152,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      auto res = TypeResolution::forInterface(ED, ED->getGenericSignature());
+      auto res = TypeResolution::forInterface(ED);
       typeCheckParameterList(PL, res,
                              TypeResolverContext::EnumElementDecl);
     }
