@@ -1302,6 +1302,15 @@ SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
   return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
 }
 
+SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const Syntax &Node) {
+  if (auto Tok = Node.getLastToken())
+    return advanceLocBegin(Loc, *Tok);
+  if (auto Prev = Node.getPreviousNode())
+    return advanceLocBegin(Loc, *Prev->getLastToken());
+  assert(false && "No tokens in tree?");
+  return Loc;
+}
+
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);
 }

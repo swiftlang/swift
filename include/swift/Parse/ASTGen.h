@@ -214,6 +214,13 @@ private:
   static SourceLoc advanceLocBegin(const SourceLoc &Loc,
                                    const syntax::Syntax &Node);
 
+  /// Advance \p Loc to the last non-missing token of the \p Node or, if it
+  /// doesn't contain any, the last non-missing token preceding it in the tree.
+  /// \p Loc must be the leading trivia of the first token in the tree in which
+  /// \p Node resides
+  static SourceLoc advanceLocEnd(const SourceLoc &Loc,
+                                 const syntax::Syntax &Node);
+
   ValueDecl *lookupInScope(DeclName Name);
 
   void addToScope(ValueDecl *D, bool diagnoseRedefinitions = true);
