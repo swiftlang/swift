@@ -50,11 +50,11 @@ static const constexpr PublicDiagnostic publicDiagnostics[] = {
 
 static const constexpr PublicDiagnosticID internalToPublicIDs[] = {
 #define DIAG(KIND, ID, Options, Text, Signature) PublicDiagnosticID::none,
-#define PUBLICERROR(PUBLICID, ID, Options, Text, Signature)                    \
+#define PUBLICERROR(ID, PUBLICID, Options, Text, Signature)                    \
   PublicDiagnosticID::PUBLICID,
-#define PUBLICWARNING(PUBLICID, ID, Options, Text, Signature)                  \
+#define PUBLICWARNING(ID, PUBLICID, Options, Text, Signature)                  \
   PublicDiagnosticID::PUBLICID,
-#define PUBLICNOTE(PUBLICID, ID, Options, Text, Signature)                     \
+#define PUBLICNOTE(ID, PUBLICID, Options, Text, Signature)                     \
   PublicDiagnosticID::PUBLICID,
 #include "swift/AST/DiagnosticsAll.def"
 };
