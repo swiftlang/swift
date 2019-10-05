@@ -232,6 +232,10 @@ TrailingWhereClause *ASTGen::generate(const GenericWhereClauseSyntax &syntax,
 Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
   Expr *result = nullptr;
 
+  auto exprLoc = advanceLocBegin(Loc, E);
+  if (hasExpr(exprLoc))
+    return getExpr(exprLoc);
+
   if (auto identifierExpr = E.getAs<IdentifierExprSyntax>())
     result = generate(*identifierExpr, Loc);
   else if (auto superRefExpr = E.getAs<SuperRefExprSyntax>())
@@ -1349,6 +1353,30 @@ TypeRepr *ASTGen::cacheType(TypeSyntax Type, TypeRepr *TypeAST) {
 TypeRepr *ASTGen::lookupType(TypeSyntax Type) {
   auto Found = TypeCache.find(Type.getId());
   return Found != TypeCache.end() ? Found->second : nullptr;
+}
+
+void ASTGen::addExpr(Expr *E, const SourceLoc Loc) {
+#ifndef NDEBUG
+  if (hasExpr(Loc)) {
+    bool PrevIsSubExpr = false;
+    Expr *Prev = Exprs.find(Loc)->second;
+    E->forEachChildExpr([&](Expr *Child) {
+      if (Child == Prev)
+        PrevIsSubExpr = true;
+      return Child;
+    });
+    assert(PrevIsSubExpr);
+  }
+#endif
+  Exprs.insert({Loc, E});
+}
+
+bool ASTGen::hasExpr(const SourceLoc Loc) const {
+  return Exprs.find(Loc) != Exprs.end();
+}
+
+Expr *ASTGen::getExpr(const SourceLoc Loc) const {
+  return Exprs.find(Loc)->second;
 }
 
 void ASTGen::addDeclAttributes(DeclAttributes attrs, SourceLoc Loc) {

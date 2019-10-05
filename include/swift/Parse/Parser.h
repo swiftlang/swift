@@ -1428,6 +1428,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
+  ParsedSyntaxResult<ParsedExprSyntax> parseExpressionSyntax(Diag<> ID);
   ParserResult<Expr> parseExpr(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/false);
   }
