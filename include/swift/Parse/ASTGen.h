@@ -85,6 +85,8 @@ public:
   Expr *generate(const syntax::ExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::IdentifierExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::SuperRefExprSyntax &Expr, const SourceLoc Loc);
+  Expr *generate(const syntax::ArrayExprSyntax &Expr, const SourceLoc Loc);
+  Expr *generate(const syntax::DictionaryExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::EditorPlaceholderExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::SpecializeExprSyntax &Expr, const SourceLoc Loc);
@@ -111,6 +113,7 @@ public:
       const SourceLoc Loc);
 
 private:
+  void validateCollectionElement(Expr *elementExpr);
 
   Expr *generateMagicIdentifierLiteralExpression(
       const syntax::TokenSyntax &PoundToken, const SourceLoc Loc);

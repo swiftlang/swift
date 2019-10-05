@@ -244,6 +244,10 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*specializeExpr, Loc);
   else if (auto editorPlaceHolderExpr = E.getAs<EditorPlaceholderExprSyntax>())
     result = generate(*editorPlaceHolderExpr, Loc);
+  else if (auto arrayExpr = E.getAs<ArrayExprSyntax>())
+    result = generate(*arrayExpr, Loc);
+  else if (auto dictionaryExpr = E.getAs<DictionaryExprSyntax>())
+    result = generate(*dictionaryExpr, Loc);
   else if (auto integerLiteralExpr = E.getAs<IntegerLiteralExprSyntax>())
     result = generate(*integerLiteralExpr, Loc);
   else if (auto floatLiteralExpr = E.getAs<FloatLiteralExprSyntax>())
@@ -432,6 +436,94 @@ Expr *ASTGen::generate(const SpecializeExprSyntax &E, const SourceLoc Loc) {
   args.assign(argTyRs.begin(), argTyRs.end());
   return UnresolvedSpecializeExpr::create(Context, base, lAngleLoc, args,
                                           rAngleLoc);
+}
+
+/// validateCollectionElement - Check if a given collection element is valid.
+///
+/// At the moment, this checks whether a given collection element is a subscript
+/// expression and whether we're subscripting into an array. If we are, then it
+/// we emit a diagnostic in case it was not something that the user was
+/// expecting.
+///
+/// For example: `let array [ [0, 1] [42] ]`
+void ASTGen::validateCollectionElement(Expr *elementExpr) {
+  if (!elementExpr)
+    return;
+
+  if (!isa<SubscriptExpr>(elementExpr))
+    return;
+
+  auto subscriptExpr = cast<SubscriptExpr>(elementExpr);
+  if (!isa<ArrayExpr>(subscriptExpr->getBase()))
+    return;
+
+  auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
+
+  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
+  auto endLocOfArray = arrayExpr->getEndLoc();
+
+  auto locForEndOfTokenArray =
+      Lexer::getLocForEndOfToken(Context.SourceMgr, endLocOfArray);
+
+  if (locForEndOfTokenArray != startLocOfSubscript) {
+    auto subscriptLoc = subscriptExpr->getLoc();
+    P.diagnose(subscriptLoc, diag::subscript_array_element)
+        .highlight(subscriptExpr->getSourceRange());
+    P.diagnose(subscriptLoc, diag::subscript_array_element_fix_it_add_comma)
+        .fixItInsertAfter(endLocOfArray, ",");
+    P.diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
+        .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
+  }
+}
+
+Expr *ASTGen::generate(const ArrayExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<Expr *, 8> elements;
+  SmallVector<SourceLoc, 8> commaLocs;
+  elements.reserve(E.getElements().size());
+  for (auto elemSyntax : E.getElements()) {
+    if (auto elemAST = generate(elemSyntax.getExpression(), Loc)) {
+      validateCollectionElement(elemAST);
+      elements.push_back(elemAST);
+    }
+    if (auto comma = elemSyntax.getTrailingComma())
+      commaLocs.push_back(advanceLocBegin(Loc, *comma));
+  }
+
+  // Don't bother to create expression if any expressions aren't parsed.
+  if (elements.empty() && !E.getElements().empty())
+    return nullptr;
+
+  auto LSquareLoc = advanceLocBegin(Loc, E);
+  auto RSquareLoc = advanceLocEnd(Loc, E);
+  return ArrayExpr::create(Context, LSquareLoc, elements, commaLocs,
+                           RSquareLoc);
+}
+
+Expr *ASTGen::generate(const DictionaryExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<Expr *, 8> elements;
+  SmallVector<SourceLoc, 8> commaLocs;
+  if (auto contents = E.getContent().getAs<DictionaryElementListSyntax>()) {
+    elements.reserve(contents->size());
+    for (auto elemSyntax : *contents) {
+      if (auto key = generate(elemSyntax.getKeyExpression(), Loc)) {
+        auto val = generate(elemSyntax.getValueExpression(), Loc);
+        if (!val)
+          val = new (Context) ErrorExpr(advanceLocEnd(Loc, elemSyntax));
+        auto elemAST = TupleExpr::createImplicit(Context, {key, val}, {});
+        elements.push_back(elemAST);
+      }
+      if (auto comma = elemSyntax.getTrailingComma())
+        commaLocs.push_back(advanceLocBegin(Loc, *comma));
+    }
+    // Don't bother to create expression if any expressions aren't parsed.
+    if (elements.empty() && !contents->empty())
+      return nullptr;
+  }
+
+  auto LSquareLoc = advanceLocBegin(Loc, E);
+  auto RSquareLoc = advanceLocEnd(Loc, E);
+  return DictionaryExpr::create(Context, LSquareLoc, elements, commaLocs,
+                                RSquareLoc);
 }
 
 Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,

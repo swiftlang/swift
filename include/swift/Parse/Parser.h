@@ -1583,14 +1583,22 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprCollectionSyntax();
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprArraySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                       ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprDictionarySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                            ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
+
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprPoundUnknownSyntax(Optional<ParsedTokenSyntax> &&LSquare,
+                              SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
-
-  void validateCollectionElement(ParserResult<Expr> element);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing
