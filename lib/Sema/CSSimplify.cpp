@@ -902,7 +902,7 @@ public:
       }
     }
 
-    auto *locator = CS.getConstraintLocator(anchor);
+    auto *locator = CS.getConstraintLocator(Locator);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
     CS.recordFix(fix);
     // Re-labeling fixes with extraneous labels should take

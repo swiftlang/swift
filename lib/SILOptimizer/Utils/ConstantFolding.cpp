@@ -18,7 +18,7 @@
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/Statistic.h"
@@ -1527,7 +1527,11 @@ static bool
 constantFoldGlobalStringTablePointerBuiltin(BuiltinInst *bi,
                                             bool enableDiagnostics) {
   // Look through string initializer to extract the string_literal instruction.
-  SILValue builtinOperand = bi->getOperand(0);
+  //
+  // We allow for a single borrow to be stripped here if we are here in
+  // [ossa]. The begin borrow occurs b/c SILGen treats builtins as having
+  // arguments with a +0 convention (implying a borrow).
+  SILValue builtinOperand = stripBorrow(bi->getOperand(0));
   SILFunction *caller = bi->getFunction();
 
   FullApplySite stringInitSite = FullApplySite::isa(builtinOperand);

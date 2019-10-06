@@ -27,7 +27,7 @@ add_swift_unittest(SwiftBasicTests
   StringExtrasTest.cpp
   SuccessorMapTest.cpp
   ThreadSafeRefCntPointerTest.cpp
-  TransformArrayRefTest.cpp
+  TransformRangeTest.cpp
   TreeScopedHashTableTest.cpp
   UnicodeTest.cpp
   ValueEnumeratorTest.cpp

@@ -78,10 +78,11 @@ Parser::parseGenericParameterClauseSyntax() {
       SyntaxParsingContext TmpCtxt(SyntaxContext);
       TmpCtxt.setTransparent();
 
+      auto AttrsLoc = Tok.getLoc();
       DeclAttributes attrsAST;
       parseDeclAttributeList(attrsAST);
       if (!attrsAST.isEmpty())
-        Generator.addDeclAttributes(attrsAST, attrsAST.getStartLoc());
+        Generator.addDeclAttributes(attrsAST, AttrsLoc);
       auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
       if (attrs)
         paramBuilder.useAttributes(std::move(*attrs));
@@ -110,9 +111,8 @@ Parser::parseGenericParameterClauseSyntax() {
           diagnose(Tok, diag::unexpected_class_constraint);
           diagnose(Tok, diag::suggest_anyobject)
               .fixItReplace(Tok.getLoc(), "AnyObject");
-          Tok.setKind(tok::identifier);
-          auto ty = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
-              consumeTokenSyntax(), None, *SyntaxContext);
+          auto ty = ParsedSyntaxRecorder::makeClassRestrictionType(
+              consumeTokenSyntax(tok::kw_class), *SyntaxContext);
           paramBuilder.useInheritedType(std::move(ty));
         } else {
           diagnose(Tok, diag::expected_generics_type_restriction, ident);
@@ -197,9 +197,8 @@ ParserResult<GenericParamList> Parser::parseSILGenericParams() {
   return makeParserResult(status, ret);
 }
 
-void
-Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
-                                              GenericParams) {
+void Parser::diagnoseWhereClauseInGenericParamList(
+    const GenericParamList *GenericParams, SourceLoc whereLoc) {
   if (GenericParams == nullptr || GenericParams->getWhereLoc().isInvalid())
     return;
 
@@ -224,7 +223,7 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
 
   SmallString<64> Buffer;
   llvm::raw_svector_ostream WhereClauseText(Buffer);
-  WhereClauseText << SourceMgr.extractText(Tok.is(tok::kw_where)
+  WhereClauseText << SourceMgr.extractText(whereLoc.isValid()
                                            ? WhereCharRange
                                            : RemoveWhereRange);
 
@@ -240,12 +239,20 @@ Parser::diagnoseWhereClauseInGenericParamList(const GenericParamList *
   Diag.fixItRemoveChars(RemoveWhereRange.getStart(),
                         RemoveWhereRange.getEnd());
 
-  if (Tok.is(tok::kw_where)) {
-    Diag.fixItReplace(Tok.getLoc(), WhereClauseText.str());
+  if (whereLoc.isValid()) {
+    Diag.fixItReplace(whereLoc, WhereClauseText.str());
   } else {
     Diag.fixItInsert(Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc),
                      WhereClauseText.str());
   }
+}
+
+void Parser::diagnoseWhereClauseInGenericParamList(
+    const GenericParamList *GenericParams) {
+  SourceLoc whereLoc;
+  if (Tok.is(tok::kw_where))
+    whereLoc = Tok.getLoc();
+  diagnoseWhereClauseInGenericParamList(GenericParams, whereLoc);
 }
 
 /// Parse a 'where' clause, which places additional constraints on generic

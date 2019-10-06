@@ -367,7 +367,7 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion3<GenericParamList *, Decl *, SpecializeAttr *> source;
+  llvm::PointerUnion<GenericParamList *, Decl *, SpecializeAttr *> source;
 
   WhereClauseOwner(Decl *decl);
 
@@ -380,8 +380,7 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return hash_combine(hash_value(owner.dc),
-                        hash_value(owner.source.getOpaqueValue()));
+    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
@@ -1209,6 +1208,7 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
 class OperatorPrecedenceGroupRequest
@@ -1227,6 +1227,48 @@ private:
 
 public:
   // Separate caching.
+  bool isCached() const { return true; }
+};
+
+class EnumRawValuesRequest :
+    public SimpleRequest<EnumRawValuesRequest,
+                         bool (EnumDecl *, TypeResolutionStage),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
+  
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+                           
+  // Separate caching.
+  bool isCached() const;
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+class IsABICompatibleOverrideRequest
+    : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching.
   bool isCached() const { return true; }
 };
 

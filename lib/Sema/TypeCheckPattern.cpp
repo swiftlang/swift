@@ -21,6 +21,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -1131,6 +1132,18 @@ recur:
 
     var->getTypeLoc() = tyLoc;
     var->getTypeLoc().setType(var->getType());
+
+    // FIXME: Copy pasted from validateDecl(). This needs to be converted to
+    // use requests.
+    if (var->getOpaqueResultTypeDecl()) {
+      if (auto sf = var->getInnermostDeclContext()->getParentSourceFile()) {
+        sf->markDeclWithOpaqueResultTypeAsValidated(var);
+      }
+    }
+
+    // FIXME: Should probably just remove the forbidden prefix stuff, it no
+    // longer makes a lot of sense in a request-based world.
+    checkForForbiddenPrefix(var);
 
     // If we are inferring a variable to have type AnyObject.Type,
     // "()", an uninhabited type, or optional thereof, emit a diagnostic.

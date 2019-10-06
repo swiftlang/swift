@@ -1361,7 +1361,6 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
                                     C.Id_self, this);
       SelfParam->setImplicit();
       SelfParam->setInterfaceType(DC->getSelfInterfaceType());
-      SelfParam->setValidationToChecked();
     }
   }
 
@@ -2142,32 +2141,15 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-static bool isValidKeyPathComponent(AbstractStorageDecl *decl) {
-  // If this property or subscript is not an override, we can reference it
-  // from a keypath component.
-  auto base = decl->getOverriddenDecl();
-  if (!base)
-    return true;
-
-  // Otherwise, we can only reference it if the type is not ABI-compatible
-  // with the type of the base.
-  //
-  // If the type is ABI compatible with the type of the base, we have to
-  // reference the base instead.
-  auto baseInterfaceTy = base->getInterfaceType();
-  auto derivedInterfaceTy = decl->getInterfaceType();
-
-  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
-
-  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
-      base, decl, baseInterfaceTy);
-
-  return !derivedInterfaceTy->matches(overrideInterfaceTy,
-                                      TypeMatchFlags::AllowABICompatible);
-}
-
-void AbstractStorageDecl::computeIsValidKeyPathComponent() {
-  setIsValidKeyPathComponent(::isValidKeyPathComponent(this));
+bool AbstractStorageDecl::isValidKeyPathComponent() const {
+  // Check whether we're an ABI compatible override of another property. If we
+  // are, then the key path should refer to the base decl instead.
+  auto &ctx = getASTContext();
+  auto isABICompatibleOverride = evaluateOrDefault(
+      ctx.evaluator,
+      IsABICompatibleOverrideRequest{const_cast<AbstractStorageDecl *>(this)},
+      false);
+  return !isABICompatibleOverride;
 }
 
 bool AbstractStorageDecl::isGetterMutating() const {
@@ -3864,7 +3846,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
 
   DD->setImplicit();
-  DD->setValidationToChecked();
 
   // Synthesize an empty body for the destructor as needed.
   DD->setBodySynthesizer(synthesizeEmptyFunctionBody);
@@ -4291,6 +4272,12 @@ bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
          && "ignoring the effects of @inlinable, @testable, and @objc, "
             "these should match up");
   return !isResilient(M, expansion);
+}
+      
+void EnumDecl::setHasFixedRawValues() {
+  auto flags = LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues;
+  LazySemanticInfo.RawTypeAndFlags.setInt(flags);
 }
 
 ProtocolDecl::ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc,
@@ -5078,6 +5065,10 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
   // setter.
   if (!isLet())
     return supportsMutation();
+
+  // Debugger expression 'let's are initialized through a side-channel.
+  if (isDebuggerVar())
+    return false;
 
   // We have a 'let'; we must be checking settability from a specific
   // DeclContext to go on further.
@@ -6578,26 +6569,22 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   if (decl->isEffectiveLinkageMoreVisibleThan(base))
     return true;
 
-  // If the method overrides something, we only need a new entry if the
-  // override has a more general AST type. However an abstraction
-  // change is OK; we don't want to add a whole new vtable entry just
-  // because an @in parameter because @owned, or whatever.
-  auto baseInterfaceTy = base->getInterfaceType();
-  auto derivedInterfaceTy = decl->getInterfaceType();
-
   using Direction = ASTContext::OverrideGenericSignatureReqCheck;
   if (!ctx.overrideGenericSignatureReqsSatisfied(
           base, decl, Direction::BaseReqSatisfiedByDerived)) {
     return true;
   }
 
-  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
-
-  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
-      base, decl, baseInterfaceTy);
-
-  return !derivedInterfaceTy->matches(overrideInterfaceTy,
-                                      TypeMatchFlags::AllowABICompatible);
+  // If this method is an ABI compatible override, then we don't need a new
+  // vtable entry. Otherwise, if it's not ABI compatible, for example if the
+  // base has a more general AST type, then we need a new entry. Note that an
+  // abstraction change is OK; we don't want to add a whole new vtable entry
+  // just because an @in parameter becomes @owned, or whatever.
+  auto isABICompatibleOverride = evaluateOrDefault(
+      ctx.evaluator,
+      IsABICompatibleOverrideRequest{const_cast<AbstractFunctionDecl *>(decl)},
+      false);
+  return !isABICompatibleOverride;
 }
 
 void AbstractFunctionDecl::computeNeedsNewVTableEntry() {
@@ -6654,8 +6641,6 @@ void AbstractFunctionDecl::computeSelfDeclType() {
                        ? ParamDecl::Specifier::InOut
                        : ParamDecl::Specifier::Default;
   selfDecl->setSpecifier(specifier);
-
-  selfDecl->setValidationToChecked();
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
@@ -6995,11 +6980,8 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  if (!hasInterfaceType())
-    return nullptr;
-
   Type resultTy = getInterfaceType();
-  if (resultTy->is<ErrorType>())
+  if (resultTy.isNull() || resultTy->is<ErrorType>())
     return resultTy;
 
   if (hasImplicitSelfDecl())
@@ -7195,6 +7177,32 @@ EnumCaseDecl *EnumElementDecl::getParentCase() const {
   }
 
   llvm_unreachable("enum element not in case of parent enum");
+}
+      
+LiteralExpr *EnumElementDecl::getRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Interface},
+      true);
+  return RawValueExpr;
+}
+
+LiteralExpr *EnumElementDecl::getStructuralRawValueExpr() const {
+  // The return value of this request is irrelevant - it exists as
+  // a cache-warmer.
+  (void)evaluateOrDefault(
+      getASTContext().evaluator,
+      EnumRawValuesRequest{getParentEnum(), TypeResolutionStage::Structural},
+      true);
+  return RawValueExpr;
+}
+
+void EnumElementDecl::setRawValueExpr(LiteralExpr *e) {
+  assert((!RawValueExpr || e == RawValueExpr || e->getType()) &&
+         "Illegal mutation of raw value expr");
+  RawValueExpr = e;
 }
 
 SourceRange ConstructorDecl::getSourceRange() const {

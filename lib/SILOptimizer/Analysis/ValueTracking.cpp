@@ -12,13 +12,13 @@
 
 #define DEBUG_TYPE "sil-value-tracking"
 #include "swift/SILOptimizer/Analysis/ValueTracking.h"
-#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SIL/InstructionUtils.h"
-#include "swift/SILOptimizer/Utils/Local.h"
-#include "swift/SIL/PatternMatch.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/Debug.h"
 using namespace swift;
 using namespace swift::PatternMatch;

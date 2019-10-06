@@ -36,6 +36,9 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
+              bool (EnumDecl *, TypeResolutionStage), SeparatelyCached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *, TypeResolutionStage), SeparatelyCached,
               NoLocationInfo)
@@ -139,3 +142,5 @@ SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsABICompatibleOverrideRequest,
+              bool(ValueDecl *), Cached, NoLocationInfo)

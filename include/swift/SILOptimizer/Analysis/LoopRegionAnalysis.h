@@ -384,7 +384,7 @@ public:
 private:
   /// A pointer to one of a Loop, Basic Block, or Function represented by this
   /// region.
-  llvm::PointerUnion3<FunctionTy *, LoopTy *, BlockTy *> Ptr;
+  llvm::PointerUnion<FunctionTy *, LoopTy *, BlockTy *> Ptr;
 
   /// The ID of this region.
   unsigned ID;

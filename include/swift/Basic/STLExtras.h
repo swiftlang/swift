@@ -253,7 +253,7 @@ inline Iterator prev_or_begin(Iterator it, Iterator begin) {
 
 /// A range of iterators.
 /// TODO: Add `llvm::iterator_range::empty()`, then remove this helper, along
-/// with the superfluous FilterIterator and TransformIterator.
+/// with the superfluous TransformIterator.
 template<typename Iterator>
 class IteratorRange {
   Iterator First, Last;
@@ -277,136 +277,6 @@ template<typename Iterator>
 inline IteratorRange<Iterator> 
 makeIteratorRange(Iterator first, Iterator last) {
   return IteratorRange<Iterator>(first, last);
-}
-
-/// An iterator that filters the results of an underlying forward
-/// iterator, only passing through those values that satisfy a predicate.
-///
-/// \tparam Iterator the underlying iterator.
-///
-/// \tparam Predicate A predicate that determines whether a value of the
-/// underlying iterator is available in the resulting sequence.
-template<typename Iterator, typename Predicate>
-class FilterIterator {
-  Iterator Current, End;
-
-  /// FIXME: Could optimize away this storage with EBCO tricks.
-  Predicate Pred;
-
-  /// Skip any non-matching elements.
-  void skipNonMatching() {
-    while (Current != End && !Pred(*Current))
-      ++Current;
-  }
-
-public:
-  /// Used to indicate when the current iterator has already been
-  /// "primed", meaning that it's at the end or points to a value that
-  /// satisfies the predicate.
-  enum PrimedT { Primed };
-
-  using iterator_category = std::forward_iterator_tag;
-  using value_type = typename std::iterator_traits<Iterator>::value_type;
-  using reference = typename std::iterator_traits<Iterator>::reference;
-  using pointer = typename std::iterator_traits<Iterator>::pointer;
-  using difference_type =
-      typename std::iterator_traits<Iterator>::difference_type;
-
-  /// Construct a new filtering iterator for the given iterator range
-  /// and predicate.
-  FilterIterator(Iterator current, Iterator end, Predicate pred)
-    : Current(current), End(end), Pred(pred) 
-  {
-    // Prime the iterator.
-    skipNonMatching();
-  }
-
-  /// Construct a new filtering iterator for the given iterator range
-  /// and predicate, where the iterator range has already been
-  /// "primed" by ensuring that it is empty or the current iterator
-  /// points to something that matches the predicate.
-  FilterIterator(Iterator current, Iterator end, Predicate pred, PrimedT)
-    : Current(current), End(end), Pred(pred) 
-  { 
-    // Assert that the iterators have already been primed.
-    assert(Current == End || Pred(*Current) && "Not primed!");
-  }
-
-  reference operator*() const {
-    return *Current;
-  }
-
-  pointer operator->() const {
-    return Current.operator->();
-  }
-
-  FilterIterator &operator++() {
-    ++Current;
-    skipNonMatching();
-    return *this;
-  }
-
-  FilterIterator operator++(int) {
-    FilterIterator old = *this;
-    ++*this;
-    return old;
-  }
-
-  friend bool operator==(FilterIterator lhs, FilterIterator rhs) {
-    return lhs.Current == rhs.Current;
-  }
-  friend bool operator!=(FilterIterator lhs, FilterIterator rhs) {
-    return !(lhs == rhs);
-  }
-};
-
-/// Create a new filter iterator.
-template<typename Iterator, typename Predicate>
-inline FilterIterator<Iterator, Predicate> 
-makeFilterIterator(Iterator current, Iterator end, Predicate pred) {
-  return FilterIterator<Iterator, Predicate>(current, end, pred);
-}
-
-/// A range filtered by a specific predicate.
-template<typename Range, typename Predicate>
-class FilterRange {
-  using Iterator = typename Range::iterator;
-
-  Iterator First, Last;
-  Predicate Pred;
-
-public:
-  using iterator = FilterIterator<Iterator, Predicate>;
-
-  FilterRange(Range range, Predicate pred)
-    : First(range.begin()), Last(range.end()), Pred(pred) 
-  { 
-    // Prime the sequence.
-    while (First != Last && !Pred(*First))
-      ++First;
-  }
-
-  iterator begin() const { 
-    return iterator(First, Last, Pred, iterator::Primed); 
-  }
-
-  iterator end() const { 
-    return iterator(Last, Last, Pred, iterator::Primed); 
-  }
-
-  bool empty() const { return First == Last; }
-
-  typename std::iterator_traits<iterator>::value_type front() const { 
-    assert(!empty() && "Front of empty range");
-    return *begin(); 
-  }
-};
-
-/// Create a new filter range.
-template<typename Range, typename Predicate>
-inline FilterRange<Range, Predicate> 
-makeFilterRange(Range range, Predicate pred) {
-  return FilterRange<Range, Predicate>(range, pred);
 }
 
 /// An iterator that transforms the result of an underlying bidirectional
@@ -488,7 +358,7 @@ class TransformRange {
   Operation Op;
 
 public:
-  using iterator = TransformIterator<typename Range::iterator, Operation>;
+  using iterator = TransformIterator<decltype(Rng.begin()), Operation>;
 
   TransformRange(Range range, Operation op)
     : Rng(range), Op(op) { }
@@ -496,6 +366,20 @@ public:
   iterator begin() const { return iterator(Rng.begin(), Op); }
   iterator end() const { return iterator(Rng.end(), Op); }
   bool empty() const { return begin() == end(); }
+
+  // The dummy template parameter keeps 'size()' from being eagerly
+  // instantiated.
+  template <typename Dummy = Range>
+  typename function_traits<decltype(&Dummy::size)>::result_type
+  size() const {
+    return Rng.size();
+  }
+
+  template <typename Index>
+  typename function_traits<Operation>::result_type
+  operator[](Index index) const {
+    return Op(Rng[index]);
+  }
 
   typename std::iterator_traits<iterator>::value_type front() const { 
     assert(!empty() && "Front of empty range");

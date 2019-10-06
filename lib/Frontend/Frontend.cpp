@@ -46,17 +46,15 @@ CompilerInstance::CompilerInstance() = default;
 CompilerInstance::~CompilerInstance() = default;
 
 std::string CompilerInvocation::getPCHHash() const {
-  using llvm::hash_code;
-  using llvm::hash_value;
   using llvm::hash_combine;
 
-  auto Code = hash_value(LangOpts.getPCHHashComponents());
-  Code = hash_combine(Code, FrontendOpts.getPCHHashComponents());
-  Code = hash_combine(Code, ClangImporterOpts.getPCHHashComponents());
-  Code = hash_combine(Code, SearchPathOpts.getPCHHashComponents());
-  Code = hash_combine(Code, DiagnosticOpts.getPCHHashComponents());
-  Code = hash_combine(Code, SILOpts.getPCHHashComponents());
-  Code = hash_combine(Code, IRGenOpts.getPCHHashComponents());
+  auto Code = hash_combine(LangOpts.getPCHHashComponents(),
+                           FrontendOpts.getPCHHashComponents(),
+                           ClangImporterOpts.getPCHHashComponents(),
+                           SearchPathOpts.getPCHHashComponents(),
+                           DiagnosticOpts.getPCHHashComponents(),
+                           SILOpts.getPCHHashComponents(),
+                           IRGenOpts.getPCHHashComponents());
 
   return llvm::APInt(64, Code).toString(36, /*Signed=*/false);
 }
@@ -253,9 +251,6 @@ static bool loadAndValidateVFSOverlay(
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &BaseFS,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> &OverlayFS,
     DiagnosticEngine &Diag) {
-  // FIXME: It should be possible to allow chained lookup of later VFS overlays
-  // through the mapping defined by earlier overlays.
-  // See rdar://problem/39440687
   auto Buffer = BaseFS->getBufferForFile(File);
   if (!Buffer) {
     Diag.diagnose(SourceLoc(), diag::cannot_open_file, File,
