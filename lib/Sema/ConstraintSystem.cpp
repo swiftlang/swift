@@ -2571,7 +2571,7 @@ bool ConstraintSystem::diagnoseAmbiguityWithFixes(
 
   bool diagnosed = true;
   {
-    DiagnosticTransaction transaction(TC.Diags);
+    CompoundDiagnosticTransaction transaction(TC.Diags);
 
     const auto *fix = viableSolutions.front().second;
     auto *commonAnchor = commonCalleeLocator->getAnchor();
@@ -2729,6 +2729,7 @@ bool ConstraintSystem::diagnoseAmbiguity(Expr *expr,
   // FIXME: Should be able to pick the best locator, e.g., based on some
   // depth-first numbering of expressions.
   if (bestOverload) {
+    CompoundDiagnosticTransaction transaction(TC.Diags);
     auto &overload = diff.overloads[*bestOverload];
     auto name = getOverloadChoiceName(overload.choices);
     auto anchor = simplifyLocatorToAnchor(overload.locator);

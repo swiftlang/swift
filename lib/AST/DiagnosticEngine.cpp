@@ -947,8 +947,11 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     for (unsigned idx = 0; idx < childNotes.size(); ++idx) {
       if (auto child = diagnosticInfoForDiagnostic(childNotes[idx])) {
         childInfo.push_back(*child);
-        childInfoPtrs.push_back(&childInfo[idx]);
       }
+    }
+    // Don't save a pointer to each element until insertion is finished.
+    for (unsigned idx = 0; idx < childInfo.size(); ++idx) {
+      childInfoPtrs.push_back(&childInfo[idx]);
     }
     info->ChildDiagnosticInfo = childInfoPtrs;
     for (auto &consumer : Consumers) {
