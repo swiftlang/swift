@@ -12,15 +12,14 @@ import Foundation
 // written in Objective-C.
 public final class Saiyan: NSObject, PowerProtocol {
   public var level: Int64
-  // FIXME: The getter and setter names should show up here.
-  // HEADER: @property (nonatomic) int64_t level;
+  // HEADER: @property (nonatomic, getter=getPower, setter=setPower:) int64_t level;
   // IRCHECK1: METACLASS_DATA__TtC13getter_setter6Saiyan
-  // IRCHECK1-NOT: selector_data(getPower)
-  // IRCHECK1-NOT: selector_data(setPower:)
+  // IRCHECK1: selector_data(getPower)
+  // IRCHECK1: selector_data(setPower:)
   // IRCHECK1: INSTANCE_METHODS__TtC13getter_setter6Saiyan
   // IRCHECK2: METACLASS_DATA__TtC13getter_setter6Saiyan
-  // IRCHECK2: selector_data(level)
-  // IRCHECK2: selector_data(setLevel:)
+  // IRCHECK2-NOT: selector_data(level)
+  // IRCHECK2-NOT: selector_data(setLevel:)
   // IRCHECK2: INSTANCE_METHODS__TtC13getter_setter6Saiyan
   public override init() {
     level = 9001
