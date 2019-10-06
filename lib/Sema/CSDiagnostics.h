@@ -109,9 +109,14 @@ public:
 
   template <typename... ArgTypes>
   InFlightDiagnostic emitDiagnostic(ArgTypes &&... Args) const;
+  
+  void diagnoseWithNotes(InFlightDiagnostic parentDiag,
+                         llvm::function_ref<void(void)> builder) const;
 
 protected:
   TypeChecker &getTypeChecker() const { return CS.TC; }
+  
+  DiagnosticEngine &getDiags() const { return CS.TC.Diags; };
 
   DeclContext *getDC() const { return CS.DC; }
 

@@ -90,6 +90,13 @@ FailureDiagnostic::emitDiagnostic(ArgTypes &&... Args) const {
   return cs.TC.diagnose(std::forward<ArgTypes>(Args)...);
 }
 
+void FailureDiagnostic::diagnoseWithNotes(InFlightDiagnostic parentDiag,
+                       llvm::function_ref<void(void)> builder) const {
+  CompoundDiagnosticTransaction transaction(getDiags());
+  parentDiag.flush();
+  builder();
+}
+
 Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
   return E ? E->getParentMap()[subExpr] : nullptr;
 }
@@ -467,31 +474,37 @@ bool RequirementFailure::diagnoseAsError() {
 
   if (auto *OTD = dyn_cast<OpaqueTypeDecl>(AffectedDecl)) {
     auto *namingDecl = OTD->getNamingDecl();
-    emitDiagnostic(
-        anchor->getLoc(), diag::type_does_not_conform_in_opaque_return,
-        namingDecl->getDescriptiveKind(), namingDecl->getFullName(), lhs, rhs);
-
-    if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
-      emitDiagnostic(repr->getLoc(), diag::opaque_return_type_declared_here)
-          .highlight(repr->getSourceRange());
-    }
+    diagnoseWithNotes(
+      emitDiagnostic(anchor->getLoc(),
+                     diag::type_does_not_conform_in_opaque_return,
+                     namingDecl->getDescriptiveKind(),
+                     namingDecl->getFullName(), lhs, rhs), [&]() {
+      if (auto *repr = namingDecl->getOpaqueResultTypeRepr()) {
+        emitDiagnostic(repr->getLoc(), diag::opaque_return_type_declared_here)
+            .highlight(repr->getSourceRange());
+      }
+    });
     return true;
   }
 
   if (genericCtx != reqDC && (genericCtx->isChildContextOf(reqDC) ||
                               isStaticOrInstanceMember(AffectedDecl))) {
     auto *NTD = reqDC->getSelfNominalTypeDecl();
-    emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
-                   AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getFullName(), NTD->getDeclaredType(), lhs,
-                   rhs);
+    diagnoseWithNotes(
+      emitDiagnostic(anchor->getLoc(), getDiagnosticInRereference(),
+                     AffectedDecl->getDescriptiveKind(),
+                     AffectedDecl->getFullName(), NTD->getDeclaredType(), lhs,
+                     rhs), [&]() {
+      emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
+    });
   } else {
-    emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
-                   AffectedDecl->getDescriptiveKind(),
-                   AffectedDecl->getFullName(), lhs, rhs);
+    diagnoseWithNotes(
+      emitDiagnostic(anchor->getLoc(), getDiagnosticOnDecl(),
+                     AffectedDecl->getDescriptiveKind(),
+                     AffectedDecl->getFullName(), lhs, rhs), [&]() {
+      emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
+    });
   }
-
-  emitRequirementNote(reqDC->getAsDecl(), lhs, rhs);
   return true;
 }
 
@@ -630,7 +643,7 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(Expr *anchor,
       nonConformingType->is<AnyMetatypeType>())) {
     return false;
   }
-
+  CompoundDiagnosticTransaction transaction(getDiags());
   emitDiagnostic(anchor->getLoc(), diag::type_cannot_conform,
                  nonConformingType->isExistentialType(), nonConformingType,
                  protocolType);
@@ -694,6 +707,7 @@ bool MissingConformanceFailure::diagnoseAsAmbiguousOperatorRef() {
   if (!(name.isOperator() && isStdlibType(getLHS()) && isStdlibType(getRHS())))
     return false;
 
+  CompoundDiagnosticTransaction transaction(getDiags());
   // If this is an operator reference and both types are from stdlib,
   // let's produce a generic diagnostic about invocation and a note
   // about missing conformance just in case.
@@ -831,8 +845,11 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType());
-  emitNotesForMismatches();
+  diagnoseWithNotes(
+    emitDiagnostic(anchor->getLoc(), *diagnostic, getFromType(), getToType()),
+    [&]() {
+    emitNotesForMismatches();
+  });
   return true;
 }
 
@@ -933,11 +950,13 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
       auto paramInterfaceTy = argApplyInfo->getParamInterfaceType();
       if (paramInterfaceTy->isTypeParameter()) {
         auto diagnoseGenericParamFailure = [&](GenericTypeParamDecl *decl) {
-          emitDiagnostic(anchor->getLoc(),
-                         diag::converting_noespace_param_to_generic_type,
-                         PD->getName(), paramInterfaceTy);
+          diagnoseWithNotes(
+            emitDiagnostic(anchor->getLoc(),
+                           diag::converting_noespace_param_to_generic_type,
+                           PD->getName(), paramInterfaceTy), [&] {
 
-          emitDiagnostic(decl, diag::generic_parameters_always_escaping);
+            emitDiagnostic(decl, diag::generic_parameters_always_escaping);
+          });
         };
 
         // If this is a situation when non-escaping parameter is passed
@@ -969,16 +988,16 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
   if (!PD)
     return false;
 
-  emitDiagnostic(anchor->getLoc(), diagnostic, PD->getName());
+  diagnoseWithNotes(
+    emitDiagnostic(anchor->getLoc(), diagnostic, PD->getName()), [&]() {
+    // Give a note and fix-it
+    auto note =
+        emitDiagnostic(PD->getLoc(), diag::noescape_parameter, PD->getName());
 
-  // Give a note and fix-it
-  auto note =
-      emitDiagnostic(PD->getLoc(), diag::noescape_parameter, PD->getName());
-
-  if (!PD->isAutoClosure()) {
-    note.fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@escaping ");
-  } // TODO: add in a fixit for autoclosure
-
+    if (!PD->isAutoClosure()) {
+      note.fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@escaping ");
+    } // TODO: add in a fixit for autoclosure
+  });
   return true;
 }
 
@@ -1129,22 +1148,23 @@ bool MemberAccessOnOptionalBaseFailure::diagnoseAsError() {
   if (!unwrappedBaseType)
     return false;
 
-  emitDiagnostic(anchor->getLoc(), diag::optional_base_not_unwrapped,
-                 baseType, Member, unwrappedBaseType);
+  diagnoseWithNotes(
+    emitDiagnostic(anchor->getLoc(), diag::optional_base_not_unwrapped,
+                   baseType, Member, unwrappedBaseType), [&]() {
 
-  // FIXME: It would be nice to immediately offer "base?.member ?? defaultValue"
-  // for non-optional results where that would be appropriate. For the moment
-  // always offering "?" means that if the user chooses chaining, we'll end up
-  // in MissingOptionalUnwrapFailure:diagnose() to offer a default value during
-  // the next compile.
-  emitDiagnostic(anchor->getLoc(), diag::optional_base_chain, Member)
-      .fixItInsertAfter(anchor->getEndLoc(), "?");
+    // FIXME: It would be nice to immediately offer
+    // "base?.member ?? defaultValue" for non-optional results where that would
+    // be appropriate. For the moment always offering "?" means that if the user
+    // chooses chaining, we'll end upin MissingOptionalUnwrapFailure:diagnose()
+    // to offer a default value during the next compile.
+    emitDiagnostic(anchor->getLoc(), diag::optional_base_chain, Member)
+        .fixItInsertAfter(anchor->getEndLoc(), "?");
 
-  if (!resultIsOptional) {
-    emitDiagnostic(anchor->getLoc(), diag::unwrap_with_force_value)
-      .fixItInsertAfter(anchor->getEndLoc(), "!");
-  }
-
+    if (!resultIsOptional) {
+      emitDiagnostic(anchor->getLoc(), diag::unwrap_with_force_value)
+        .fixItInsertAfter(anchor->getEndLoc(), "!");
+    }
+  });
   return true;
 }
 
@@ -1283,6 +1303,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   if (!baseType->getOptionalObjectType())
     return false;
 
+  CompoundDiagnosticTransaction transaction(getDiags());
   emitDiagnostic(unwrappedExpr->getLoc(), diag::optional_not_unwrapped,
                  baseType, unwrappedType);
 
@@ -1419,11 +1440,13 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
         if (baseRef->getDecl() == ctor->getImplicitSelfDecl() &&
             ctor->getDelegatingOrChainedInitKind(nullptr) ==
             ConstructorDecl::BodyInitKind::Delegating) {
-          emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
-                      member->getName());
-          if (auto *ref = getResolvedMemberRef(member)) {
-            emitDiagnostic(ref, diag::decl_declared_here, member->getName());
-          }
+          diagnoseWithNotes(
+            emitDiagnostic(loc, diag::assignment_let_property_delegating_init,
+                           member->getName()), [&]() {
+            if (auto *ref = getResolvedMemberRef(member)) {
+              emitDiagnostic(ref, diag::decl_declared_here, member->getName());
+            }
+          });
           return true;
         }
       }
@@ -1577,6 +1600,7 @@ bool AssignmentFailure::diagnoseAsError() {
         message += " is immutable";
       }
 
+      CompoundDiagnosticTransaction transaction(getDiags());
       emitDiagnostic(Loc, DeclDiagnostic, message)
           .highlight(immInfo.first->getSourceRange());
 
@@ -1931,6 +1955,7 @@ bool ContextualFailure::diagnoseAsError() {
   // Special case of some common conversions involving Swift.String
   // indexes, catching cases where people attempt to index them with an integer.
   if (isIntegerToStringIndexConversion()) {
+    CompoundDiagnosticTransaction transaction(getDiags());
     emitDiagnostic(anchor->getLoc(), diag::string_index_not_integer,
                    getFromType())
         .highlight(anchor->getSourceRange());
@@ -2112,23 +2137,25 @@ bool ContextualFailure::diagnoseConversionToNil() const {
   if (!diagnostic)
     return false;
 
-  emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
+  {
+    CompoundDiagnosticTransaction transaction(getDiags());
+    emitDiagnostic(anchor->getLoc(), *diagnostic, getToType());
 
-  if (CTP == CTP_Initialization) {
-    auto *patternTR = cs.getContextualTypeLoc().getTypeRepr();
-    if (!patternTR)
-      return true;
+    if (CTP == CTP_Initialization) {
+      auto *patternTR = cs.getContextualTypeLoc().getTypeRepr();
+      if (!patternTR)
+        return true;
 
-    auto diag = emitDiagnostic(patternTR->getLoc(), diag::note_make_optional,
+      auto diag = emitDiagnostic(patternTR->getLoc(), diag::note_make_optional,
                                OptionalType::get(getToType()));
-    if (patternTR->isSimple()) {
-      diag.fixItInsertAfter(patternTR->getEndLoc(), "?");
-    } else {
-      diag.fixItInsert(patternTR->getStartLoc(), "(");
-      diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
+      if (patternTR->isSimple()) {
+        diag.fixItInsertAfter(patternTR->getEndLoc(), "?");
+      } else {
+        diag.fixItInsert(patternTR->getStartLoc(), "(");
+        diag.fixItInsertAfter(patternTR->getEndLoc(), ")?");
+      }
     }
   }
-
   return true;
 }
 
@@ -2253,22 +2280,23 @@ bool ContextualFailure::diagnoseConversionToDictionary() const {
   // If the contextual type conforms to ExpressibleByDictionaryLiteral, then
   // they wrote "x = [1,2]" but probably meant "x = [1:2]".
   bool isIniting = getContextualTypePurpose() == CTP_Initialization;
-  emitDiagnostic(arrayExpr->getStartLoc(), diag::should_use_dictionary_literal,
-                 toType, isIniting);
+  diagnoseWithNotes(
+    emitDiagnostic(arrayExpr->getStartLoc(),
+                   diag::should_use_dictionary_literal, toType,
+                   isIniting), [&]() {
+    auto diagnostic =
+        emitDiagnostic(arrayExpr->getStartLoc(), diag::meant_dictionary_lit);
 
-  auto diagnostic =
-      emitDiagnostic(arrayExpr->getStartLoc(), diag::meant_dictionary_lit);
-
-  // Change every other comma into a colon, only if the number
-  // of commas present matches the number of elements, because
-  // otherwise it might a structural problem with the expression
-  // e.g. ["a""b": 1].
-  const auto commaLocs = arrayExpr->getCommaLocs();
-  if (commaLocs.size() == numElements - 1) {
-    for (unsigned i = 0, e = numElements / 2; i != e; ++i)
-      diagnostic.fixItReplace(commaLocs[i * 2], ":");
-  }
-
+    // Change every other comma into a colon, only if the number
+    // of commas present matches the number of elements, because
+    // otherwise it might a structural problem with the expression
+    // e.g. ["a""b": 1].
+    const auto commaLocs = arrayExpr->getCommaLocs();
+    if (commaLocs.size() == numElements - 1) {
+      for (unsigned i = 0, e = numElements / 2; i != e; ++i)
+        diagnostic.fixItReplace(commaLocs[i * 2], ":");
+    }
+  });
   return true;
 }
 
@@ -2944,7 +2972,7 @@ bool SubscriptMisuseFailure::diagnoseAsError() {
   (void)simplifyLocator(getConstraintSystem(), getLocator(), memberRange);
 
   auto nameLoc = DeclNameLoc(memberRange.Start);
-
+  CompoundDiagnosticTransaction transaction(getDiags());
   auto diag = emitDiagnostic(baseExpr->getLoc(),
                              diag::could_not_find_subscript_member_did_you_mean,
                              getType(baseExpr));
@@ -3046,6 +3074,7 @@ bool MissingMemberFailure::diagnoseAsError() {
                              defaultMemberLookupOptions, corrections);
   };
 
+  CompoundDiagnosticTransaction trasaction(getDiags());
   if (getName().getBaseName().getKind() == DeclBaseName::Kind::Subscript) {
     auto loc = anchor->getLoc();
     if (auto *metatype = baseType->getAs<MetatypeType>()) {
@@ -3913,6 +3942,7 @@ bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
     return false;
 
   auto name = decl->getBaseName();
+  CompoundDiagnosticTransaction transaction(getDiags());
   auto diagnostic =
       emitDiagnostic(anchor->getLoc(),
                      diag::cannot_convert_single_tuple_into_multiple_arguments,
@@ -4515,16 +4545,13 @@ bool MissingContextualConformanceFailure::diagnoseAsError() {
   auto srcType = getFromType();
   auto dstType = getToType();
 
-  emitDiagnostic(anchor->getLoc(), *diagnostic, srcType, dstType);
-
-  if (isa<InOutExpr>(anchor))
-    return true;
-
-  if (srcType->isAny() && dstType->isAnyObject()) {
-    emitDiagnostic(anchor->getLoc(), diag::any_as_anyobject_fixit)
-        .fixItInsertAfter(anchor->getEndLoc(), " as AnyObject");
-  }
-
+  diagnoseWithNotes(
+    emitDiagnostic(anchor->getLoc(), *diagnostic, srcType, dstType), [&]() {
+    if (!isa<InOutExpr>(anchor) && srcType->isAny() && dstType->isAnyObject()) {
+     emitDiagnostic(anchor->getLoc(), diag::any_as_anyobject_fixit)
+          .fixItInsertAfter(anchor->getEndLoc(), " as AnyObject");
+    }
+  });
   return true;
 }
 
@@ -4787,6 +4814,7 @@ void SkipUnhandledConstructInFunctionBuilderFailure::diagnosePrimary(
 }
 
 bool SkipUnhandledConstructInFunctionBuilderFailure::diagnoseAsError() {
+  CompoundDiagnosticTransaction transaction(getDiags());
   diagnosePrimary(/*asNote=*/false);
   emitDiagnostic(builder,
                  diag::kind_declname_declared_here,
@@ -5208,16 +5236,17 @@ bool ArgumentMismatchFailure::diagnoseArchetypeMismatch() const {
     return OS.str();
   };
 
-  emitDiagnostic(
-      getAnchor()->getLoc(), diag::cannot_convert_argument_value_generic, argTy,
-      describeGenericType(argDecl), paramTy, describeGenericType(paramDecl));
+  diagnoseWithNotes(
+    emitDiagnostic(
+        getAnchor()->getLoc(), diag::cannot_convert_argument_value_generic,
+        argTy, describeGenericType(argDecl), paramTy,
+        describeGenericType(paramDecl)), [&]() {
+    emitDiagnostic(argDecl, diag::descriptive_generic_type_declared_here,
+                   describeGenericType(argDecl, true));
 
-  emitDiagnostic(argDecl, diag::descriptive_generic_type_declared_here,
-                 describeGenericType(argDecl, true));
-
-  emitDiagnostic(paramDecl, diag::descriptive_generic_type_declared_here,
-                 describeGenericType(paramDecl, true));
-
+    emitDiagnostic(paramDecl, diag::descriptive_generic_type_declared_here,
+                   describeGenericType(paramDecl, true));
+  });
   return true;
 }
 
@@ -5265,10 +5294,12 @@ void ExpandArrayIntoVarargsFailure::tryDropArrayBracketsFixIt(
 
 bool ExpandArrayIntoVarargsFailure::diagnoseAsError() {
   if (auto anchor = getAnchor()) {
-    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic,
-                   getFromType(), getToType());
-    tryDropArrayBracketsFixIt(anchor);
-    // TODO: Array splat fix-it once that's supported.
+    diagnoseWithNotes(
+      emitDiagnostic(anchor->getLoc(), diag::cannot_convert_array_to_variadic,
+                     getFromType(), getToType()), [&]() {
+      tryDropArrayBracketsFixIt(anchor);
+      // TODO: Array splat fix-it once that's supported.
+    });
     return true;
   }
   return false;

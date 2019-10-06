@@ -950,9 +950,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       }
     }
     // Don't save a pointer to each element until insertion is finished.
-    for (unsigned idx = 0; idx < childInfo.size(); ++idx) {
+    for (unsigned idx = 0; idx < childInfo.size(); ++idx)
       childInfoPtrs.push_back(&childInfo[idx]);
-    }
+
     info->ChildDiagnosticInfo = childInfoPtrs;
     for (auto &consumer : Consumers) {
       consumer->handleDiagnostic(SourceMgr, info->Loc, info->Kind,
