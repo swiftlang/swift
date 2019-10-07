@@ -268,6 +268,11 @@ MathTests.test("gradient_${T}") {
   expectEqualWithTolerance(1.3333333333333333334, gradient(at: 0.5 as ${T}, in: atanh), ulps: 16)
   expectEqualWithTolerance(0.020666985354092053575, gradient(at: 2.0 as ${T}, in: erf), ulps: 16)
   expectEqualWithTolerance(-0.020666985354092053575, gradient(at: 2.0 as ${T}, in: erfc), ulps: 16)
+  expectEqualWithTolerance(0.35355339059327376222, gradient(at: 2.0 as ${T}, in: {x in sqrt(x)}), ulps: 16)
+  let fma_grad = gradient(at: 4.0 as ${T}, 5.0 as ${T}, 6.0 as ${T}, in: {x, y, z in fma(x, y, z)})
+  expectEqualWithTolerance(5.0, fma_grad.0, ulps: 16)
+  expectEqualWithTolerance(4.0, fma_grad.1, ulps: 16)
+  expectEqualWithTolerance(1.0, fma_grad.2, ulps: 16)
 }
 %end
 

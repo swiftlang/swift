@@ -20,11 +20,20 @@ public func fabs<T: FloatingPoint>(_ x: T) -> T {
 }
 
 @_transparent
+@differentiable(
+  vjp: _vjpSqrt
+  where T : Differentiable & FloatingPoint, T == T.TangentVector
+)
 public func sqrt<T: FloatingPoint>(_ x: T) -> T {
   return x.squareRoot()
 }
 
 @_transparent
+@differentiable(
+  wrt: (x, y, z),
+  vjp: _vjpFma
+  where T : Differentiable & FloatingPoint, T == T.TangentVector
+)
 public func fma<T: FloatingPoint>(_ x: T, _ y: T, _ z: T) -> T {
   return z.addingProduct(x, y)
 }
@@ -80,6 +89,25 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
   // The C stdlib `frexp` uses a different notion of significand / exponent
   // than IEEE 754, so we need to adjust them by a factor of two.
   return (x.significand / 2, Int(x.exponent + 1))
+}
+
+// SWIFT_ENABLE_TENSORFLOW
+@usableFromInline
+func _vjpSqrt<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (T, (T) -> T) where T == T.TangentVector {
+  let value = x.squareRoot()
+  return (value, {v in (1 / 2) * ( 1 / value) * v})
+}
+
+@usableFromInline
+func _vjpFma<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T,
+  _ z: T
+) -> (T, (T) -> (T, T, T)) where T == T.TangentVector {
+  return (fma(x, y, z),
+    {v in return (v * y, v * x, v)})
 }
 
 %for T in ['Float','Double']:
