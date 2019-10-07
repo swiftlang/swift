@@ -470,33 +470,33 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
   }
   auto buffers = getInputBuffersIfPresent(input);
 
-  if (!buffers.ModuleBuffer) {
+  if (!buffers.hasValue()) {
     failed = true;
     return None;
   }
 
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
-  if (serialization::isSerializedAST(buffers.ModuleBuffer->getBuffer())) {
+  if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
     PartialModules.push_back(
-        {std::move(buffers.ModuleBuffer), std::move(buffers.ModuleDocBuffer),
-         std::move(buffers.ModuleSourceInfoBuffer)});
+        {std::move(buffers->ModuleBuffer), std::move(buffers->ModuleDocBuffer),
+         std::move(buffers->ModuleSourceInfoBuffer)});
     return None;
   }
-  assert(buffers.ModuleDocBuffer.get() == nullptr);
-  assert(buffers.ModuleSourceInfoBuffer.get() == nullptr);
+  assert(buffers->ModuleDocBuffer.get() == nullptr);
+  assert(buffers->ModuleSourceInfoBuffer.get() == nullptr);
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
-  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers.ModuleBuffer));
+  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers->ModuleBuffer));
 
   InputSourceCodeBufferIDs.push_back(bufferID);
   return bufferID;
 }
 
-CompilerInstance::ModuleBuffers CompilerInstance::getInputBuffersIfPresent(
+Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
   if (auto b = input.buffer()) {
-    return {llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(), b->getBufferIdentifier()),
-            nullptr, nullptr};
+    return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
+                                                              b->getBufferIdentifier()));
   }
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
@@ -506,19 +506,16 @@ CompilerInstance::ModuleBuffers CompilerInstance::getInputBuffersIfPresent(
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
-    return {nullptr, nullptr, nullptr};
+    return None;
   }
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
-    return {std::move(*inputFileOrErr), nullptr, nullptr};
+    return ModuleBuffers(std::move(*inputFileOrErr));
 
-  Optional<std::unique_ptr<llvm::MemoryBuffer>> moduleDocBuffer = openModuleDoc(input);
-  Optional<std::unique_ptr<llvm::MemoryBuffer>> moduleSourceInfoBuffer = openModuleSourceInfo(input);
-
-  return {
+  return ModuleBuffers(
     std::move(*inputFileOrErr),
-    moduleDocBuffer.hasValue() ? std::move(*moduleDocBuffer): nullptr,
-    moduleSourceInfoBuffer.hasValue() ? std::move(*moduleSourceInfoBuffer): nullptr
-  };
+    openModuleDoc(input).getValueOr(nullptr),
+    openModuleSourceInfo(input).getValueOr(nullptr)
+  );
 }
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
