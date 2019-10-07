@@ -4263,7 +4263,11 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
   }
 
   if (isContextualMismatch()) {
-    emitDiagnostic(anchor->getLoc(), diag::cannot_convert_argument_value,
+    auto *locator = getLocator();
+    emitDiagnostic(anchor->getLoc(),
+                   locator->isLastElement<LocatorPathElt::ContextualType>()
+                       ? diag::cannot_convert_initializer_value
+                       : diag::cannot_convert_argument_value,
                    getType(anchor), ContextualType);
     return true;
   }
