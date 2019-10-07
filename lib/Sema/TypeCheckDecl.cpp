@@ -1437,10 +1437,8 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // base has a more general AST type, then we need a new entry. Note that an
   // abstraction change is OK; we don't want to add a whole new vtable entry
   // just because an @in parameter becomes @owned, or whatever.
-  auto isABICompatibleOverride = evaluateOrDefault(
-      evaluator,
-      IsABICompatibleOverrideRequest{const_cast<AbstractFunctionDecl *>(decl)},
-      false);
+  auto isABICompatibleOverride =
+      evaluateOrDefault(evaluator, IsABICompatibleOverrideRequest{decl}, false);
   return !isABICompatibleOverride;
 }
 
