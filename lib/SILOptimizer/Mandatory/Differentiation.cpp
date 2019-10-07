@@ -6188,41 +6188,7 @@ public:
     // have no dominated active values; control flow differentiation does not
     // handle this case. See TF-876 for context.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
-      /*
-      // TODO(TF-788): Re-enable non-varied result warning.
-      // Emit fixit if original result has a valid source location.
-      auto startLoc = origResult.getLoc().getStartSourceLoc();
-      auto endLoc = origResult.getLoc().getEndSourceLoc();
-      if (startLoc.isValid() && endLoc.isValid()) {
-        getContext().diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
-            .fixItInsert(startLoc, "withoutDerivative(at:")
-            .fixItInsertAfter(endLoc, ")");
-      }
-      */
-      LLVM_DEBUG(getADDebugStream() << original.getName()
-                                    << " has non-varied result, returning zero"
-                                       " for all pullback results");
-      auto *pullbackEntry = pullback.createBasicBlock();
-      createEntryArguments(&pullback);
-      builder.setInsertionPoint(pullbackEntry);
-      // Destroy all owned arguments.
-      for (auto *arg : pullbackEntry->getArguments())
-        if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
-          builder.emitDestroyOperation(pbLoc, arg);
-      // Return zero for each result.
-      getRemappedTangentType(origResult->getType());
-      SmallVector<SILValue, 4> directResults;
-      auto indirectResultIt = pullback.getIndirectResults().begin();
-      for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
-        if (resultInfo.isFormalDirect()) {
-          directResults.push_back(emitZeroDirect(resultInfo.getType(), pbLoc));
-        } else {
-          emitZeroIndirect(resultInfo.getType(), *indirectResultIt++, pbLoc);
-        }
-      }
-      builder.createReturn(pbLoc, joinElements(directResults, builder, pbLoc));
-      LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
-                                    << original.getName() << ":\n" << pullback);
+      handleNonVariedResult(origResult);
       return errorOccurred;
     }
 
@@ -6486,6 +6452,47 @@ public:
     LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
                                   << original.getName() << ":\n" << pullback);
     return errorOccurred;
+  }
+
+  /// If original result is non-varied, it will always have a zero derivative.
+  /// Skip full pullback generation and simply return zero for wrt parameters.
+  void handleNonVariedResult(SILValue origNonvariedResult) {
+    auto &pullback = getPullback();
+    auto pbLoc = getPullback().getLocation();
+    /*
+    // TODO(TF-788): Re-enable non-varied result warning.
+    // Emit fixit if original non-varied result has a valid source location.
+    auto startLoc = origNonvariedResult.getLoc().getStartSourceLoc();
+    auto endLoc = origNonvariedResult.getLoc().getEndSourceLoc();
+    if (startLoc.isValid() && endLoc.isValid()) {
+      getContext().diagnose(startLoc, diag::autodiff_nonvaried_result_fixit)
+          .fixItInsert(startLoc, "withoutDerivative(at:")
+          .fixItInsertAfter(endLoc, ")");
+    }
+    */
+    LLVM_DEBUG(getADDebugStream() << getOriginal().getName()
+                                  << " has non-varied result, returning zero"
+                                     " for all pullback results");
+    auto *pullbackEntry = pullback.createBasicBlock();
+    createEntryArguments(&pullback);
+    builder.setInsertionPoint(pullbackEntry);
+    // Destroy all owned arguments.
+    for (auto *arg : pullbackEntry->getArguments())
+      if (arg->getOwnershipKind() == ValueOwnershipKind::Owned)
+        builder.emitDestroyOperation(pbLoc, arg);
+    // Return zero for each result.
+    SmallVector<SILValue, 4> directResults;
+    auto indirectResultIt = pullback.getIndirectResults().begin();
+    for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
+      if (resultInfo.isFormalDirect())
+        directResults.push_back(emitZeroDirect(resultInfo.getType(), pbLoc));
+      else
+        emitZeroIndirect(resultInfo.getType(), *indirectResultIt++, pbLoc);
+    }
+    builder.createReturn(pbLoc, joinElements(directResults, builder, pbLoc));
+    LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
+                                  << getOriginal().getName() << ":\n"
+                                  << pullback);
   }
 
   using TrampolineBlockSet = SmallPtrSet<SILBasicBlock *, 4>;
