@@ -87,7 +87,6 @@ struct LineColumn {
 struct BasicDeclLocs {
   StringRef SourceFilePath;
   LineColumn Loc;
-  LineColumn NameLoc;
   LineColumn StartLoc;
   LineColumn EndLoc;
 };

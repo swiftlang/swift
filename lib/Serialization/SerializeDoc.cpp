@@ -513,7 +513,6 @@ namespace {
 struct DeclLocationsTableData {
   uint32_t SourceFileOffset;
   LineColumn Loc;
-  LineColumn NameLoc;
   LineColumn StartLoc;
   LineColumn EndLoc;
 };
@@ -621,7 +620,6 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
 writer.write<uint32_t>(data.X.Line);                                                              \
 writer.write<uint32_t>(data.X.Column);
     WRITE_LINE_COLUMN(Loc)
-    WRITE_LINE_COLUMN(NameLoc);
     WRITE_LINE_COLUMN(StartLoc);
     WRITE_LINE_COLUMN(EndLoc);
 #undef WRITE_LINE_COLUMN
@@ -657,13 +655,6 @@ writer.write<uint32_t>(data.X.Column);
     llvm::sys::fs::make_absolute(SourceFilePath);
     Result.SourceFileOffset = FWriter.getTextOffset(SourceFilePath);
     Result.Loc = getLineColumn(SM, D->getLoc());
-    if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      Result.NameLoc = getLineColumn(SM, VD->getNameLoc());
-    } else if(auto *OD = dyn_cast<OperatorDecl>(D)) {
-      Result.NameLoc = getLineColumn(SM, OD->getNameLoc());
-    } else if(auto *PD = dyn_cast<PrecedenceGroupDecl>(D)) {
-      Result.NameLoc = getLineColumn(SM, PD->getNameLoc());
-    }
     Result.StartLoc = getLineColumn(SM, D->getStartLoc());
     Result.EndLoc = getLineColumn(SM, D->getEndLoc());
     return Result;
@@ -685,7 +676,6 @@ writer.write<uint32_t>(data.X.Column);
 Result.X.Line = Locs->X.Line;                                                                     \
 Result.X.Column = Locs->X.Column;
       COPY_LINE_COLUMN(Loc)
-      COPY_LINE_COLUMN(NameLoc)
       COPY_LINE_COLUMN(StartLoc)
       COPY_LINE_COLUMN(EndLoc)
 #undef COPY_LINE_COLUMN

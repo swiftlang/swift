@@ -2387,8 +2387,8 @@ Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const
   auto UsrId = *It;
   uint32_t NumSize = 4;
   // Size of BasicDeclLocs in the buffer.
-  // FilePathOffset + 4 * LineColumn
-  uint32_t LineColumnCount = 4;
+  // FilePathOffset + LocNum * LineColumn
+  uint32_t LineColumnCount = 3;
   uint32_t RecordSize = NumSize + NumSize * 2 * LineColumnCount;
   uint32_t RecordOffset = RecordSize * UsrId;
   assert(RecordOffset < BasicDeclLocsData.size());
@@ -2408,7 +2408,6 @@ Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const
 Result.X.Line = ReadNext();                                                                       \
 Result.X.Column = ReadNext();
   READ_FIELD(Loc)
-  READ_FIELD(NameLoc)
   READ_FIELD(StartLoc)
   READ_FIELD(EndLoc)
 #undef READ_FIELD
