@@ -6181,14 +6181,15 @@ public:
     auto origResult = origFormalResults[getIndices().source];
 
     // If original result is non-varied, it will always have a zero derivative.
-    // Skip full pullback generation and simply return zero for wrt parameters.
+    // Skip full pullback generation and simply emit zero derivatives for wrt
+    // parameters.
     //
     // NOTE(TF-876): This shortcut is currently necessary for functions
     // returning non-varied result with >1 basic block where some basic blocks
     // have no dominated active values; control flow differentiation does not
     // handle this case. See TF-876 for context.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
-      handleNonVariedResult(origResult);
+      emitZeroDerivativesForNonvariedResult(origResult);
       return errorOccurred;
     }
 
@@ -6455,8 +6456,9 @@ public:
   }
 
   /// If original result is non-varied, it will always have a zero derivative.
-  /// Skip full pullback generation and simply return zero for wrt parameters.
-  void handleNonVariedResult(SILValue origNonvariedResult) {
+  /// Skip full pullback generation and simply emit zero derivatives for wrt
+  /// parameters.
+  void emitZeroDerivativesForNonvariedResult(SILValue origNonvariedResult) {
     auto &pullback = getPullback();
     auto pbLoc = getPullback().getLocation();
     /*
