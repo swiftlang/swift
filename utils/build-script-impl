@@ -284,9 +284,10 @@ KNOWN_SETTINGS=(
 # these functions.
 
 function call() {
-    if [[ ${DRY_RUN} ]]; then
+    if [[ ${DRY_RUN} ]] || [[ "${VERBOSE_BUILD}" ]]; then
         echo "${PS4}"$(quoted_print "$@")
-    else
+    fi
+    if [[ ! ${DRY_RUN} ]]; then
         { set -x; } 2>/dev/null
         "$@"
         { set +x; } 2>/dev/null
