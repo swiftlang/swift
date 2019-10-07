@@ -120,7 +120,7 @@ func _vjpLog10(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
 
 @usableFromInline
 func _vjpLog2(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
-    return (log2(x), { v in v / (${T}(M_LN2) * x)})
+  return (log2(x), { v in v / (${T}(M_LN2) * x)})
 }
 
 @usableFromInline
