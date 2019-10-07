@@ -1678,9 +1678,6 @@ static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
   else
     getter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
-  if (storage->isStatic())
-    getter->setStatic();
-
   if (!storage->requiresOpaqueAccessor(AccessorKind::Get))
     getter->setForcedStaticDispatch(true);
 
@@ -1696,7 +1693,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
 
   SourceLoc loc = storage->getLoc();
 
-  bool isStatic = storage->isStatic();
   bool isMutating = storage->isSetterMutating();
 
   GenericParamList *genericParams = createAccessorGenericParams(storage);
@@ -1725,9 +1721,6 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   else
     setter->setSelfAccessKind(SelfAccessKind::NonMutating);
 
-  if (isStatic)
-    setter->setStatic();
-
   // All mutable storage requires a setter.
   assert(storage->requiresOpaqueAccessor(AccessorKind::Set));
 
@@ -1744,7 +1737,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
 
   SourceLoc loc = storage->getLoc();
 
-  bool isStatic = storage->isStatic();
   bool isMutating = storage->isGetterMutating();
   if (kind == AccessorKind::Modify)
     isMutating |= storage->isSetterMutating();
@@ -1770,9 +1762,6 @@ createCoroutineAccessorPrototype(AbstractStorageDecl *storage,
     accessor->setSelfAccessKind(SelfAccessKind::Mutating);
   else
     accessor->setSelfAccessKind(SelfAccessKind::NonMutating);
-
-  if (isStatic)
-    accessor->setStatic();
 
   // If the storage does not provide this accessor as an opaque accessor,
   // we can't add a dynamically-dispatched method entry for the accessor,

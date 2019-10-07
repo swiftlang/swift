@@ -1952,7 +1952,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
                      /*GenericParams=*/nullptr,
                      params,
                      TypeLoc::withoutLoc(stringTy), swiftDecl);
-  getterDecl->setStatic(isStatic);
   getterDecl->computeType();
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -1962,7 +1961,6 @@ static bool addErrorDomain(NominalTypeDecl *swiftDecl,
   makeComputed(errorDomainPropertyDecl, getterDecl, nullptr);
 
   getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
   getterDecl->setAccess(AccessLevel::Public);
 
   llvm::PointerIntPair<ValueDecl *, 1, bool> contextData(swiftValueDecl,
