@@ -4273,7 +4273,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
   }
 
   if (ContextualType->getNumParams() == 0) {
-    if (auto argExpr = getArgumentExprFor(getRawAnchor())) {
+    if (auto argExpr = getArgumentListExprFor(getLocator())) {
       emitDiagnostic(anchor->getLoc(), diag::extra_argument_to_nullary_call)
           .highlight(argExpr->getSourceRange())
           .fixItRemove(argExpr->getSourceRange());
@@ -4294,7 +4294,7 @@ bool ExtraneousArgumentsFailure::diagnoseAsNote() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseSingleExtraArgument() const {
-  auto *arguments = getArgumentExprFor(getRawAnchor());
+  auto *arguments = getArgumentListExprFor(getLocator());
   if (!arguments)
     return false;
 
