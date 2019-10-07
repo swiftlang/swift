@@ -983,7 +983,7 @@ static StringRef getTypeName(SDKContext &Ctx, Type Ty,
 static StringRef calculateUsr(SDKContext &Ctx, ValueDecl *VD) {
   llvm::SmallString<64> SS;
   llvm::raw_svector_ostream OS(SS);
-  if (!ide::printDeclUSR(VD, OS)) {
+  if (!ide::printValueDeclUSR(VD, OS)) {
     return Ctx.buffer(SS.str());
   }
   return StringRef();

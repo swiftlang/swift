@@ -2358,7 +2358,7 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   llvm::raw_svector_ostream OS(USRBuffer);
-  if (ide::printDeclUSRForModuleDoc(D, OS))
+  if (ide::printDeclUSR(D, OS))
     return None;
 
   return getCommentForDeclByUSR(USRBuffer.str());
@@ -2378,7 +2378,7 @@ Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
   llvm::raw_svector_ostream OS(USRBuffer);
-  if (ide::printDeclUSRForModuleDoc(D, OS))
+  if (ide::printDeclUSR(D, OS))
     return None;
 
   auto It = DeclUSRsTable->find(OS.str());

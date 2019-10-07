@@ -2819,7 +2819,7 @@ private:
   void printUSR(const ValueDecl *VD, SourceLoc Loc) {
     printLoc(Loc);
     OS << ' ';
-    if (ide::printDeclUSR(VD, OS))
+    if (ide::printValueDeclUSR(VD, OS))
       OS << "ERROR:no-usr";
     OS << '\n';
   }
@@ -2905,7 +2905,7 @@ private:
     std::string USR;
     {
       llvm::raw_string_ostream OS(USR);
-      printDeclUSR(VD, OS);
+      printValueDeclUSR(VD, OS);
     }
 
     std::string error;

@@ -40,9 +40,9 @@ bool printTypeUSR(Type Ty, raw_ostream &OS);
 /// \returns true if it failed, false on success.
 bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
 
-/// Prints out the USR for the given Decl.
+/// Prints out the USR for the given ValueDecl.
 /// \returns true if it failed, false on success.
-bool printDeclUSR(const ValueDecl *D, raw_ostream &OS);
+bool printValueDeclUSR(const ValueDecl *D, raw_ostream &OS);
 
 /// Prints out the USR for the given ModuleEntity.
 /// \returns true if it failed, false on success.
@@ -57,9 +57,9 @@ bool printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
 /// \returns true if it failed, false on success.
 bool printExtensionUSR(const ExtensionDecl *ED, raw_ostream &OS);
 
-/// Prints out the Decl USRs suitable for keys .swiftdoc and .swiftsourceinfo files.
+/// Prints out the USR for the given Decl.
 /// \returns true if it failed, false on success.
-bool printDeclUSRForModuleDoc(const Decl *D, raw_ostream &OS);
+bool printDeclUSR(const Decl *D, raw_ostream &OS);
 
 } // namespace ide
 } // namespace swift

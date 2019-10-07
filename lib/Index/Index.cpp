@@ -183,7 +183,7 @@ class IndexSwiftASTWalker : public SourceEntityWalker {
           if (ide::printExtensionUSR(ExtD, OS))
             return true;
         } else {
-          if (ide::printDeclUSR(D, OS))
+          if (ide::printValueDeclUSR(D, OS))
             return true;
         }
         result.USR = stringStorage.copyString(OS.str());

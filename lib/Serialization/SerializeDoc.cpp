@@ -417,7 +417,7 @@ static void writeDeclCommentTable(
       {
         USRBuffer.clear();
         llvm::raw_svector_ostream OS(USRBuffer);
-        if (ide::printDeclUSR(VD, OS))
+        if (ide::printValueDeclUSR(VD, OS))
           return true;
       }
 
@@ -628,7 +628,7 @@ writer.write<uint32_t>(data.X.Column);
   Optional<uint32_t> calculateUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
-    if (ide::printDeclUSRForModuleDoc(D, OS))
+    if (ide::printDeclUSR(D, OS))
       return None;
     return USRWriter.getNewUSRID(OS.str());
   }
