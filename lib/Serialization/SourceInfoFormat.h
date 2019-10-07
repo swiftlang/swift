@@ -1,4 +1,4 @@
-//===---= SourceInfoFormat.h - The internals of swiftsourceinfo files ----===//
+//===--- SourceInfoFormat.h - Format swiftsourceinfo files ---*- c++ -*---===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -66,27 +66,26 @@ const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
 namespace sourceinfo_block {
   enum RecordKind {
     BASIC_DECL_LOCS = 1,
-    DECL_USRS = 96,
-    SOURCE_FILE_PATHS,
+    DECL_USRS,
+    TEXT_DATA,
   };
 
   using BasicDeclLocsLayout = BCRecordLayout<
     BASIC_DECL_LOCS, // record ID
-    BCVBR<16>,       // table offset within the blob (an llvm::OnDiskHashTable)
-    BCBlob           // map from Decl USR ID to basic source locations.
+    BCBlob           // an array of fixed size location data
   >;
 
   using DeclUSRSLayout = BCRecordLayout<
     DECL_USRS,         // record ID
     BCVBR<16>,         // table offset within the blob (an llvm::OnDiskHashTable)
-    BCBlob             // map from decl USR ID to actual USR
+    BCBlob             // map from actual USR to USR Id
   >;
 
-  using SourceFilePathsLayout = BCRecordLayout<
-    SOURCE_FILE_PATHS, // record ID
-    BCVBR<16>,         // table offset within the blob (an llvm::OnDiskHashTable)
-    BCBlob             // map from file ID to actual file path
+  using TextDataLayout = BCRecordLayout<
+    TEXT_DATA,        // record ID
+    BCBlob            // a list of 0-terminated string segments
   >;
+
 } // namespace sourceinfo_block
 
 } // end namespace serialization

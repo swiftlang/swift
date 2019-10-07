@@ -2515,11 +2515,11 @@ public:
       getBasicLocsForDecl(D);
     if (!moduleLoc.hasValue())
       return;
-    if (!moduleLoc->Loc.hasValue())
+    if (!moduleLoc->Loc.isValid())
       return;
     OS << moduleLoc->SourceFilePath
-       << ":" << moduleLoc->Loc->Line
-       << ":" << moduleLoc->Loc->Column << ": ";
+       << ":" << moduleLoc->Loc.Line
+       << ":" << moduleLoc->Loc.Column << ": ";
   }
 
   bool walkToDeclPre(Decl *D) override {

@@ -406,16 +406,6 @@ private:
   std::unique_ptr<GroupNameTable> GroupNamesMap;
   std::unique_ptr<SerializedDeclCommentTable> DeclCommentTable;
 
-  class BasicDeclLocTableInfo;
-  using SerializedBasicDeclLocsTable =
-      llvm::OnDiskIterableChainedHashTable<BasicDeclLocTableInfo>;
-  std::unique_ptr<SerializedBasicDeclLocsTable> BasicDeclLocsTable;
-
-  class SourceFilePathTableInfo;
-  using SerializedSourceFilePathTable =
-      llvm::OnDiskIterableChainedHashTable<SourceFilePathTableInfo>;
-  std::unique_ptr<SerializedSourceFilePathTable> SourceFilePathsTable;
-
   class DeclUSRTableInfo;
   using SerializedDeclUSRTable =
       llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
@@ -569,22 +559,16 @@ private:
 
   /// Read an on-disk decl hash table stored in
   /// \c sourceinfo_block::BasicDeclLocsLayout format.
-  std::unique_ptr<SerializedBasicDeclLocsTable>
-  readBasicDeclLocsTable(ArrayRef<uint64_t> fields, StringRef blobData);
+  StringRef BasicDeclLocsData;
 
   /// Read an on-disk decl hash table stored in
   /// \c sourceinfo_block::SourceFilePathsLayout format.
-  std::unique_ptr<SerializedSourceFilePathTable>
-  readSourceFilePathsTable(ArrayRef<uint64_t> fields, StringRef blobData);
+  StringRef SourceLocsTextData;
 
   /// Read an on-disk decl hash table stored in
   /// \c sourceinfo_block::DeclUSRSLayout format.
   std::unique_ptr<SerializedDeclUSRTable>
   readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData);
-
-  StringRef getSourceFilePathById(unsigned Id) const;
-
-  uint32_t getDeclUSRId(StringRef USR) const;
 
   /// Recursively reads a pattern from \c DeclTypeCursor.
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);

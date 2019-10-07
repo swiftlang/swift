@@ -79,16 +79,17 @@ struct CommentInfo {
 };
 
 struct LineColumn {
-  uint32_t Line;
-  uint32_t Column;
+  uint32_t Line = 0;
+  uint32_t Column = 0;
+  bool isValid() const { return Line && Column; }
 };
 
 struct BasicDeclLocs {
   StringRef SourceFilePath;
-  Optional<LineColumn> Loc;
-  Optional<LineColumn> NameLoc;
-  Optional<LineColumn> StartLoc;
-  Optional<LineColumn> EndLoc;
+  LineColumn Loc;
+  LineColumn NameLoc;
+  LineColumn StartLoc;
+  LineColumn EndLoc;
 };
 
 } // namespace swift

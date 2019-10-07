@@ -510,77 +510,12 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   S.writeToStream(os);
 }
 namespace {
-static uint32_t INVALID_VALUE = UINT32_MAX;
-struct LineColoumn {
-  uint32_t Line = INVALID_VALUE;
-  uint32_t Column = INVALID_VALUE;
-};
-
 struct DeclLocationsTableData {
-  uint32_t SourceFileID;
-  LineColoumn Loc;
-  LineColoumn NameLoc;
-  LineColoumn StartLoc;
-  LineColoumn EndLoc;
-};
-
-class DeclLocsTableInfo {
-public:
-  using key_type = uint32_t;
-  using key_type_ref = key_type;
-  using data_type = DeclLocationsTableData;
-  using data_type_ref = const data_type &;
-  using hash_value_type = uint32_t;
-  using offset_type = unsigned;
-
-  hash_value_type ComputeHash(key_type_ref key) {
-    return key;
-  }
-
-  std::pair<unsigned, unsigned>
-  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
-    const unsigned numLen = 4;
-    const unsigned LineColumnLen = numLen * 2;
-    uint32_t keyLength = numLen;
-    uint32_t dataLength = 0;
-
-    // File ID
-    dataLength += numLen;
-
-    // Loc
-    dataLength += LineColumnLen;
-
-    // NameLoc
-    dataLength += LineColumnLen;
-
-    // StartLoc
-    dataLength += LineColumnLen;
-
-    // EndLoc
-    dataLength += LineColumnLen;
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(keyLength);
-    writer.write<uint32_t>(dataLength);
-    return { keyLength, dataLength };
-  }
-
-  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(key);
-  }
-
-  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data, unsigned len) {
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(data.SourceFileID);
-#define WRITE_LINE_COLUMN(X)                                                                      \
-writer.write<uint32_t>(data.X.Line);                                                              \
-writer.write<uint32_t>(data.X.Column);
-    WRITE_LINE_COLUMN(Loc)
-    WRITE_LINE_COLUMN(NameLoc);
-    WRITE_LINE_COLUMN(StartLoc);
-    WRITE_LINE_COLUMN(EndLoc);
-#undef WRITE_LINE_COLUMN
-  }
+  uint32_t SourceFileOffset;
+  LineColumn Loc;
+  LineColumn NameLoc;
+  LineColumn StartLoc;
+  LineColumn EndLoc;
 };
 
 class USRTableInfo {
@@ -604,7 +539,6 @@ public:
     uint32_t dataLength = numLen;
     endian::Writer writer(out, little);
     writer.write<uint32_t>(keyLength);
-    writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
   }
 
@@ -621,15 +555,15 @@ public:
 class DeclUSRsTableWriter {
   llvm::StringMap<uint32_t> USRMap;
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
-  // 0 is never used as an Id.
   uint32_t CurId = 0;
 public:
-  uint32_t getUSRID(StringRef USR) {
+  Optional<uint32_t> getNewUSRID(StringRef USR) {
     if (USRMap.find(USR) == USRMap.end()) {
-      ++CurId;
       generator.insert(USRMap.insert(std::make_pair(USR, CurId)).first->getKey(), CurId);
+      ++CurId;
+      return USRMap.find(USR)->second;
     }
-    return USRMap.find(USR)->second;
+    return None;
   }
   void emitUSRsRecord(llvm::BitstreamWriter &out) {
     sourceinfo_block::DeclUSRSLayout USRsList(out);
@@ -646,74 +580,32 @@ public:
   }
 };
 
-class FilePathsTableInfo {
+class StringWriter {
+  llvm::StringMap<uint32_t> IndexMap;
+  llvm::SmallString<1024> Buffer;
 public:
-  using key_type = uint32_t;
-  using key_type_ref = key_type;
-  using data_type = StringRef;
-  using data_type_ref = const data_type &;
-  using hash_value_type = uint32_t;
-  using offset_type = unsigned;
-
-  hash_value_type ComputeHash(key_type_ref key) {
-    return key;
-  }
-
-  std::pair<unsigned, unsigned>
-  EmitKeyDataLength(raw_ostream &out, key_type_ref key, data_type_ref data) {
-    const unsigned numLen = 4;
-    uint32_t keyLength = numLen;
-    uint32_t dataLength = data.size();
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(keyLength);
-    writer.write<uint32_t>(dataLength);
-    return { keyLength, dataLength };
-  }
-
-  void EmitKey(raw_ostream &out, key_type_ref key, unsigned len) {
-    endian::Writer writer(out, little);
-    writer.write<uint32_t>(key);
-  }
-
-  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data, unsigned len) {
-    out << data;
-  }
-};
-
-class FilePathTableWriter {
-  llvm::StringMap<uint32_t> PathIDMap;
-  llvm::OnDiskChainedHashTableGenerator<FilePathsTableInfo> generator;
-  // 0 is never used as an Id.
-  uint32_t CurId = 0;
-public:
-  uint32_t getFileID(StringRef Path) {
-    if (PathIDMap.find(Path) == PathIDMap.end()) {
-      ++CurId;
-      generator.insert(CurId, PathIDMap.insert(std::make_pair(Path, CurId)).first->getKey());
+  uint32_t getTextOffset(StringRef Text) {
+    if (IndexMap.find(Text) == IndexMap.end()) {
+      IndexMap.insert({Text, Buffer.size()});
+      Buffer.append(Text);
+      Buffer.push_back('\0');
     }
-    return PathIDMap.find(Path)->second;
+    return IndexMap[Text];
   }
+
   void emitSourceFilesRecord(llvm::BitstreamWriter &Out) {
-    sourceinfo_block::SourceFilePathsLayout SourceFilesList(Out);
+    sourceinfo_block::TextDataLayout TextBlob(Out);
     SmallVector<uint64_t, 8> scratch;
-    llvm::SmallString<32> hashTableBlob;
-    uint32_t tableOffset;
-    {
-      llvm::raw_svector_ostream blobStream(hashTableBlob);
-      // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, little);
-      tableOffset = generator.Emit(blobStream);
-    }
-    SourceFilesList.emit(scratch, tableOffset, hashTableBlob);
+    TextBlob.emit(scratch, Buffer);
   }
 };
 
 struct BasicDeclLocsTableWriter : public ASTWalker {
-  llvm::OnDiskChainedHashTableGenerator<DeclLocsTableInfo> generator;
+  llvm::SmallString<1024> Buffer;
   DeclUSRsTableWriter &USRWriter;
-  FilePathTableWriter &FWriter;
+  StringWriter &FWriter;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
-                           FilePathTableWriter &FWriter): USRWriter(USRWriter), FWriter(FWriter) {}
+                           StringWriter &FWriter): USRWriter(USRWriter), FWriter(FWriter) {}
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S }; }
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E }; }
@@ -721,16 +613,30 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
 
+  void appendToBuffer(DeclLocationsTableData data) {
+    llvm::raw_svector_ostream out(Buffer);
+    endian::Writer writer(out, little);
+    writer.write<uint32_t>(data.SourceFileOffset);
+#define WRITE_LINE_COLUMN(X)                                                                      \
+writer.write<uint32_t>(data.X.Line);                                                              \
+writer.write<uint32_t>(data.X.Column);
+    WRITE_LINE_COLUMN(Loc)
+    WRITE_LINE_COLUMN(NameLoc);
+    WRITE_LINE_COLUMN(StartLoc);
+    WRITE_LINE_COLUMN(EndLoc);
+#undef WRITE_LINE_COLUMN
+  }
+
   Optional<uint32_t> calculateUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSRForModuleDoc(D, OS))
       return None;
-    return USRWriter.getUSRID(OS.str());
+    return USRWriter.getNewUSRID(OS.str());
   }
 
-  LineColoumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
-    LineColoumn Result;
+  LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
+    LineColumn Result;
     if (Loc.isValid()) {
       auto LC = SM.getLineAndColumn(Loc);
       Result.Line = LC.first;
@@ -748,7 +654,8 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     DeclLocationsTableData Result;
     // Use getDisplayNameForLoc could give use file name specified by #sourceLocation
     SmallString<128> SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
-    Result.SourceFileID = FWriter.getFileID(SourceFilePath);
+    llvm::sys::fs::make_absolute(SourceFilePath);
+    Result.SourceFileOffset = FWriter.getTextOffset(SourceFilePath);
     Result.Loc = getLineColumn(SM, D->getLoc());
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       Result.NameLoc = getLineColumn(SM, VD->getNameLoc());
@@ -773,17 +680,15 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
       if (!Locs.hasValue())
         return None;
       DeclLocationsTableData Result;
-      Result.SourceFileID = FWriter.getFileID(Locs->SourceFilePath);
-#define FIELD(X)                                                                                  \
-      if (Locs->X.hasValue()) {                                                                   \
-        Result.X.Line = Locs->X->Line;                                                            \
-        Result.X.Column = Locs->X->Column;                                                        \
-      }
-      FIELD(Loc)
-      FIELD(NameLoc)
-      FIELD(StartLoc)
-      FIELD(EndLoc)
-#undef FIELD
+      Result.SourceFileOffset = FWriter.getTextOffset(Locs->SourceFilePath);
+#define COPY_LINE_COLUMN(X)                                                                       \
+Result.X.Line = Locs->X.Line;                                                                     \
+Result.X.Column = Locs->X.Column;
+      COPY_LINE_COLUMN(Loc)
+      COPY_LINE_COLUMN(NameLoc)
+      COPY_LINE_COLUMN(StartLoc)
+      COPY_LINE_COLUMN(EndLoc)
+#undef COPY_LINE_COLUMN
       return Result;
     }
   }
@@ -807,14 +712,14 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     auto LocData = getLocData(D);
     if (!USR.hasValue() || !LocData.hasValue())
       return true;
-    generator.insert(*USR, *LocData);
+    appendToBuffer(*LocData);
     return true;
   }
 };
 
 static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
                                 ModuleOrSourceFile MSF, DeclUSRsTableWriter &USRWriter,
-                                FilePathTableWriter &FWriter) {
+                                StringWriter &FWriter) {
   assert(MSF);
   const sourceinfo_block::BasicDeclLocsLayout DeclLocsList(Out);
   BasicDeclLocsTableWriter Writer(USRWriter, FWriter);
@@ -825,15 +730,7 @@ static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
   }
 
   SmallVector<uint64_t, 8> scratch;
-  llvm::SmallString<32> hashTableBlob;
-  uint32_t tableOffset;
-  {
-    llvm::raw_svector_ostream blobStream(hashTableBlob);
-    // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
-    tableOffset = Writer.generator.Emit(blobStream);
-  }
-  DeclLocsList.emit(scratch, tableOffset, hashTableBlob);
+  DeclLocsList.emit(scratch, Writer.Buffer);
 }
 
 class SourceInfoSerializer : public SerializerBase {
@@ -862,7 +759,7 @@ public:
     BLOCK(DECL_LOCS_BLOCK);
     BLOCK_RECORD(sourceinfo_block, BASIC_DECL_LOCS);
     BLOCK_RECORD(sourceinfo_block, DECL_USRS);
-    BLOCK_RECORD(sourceinfo_block, SOURCE_FILE_PATHS);
+    BLOCK_RECORD(sourceinfo_block, TEXT_DATA);
 
 #undef BLOCK
 #undef BLOCK_RECORD
@@ -897,15 +794,13 @@ void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile 
     {
       BCBlockRAII restoreBlock(S.Out, DECL_LOCS_BLOCK_ID, 4);
       DeclUSRsTableWriter USRWriter;
-      FilePathTableWriter FPWriter;
+      StringWriter FPWriter;
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
       // Emit USR table mapping from a USR to USR Id.
       // The basic locs record uses USR Id instead of actual USR, so that we don't need to repeat
       // USR texts for newly added records.
       USRWriter.emitUSRsRecord(S.Out);
-      // Emit source file table mapping from a source file ID to actual source file name.
-      // The basic locs record uses source file Id instead of actual source file name, so that
-      // we don't need to repeat file names.
+      // A blob of 0 terminated strings referenced by the location records, e.g. file paths.
       FPWriter.emitSourceFilesRecord(S.Out);
     }
   }
