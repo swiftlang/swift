@@ -1007,11 +1007,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
   unsigned numGenericParams = 1 + arity;
   BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
-  // Look up the Differentiable protocol.
-  SmallVector<ValueDecl *, 1> diffableProtoLookup;
-  Context.lookupInSwiftModule("Differentiable", diffableProtoLookup);
-  assert(diffableProtoLookup.size() == 1);
-  auto *diffableProto = cast<ProtocolDecl>(diffableProtoLookup.front());
+  // Get the `Differentiable` protocol.
+  auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
   // Create type parameters and add conformance constraints.
   auto fnResultGen = makeGenericParam(arity);
   builder.addConformanceRequirement(fnResultGen, diffableProto);

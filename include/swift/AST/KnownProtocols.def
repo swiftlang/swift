@@ -87,7 +87,7 @@ PROTOCOL(TensorGroup)
 PROTOCOL_(TensorFlowDataTypeCompatible)
 PROTOCOL(TensorProtocol)
 PROTOCOL(VectorProtocol)
-PROTOCOL(Differentiable)
+PROTOCOL_(Differentiable)
 PROTOCOL(EuclideanDifferentiable)
 
 PROTOCOL_(ObjectiveCBridgeable)
