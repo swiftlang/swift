@@ -99,7 +99,7 @@ func _vjpSqrt<T: FloatingPoint & Differentiable> (
   _ x: T
 ) -> (T, (T) -> T) where T == T.TangentVector {
   let value = x.squareRoot()
-  return (value, {v in (1 / 2) * ( 1 / value) * v})
+  return (value, { v in v / (2 * value) })
 }
 
 @usableFromInline
@@ -108,8 +108,7 @@ func _vjpFma<T: FloatingPoint & Differentiable> (
   _ y: T,
   _ z: T
 ) -> (T, (T) -> (T, T, T)) where T == T.TangentVector {
-  return (fma(x, y, z),
-    {v in return (v * y, v * x, v)})
+  return (fma(x, y, z), { v in (v * y, v * x, v) })
 }
 
 %for T in ['Float','Double']:
@@ -145,12 +144,12 @@ func _vjpLog(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
 
 @usableFromInline
 func _vjpLog10(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
-  return (log10(x), { v in v * ${T}(M_LOG10E) / x})
+  return (log10(x), { v in v * ${T}(M_LOG10E) / x })
 }
 
 @usableFromInline
 func _vjpLog2(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
-  return (log2(x), { v in v / (${T}(M_LN2) * x)})
+  return (log2(x), { v in v / (${T}(M_LN2) * x) })
 }
 
 @usableFromInline
@@ -222,7 +221,7 @@ func _vjpExpm1(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
 
 @usableFromInline
 func _vjpLog1p(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
-  return (log1p(x), { v in v / ( x + 1) })
+  return (log1p(x), { v in v / (x + 1) })
 }
 
 @usableFromInline
