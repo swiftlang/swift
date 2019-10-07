@@ -1388,7 +1388,7 @@ void ASTMangler::appendRetroactiveConformances(Type type) {
     module = Mod ? Mod : nominal->getModuleContext();
     subMap = type->getContextSubstitutionMap(module, nominal);
   }
-  
+
   appendRetroactiveConformances(subMap, module);
 }
 
@@ -2528,7 +2528,7 @@ ASTMangler::appendProtocolConformance(const ProtocolConformance *conformance) {
 
   auto conformingType = conformance->getType();
   appendType(conformingType->getCanonicalType());
-  
+
   appendProtocolName(conformance->getProtocol());
 
   bool needsModule = true;
@@ -2649,6 +2649,10 @@ void ASTMangler::appendDependentProtocolConformance(
 void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance) {
   auto module = conformance->getDeclContext()->getParentModule();
+  if (!CurGenericSignature && conformance->getGenericSignature()) {
+    CurGenericSignature =
+        conformance->getGenericSignature()->getCanonicalSignature();
+  }
 
   // Conforming type.
   Type conformingType = conformance->getType();
@@ -2679,7 +2683,7 @@ void ASTMangler::appendConcreteProtocolConformance(
         assert(CurGenericSignature &&
                "Need a generic signature to resolve conformance");
         auto conformanceAccessPath =
-          CurGenericSignature->getConformanceAccessPath(type, proto);
+            CurGenericSignature->getConformanceAccessPath(type, proto);
         appendDependentProtocolConformance(conformanceAccessPath);
       } else if (auto opaqueType = canType->getAs<OpaqueTypeArchetypeType>()) {
         GenericSignature opaqueSignature = opaqueType->getBoundSignature();
