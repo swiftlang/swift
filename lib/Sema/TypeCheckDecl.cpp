@@ -626,7 +626,7 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 }
 
 /// Check whether \c current is a redeclaration.
-static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
+static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   // If we've already checked this declaration, don't do it again.
   if (current->alreadyCheckedRedeclaration())
     return;
@@ -689,7 +689,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     // If both declarations are in the same file, only diagnose the second one.
     if (currentFile == other->getDeclContext()->getParentSourceFile())
       if (current->getLoc().isValid() &&
-          tc.Context.SourceMgr.isBeforeInBuffer(
+          ctx.SourceMgr.isBeforeInBuffer(
             current->getLoc(), other->getLoc()))
         continue;
 
@@ -732,8 +732,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
-      tc.diagnose(current, diag::multiple_override, current->getFullName());
-      tc.diagnose(other, diag::multiple_override_prev, other->getFullName());
+      current->diagnose(diag::multiple_override, current->getFullName());
+      other->diagnose(diag::multiple_override_prev, other->getFullName());
       markInvalid();
       break;
     }
@@ -742,7 +742,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     CanType otherSigType = other->getOverloadSignatureType();
 
     bool wouldBeSwift5Redeclaration = false;
-    auto isRedeclaration = conflicting(tc.Context, currentSig, currentSigType,
+    auto isRedeclaration = conflicting(ctx, currentSig, currentSigType,
                                        otherSig, otherSigType,
                                        &wouldBeSwift5Redeclaration);
     // If there is another conflict, complain.
@@ -753,8 +753,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
         if (currentFile == otherFile &&
             current->getLoc().isValid() &&
             other->getLoc().isValid() &&
-            tc.Context.SourceMgr.isBeforeInBuffer(current->getLoc(),
-                                                  other->getLoc())) {
+            ctx.SourceMgr.isBeforeInBuffer(current->getLoc(),
+                                           other->getLoc())) {
           std::swap(current, other);
         }
       }
@@ -859,9 +859,9 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       // If this isn't a redeclaration in the current version of Swift, but
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
-        tc.diagnose(current, diag::invalid_redecl_swift5_warning,
-                    current->getFullName());
-        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        current->diagnose(diag::invalid_redecl_swift5_warning,
+                          current->getFullName());
+        other->diagnose(diag::invalid_redecl_prev, other->getFullName());
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -871,13 +871,14 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           // checker should have already taken care of emitting a more
           // productive diagnostic.
           if (!other->getOverriddenDecl())
-            tc.diagnose(current, diag::invalid_redecl_init,
-                        current->getFullName(),
-                        otherInit->isMemberwiseInitializer());
+            current->diagnose(diag::invalid_redecl_init,
+                              current->getFullName(),
+                              otherInit->isMemberwiseInitializer());
         } else {
-          tc.diagnoseWithNotes(tc.diagnose(current, diag::invalid_redecl,
-                                           current->getFullName()), [&]() {
-            tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+          ctx.Diags.diagnoseWithNotes(
+            current->diagnose(diag::invalid_redecl,
+                              current->getFullName()), [&]() {
+            other->diagnose(diag::invalid_redecl_prev, other->getFullName());
           });
         }
         markInvalid();
@@ -2121,7 +2122,8 @@ public:
     TC.checkUnsupportedProtocolType(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
-      checkRedeclaration(TC, VD);
+      auto &Context = TC.Context;
+      checkRedeclaration(Context, VD);
 
       // Force some requests, which can produce diagnostics.
 
@@ -2139,7 +2141,6 @@ public:
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
-      auto &Context = TC.Context;
       if (VD->getDeclContext()->isTypeContext() &&
           (VD->getFullName().isSimpleName(Context.Id_Type) ||
            VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
