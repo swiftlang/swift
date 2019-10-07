@@ -21,7 +21,7 @@ ATTRIBUTE_NODES = [
                    description='The name of the attribute.'),
              Child('LeftParen', kind='LeftParenToken',
                    is_optional=True),
-             Child('ArgumentList', kind='FunctionCallArgumentList',
+             Child('ArgumentList', kind='TupleExprElementList',
                    collection_element_name='Argument', is_optional=True),
              Child('RightParen', kind='RightParenToken',
                    is_optional=True),
