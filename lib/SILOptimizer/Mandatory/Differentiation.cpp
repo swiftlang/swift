@@ -6474,7 +6474,7 @@ public:
     */
     LLVM_DEBUG(getADDebugStream() << getOriginal().getName()
                                   << " has non-varied result, returning zero"
-                                     " for all pullback results");
+                                     " for all pullback results\n");
     auto *pullbackEntry = pullback.createBasicBlock();
     createEntryArguments(&pullback);
     builder.setInsertionPoint(pullbackEntry);
