@@ -4045,8 +4045,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    auto resolution = TypeResolution::forInterface(FD);
-    typeCheckParameterList(FD->getParameters(), resolution,
+    typeCheckParameterList(FD->getParameters(), FD,
                            TypeResolverContext::AbstractFunctionDecl);
     validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
@@ -4072,8 +4071,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    auto res = TypeResolution::forInterface(CD);
-    typeCheckParameterList(CD->getParameters(), res,
+    typeCheckParameterList(CD->getParameters(), CD,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
     break;
@@ -4084,8 +4082,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    auto res = TypeResolution::forInterface(DD);
-    typeCheckParameterList(DD->getParameters(), res,
+    typeCheckParameterList(DD->getParameters(), DD,
                            TypeResolverContext::AbstractFunctionDecl);
     DD->computeType();
     break;
@@ -4096,8 +4093,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    auto res = TypeResolution::forInterface(SD);
-    typeCheckParameterList(SD->getIndices(), res,
+    typeCheckParameterList(SD->getIndices(), SD,
                            TypeResolverContext::SubscriptDecl);
     validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
@@ -4112,8 +4108,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      auto res = TypeResolution::forInterface(ED);
-      typeCheckParameterList(PL, res,
+      typeCheckParameterList(PL, ED,
                              TypeResolverContext::EnumElementDecl);
     }
 

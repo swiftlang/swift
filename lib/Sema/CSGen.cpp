@@ -2028,8 +2028,9 @@ namespace {
 
         // If a type was explicitly specified, use its opened type.
         if (auto type = param->getTypeLoc().getType()) {
+          paramType = closureExpr->mapTypeIntoContext(type);
           // FIXME: Need a better locator for a pattern as a base.
-          paramType = CS.openUnboundGenericType(type, locator);
+          paramType = CS.openUnboundGenericType(paramType, locator);
           internalType = paramType;
         } else {
           // Otherwise, create fresh type variables.

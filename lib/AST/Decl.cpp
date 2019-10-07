@@ -2744,13 +2744,7 @@ void ValueDecl::setInterfaceType(Type type) {
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
-
-    // ParamDecls in closure contexts can have type variables
-    // archetype in them during constraint generation.
-    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
-      assert(!type->hasArchetype() &&
-             "Archetype in interface type");
-    }
+    assert(!type->hasArchetype() && "Archetype in interface type");
 
     if (type->hasError())
       setInvalid();
