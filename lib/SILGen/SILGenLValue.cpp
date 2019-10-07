@@ -1430,7 +1430,14 @@ namespace {
 
         // Create the allocating setter function. It captures the base address.
         auto setterInfo = SGF.getConstantInfo(setter);
-        SILValue setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
+        SILValue setterFRef;
+        if (setter.hasDecl() && setter.getDecl()->isObjCDynamic()) {
+          auto methodTy = SILType::getPrimitiveObjectType(
+              SGF.SGM.Types.getConstantFunctionType(setter));
+          setterFRef = SGF.B.createObjCMethod(
+              loc, base.getValue(), setter, methodTy);
+        } else
+          setterFRef = SGF.emitGlobalFunctionRef(loc, setter, setterInfo);
         CanSILFunctionType setterTy = setterFRef->getType().castTo<SILFunctionType>();
         SILFunctionConventions setterConv(setterTy, SGF.SGM.M);
 
