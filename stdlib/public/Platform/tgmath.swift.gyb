@@ -20,6 +20,7 @@ public func fabs<T: FloatingPoint>(_ x: T) -> T {
 }
 
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
 @differentiable(
   vjp: _vjpSqrt
   where T : Differentiable & FloatingPoint, T == T.TangentVector
@@ -29,6 +30,7 @@ public func sqrt<T: FloatingPoint>(_ x: T) -> T {
 }
 
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
 @differentiable(
   wrt: (x, y, z),
   vjp: _vjpFma
