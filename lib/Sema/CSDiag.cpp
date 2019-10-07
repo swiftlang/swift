@@ -4569,7 +4569,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
       auto type = getTypeOfExpressionWithoutApplying(
           resultExpr, CS.DC, decl, FreeTypeVariableBinding::UnresolvedType);
       if (type)
-        resultType = type;
+        resultType = type->getRValueType();
     }
     
     // If we found a type, presuppose it was the intended result and insert a
