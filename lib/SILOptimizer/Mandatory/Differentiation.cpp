@@ -6484,10 +6484,12 @@ public:
     SmallVector<SILValue, 4> directResults;
     auto indirectResultIt = pullback.getIndirectResults().begin();
     for (auto resultInfo : pullback.getLoweredFunctionType()->getResults()) {
+      auto resultType =
+          pullback.mapTypeIntoContext(resultInfo.getType())->getCanonicalType();
       if (resultInfo.isFormalDirect())
-        directResults.push_back(emitZeroDirect(resultInfo.getType(), pbLoc));
+        directResults.push_back(emitZeroDirect(resultType, pbLoc));
       else
-        emitZeroIndirect(resultInfo.getType(), *indirectResultIt++, pbLoc);
+        emitZeroIndirect(resultType, *indirectResultIt++, pbLoc);
     }
     builder.createReturn(pbLoc, joinElements(directResults, builder, pbLoc));
     LLVM_DEBUG(getADDebugStream() << "Generated pullback for "
