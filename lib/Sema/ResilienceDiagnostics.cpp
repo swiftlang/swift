@@ -259,44 +259,23 @@ diagnoseGenericArgumentsExportability(SourceLoc loc,
   return hadAnyIssues;
 }
 
-void TypeChecker::diagnoseGenericTypeExportability(const TypeLoc &TL,
+void TypeChecker::diagnoseGenericTypeExportability(SourceLoc Loc, Type T,
                                                    const DeclContext *DC) {
-  class GenericTypeFinder : public TypeDeclFinder {
-    using Callback = llvm::function_ref<void(SubstitutionMap)>;
-
-    const SourceFile &SF;
-    Callback callback;
-  public:
-    GenericTypeFinder(const SourceFile &SF, Callback callback)
-        : SF(SF), callback(callback) {}
-
-
-    Action visitBoundGenericType(BoundGenericType *ty) override {
-      ModuleDecl *useModule = SF.getParentModule();
-      SubstitutionMap subs = ty->getContextSubstitutionMap(useModule,
-                                                           ty->getDecl());
-      callback(subs);
-      return Action::Continue;
-    }
-
-    Action visitTypeAliasType(TypeAliasType *ty) override {
-      callback(ty->getSubstitutionMap());
-      return Action::Continue;
-    }
-  };
-
-  assert(TL.getType() && "type not validated yet");
-
   const SourceFile *SF = DC->getParentSourceFile();
   if (!SF)
     return;
 
-  TL.getType().walk(GenericTypeFinder(*SF, [&](SubstitutionMap subs) {
-    // FIXME: It would be nice to highlight just the part of the type that's
-    // problematic, but unfortunately the TypeRepr doesn't have the
-    // information we need and the Type doesn't easily map back to it.
-    (void)diagnoseGenericArgumentsExportability(TL.getLoc(), subs, *SF);
-  }));
+  // FIXME: It would be nice to highlight just the part of the type that's
+  // problematic, but unfortunately the TypeRepr doesn't have the
+  // information we need and the Type doesn't easily map back to it.
+  if (auto *BGT = dyn_cast<BoundGenericType>(T.getPointer())) {
+    ModuleDecl *useModule = SF->getParentModule();
+    auto subs = T->getContextSubstitutionMap(useModule, BGT->getDecl());
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+  } else if (auto *TAT = dyn_cast<TypeAliasType>(T.getPointer())) {
+    auto subs = TAT->getSubstitutionMap();
+    (void)diagnoseGenericArgumentsExportability(Loc, subs, *SF);
+  }
 }
 
 bool
