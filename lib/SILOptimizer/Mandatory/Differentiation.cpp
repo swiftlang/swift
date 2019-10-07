@@ -6190,7 +6190,7 @@ public:
     // handle this case. See TF-876 for context.
     if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
       emitZeroDerivativesForNonvariedResult(origResult);
-      return errorOccurred;
+      return false;
     }
 
     // Get dominated active values in original blocks.
