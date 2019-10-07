@@ -1108,11 +1108,10 @@ public:
   /// pointer value as a previously processed and deleted instruction.
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc,
-      AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
-      SILValue original, ArrayRef<SILValue> associatedFunctions = {}) {
+      AutoDiffIndexSubset *parameterIndices, SILValue original,
+      Optional<std::pair<SILValue, SILValue>> associatedFunctions = None) {
     auto *dfi = builder.createDifferentiableFunction(
-        loc, parameterIndices, differentiationOrder, original,
-        associatedFunctions);
+        loc, parameterIndices, original, associatedFunctions);
     processedDifferentiableFunctionInsts.erase(dfi);
     return dfi;
   }
@@ -1685,8 +1684,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
 
   AutoDiffAssociatedFunctionKind assocFnKind(kind);
   auto assocFnType = remappedOrigFnSubstTy->getAutoDiffAssociatedFunctionType(
-      parameters, source, /*differentiationOrder*/ 1, assocFnKind,
-      context.getTypeConverter(),
+      parameters, source, assocFnKind, context.getTypeConverter(),
       LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
 
   auto assocFnResultTypes =
@@ -2579,8 +2577,7 @@ emitAssociatedFunctionReference(
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(
           functionSource.getLoc(), functionSource);
       SILValue assocFn = builder.createDifferentiableFunctionExtract(
-          borrowedDiffFunc.getLoc(), kind, /*differentiationOrder*/ 1,
-          borrowedDiffFunc);
+          borrowedDiffFunc.getLoc(), kind, borrowedDiffFunc);
       assocFn =
           builder.emitCopyValueOperation(functionSource.getLoc(), assocFn);
       builder.emitEndBorrowOperation(functionSource.getLoc(), borrowedDiffFunc);
@@ -2718,11 +2715,10 @@ emitAssociatedFunctionReference(
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         minimalIndices.parameters, minimalIndices.source,
-        /*differentiationOrder*/ 1, kind, context.getTypeConverter(),
+        kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
-        context.getASTContext());
+        kind, minimalAttr->getParameterIndices(), context.getASTContext());
     auto *ref = builder.createWitnessMethod(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
         requirementDeclRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
@@ -2766,10 +2762,10 @@ emitAssociatedFunctionReference(
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffAssociatedFunctionType(
         minimalIndices.parameters, minimalIndices.source,
-        /*differentiationOrder*/ 1, kind, context.getTypeConverter(),
+        kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-        kind, /*differentiationOrder*/ 1, minimalAttr->getParameterIndices(),
+        kind, minimalAttr->getParameterIndices(),
         context.getASTContext());
     auto *ref = builder.createClassMethod(
         loc, classMethodInst->getOperand(),
@@ -3787,7 +3783,7 @@ public:
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
       vjpValue = builder.createDifferentiableFunctionExtract(
           loc, DifferentiableFunctionExtractInst::Extractee::VJP,
-          /*differentiationOrder*/ 1, borrowedDiffFunc);
+          borrowedDiffFunc);
       vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
     }
 
@@ -3858,8 +3854,7 @@ public:
       }
 
       auto *diffFuncInst = context.createDifferentiableFunction(
-          getBuilder(), loc, indices.parameters, /*differentiationOrder*/ 1,
-          original);
+          getBuilder(), loc, indices.parameters, original);
 
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInsts().push_back(diffFuncInst);
@@ -3871,7 +3866,7 @@ public:
           builder.emitBeginBorrowOperation(loc, diffFuncInst);
       auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
           loc, DifferentiableFunctionExtractInst::Extractee::VJP,
-          /*differentiationOrder*/ 1, borrowedADFunc);
+          borrowedADFunc);
       vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
       builder.emitEndBorrowOperation(loc, borrowedADFunc);
       builder.emitDestroyValueOperation(loc, diffFuncInst);
@@ -5466,7 +5461,7 @@ public:
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
       jvpValue = builder.createDifferentiableFunctionExtract(
           loc, DifferentiableFunctionExtractInst::Extractee::JVP,
-          /*differentiationOrder*/ 1, borrowedDiffFunc);
+          borrowedDiffFunc);
       jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
     }
 
@@ -5533,8 +5528,7 @@ public:
         return;
 
       auto *diffFuncInst = context.createDifferentiableFunction(
-          builder, loc, indices.parameters, /*differentiationOrder*/ 1,
-          original);
+          builder, loc, indices.parameters, original);
 
       // Record the `differentiable_function` instruction.
       context.getDifferentiableFunctionInsts().push_back(diffFuncInst);
@@ -5546,7 +5540,7 @@ public:
           builder.emitBeginBorrowOperation(loc, diffFuncInst);
       auto extractedJVP = builder.createDifferentiableFunctionExtract(
           loc, DifferentiableFunctionExtractInst::Extractee::JVP,
-          /*differentiationOrder*/ 1, borrowedADFunc);
+          borrowedADFunc);
       jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
       builder.emitEndBorrowOperation(loc, borrowedADFunc);
       builder.emitDestroyValueOperation(loc, diffFuncInst);
@@ -7846,9 +7840,8 @@ ADContext::declareExternalAssociatedFunction(
   auto originalLoc = original->getLocation();
   auto assocGenSig = getDerivativeGenericSignature(attr, original);
   auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1, kind,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
-      assocGenSig);
+      indices.parameters, indices.source, kind, module.Types,
+      LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
   auto *assocFn = fb.createFunction(
@@ -7891,9 +7884,9 @@ static SILFunction *createEmptyVJP(
       ? vjpGenericSig->getGenericEnvironment()
       : nullptr;
   auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
-      AutoDiffAssociatedFunctionKind::VJP, module.Types,
-      LookUpConformanceInModule(module.getSwiftModule()), vjpGenericSig);
+      indices.parameters, indices.source, AutoDiffAssociatedFunctionKind::VJP,
+      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
   auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
@@ -7941,7 +7934,7 @@ static SILFunction *createEmptyJVP(
       ? jvpGenericSig->getGenericEnvironment()
       : nullptr;
   auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
+      indices.parameters, indices.source,
       AutoDiffAssociatedFunctionKind::JVP, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
@@ -8352,8 +8345,8 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   // Compute target type for thunking.
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
   auto targetType = origFnType->getAutoDiffAssociatedFunctionType(
-      desiredIndices.parameters, desiredIndices.source,
-      /*differentiationOrder*/ 1, kind, module.Types, lookupConformance);
+      desiredIndices.parameters, desiredIndices.source, kind, module.Types,
+      lookupConformance);
   auto *caller = assocFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType = caller->mapTypeIntoContext(
@@ -8501,7 +8494,6 @@ SILValue ADContext::promoteToDifferentiableFunction(
   auto origFnTy = origFnOperand->getType().castTo<SILFunctionType>();
   auto parameterIndices = dfi->getParameterIndices();
   unsigned resultIndex = resultIndices[dfi];
-  unsigned differentiationOrder = dfi->getDifferentiationOrder();
 
   // Handle curry thunk applications specially.
   if (auto *ai = dyn_cast<ApplyInst>(origFnOperand)) {
@@ -8550,7 +8542,6 @@ SILValue ADContext::promoteToDifferentiableFunction(
           SILBuilder thunkBuilder(retInst);
           auto *dfi = createDifferentiableFunction(thunkBuilder, loc,
                                                    parameterIndices,
-                                                   differentiationOrder,
                                                    retInst->getOperand());
           resultIndices[dfi] = resultIndex;
           thunkBuilder.createReturn(loc, dfi);
@@ -8656,8 +8647,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
       }
     }
     auto expectedAssocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, resultIndex, differentiationOrder,
-        assocFnKind, getTypeConverter(),
+        parameterIndices, resultIndex, assocFnKind, getTypeConverter(),
         LookUpConformanceInModule(getModule().getSwiftModule()));
     // If `assocFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.
@@ -8677,8 +8667,8 @@ SILValue ADContext::promoteToDifferentiableFunction(
 
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newDFI = createDifferentiableFunction(
-      builder, loc, parameterIndices, differentiationOrder, origFnCopy,
-      assocFns);
+      builder, loc, parameterIndices, origFnCopy,
+      std::make_pair(assocFns[0], assocFns[1]));
   resultIndices[dfi] = resultIndex;
   getDifferentiableFunctionInsts().push_back(dfi);
 
@@ -8712,8 +8702,8 @@ void ADContext::foldDifferentiableFunctionExtraction(
       continue;
     }
     // Fold associated function extractors.
-    auto assocFnValue = source->getAssociatedFunction(
-        dfei->getDifferentiationOrder(), dfei->getAssociatedFunctionKind());
+    auto assocFnValue =
+        source->getDerivativeFunction(dfei->getAssociatedFunctionKind());
     dfei->replaceAllUsesWith(assocFnValue);
     dfei->eraseFromParent();
   }
@@ -8721,8 +8711,8 @@ void ADContext::foldDifferentiableFunctionExtraction(
   // it.
   if (isInstructionTriviallyDead(source)) {
     SILBuilder builder(source);
-    for (auto &assocFn : source->getAssociatedFunctions())
-      builder.emitDestroyAddrAndFold(source->getLoc(), assocFn.get());
+    builder.emitDestroyAddrAndFold(source->getLoc(), source->getJVPFunction());
+    builder.emitDestroyAddrAndFold(source->getLoc(), source->getVJPFunction());
     source->eraseFromParent();
   }
   // Mark `source` as processed so that it won't be reprocessed after deletion.
@@ -8735,13 +8725,8 @@ bool ADContext::processDifferentiableFunctionInst(
     auto &s = getADDebugStream() << "Processing DifferentiableFunctionInst:\n";
     dfi->printInContext(s);
   });
-
-  if (dfi->getNumAssociatedFunctions() ==
-      autodiff::getNumAutoDiffAssociatedFunctions(
-          dfi->getDifferentiationOrder()))
+  if (dfi->hasDerivativeFunctions())
     return false;
-  assert(dfi->getNumAssociatedFunctions() == 0 &&
-         "some functions are already filled in but not all of them");
 
   SILFunction *parent = dfi->getFunction();
   auto loc = dfi->getLoc();

@@ -93,13 +93,13 @@ template <class T> class SILVTableVisitor {
       auto constant = SILDeclRef(fd, SILDeclRef::Kind::Func);
       auto jvpConstant = constant.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              AutoDiffAssociatedFunctionKind::JVP,
               DA->getParameterIndices(), fd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              AutoDiffAssociatedFunctionKind::VJP,
               DA->getParameterIndices(), fd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }
@@ -120,13 +120,13 @@ template <class T> class SILVTableVisitor {
       auto constant = SILDeclRef(cd, SILDeclRef::Kind::Allocator);
       auto jvpConstant = constant.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              AutoDiffAssociatedFunctionKind::JVP,
               DA->getParameterIndices(), cd->getASTContext()));
       maybeAddEntry(jvpConstant);
 
       auto vjpConstant = constant.asAutoDiffAssociatedFunction(
           AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              AutoDiffAssociatedFunctionKind::VJP,
               DA->getParameterIndices(), cd->getASTContext()));
       maybeAddEntry(vjpConstant);
     }

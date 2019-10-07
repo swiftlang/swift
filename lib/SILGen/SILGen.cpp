@@ -774,10 +774,10 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
       auto lookUpConformance = LookUpConformanceInModule(M.getSwiftModule());
       auto expectedJVPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
+          indices.parameters, indices.source,
           AutoDiffAssociatedFunctionKind::JVP, Types, lookUpConformance);
       auto expectedVJPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
+          indices.parameters, indices.source,
           AutoDiffAssociatedFunctionKind::VJP, Types, lookUpConformance);
 
       // Self reordering is necessary if wrt at least two parameters, including
@@ -802,7 +802,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
               reorderSelf);
         } else {
           auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+              AutoDiffAssociatedFunctionKind::JVP,
               diffAttr->getParameterIndices(), AFD->getASTContext());
           jvpThunk = getOrCreateAutoDiffThunk(
               constant.asAutoDiffAssociatedFunction(id), jvpFn,
@@ -820,7 +820,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
               reorderSelf);
         } else {
           auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+              AutoDiffAssociatedFunctionKind::VJP,
               diffAttr->getParameterIndices(), AFD->getASTContext());
           vjpThunk = getOrCreateAutoDiffThunk(
               constant.asAutoDiffAssociatedFunction(id), vjpFn,

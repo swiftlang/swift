@@ -996,9 +996,8 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 // SWIFT_ENABLE_TENSORFLOW
 static ValueDecl *getAutoDiffApplyAssociatedFunction(
     ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
-    unsigned arity, unsigned order, bool rethrows) {
+    unsigned arity, bool rethrows) {
   assert(arity >= 1);
-  assert(order == 1 && "higher-order differentiation is not supported yet");
   // JVP:
   //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
   //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
@@ -1047,7 +1046,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
         auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
-            paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1, kind,
+            paramIndices, /*resultIndex*/ 0, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));
         return assocFnTy->getResult();
       }};
@@ -1842,13 +1841,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   // SWIFT_ENABLE_TENSORFLOW
   if (OperationName.startswith("autodiffApply_")) {
     AutoDiffAssociatedFunctionKind kind;
-    unsigned arity, order;
+    unsigned arity;
     bool rethrows;
     if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
-                                                 order, rethrows))
+                                                 rethrows))
       return nullptr;
     return getAutoDiffApplyAssociatedFunction(Context, Id, kind, arity,
-                                              order, rethrows);
+                                              rethrows);
   }
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)

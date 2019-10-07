@@ -458,29 +458,25 @@ struct AutoDiffAssociatedFunctionKind {
 /// compared by opaque pointer value.
 class AutoDiffAssociatedFunctionIdentifier : public llvm::FoldingSetNode {
   const AutoDiffAssociatedFunctionKind kind;
-  const unsigned differentiationOrder;
   AutoDiffIndexSubset *const parameterIndices;
 
   AutoDiffAssociatedFunctionIdentifier(
-      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
+      AutoDiffAssociatedFunctionKind kind,
       AutoDiffIndexSubset *parameterIndices) :
-    kind(kind), differentiationOrder(differentiationOrder),
-    parameterIndices(parameterIndices) {}
+    kind(kind), parameterIndices(parameterIndices) {}
 
 public:
   AutoDiffAssociatedFunctionKind getKind() const { return kind; }
-  unsigned getDifferentiationOrder() const { return differentiationOrder; }
   AutoDiffIndexSubset *getParameterIndices() const {
     return parameterIndices;
   }
 
   static AutoDiffAssociatedFunctionIdentifier *get(
-      AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
+      AutoDiffAssociatedFunctionKind kind,
       AutoDiffIndexSubset *parameterIndices, ASTContext &C);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
     ID.AddInteger(kind);
-    ID.AddInteger(differentiationOrder);
     ID.AddPointer(parameterIndices);
   }
 };
@@ -520,29 +516,12 @@ void getSubsetParameterTypes(AutoDiffIndexSubset *indices,
 AutoDiffIndexSubset *getLoweredParameterIndices(AutoDiffIndexSubset *indices,
                                                 AnyFunctionType *type);
 
-/// Returns the offset for an associated function at a specific differentiation
-/// order.
-/// This is used for both ordering in the `differentiable_function` instruction
-/// and ABI layout.
-///
-///                Order 1       Order 2     ...
-/// |----------| |-----|-----| |-----|-----| ...
-/// | Original | | JVP | VJP | | JVP | VJP | ...
-/// |----------| |-----|-----| |-----|-----| ...
-unsigned
-getOffsetForAutoDiffAssociatedFunction(unsigned order,
-                                       AutoDiffAssociatedFunctionKind kind);
-
-unsigned
-getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder);
-
 /// Retrieve config from the function name of a variant of
 /// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
 /// Returns true if the function name is parsed successfully.
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffAssociatedFunctionKind &kind,
-                                   unsigned &arity, unsigned &order,
-                                   bool &rethrows);
+                                   unsigned &arity, bool &rethrows);
 
 /// Computes the correct linkage for an associated function given the linkage of
 /// the original function. If the original linkage is not external and

@@ -414,9 +414,8 @@ namespace sil_block {
   // SWIFT_ENABLE_TENSORFLOW
   using SILInstDifferentiableFunctionLayout = BCRecordLayout<
     SIL_INST_DIFFERENTIABLE_FUNCTION,
-    BCVBR<8>,             // differentiation order
     BCVBR<8>,             // number of function parameters
-    BCVBR<8>,             // number of operands
+    BCFixed<1>,           // has derivative functions?
     BCArray<ValueIDField> // parameter indices and operands
   >;
 
@@ -425,8 +424,7 @@ namespace sil_block {
     TypeIDField,
     SILTypeCategoryField,
     ValueIDField,
-    BCFixed<2>, // extractee
-    BCVBR<8>    // order
+    BCFixed<2> // extractee
   >;
 
   // SIL instructions with one type. (alloc_stack)

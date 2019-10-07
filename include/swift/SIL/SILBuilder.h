@@ -511,28 +511,27 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation loc, AutoDiffIndexSubset *parameterIndices,
-      unsigned differentiationOrder, SILValue original,
-      ArrayRef<SILValue> associatedFunctions = {}) {
+      SILLocation Loc, AutoDiffIndexSubset *ParameterIndices,
+      SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(
-        getModule(), getSILDebugLocation(loc), parameterIndices,
-        differentiationOrder, original, associatedFunctions));
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
   }
   
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
-      SILLocation loc, DifferentiableFunctionExtractee extractee,
-      unsigned differentiationOrder, SILValue theFunction) {
+      SILLocation Loc, DifferentiableFunctionExtractee Extractee,
+      SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc), extractee, differentiationOrder,
-        theFunction));
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
   }
 
   DifferentiableFunctionExtractInst *
-  createDifferentiableFunctionExtractOriginal(SILLocation loc,
-                                              SILValue theFunction) {
+  createDifferentiableFunctionExtractOriginal(SILLocation Loc,
+                                              SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
-        getModule(), getSILDebugLocation(loc),
-        DifferentiableFunctionExtractee::Original, 0, theFunction));
+        getModule(), getSILDebugLocation(Loc),
+        DifferentiableFunctionExtractee::Original, TheFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

@@ -1015,8 +1015,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
            // SWIFT_ENABLE_TENSORFLOW
            Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
            IsNonThrowingApply = 0;
-  // SWIFT_ENABLE_TENSORFLOW
-  unsigned NumArguments = 0;
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1120,13 +1118,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   // SWIFT_ENABLE_TENSORFLOW
   case SIL_INST_DIFFERENTIABLE_FUNCTION:
     SILInstDifferentiableFunctionLayout::readRecord(
-        scratch, /*order*/ Attr, /*numParams*/ Attr2, NumArguments,
+        scratch, /*numParams*/ Attr, /*hasDerivativeFunctions*/ Attr2,
         ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionInst;
     break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
     SILInstDifferentiableFunctionExtractLayout::readRecord(
-        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr, /*order*/ Attr2);
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
     break;
   case SIL_INST_NO_OPERAND:
@@ -1521,22 +1519,28 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   }
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
-    auto numParamIndices = ListOfValues.size() - NumArguments * 3;
+    bool hasDerivativeFunctions = (bool)Attr2;
+    unsigned numOperands = hasDerivativeFunctions ? 3 : 1;
+    auto numParamIndices = ListOfValues.size() - numOperands * 3;
+    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
     auto rawParamIndices =
        map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
                                      [](uint64_t i) { return (unsigned)i; });
-    auto numParams = Attr2;
+    auto numParams = Attr;
     auto *paramIndices =
         AutoDiffIndexSubset::get(MF->getContext(), numParams, rawParamIndices);
-    SmallVector<SILValue, 4> operands;
-    for (auto i = numParamIndices; i < NumArguments * 3; i += 3) {
+    SmallVector<SILValue, 3> operands;
+    for (auto i = numParamIndices;
+         i < numParamIndices + numOperands * 3; i += 3) {
       auto astTy = MF->getType(ListOfValues[i]);
       auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
       operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
     }
+    Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+    if (hasDerivativeFunctions)
+      derivativeFunctions = std::make_pair(operands[1], operands[2]);
     ResultVal = Builder.createDifferentiableFunction(
-        Loc, paramIndices, /*differentiationOrder*/ Attr, operands[0],
-        ArrayRef<SILValue>(operands).drop_front());
+        Loc, paramIndices, operands[0], derivativeFunctions);
     break;
   }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
@@ -1544,9 +1548,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
     DifferentiableFunctionExtractee extractee(Attr);
-    auto order = Attr2;
     ResultVal =
-        Builder.createDifferentiableFunctionExtract(Loc, extractee, order, val);
+        Builder.createDifferentiableFunctionExtract(Loc, extractee, val);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

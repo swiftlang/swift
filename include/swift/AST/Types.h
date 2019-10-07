@@ -3099,8 +3099,8 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Given `indices`, `differentiationOrder`, and `kind`, calculates the type
-  /// of the corresponding autodiff associated function.
+  /// Given `indices` and `kind`, calculates the type of the corresponding
+  /// autodiff associated function.
   ///
   /// By default, if the original type has a self parameter list and parameter
   /// indices include self, the computed associated function type will return a
@@ -3116,7 +3116,7 @@ public:
   /// function, including `@differentiable`.
   AnyFunctionType *getAutoDiffAssociatedFunctionType(
       AutoDiffIndexSubset *indices, unsigned resultIndex,
-      unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
+      AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr,
       bool makeSelfParamFirst = false);
@@ -4216,7 +4216,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices);
+      AutoDiffIndexSubset *parameterIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
@@ -4224,8 +4224,8 @@ public:
   /// a function of this type.
   CanSILFunctionType getAutoDiffAssociatedFunctionType(
       AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
-      unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-      Lowering::TypeConverter &TC, LookupConformanceFn lookupConformance,
+      AutoDiffAssociatedFunctionKind kind, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
       CanGenericSignature associatedFunctionGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can

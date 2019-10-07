@@ -5620,20 +5620,17 @@ differentiable_function
   sil-differentiable-function-associated-function-list ::=
       '{' sil-value ',' sil-value '}'
 
-  differentiable_function [wrt 0] [order 1] %0 : $(T) -> T \
+  differentiable_function [wrt 0] %0 : $(T) -> T \
     with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
-Bundles a function with its associated differentiation functions up to a
-specified differentiation order into an ``@differentiable`` function. There are
-two associated functions per differentiation order: a Jacobian-vector products
-(JVP) function and a vector-Jacobian products (VJP) function.
+Bundles a function with its associated differentiation functions into a
+``@differentiable`` function. There are two associated functions:
+a Jacobian-vector products (JVP) function and a vector-Jacobian products (VJP)
+function.
 
 ``[wrt ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
 parameters.
-
-``[order ...]`` specifies the maximum differentiation order for the resulting
-function. The number of lists of associated functions is equal to the order.
 
 A ``with`` clause specifies the differentiation functions associated
 with the original function. When a ``with`` clause is not specified, the first
@@ -5660,12 +5657,12 @@ differentiable_function_extract
   sil-differentiable-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
 
   differentiable_function_extract [original] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
 
 Extracts the original function or an associated function from the given
-``@differentiable`` function at a specific differentiation order. It must be
-provided with an extractee: ``[original]``, ``[jvp]`` or ``[vjp]``.
+``@differentiable`` function. It must be provided with an extractee:
+``[original]``, ``[jvp]`` or ``[vjp]``.
 
 
 Assertion configuration

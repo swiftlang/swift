@@ -2736,20 +2736,16 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
     auto instr = cast<DifferentiableFunctionInst>(convInstr);
-    SmallVector<SILValue, 2> associatedFunctions;
-    for (auto &assocFn : instr->getAssociatedFunctions())
-      associatedFunctions.push_back(assocFn.get());
     newInstr = convBuilder.createDifferentiableFunction(
         instr->getLoc(), instr->getParameterIndices(),
-        instr->getDifferentiationOrder(), instr->getOriginalFunction(),
-        associatedFunctions);
+        instr->getOriginalFunction(),
+        instr->getOptionalDerivativeFunctionPair());
     break;
   }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     auto instr = cast<DifferentiableFunctionExtractInst>(convInstr);
     newInstr = convBuilder.createDifferentiableFunctionExtract(
-        instr->getLoc(), instr->getExtractee(),
-        instr->getDifferentiationOrder(), instr->getFunctionOperand());
+        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

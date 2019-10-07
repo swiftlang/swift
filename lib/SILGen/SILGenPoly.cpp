@@ -3269,8 +3269,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       outputSubstType->getWithoutDifferentiability());
   auto &expectedTLNotDiff = SGF.getTypeLowering(outputOrigTypeNotDiff,
                                                 outputSubstTypeNotDiff);
-  // `differentiable_function_extract` is consuming; copy `fn` before passing as
-  // operand.
+  // `differentiable_function_extract` takes `@guaranteed` values.
   auto borrowedFnValue = fn.borrow(SGF, loc);
   SILValue original = SGF.B.createDifferentiableFunctionExtractOriginal(
       loc, borrowedFnValue.getValue());
@@ -3297,7 +3296,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
       [&](CanAnyFunctionType fnTy, AutoDiffAssociatedFunctionKind kind)
           -> CanAnyFunctionType {
         auto assocTy = fnTy->getAutoDiffAssociatedFunctionType(
-            parameterIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1,
+            parameterIndices, /*resultIndex*/ 0,
             kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
         return cast<AnyFunctionType>(assocTy->getCanonicalType());
       };
@@ -3322,7 +3321,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
     auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
                                                   assocFnOutputSubstType);
     SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
-        loc, kind, /*differentiationOrder*/ 1, borrowedFnValue.getValue());
+        loc, kind, borrowedFnValue.getValue());
     assocFn = SGF.B.emitCopyValueOperation(loc, assocFn);
     auto managedAssocFn = SGF.emitManagedRValueWithCleanup(assocFn);
     return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,
@@ -3335,9 +3334,8 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
 
   SILValue convertedBundle = SGF.B.createDifferentiableFunction(
       loc, sourceType->getDifferentiationParameterIndices(),
-      /*differentiationOrder*/ 1,
       originalThunk.forward(SGF),
-      {jvpThunk.forward(SGF), vjpThunk.forward(SGF)});
+      std::make_pair(jvpThunk.forward(SGF), vjpThunk.forward(SGF)));
   return SGF.emitManagedRValueWithCleanup(convertedBundle);
 }
 
@@ -3687,7 +3685,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
 
   auto origFnType = original->getLoweredFunctionType();
   auto origAssocFnType = origFnType->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, /*differentiationOrder*/ 1,
+      indices.parameters, indices.source,
       assocFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
       assocFnType->getGenericSignature());
   assert(!origAssocFnType->getExtInfo().hasContext());
@@ -4307,10 +4305,10 @@ getWitnessFunctionRef(SILGenFunction &SGF,
           autoDiffFuncId->getParameterIndices(),
           witness.getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
       auto autoDiffFn = SGF.B.createDifferentiableFunction(
-          loc, loweredIndices, /*differentiationOrder*/ 1, originalFn);
+          loc, loweredIndices, originalFn);
       return SGF.B.createDifferentiableFunctionExtract(
           loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
-          /*differentiationOrder*/ 1, autoDiffFn);
+          autoDiffFn);
     }
 
     return SGF.emitGlobalFunctionRef(loc, witness);

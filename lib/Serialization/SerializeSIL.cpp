@@ -1000,8 +1000,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     }
     SILInstDifferentiableFunctionLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionLayout::Code],
-        dfi->getDifferentiationOrder(), paramIndices->getCapacity(),
-        dfi->getNumOperands(), trailingInfo);
+        paramIndices->getCapacity(), dfi->hasDerivativeFunctions(),
+        trailingInfo);
     break;
   }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
@@ -1013,7 +1013,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstDifferentiableFunctionExtractLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiableFunctionExtractLayout::Code],
         operandTypeRef, (unsigned)operandType.getCategory(), operandRef,
-        rawExtractee, dfei->getDifferentiationOrder());
+        rawExtractee);
     break;
   }
   case SILInstructionKind::ApplyInst: {

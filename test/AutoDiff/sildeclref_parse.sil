@@ -13,17 +13,17 @@ bb0(%0 : $*T):
   // CHECK: witness_method $T, #Proto.f!1
   %1 = witness_method $T, #Proto.f!1 : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
 
-  // CHECK: witness_method $T, #Proto.f!1.jvp.1.SSS
-  %2 = witness_method $T, #Proto.f!1.jvp.1.SSS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+  // CHECK: witness_method $T, #Proto.f!1.jvp.SSS
+  %2 = witness_method $T, #Proto.f!1.jvp.SSS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
 
-  // CHECK: witness_method $T, #Proto.f!1.jvp.1.UUS
-  %3 = witness_method $T, #Proto.f!1.jvp.1.UUS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+  // CHECK: witness_method $T, #Proto.f!1.jvp.UUS
+  %3 = witness_method $T, #Proto.f!1.jvp.UUS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
 
-  // CHECK: witness_method $T, #Proto.f!1.vjp.1.SSS
-  %4 = witness_method $T, #Proto.f!1.vjp.1.SSS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+  // CHECK: witness_method $T, #Proto.f!1.vjp.SSS
+  %4 = witness_method $T, #Proto.f!1.vjp.SSS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
 
-  // CHECK: witness_method $T, #Proto.f!1.vjp.1.UUS
-  %5 = witness_method $T, #Proto.f!1.vjp.1.UUS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
+  // CHECK: witness_method $T, #Proto.f!1.vjp.UUS
+  %5 = witness_method $T, #Proto.f!1.vjp.UUS : <Self where Self : Proto> (Self) -> (Float, Float) -> Float : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@in_guaranteed τ_0_0) -> (Float, Float) -> Float
 
   %6 = tuple ()
   return %6 : $()

@@ -361,8 +361,7 @@ void SILDeclRef::print(raw_ostream &OS) const {
       OS << "vjp.";
       break;
     }
-    OS << autoDiffFuncId->getDifferentiationOrder() << "."
-       << autoDiffFuncId->getParameterIndices()->getString();
+    OS << autoDiffFuncId->getParameterIndices()->getString();
   }
 }
 
@@ -1169,16 +1168,11 @@ public:
         *this << ' ' << i;
       *this << "] ";
     }
-    *this << "[order " << dfi->getDifferentiationOrder() << "] ";
     *this << getIDAndType(dfi->getOriginalFunction());
-    if (!dfi->getAssociatedFunctions().empty()) {
+    if (dfi->hasDerivativeFunctions()) {
       *this << " with ";
-      interleave(range(1, dfi->getDifferentiationOrder() + 1),
-                 [&](unsigned order) {
-                   auto pair = dfi->getAssociatedFunctionPair(order);
-                   *this << '{' << getIDAndType(pair.first) << ", "
-                         << getIDAndType(pair.second) << '}';
-                 }, [this] { *this << ", "; });
+      *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
+            << getIDAndType(dfi->getVJPFunction()) << '}';
     }
   }
 
@@ -1197,9 +1191,6 @@ public:
       break;
     }
     *this << "] ";
-    auto order = dfei->getDifferentiationOrder();
-    if (order > 0)
-      *this << "[order " << order << "] ";
     *this << getIDAndType(dfei->getFunctionOperand());
   }
 
