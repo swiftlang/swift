@@ -54,13 +54,6 @@ namespace swift {
 
 #undef HAS_TRIVIAL_DISPLAY
 
-  namespace ast_scope {
-  class ASTScopeImpl;
-  class ScopeCreator;
-  } // namespace ast_scope
-  void simple_display(llvm::raw_ostream &out, const ast_scope::ASTScopeImpl *);
-  void simple_display(llvm::raw_ostream &out, const ast_scope::ScopeCreator *);
-
   template<typename T>
   typename std::enable_if<HasTrivialDisplay<T>::value>::type
   simple_display(llvm::raw_ostream &out, const T &value) {

@@ -757,7 +757,7 @@ SourceLoc getLocAfterExtendedNominal(const ExtensionDecl *const ext) {
       .getEnd();
 }
 
-SourceLoc swift::extractNearestSourceLoc(
+SourceLoc ast_scope::extractNearestSourceLoc(
     std::tuple<ASTScopeImpl *, ScopeCreator *> scopeAndCreator) {
   const ASTScopeImpl *scope = std::get<0>(scopeAndCreator);
   return scope->getSourceRangeOfThisASTNode().Start;

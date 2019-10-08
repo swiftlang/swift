@@ -202,7 +202,7 @@ bool IterableTypeScope::doesDeclHaveABody() const {
   return getBraces().Start != getBraces().End;
 }
 
-void swift::simple_display(llvm::raw_ostream &out,
-                           const ast_scope::ASTScopeImpl *scope) {
+void ast_scope::simple_display(llvm::raw_ostream &out,
+                               const ASTScopeImpl *scope) {
   scope->print(out);
 }

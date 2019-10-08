@@ -2088,7 +2088,7 @@ bool ASTSourceFileScope::crossCheckWithAST() {
   return scopeCreator->containsAllDeclContextsFromAST();
 }
 
-void swift::simple_display(llvm::raw_ostream &out,
-                           const ast_scope::ScopeCreator *scopeCreator) {
+void ast_scope::simple_display(llvm::raw_ostream &out,
+                               const ScopeCreator *scopeCreator) {
   scopeCreator->print(out);
 }
