@@ -6046,6 +6046,24 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   return AnyFunctionType::Param(type, label, flags);
 }
 
+Initializer *ParamDecl::getDefaultArgumentInitContextCached() const {
+  if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
+      return defaultInfo->InitContext;
+
+  return nullptr;
+}
+
+Initializer *ParamDecl::getDefaultArgumentInitContext() const {
+  // If this param doesn't need a context, don't bother kicking off a request.
+  if (!getDefaultValue() && !getStoredProperty())
+    return nullptr;
+
+  auto &ctx = getASTContext();
+  auto *mutableThis = const_cast<ParamDecl *>(this);
+  return evaluateOrDefault(
+      ctx.evaluator, DefaultArgumentInitContextRequest{mutableThis}, nullptr);
+}
+
 void ParamDecl::setDefaultValue(Expr *E) {
   if (!DefaultValueAndFlags.getPointer()) {
     if (!E) return;
@@ -6093,8 +6111,13 @@ CustomAttr *ValueDecl::getAttachedFunctionBuilder() const {
 }
 
 void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
-  assert(DefaultValueAndFlags.getPointer());
-  DefaultValueAndFlags.getPointer()->InitContext = initContext;
+  auto *oldContext = getDefaultArgumentInitContextCached();
+  assert((!oldContext || oldContext == initContext) &&
+         "Cannot change init context after setting");
+
+  auto *defaultInfo = DefaultValueAndFlags.getPointer();
+  assert(defaultInfo);
+  defaultInfo->InitContext = initContext;
 }
 
 void ParamDecl::setDefaultArgumentCaptureInfo(CaptureInfo captures) {

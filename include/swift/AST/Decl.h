@@ -5175,6 +5175,8 @@ enum class ParamSpecifier : uint8_t {
 
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
+  friend class DefaultArgumentInitContextRequest;
+
   llvm::PointerIntPair<Identifier, 1, bool> ArgumentNameAndDestructured;
   SourceLoc ParameterNameLoc;
   SourceLoc ArgumentNameLoc;
@@ -5188,6 +5190,10 @@ class ParamDecl : public VarDecl {
     StringRef StringRepresentation;
     CaptureInfo Captures;
   };
+
+  /// Retrieve the cached initializer context for the parameter's default
+  /// argument without triggering a request.
+  Initializer *getDefaultArgumentInitContextCached() const;
 
   enum class Flags : uint8_t {
     /// Whether or not this parameter is vargs.
@@ -5262,11 +5268,8 @@ public:
 
   void setStoredProperty(VarDecl *var);
 
-  Initializer *getDefaultArgumentInitContext() const {
-    if (auto stored = DefaultValueAndFlags.getPointer())
-      return stored->InitContext;
-    return nullptr;
-  }
+  /// Retrieve the initializer context for the parameter's default argument.
+  Initializer *getDefaultArgumentInitContext() const;
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 

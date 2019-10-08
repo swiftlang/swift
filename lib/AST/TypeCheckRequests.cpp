@@ -1181,3 +1181,21 @@ void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
   diags.diagnose(decl, diag::kind_declname_declared_here,
                  decl->getDescriptiveKind(), decl->getName());
 }
+
+//----------------------------------------------------------------------------//
+// DefaultArgumentInitContextRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<Initializer *>
+DefaultArgumentInitContextRequest::getCachedResult() const {
+  auto *param = std::get<0>(getStorage());
+  if (auto *init = param->getDefaultArgumentInitContextCached())
+    return init;
+
+  return None;
+}
+
+void DefaultArgumentInitContextRequest::cacheResult(Initializer *init) const {
+  auto *param = std::get<0>(getStorage());
+  param->setDefaultArgumentInitContext(init);
+}

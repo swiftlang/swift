@@ -2035,6 +2035,41 @@ static void checkDefaultArguments(ParameterList *params) {
   }
 }
 
+llvm::Expected<Initializer *>
+DefaultArgumentInitContextRequest::evaluate(Evaluator &eval,
+                                            ParamDecl *param) const {
+  auto &ctx = param->getASTContext();
+  auto *parentDC = param->getDeclContext();
+  auto *paramList = getParameterList(cast<ValueDecl>(parentDC->getAsDecl()));
+
+  // In order to compute the initializer context for this parameter, we need to
+  // know its index in the parameter list. Therefore iterate over the parameters
+  // looking for it and fill in the other parameter's contexts while we're here.
+  Initializer *result = nullptr;
+  for (auto idx : indices(*paramList)) {
+    auto *otherParam = paramList->get(idx);
+
+    // If this param doesn't need a context, we're done.
+    if (!otherParam->getDefaultValue() && !otherParam->getStoredProperty())
+      continue;
+
+    // If this param already has a context, continue using it.
+    if (otherParam->getDefaultArgumentInitContextCached())
+      continue;
+
+    // Create a new initializer context. If this is for the parameter that
+    // kicked off the request, make a note of it for when we return. Otherwise
+    // cache the result ourselves.
+    auto *initDC = new (ctx) DefaultArgumentInitializer(parentDC, idx);
+    if (param == otherParam)
+      result = initDC;
+    else
+      eval.cacheOutput(DefaultArgumentInitContextRequest{otherParam}, initDC);
+  }
+  assert(result && "Didn't create init context?");
+  return result;
+}
+
 PrecedenceGroupDecl *TypeChecker::lookupPrecedenceGroup(DeclContext *dc,
                                                         Identifier name,
                                                         SourceLoc nameLoc) {
