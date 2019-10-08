@@ -492,8 +492,11 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->getInterfaceType())
+  if (witness->isRecursiveValidation())
     return Type();
+
+  // FIXME: This is here to trigger the isInvalid() computation.
+  (void) witness->getInterfaceType();
 
   if (witness->isInvalid())
     return Type();

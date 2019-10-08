@@ -440,7 +440,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF) {
     emitGlobalDecl(decl);
   for (auto *localDecl : SF.LocalTypeDecls)
     emitGlobalDecl(localDecl);
-  for (auto *opaqueDecl : SF.OpaqueReturnTypes)
+  for (auto *opaqueDecl : SF.getOpaqueReturnTypeDecls())
     maybeEmitOpaqueTypeDecl(opaqueDecl);
 
   SF.collectLinkLibraries([this](LinkLibrary linkLib) {

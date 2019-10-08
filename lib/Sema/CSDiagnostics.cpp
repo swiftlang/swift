@@ -221,20 +221,28 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   if (!argExpr)
     return None;
 
-  ValueDecl *callee = nullptr;
+  Optional<OverloadChoice> choice;
   Type rawFnType;
   if (auto overload = getChoiceFor(argLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
-    callee = overload->choice.getDeclOrNull();
+    choice = overload->choice;
     rawFnType = overload->openedType;
   } else {
-    // If we didn't resolve an overload for the callee, we must be dealing with
-    // a call of an arbitrary function expr.
-    auto *call = cast<CallExpr>(anchor);
-    assert(!shouldHaveDirectCalleeOverload(call) &&
-           "Should we have resolved a callee for this?");
-    rawFnType = cs.getType(call->getFn());
+    // If we didn't resolve an overload for the callee, we should be dealing
+    // with a call of an arbitrary function expr.
+    if (auto *call = dyn_cast<CallExpr>(anchor)) {
+      assert(!shouldHaveDirectCalleeOverload(call) &&
+             "Should we have resolved a callee for this?");
+      rawFnType = cs.getType(call->getFn());
+    } else {
+      // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
+      // we can end up a BinaryExpr here with an unresolved callee. It should be
+      // possible to remove this once we've gotten rid of the old CSDiag logic
+      // and just assert that we have a CallExpr.
+      auto *apply = cast<ApplyExpr>(anchor);
+      rawFnType = cs.getType(apply->getFn());
+    }
   }
 
   // Try to resolve the function type by loading lvalues and looking through
@@ -249,6 +257,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // Resolve the interface type for the function. Note that this may not be a
   // function type, for example it could be a generic parameter.
   Type fnInterfaceType;
+  auto *callee = choice ? choice->getDeclOrNull() : nullptr;
   if (callee && callee->hasInterfaceType()) {
     // If we have a callee with an interface type, we can use it. This is
     // preferable to resolveInterfaceType, as this will allow us to get a
@@ -261,7 +270,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
-    if (callee->hasCurriedSelf())
+    if (hasAppliedSelf(cs, *choice))
       fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
 
     if (auto *fn = fnInterfaceType->getAs<AnyFunctionType>()) {
@@ -5033,13 +5042,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsNote() {
-  auto *locator = getLocator();
-  auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
-  assert(argToParam);
-
-  if (auto *decl = getDecl()) {
-    emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
-                   getToType(), argToParam->getParamIdx());
+  if (auto *callee = getCallee()) {
+    emitDiagnostic(callee, diag::candidate_has_invalid_argument_at_position,
+                   getToType(), getParamPosition());
     return true;
   }
 
@@ -5066,11 +5071,10 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // one would cover both arguments.
   if (getAnchor() == rhs && rhsType->is<FunctionType>()) {
     auto &cs = getConstraintSystem();
-    auto info = getFunctionArgApplyInfo(locator);
-    if (info && cs.hasFixFor(cs.getConstraintLocator(
-                    binaryOp, {ConstraintLocator::ApplyArgument,
-                               LocatorPathElt::ApplyArgToParam(
-                                   0, 0, info->getParameterFlagsAtIndex(0))})))
+    if (cs.hasFixFor(cs.getConstraintLocator(
+            binaryOp, {ConstraintLocator::ApplyArgument,
+                       LocatorPathElt::ApplyArgToParam(
+                           0, 0, getParameterFlagsAtIndex(0))})))
       return true;
   }
 
@@ -5228,14 +5232,12 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
     return false;
 
-  auto info = *getFunctionArgApplyInfo(locator);
-
   auto *argType = cs.createTypeVariable(
       cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
       /*flags=*/0);
 
   // Assign new type variable to a type of a parameter.
-  auto *fnType = info.getFnType();
+  auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
   cs.assignFixedType(argType, param.getOldType());
 
