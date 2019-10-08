@@ -2580,7 +2580,22 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   TypeLoc returnLoc;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
-    returnLoc = VD->getTypeLoc();
+    if (auto *P = VD->getParentPattern()) {
+      while (auto *PP = dyn_cast<ParenPattern>(P))
+        P = PP->getSubPattern();
+
+      if (auto *TP = dyn_cast<TypedPattern>(P)) {
+        P = P->getSemanticsProvidingPattern();
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          assert(NP->getDecl() == VD);
+          (void) NP;
+
+          returnLoc = TP->getTypeLoc();
+        }
+      }
+    } else {
+      returnLoc = VD->getTypeLoc();
+    }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
     returnLoc = FD->getBodyResultTypeLoc();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
@@ -2591,23 +2606,12 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    return func->getOpaqueResultTypeDecl();
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
-    return storage->getOpaqueResultTypeDecl();
-  } else {
+  if (getOpaqueResultTypeRepr() == nullptr)
     return nullptr;
-  }
-}
 
-void ValueDecl::setOpaqueResultTypeDecl(OpaqueTypeDecl *D) {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    func->setOpaqueResultTypeDecl(D);
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)){
-    storage->setOpaqueResultTypeDecl(D);
-  } else {
-    llvm_unreachable("decl does not support opaque result types");
-  }
+  return evaluateOrDefault(getASTContext().evaluator,
+    OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
+    nullptr);
 }
 
 bool ValueDecl::isObjC() const {
@@ -2699,6 +2703,27 @@ bool ValueDecl::isProtocolRequirement() const {
 
 bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
+}
+
+bool ValueDecl::isRecursiveValidation() const {
+  if (hasValidationStarted() && !hasInterfaceType())
+    return true;
+
+  if (auto *vd = dyn_cast<VarDecl>(this))
+    if (auto *pbd = vd->getParentPatternBinding())
+      if (pbd->isBeingValidated())
+        return true;
+
+  auto *dc = getDeclContext();
+  while (isa<NominalTypeDecl>(dc))
+    dc = dc->getParent();
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (ext->isComputingGenericSignature())
+      return true;
+  }
+
+  return false;
 }
 
 Type ValueDecl::getInterfaceType() const {
@@ -6876,7 +6901,14 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                              const_cast<FuncDecl *>(this)
                            },
                            nullptr);
- }
+}
+
+bool FuncDecl::isStatic() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    IsStaticRequest{const_cast<FuncDecl *>(this)},
+    false);
+}
 
 AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,

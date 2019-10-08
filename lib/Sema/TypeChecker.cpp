@@ -618,22 +618,6 @@ swift::handleSILGenericParams(ASTContext &Ctx, GenericParamList *genericParams,
   return createTypeChecker(Ctx).handleSILGenericParams(genericParams, DC);
 }
 
-void swift::typeCheckCompletionDecl(Decl *D) {
-  auto &Ctx = D->getASTContext();
-
-  DiagnosticSuppression suppression(Ctx.Diags);
-  (void)createTypeChecker(Ctx);
-  if (auto ext = dyn_cast<ExtensionDecl>(D)) {
-    if (auto *nominal = ext->computeExtendedNominal()) {
-      // FIXME(InterfaceTypeRequest): Remove this.
-      (void)nominal->getInterfaceType();
-    }
-  } else {
-    // FIXME(InterfaceTypeRequest): Remove this.
-    (void)cast<ValueDecl>(D)->getInterfaceType();
-  }
-}
-
 void swift::typeCheckPatternBinding(PatternBindingDecl *PBD,
                                     unsigned bindingIndex) {
   assert(!PBD->isInitializerChecked(bindingIndex) &&

@@ -60,8 +60,7 @@ public:
 
   /// Look up an opaque return type by the mangled name of the declaration
   /// that defines it.
-  virtual OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName,
-                                                 LazyResolver *resolver) {
+  virtual OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) {
     return nullptr;
   }
 

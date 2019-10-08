@@ -895,3 +895,17 @@ void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
 
 }
+
+//----------------------------------------------------------------------------//
+// IsStaticRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsStaticRequest::getCachedResult() const {
+  auto *FD = std::get<0>(getStorage());
+  return FD->getCachedIsStatic();
+}
+
+void IsStaticRequest::cacheResult(bool result) const {
+  auto *FD = std::get<0>(getStorage());
+  FD->setStatic(result);
+}

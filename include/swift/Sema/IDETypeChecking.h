@@ -36,9 +36,6 @@ namespace swift {
   class ValueDecl;
   class DeclName;
 
-  /// Typecheck a declaration parsed during code completion.
-  void typeCheckCompletionDecl(Decl *D);
-
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
 
