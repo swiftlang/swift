@@ -149,3 +149,5 @@ SWIFT_REQUEST(TypeChecker, IsABICompatibleOverrideRequest,
               bool(ValueDecl *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsStaticRequest,
               bool(FuncDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, NeedsNewVTableEntryRequest,
+              bool(AbstractFunctionDecl *), SeparatelyCached, NoLocationInfo)

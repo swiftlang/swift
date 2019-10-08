@@ -702,8 +702,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // Note that this is a stub implementation.
     ctor->setStubImplementation(true);
 
-    // Stub constructors don't appear in the vtable.
-    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 

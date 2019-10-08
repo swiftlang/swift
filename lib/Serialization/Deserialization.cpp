@@ -2581,7 +2581,8 @@ public:
     if (initKind.hasValue())
       ctx.evaluator.cacheOutput(InitKindRequest{ctor},
                                 std::move(initKind.getValue()));
-    ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
+                              std::move(needsNewVTableEntry));
 
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     if (auto *overridden = ctor->getOverriddenDecl()) {
@@ -3057,7 +3058,8 @@ public:
       fn->setImplicit();
     fn->setIsObjC(isObjC);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
-    fn->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
+                              std::move(needsNewVTableEntry));
 
     if (opaqueReturnTypeID) {
       ctx.evaluator.cacheOutput(

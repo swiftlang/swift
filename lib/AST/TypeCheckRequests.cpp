@@ -909,3 +909,20 @@ void IsStaticRequest::cacheResult(bool result) const {
   auto *FD = std::get<0>(getStorage());
   FD->setStatic(result);
 }
+
+//----------------------------------------------------------------------------//
+// NeedsNewVTableEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> NeedsNewVTableEntryRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.NeedsNewVTableEntryComputed)
+    return decl->LazySemanticInfo.NeedsNewVTableEntry;
+  return None;
+}
+
+void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
+  decl->LazySemanticInfo.NeedsNewVTableEntry = value;
+}
