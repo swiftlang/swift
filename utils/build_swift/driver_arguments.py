@@ -205,6 +205,7 @@ def _apply_default_arguments(args):
         args.test_android = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
+        args.test_skstresstester = False
 
     # --skip-test-ios is merely a shorthand for host and simulator tests.
     if not args.test_ios:
@@ -568,6 +569,8 @@ def create_argument_parser():
            help='build SourceKitLSP')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
+    option(['--install-skstresstester'], toggle_true('install_skstresstester'),
+           help='install the SourceKit stress tester')
     option(['--toolchain-benchmarks'],
            toggle_true('build_toolchainbenchmarks'),
            help='build Swift Benchmarks using swiftpm against the just built '
@@ -955,6 +958,8 @@ def create_argument_parser():
            help='skip testing indexstore-db')
     option('--skip-test-sourcekit-lsp', toggle_false('test_sourcekitlsp'),
            help='skip testing sourcekit-lsp')
+    option('--skip-test-skstresstester', toggle_false('test_skstresstester'),
+           help='skip testing the SourceKit Stress tester')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
