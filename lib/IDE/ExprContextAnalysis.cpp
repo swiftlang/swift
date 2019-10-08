@@ -888,9 +888,6 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
   if (VD->isOperator())
     return false;
 
-  if (!VD->getInterfaceType())
-    return false;
-
   if (T->getOptionalObjectType() &&
       VD->getModuleContext()->isStdlibModule()) {
     // In optional context, ignore '.init(<some>)', 'init(nilLiteral:)',

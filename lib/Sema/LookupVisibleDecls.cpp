@@ -279,8 +279,11 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       if (!D->isObjC())
         return;
 
-      // Ensure that the declaration has a type.
-      if (!D->getInterfaceType()) return;
+      if (D->isRecursiveValidation())
+        return;
+
+      // FIXME: This is used to compute isInvalid() below.
+      (void) D->getInterfaceType();
 
       switch (D->getKind()) {
 #define DECL(ID, SUPER) \
@@ -757,9 +760,11 @@ public:
         continue;
       }
 
-      if (!VD->getInterfaceType()) {
+      if (VD->isRecursiveValidation())
         continue;
-      }
+
+      // FIXME: This is used to compute isInvalid() below.
+      (void) VD->getInterfaceType();
 
       auto &PossiblyConflicting = DeclsByName[VD->getBaseName()];
 
@@ -801,11 +806,14 @@ public:
       for (auto I = PossiblyConflicting.begin(), E = PossiblyConflicting.end();
            I != E; ++I) {
         auto *OtherVD = *I;
-        if (OtherVD->isInvalid() || !OtherVD->getInterfaceType()) {
-          // For some invalid decls it might be impossible to compute the
-          // signature, for example, if the types could not be resolved.
+        if (OtherVD->isRecursiveValidation())
           continue;
-        }
+
+        // FIXME: This is used to compute isInvalid() below.
+        (void) OtherVD->getInterfaceType();
+
+        if (OtherVD->isInvalid())
+          continue;
 
         auto OtherSignature = OtherVD->getOverloadSignature();
         auto OtherSignatureType = OtherVD->getOverloadSignatureType();
