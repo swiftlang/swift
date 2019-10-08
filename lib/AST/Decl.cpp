@@ -2731,8 +2731,11 @@ Type ValueDecl::getInterfaceType() const {
     // Our clients that don't register the lazy resolver are relying on the
     // fact that they can't pull an interface type out to avoid doing work.
     // This is a necessary evil until we can wean them off.
-    if (auto resolver = getASTContext().getLazyResolver())
+    if (auto resolver = getASTContext().getLazyResolver()) {
       resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
+      if (!hasInterfaceType())
+        return ErrorType::get(getASTContext());
+    }
   }
   return TypeAndAccess.getPointer();
 }
@@ -2741,13 +2744,7 @@ void ValueDecl::setInterfaceType(Type type) {
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
-
-    // ParamDecls in closure contexts can have type variables
-    // archetype in them during constraint generation.
-    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
-      assert(!type->hasArchetype() &&
-             "Archetype in interface type");
-    }
+    assert(!type->hasArchetype() && "Archetype in interface type");
 
     if (type->hasError())
       setInvalid();

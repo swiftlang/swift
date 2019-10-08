@@ -813,11 +813,8 @@ bool swift::isRepresentableInObjC(
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsObjC.
 
-  if (!VD->getInterfaceType()) {
-    VD->diagnose(diag::recursive_decl_reference, VD->getDescriptiveKind(),
-                 VD->getName());
-    return false;
-  }
+  // FIXME: Computes isInvalid() below.
+  (void) VD->getInterfaceType();
 
   if (VD->isInvalid())
     return false;

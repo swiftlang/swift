@@ -626,20 +626,21 @@ TypeChecker::handleSILGenericParams(GenericParamList *genericParams,
 }
 
 /// Check whether \c current is a redeclaration.
-static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
+static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
   // If we've already checked this declaration, don't do it again.
   if (current->alreadyCheckedRedeclaration())
     return;
 
-  // If there's no type yet, come back to it later.
-  if (!current->hasInterfaceType())
-    return;
-  
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
 
+  // FIXME: Computes isInvalid() below.
+  (void) current->getInterfaceType();
+
   // Ignore invalid and anonymous declarations.
-  if (current->isInvalid() || !current->hasName())
+  if (current->isInvalid() ||
+      !current->hasInterfaceType() ||
+      !current->hasName())
     return;
 
   // If this declaration isn't from a source file, don't check it.
@@ -685,6 +686,13 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (currentModule != other->getModuleContext())
       continue;
 
+    // If both declarations are in the same file, only diagnose the second one.
+    if (currentFile == other->getDeclContext()->getParentSourceFile())
+      if (current->getLoc().isValid() &&
+          ctx.SourceMgr.isBeforeInBuffer(
+            current->getLoc(), other->getLoc()))
+        continue;
+
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
     if (currentDC->isTypeContext() != other->getDeclContext()->isTypeContext())
@@ -696,13 +704,11 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     if (!conflicting(currentSig, otherSig))
       continue;
 
-    // Validate the declaration but only if it came from a different context.
-    if (other->getDeclContext() != current->getDeclContext())
-      (void)other->getInterfaceType();
+    // FIXME: Computes isInvalid() below.
+    (void) other->getInterfaceType();
 
-    // Skip invalid or not yet seen declarations.
-    // FIXME(InterfaceTypeRequest): Delete this.
-    if (other->isInvalid() || !other->hasInterfaceType())
+    // Skip invalid declarations.
+    if (other->isInvalid())
       continue;
 
     // Skip declarations in other files.
@@ -726,8 +732,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     const auto *currentOverride = current->getOverriddenDecl();
     const auto *otherOverride = other->getOverriddenDecl();
     if (currentOverride && currentOverride == otherOverride) {
-      tc.diagnose(current, diag::multiple_override, current->getFullName());
-      tc.diagnose(other, diag::multiple_override_prev, other->getFullName());
+      current->diagnose(diag::multiple_override, current->getFullName());
+      other->diagnose(diag::multiple_override_prev, other->getFullName());
       markInvalid();
       break;
     }
@@ -736,7 +742,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     CanType otherSigType = other->getOverloadSignatureType();
 
     bool wouldBeSwift5Redeclaration = false;
-    auto isRedeclaration = conflicting(tc.Context, currentSig, currentSigType,
+    auto isRedeclaration = conflicting(ctx, currentSig, currentSigType,
                                        otherSig, otherSigType,
                                        &wouldBeSwift5Redeclaration);
     // If there is another conflict, complain.
@@ -747,8 +753,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
         if (currentFile == otherFile &&
             current->getLoc().isValid() &&
             other->getLoc().isValid() &&
-            tc.Context.SourceMgr.isBeforeInBuffer(current->getLoc(),
-                                                  other->getLoc())) {
+            ctx.SourceMgr.isBeforeInBuffer(current->getLoc(),
+                                           other->getLoc())) {
           std::swap(current, other);
         }
       }
@@ -853,9 +859,9 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
       // If this isn't a redeclaration in the current version of Swift, but
       // would be in Swift 5 mode, emit a warning instead of an error.
       if (wouldBeSwift5Redeclaration) {
-        tc.diagnose(current, diag::invalid_redecl_swift5_warning,
-                    current->getFullName());
-        tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+        current->diagnose(diag::invalid_redecl_swift5_warning,
+                          current->getFullName());
+        other->diagnose(diag::invalid_redecl_prev, other->getFullName());
       } else {
         const auto *otherInit = dyn_cast<ConstructorDecl>(other);
         // Provide a better description for implicit initializers.
@@ -865,13 +871,14 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
           // checker should have already taken care of emitting a more
           // productive diagnostic.
           if (!other->getOverriddenDecl())
-            tc.diagnose(current, diag::invalid_redecl_init,
-                        current->getFullName(),
-                        otherInit->isMemberwiseInitializer());
+            current->diagnose(diag::invalid_redecl_init,
+                              current->getFullName(),
+                              otherInit->isMemberwiseInitializer());
         } else {
-          tc.diagnoseWithNotes(tc.diagnose(current, diag::invalid_redecl,
-                                           current->getFullName()), [&]() {
-            tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+          ctx.Diags.diagnoseWithNotes(
+            current->diagnose(diag::invalid_redecl,
+                              current->getFullName()), [&]() {
+            other->diagnose(diag::invalid_redecl_prev, other->getFullName());
           });
         }
         markInvalid();
@@ -1127,7 +1134,6 @@ ExistentialTypeSupportedRequest::evaluate(Evaluator &evaluator,
 
     // For value members, look at their type signatures.
     if (auto valueMember = dyn_cast<ValueDecl>(member)) {
-      (void)valueMember->getInterfaceType();
       if (!decl->isAvailableInExistential(valueMember))
         return false;
     }
@@ -1587,8 +1593,10 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   
   Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
+    // FIXME: Computes isInvalid() below.
+    (void) elt->getInterfaceType();
+
     // If the element has been diagnosed up to now, skip it.
-    (void)elt->getInterfaceType();
     if (elt->isInvalid())
       continue;
 
@@ -2190,7 +2198,8 @@ public:
     TC.checkUnsupportedProtocolType(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
-      checkRedeclaration(TC, VD);
+      auto &Context = TC.Context;
+      checkRedeclaration(Context, VD);
 
       // Force some requests, which can produce diagnostics.
 
@@ -2208,7 +2217,6 @@ public:
       // "Type" or "Protocol" since we reserve the X.Type and X.Protocol
       // expressions to mean something builtin to the language.  We *do* allow
       // these if they are escaped with backticks though.
-      auto &Context = TC.Context;
       if (VD->getDeclContext()->isTypeContext() &&
           (VD->getFullName().isSimpleName(Context.Id_Type) ||
            VD->getFullName().isSimpleName(Context.Id_Protocol)) &&
@@ -2542,10 +2550,10 @@ public:
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
-    (void)SD->getInterfaceType();
+    // Force requests that can emit diagnostics.
+    (void) SD->getInterfaceType();
+    (void) SD->getGenericSignature();
 
-    // Force creation of the generic signature.
-    (void)SD->getGenericSignature();
     if (!SD->isInvalid()) {
       TC.checkReferencedGenericParams(SD);
       checkGenericParams(SD->getGenericParams(), SD, TC);
@@ -2592,31 +2600,24 @@ public:
   }
 
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    (void)TAD->getInterfaceType();
+    // Force requests that can emit diagnostics.
+    (void) TAD->getGenericSignature();
+    (void) TAD->getUnderlyingType();
 
     TC.checkDeclAttributes(TAD);
-
-    // Force the generic signature to be computed in case it emits diagnostics.
-    (void)TAD->getGenericSignature();
-    // Force computing the underlying type in case it emits diagnostics.
-    (void)TAD->getUnderlyingType();
-
     checkAccessControl(TC, TAD);
 
   }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
-    (void)OTD->getInterfaceType();
+    // Force requests that can emit diagnostics.
+    (void) OTD->getGenericSignature();
+
     TC.checkDeclAttributes(OTD);
-    
-    // Force the generic signature to be computed in case it emits diagnostics.
-    (void)OTD->getGenericSignature();
-    
     checkAccessControl(TC, OTD);
   }
   
   void visitAssociatedTypeDecl(AssociatedTypeDecl *AT) {
-    (void)AT->getInterfaceType();
     TC.checkDeclAttributes(AT);
 
     checkInheritanceClause(AT);
@@ -2634,7 +2635,7 @@ public:
     checkAccessControl(TC, AT);
 
     // Trigger the checking for overridden declarations.
-    (void)AT->getOverriddenDecls();
+    (void) AT->getOverriddenDecls();
 
     auto defaultType = AT->getDefaultDefinitionType();
     if (defaultType && !defaultType->hasError()) {
@@ -2704,7 +2705,10 @@ public:
 
   void visitEnumDecl(EnumDecl *ED) {
     checkUnsupportedNestedType(ED);
-    (void)ED->getInterfaceType();
+
+    // FIXME: Remove this once we clean up the mess involving raw values.
+    (void) ED->getInterfaceType();
+
     checkGenericParams(ED->getGenericParams(), ED, TC);
 
     {
@@ -2751,7 +2755,6 @@ public:
   void visitStructDecl(StructDecl *SD) {
     checkUnsupportedNestedType(SD);
 
-    (void)SD->getInterfaceType();
     checkGenericParams(SD->getGenericParams(), SD, TC);
 
     // Force lowering of stored properties.
@@ -2872,9 +2875,9 @@ public:
   void visitClassDecl(ClassDecl *CD) {
     checkUnsupportedNestedType(CD);
 
-    (void)CD->getInterfaceType();
     // Force creation of the generic signature.
-    (void)CD->getGenericSignature();
+    (void) CD->getGenericSignature();
+
     checkGenericParams(CD->getGenericParams(), CD, TC);
 
     {
@@ -3026,10 +3029,6 @@ public:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     checkUnsupportedNestedType(PD);
-
-    // FIXME: Circularity?
-    if (!PD->getInterfaceType())
-      return;
 
     auto *SF = PD->getParentSourceFile();
     {
@@ -3241,7 +3240,7 @@ public:
   }
 
   void visitEnumElementDecl(EnumElementDecl *EED) {
-    (void)EED->getInterfaceType();
+    (void) EED->getInterfaceType();
     auto *ED = EED->getParentEnum();
 
     TC.checkDeclAttributes(EED);
@@ -3385,7 +3384,7 @@ public:
   }
 
   void visitConstructorDecl(ConstructorDecl *CD) {
-    (void)CD->getInterfaceType();
+    (void) CD->getInterfaceType();
 
     // Compute these requests in case they emit diagnostics.
     (void) CD->getInitKind();
@@ -3512,8 +3511,6 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    (void)DD->getInterfaceType();
-
     TC.checkDeclAttributes(DD);
 
     if (DD->getDeclContext()->isLocalContext()) {
@@ -4048,13 +4045,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Accessor: {
     auto *FD = cast<FuncDecl>(D);
 
-    // Bail out if we're in a recursive validation situation.
-    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-      auto *storage = accessor->getStorage();
-      if (!storage->getInterfaceType())
-        return;
-    }
-
     DeclValidationRAII IBV(FD);
 
     // Accessors should pick up various parts of their type signatures
@@ -4131,8 +4121,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    auto resolution = TypeResolution::forInterface(FD);
-    typeCheckParameterList(FD->getParameters(), resolution,
+    typeCheckParameterList(FD->getParameters(), FD,
                            TypeResolverContext::AbstractFunctionDecl);
     validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
@@ -4158,8 +4147,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    auto res = TypeResolution::forInterface(CD);
-    typeCheckParameterList(CD->getParameters(), res,
+    typeCheckParameterList(CD->getParameters(), CD,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
     break;
@@ -4170,8 +4158,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    auto res = TypeResolution::forInterface(DD);
-    typeCheckParameterList(DD->getParameters(), res,
+    typeCheckParameterList(DD->getParameters(), DD,
                            TypeResolverContext::AbstractFunctionDecl);
     DD->computeType();
     break;
@@ -4182,8 +4169,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    auto res = TypeResolution::forInterface(SD);
-    typeCheckParameterList(SD->getIndices(), res,
+    typeCheckParameterList(SD->getIndices(), SD,
                            TypeResolverContext::SubscriptDecl);
     validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
@@ -4198,8 +4184,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      auto res = TypeResolution::forInterface(ED);
-      typeCheckParameterList(PL, res,
+      typeCheckParameterList(PL, ED,
                              TypeResolverContext::EnumElementDecl);
     }
 
