@@ -1574,14 +1574,19 @@ public:
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
                              Expr *&trailingClosure);
-
+  ParserStatus parseExprListSyntax(
+  tok leftK, tok rightK, bool isPostfix, bool isExprBasic,
+  llvm::function_ref<void(
+      ParsedTokenSyntax &&, ParsedTupleExprElementListSyntax &&,
+      Optional<ParsedTokenSyntax> &&, Optional<ParsedClosureExprSyntax> &&)>
+                      callback);
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
+  ParsedSyntaxResult<ParsedClosureExprSyntax>
+  parseTrailingClosureSyntax(SourceRange calleeRange);
 
-  /// Parse an object literal.
-  ///
-  /// \param LK The literal kind as determined by the first token.
-  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
-                                            bool isExprBasic);
+  ParserResult<Expr> parseExprObjectLiteral(bool isExprBasic);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprObjectLiteralSyntax(bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();

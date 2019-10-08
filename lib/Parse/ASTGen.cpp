@@ -268,6 +268,8 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*poundFunctionExpr, Loc);
   else if (auto poundDsohandleExpr = E.getAs<PoundDsohandleExprSyntax>())
     result = generate(*poundDsohandleExpr, Loc);
+  else if (auto objectLiteralExpr = E.getAs<ObjectLiteralExprSyntax>())
+    result = generate(*objectLiteralExpr, Loc);
   else if (auto unknownExpr = E.getAs<UnknownExprSyntax>())
     result = generate(*unknownExpr, Loc);
   else {
@@ -645,6 +647,40 @@ Expr *ASTGen::generate(const PoundDsohandleExprSyntax &Expr,
                        const SourceLoc Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundDsohandle(),
                                                   Loc);
+}
+
+Expr *ASTGen::generate(const ObjectLiteralExprSyntax &E, const SourceLoc Loc) {
+  ObjectLiteralExpr::LiteralKind kind;
+  switch (E.getIdentifier().getTokenKind()) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  case tok::pound_##Name:                                                      \
+    kind = ObjectLiteralExpr::Name;                                            \
+    break;
+#include "swift/Syntax/TokenKinds.def"
+  default:
+    llvm_unreachable("unknown token kind for object literal expression");
+  }
+
+  SmallVector<Expr *, 2> args;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  generateExprTupleElementList(E.getArguments(), Loc, true, args, argLabels,
+                               argLabelLocs);
+
+  ClosureExpr *trailingClosure = nullptr;
+  if (auto CE = E.getTrailingClosure())
+    trailingClosure = dyn_cast_or_null<ClosureExpr>(generate(*CE, Loc));
+
+  if (E.getLeftParen().isMissing() || E.getRightParen().isMissing())
+    return nullptr;
+
+  SourceLoc poundLoc = advanceLocBegin(Loc, E.getIdentifier());
+  SourceLoc LParenLoc = advanceLocBegin(Loc, E.getLeftParen());
+  SourceLoc RParenLoc = advanceLocBegin(Loc, E.getRightParen());
+
+  return ObjectLiteralExpr::create(Context, poundLoc, kind, LParenLoc, args,
+                                   argLabels, argLabelLocs, RParenLoc,
+                                   trailingClosure, /*implicit=*/false);
 }
 
 Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc Loc) {

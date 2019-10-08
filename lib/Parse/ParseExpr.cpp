@@ -1654,9 +1654,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
 
 #define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
-  case tok::pound_##Name:                                                      \
-    return parseExprObjectLiteral(ObjectLiteralExpr::Name, isExprBasic);
+  case tok::pound_##Name:
 #include "swift/Syntax/TokenKinds.def"
+    return parseExprObjectLiteral(isExprBasic);
 
   case tok::code_complete: {
     auto Result =
@@ -2772,8 +2772,11 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
   // Parse the closing '}'.
   SourceLoc rightBrace;
-  parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
-                     leftBrace);
+  if (parseMatchingToken(tok::r_brace, rightBrace,
+                         diag::expected_closure_rbrace, leftBrace)) {
+    // Synthesize an r_brace syntax node if the token is absent
+    SyntaxContext->synthesize(tok::r_brace, rightBrace);
+  }
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.
@@ -3006,6 +3009,62 @@ ParserStatus Parser::parseExprTupleElementListSyntax(
 ///   expr-list(left, right):
 ///     left right expr-closure?
 ///     left expr-tuple-element-list right expr-closure?
+ParserStatus Parser::parseExprListSyntax(
+    tok leftK, tok rightK, bool isPostfix, bool isExprBasic,
+    llvm::function_ref<void(
+        ParsedTokenSyntax &&, ParsedTupleExprElementListSyntax &&,
+        Optional<ParsedTokenSyntax> &&, Optional<ParsedClosureExprSyntax> &&)>
+        callback) {
+  StructureMarkerRAII ParsingExprList(*this, Tok);
+  if (ParsingExprList.isFailed())
+    return makeParserError();
+
+  ParserStatus status;
+
+  auto TokIsStringInterpolationEOF = [&]() -> bool {
+    return Tok.is(tok::eof) && Tok.getText() == ")" && rightK == tok::r_paren;
+  };
+
+  // Parse '(' or '['.
+  auto leftLoc = Tok.getLoc();
+  auto leftTok = consumeTokenSyntax(tok::l_paren);
+
+  // Parse the elements.
+  SmallVector<ParsedTupleExprElementSyntax, 4> elements;
+  status |= parseExprTupleElementListSyntax(elements, [&] {
+    return Tok.is(rightK) || TokIsStringInterpolationEOF();
+  });
+  auto list =
+      ParsedSyntaxRecorder::makeTupleExprElementList(elements, *SyntaxContext);
+
+  if (TokIsStringInterpolationEOF()) {
+    callback(std::move(leftTok), std::move(list), None, None);
+    return status;
+  }
+
+  // Parse ')' or ']'.
+  auto rightTok =
+      parseMatchingTokenSyntax(rightK, rightK == tok::r_paren
+                                         ? diag::expected_rparen_expr_list
+                                         : diag::expected_rsquare_expr_list,
+                               leftLoc, /*silenceDiag=*/status.isError());
+  status |= rightTok.getStatus();
+  auto rightLoc = PreviousLoc;
+
+  // If we aren't interested in trailing closures, or there isn't a valid one,
+  // we're done.
+  if (rightTok.isNull() || !isPostfix || Tok.isNot(tok::l_brace) ||
+      !isValidTrailingClosure(isExprBasic, *this)) {
+    callback(std::move(leftTok), std::move(list), rightTok.getOrNull(), None);
+    return status;
+  }
+
+  auto closure = parseTrailingClosureSyntax({leftLoc, rightLoc});
+  status |= closure.getStatus();
+  callback(std::move(leftTok), std::move(list), rightTok.getOrNull(), closure.getOrNull());
+  return status;
+}
+
 ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    bool isPostfix,
                                    bool isExprBasic,
@@ -3112,45 +3171,63 @@ ParserResult<Expr> Parser::parseTrailingClosure(SourceRange calleeRange) {
 
   return closure;
 }
+
+ParsedSyntaxResult<ParsedClosureExprSyntax>
+Parser::parseTrailingClosureSyntax(SourceRange calleeRange) {
+  SyntaxParsingContext TmpContext(SyntaxContext);
+  TmpContext.setTransparent();
+
+  SourceLoc ExprLoc = Tok.getLoc();
+  ParserResult<Expr> Result = parseTrailingClosure(calleeRange);
+  if (auto ParsedExpr = TmpContext.popIf<ParsedClosureExprSyntax>()) {
+    Generator.addExpr(Result.getPtrOrNull(), ExprLoc);
+    return makeParsedResult(std::move(*ParsedExpr), Result.getStatus());
+  }
+  return Result.getStatus();
+}
  
 /// Parse an object literal expression.
 ///
 /// expr-literal:
 ///   '#' identifier expr-paren
-ParserResult<Expr>
-Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
-                               bool isExprBasic) {
-  SyntaxParsingContext ObjectLiteralContext(SyntaxContext,
-                                            SyntaxKind::ObjectLiteralExpr);
-  SourceLoc PoundLoc = consumeToken();
-  // Parse a tuple of args
+ParsedSyntaxResult<ParsedExprSyntax>
+Parser::parseExprObjectLiteralSyntax(bool isExprBasic) {
+  ParsedObjectLiteralExprSyntaxBuilder builder(*SyntaxContext);
+  ParserStatus status;
+
+  builder.useIdentifier(consumeTokenSyntax());
+
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::expected_arg_list_in_object_literal);
-    return makeParserError();
+    return makeParsedError(builder.build());
   }
 
-  // Parse the argument list.
-  SourceLoc lParenLoc, rParenLoc;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  Expr *trailingClosure;
+  status |= parseExprListSyntax(
+      tok::l_paren, tok::r_paren,
+      /*isPostfix=*/true, isExprBasic,
+      [&](ParsedTokenSyntax &&leftTok, ParsedTupleExprElementListSyntax &&args,
+          Optional<ParsedTokenSyntax> &&rightTok,
+          Optional<ParsedClosureExprSyntax> &&closure) {
+        builder.useLeftParen(std::move(leftTok));
+        builder.useArguments(std::move(args));
+        if (rightTok)
+          builder.useRightParen(std::move(*rightTok));
+        if (closure)
+          builder.useTrailingClosure(std::move(*closure));
+      });
+  return makeParsedResult(builder.build(), status);
+}
 
-  ParserStatus status = parseExprList(tok::l_paren, tok::r_paren,
-                                      /*isPostfix=*/true, isExprBasic,
-                                      lParenLoc, args, argLabels,
-                                      argLabelLocs,
-                                      rParenLoc,
-                                      trailingClosure);
-  if (status.hasCodeCompletion())
-    return makeParserCodeCompletionResult<Expr>();
-  if (status.isError())
-    return makeParserError();
+ParserResult<Expr>
+Parser::parseExprObjectLiteral(bool isExprBasic) {
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseExprObjectLiteralSyntax(isExprBasic);
+  assert(!parsed.isNull());
+  SyntaxContext->addSyntax(parsed.get());
 
-  return makeParserResult(
-    ObjectLiteralExpr::create(Context, PoundLoc, LitKind, lParenLoc, args,
-                              argLabels, argLabelLocs, rParenLoc,
-                              trailingClosure, /*implicit=*/false));
+  auto syntax = SyntaxContext->topNode<ExprSyntax>();
+  return makeParserResult(parsed.getStatus(),
+                          Generator.generate(syntax, leadingLoc));
 }
 
 /// Parse and diagnose unknown pound expression
