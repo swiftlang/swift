@@ -15,6 +15,9 @@ import Swift
 // This type intentionally shadows the stdlib one
 @available(swift, introduced: 5.0)
 public final class _stdlib_AtomicInt {
+// FIXME: This implements acquiring and releasing memory ordering, while
+// the original type was sequentially consistent.
+
   internal var _valueStorage: Int
 
   // FIXME: This should be an UnsafeAtomicInt, but we don't want to constrain

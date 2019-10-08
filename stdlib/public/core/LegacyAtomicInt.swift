@@ -20,9 +20,9 @@ public final class _stdlib_AtomicInt {
   internal var _valueStorage: Int
 
   // FIXME: This should be an UnsafeAtomicInt, but we don't want to constrain
-  // availability.
-  internal var _valuePtr: UnsafeMutableRawPointer {
-    return _getUnsafePointerToStoredProperties(self)
+  // availability, and we need to implement sequential consistent ordering.
+  internal var _valuePtr: Builtin.RawPointer {
+    return _getUnsafePointerToStoredProperties(self)._rawValue
   }
 
   public init(_ value: Int = 0) {
@@ -30,36 +30,28 @@ public final class _stdlib_AtomicInt {
   }
 
   public func store(_ desired: Int) {
-    _valuePtr._atomicStoreWord(UInt(bitPattern: desired))
+    Builtin.atomicstore_seqcst_Word(_valuePtr, desired._builtinWordValue)
   }
 
   public func load() -> Int {
-    return Int(bitPattern: _valuePtr._atomicLoadWord())
+    Int(Builtin.atomicload_seqcst_Word(_valuePtr))
   }
 
   @discardableResult
   public func fetchAndAdd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenWrappingAddWord(
-      UInt(bitPattern: operand))
-    return Int(bitPattern: word)
+    Int(Builtin.atomicrmw_add_seqcst_Word(_valuePtr, operand._builtinWordValue))
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenAndWord(
-      UInt(bitPattern: operand))
-    return Int(bitPattern: word)
+    Int(Builtin.atomicrmw_and_seqcst_Word(_valuePtr, operand._builtinWordValue))
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenOrWord(
-      UInt(bitPattern: operand))
-    return Int(bitPattern: word)
+    Int(Builtin.atomicrmw_or_seqcst_Word(_valuePtr, operand._builtinWordValue))
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenXorWord(
-      UInt(bitPattern: operand))
-    return Int(bitPattern: word)
+    Int(Builtin.atomicrmw_xor_seqcst_Word(_valuePtr, operand._builtinWordValue))
   }
 
   public func addAndFetch(_ operand: Int) -> Int {
@@ -76,12 +68,12 @@ public final class _stdlib_AtomicInt {
   }
 
   public func compareExchange(expected: inout Int, desired: Int) -> Bool {
-    var expectedWord = UInt(bitPattern: expected)
-    let success = _valuePtr._atomicCompareExchangeWord(
-      expected: &expectedWord,
-      desired: UInt(bitPattern: desired))
-    expected = Int(bitPattern: expectedWord)
-    return success
+    let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
+      _valuePtr,
+      expected._builtinWordValue,
+      desired._builtinWordValue)
+    expected = Int(oldValue)
+    return Bool(won)
   }
 }
 
@@ -96,13 +88,12 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   expected: UnsafeMutablePointer<Int>,
   desired: Int
 ) -> Bool {
-  var expectedWord = UInt(bitPattern: expected.pointee)
-  let success = UnsafeMutableRawPointer(target)
-    ._atomicCompareExchangeWord(
-      expected: &expectedWord,
-      desired: UInt(bitPattern: desired))
-  expected.pointee = Int(bitPattern: expectedWord)
-  return success
+  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
+    target._rawValue,
+    expected.pointee._builtinWordValue,
+    desired._builtinWordValue)
+  expected.pointee = Int(oldValue)
+  return Bool(won)
 }
 
 
@@ -117,8 +108,7 @@ public // Existing uses outside stdlib
 func _swift_stdlib_atomicLoadInt(
   object target: UnsafeMutablePointer<Int>
 ) -> Int {
-  let result = UnsafeMutableRawPointer(target)._atomicLoadWord()
-  return Int(bitPattern: result)
+  Int(Builtin.atomicload_seqcst_Word(target._rawValue))
 }
 
 @available(*, deprecated)
@@ -131,7 +121,7 @@ internal func _swift_stdlib_atomicStoreInt(
   object target: UnsafeMutablePointer<Int>,
   desired: Int
 ) {
-  UnsafeMutableRawPointer(target)._atomicStoreWord(UInt(bitPattern: desired))
+  Builtin.atomicstore_seqcst_Word(target._rawValue, desired._builtinWordValue)
 }
 
 // Warning: no overflow checking.
@@ -148,9 +138,10 @@ func _swift_stdlib_atomicFetchAddInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  let raw = UnsafeMutableRawPointer(target)
-  let word = raw._atomicFetchThenWrappingAddWord(UInt(bitPattern: operand))
-  return Int(bitPattern: word)
+  Int(
+    Builtin.atomicrmw_add_seqcst_Word(
+      target._rawValue,
+      operand._builtinWordValue))
 }
 
 @available(*, deprecated)
@@ -163,8 +154,10 @@ func _swift_stdlib_atomicFetchAndInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  let raw = UnsafeMutableRawPointer(target)
-  return Int(bitPattern: raw._atomicFetchThenAndWord(UInt(bitPattern: operand)))
+  Int(
+    Builtin.atomicrmw_and_seqcst_Word(
+      target._rawValue,
+      operand._builtinWordValue))
 }
 
 @available(*, deprecated)
@@ -177,8 +170,10 @@ func _swift_stdlib_atomicFetchOrInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  let raw = UnsafeMutableRawPointer(target)
-  return Int(bitPattern: raw._atomicFetchThenOrWord(UInt(bitPattern: operand)))
+  Int(
+    Builtin.atomicrmw_or_seqcst_Word(
+      target._rawValue,
+      operand._builtinWordValue))
 }
 
 @available(*, deprecated)
@@ -191,8 +186,10 @@ func _swift_stdlib_atomicFetchXorInt(
   object target: UnsafeMutablePointer<Int>,
   operand: Int
 ) -> Int {
-  let raw = UnsafeMutableRawPointer(target)
-  return Int(bitPattern: raw._atomicFetchThenXorWord(UInt(bitPattern: operand)))
+  Int(
+    Builtin.atomicrmw_xor_seqcst_Word(
+      target._rawValue,
+      operand._builtinWordValue))
 }
 
 // Warning: no overflow checking.
@@ -202,10 +199,8 @@ internal func _swift_stdlib_atomicFetchAddInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
 ) -> Int32 {
-  let value = Builtin.atomicrmw_add_seqcst_Int32(
-    target._rawValue,
-    operand._value)
-  return Int32(value)
+  Int32(
+    Builtin.atomicrmw_add_seqcst_Int32(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -215,9 +210,8 @@ internal func _swift_stdlib_atomicFetchAddInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
 ) -> Int64 {
-  let value = Builtin.atomicrmw_add_seqcst_Int64(
-    target._rawValue, operand._value)
-  return Int64(value)
+  Int64(
+    Builtin.atomicrmw_add_seqcst_Int64(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -227,9 +221,8 @@ internal func _swift_stdlib_atomicFetchAndInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
 ) -> Int32 {
-  let value = Builtin.atomicrmw_and_seqcst_Int32(
-    target._rawValue, operand._value)
-  return Int32(value)
+  Int32(
+    Builtin.atomicrmw_and_seqcst_Int32(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -239,9 +232,8 @@ internal func _swift_stdlib_atomicFetchAndInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
 ) -> Int64 {
-  let value = Builtin.atomicrmw_and_seqcst_Int64(
-    target._rawValue, operand._value)
-  return Int64(value)
+  Int64(
+    Builtin.atomicrmw_and_seqcst_Int64(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -251,9 +243,8 @@ internal func _swift_stdlib_atomicFetchOrInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
 ) -> Int32 {
-  let value = Builtin.atomicrmw_or_seqcst_Int32(
-    target._rawValue, operand._value)
-  return Int32(value)
+  Int32(
+    Builtin.atomicrmw_or_seqcst_Int32(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -263,9 +254,8 @@ internal func _swift_stdlib_atomicFetchOrInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
 ) -> Int64 {
-  let value = Builtin.atomicrmw_or_seqcst_Int64(
-    target._rawValue, operand._value)
-  return Int64(value)
+  Int64(
+    Builtin.atomicrmw_or_seqcst_Int64(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -275,9 +265,8 @@ internal func _swift_stdlib_atomicFetchXorInt32(
   object target: UnsafeMutablePointer<Int32>,
   operand: Int32
 ) -> Int32 {
-  let value = Builtin.atomicrmw_xor_seqcst_Int32(
-    target._rawValue, operand._value)
-  return Int32(value)
+  Int32(
+    Builtin.atomicrmw_xor_seqcst_Int32(target._rawValue, operand._value))
 }
 
 // Warning: no overflow checking.
@@ -287,7 +276,6 @@ internal func _swift_stdlib_atomicFetchXorInt64(
   object target: UnsafeMutablePointer<Int64>,
   operand: Int64
 ) -> Int64 {
-  let value = Builtin.atomicrmw_xor_seqcst_Int64(
-    target._rawValue, operand._value)
-  return Int64(value)
+  Int64(
+    Builtin.atomicrmw_xor_seqcst_Int64(target._rawValue, operand._value))
 }
