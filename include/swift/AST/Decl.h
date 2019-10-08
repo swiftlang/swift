@@ -6355,13 +6355,7 @@ public:
                   ParameterList *Params,
                   SourceLoc EqualsLoc,
                   LiteralExpr *RawValueExpr,
-                  DeclContext *DC)
-  : DeclContext(DeclContextKind::EnumElementDecl, DC),
-    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
-    Params(Params),
-    EqualsLoc(EqualsLoc),
-    RawValueExpr(RawValueExpr)
-  {}
+                  DeclContext *DC);
 
   Identifier getName() const { return getFullName().getBaseIdentifier(); }
 
@@ -6377,6 +6371,7 @@ public:
 
   Type getArgumentInterfaceType() const;
 
+  void setParameterList(ParameterList *params);
   ParameterList *getParameterList() const { return Params; }
 
   /// Retrieves a fully typechecked raw value expression associated

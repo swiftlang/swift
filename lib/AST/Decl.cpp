@@ -7070,6 +7070,18 @@ SourceRange FuncDecl::getSourceRange() const {
   return StartLoc;
 }
 
+EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                                 ParameterList *Params,
+                                 SourceLoc EqualsLoc,
+                                 LiteralExpr *RawValueExpr,
+                                 DeclContext *DC)
+  : DeclContext(DeclContextKind::EnumElementDecl, DC),
+    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
+    EqualsLoc(EqualsLoc),
+    RawValueExpr(RawValueExpr) {
+  setParameterList(Params);
+}
+
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
@@ -7125,6 +7137,13 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     elements.emplace_back(eltType, param.getLabel());
   }
   return TupleType::get(elements, ctx);
+}
+
+void EnumElementDecl::setParameterList(ParameterList *params) {
+  Params = params;
+
+  if (params)
+    params->setDeclContextOfParamDecls(this);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
