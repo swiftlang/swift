@@ -1785,7 +1785,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
                                 /*isPostfix=*/false, /*isExprBasic=*/true,
                                 lParenLoc, args, argLabels, argLabelLocs,
                                 rParenLoc, trailingClosure,
-                                SyntaxKind::FunctionCallArgumentList);
+                                SyntaxKind::TupleExprElementList);
         assert(!trailingClosure && "Cannot parse a trailing closure here");
         hasInitializer = true;
       }
