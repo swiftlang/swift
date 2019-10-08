@@ -220,11 +220,11 @@ static CanType joinElementTypesFromValues(SILValueRange &&range,
 static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
                                             ProtocolDecl *protocol) {
   assert(operatorName.isOperator());
-  // Find the operator requirement in the `VectorProtocol` protocol
-  // declaration and cache it.
+  // Find the operator requirement in the given protocol declaration.
   auto opLookup = protocol->lookupDirect(operatorName);
-  // Find the `+` with type siguature `(Self, Self) -> Self`.
   for (auto *decl : opLookup) {
+    if (!decl->isProtocolRequirement())
+      continue;
     auto *fd = dyn_cast<FuncDecl>(decl);
     if (!fd || !fd->isStatic() || !fd->isOperator())
       continue;
@@ -875,9 +875,6 @@ private:
   /// The AdditiveArithmetic protocol in the standard library.
   ProtocolDecl *additiveArithmeticProtocol =
       astCtx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  /// The VectorProtocol protocol in the standard library.
-  ProtocolDecl *vectorProtocolProtocol =
-      astCtx.getProtocol(KnownProtocolKind::VectorProtocol);
 
   /// `AdditiveArithmetic.+` declaration.
   mutable FuncDecl *cachedPlusFn = nullptr;
@@ -931,10 +928,6 @@ public:
 
   ProtocolDecl *getAdditiveArithmeticProtocol() const {
     return additiveArithmeticProtocol;
-  }
-
-  ProtocolDecl *getVectorProtocolProtocol() const {
-    return vectorProtocolProtocol;
   }
 
   FuncDecl *getPlusDecl() const {

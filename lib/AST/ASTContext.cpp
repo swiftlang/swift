@@ -1066,8 +1066,6 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::TensorArrayProtocol:
   case KnownProtocolKind::TensorGroup:
-  case KnownProtocolKind::TensorFlowDataTypeCompatible:
-  case KnownProtocolKind::TensorProtocol:
     M = getLoadedModule(Id_TensorFlow);
     break;
   case KnownProtocolKind::Expression:
