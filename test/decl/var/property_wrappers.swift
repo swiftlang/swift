@@ -235,8 +235,8 @@ struct Initialization {
   @Wrapper(stored: 17)
   var x2: Double
 
-  @Wrapper(stored: 17)
-  var x3 = 42 // expected-error{{extra argument 'wrappedValue' in call}}
+  @Wrapper(stored: 17) // expected-error {{initializer expects a single parameter of type 'T' [with T = (wrappedValue: Int, stored: Int)]}}
+  var x3 = 42
 
   @Wrapper(stored: 17)
   var x4
