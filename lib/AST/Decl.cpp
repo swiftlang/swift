@@ -1352,14 +1352,15 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
     auto DC = singleVar->getDeclContext();
     if (DC->isTypeContext()) {
       auto specifier = (DC->getDeclaredInterfaceType()->hasReferenceSemantics()
-                        ? ParamDecl::Specifier::Default
-                        : ParamDecl::Specifier::InOut);
+                        ? ParamSpecifier::Default
+                        : ParamSpecifier::InOut);
 
       ASTContext &C = DC->getASTContext();
-      SelfParam = new (C) ParamDecl(specifier, SourceLoc(), SourceLoc(),
+      SelfParam = new (C) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), singleVar->getLoc(),
                                     C.Id_self, this);
       SelfParam->setImplicit();
+      SelfParam->setSpecifier(specifier);
       SelfParam->setInterfaceType(DC->getSelfInterfaceType());
     }
   }
@@ -5455,15 +5456,11 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
 void ParamDecl::setSpecifier(Specifier specifier) {
   // FIXME: Revisit this; in particular shouldn't __owned parameters be
   // ::Let also?
-  setIntroducer(specifier == ParamDecl::Specifier::Default
+  setIntroducer(specifier == ParamSpecifier::Default
                 ? VarDecl::Introducer::Let
                 : VarDecl::Introducer::Var);
   Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
-  setImplInfo(
-    StorageImplInfo::getSimpleStored(
-      isImmutableSpecifier(specifier)
-      ? StorageIsNotMutable
-      : StorageIsMutable));
+  Bits.ParamDecl.SpecifierComputed = true;
 }
 
 bool ParamDecl::isAnonClosureParam() const {
@@ -5476,6 +5473,15 @@ bool ParamDecl::isAnonClosureParam() const {
     return false;
 
   return nameStr[0] == '$';
+}
+
+ParamDecl::Specifier ParamDecl::getSpecifier() const {
+  auto &ctx = getASTContext();
+
+  auto mutableThis = const_cast<ParamDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParamSpecifierRequest{mutableThis},
+                           ParamDecl::Specifier::Default);
 }
 
 StaticSpellingKind AbstractStorageDecl::getCorrectStaticSpelling() const {
@@ -5714,21 +5720,18 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-ParamDecl::ParamDecl(Specifier specifier, SourceLoc specifierLoc,
+ParamDecl::ParamDecl(SourceLoc specifierLoc,
                      SourceLoc argumentNameLoc, Identifier argumentName,
                      SourceLoc parameterNameLoc, Identifier parameterName,
                      DeclContext *dc)
     : VarDecl(DeclKind::Param,
               /*IsStatic*/ false,
-              specifier == ParamDecl::Specifier::Default
-                  ? VarDecl::Introducer::Let
-                  : VarDecl::Introducer::Var,
+              VarDecl::Introducer::Let,
               /*IsCaptureList*/ false, parameterNameLoc, parameterName, dc,
-              StorageIsMutable_t(!isImmutableSpecifier(specifier))),
+              StorageIsNotMutable),
       ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
-
-  Bits.ParamDecl.Specifier = static_cast<unsigned>(specifier);
+  Bits.ParamDecl.SpecifierComputed = false;
   Bits.ParamDecl.IsTypeLocImplicit = false;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
@@ -5745,7 +5748,6 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
     ArgumentNameLoc(PD->getArgumentNameLoc()),
     SpecifierLoc(PD->getSpecifierLoc()),
     DefaultValueAndFlags(nullptr, PD->DefaultValueAndFlags.getInt()) {
-  Bits.ParamDecl.Specifier = static_cast<unsigned>(PD->getSpecifier());
   Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
   Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
   typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
@@ -5755,6 +5757,7 @@ ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
   if (withTypes && PD->hasInterfaceType())
     setInterfaceType(PD->getInterfaceType());
 
+  setSpecifier(PD->getSpecifier());
   setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
 }
 
@@ -6553,8 +6556,7 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
 
   // Create and save our 'self' parameter.
   auto &ctx = getASTContext();
-  *selfDecl = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                  SourceLoc(), SourceLoc(), Identifier(),
+  *selfDecl = new (ctx) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
 
@@ -6581,11 +6583,6 @@ void AbstractFunctionDecl::computeSelfDeclType() {
                                     /*isInitializingCtor*/true,
                                     /*wantDynamicSelf*/true);
   selfDecl->setInterfaceType(selfParam.getPlainType());
-
-  auto specifier = selfParam.getParameterFlags().isInOut()
-                       ? ParamDecl::Specifier::InOut
-                       : ParamDecl::Specifier::Default;
-  selfDecl->setSpecifier(specifier);
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {

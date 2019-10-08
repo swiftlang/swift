@@ -3941,6 +3941,77 @@ static void validateResultType(ValueDecl *decl,
   }
 }
 
+llvm::Expected<ParamSpecifier>
+ParamSpecifierRequest::evaluate(Evaluator &evaluator,
+                                ParamDecl *param) const {
+  auto *dc = param->getDeclContext();
+
+  if (param->isSelfParameter()) {
+    auto selfParam = computeSelfParam(cast<AbstractFunctionDecl>(dc),
+                                      /*isInitializingCtor*/true,
+                                      /*wantDynamicSelf*/false);
+    return (selfParam.getParameterFlags().isInOut()
+            ? ParamSpecifier::InOut
+            : ParamSpecifier::Default);
+  }
+
+  if (auto *accessor = dyn_cast<AccessorDecl>(dc)) {
+    auto *storage = accessor->getStorage();
+    auto *originalParam = getOriginalParamFromAccessor(
+      storage, accessor, param);
+    if (originalParam == nullptr) {
+      // This is the setter's newValue parameter. Note that even though
+      // the AST uses the 'Default' specifier, SIL will lower this to a
+      // +1 parameter.
+      return ParamSpecifier::Default;
+    }
+
+    if (param != originalParam) {
+      // This is the 'subscript(...) { get { ... } set { ... } }' case.
+      // This means we cloned the parameter list for each accessor.
+      // Delegate to the original parameter.
+      return originalParam->getSpecifier();
+    }
+
+    // This is the 'subscript(...) { <<body of getter>> }' case.
+    // The subscript and the getter share their ParamDecls.
+    // Fall through.
+  }
+
+  auto typeRepr = param->getTypeLoc().getTypeRepr();
+  assert(typeRepr != nullptr && "Should call setSpecifier() on "
+         "synthesized parameter declarations");
+
+  auto *nestedRepr = typeRepr;
+
+  // Look through parens here; other than parens, specifiers
+  // must appear at the top level of a parameter type.
+  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+    if (!tupleRepr->isParenType())
+      break;
+    nestedRepr = tupleRepr->getElementType(0);
+  }
+
+  if (isa<InOutTypeRepr>(nestedRepr) &&
+      param->isDefaultArgument()) {
+    auto &ctx = param->getASTContext();
+    ctx.Diags.diagnose(param->getDefaultValue()->getLoc(),
+                       swift::diag::cannot_provide_default_value_inout,
+                       param->getName());
+    return ParamSpecifier::Default;
+  }
+
+  if (isa<InOutTypeRepr>(nestedRepr)) {
+    return ParamSpecifier::InOut;
+  } else if (isa<SharedTypeRepr>(nestedRepr)) {
+    return ParamSpecifier::Shared;
+  } else if (isa<OwnedTypeRepr>(nestedRepr)) {
+    return ParamSpecifier::Owned;
+  }
+
+  return ParamSpecifier::Default;
+}
+
 void TypeChecker::validateDecl(ValueDecl *D) {
   // Generic parameters are validated as part of their context.
   if (isa<GenericTypeParamDecl>(D))
@@ -4084,12 +4155,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         auto indices = SD->getIndices();
         for (size_t i = 0, e = indices->size(); i != e; ++i) {
           auto subscriptParam = indices->get(i);
+          auto accessorParam = valueParams->get(valueParams->size() - e + i);
+
           if (!subscriptParam->hasInterfaceType())
             continue;
 
           Type paramIfaceTy = subscriptParam->getInterfaceType();
 
-          auto accessorParam = valueParams->get(valueParams->size() - e + i);
           accessorParam->setInterfaceType(paramIfaceTy);
           accessorParam->getTypeLoc().setType(paramIfaceTy);
         }

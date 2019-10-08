@@ -1698,11 +1698,11 @@ static AccessorDecl *createSetterPrototype(AbstractStorageDecl *storage,
   GenericParamList *genericParams = createAccessorGenericParams(storage);
 
   // Add a "(value : T, indices...)" argument list.
-  auto *param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                    SourceLoc(), SourceLoc(),
+  auto *param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                     Identifier(), loc,
                                     ctx.getIdentifier("value"),
                                     storage->getDeclContext());
+  param->setSpecifier(ParamSpecifier::Default);
   param->setImplicit();
 
   auto *params = buildIndexForwardingParamList(storage, param, ctx);

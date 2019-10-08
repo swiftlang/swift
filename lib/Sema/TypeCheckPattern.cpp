@@ -800,46 +800,18 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL) {
   bool hadError = false;
   
   for (auto param : *PL) {
-    auto typeRepr = param->getTypeLoc().getTypeRepr();
-    if (!typeRepr) {
+    if (!param->getTypeLoc().getTypeRepr()) {
       if (param->hasInterfaceType())
         hadError |= param->isInvalid();
       continue;
     }
 
     validateParameterType(param);
-    
+
     auto type = param->getTypeLoc().getType();
     param->setInterfaceType(type);
 
     hadError |= param->isInvalid();
-
-    auto *nestedRepr = typeRepr;
-
-    // Look through parens here; other than parens, specifiers
-    // must appear at the top level of a parameter type.
-    while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
-      if (!tupleRepr->isParenType())
-        break;
-      nestedRepr = tupleRepr->getElementType(0);
-    }
-
-    if (isa<InOutTypeRepr>(nestedRepr)) {
-      param->setSpecifier(ParamDecl::Specifier::InOut);
-    } else if (isa<SharedTypeRepr>(nestedRepr)) {
-      param->setSpecifier(ParamDecl::Specifier::Shared);
-    } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-      param->setSpecifier(ParamDecl::Specifier::Owned);
-    }
-
-    if (isa<InOutTypeRepr>(nestedRepr) &&
-        param->isDefaultArgument()) {
-      auto &ctx = param->getASTContext();
-      ctx.Diags.diagnose(param->getDefaultValue()->getLoc(),
-                         swift::diag::cannot_provide_default_value_inout,
-                         param->getName());
-      param->setSpecifier(ParamDecl::Specifier::Default);
-    }
   }
   
   return hadError;

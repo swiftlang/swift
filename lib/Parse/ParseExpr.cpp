@@ -2596,8 +2596,9 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
           nameLoc = consumeToken(tok::kw__);
         }
         auto var = new (Context)
-            ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+            ParamDecl(SourceLoc(), SourceLoc(),
                       Identifier(), nameLoc, name, nullptr);
+        var->setSpecifier(ParamSpecifier::Default);
         elements.push_back(var);
 
         // Consume a comma to continue.
@@ -2903,8 +2904,9 @@ Expr *Parser::parseExprAnonClosureArg() {
     Identifier ident = Context.getIdentifier(varName);
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
-        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+        ParamDecl(SourceLoc(), SourceLoc(),
                   Identifier(), varLoc, ident, closure);
+    var->setSpecifier(ParamSpecifier::Default);
     var->setImplicit();
     decls.push_back(var);
   }

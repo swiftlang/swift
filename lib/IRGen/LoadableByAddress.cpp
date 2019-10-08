@@ -1376,10 +1376,11 @@ void LoadableStorageAllocation::insertIndirectReturnArgs() {
 
   auto &ctx = pass.F->getModule().getASTContext();
   auto var = new (ctx) ParamDecl(
-      ParamDecl::Specifier::InOut, SourceLoc(), SourceLoc(),
+      SourceLoc(), SourceLoc(),
       ctx.getIdentifier("$return_value"), SourceLoc(),
       ctx.getIdentifier("$return_value"),
       pass.F->getDeclContext());
+  var->setSpecifier(ParamSpecifier::InOut);
   pass.F->begin()->insertFunctionArgument(
       0, newResultStorageType.getAddressType(), ValueOwnershipKind::Any, var);
 }

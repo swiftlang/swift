@@ -522,10 +522,11 @@ makeEnumRawValueConstructor(ClangImporter::Implementation &Impl,
   ASTContext &C = Impl.SwiftContext;
   auto rawTy = enumDecl->getRawType();
 
-  auto param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+  auto param = new (C) ParamDecl(SourceLoc(),
                                  SourceLoc(), C.Id_rawValue,
                                  SourceLoc(), C.Id_rawValue,
                                  enumDecl);
+  param->setSpecifier(ParamSpecifier::Default);
   param->setInterfaceType(rawTy);
 
   auto paramPL = ParameterList::createWithoutLoc(param);
@@ -738,10 +739,10 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
-  auto newValueDecl = new (C) ParamDecl(ParamDecl::Specifier::Default,
-                                        SourceLoc(), SourceLoc(),
+  auto newValueDecl = new (C) ParamDecl(SourceLoc(), SourceLoc(),
                                         Identifier(), SourceLoc(), C.Id_value,
                                         importedDecl);
+  newValueDecl->setSpecifier(ParamSpecifier::Default);
   newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
 
   auto *params = ParameterList::createWithoutLoc(newValueDecl);
@@ -1418,8 +1419,9 @@ createValueConstructor(ClangImporter::Implementation &Impl,
 
     Identifier argName = generateParamName ? var->getName() : Identifier();
     auto param = new (context)
-        ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), argName,
+        ParamDecl(SourceLoc(), SourceLoc(), argName,
                   SourceLoc(), var->getName(), structDecl);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(var->getInterfaceType());
     Impl.recordImplicitUnwrapForDecl(param, var->isImplicitlyUnwrappedOptional());
     valueParameters.push_back(param);
@@ -1746,8 +1748,9 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
   auto valueIndex = setter->getParameters();
 
   auto paramVarDecl =
-      new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      new (C) ParamDecl(SourceLoc(), SourceLoc(),
                         Identifier(), loc, valueIndex->get(0)->getName(), dc);
+  paramVarDecl->setSpecifier(ParamSpecifier::Default);
   paramVarDecl->setInterfaceType(elementInterfaceTy);
 
   auto valueIndicesPL = ParameterList::create(C, {paramVarDecl, index});
@@ -5781,8 +5784,9 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
     // argument label
     auto *paramDecl =
         new (Impl.SwiftContext) ParamDecl(
-            ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), argNames.front(),
+            SourceLoc(), SourceLoc(), argNames.front(),
             SourceLoc(), argNames.front(), dc);
+    paramDecl->setSpecifier(ParamSpecifier::Default);
     paramDecl->setInterfaceType(Impl.SwiftContext.TheEmptyTupleType);
 
     parameterList = ParameterList::createWithoutLoc(paramDecl);
