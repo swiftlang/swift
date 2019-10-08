@@ -138,6 +138,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
+    skip-local-build            ""               "set to skip building for the current host (useful when crosscompiling)"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -1049,7 +1050,11 @@ for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     esac
 done
 
-ALL_HOSTS=("${LOCAL_HOST}" "${CROSS_COMPILE_HOSTS[@]}")
+ALL_HOSTS=()
+if [[ ! "${SKIP_LOCAL_BUILD}" ]] ; then
+    ALL_HOSTS=("${ALL_HOSTS[@]}" "${LOCAL_HOST}")
+fi
+ALL_HOSTS=("${ALL_HOSTS[@]}" "${CROSS_COMPILE_HOSTS[@]}")
 
 function has_cross_compile_hosts() {
     if [[ ${#ALL_HOSTS[@]} -gt 1 ]]; then
