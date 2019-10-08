@@ -4216,7 +4216,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Encodable:
   case KnownProtocolKind::Decodable:
   case KnownProtocolKind::StringInterpolationProtocol:
-  case KnownProtocolKind::Expression:
+  case KnownProtocolKind::Differentiable:
   // SWIFT_ENABLE_TENSORFLOW
   case KnownProtocolKind::AdditiveArithmetic:
   case KnownProtocolKind::PointwiseMultiplicative:
@@ -4227,8 +4227,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TensorFlowDataTypeCompatible:
   case KnownProtocolKind::TensorProtocol:
   case KnownProtocolKind::VectorProtocol:
-  case KnownProtocolKind::Differentiable:
   case KnownProtocolKind::EuclideanDifferentiable:
+  case KnownProtocolKind::Expression:
     return SpecialProtocol::None;
   }
 
