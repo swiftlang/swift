@@ -160,7 +160,8 @@ FUNCTION_VALUE_WITNESS(assignWithTake,
                        MUTABLE_VALUE_TYPE,
                        (MUTABLE_VALUE_TYPE, MUTABLE_VALUE_TYPE, TYPE_TYPE))
 
-/// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases)
+/// unsigned (*getEnumTagSinglePayload)(const T* enum, UINT_TYPE emptyCases,
+///                                     M *self);
 /// Given an instance of valid single payload enum with a payload of this
 /// witness table's type (e.g Optional<ThisType>) , get the tag of the enum.
 FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
@@ -169,7 +170,7 @@ FUNCTION_VALUE_WITNESS(getEnumTagSinglePayload,
                        (IMMUTABLE_VALUE_TYPE, UINT_TYPE, TYPE_TYPE))
 
 /// void (*storeEnumTagSinglePayload)(T* enum, UINT_TYPE whichCase,
-///                                   UINT_TYPE emptyCases)
+///                                   UINT_TYPE emptyCases, M *self);
 /// Given uninitialized memory for an instance of a single payload enum with a
 /// payload of this witness table's type (e.g Optional<ThisType>), store the
 /// tag.
