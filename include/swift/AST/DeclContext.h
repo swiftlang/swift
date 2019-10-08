@@ -667,7 +667,7 @@ public:
 
 /// The range of declarations stored within an iterable declaration
 /// context.
-typedef IteratorRange<DeclIterator> DeclRange;
+typedef llvm::iterator_range<DeclIterator> DeclRange;
 
 /// The kind of an \c IterableDeclContext.
 enum class IterableDeclContextKind : uint8_t {  

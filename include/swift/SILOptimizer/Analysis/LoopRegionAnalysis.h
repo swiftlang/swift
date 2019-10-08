@@ -674,7 +674,7 @@ public:
   unsigned succ_size() const { return Succs.size(); }
 
 private:
-  using InnerSuccRange = IteratorRange<decltype(Succs)::const_iterator>;
+  using InnerSuccRange = llvm::iterator_range<decltype(Succs)::const_iterator>;
 
 public:
   using SuccRange =
