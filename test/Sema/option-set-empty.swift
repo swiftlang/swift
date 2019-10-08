@@ -2,16 +2,16 @@
 
 struct SomeOptions: OptionSet {
     var rawValue: Int
+    
+    let someVal = MyOptions(rawValue: 6)
     static let some = MyOptions(rawValue: 4)
-    let empty = SomeOptions(rawValue: 0)
-    var otherVal = SomeOptions(rawValue: 0)
+    static let empty = SomeOptions(rawValue: 0) // expected-warning {{static property 'empty' produces an empty option set}} expected-note {{use [] to silence this warning}}{{35-48=([])}}
+    static var otherVal = SomeOptions(rawValue: 0)
 }
 
 struct MyOptions: OptionSet {
-    init() {
-        rawValue = 0
-    }
-    var rawValue: Int
+    let rawValue: Int
+    
     static let none = MyOptions(rawValue: 0) // expected-warning {{static property 'none' produces an empty option set}} expected-note {{use [] to silence this warning}}{{32-45=([])}}
     static var nothing = MyOptions(rawValue: 0)
     static let nope = MyOptions()
