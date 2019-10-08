@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | %FileCheck %s
+// RUN: %target-run-simple-swift | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-codesign %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | %FileCheck %s
@@ -100,6 +100,24 @@ func allToAll<T, U>(_ t: T, _: U.Type) -> Bool {
 func allMetasToAllMetas<T, U>(_: T.Type, _: U.Type) -> Bool {
   return T.self is U.Type
 }
+
+protocol P {}
+struct PS: P {}
+enum PE: P {}
+class PC: P {}
+
+func nongenericAnyIsP(type: Any.Type) -> Bool {
+  return type is P.Type
+}
+func genericAnyIs<T>(type: Any.Type, to: T.Type) -> Bool {
+  return type is T.Type
+}
+print("nongenericAnyIsP(type: PS.self)", nongenericAnyIsP(type: PS.self)) // CHECK: nongenericAnyIsP(type: PS.self) true
+print("genericAnyIs(type: PS.self, to: P.self)", genericAnyIs(type: PS.self, to: P.self)) // CHECK-ONONE: genericAnyIs(type: PS.self, to: P.self) true
+print("nongenericAnyIsP(type: PE.self)", nongenericAnyIsP(type: PE.self)) // CHECK: nongenericAnyIsP(type: PE.self) true
+print("genericAnyIs(type: PE.self, to: P.self)", genericAnyIs(type: PE.self, to: P.self)) // CHECK-ONONE: genericAnyIs(type: PE.self, to: P.self) true
+print("nongenericAnyIsP(type: PC.self)", nongenericAnyIsP(type: PC.self)) // CHECK: nongenericAnyIsP(type: PC.self) true
+print("genericAnyIs(type: PC.self, to: P.self)", genericAnyIs(type: PC.self, to: P.self)) // CHECK-ONONE: genericAnyIs(type: PC.self, to: P.self) true
 
 print(allToInt(22)) // CHECK: 22
 print(anyToInt(44)) // CHECK: 44

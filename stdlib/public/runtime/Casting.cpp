@@ -1115,6 +1115,14 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
     }
     break;
 
+  case MetadataKind::Existential: {
+    auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
+    for (auto protocol : targetTypeAsExistential->getProtocols())
+      if (!swift_conformsToProtocol(sourceType, protocol.getSwiftProtocol()))
+        return nullptr;
+    return origSourceType;
+  }
+
   default:
     // The cast succeeds only if the metadata pointers are statically
     // equivalent.
