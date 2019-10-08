@@ -513,6 +513,8 @@ NOTE(autodiff_class_member_not_supported,none,
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
+NOTE(autodiff_jvp_control_flow_not_supported,none,
+     "forward-mode differentiation does not yet support control flow", ())
 NOTE(autodiff_control_flow_not_supported,none,
      "cannot differentiate unsupported control flow", ())
 // TODO(TF-645): Remove when differentiation supports `ref_element_addr`.
