@@ -325,6 +325,10 @@ namespace swift {
     /// set to true.
     bool ExperimentalDependenciesIncludeIntrafileOnes = false;
 
+    /// Whether to enable experimental differentiable programming features:
+    /// `@differentiable` declaration attribute, etc.
+    bool EnableExperimentalDifferentiableProgramming = false;
+
     /// Sets the target we are building for and updates platform conditions
     /// to match.
     ///
