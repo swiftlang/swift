@@ -194,6 +194,7 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
   RawAtomics.swift.gyb
   Runtime.swift.gyb
   UnavailableStringAPIs.swift.gyb
+  UnsafeAtomicUInt.swift.gyb
   UnsafeAtomics.swift.gyb
   UnsafeBufferPointer.swift.gyb
   UnsafeRawBufferPointer.swift.gyb
