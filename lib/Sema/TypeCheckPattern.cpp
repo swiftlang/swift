@@ -744,11 +744,11 @@ static bool validateTypedPattern(TypeChecker &TC,
   return hadError;
 }
 
-static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
+static void validateParameterType(ParamDecl *decl, TypeResolution resolution,
                                   TypeResolutionOptions options,
-                                  TypeChecker &TC) {
+                                  ASTContext &ctx) {
   if (auto ty = decl->getTypeLoc().getType())
-    return ty->hasError();
+    return;
 
   auto origContext = options.getContext();
   options.setContext(None);
@@ -761,35 +761,25 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
                        TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
-  bool hadError = false;
-
   auto &TL = decl->getTypeLoc();
 
-  // We might have a null typeLoc if this is a closure parameter list,
-  // where parameters are allowed to elide their types.
-  if (!TL.isNull()) {
-    hadError |= TypeChecker::validateType(TC.Context, TL, resolution, options);
-  }
+  TypeChecker::validateType(ctx, TL, resolution, options);
 
   Type Ty = TL.getType();
-  if (decl->isVariadic() && !Ty.isNull() && !hadError) {
-    Ty = TC.getArraySliceType(decl->getStartLoc(), Ty);
+  if (decl->isVariadic()) {
+    Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
     if (Ty.isNull()) {
-      hadError = true;
+      Ty = ErrorType::get(ctx);
     }
-    TL.setType(Ty);
 
     // Disallow variadic parameters in enum elements.
-    if (!hadError && origContext == TypeResolverContext::EnumElementDecl) {
-      TC.diagnose(decl->getStartLoc(), diag::enum_element_ellipsis);
-      hadError = true;
+    if (origContext == TypeResolverContext::EnumElementDecl) {
+      decl->diagnose(diag::enum_element_ellipsis);
+      Ty = ErrorType::get(ctx);
     }
+
+    TL.setType(Ty);
   }
-
-  if (hadError)
-    TL.setInvalidType(TC.Context);
-
-  return hadError;
 }
 
 /// Type check a parameter list.
@@ -802,60 +792,43 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
   
   for (auto param : *PL) {
     auto typeRepr = param->getTypeLoc().getTypeRepr();
-    if (!typeRepr &&
-        param->hasInterfaceType()) {
-      hadError |= param->isInvalid();
+    if (!typeRepr) {
+      if (param->hasInterfaceType())
+        hadError |= param->isInvalid();
       continue;
     }
 
-    hadError |= validateParameterType(param, resolution, options, *this);
+    validateParameterType(param, resolution, options, Context);
     
     auto type = param->getTypeLoc().getType();
+    param->setInterfaceType(type);
 
-    // If there was no type specified, and if we're not looking at a
-    // ClosureExpr, then we have a parse error (no type was specified).  The
-    // parser will have already diagnosed this, but treat this as a type error
-    // as well to get the ParamDecl marked invalid and to get an ErrorType.
-    if (!type) {
-      // Closure argument lists are allowed to be missing types.
-      if (options.isAnyExpr())
-        continue;
-      param->setInvalid();
-    }
-    
-    if (param->isInvalid() || type->hasError()) {
-      param->markInvalid();
-      hadError = true;
-    } else {
-      param->setInterfaceType(type);
+    hadError |= param->isInvalid();
+
+    auto *nestedRepr = typeRepr;
+
+    // Look through parens here; other than parens, specifiers
+    // must appear at the top level of a parameter type.
+    while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
+      if (!tupleRepr->isParenType())
+        break;
+      nestedRepr = tupleRepr->getElementType(0);
     }
 
-    if (!hadError) {
-      auto *nestedRepr = typeRepr;
-
-      // Look through parens here; other than parens, specifiers
-      // must appear at the top level of a parameter type.
-      while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(nestedRepr)) {
-        if (!tupleRepr->isParenType())
-          break;
-        nestedRepr = tupleRepr->getElementType(0);
-      }
-
-      if (isa<InOutTypeRepr>(nestedRepr)) {
-        param->setSpecifier(ParamDecl::Specifier::InOut);
-      } else if (isa<SharedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(ParamDecl::Specifier::Shared);
-      } else if (isa<OwnedTypeRepr>(nestedRepr)) {
-        param->setSpecifier(ParamDecl::Specifier::Owned);
-      }
+    if (isa<InOutTypeRepr>(nestedRepr)) {
+      param->setSpecifier(ParamDecl::Specifier::InOut);
+    } else if (isa<SharedTypeRepr>(nestedRepr)) {
+      param->setSpecifier(ParamDecl::Specifier::Shared);
+    } else if (isa<OwnedTypeRepr>(nestedRepr)) {
+      param->setSpecifier(ParamDecl::Specifier::Owned);
     }
 
-    if (param->isInOut() && param->isDefaultArgument()) {
+    if (isa<InOutTypeRepr>(nestedRepr) &&
+        param->isDefaultArgument()) {
       diagnose(param->getDefaultValue()->getLoc(),
                swift::diag::cannot_provide_default_value_inout,
                param->getName());
-      param->markInvalid();
-      hadError = true;
+      param->setSpecifier(ParamDecl::Specifier::Default);
     }
   }
   
