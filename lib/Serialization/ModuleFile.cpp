@@ -1293,13 +1293,13 @@ bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
       unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
 
       switch (kind) {
-      case sourceinfo_block::BASIC_DECL_LOCS:
+      case decl_locs_block::BASIC_DECL_LOCS:
         BasicDeclLocsData = blobData;
         break;
-      case sourceinfo_block::TEXT_DATA:
+      case decl_locs_block::TEXT_DATA:
         SourceLocsTextData = blobData;
         break;
-      case sourceinfo_block::DECL_USRS:
+      case decl_locs_block::DECL_USRS:
         DeclUSRsTable = readDeclUSRsTable(scratch, blobData);
         break;
       default:

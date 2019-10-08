@@ -63,7 +63,7 @@ const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
 /// to make backwards-compatible changes using the LLVM bitcode format.
 ///
 /// \sa DECL_LOCS_BLOCK_ID
-namespace sourceinfo_block {
+namespace decl_locs_block {
   enum RecordKind {
     BASIC_DECL_LOCS = 1,
     DECL_USRS,
