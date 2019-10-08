@@ -702,6 +702,8 @@ Result.X.Column = Locs->X.Column;
     auto LocData = getLocData(D);
     if (!USR.hasValue() || !LocData.hasValue())
       return true;
+    assert(*USR * sizeof(DeclLocationsTableData) == Buffer.size() &&
+           "USR id is used as an index to access basic location array");
     appendToBuffer(*LocData);
     return true;
   }
