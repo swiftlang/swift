@@ -46,17 +46,20 @@ public final class _stdlib_AtomicInt {
   }
   @discardableResult
   public func fetchAndAnd(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenAndWord(UInt(bitPattern: operand))
+    let word = _valuePtr._atomicFetchThenBitwiseAndWord(
+      UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndOr(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenOrWord(UInt(bitPattern: operand))
+    let word = _valuePtr._atomicFetchThenBitwiseOrWord(
+      UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
   @discardableResult
   public func fetchAndXor(_ operand: Int) -> Int {
-    let word = _valuePtr._atomicFetchThenXorWord(UInt(bitPattern: operand))
+    let word = _valuePtr._atomicFetchThenBitwiseXorWord(
+      UInt(bitPattern: operand))
     return Int(bitPattern: word)
   }
 

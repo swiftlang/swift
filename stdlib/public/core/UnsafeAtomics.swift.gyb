@@ -12,12 +12,12 @@
 
 %{
   integerOperations = [
-    #          API name, lowercase name,     operator
-    (     'WrappingAdd', 'wrappingAdd',      '&+'),
+    # API name,          lowercase name,     operator
+    ('WrappingAdd',      'wrappingAdd',      '&+'),
     ('WrappingSubtract', 'wrappingSubtract', '&-'),
-    (             'And', 'and',              '&'),
-    (              'Or', 'or',               '|'),
-    (             'Xor', 'xor',              '^')
+    ('BitwiseAnd',       'bitwiseAnd',       '&'),
+    ('BitwiseOr',        'bitwiseOr',        '|'),
+    ('BitwiseXor',       'bitwiseXor',       '^')
   ]
 
   boolOperations = [

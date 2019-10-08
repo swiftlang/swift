@@ -35,12 +35,12 @@
     ]
 
   integerOperations = [
-    #          API name, llvm name,  operator
-    (     'WrappingAdd', 'add', '&+'),
-    ('WrappingSubtract', 'sub', '&-'),
-    (             'And', 'and', '&'),
-    (              'Or', 'or',  '|'),
-    (             'Xor', 'xor', '^')
+    # Swift name,        llvm name,  operator
+    ('WrappingAdd',      'add',      '&+'),
+    ('WrappingSubtract', 'sub',      '&-'),
+    ('BitwiseAnd',       'and',      '&'),
+    ('BitwiseOr',        'or',       '|'),
+    ('BitwiseXor',       'xor',      '^')
   ]
 }%
 
