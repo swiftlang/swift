@@ -247,6 +247,11 @@ struct MapRegionCounters : public ASTWalker {
     if (skipExpr(E))
       return {true, E};
 
+    // Profiling for closures should be handled separately. Do not visit
+    // closure expressions twice.
+    if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
+      return {false, E};
+
     // If AST visitation begins with an expression, the counter map must be
     // empty. Set up a counter for the root.
     if (Parent.isNull()) {
@@ -604,6 +609,11 @@ struct PGOMapping : public ASTWalker {
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
       return {true, E};
+
+    // Profiling for closures should be handled separately. Do not visit
+    // closure expressions twice.
+    if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
+      return {false, E};
 
     unsigned parent = getParentCounter();
 
@@ -1045,6 +1055,11 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
       return {true, E};
+
+    // Profiling for closures should be handled separately. Do not visit
+    // closure expressions twice.
+    if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
+      return {false, E};
 
     if (!RegionStack.empty())
       extendRegion(E);
