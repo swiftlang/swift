@@ -3541,8 +3541,6 @@ public:
     return SourceRange(EnumLoc, getBraces().End);
   }
 
-  EnumElementDecl *getElement(Identifier Name) const;
-  
 public:
   /// A range for iterating the elements of an enum.
   using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;

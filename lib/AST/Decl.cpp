@@ -4182,14 +4182,6 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
   return ::new (buf) EnumCaseDecl(CaseLoc, Elements, DC);
 }
 
-EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large enum decls.
-  for (EnumElementDecl *Elt : getAllElements())
-    if (Elt->getName() == Name)
-      return Elt;
-  return nullptr;
-}
-
 bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
   switch (static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
     case AssociatedValueCheck::Unchecked:
