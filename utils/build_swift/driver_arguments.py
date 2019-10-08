@@ -303,6 +303,10 @@ def create_argument_parser():
                 'device')
     option(['-I', '--ios-all'], store_true('ios_all'),
            help='also build for iOS, and allow all iOS tests')
+
+    option(['--skip-local-build'], toggle_true('skip_local_build'),
+           help='set to skip building for the local platform')
+
     option('--skip-ios', store_false('ios'),
            help='set to skip everything iOS-related')
 
