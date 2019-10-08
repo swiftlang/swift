@@ -138,6 +138,7 @@ KNOWN_SETTINGS=(
     skip-build-benchmarks       ""               "set to skip building Swift Benchmark Suite"
     skip-build-external-benchmarks "1"            "set to skip building the external Swift Benchmark Suite. (skipped by default)"
     skip-build-playgroundsupport ""              "set to skip building PlaygroundSupport"
+    skip-local-build            ""               "set to skip building for the current host (useful when crosscompiling)"
     skip-test-cmark             ""               "set to skip testing CommonMark"
     skip-test-lldb              ""               "set to skip testing lldb"
     skip-test-swift             ""               "set to skip testing Swift"
@@ -1050,7 +1051,11 @@ for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     esac
 done
 
-ALL_HOSTS=("${LOCAL_HOST}" "${CROSS_COMPILE_HOSTS[@]}")
+ALL_HOSTS=()
+if [[ ! "${SKIP_LOCAL_BUILD}" ]] ; then
+    ALL_HOSTS=("${ALL_HOSTS[@]}" "${LOCAL_HOST}")
+fi
+ALL_HOSTS=("${ALL_HOSTS[@]}" "${CROSS_COMPILE_HOSTS[@]}")
 
 function has_cross_compile_hosts() {
     if [[ ${#ALL_HOSTS[@]} -gt 1 ]]; then
@@ -2927,24 +2932,27 @@ for host in "${ALL_HOSTS[@]}"; do
             # When we are building LLVM copy over the compiler-rt
             # builtins for iOS/tvOS/watchOS to ensure that Swift's
             # stdlib can use compiler-rt builtins when targetting iOS/tvOS/watchOS.
-            if [[ "${product}" == "llvm" && "${BUILD_LLVM}" == "1" ]]; then
-                if [[ "$(uname -s)" == "Darwin" ]] ; then
-                    HOST_CXX_DIR=$(dirname "${HOST_CXX}")
-                    DEST_CXX_BUILTINS_VERSION=$(ls "$(build_directory_bin ${host} llvm)/../lib/clang" | awk '{print $0}')
+            if [[ "${product}" = "llvm" ]] && [[ "${BUILD_LLVM}" = "1" ]] && [[ "$(uname -s)" = "Darwin" ]]; then
+                HOST_CXX_DIR=$(dirname "${HOST_CXX}")
+                HOST_LIB_CLANG_DIR="${HOST_CXX_DIR}/../lib/clang"
+                DEST_LIB_CLANG_DIR="$(build_directory_bin ${host} llvm)/../lib/clang"
+
+                if [[ -d "${HOST_LIB_CLANG_DIR}" ]] && [[ -d "${DEST_LIB_CLANG_DIR}" ]]; then
+                    DEST_CXX_BUILTINS_VERSION=$(ls "${DEST_LIB_CLANG_DIR}" | awk '{print $0}')
                     DEST_BUILTINS_DIR="$(build_directory_bin ${host} llvm)/../lib/clang/$DEST_CXX_BUILTINS_VERSION/lib/darwin"
 
-                    if [ -d "$DEST_BUILTINS_DIR" ]; then
-                        for HOST_CXX_BUILTINS_PATH in "$HOST_CXX_DIR/../lib/clang"/*; do
-                            HOST_CXX_BUILTINS_DIR="$HOST_CXX_BUILTINS_PATH/lib/darwin"
-                            echo "copying compiler-rt embedded builtins from $HOST_CXX_BUILTINS_DIR into the local clang build directory $DEST_BUILTINS_DIR."
+                    if [[ -d "${DEST_BUILTINS_DIR}" ]]; then
+                        for HOST_CXX_BUILTINS_PATH in "${HOST_LIB_CLANG_DIR}"/*; do
+                            HOST_CXX_BUILTINS_DIR="${HOST_CXX_BUILTINS_PATH}/lib/darwin"
+                            echo "copying compiler-rt embedded builtins from ${HOST_CXX_BUILTINS_DIR} into the local clang build directory ${DEST_BUILTINS_DIR}."
 
                             for OS in ios watchos tvos; do
                                 LIB_NAME="libclang_rt.$OS.a"
                                 HOST_LIB_PATH="$HOST_CXX_BUILTINS_DIR/$LIB_NAME"
-                                if [ -f "$HOST_LIB_PATH" ]; then
-                                    call cp "$HOST_LIB_PATH" "$DEST_BUILTINS_DIR/$LIB_NAME"
+                                if [[ -f "${HOST_LIB_PATH}" ]]; then
+                                    call cp "${HOST_LIB_PATH}" "${DEST_BUILTINS_DIR}/${LIB_NAME}"
                                 elif [[ "${VERBOSE_BUILD}" ]]; then
-                                    echo "no file exists at $HOST_LIB_PATH"
+                                    echo "no file exists at ${HOST_LIB_PATH}"
                                 fi
                             done
                         done
@@ -3445,7 +3453,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 if [ "${BUILD_LIBPARSER_ONLY}" ]; then
                     # We don't have a toolchain so we should install to the specified dir
                     DYLIB_DIR="${INSTALL_DESTDIR}"
-                    MODULE_DIR="${INSTALL_DESTDIR}"
+                    MODULE_DIR="${INSTALL_DESTDIR}/${product}.swiftmodule/${SWIFT_HOST_VARIANT_ARCH}"
                     # Create the install dir if it doesn't exist
                     call mkdir -p "${INSTALL_DESTDIR}"
                     # Install libParser is necessary
@@ -3455,14 +3463,14 @@ for host in "${ALL_HOSTS[@]}"; do
                 else
                     # We have a toolchain so install to the toolchain
                     DYLIB_DIR="${host_install_destdir}${host_install_prefix}/lib/swift/${SWIFT_HOST_VARIANT}"
-                    MODULE_DIR="${DYLIB_DIR}/${SWIFT_HOST_VARIANT_ARCH}"
+                    MODULE_DIR="${DYLIB_DIR}/${product}.swiftmodule/${SWIFT_HOST_VARIANT_ARCH}"
                 fi
                 if [[ "${SKIP_SWIFTSYNTAX_SWIFTSIDE}" ]]; then
                     continue
                 fi
                 set_swiftsyntax_build_command
                 if [[ -z "${SKIP_INSTALL_SWIFTSYNTAX_MODULE}" ]] ; then
-                    call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --swiftmodule-dir "${MODULE_DIR}" --install
+                    call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --swiftmodule-base-name "${MODULE_DIR}" --install
                 else
                     call "${swiftsyntax_build_command[@]}" --dylib-dir="${DYLIB_DIR}" --install
                 fi

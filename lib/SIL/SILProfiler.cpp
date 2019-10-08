@@ -247,6 +247,11 @@ struct MapRegionCounters : public ASTWalker {
     if (skipExpr(E))
       return {true, E};
 
+    // Profiling for closures should be handled separately. Do not visit
+    // closure expressions twice.
+    if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
+      return {false, E};
+
     // If AST visitation begins with an expression, the counter map must be
     // empty. Set up a counter for the root.
     if (Parent.isNull()) {
@@ -430,6 +435,20 @@ public:
     assert(EndLoc && "Region has no end location");
     return *EndLoc;
   }
+
+  void print(llvm::raw_ostream &OS, const SourceManager &SM) const {
+    OS << "[";
+    if (hasStartLoc())
+      getStartLoc().print(OS, SM);
+    else
+      OS << "?";
+    OS << ", ";
+    if (hasEndLoc())
+      getEndLoc().print(OS, SM);
+    else
+      OS << "?";
+    OS << "]";
+  }
 };
 
 /// An ASTWalker that maps ASTNodes to profiling counters.
@@ -590,6 +609,11 @@ struct PGOMapping : public ASTWalker {
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
       return {true, E};
+
+    // Profiling for closures should be handled separately. Do not visit
+    // closure expressions twice.
+    if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
+      return {false, E};
 
     unsigned parent = getParentCounter();
 
@@ -754,6 +778,11 @@ private:
   void pushRegion(ASTNode Node) {
     RegionStack.emplace_back(Node, getCounter(Node), Node.getStartLoc(),
                              getEndLoc(Node));
+    LLVM_DEBUG({
+      llvm::dbgs() << "Pushed region: ";
+      RegionStack.back().print(llvm::dbgs(), SM);
+      llvm::dbgs() << "\n";
+    });
   }
 
   /// Replace the current region's count by pushing an incomplete region.
@@ -780,6 +809,8 @@ private:
     auto ParentIt = I;
     SourceLoc EndLoc = ParentIt->getEndLoc();
 
+    unsigned FirstPoppedIndex = SourceRegions.size();
+    (void)FirstPoppedIndex;
     SourceRegions.push_back(std::move(*I++));
     for (; I != E; ++I) {
       if (!I->hasStartLoc())
@@ -788,6 +819,14 @@ private:
         I->setEndLoc(EndLoc);
       SourceRegions.push_back(std::move(*I));
     }
+
+    LLVM_DEBUG({
+      for (unsigned Idx = FirstPoppedIndex; Idx < SourceRegions.size(); ++Idx) {
+        llvm::dbgs() << "Popped region: ";
+        SourceRegions[Idx].print(llvm::dbgs(), SM);
+        llvm::dbgs() << "\n";
+      }
+    });
 
     RegionStack.erase(ParentIt, E);
   }
@@ -1016,6 +1055,11 @@ public:
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
     if (skipExpr(E))
       return {true, E};
+
+    // Profiling for closures should be handled separately. Do not visit
+    // closure expressions twice.
+    if (isa<AbstractClosureExpr>(E) && !Parent.isNull())
+      return {false, E};
 
     if (!RegionStack.empty())
       extendRegion(E);
