@@ -86,7 +86,7 @@
             }
         },
         "master-llvm-monorepo": {
-            "aliases": ["master-llvm-monorepo"],
+            "aliases": ["master-llvm-monorepo", "swift/master"],
             "repos": {
                 "llvm-project": "swift/master",
                 "swift": "master",
