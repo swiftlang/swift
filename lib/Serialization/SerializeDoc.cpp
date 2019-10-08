@@ -13,6 +13,7 @@
 #include "DocFormat.h"
 #include "Serialization.h"
 #include "SourceInfoFormat.h"
+#include "swift/Basic/Defer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
@@ -556,6 +557,7 @@ class DeclUSRsTableWriter {
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
   uint32_t CurId = 0;
 public:
+  uint32_t peekNextId() const { return CurId; }
   Optional<uint32_t> getNewUSRID(StringRef USR) {
     if (USRMap.find(USR) == USRMap.end()) {
       generator.insert(USRMap.insert(std::make_pair(USR, CurId)).first->getKey(), CurId);
@@ -690,6 +692,10 @@ Result.X.Column = Locs->X.Column;
   }
 
   bool walkToDeclPre(Decl *D) override {
+    SWIFT_DEFER {
+      assert(USRWriter.peekNextId() * sizeof(DeclLocationsTableData) == Buffer.size() &&
+      "USR Id has a one-to-one mapping with DeclLocationsTableData");
+    };
     // We shouldn't expose any Decls that .swiftdoc file isn't willing to expose.
     // .swiftdoc doesn't include comments for double underscored symbols, but for .swiftsourceinfo,
     // having the source location for these symbols isn't a concern becuase these
@@ -706,9 +712,6 @@ Result.X.Column = Locs->X.Column;
     auto USR = calculateNewUSRId(D);
     if (!USR.hasValue())
       return true;
-    // OK, we get a new USR, now append the associated source location data.
-    assert(*USR * sizeof(DeclLocationsTableData) == Buffer.size() &&
-           "USR id is used as an index to access basic location array");
     appendToBuffer(*LocData);
     return true;
   }
