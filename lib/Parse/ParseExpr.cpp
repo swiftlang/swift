@@ -1117,7 +1117,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
           indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
-          SyntaxKind::FunctionCallArgumentList);
+          SyntaxKind::TupleExprElementList);
       Result = makeParserResult(
           status | Result,
           SubscriptExpr::create(Context, Result.get(), lSquareLoc, indexArgs,
@@ -1140,7 +1140,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
 
       // Add dummy blank argument list to the call expression syntax.
       SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankFunctionCallArgumentList(
+          ParsedSyntaxRecorder::makeBlankTupleExprElementList(
               Tok.getLoc(), *SyntaxContext));
 
       ParserResult<Expr> closure =
@@ -1590,7 +1590,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                           argLabelLocs,
                                           rParenLoc,
                                           trailingClosure,
-                                          SyntaxKind::FunctionCallArgumentList);
+                                          SyntaxKind::TupleExprElementList);
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       return makeParserResult(
                  status,
@@ -1605,7 +1605,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     if (Tok.is(tok::l_brace) && isValidTrailingClosure(isExprBasic, *this)) {
       // Add dummy blank argument list to the call expression syntax.
       SyntaxContext->addSyntax(
-          ParsedSyntaxRecorder::makeBlankFunctionCallArgumentList(
+          ParsedSyntaxRecorder::makeBlankTupleExprElementList(
               Tok.getLoc(), *SyntaxContext));
 
       ParserResult<Expr> closure =
@@ -1639,7 +1639,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // element without label.
     ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
     return parseExprList(tok::l_paren, tok::r_paren,
-                         SyntaxKind::TupleElementList);
+                         SyntaxKind::TupleExprElementList);
 
   case tok::l_square:
     return parseExprCollection();
@@ -3015,8 +3015,7 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
       SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
                                                    DeclRefKind::Ordinary,
                                                    DeclNameLoc(Loc));
-    } else if (Kind == SyntaxKind::FunctionCallArgumentList &&
-               Tok.is(tok::code_complete)) {
+    } else if (isPostfix && Tok.is(tok::code_complete)) {
       // Handle call arguments specially because it may need argument labels.
       auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
       if (CodeCompletion)
@@ -3131,7 +3130,7 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                       argLabelLocs,
                                       rParenLoc,
                                       trailingClosure,
-                                      SyntaxKind::FunctionCallArgumentList);
+                                      SyntaxKind::TupleExprElementList);
   if (status.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (status.isError())
@@ -3170,9 +3169,9 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
     // Parse arguments.
     ParserStatus status =
         parseExprList(tok::l_paren, tok::r_paren,
-                      /*isPostfix=*/false, /*isExprBasic*/ false, LParenLoc,
+                      /*isPostfix=*/true, /*isExprBasic*/ true, LParenLoc,
                       args, argLabels, argLabelLocs, RParenLoc, trailingClosure,
-                      SyntaxKind::FunctionCallArgumentList);
+                      SyntaxKind::TupleExprElementList);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
@@ -3288,7 +3287,7 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                                       argLabelLocs,
                                       rParenLoc,
                                       trailingClosure,
-                                      SyntaxKind::FunctionCallArgumentList);
+                                      SyntaxKind::TupleExprElementList);
 
   // Form the call.
   return makeParserResult(

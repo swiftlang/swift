@@ -1299,14 +1299,12 @@ SourceLoc Parser::getErrorOrMissingLoc() const {
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   switch (ListKind) {
-  case SyntaxKind::FunctionCallArgumentList:
-    return SyntaxKind::FunctionCallArgument;
+  case SyntaxKind::TupleExprElementList:
+    return SyntaxKind::TupleExprElement;
   case SyntaxKind::ArrayElementList:
     return SyntaxKind::ArrayElement;
   case SyntaxKind::DictionaryElementList:
     return SyntaxKind::DictionaryElement;
-  case SyntaxKind::TupleElementList:
-    return SyntaxKind::TupleElement;
   case SyntaxKind::FunctionParameterList:
     return SyntaxKind::FunctionParameter;
   case SyntaxKind::TupleTypeElementList:
