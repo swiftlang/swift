@@ -526,7 +526,7 @@ CompilerInstance::openModuleSourceInfo(const InputFile &input) {
   std::string NonPrivatePath = moduleSourceInfoFilePath.str().str();
   StringRef fileName = llvm::sys::path::filename(NonPrivatePath);
   llvm::sys::path::remove_filename(moduleSourceInfoFilePath);
-  llvm::sys::path::append(moduleSourceInfoFilePath, "Private");
+  llvm::sys::path::append(moduleSourceInfoFilePath, "Project");
   llvm::sys::path::append(moduleSourceInfoFilePath, fileName);
   if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
                                                             moduleSourceInfoFilePath))

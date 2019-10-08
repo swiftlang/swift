@@ -273,27 +273,27 @@ SerializedModuleLoaderBase::openModuleSourceInfoFile(AccessPathElem ModuleID,
 
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
   {
-    llvm::SmallString<128> PrivatePath(ModulePath);
-    llvm::sys::path::remove_filename(PrivatePath);
-    llvm::sys::path::append(PrivatePath, "Private");
-    llvm::sys::path::append(PrivatePath, ModuleSourceInfoFilename);
+    llvm::SmallString<128> ProjectPath(ModulePath);
+    llvm::sys::path::remove_filename(ProjectPath);
+    llvm::sys::path::append(ProjectPath, "Project");
+    llvm::sys::path::append(ProjectPath, ModuleSourceInfoFilename);
 
     // Try to open the module source info file.  If it does not exist, ignore
     // the error.  However, pass though all other errors.
     if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
-      FS.getBufferForFile(PrivatePath)) {
+      FS.getBufferForFile(ProjectPath)) {
       *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
       return std::error_code();
     }
   }
   {
-    llvm::SmallString<128> NonPrivatePath(ModulePath);
-    llvm::sys::path::remove_filename(NonPrivatePath);
-    llvm::sys::path::append(NonPrivatePath, ModuleSourceInfoFilename);
+    llvm::SmallString<128> NonProjectPath(ModulePath);
+    llvm::sys::path::remove_filename(NonProjectPath);
+    llvm::sys::path::append(NonProjectPath, ModuleSourceInfoFilename);
 
     // Try to open the module source info file adjacent to the .swiftmodule file.
     if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
-      FS.getBufferForFile(NonPrivatePath)) {
+      FS.getBufferForFile(NonProjectPath)) {
       *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
       return std::error_code();
     }
