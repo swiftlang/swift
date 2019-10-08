@@ -151,6 +151,9 @@ ATTRIBUTE_NODES = [
                    'PostfixOperatorToken',
                    'SpacedBinaryOperatorToken',
                    'UnspacedBinaryOperatorToken',
+                   'InitToken',
+                   'DeinitToken',
+                   'SubscriptToken',
                ]),
          Child('DeclNameArguments', kind='DeclNameArguments',
                is_optional=True, description='''
