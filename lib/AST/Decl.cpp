@@ -6465,17 +6465,19 @@ DeclName AbstractFunctionDecl::getEffectiveFullName() const {
   return DeclName();
 }
 
-const ParamDecl *swift::getParameterAt(const ValueDecl *source, unsigned index) {
-  const ParameterList *paramList;
+ParameterList *swift::getParameterList(ValueDecl *source) {
   if (auto *AFD = dyn_cast<AbstractFunctionDecl>(source)) {
-    paramList = AFD->getParameters();
+    return AFD->getParameters();
   } else if (auto *EED = dyn_cast<EnumElementDecl>(source)) {
-    paramList = EED->getParameterList();
+    return EED->getParameterList();
   } else {
-    paramList = cast<SubscriptDecl>(source)->getIndices();
+    return cast<SubscriptDecl>(source)->getIndices();
   }
+}
 
-  return paramList->get(index);
+const ParamDecl *swift::getParameterAt(const ValueDecl *source,
+                                       unsigned index) {
+  return getParameterList(const_cast<ValueDecl *>(source))->get(index);
 }
 
 Type AbstractFunctionDecl::getMethodInterfaceType() const {
