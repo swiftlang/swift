@@ -1345,12 +1345,9 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
-  TypeResolutionOptions options(TypeResolverContext::ClosureExpr);
-  options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
   bool hadParameterError = false;
 
-  if (TC.typeCheckParameterList(PL, closure, options)) {
+  if (TypeChecker::typeCheckParameterList(PL)) {
     // If we encounter an error validating the parameter list, don't bail.
     // Instead, go on to validate any potential result type, and bail
     // afterwards.  This allows for better diagnostics, and keeps the

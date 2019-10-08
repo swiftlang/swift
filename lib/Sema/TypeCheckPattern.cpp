@@ -744,14 +744,26 @@ static bool validateTypedPattern(TypeChecker &TC,
   return hadError;
 }
 
-static void validateParameterType(ParamDecl *decl, TypeResolution resolution,
-                                  TypeResolutionOptions options,
-                                  ASTContext &ctx) {
+static void validateParameterType(ParamDecl *decl) {
   if (auto ty = decl->getTypeLoc().getType())
     return;
 
-  auto origContext = options.getContext();
-  options.setContext(None);
+  auto *dc = decl->getDeclContext();
+  auto resolution = TypeResolution::forInterface(dc);
+
+  TypeResolutionOptions options(None);
+  if (isa<AbstractClosureExpr>(dc)) {
+    options = TypeResolutionOptions(TypeResolverContext::ClosureExpr);
+    options |= TypeResolutionFlags::AllowUnspecifiedTypes;
+    options |= TypeResolutionFlags::AllowUnboundGenerics;
+  } else if (isa<AbstractFunctionDecl>(dc)) {
+    options = TypeResolutionOptions(TypeResolverContext::AbstractFunctionDecl);
+  } else if (isa<SubscriptDecl>(dc)) {
+    options = TypeResolutionOptions(TypeResolverContext::SubscriptDecl);
+  } else {
+    assert(isa<EnumElementDecl>(dc));
+    options = TypeResolutionOptions(TypeResolverContext::EnumElementDecl);
+  }
 
   // If the element is a variadic parameter, resolve the parameter type as if
   // it were in non-parameter position, since we want functions to be
@@ -763,6 +775,7 @@ static void validateParameterType(ParamDecl *decl, TypeResolution resolution,
 
   auto &TL = decl->getTypeLoc();
 
+  auto &ctx = dc->getASTContext();
   TypeChecker::validateType(ctx, TL, resolution, options);
 
   Type Ty = TL.getType();
@@ -773,7 +786,7 @@ static void validateParameterType(ParamDecl *decl, TypeResolution resolution,
     }
 
     // Disallow variadic parameters in enum elements.
-    if (origContext == TypeResolverContext::EnumElementDecl) {
+    if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
       decl->diagnose(diag::enum_element_ellipsis);
       Ty = ErrorType::get(ctx);
     }
@@ -783,11 +796,7 @@ static void validateParameterType(ParamDecl *decl, TypeResolution resolution,
 }
 
 /// Type check a parameter list.
-bool TypeChecker::typeCheckParameterList(ParameterList *PL,
-                                         DeclContext *dc,
-                                         TypeResolutionOptions options) {
-  auto resolution = TypeResolution::forInterface(dc);
-
+bool TypeChecker::typeCheckParameterList(ParameterList *PL) {
   bool hadError = false;
   
   for (auto param : *PL) {
@@ -798,7 +807,7 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
       continue;
     }
 
-    validateParameterType(param, resolution, options, Context);
+    validateParameterType(param);
     
     auto type = param->getTypeLoc().getType();
     param->setInterfaceType(type);
@@ -825,9 +834,10 @@ bool TypeChecker::typeCheckParameterList(ParameterList *PL,
 
     if (isa<InOutTypeRepr>(nestedRepr) &&
         param->isDefaultArgument()) {
-      diagnose(param->getDefaultValue()->getLoc(),
-               swift::diag::cannot_provide_default_value_inout,
-               param->getName());
+      auto &ctx = param->getASTContext();
+      ctx.Diags.diagnose(param->getDefaultValue()->getLoc(),
+                         swift::diag::cannot_provide_default_value_inout,
+                         param->getName());
       param->setSpecifier(ParamDecl::Specifier::Default);
     }
   }

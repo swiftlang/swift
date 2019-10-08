@@ -4124,8 +4124,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    typeCheckParameterList(FD->getParameters(), FD,
-                           TypeResolverContext::AbstractFunctionDecl);
+    typeCheckParameterList(FD->getParameters());
     validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
@@ -4150,8 +4149,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    typeCheckParameterList(CD->getParameters(), CD,
-                           TypeResolverContext::AbstractFunctionDecl);
+    typeCheckParameterList(CD->getParameters());
     CD->computeType();
     break;
   }
@@ -4161,8 +4159,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    typeCheckParameterList(DD->getParameters(), DD,
-                           TypeResolverContext::AbstractFunctionDecl);
+    typeCheckParameterList(DD->getParameters());
     DD->computeType();
     break;
   }
@@ -4172,8 +4169,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    typeCheckParameterList(SD->getIndices(), SD,
-                           TypeResolverContext::SubscriptDecl);
+    typeCheckParameterList(SD->getIndices());
     validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
 
@@ -4182,14 +4178,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
-    EnumDecl *ED = EED->getParentEnum();
-
     DeclValidationRAII IBV(EED);
 
-    if (auto *PL = EED->getParameterList()) {
-      typeCheckParameterList(PL, ED,
-                             TypeResolverContext::EnumElementDecl);
-    }
+    if (auto *PL = EED->getParameterList())
+      typeCheckParameterList(PL);
 
     EED->computeType();
     break;

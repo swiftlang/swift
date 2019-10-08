@@ -1354,8 +1354,7 @@ public:
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
   /// Type check a parameter list.
-  bool typeCheckParameterList(ParameterList *PL, DeclContext *dc,
-                              TypeResolutionOptions options);
+  static bool typeCheckParameterList(ParameterList *PL);
 
   /// Coerce a pattern to the given type.
   ///
