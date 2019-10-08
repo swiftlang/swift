@@ -5158,6 +5158,13 @@ public:
   }
 };
 
+enum class ParamSpecifier : uint8_t {
+  Default = 0,
+  InOut = 1,
+  Shared = 2,
+  Owned = 3,
+};
+
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   Identifier ArgumentName;
@@ -5185,12 +5192,7 @@ class ParamDecl : public VarDecl {
       DefaultValueAndFlags;
 
 public:
-  enum class Specifier : uint8_t {
-    Default = 0,
-    InOut = 1,
-    Shared = 2,
-    Owned = 3,
-  };
+  using Specifier = ParamSpecifier;
 
   ParamDecl(Specifier specifier,
             SourceLoc specifierLoc, SourceLoc argumentNameLoc,
