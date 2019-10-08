@@ -43,6 +43,7 @@ namespace llvm {
   template<typename T> class TinyPtrVector;
   template<typename T> class Optional;
   template <typename ...PTs> class PointerUnion;
+  template <typename IteratorT> class iterator_range;
   class SmallBitVector;
 
   // Other common classes.
@@ -63,6 +64,7 @@ namespace swift {
 
   // Containers.
   using llvm::ArrayRef;
+  using llvm::iterator_range;
   using llvm::MutableArrayRef;
   using llvm::None;
   using llvm::Optional;

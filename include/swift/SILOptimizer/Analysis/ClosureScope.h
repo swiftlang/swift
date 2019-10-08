@@ -102,7 +102,7 @@ class ClosureScopeAnalysis : public SILAnalysis {
       return None;
     }
   };
-  using IndexRange = llvm::iterator_range<int *>;
+  using IndexRange = iterator_range<int *>;
 
 public:
   // A range of SILFunction scopes converted from their scope indices and

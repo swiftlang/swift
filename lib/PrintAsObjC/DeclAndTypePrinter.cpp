@@ -2034,7 +2034,7 @@ void DeclAndTypePrinter::print(Type ty) {
 }
 
 void DeclAndTypePrinter::printAdHocCategory(
-    llvm::iterator_range<const ValueDecl * const *> members) {
+    iterator_range<const ValueDecl * const *> members) {
   getImpl().printAdHocCategory(members);
 }
 

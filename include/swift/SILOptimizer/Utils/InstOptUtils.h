@@ -38,7 +38,7 @@ template <class T> class NullablePtr;
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction*)
 using UserTransform = std::function<SILInstruction *(Operand *)>;
 using ValueBaseUserRange =
-    TransformRange<llvm::iterator_range<ValueBase::use_iterator>,UserTransform>;
+    TransformRange<iterator_range<ValueBase::use_iterator>, UserTransform>;
 
 inline ValueBaseUserRange
 makeUserRange(iterator_range<ValueBase::use_iterator> range) {

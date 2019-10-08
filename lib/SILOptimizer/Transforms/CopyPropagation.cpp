@@ -419,7 +419,7 @@ public:
     originalDestroyBlocks.insert(use->getUser()->getParent());
   }
 
-  llvm::iterator_range<BlockSetVec::const_iterator>
+  iterator_range<BlockSetVec::const_iterator>
   getOriginalDestroyBlocks() const {
     return originalDestroyBlocks;
   }
