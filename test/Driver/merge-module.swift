@@ -16,27 +16,27 @@
 
 // RUN: %swiftc_driver -emit-module -driver-print-jobs -driver-filelist-threshold=0 %s %S/../Inputs/empty.swift -module-name main 2>&1 | %FileCheck -check-prefix FILELISTS %s
 
-// CHECK: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// CHECK: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // CHECK: -module-name {{[^ ]+}}
 // CHECK: -o [[OBJECTFILE:.*]]
 
-// CHECK-NEXT: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// CHECK-NEXT: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // CHECK: -emit-module
 // CHECK: -module-name {{[^ ]+}}
 // CHECK: -o {{[^ ]+}}
 
 
-// SIMPLE: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// SIMPLE: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // SIMPLE: -emit-module
 // SIMPLE: -primary-file
 // SIMPLE: -emit-module-doc-path {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.swiftdoc
 // SIMPLE: -o {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.swiftmodule
-// SIMPLE: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// SIMPLE: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // SIMPLE: -emit-module
 // SIMPLE: -o main.swiftmodule
 
 
-// COMPLEX: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// COMPLEX: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // COMPLEX: -emit-module
 // COMPLEX-DAG: -emit-module-doc-path {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.swiftdoc
 // COMPLEX-DAG: -sdk {{.*}}/Inputs/clang-importer-sdk
@@ -44,7 +44,7 @@
 // COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks
 // COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
 // COMPLEX-DAG: -module-cache-path /tmp/modules
-// COMPLEX: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// COMPLEX: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // COMPLEX: -emit-module
 // COMPLEX-DAG: -F /path/to/frameworks -F /path/to/more/frameworks
 // COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
@@ -52,27 +52,27 @@
 // COMPLEX: -o sdk.out
 
 
-// TWO-OUTPUTS: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// TWO-OUTPUTS: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // TWO-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // TWO-OUTPUTS: -emit-module-doc-path {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.swiftdoc
 // TWO-OUTPUTS: -o {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.o
-// TWO-OUTPUTS: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// TWO-OUTPUTS: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // TWO-OUTPUTS: -emit-module [[MODULE]]
 // TWO-OUTPUTS: -o main.swiftmodule
 
-// THREE-OUTPUTS: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// THREE-OUTPUTS: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // THREE-OUTPUTS: -emit-module-path [[MODULE:[^ ]+]]
 // THREE-OUTPUTS: -emit-module-doc-path {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.swiftdoc
 // THREE-OUTPUTS: -o {{[^ ]*[/\\]}}merge-module-{{[^ ]*}}.o
-// THREE-OUTPUTS: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// THREE-OUTPUTS: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // THREE-OUTPUTS: -emit-module [[MODULE]]
 // THREE-OUTPUTS: -emit-objc-header-path sdk.foo.h
 // THREE-OUTPUTS: -o sdk.foo.out
 
 
-// FILELISTS: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
-// FILELISTS-NEXT: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
-// FILELISTS-NEXT: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend
+// FILELISTS: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
+// FILELISTS-NEXT: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
+// FILELISTS-NEXT: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend
 // FILELISTS-NOT: .swiftmodule
 // FILELISTS: -filelist {{[^ ]+}}
 // FILELISTS-NOT: .swiftmodule
@@ -83,15 +83,15 @@
 // RUN: %FileCheck %s < %t.complex.txt
 // RUN: %FileCheck -check-prefix MERGE_1 %s < %t.complex.txt
 
-// MERGE_1: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend -emit-module -primary-file {{[^ ]+[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]+[/\\]}}Inputs{{/|\\\\}}lib.swift
+// MERGE_1: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend -emit-module -primary-file {{[^ ]+[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} {{[^ ]+[/\\]}}Inputs{{/|\\\\}}lib.swift
 // MERGE_1: -emit-module-doc-path [[PARTIAL_MODULE_A:[^ ]+]].swiftdoc
 // MERGE_1: -module-name merge
 // MERGE_1: -o [[PARTIAL_MODULE_A]].swiftmodule
-// MERGE_1: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend -emit-module {{[^ ]+[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} -primary-file {{[^ ]+[/\\]}}Inputs{{/|\\\\}}lib.swift
+// MERGE_1: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend -emit-module {{[^ ]+[/\\]}}Inputs{{/|\\\\}}main.swift{{"?}} -primary-file {{[^ ]+[/\\]}}Inputs{{/|\\\\}}lib.swift
 // MERGE_1: -emit-module-doc-path [[PARTIAL_MODULE_B:[^ ]+]].swiftdoc
 // MERGE_1: -module-name merge
 // MERGE_1: -o [[PARTIAL_MODULE_B]].swiftmodule
-// MERGE_1: {{bin(/|\\\\)swiftc?(\.EXE)?"?}} -frontend -merge-modules -emit-module [[PARTIAL_MODULE_A]].swiftmodule{{"?}} [[PARTIAL_MODULE_B]].swiftmodule
+// MERGE_1: {{bin(/|\\\\)swiftc?(\.exe)?"?}} -frontend -merge-modules -emit-module [[PARTIAL_MODULE_A]].swiftmodule{{"?}} [[PARTIAL_MODULE_B]].swiftmodule
 // MERGE_1: -parse-as-library
 // MERGE_1: -emit-module-doc-path {{"?}}/tmp{{(/|\\\\)}}modules.swiftdoc{{"?}}
 // MERGE_1: -module-name merge

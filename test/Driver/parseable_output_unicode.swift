@@ -8,8 +8,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c -primary-file {{.*[\\/]}}你好.swift{{(\\")? .*}} -o {{.*[\\/]}}你好-[[OUTPUT:.*]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*[\\/]}}你好.swift{{(\\")? .*}} -o {{.*[\\/]}}你好-[[OUTPUT:.*]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -69,8 +69,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}你好-[[OUTPUT]].swiftmodule{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftmodule{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}你好-[[OUTPUT]].swiftmodule{{(\\")?}} {{.*}} -o {{.*[\\/]}}parseable_output_unicode.swift.tmp.swiftmodule{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-merge-modules",
