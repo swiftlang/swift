@@ -1,0 +1,163 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+  rmwOrderings = [
+    # View name               raw name     documentation name
+    ("",                      "",          "acquiring and releasing"),
+    ("Relaxed",               "Relaxed",   "relaxed"),
+    ("Acquiring",             "Acquiring", "acquiring"),
+    ("Releasing",             "Releasing", "releasing"),
+    ("AcquiringAndReleasing", "",          "acquiring and releasing"),
+  ]
+
+  loadOrderings = [
+    # ordering     raw API name,  doc name
+    ("",           "",            "acquiring"),
+    ("Relaxed",    "Relaxed",     "relaxed"),
+    ("Acquiring",  "",            "acquiring"),
+  ]
+
+  storeOrderings = [
+    # ordering     raw API name,  doc name
+    ("",           "",            "releasing"),
+    ("Relaxed",    "Relaxed",     "relaxed"),
+    ("Releasing",  "",            "releasing"),
+  ]
+
+  def lowerFirst(str):
+    return str[:1].lower() + str[1:] if str else ""
+
+  def extensionSuffix(ordering):
+    return "." + ordering if ordering else ""
+}%
+
+/// Provides atomic operations on an unsafe mutable pointer, without owning the
+/// value itself.
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+@frozen
+public struct UnsafeAtomicMutablePointer<Pointee> {
+  @usableFromInline
+  internal let _ptr: UnsafeMutableRawPointer
+
+  @_transparent @_alwaysEmitIntoClient
+  public init(_ pointer: UnsafeMutablePointer<UnsafeMutablePointer<Pointee>?>) {
+    self._ptr = UnsafeMutableRawPointer(pointer)
+  }
+}
+
+% for (Ordering, rawname, docname) in rmwOrderings:
+%   if Ordering <> "":
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicMutablePointer {
+  /// A view providing atomic operations on an `UnsafeAtomicMutablePointer` with
+  /// ${docname} memory ordering.
+  @frozen
+  public struct ${Ordering} {
+    @usableFromInline
+    internal let _ptr: UnsafeMutableRawPointer
+
+    @_transparent @_alwaysEmitIntoClient
+    internal init(_pointer: UnsafeMutableRawPointer) {
+      self._ptr = _pointer
+    }
+  }
+
+  /// Returns a view providing atomic operations on this value with
+  /// ${docname} memory ordering.
+  @_transparent @_alwaysEmitIntoClient
+  public var ${lowerFirst(Ordering)}: ${Ordering} {
+    ${Ordering}(_pointer: _ptr)
+  }
+}
+%   end
+% end
+
+% for (Ordering, RawOrdering, docname) in loadOrderings:
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicMutablePointer${extensionSuffix(Ordering)} {
+  /// Atomically loads and returns the current value,
+  /// with ${docname} memory ordering.
+  @_transparent @_alwaysEmitIntoClient
+  public func load() -> UnsafeMutablePointer<Pointee>? {
+    let value = _ptr._atomic${RawOrdering}LoadWord()
+    return UnsafeMutablePointer(bitPattern: value)
+  }
+}
+% end
+
+
+% for (Ordering, RawOrdering, docname) in storeOrderings:
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicMutablePointer${extensionSuffix(Ordering)} {
+  /// Atomically sets the current value to `desired`,
+  /// with ${docname} memory ordering.
+  @_transparent @_alwaysEmitIntoClient
+  public func store(_ desired: UnsafeMutablePointer<Pointee>?) {
+    let desiredWord = UInt(bitPattern: desired)
+    _ptr._atomic${RawOrdering}StoreWord(desiredWord)
+  }
+}
+% end
+
+% for (Ordering, RawOrdering, docname) in rmwOrderings:
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicMutablePointer${extensionSuffix(Ordering)} {
+  /// Atomically sets the current value to `desired` and returns the previous
+  /// value, with ${docname} memory ordering.
+  ///
+  /// - Returns: The original value.
+  @_transparent @_alwaysEmitIntoClient
+  public func exchange(
+    _ desired: UnsafeMutablePointer<Pointee>?
+  ) -> UnsafeMutablePointer<Pointee>? {
+    let desiredWord = UInt(bitPattern: desired)
+    let resultWord = _ptr._atomic${RawOrdering}ExchangeWord(desiredWord)
+    return UnsafeMutablePointer(bitPattern: resultWord)
+  }
+}
+% end
+
+% for (Ordering, RawOrdering, docname) in rmwOrderings:
+@available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, *)
+extension UnsafeAtomicMutablePointer${extensionSuffix(Ordering)} {
+  /// Perform an atomic compare and exchange operation with
+  /// ${docname} ordering constraints.
+  ///
+  /// This operation is equivalent to the following pseudo-code:
+  ///
+  /// ```
+  /// atomically${Ordering}(self) { value in
+  ///   if value == expected {
+  ///      value = desired
+  ///      return true
+  ///   } else {
+  ///      expected = value
+  ///      return false
+  ///   }
+  /// }
+  /// ```
+  @_transparent @_alwaysEmitIntoClient
+  public func compareExchange(
+    expected: inout UnsafeMutablePointer<Pointee>?,
+    desired: UnsafeMutablePointer<Pointee>?
+  ) -> Bool {
+    var expectedWord = UInt(bitPattern: expected)
+    let desiredWord = UInt(bitPattern: desired)
+    let success = _ptr._atomic${RawOrdering}CompareExchangeWord(
+      expected: &expectedWord,
+      desired: desiredWord)
+    expected = UnsafeMutablePointer(bitPattern: expectedWord)
+    return success
+  }
+}
+% end

@@ -198,8 +198,11 @@
   ],
   "Atomics": [
     "RawAtomics.swift",
+    "UnsafeAtomicInt.swift",
     "UnsafeAtomicUInt.swift",
-    "UnsafeAtomics.swift",
+    "UnsafeAtomicUnmanaged.swift",
+    "UnsafeAtomicMutablePointer.swift",
+    "UnsafeAtomicInitializableReference.swift",
     "LegacyAtomicInt.swift"
   ],
   "Misc": [
