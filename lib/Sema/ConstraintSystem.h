@@ -4014,6 +4014,11 @@ Optional<Identifier> getOperatorName(Expr *expr);
 // }
 bool isAutoClosureArgument(Expr *argExpr);
 
+/// Checks whether referencing the given overload choice results in the self
+/// parameter being applied, meaning that it's dropped from the type of the
+/// reference.
+bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice);
+
 /// Check whether type conforms to a given known protocol.
 bool conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                              KnownProtocolKind protocol);

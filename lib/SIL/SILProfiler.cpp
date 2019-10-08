@@ -177,6 +177,12 @@ bool visitFunctionDecl(ASTWalker &Walker, AbstractFunctionDecl *AFD, F Func) {
   return continueWalk;
 }
 
+/// Whether to skip visitation of an expression. Children of skipped exprs
+/// should still be visited.
+static bool skipExpr(Expr *E) {
+  return !E->getStartLoc().isValid() || !E->getEndLoc().isValid();
+}
+
 /// An ASTWalker that maps ASTNodes to profiling counters.
 struct MapRegionCounters : public ASTWalker {
   /// The next counter value to assign.
@@ -238,6 +244,9 @@ struct MapRegionCounters : public ASTWalker {
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (skipExpr(E))
+      return {true, E};
+
     // If AST visitation begins with an expression, the counter map must be
     // empty. Set up a counter for the root.
     if (Parent.isNull()) {
@@ -400,7 +409,10 @@ public:
 
   bool hasStartLoc() const { return StartLoc.hasValue(); }
 
-  void setStartLoc(SourceLoc Loc) { StartLoc = Loc; }
+  void setStartLoc(SourceLoc Loc) {
+    assert(Loc.isValid());
+    StartLoc = Loc;
+  }
 
   const SourceLoc &getStartLoc() const {
     assert(StartLoc && "Region has no start location");
@@ -409,7 +421,10 @@ public:
 
   bool hasEndLoc() const { return EndLoc.hasValue(); }
 
-  void setEndLoc(SourceLoc Loc) { EndLoc = Loc; }
+  void setEndLoc(SourceLoc Loc) {
+    assert(Loc.isValid());
+    EndLoc = Loc;
+  }
 
   const SourceLoc &getEndLoc() const {
     assert(EndLoc && "Region has no end location");
@@ -573,6 +588,9 @@ struct PGOMapping : public ASTWalker {
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (skipExpr(E))
+      return {true, E};
+
     unsigned parent = getParentCounter();
 
     if (Parent.isNull()) {
@@ -996,6 +1014,9 @@ public:
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+    if (skipExpr(E))
+      return {true, E};
+
     if (!RegionStack.empty())
       extendRegion(E);
 

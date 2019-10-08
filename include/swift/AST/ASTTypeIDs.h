@@ -34,6 +34,7 @@ class IterableDeclContext;
 class ModuleDecl;
 class NominalTypeDecl;
 class OperatorDecl;
+class OpaqueTypeDecl;
 class PrecedenceGroupDecl;
 struct PropertyWrapperBackingPropertyInfo;
 struct PropertyWrapperTypeInfo;

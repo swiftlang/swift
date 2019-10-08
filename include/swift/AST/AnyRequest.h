@@ -54,7 +54,7 @@ class AnyRequest {
   friend llvm::DenseMapInfo<swift::AnyRequest>;
 
   static hash_code hashForHolder(uint64_t typeID, hash_code requestHash) {
-    return hash_combine(hash_value(typeID), requestHash);
+    return hash_combine(typeID, requestHash);
   }
 
   /// Abstract base class used to hold the specific request kind.

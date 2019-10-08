@@ -380,34 +380,36 @@ class ModuleInterfaceLoaderImpl {
   /// with dead entries -- when other factors change, such as the contents of
   /// the .swiftinterface input or its dependencies.
   std::string getCacheHash(const CompilerInvocation &SubInvocation) {
-    // Start with the compiler version (which will be either tag names or revs).
-    // Explicitly don't pass in the "effective" language version -- this would
-    // mean modules built in different -swift-version modes would rebuild their
-    // dependencies.
-    llvm::hash_code H = hash_value(swift::version::getSwiftFullVersion());
-
-    // Simplest representation of input "identity" (not content) is just a
-    // pathname, and probably all we can get from the VFS in this regard
-    // anyways.
-    H = hash_combine(H, interfacePath);
-
-    // Include the normalized target triple. In practice, .swiftinterface files
-    // will be in target-specific subdirectories and would have
-    // target-specific pieces #if'd out. However, it doesn't hurt to
-    // include it, and it guards against mistakenly reusing cached modules
-    // across targets. Note that this normalization explicitly doesn't
-    // include the minimum deployment target (e.g. the '12.0' in 'ios12.0').
     auto normalizedTargetTriple =
         getTargetSpecificModuleTriple(SubInvocation.getLangOptions().Target);
-    H = hash_combine(H, normalizedTargetTriple.str());
 
-    // The SDK path is going to affect how this module is imported, so include
-    // it.
-    H = hash_combine(H, SubInvocation.getSDKPath());
+    llvm::hash_code H = hash_combine(
+        // Start with the compiler version (which will be either tag names or
+        // revs). Explicitly don't pass in the "effective" language version --
+        // this would mean modules built in different -swift-version modes would
+        // rebuild their dependencies.
+        swift::version::getSwiftFullVersion(),
 
-    // Whether or not we're tracking system dependencies affects the
-    // invalidation behavior of this cache item.
-    H = hash_combine(H, SubInvocation.getFrontendOptions().TrackSystemDeps);
+        // Simplest representation of input "identity" (not content) is just a
+        // pathname, and probably all we can get from the VFS in this regard
+        // anyways.
+        interfacePath,
+
+        // Include the normalized target triple. In practice, .swiftinterface
+        // files will be in target-specific subdirectories and would have
+        // target-specific pieces #if'd out. However, it doesn't hurt to include
+        // it, and it guards against mistakenly reusing cached modules across
+        // targets. Note that this normalization explicitly doesn't include the
+        // minimum deployment target (e.g. the '12.0' in 'ios12.0').
+        normalizedTargetTriple.str(),
+
+        // The SDK path is going to affect how this module is imported, so
+        // include it.
+        SubInvocation.getSDKPath(),
+
+        // Whether or not we're tracking system dependencies affects the
+        // invalidation behavior of this cache item.
+        SubInvocation.getFrontendOptions().TrackSystemDeps);
 
     return llvm::APInt(64, H).toString(36, /*Signed=*/false);
   }
