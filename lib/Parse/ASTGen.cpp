@@ -684,8 +684,8 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
                                      const TupleTypeElementListSyntax &Elements,
                                      const TokenSyntax &RParen,
                                      const SourceLoc Loc, bool IsFunction) {
-  auto LPLoc = generate(LParen, Loc);
-  auto RPLoc = generate(RParen, Loc);
+  auto LPLoc = advanceLocBegin(Loc, LParen);
+  auto RPLoc = advanceLocEnd(Loc, RParen);
 
   SmallVector<TupleTypeReprElement, 4> TupleElements;
 
@@ -1000,14 +1000,8 @@ TypeRepr *ASTGen::generate(const DictionaryTypeSyntax &Type,
   auto ColonLoc = advanceLocBegin(Loc, Type.getColon());
 
   SourceLoc LBracketLoc, RBracketLoc;
-  if (Type.getLeftSquareBracket().isPresent())
-    LBracketLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
-  else
-    LBracketLoc = advanceLocBegin(Loc, *Type.getFirstToken());
-  if (Type.getRightSquareBracket().isPresent())
-    RBracketLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  else
-    RBracketLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  LBracketLoc = advanceLocBegin(Loc, Type);
+  RBracketLoc = advanceLocEnd(Loc, Type);
   SourceRange Range{LBracketLoc, RBracketLoc};
   return new (Context) DictionaryTypeRepr(KeyType, ValueType, ColonLoc, Range);
 }
@@ -1017,14 +1011,8 @@ TypeRepr *ASTGen::generate(const ArrayTypeSyntax &Type, SourceLoc Loc) {
   if (!ElementType)
     return nullptr;
   SourceLoc LBracketLoc, RBracketLoc;
-  if (Type.getLeftSquareBracket().isPresent())
-    LBracketLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
-  else
-    LBracketLoc = advanceLocBegin(Loc, *Type.getFirstToken());
-  if (Type.getRightSquareBracket().isPresent())
-    RBracketLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  else
-    RBracketLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  LBracketLoc = advanceLocBegin(Loc, Type);
+  RBracketLoc = advanceLocEnd(Loc, Type);
   return new (Context) ArrayTypeRepr(ElementType, {LBracketLoc, RBracketLoc});
 }
 
@@ -1206,8 +1194,8 @@ void
 ASTGen::generate(const GenericArgumentClauseSyntax &clause, const SourceLoc Loc,
                  SourceLoc &lAngleLoc, SourceLoc &rAngleLoc,
                  SmallVectorImpl<TypeRepr *> &args) {
-  lAngleLoc = advanceLocBegin(Loc, clause.getLeftAngleBracket());
-  rAngleLoc = advanceLocBegin(Loc, clause.getRightAngleBracket());
+  lAngleLoc = advanceLocBegin(Loc, clause);
+  rAngleLoc = advanceLocEnd(Loc, clause);
 
   assert(args.empty());
   for (auto Arg : clause.getArguments()) {
@@ -1303,8 +1291,8 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
       whereLoc = advanceLocBegin(Loc, whereClause->getWhereKeyword());
   }
 
-  auto lAngleLoc = advanceLocBegin(Loc, clause.getLeftAngleBracket());
-  auto rAngleLoc = advanceLocBegin(Loc, clause.getRightAngleBracket());
+  auto lAngleLoc = advanceLocBegin(Loc, clause);
+  auto rAngleLoc = advanceLocEnd(Loc, clause);
   return GenericParamList::create(Context, lAngleLoc, params, whereLoc,
                                   requirements, rAngleLoc);
 }
@@ -1395,10 +1383,17 @@ SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
 }
 
 SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const Syntax &Node) {
-  if (auto Tok = Node.getLastToken())
-    return advanceLocBegin(Loc, *Tok);
+  if (!Node.isMissing()) {
+    // NOTE: We cannot use 'getLastToken()' because it doesn't take string
+    // literal expressions into account.
+    if (Node.isToken() || Node.is<StringLiteralExprSyntax>())
+      return advanceLocBegin(Loc, Node);
+    for (size_t I = Node.getNumChildren(); I != 0; --I)
+      if (auto Child = Node.getChild(I - 1))
+        return advanceLocEnd(Loc, *Child);
+  }
   if (auto Prev = Node.getPreviousNode())
-    return advanceLocBegin(Loc, *Prev->getLastToken());
+    return advanceLocEnd(Loc, *Prev);
   assert(false && "No tokens in tree?");
   return Loc;
 }
