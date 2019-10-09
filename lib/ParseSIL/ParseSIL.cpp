@@ -5831,10 +5831,10 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
         FunctionState.convertRequirements(
             FunctionState.F, attr->getWhereClause()->getRequirements(),
             requirements);
-        auto *derivativeGenSig = evaluateOrDefault(
+        auto derivativeGenSig = evaluateOrDefault(
             P.Context.evaluator,
             AbstractGenericSignatureRequest{
-              FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+              FunctionState.F->getGenericEnvironment()->getGenericSignature().getPointer(),
               /*addedGenericParams=*/{},
               std::move(requirements)},
               nullptr);

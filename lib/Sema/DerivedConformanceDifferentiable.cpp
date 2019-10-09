@@ -636,7 +636,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
               ->getAttrs()
               .hasAttribute<DifferentiableAttr>())
         continue;
-      GenericSignature *derivativeGenSig = nullptr;
+      GenericSignature derivativeGenSig = GenericSignature();
       // If the parent declaration context is an extension, the nominal type may
       // conditionally conform to `Differentiable`. Use the extension generic
       // requirements in getter `@differentiable` attributes.

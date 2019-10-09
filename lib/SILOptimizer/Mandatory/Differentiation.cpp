@@ -241,9 +241,9 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 /// - Additional derivative requirements (optional).
 /// The constrained derivative generic signature constrains all wrt parameters
 /// to conform to `Differentiable`.
-static GenericSignature *getConstrainedDerivativeGenericSignature(
+static GenericSignature getConstrainedDerivativeGenericSignature(
     CanSILFunctionType originalFnTy, AutoDiffIndexSubset *paramIndexSet,
-    GenericSignature *derivativeGenSig) {
+    GenericSignature derivativeGenSig) {
   if (!derivativeGenSig)
     derivativeGenSig = originalFnTy->getGenericSignature();
   if (!derivativeGenSig)
@@ -261,7 +261,7 @@ static GenericSignature *getConstrainedDerivativeGenericSignature(
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
-          derivativeGenSig,
+          derivativeGenSig.getPointer(),
           /*addedGenericParams*/ {},
           std::move(requirements)},
       nullptr);
@@ -274,7 +274,7 @@ static GenericSignature *getConstrainedDerivativeGenericSignature(
 /// - Otherwise, return the original function's generic signature.
 static CanGenericSignature getDerivativeGenericSignature(
     SILDifferentiableAttr *attr, SILFunction *original) {
-  if (auto *attrDerivativeGenSig = attr->getDerivativeGenericSignature())
+  if (auto attrDerivativeGenSig = attr->getDerivativeGenericSignature())
     return attrDerivativeGenSig->getCanonicalSignature();
   return original->getLoweredFunctionType()->getGenericSignature();
 }
@@ -1066,7 +1066,7 @@ public:
   /// with the specified parameter indices.
   SILDifferentiableAttr *createDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices,
-      GenericSignature *derivativeGenericSignature) const {
+      GenericSignature derivativeGenericSignature) const {
     assert(!lookUpDifferentiableAttr(original, indices));
     auto derivativeConstrainedGenSig = getConstrainedDerivativeGenericSignature(
         original->getLoweredFunctionType(), indices.parameters,
@@ -1083,7 +1083,7 @@ public:
   /// original function corresponding to the specified parameter indices.
   SILDifferentiableAttr *getOrCreateDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices,
-      GenericSignature *derivativeGenericSignature) {
+      GenericSignature derivativeGenericSignature) {
     if (auto *attr = lookUpDifferentiableAttr(original, indices))
       return attr;
     assert(original->isDefinition());
@@ -1383,7 +1383,7 @@ using Activity = OptionSet<ActivityFlags>;
 class DifferentiableActivityInfo {
 private:
   DifferentiableActivityCollection &parent;
-  GenericSignature *assocGenSig = nullptr;
+  GenericSignature assocGenSig = GenericSignature();
 
   /// Input values, i.e. parameters (both direct and indirect).
   SmallVector<SILValue, 4> inputValues;
@@ -1420,7 +1420,7 @@ private:
 
 public:
   explicit DifferentiableActivityInfo(
-      DifferentiableActivityCollection &parent, GenericSignature *assocGenSig);
+      DifferentiableActivityCollection &parent, GenericSignature assocGenSig);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
@@ -1790,18 +1790,18 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 
 class DifferentiableActivityCollection {
 public:
-  SmallDenseMap<GenericSignature *, DifferentiableActivityInfo> activityInfoMap;
+  SmallDenseMap<GenericSignatureImpl *, DifferentiableActivityInfo> activityInfoMap;
   SILFunction &function;
   DominanceInfo *domInfo;
   PostDominanceInfo *postDomInfo;
 
   DifferentiableActivityInfo &getActivityInfo(
-      GenericSignature *assocGenSig, AutoDiffAssociatedFunctionKind kind) {
-    auto activityInfoLookup = activityInfoMap.find(assocGenSig);
+      GenericSignature assocGenSig, AutoDiffAssociatedFunctionKind kind) {
+    auto activityInfoLookup = activityInfoMap.find(assocGenSig.getPointer());
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
     auto insertion = activityInfoMap.insert(
-        {assocGenSig, DifferentiableActivityInfo(*this, assocGenSig)});
+        {assocGenSig.getPointer(), DifferentiableActivityInfo(*this, assocGenSig)});
     return insertion.first->getSecond();
   }
 
@@ -1834,7 +1834,7 @@ DifferentiableActivityCollection::DifferentiableActivityCollection(
     : function(f), domInfo(di), postDomInfo(pdi) {}
 
 DifferentiableActivityInfo::DifferentiableActivityInfo(
-    DifferentiableActivityCollection &parent, GenericSignature *assocGenSig)
+    DifferentiableActivityCollection &parent, GenericSignature assocGenSig)
     : parent(parent), assocGenSig(assocGenSig) {
   analyze(parent.domInfo, parent.postDomInfo);
 }
@@ -1909,7 +1909,7 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
               projType = assocGenSig->getCanonicalTypeInContext(
                   projType->mapTypeOutOfContext());
             if (projType->getAutoDiffAssociatedTangentSpace(
-                LookUpConformanceInSignature(*assocGenSig)))
+                LookUpConformanceInSignature(assocGenSig.getPointer())))
               setVaried(teai, i);
           }
         }
@@ -2275,7 +2275,7 @@ static bool diagnoseUnsupportedControlFlow(ADContext &context,
 /// derivative generic signature (containing requirements), original function,
 /// and substitution map. Returns true if error is emitted.
 static bool diagnoseUnsatisfiedRequirements(ADContext &context,
-                                            GenericSignature *derivativeGenSig,
+                                            GenericSignature derivativeGenSig,
                                             SILFunction *original,
                                             SubstitutionMap substMap,
                                             DifferentiationInvoker invoker,
@@ -2460,7 +2460,7 @@ reapplyFunctionConversion(
     SILValue newFunc, SILValue oldFunc, SILValue oldConvertedFunc,
     SILBuilder &builder, SILLocation loc,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc,
-    GenericSignature *newFuncGenSig = nullptr) {
+    GenericSignature newFuncGenSig = GenericSignature()) {
   // If the old func is the new func, then there's no conversion.
   if (oldFunc == oldConvertedFunc)
     return newFunc;
@@ -2625,7 +2625,7 @@ emitAssociatedFunctionReference(
       }
       // Sanity check passed. Create a new `[differentiable]` attribute and
       // process it it.
-      GenericSignature *contextualDerivativeGenSig = nullptr;
+      GenericSignature contextualDerivativeGenSig = GenericSignature();
       if (invoker.getKind() ==
           DifferentiationInvoker::Kind::IndirectDifferentiation)
         contextualDerivativeGenSig = invoker.getIndirectDifferentiation().second
@@ -2857,7 +2857,7 @@ buildThunkSignature(SILFunction *fn,
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
   builder.addRequirement(newRequirement, source, nullptr);
 
-  auto *genericSig = std::move(builder).computeGenericSignature(
+  auto genericSig = std::move(builder).computeGenericSignature(
       SourceLoc(), /*allowConcreteGenericParams=*/true);
   genericEnv = genericSig->getGenericEnvironment();
 

@@ -537,11 +537,11 @@ static void printDifferentiableAttrArguments(
   // First, filter out requirements satisfied by the original function's
   // generic signature. They should not be printed.
   ArrayRef<Requirement> derivativeRequirements;
-  if (auto *derivativeGenSig = attr->getDerivativeGenericSignature())
+  if (auto derivativeGenSig = attr->getDerivativeGenericSignature())
     derivativeRequirements = derivativeGenSig->getRequirements();
   auto requirementsToPrint =
       makeFilterRange(derivativeRequirements, [&](Requirement req) {
-        if (auto *originalGenSig = original->getGenericSignature())
+        if (auto originalGenSig = original->getGenericSignature())
           if (originalGenSig->isRequirementSatisfied(req))
             return false;
         return true;
@@ -563,7 +563,7 @@ static void printDifferentiableAttrArguments(
       };
     }
     interleave(requirementsToPrint, [&](Requirement req) {
-      if (auto *originalGenSig = original->getGenericSignature())
+      if (auto originalGenSig = original->getGenericSignature())
         if (originalGenSig->isRequirementSatisfied(req))
           return;
       auto FirstTy = getInterfaceType(req.getFirstType());
@@ -1459,7 +1459,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        AutoDiffIndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
-                                       GenericSignature *derivativeGenSig)
+                                       GenericSignature derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
       linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
       ParameterIndices(indices) {
@@ -1487,7 +1487,7 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
                            bool linear, AutoDiffIndexSubset *indices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
-                           GenericSignature *derivativeGenSig) {
+                           GenericSignature derivativeGenSig) {
   void *mem = context.Allocate(sizeof(DifferentiableAttr),
                                alignof(DifferentiableAttr));
   return new (mem) DifferentiableAttr(context, implicit, atLoc, baseRange,
@@ -1510,7 +1510,7 @@ void DifferentiableAttr::setVJPFunction(FuncDecl *decl) {
 GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
     AbstractFunctionDecl *original) const {
   GenericEnvironment *derivativeGenEnv = original->getGenericEnvironment();
-  if (auto *derivativeGenSig = getDerivativeGenericSignature())
+  if (auto derivativeGenSig = getDerivativeGenericSignature())
     return derivativeGenEnv = derivativeGenSig->getGenericEnvironment();
   return original->getGenericEnvironment();
 }

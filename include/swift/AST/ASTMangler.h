@@ -308,7 +308,7 @@ protected:
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
   bool appendGenericSignature(GenericSignature sig,
-                              GenericSignature contextSig = nullptr);
+                              GenericSignature contextSig = GenericSignature());
 
   void appendRequirement(const Requirement &reqt);
 

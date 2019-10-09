@@ -4491,7 +4491,7 @@ Type TypeBase::openAnyExistentialType(OpenedArchetypeType *&opened) {
 // with `params` parameters and `retTy` return type.
 static AnyFunctionType *
 makeFunctionType(AnyFunctionType *copy, ArrayRef<AnyFunctionType::Param> params,
-                 Type retTy, GenericSignature *genericSignature) {
+                 Type retTy, GenericSignature genericSignature) {
   if (!genericSignature)
     if (auto *genericFunctionType = copy->getAs<GenericFunctionType>())
       genericSignature = genericFunctionType->getGenericSignature();
@@ -4571,7 +4571,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *indices, unsigned resultIndex,
     unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
     LookupConformanceFn lookupConformance,
-    GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
+    GenericSignature whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -4735,7 +4735,7 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
 // SWIFT_ENABLE_TENSORFLOW
 static AnyFunctionType *
 makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
-                 GenericSignature *genericSignature) {
+                 GenericSignature genericSignature) {
   if (genericSignature)
     return GenericFunctionType::get(genericSignature, params, retTy);
   return FunctionType::get(params, retTy);

@@ -3118,7 +3118,7 @@ public:
       AutoDiffIndexSubset *indices, unsigned resultIndex,
       unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
       LookupConformanceFn lookupConformance,
-      GenericSignature *whereClauseGenericSignature = nullptr,
+      GenericSignature whereClauseGenericSignature = GenericSignature(),
       bool makeSelfParamFirst = false);
 
   /// Given the type of an autodiff associated function, returns the

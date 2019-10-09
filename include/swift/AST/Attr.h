@@ -1559,7 +1559,7 @@ class DifferentiableAttr final
   /// type checker based on the original function's generic signature and the
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
-  GenericSignature *DerivativeGenericSignature = nullptr;
+  GenericSignature DerivativeGenericSignature = GenericSignature();
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
@@ -1574,7 +1574,7 @@ class DifferentiableAttr final
                               bool linear, AutoDiffIndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
-                              GenericSignature *derivativeGenericSignature);
+                              GenericSignature derivativeGenericSignature);
 
 public:
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
@@ -1590,7 +1590,7 @@ public:
                                     bool linear, AutoDiffIndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
-                                    GenericSignature *derivativeGenSig);
+                                    GenericSignature derivativeGenSig);
 
   /// Get the optional 'jvp:' function name and location.
   /// Use this instead of `getJVPFunction` to check whether the attribute has a
@@ -1620,16 +1620,16 @@ public:
   size_t numTrailingObjects(OverloadToken<ParsedAutoDiffParameter>) const {
     return NumParsedParameters;
   }
-                                      
+
   bool isLinear() const { return linear; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
-  GenericSignature *getDerivativeGenericSignature() const {
+  GenericSignature getDerivativeGenericSignature() const {
     return DerivativeGenericSignature;
   }
   void setDerivativeGenericSignature(ASTContext &context,
-                                     GenericSignature* derivativeGenSig) {
+                                     GenericSignature derivativeGenSig) {
     DerivativeGenericSignature = derivativeGenSig;
   }
 

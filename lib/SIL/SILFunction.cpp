@@ -63,7 +63,7 @@ SILDifferentiableAttr::
 SILDifferentiableAttr(const SILAutoDiffIndices &indices,
                       StringRef jvpName,
                       StringRef vjpName,
-                      GenericSignature *derivativeGenSig)
+                      GenericSignature derivativeGenSig)
   : indices(indices), JVPName(jvpName), VJPName(vjpName),
     DerivativeGenericSignature(derivativeGenSig) {}
 
@@ -84,7 +84,7 @@ SILDifferentiableAttr::create(SILModule &M,
                               const SILAutoDiffIndices &indices,
                               StringRef jvpName,
                               StringRef vjpName,
-                              GenericSignature *derivativeGenSig) {
+                              GenericSignature derivativeGenSig) {
   void *mem =
       M.allocate(sizeof(SILDifferentiableAttr), alignof(SILDifferentiableAttr));
   return ::new (mem)
