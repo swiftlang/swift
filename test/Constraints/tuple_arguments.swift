@@ -1728,7 +1728,7 @@ func autoclosureSplat() {
   // wrap the closure in a function conversion.
 
   takeFn { (fn: @autoclosure () -> Int, x: Int) in }
-  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-1 {{contextual closure type '(@escaping () -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
 
   takeFn { (fn: @autoclosure @escaping () -> Int) in }
   // FIXME: It looks like matchFunctionTypes() does not check @autoclosure at all.
@@ -1737,7 +1737,7 @@ func autoclosureSplat() {
   // instead of changing the test.
 
   takeFn { (fn: @autoclosure @escaping () -> Int, x: Int) in }
-  // expected-error@-1 {{contextual closure type '(_) -> ()' expects 1 argument, but 2 were used in closure body}}
+  // expected-error@-1 {{contextual closure type '(@escaping () -> Int) -> ()' expects 1 argument, but 2 were used in closure body}}
 }
 
 func noescapeSplat() {

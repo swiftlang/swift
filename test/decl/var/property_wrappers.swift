@@ -1117,8 +1117,8 @@ struct MissingPropertyWrapperUnwrap {
 }
 
 struct InvalidPropertyDelegateUse {
-  @Foo var x: Int = 42 // expected-error {{cannot invoke initializer for ty}}
-  // expected-note@-1{{overloads for 'Foo<_>' exist with these partially matching paramet}}
+  // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
+  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
