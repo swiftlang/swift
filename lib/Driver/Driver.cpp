@@ -2793,7 +2793,7 @@ static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
                                                 StringRef workingDirectory,
                                                 CommandOutput *Output,
                                                 file_types::ID fileID,
-                                                bool isProject = false,
+                                                bool shouldUseProjectFolder = false,
                                                 Optional<options::ID> optId = llvm::None) {
   if (hasExistingAdditionalOutput(*Output, fileID))
     return;
@@ -2819,7 +2819,7 @@ static void chooseModuleAuxiliaryOutputFilePath(Compilation &C,
     bool isTempFile = C.isTemporaryFile(ModulePath);
     auto ModuleName = llvm::sys::path::filename(ModulePath);
     llvm::SmallString<128> Path(llvm::sys::path::parent_path(ModulePath));
-    if (isProject) {
+    if (shouldUseProjectFolder) {
       llvm::sys::path::append(Path, "Project");
       // If the build system has created a Project dir for us to include the file, use it.
       if (!llvm::sys::fs::exists(Path)) {
@@ -2840,7 +2840,8 @@ void Driver::chooseSwiftSourceInfoOutputPath(Compilation &C,
                                              CommandOutput *Output) const {
   chooseModuleAuxiliaryOutputFilePath(C, OutputMap, workingDirectory, Output,
                                       file_types::TY_SwiftSourceInfoFile,
-                                      /*isProject*/true, options::OPT_emit_module_source_info_path);
+                                      /*shouldUseProjectFolder*/true,
+                                      options::OPT_emit_module_source_info_path);
 }
 
 void Driver::chooseSwiftModuleDocOutputPath(Compilation &C,

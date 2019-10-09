@@ -520,18 +520,19 @@ Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPre
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
 CompilerInstance::openModuleSourceInfo(const InputFile &input) {
-  llvm::SmallString<128> moduleSourceInfoFilePath(input.file());
-  llvm::sys::path::replace_extension(moduleSourceInfoFilePath,
-                                     file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
-  std::string NonPrivatePath = moduleSourceInfoFilePath.str().str();
-  StringRef fileName = llvm::sys::path::filename(NonPrivatePath);
-  llvm::sys::path::remove_filename(moduleSourceInfoFilePath);
-  llvm::sys::path::append(moduleSourceInfoFilePath, "Project");
-  llvm::sys::path::append(moduleSourceInfoFilePath, fileName);
+  llvm::SmallString<128> pathWithoutProjectDir(input.file());
+  llvm::sys::path::replace_extension(pathWithoutProjectDir,
+                  file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
+  llvm::SmallString<128> pathWithProjectDir = pathWithoutProjectDir.str();
+  StringRef fileName = llvm::sys::path::filename(pathWithoutProjectDir);
+  llvm::sys::path::remove_filename(pathWithProjectDir);
+  llvm::sys::path::append(pathWithProjectDir, "Project");
+  llvm::sys::path::append(pathWithProjectDir, fileName);
   if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
-                                                            moduleSourceInfoFilePath))
+                                                            pathWithProjectDir))
     return std::move(*sourceInfoFileOrErr);
-  if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(), NonPrivatePath))
+  if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                            pathWithoutProjectDir))
     return std::move(*sourceInfoFileOrErr);
   return None;
 }

@@ -263,43 +263,35 @@ std::error_code SerializedModuleLoaderBase::openModuleDocFile(
   return std::error_code();
 }
 
-std::error_code
-SerializedModuleLoaderBase::openModuleSourceInfoFile(AccessPathElem ModuleID,
-                                                     StringRef ModulePath,
-                                                     StringRef ModuleSourceInfoFilename,
-                                   std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
+void
+SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(
+                                                      AccessPathElem ModuleID,
+                                                      StringRef ModulePath,
+                                            StringRef ModuleSourceInfoFilename,
+                              std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
   if (!ModuleSourceInfoBuffer)
-    return std::error_code();
-
+    return;
   llvm::vfs::FileSystem &FS = *Ctx.SourceMgr.getFileSystem();
-  {
-    llvm::SmallString<128> ProjectPath(ModulePath);
-    llvm::sys::path::remove_filename(ProjectPath);
-    llvm::sys::path::append(ProjectPath, "Project");
-    llvm::sys::path::append(ProjectPath, ModuleSourceInfoFilename);
+  llvm::SmallString<128> PathWithoutProjectDir(ModulePath);
+  llvm::sys::path::replace_extension(PathWithoutProjectDir,
+                  file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
+  llvm::SmallString<128> PathWithProjectDir = PathWithoutProjectDir.str();
+  StringRef FileName = llvm::sys::path::filename(PathWithoutProjectDir);
+  llvm::sys::path::remove_filename(PathWithProjectDir);
+  llvm::sys::path::append(PathWithProjectDir, "Project");
+  llvm::sys::path::append(PathWithProjectDir, FileName);
 
-    // Try to open the module source info file.  If it does not exist, ignore
-    // the error.  However, pass though all other errors.
-    if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
-      FS.getBufferForFile(ProjectPath)) {
-      *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
-      return std::error_code();
-    }
+  // Try to open the module source info file from the "Project" directory.
+  // If it does not exist, ignore the error.
+  if (auto ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithProjectDir)) {
+    *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
+    return;
   }
-  {
-    llvm::SmallString<128> NonProjectPath(ModulePath);
-    llvm::sys::path::remove_filename(NonProjectPath);
-    llvm::sys::path::append(NonProjectPath, ModuleSourceInfoFilename);
-
-    // Try to open the module source info file adjacent to the .swiftmodule file.
-    if (llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> ModuleSourceInfoOrErr =
-      FS.getBufferForFile(NonProjectPath)) {
-      *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
-      return std::error_code();
-    }
+  // Try to open the module source info file adjacent to the .swiftmodule file.
+  if (auto ModuleSourceInfoOrErr = FS.getBufferForFile(PathWithoutProjectDir)) {
+    *ModuleSourceInfoBuffer = std::move(*ModuleSourceInfoOrErr);
+    return;
   }
-  // Failing to load .swiftsourceinfo file isn't critical, so don't return any errors.
-  return std::error_code();
 }
 
 std::error_code SerializedModuleLoaderBase::openModuleFiles(
@@ -335,15 +327,14 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
 
+  // Open .swiftsourceinfo file if it's present.
+  openModuleSourceInfoFileIfPresent(ModuleID, ModulePath,
+                                    ModuleSourceInfoFileName,
+                                    ModuleSourceInfoBuffer);
   auto ModuleDocErr =
     openModuleDocFile(ModuleID, ModuleDocPath, ModuleDocBuffer);
   if (ModuleDocErr)
     return ModuleDocErr;
-
-  auto ModuleSourceInfoErr =
-    openModuleSourceInfoFile(ModuleID, ModulePath, ModuleSourceInfoFileName, ModuleSourceInfoBuffer);
-  if (ModuleSourceInfoErr)
-    return ModuleSourceInfoErr;
 
   *ModuleBuffer = std::move(ModuleOrErr.get());
 

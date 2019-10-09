@@ -1037,7 +1037,8 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
     *ModuleBuffer = std::move(*ModuleBufferOrErr);
   }
   // Open .swiftsourceinfo file if it's present.
-  SerializedModuleLoaderBase::openModuleSourceInfoFile(ModuleID, ModPath,
+  SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,
+                                                                ModPath,
                                                        ModuleSourceInfoFilename,
                                                        ModuleSourceInfoBuffer);
   // Delegate back to the serialized module loader to load the module doc.

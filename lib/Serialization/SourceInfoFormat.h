@@ -31,13 +31,13 @@ using llvm::BCRecordLayout;
 using llvm::BCVBR;
 
 /// Magic number for serialized source info files.
-const unsigned char SWIFTSOURCEINFO_SIGNATURE[] = { 0xD6, 0x9C, 0xB7, 0x23 };
+const unsigned char SWIFTSOURCEINFO_SIGNATURE[] = { 0xF0, 0x9F, 0x8F, 0x8E };
 
 /// Serialized sourceinfo format major version number.
 ///
 /// Increment this value when making a backwards-incompatible change, i.e. where
 /// an \e old compiler will \e not be able to read the new format. This should
-/// be rare. When incrementing this value, reset SWIFTDOC_VERSION_MINOR to 0.
+/// be rare. When incrementing this value, reset SWIFTSOURCEINFO_VERSION_MINOR to 0.
 ///
 /// See docs/StableBitcode.md for information on how to make
 /// backwards-compatible changes using the LLVM bitcode format.
@@ -56,11 +56,14 @@ const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
 
 /// The record types within the DECL_LOCS block.
 ///
-/// Be very careful when changing this block; it must remain
-/// backwards-compatible. Adding new records is okay---they will be ignored---
-/// but modifying existing ones must be done carefully. You may need to update
-/// the version when you do so. See docs/StableBitcode.md for information on how
-/// to make backwards-compatible changes using the LLVM bitcode format.
+/// Though we strive to keep the format stable, breaking the format of
+/// .swiftsourceinfo doesn't have consequences as serious as breaking the format
+/// of .swiftdoc, because .swiftsourceinfo file is for local development use only.
+///
+/// When changing this block, backwards-compatible changes are prefered.
+/// You may need to update the version when you do so. See docs/StableBitcode.md
+/// for information on how to make backwards-compatible changes using the LLVM
+/// bitcode format.
 ///
 /// \sa DECL_LOCS_BLOCK_ID
 namespace decl_locs_block {

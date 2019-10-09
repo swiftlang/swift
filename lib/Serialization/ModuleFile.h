@@ -411,6 +411,13 @@ private:
       llvm::OnDiskIterableChainedHashTable<DeclUSRTableInfo>;
   std::unique_ptr<SerializedDeclUSRTable> DeclUSRsTable;
 
+  /// A blob of 0 terminated string segments referenced in \c SourceLocsTextData
+  StringRef SourceLocsTextData;
+
+  /// An array of fixed size source location data for each USR appearing in
+  /// \c DeclUSRsTable.
+  StringRef BasicDeclLocsData;
+
   struct ModuleBits {
     /// The decl ID of the main class in this module file, if it has one.
     unsigned EntryPointDeclID : 31;
@@ -556,14 +563,6 @@ private:
   ///
   /// Returns false if there was an error.
   bool readModuleSourceInfoIfPresent();
-
-  /// Read an on-disk decl hash table stored in
-  /// \c sourceinfo_block::BasicDeclLocsLayout format.
-  StringRef BasicDeclLocsData;
-
-  /// Read an on-disk decl hash table stored in
-  /// \c sourceinfo_block::SourceFilePathsLayout format.
-  StringRef SourceLocsTextData;
 
   /// Read an on-disk decl hash table stored in
   /// \c sourceinfo_block::DeclUSRSLayout format.

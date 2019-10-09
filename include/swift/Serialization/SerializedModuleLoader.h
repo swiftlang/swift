@@ -89,11 +89,11 @@ protected:
                     StringRef ModuleDocPath,
                     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
 
-  std::error_code
-  openModuleSourceInfoFile(AccessPathElem ModuleID,
-                           StringRef ModulePath,
-                           StringRef ModuleSourceInfoFileName,
-                           std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
+  void
+  openModuleSourceInfoFileIfPresent(AccessPathElem ModuleID,
+                                    StringRef ModulePath,
+                                    StringRef ModuleSourceInfoFileName,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try

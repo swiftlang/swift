@@ -13,7 +13,6 @@
 #include "DocFormat.h"
 #include "Serialization.h"
 #include "SourceInfoFormat.h"
-#include "swift/Basic/Defer.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsCommon.h"
@@ -21,7 +20,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
+#include "llvm/ADT/StringSet.h"
 #include "llvm/Support/DJB.h"
 #include "llvm/Support/EndianStream.h"
 #include "llvm/Support/OnDiskHashTable.h"
@@ -546,25 +547,29 @@ public:
     out << key;
   }
 
-  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data, unsigned len) {
+  void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
+                unsigned len) {
     endian::Writer writer(out, little);
     writer.write<uint32_t>(data);
   }
 };
 
 class DeclUSRsTableWriter {
-  llvm::StringMap<uint32_t> USRMap;
+  llvm::StringSet<> USRs;
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
-  uint32_t CurId = 0;
 public:
-  uint32_t peekNextId() const { return CurId; }
-  Optional<uint32_t> getNewUSRID(StringRef USR) {
-    if (USRMap.find(USR) == USRMap.end()) {
-      generator.insert(USRMap.insert(std::make_pair(USR, CurId)).first->getKey(), CurId);
-      ++CurId;
-      return USRMap.find(USR)->second;
-    }
-    return None;
+  uint32_t peekNextId() const { return USRs.size(); }
+  Optional<uint32_t> getNewUSRId(StringRef USR) {
+    // Attempt to insert the USR into the StringSet.
+    auto It = USRs.insert(USR);
+    // If the USR exists in the StringSet, return None.
+    if (!It.second)
+      return None;
+    auto Id = USRs.size() - 1;
+    // We have to insert the USR from the StringSet because it's where the
+    // memory is owned.
+    generator.insert(It.first->getKey(), Id);
+    return Id;
   }
   void emitUSRsRecord(llvm::BitstreamWriter &out) {
     decl_locs_block::DeclUSRSLayout USRsList(out);
@@ -606,10 +611,11 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   DeclUSRsTableWriter &USRWriter;
   StringWriter &FWriter;
   BasicDeclLocsTableWriter(DeclUSRsTableWriter &USRWriter,
-                           StringWriter &FWriter): USRWriter(USRWriter), FWriter(FWriter) {}
+                           StringWriter &FWriter): USRWriter(USRWriter),
+                           FWriter(FWriter) {}
 
-  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S }; }
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E }; }
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override { return { false, S };}
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override { return { false, E };}
   bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   bool walkToTypeReprPre(TypeRepr *T) override { return false; }
   bool walkToParameterListPre(ParameterList *PL) override { return false; }
@@ -618,8 +624,8 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::raw_svector_ostream out(Buffer);
     endian::Writer writer(out, little);
     writer.write<uint32_t>(data.SourceFileOffset);
-#define WRITE_LINE_COLUMN(X)                                                                      \
-writer.write<uint32_t>(data.X.Line);                                                              \
+#define WRITE_LINE_COLUMN(X)                                                  \
+writer.write<uint32_t>(data.X.Line);                                          \
 writer.write<uint32_t>(data.X.Column);
     WRITE_LINE_COLUMN(Loc)
     WRITE_LINE_COLUMN(StartLoc);
@@ -632,7 +638,7 @@ writer.write<uint32_t>(data.X.Column);
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSR(D, OS))
       return None;
-    return USRWriter.getNewUSRID(OS.str());
+    return USRWriter.getNewUSRId(OS.str());
   }
 
   LineColumn getLineColumn(SourceManager &SM, SourceLoc Loc) {
@@ -674,8 +680,8 @@ writer.write<uint32_t>(data.X.Column);
         return None;
       DeclLocationsTableData Result;
       Result.SourceFileOffset = FWriter.getTextOffset(Locs->SourceFilePath);
-#define COPY_LINE_COLUMN(X)                                                                       \
-Result.X.Line = Locs->X.Line;                                                                     \
+#define COPY_LINE_COLUMN(X)                                                   \
+Result.X.Line = Locs->X.Line;                                                 \
 Result.X.Column = Locs->X.Column;
       COPY_LINE_COLUMN(Loc)
       COPY_LINE_COLUMN(StartLoc)
@@ -693,13 +699,13 @@ Result.X.Column = Locs->X.Column;
 
   bool walkToDeclPre(Decl *D) override {
     SWIFT_DEFER {
-      assert(USRWriter.peekNextId() * sizeof(DeclLocationsTableData) == Buffer.size() &&
-      "USR Id has a one-to-one mapping with DeclLocationsTableData");
+      assert(USRWriter.peekNextId() * sizeof(DeclLocationsTableData)
+             == Buffer.size() &&
+            "USR Id has a one-to-one mapping with DeclLocationsTableData");
     };
-    // We shouldn't expose any Decls that .swiftdoc file isn't willing to expose.
-    // .swiftdoc doesn't include comments for double underscored symbols, but for .swiftsourceinfo,
-    // having the source location for these symbols isn't a concern becuase these
-    // symbols are in .swiftinterface anyway.
+    // .swiftdoc doesn't include comments for double underscored symbols, but
+    // for .swiftsourceinfo, having the source location for these symbols isn't
+    // a concern becuase these symbols are in .swiftinterface anyway.
     if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
       return false;
     if (!shouldSerializeSourceLoc(D))
@@ -718,7 +724,8 @@ Result.X.Column = Locs->X.Column;
 };
 
 static void emitBasicLocsRecord(llvm::BitstreamWriter &Out,
-                                ModuleOrSourceFile MSF, DeclUSRsTableWriter &USRWriter,
+                                ModuleOrSourceFile MSF,
+                                DeclUSRsTableWriter &USRWriter,
                                 StringWriter &FWriter) {
   assert(MSF);
   const decl_locs_block::BasicDeclLocsLayout DeclLocsList(Out);
@@ -773,9 +780,10 @@ public:
       control_block::TargetLayout Target(Out);
 
       auto& LangOpts = M->getASTContext().LangOpts;
-      Metadata.emit(ScratchRecord, SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR,
+      Metadata.emit(ScratchRecord, SWIFTSOURCEINFO_VERSION_MAJOR,
+                    SWIFTSOURCEINFO_VERSION_MINOR,
                     /*short version string length*/0, /*compatibility length*/0,
-                    version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion));
+              version::getSwiftFullVersion(LangOpts.EffectiveLanguageVersion));
 
       ModuleName.emit(ScratchRecord, M->getName().str());
       Target.emit(ScratchRecord, LangOpts.Target.str());
@@ -783,7 +791,8 @@ public:
   }
 };
 }
-void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+void serialization::writeSourceInfoToStream(raw_ostream &os,
+                                            ModuleOrSourceFile DC) {
   assert(DC);
   SourceInfoSerializer S{SWIFTSOURCEINFO_SIGNATURE, DC};
   // FIXME: This is only really needed for debugging. We don't actually use it.
@@ -797,10 +806,11 @@ void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile 
       StringWriter FPWriter;
       emitBasicLocsRecord(S.Out, DC, USRWriter, FPWriter);
       // Emit USR table mapping from a USR to USR Id.
-      // The basic locs record uses USR Id instead of actual USR, so that we don't need to repeat
-      // USR texts for newly added records.
+      // The basic locs record uses USR Id instead of actual USR, so that we
+      // don't need to repeat USR texts for newly added records.
       USRWriter.emitUSRsRecord(S.Out);
-      // A blob of 0 terminated strings referenced by the location records, e.g. file paths.
+      // A blob of 0 terminated strings referenced by the location records,
+      // e.g. file paths.
       FPWriter.emitSourceFilesRecord(S.Out);
     }
   }

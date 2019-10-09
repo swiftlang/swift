@@ -1224,7 +1224,7 @@ bool ModuleFile::readModuleDocIfPresent() {
 }
 
 class ModuleFile::DeclUSRTableInfo {
-  public:
+public:
   using internal_key_type = StringRef;
   using external_key_type = StringRef;
   using data_type = uint32_t;
@@ -1238,7 +1238,9 @@ class ModuleFile::DeclUSRTableInfo {
     return llvm::djbHash(key, SWIFTSOURCEINFO_HASH_SEED);
   }
 
-  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) { return lhs == rhs; }
+  static bool EqualKey(internal_key_type lhs, internal_key_type rhs) {
+    return lhs == rhs;
+  }
 
   static std::pair<unsigned, unsigned> ReadKeyDataLength(const uint8_t *&data) {
     unsigned keyLength = endian::readNext<uint32_t, little, unaligned>(data);
@@ -1252,7 +1254,7 @@ class ModuleFile::DeclUSRTableInfo {
 
   data_type ReadData(internal_key_type key, const uint8_t *data, unsigned length) {
     assert(length == 4);
-    return *reinterpret_cast<const uint32_t*>(data);
+    return endian::readNext<uint32_t, little, unaligned>(data);
   }
 };
 
@@ -1263,8 +1265,8 @@ ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
   uint32_t tableOffset = static_cast<uint32_t>(fields.front());
   auto base = reinterpret_cast<const uint8_t *>(blobData.data());
   return std::unique_ptr<SerializedDeclUSRTable>(
-    SerializedDeclUSRTable::Create(base + tableOffset, base + sizeof(uint32_t), base,
-                                   DeclUSRTableInfo()));
+    SerializedDeclUSRTable::Create(base + tableOffset, base + sizeof(uint32_t),
+                                   base));
 }
 
 bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
@@ -2364,7 +2366,8 @@ Optional<CommentInfo> ModuleFile::getCommentForDecl(const Decl *D) const {
   return getCommentForDeclByUSR(USRBuffer.str());
 }
 
-Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
+Optional<BasicDeclLocs>
+ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const {
   assert(D);
 
   // Keep these as assertions instead of early exits to ensure that we are not
@@ -2374,6 +2377,9 @@ Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const
   assert(D->getDeclContext()->getModuleScopeContext() == FileContext &&
          "Decl is from a different serialized file");
   if (!DeclUSRsTable)
+    return None;
+  // Future compilers may not provide BasicDeclLocsData anymore.
+  if (BasicDeclLocsData.empty())
     return None;
   // Compute the USR.
   llvm::SmallString<128> USRBuffer;
@@ -2394,18 +2400,17 @@ Optional<BasicDeclLocs> ModuleFile::getBasicDeclLocsForDecl(const Decl *D) const
   assert(RecordOffset < BasicDeclLocsData.size());
   assert(BasicDeclLocsData.size() % RecordSize == 0);
   BasicDeclLocs Result;
-  auto *Record = reinterpret_cast<const uint32_t*>(BasicDeclLocsData.data() + RecordOffset);
+  auto *Record = BasicDeclLocsData.data() + RecordOffset;
   auto ReadNext = [&Record]() {
-    uint32_t Result = *Record;
-    ++ Record;
-    return Result;
+    return endian::readNext<uint32_t, little, unaligned>(Record);
   };
+
   auto FilePath = SourceLocsTextData.substr(ReadNext());
   size_t TerminatorOffset = FilePath.find('\0');
   assert(TerminatorOffset != StringRef::npos && "unterminated string data");
   Result.SourceFilePath = FilePath.slice(0, TerminatorOffset);
-#define READ_FIELD(X)                                                                             \
-Result.X.Line = ReadNext();                                                                       \
+#define READ_FIELD(X)                                                         \
+Result.X.Line = ReadNext();                                                   \
 Result.X.Column = ReadNext();
   READ_FIELD(Loc)
   READ_FIELD(StartLoc)
