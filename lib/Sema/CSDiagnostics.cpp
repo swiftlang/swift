@@ -4884,8 +4884,28 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
                 argExpr->getLoc(), diag::single_tuple_parameter_mismatch_normal,
                 choice->getDescriptiveKind(), name, paramTy, subsStr);
 
+  auto newLeftParenLoc = argExpr->getStartLoc();
+  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    auto firstArgLabel = TE->getElementName(0);
+    // Cover situations like:
+    //
+    // func foo<T>(x: T) {}
+    // foo(x: 0, 1)
+    //
+    // Where left paren should be suggested after the label,
+    // since the label belongs to the parameter itself.
+    if (!firstArgLabel.empty()) {
+      auto paramTuple = resolveType(ParamType)->castTo<TupleType>();
+      // If the label of the first argument matches the one required
+      // by the parameter it would be omitted from the fixed parameter type.
+      if (!paramTuple->getElement(0).hasName())
+        newLeftParenLoc = Lexer::getLocForEndOfToken(getASTContext().SourceMgr,
+                                                     TE->getElementNameLoc(0));
+    }
+  }
+
   diagnostic.highlight(argExpr->getSourceRange())
-      .fixItInsertAfter(argExpr->getStartLoc(), "(")
+      .fixItInsertAfter(newLeftParenLoc, "(")
       .fixItInsert(argExpr->getEndLoc(), ")");
   return true;
 }

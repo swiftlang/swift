@@ -74,7 +74,7 @@ do {
   generic((3, 4))
 
   genericLabeled(x: 3)
-  genericLabeled(x: 3, 4) // expected-error {{global function 'genericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{18-18=(}} {{25-25=)}}
+  genericLabeled(x: 3, 4) // expected-error {{global function 'genericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{20-20=(}} {{25-25=)}}
   genericLabeled(x: (3))
   genericLabeled(x: (3, 4))
 
@@ -261,7 +261,7 @@ do {
   s.generic((3, 4))
 
   s.genericLabeled(x: 3)
-  s.genericLabeled(x: 3, 4) // expected-error {{instance method 'genericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{20-20=(}} {{27-27=)}}
+  s.genericLabeled(x: 3, 4) // expected-error {{instance method 'genericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{22-22=(}} {{27-27=)}}
   s.genericLabeled(x: (3))
   s.genericLabeled(x: (3, 4))
 
@@ -395,7 +395,7 @@ do {
   s.mutatingGeneric((3, 4))
 
   s.mutatingGenericLabeled(x: 3)
-  s.mutatingGenericLabeled(x: 3, 4) // expected-error {{instance method 'mutatingGenericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{28-28=(}} {{35-35=)}}
+  s.mutatingGenericLabeled(x: 3, 4) // expected-error {{instance method 'mutatingGenericLabeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{30-30=(}} {{35-35=)}}
   s.mutatingGenericLabeled(x: (3))
   s.mutatingGenericLabeled(x: (3, 4))
 
@@ -932,7 +932,7 @@ do {
   _ = GenericInit(3, 4) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} {{19-19=(}} {{23-23=)}}
   _ = GenericInit((3, 4))
 
-  _ = GenericInitLabeled(x: 3, 4) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} {{26-26=(}} {{33-33=)}}
+  _ = GenericInitLabeled(x: 3, 4) // expected-error {{initializer expects a single parameter of type 'T' [with T = (Int, Int)]}} {{28-28=(}} {{33-33=)}}
   _ = GenericInitLabeled(x: (3, 4))
 
   _ = GenericInitTwo(3, 4)
@@ -1060,7 +1060,7 @@ do {
   _ = s1[(3.0, 4.0)]
 
   let s1a  = GenericSubscriptLabeled<(Double, Double)>()
-  _ = s1a [x: 3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{12-12=(}} {{23-23=)}}
+  _ = s1a [x: 3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{14-14=(}} {{23-23=)}}
   _ = s1a [x: (3.0, 4.0)]
 
   let s2 = GenericSubscriptTwo<Double>()
@@ -1072,7 +1072,7 @@ do {
   _ = s3[(3.0, 4.0)]
 
   let s3a = GenericSubscriptLabeledTuple<Double>()
-  _ = s3a[x: 3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{11-11=(}} {{22-22=)}}
+  _ = s3a[x: 3.0, 4.0] // expected-error {{subscript expects a single parameter of type '(Double, Double)'}} {{13-13=(}} {{22-22=)}}
   _ = s3a[x: (3.0, 4.0)]
 }
 
@@ -1130,7 +1130,7 @@ do {
   _ = GenericEnum.one(3, 4) // expected-error {{enum case 'one' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{23-23=(}} {{27-27=)}}
   _ = GenericEnum.one((3, 4))
 
-  _ = GenericEnum.labeled(x: 3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{27-27=(}} {{34-34=)}}
+  _ = GenericEnum.labeled(x: 3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{29-29=(}} {{34-34=)}}
   _ = GenericEnum.labeled(x: (3, 4))
   _ = GenericEnum.labeled(3, 4) // expected-error {{enum case 'labeled' expects a single parameter of type 'T' [with T = (Int, Int)]}} {{27-27=(}} {{31-31=)}}
   _ = GenericEnum.labeled((3, 4)) // expected-error {{missing argument label 'x:' in call}}
@@ -1265,7 +1265,7 @@ do {
   sTwo.requirement(3.0, 4.0) // expected-error {{instance method 'requirement' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{20-20=(}} {{28-28=)}}
   sTwo.requirement((3.0, 4.0))
 
-  sTwo.requirementLabeled(x: 3.0, 4.0) // expected-error {{instance method 'requirementLabeled' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{27-27=(}} {{38-38=)}}
+  sTwo.requirementLabeled(x: 3.0, 4.0) // expected-error {{instance method 'requirementLabeled' expects a single parameter of type 'GenericConforms<(Double, Double)>.Element' (aka '(Double, Double)')}} {{29-29=(}} {{38-38=)}}
   sTwo.requirementLabeled(x: (3.0, 4.0))
 }
 
