@@ -85,6 +85,8 @@ RC<SyntaxData> SyntaxData::getNextNode() const {
 }
 
 RC<SyntaxData> SyntaxData::getFirstToken() const {
+  if (getRaw()->isMissing())
+    return nullptr;
   if (getRaw()->isToken()) {
     // Get a reference counted version of this
     assert(hasParent() && "The syntax tree should not conisist only of the root");
@@ -106,6 +108,8 @@ RC<SyntaxData> SyntaxData::getFirstToken() const {
 }
 
 RC<SyntaxData> SyntaxData::getLastToken() const {
+  if (getRaw()->isMissing())
+    return nullptr;
   if (getRaw()->isToken()) {
     // Get a reference counted version of this
     assert(hasParent() && "The syntax tree should not conisist only of the root");
