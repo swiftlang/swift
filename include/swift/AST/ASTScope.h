@@ -343,6 +343,12 @@ public:
   /// expandScope me, sending deferred nodes to my descendants.
   /// Return the scope into which to place subsequent decls
   ASTScopeImpl *expandAndBeCurrentDetectingRecursion(ScopeCreator &);
+
+  /// Expand or reexpand the scope if unexpanded or if not current.
+  /// There are several places in the compiler that mutate the AST after the
+  /// fact, above and beyond adding Decls to the SourceFile. These are
+  /// documented in: rdar://53018839, rdar://53027266, rdar://53027733,
+  /// rdar://53028050
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
   unsigned getASTAncestorScopeCount() const { return astAncestorScopeCount; }
@@ -354,6 +360,12 @@ protected:
   void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
   virtual void beCurrent();
+  virtual bool doesExpansionOnlyAddNewDeclsAtEnd() const;
+
+public:
+  bool isExpansionNeeded(const ScopeCreator &) const;
+
+protected:
   bool isCurrent() const;
   virtual bool isCurrentIfWasExpanded() const;
 
@@ -384,16 +396,7 @@ public:
 
   bool isATypeDeclScope() const;
 
-  /// There are several places in the compiler that mutate the AST after the
-  /// fact, above and beyond adding Decls to the SourceFile. These are
-  /// documented in: rdar://53018839, rdar://53027266, rdar://53027733,
-  /// rdar://53028050
-  /// Return true if did reexpand
-  bool reexpandIfObsolete(ScopeCreator &);
-
 private:
-  void reexpand(ScopeCreator &);
-
   virtual ScopeCreator &getScopeCreator();
 
 #pragma mark - - creation queries
@@ -544,7 +547,7 @@ public:
   /// Since parsing can be interleaved with type-checking, on every
   /// lookup, look at creating scopes for any \c Decls beyond this number.
   /// rdar://55562483 Unify with numberOfChildrenWhenLastExpanded
-  int numberOfDeclsAlreadySeen = 0;
+  size_t numberOfDeclsAlreadySeen = 0;
 
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
 
@@ -558,7 +561,6 @@ protected:
 public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
-  void addNewDeclsToScopeTree();
   void buildFullyExpandedTree();
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
@@ -569,11 +571,15 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+  bool isCurrentIfWasExpanded() const override;
+  void beCurrent() override;
+  bool doesExpansionOnlyAddNewDeclsAtEnd() const override;
 
   ScopeCreator &getScopeCreator() override;
 
 private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 };
 
 class Portion {

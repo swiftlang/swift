@@ -20,7 +20,7 @@ SWIFT_REQUEST(NameLookup, CustomAttrNominalRequest,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExpandASTScopeRequest,
               ast_scope::ASTScopeImpl* (ast_scope::ASTScopeImpl*, ast_scope::ScopeCreator*),
-              Uncached,
+              SeparatelyCached,
               NoLocationInfo)
 SWIFT_REQUEST(NameLookup, ExtendedNominalRequest,
               NominalTypeDecl *(ExtensionDecl *), SeparatelyCached,

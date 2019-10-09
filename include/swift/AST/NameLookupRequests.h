@@ -333,7 +333,7 @@ class ExpandASTScopeRequest
     : public SimpleRequest<ExpandASTScopeRequest,
                            ast_scope::ASTScopeImpl *(ast_scope::ASTScopeImpl *,
                                                      ast_scope::ScopeCreator *),
-                           CacheKind::Uncached> {
+                           CacheKind::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -346,8 +346,10 @@ private:
            ast_scope::ScopeCreator *) const;
 
 public:
-  // Caching
-  bool isCached() const { return true; }
+  // Separate caching.
+  bool isCached() const;
+  Optional<ast_scope::ASTScopeImpl *> getCachedResult() const;
+  void cacheResult(ast_scope::ASTScopeImpl *) const {}
 };
 
 #define SWIFT_TYPEID_ZONE NameLookup

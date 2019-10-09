@@ -204,5 +204,9 @@ bool IterableTypeScope::doesDeclHaveABody() const {
 
 void ast_scope::simple_display(llvm::raw_ostream &out,
                                const ASTScopeImpl *scope) {
-  scope->print(out);
+  // Cannot call scope->print(out) because printing an ASTFunctionBodyScope
+  // gets the source range which can cause a request to parse it.
+  // That in turn causes the request dependency printing code to blow up
+  // as the AnyRequest ends up with a null.
+  out << scope->getClassName() << "\n";
 }
