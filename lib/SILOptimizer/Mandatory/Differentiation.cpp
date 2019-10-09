@@ -4256,15 +4256,6 @@ private:
     return activityInfo;
   }
 
-  static SILBuilder
-  initializeDifferentialBuilder(ADContext &context, SILFunction *original,
-                                SILDifferentiableAttr *attr,
-                                LinearMapInfo *differentialInfo) {
-    auto *differential =
-        createEmptyDifferential(context, original, attr, differentialInfo);
-    return SILBuilder(*differential);
-  }
-
   //--------------------------------------------------------------------------//
   // Differential struct mapping
   //--------------------------------------------------------------------------//
@@ -5241,8 +5232,8 @@ public:
                               context, original, attr->getIndices(), jvp)),
         differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
                          jvp, attr->getIndices(), activityInfo),
-        differentialBuilder(initializeDifferentialBuilder(
-            context, original, attr, &differentialInfo)),
+        differentialBuilder(SILBuilder(*createEmptyDifferential(
+            context, original, attr, &differentialInfo))),
         diffLocalAllocBuilder(getDifferential()) {
     // Create empty differential function.
     context.getGeneratedFunctions().push_back(&getDifferential());
