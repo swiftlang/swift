@@ -274,6 +274,25 @@ extension TF_697_Sequential: TF_697_Layer where Layer1: TF_697_Layer {
     }
 }
 
+// TF-817: Test remapping `apply` callee types in derivative function context.
+struct TF_817<T> {
+  func foo(_ index: Int) -> T {
+    fatalError()
+  }
+}
+extension TF_817: Differentiable where T: Differentiable {
+  @differentiating(foo)
+  func vjpFoo(index: Int) -> (value: T, pullback: (T.TangentVector) -> (TangentVector)) {
+    fatalError()
+  }
+}
+extension TF_817 {
+  @differentiable(wrt: self where T: Differentiable)
+  public func test(index: Int) -> T {
+    return self.foo(0) // crash happened here
+  }
+}
+
 // Test layout requirements.
 
 // The layout requirement is "contextual": the requirement is not on `T`, the
