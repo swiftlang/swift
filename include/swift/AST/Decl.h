@@ -5829,9 +5829,6 @@ public:
     Bits.AbstractFunctionDecl.Synthesized = value;
   }
 
-private:
-  void computeNeedsNewVTableEntry();
-
 public:
   /// Compute the interface type of this function declaration from the
   /// parameter types.
