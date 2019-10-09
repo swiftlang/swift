@@ -468,6 +468,13 @@ private:
   Lowering::TypeConverter &typeConverter;
 
 private:
+  /// Remaps the given type into the derivative function's context.
+  SILType remapTypeInDerivative(SILType ty) {
+    if (ty.hasArchetype())
+      return derivative->mapTypeIntoContext(ty.mapTypeOutOfContext());
+    return derivative->mapTypeIntoContext(ty);
+  }
+
   /// Adds a `VarDecl` member with the given name and type to the given nominal
   /// declaration.
   VarDecl *addVarDecl(NominalTypeDecl *nominal, StringRef name, Type type) {
@@ -1647,9 +1654,12 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   //   parameters from the function type.
   // - Otherwise, use the active parameters.
   AutoDiffIndexSubset *parameters;
-  auto originalFnSubstTy = ai->getSubstCalleeType();
-  if (originalFnSubstTy->isDifferentiable()) {
-    parameters = originalFnSubstTy->getDifferentiationParameterIndices();
+  auto origFnSubstTy = ai->getSubstCalleeType();
+  auto remappedOrigFnSubstTy =
+      remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
+          .castTo<SILFunctionType>();
+  if (remappedOrigFnSubstTy->isDifferentiable()) {
+    parameters = remappedOrigFnSubstTy->getDifferentiationParameterIndices();
   } else {
     parameters = AutoDiffIndexSubset::get(
         original->getASTContext(),
@@ -1664,24 +1674,24 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
       [&](CanSILFunctionType origFnTy) {
         // Check non-differentiable arguments.
         for (unsigned paramIndex : range(origFnTy->getNumParameters())) {
+          auto remappedParamType =
+              origFnTy->getParameters()[paramIndex].getSILStorageType();
           if (applyIndices.isWrtParameter(paramIndex) &&
-              !origFnTy->getParameters()[paramIndex]
-                  .getSILStorageType()
-                  .isDifferentiable(derivative->getModule()))
+              !remappedParamType.isDifferentiable(derivative->getModule()))
             return true;
         }
         // Check non-differentiable results.
-        if (!origFnTy->getResults()[applyIndices.source]
-                .getSILStorageType()
-                .isDifferentiable(derivative->getModule()))
+        auto remappedResultType =
+            origFnTy->getResults()[applyIndices.source].getSILStorageType();
+        if (!remappedResultType.isDifferentiable(derivative->getModule()))
           return true;
         return false;
       };
-  if (checkNondifferentiableOriginalFunctionType(originalFnSubstTy))
+  if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
     return;
 
   AutoDiffAssociatedFunctionKind assocFnKind(kind);
-  auto assocFnType = originalFnSubstTy->getAutoDiffAssociatedFunctionType(
+  auto assocFnType = remappedOrigFnSubstTy->getAutoDiffAssociatedFunctionType(
       parameters, source, /*differentiationOrder*/ 1, assocFnKind,
       context.getTypeConverter(),
       LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
