@@ -897,20 +897,18 @@ namespace {
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
       for (AutoDiffAssociatedFunctionKind kind :
-           {AutoDiffAssociatedFunctionKind::JVP,
-            AutoDiffAssociatedFunctionKind::VJP}) {
+               {AutoDiffAssociatedFunctionKind::JVP,
+                AutoDiffAssociatedFunctionKind::VJP}) {
         auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
             paramIndices, 0, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
-        auto extractee = DifferentiableFunctionExtractee(kind);
-
-        // A bug caused by implicit conversions caused us to get the wrong
-        // extractee, so assert that we have the right extractee to prevent
-        // reoccurrence of the bug.
-        assert(extractee.getExtracteeAsAssociatedFunction() ==
-               Optional<AutoDiffAssociatedFunctionKind>(kind));
-
+        DifferentiableFunctionExtractee extractee(kind);
+        // Assert that we have the right extractee. A terrible bug in the past
+        // was caused by implicit conversions from `unsigned` to
+        // `DifferentiableFunctionExtractee` which resulted into a wrong
+        // extractee.
+        assert(extractee.getExtracteeAsAssociatedFunction() == kind);
         children.push_back(Child{
             extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
       }
