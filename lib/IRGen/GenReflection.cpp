@@ -1129,6 +1129,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     assert(FourCC.size() <= 4 &&
            "COFF section name length must be <= 8 characters");

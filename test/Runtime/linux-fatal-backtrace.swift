@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %{python} %S/../Inputs/not.py "%target-run %t/a.out" 2>&1 | PYTHONPATH=%lldb-python-path %{python} %utils/symbolicate-linux-fatal %t/a.out - | %{python} %utils/backtrace-check -u
+
+// REQUIRES: rdar55490694
 // REQUIRES: executable_test
 // REQUIRES: OS=linux-gnu
 // REQUIRES: lldb

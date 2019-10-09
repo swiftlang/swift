@@ -26,6 +26,7 @@
 #include "llvm/Object/ELFObjectFile.h"
 #include "llvm/Object/MachOUniversal.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Error.h"
 
 #if defined(_WIN32)
 #include <io.h>
@@ -137,15 +138,15 @@ public:
     for (SectionRef S : O->sections()) {
       if (!needToRelocate(S))
         continue;
-      StringRef Content;
       auto SectionAddr = getSectionAddress(S);
       if (SectionAddr)
         VASize = std::max(VASize, SectionAddr + S.getSize());
 
-      if (auto EC = S.getContents(Content))
-        reportError(EC);
+     llvm::Expected<llvm::StringRef> Content = S.getContents();
+      if (!Content)
+        reportError(errorToErrorCode(Content.takeError()));
 
-      auto PhysOffset = (uintptr_t)Content.data() - (uintptr_t)O->getData().data();
+      auto PhysOffset = (uintptr_t)Content->data() - (uintptr_t)O->getData().data();
       
       if (PhysOffset == SectionAddr) {
         continue;
@@ -153,8 +154,8 @@ public:
 
       RelocatedRegions.push_back(RelocatedRegion{
         SectionAddr,
-        Content.size(),
-        Content.data()});
+        Content->size(),
+        Content->data()});
     }
   }
 

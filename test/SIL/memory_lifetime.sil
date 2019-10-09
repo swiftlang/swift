@@ -342,3 +342,38 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   return %196 : $()
 }
 
+sil @getInner : $@convention(thin) () -> (@owned T, @error Error)
+
+sil [ossa] @test_mismatch_at_unreachable : $@convention(thin) () -> @owned Inner {
+bb0:
+  %1 = alloc_stack $Inner, var, name "self"
+  %3 = function_ref @getInner : $@convention(thin) () -> (@owned T, @error Error)
+  try_apply %3() : $@convention(thin) () -> (@owned T, @error Error), normal bb1, error bb5
+
+bb1(%5 : @owned $T):
+  %7 = struct_element_addr %1 : $*Inner, #Inner.a
+  store %5 to [init] %7 : $*T
+  %11 = function_ref @getInner : $@convention(thin) () -> (@owned T, @error Error)
+  try_apply %11() : $@convention(thin) () -> (@owned T, @error Error), normal bb2, error bb6
+
+bb2(%13 : @owned $T):
+  %15 = struct_element_addr %1 : $*Inner, #Inner.b
+  store %13 to [init] %15 : $*T
+  br bb3
+
+bb3:
+  %19 = load [take] %1 : $*Inner
+  dealloc_stack %1 : $*Inner
+  return %19 : $Inner
+
+// An inconsistent state is allowed at unreachable blocks.
+bb4(%23 : @owned $Error):
+  unreachable
+
+bb5(%43 : @owned $Error):
+  br bb4(%43 : $Error)
+
+bb6(%45 : @owned $Error):
+  br bb4(%45 : $Error)
+}
+

@@ -367,9 +367,9 @@ struct WhereClauseOwner {
 
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
-  llvm::PointerUnion4<GenericParamList *, Decl *, SpecializeAttr *,
-                      // SWIFT_ENABLE_TENSORFLOW
-                      DifferentiableAttr *>
+  llvm::PointerUnion<GenericParamList *, Decl *, SpecializeAttr *,
+                     // SWIFT_ENABLE_TENSORFLOW
+                     DifferentiableAttr *>
       source;
 
   WhereClauseOwner(Decl *decl);

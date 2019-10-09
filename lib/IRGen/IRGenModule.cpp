@@ -95,7 +95,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGO = Importer->getClangCodeGenOpts();
   CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
-  CGO.DisableFPElim = Opts.DisableFPElim;
+  CGO.setFramePointer(Opts.DisableFPElim
+                          ? clang::CodeGenOptions::FramePointerKind::All
+                          : clang::CodeGenOptions::FramePointerKind::None);
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
   switch (Opts.DebugInfoLevel) {
   case IRGenDebugInfoLevel::None:
@@ -658,7 +660,8 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  cache = Module.getOrInsertFunction(functionName.c_str(), fnTy);
+  cache =
+      cast<llvm::Function>(Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee());
 
   // Add any function attributes and set the calling convention.
   if (auto fn = dyn_cast<llvm::Function>(cache)) {
@@ -905,13 +908,7 @@ bool swift::irgen::shouldRemoveTargetFeature(StringRef feature) {
 
 void IRGenModule::setHasFramePointer(llvm::AttrBuilder &Attrs,
                                      bool HasFramePointer) {
-  if (HasFramePointer) {
-    Attrs.addAttribute("no-frame-pointer-elim", "true");
-    Attrs.addAttribute("no-frame-pointer-elim-non-leaf");
-  } else {
-    Attrs.addAttribute("no-frame-pointer-elim", "false");
-    Attrs.removeAttribute("no-frame-pointer-elim-non-leaf");
-  }
+  Attrs.addAttribute("frame-pointer", HasFramePointer ? "all" : "none");
 }
 
 void IRGenModule::setHasFramePointer(llvm::Function *F,
@@ -1068,8 +1065,9 @@ void IRGenModule::addLinkLibrary(const LinkLibrary &linkLib) {
   if (linkLib.shouldForceLoad()) {
     llvm::SmallString<64> buf;
     encodeForceLoadSymbolName(buf, linkLib.getName());
-    auto ForceImportThunk =
-        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false));
+    auto ForceImportThunk = cast<llvm::Function>(
+        Module.getOrInsertFunction(buf, llvm::FunctionType::get(VoidTy, false))
+            .getCallee());
 
     const IRLinkage IRL =
         llvm::Triple(Module.getTargetTriple()).isOSBinFormatCOFF()

@@ -92,10 +92,10 @@ public:
   class ResolvedType;
 
   using UnresolvedRequirementRHS =
-      llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+      llvm::PointerUnion<Type, PotentialArchetype *, LayoutConstraint>;
 
   using RequirementRHS =
-    llvm::PointerUnion3<Type, PotentialArchetype *, LayoutConstraint>;
+    llvm::PointerUnion<Type, PotentialArchetype *, LayoutConstraint>;
 
   /// The location of a requirement as written somewhere in the source.
   typedef llvm::PointerUnion<const TypeRepr *, const RequirementRepr *>
@@ -1373,8 +1373,8 @@ class GenericSignatureBuilder::FloatingRequirementSource {
   } kind;
 
   using Storage =
-    llvm::PointerUnion3<const RequirementSource *, const TypeRepr *,
-                        const RequirementRepr *>;
+    llvm::PointerUnion<const RequirementSource *, const TypeRepr *,
+                       const RequirementRepr *>;
 
   Storage storage;
 
