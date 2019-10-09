@@ -983,22 +983,24 @@ ConstraintSystem::TypeMatchResult constraints::matchCallArguments(
                                     parameterBindings, locator);
     if (constraints::matchCallArguments(
             argsWithLabels, params, paramInfo, hasTrailingClosure,
-            cs.shouldAttemptFixes(), listener, parameterBindings)) {
-      if (!cs.shouldAttemptFixes())
-        return cs.getTypeMatchFailure(locator);
-
-      if (AllowTupleSplatForSingleParameter::attempt(
-              cs, argsWithLabels, params, parameterBindings, locator))
-        return cs.getTypeMatchFailure(locator);
-    }
+            cs.shouldAttemptFixes(), listener, parameterBindings))
+      return cs.getTypeMatchFailure(locator);
 
     auto extraArguments = listener.getExtraneousArguments();
     if (!extraArguments.empty()) {
-      auto *fix = RemoveExtraneousArguments::create(
-          cs, contextualType, extraArguments, cs.getConstraintLocator(locator));
+      // First let's see whether this is a situation where a single
+      // parameter is a tuple, but N distinct arguments were passed in.
+      if (AllowTupleSplatForSingleParameter::attempt(
+              cs, argsWithLabels, params, parameterBindings, locator)) {
+        // Let's produce a generic "extraneous arguments"
+        // diagnostic otherwise.
+        auto *fix = RemoveExtraneousArguments::create(
+            cs, contextualType, extraArguments,
+            cs.getConstraintLocator(locator));
 
-      if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 2))
-        return cs.getTypeMatchFailure(locator);
+        if (cs.recordFix(fix, /*impact=*/extraArguments.size() * 5))
+          return cs.getTypeMatchFailure(locator);
+      }
     }
   }
 
