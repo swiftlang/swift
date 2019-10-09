@@ -883,20 +883,20 @@ bool GenericContext::isComputingGenericSignature() const {
                  GenericSignatureRequest{const_cast<GenericContext*>(this)});
 }
 
-GenericSignature *GenericContext::getGenericSignature() const {
+GenericSignature GenericContext::getGenericSignature() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GenericSignatureRequest{const_cast<GenericContext *>(this)}, nullptr);
 }
 
 GenericEnvironment *GenericContext::getGenericEnvironment() const {
-  if (auto *genericSig = getGenericSignature())
+  if (auto genericSig = getGenericSignature())
     return genericSig->getGenericEnvironment();
 
   return nullptr;
 }
 
-void GenericContext::setGenericSignature(GenericSignature *genericSig) {
+void GenericContext::setGenericSignature(GenericSignature genericSig) {
   assert(!GenericSigAndBit.getPointer() && "Generic signature cannot be changed");
   getASTContext().evaluator.cacheOutput(GenericSignatureRequest{this},
                                         std::move(genericSig));
@@ -1125,8 +1125,7 @@ bool ExtensionDecl::isConstrainedExtension() const {
 
   // If the generic signature differs from that of the nominal type, it's a
   // constrained extension.
-  return getGenericSignature()->getCanonicalSignature()
-    != nominal->getGenericSignature()->getCanonicalSignature();
+  return !getGenericSignature()->isEqual(nominal->getGenericSignature());
 }
 
 bool ExtensionDecl::isEquivalentToExtendedContext() const {
@@ -3641,7 +3640,7 @@ void TypeAliasDecl::computeType() {
   // Set the interface type of this declaration.
   ASTContext &ctx = getASTContext();
 
-  auto *genericSig = getGenericSignature();
+  auto genericSig = getGenericSignature();
   SubstitutionMap subs;
   if (genericSig)
     subs = genericSig->getIdentitySubstitutionMap();
@@ -4636,7 +4635,7 @@ findProtocolSelfReferences(const ProtocolDecl *proto, Type type,
 /// Find Self references in a generic signature's same-type requirements.
 static SelfReferenceKind
 findProtocolSelfReferences(const ProtocolDecl *protocol,
-                           GenericSignature *genericSig){
+                           GenericSignature genericSig){
   if (!genericSig) return SelfReferenceKind::None();
 
   auto selfTy = protocol->getSelfInterfaceType();
@@ -6277,7 +6276,7 @@ void SubscriptDecl::computeType() {
   getIndices()->getParams(argTy);
 
   Type funcTy;
-  if (auto *sig = getGenericSignature())
+  if (auto sig = getGenericSignature())
     funcTy = GenericFunctionType::get(sig, argTy, elementTy);
   else
     funcTy = FunctionType::get(argTy, elementTy);
@@ -6761,7 +6760,7 @@ void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
 OpaqueTypeDecl::OpaqueTypeDecl(ValueDecl *NamingDecl,
                                GenericParamList *GenericParams,
                                DeclContext *DC,
-                               GenericSignature *OpaqueInterfaceGenericSignature,
+                               GenericSignature OpaqueInterfaceGenericSignature,
                                GenericTypeParamType *UnderlyingInterfaceType)
   : GenericTypeDecl(DeclKind::OpaqueType, DC, Identifier(), SourceLoc(), {},
                     GenericParams),
@@ -6806,7 +6805,7 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 
 void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
   auto &ctx = getASTContext();
-  auto *sig = getGenericSignature();
+  auto sig = getGenericSignature();
   bool hasSelf = hasImplicitSelfDecl();
 
   // Result
@@ -7243,7 +7242,7 @@ void EnumElementDecl::computeType() {
     resultTy = FunctionType::get(argTy, resultTy);
   }
 
-  if (auto *genericSig = ED->getGenericSignature())
+  if (auto genericSig = ED->getGenericSignature())
     resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
   else
     resultTy = FunctionType::get({selfTy}, resultTy);
@@ -7325,7 +7324,7 @@ Type ConstructorDecl::getInitializerInterfaceType() {
   // instead of a metatype.
   auto initSelfParam = computeSelfParam(this, /*isInitializingCtor=*/true);
   Type initFuncTy;
-  if (auto *sig = getGenericSignature())
+  if (auto sig = getGenericSignature())
     initFuncTy = GenericFunctionType::get(sig, {initSelfParam}, funcTy);
   else
     initFuncTy = FunctionType::get({initSelfParam}, funcTy);

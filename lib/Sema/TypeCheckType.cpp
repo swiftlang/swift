@@ -64,7 +64,7 @@ TypeResolution TypeResolution::forInterface(DeclContext *dc,
 }
 
 TypeResolution TypeResolution::forInterface(DeclContext *dc,
-                                            GenericSignature *genericSig,
+                                            GenericSignature genericSig,
                                             LazyResolver *resolver) {
   TypeResolution result(dc, TypeResolutionStage::Interface);
   result.Resolver = resolver;
@@ -98,7 +98,7 @@ GenericSignatureBuilder *TypeResolution::getGenericSignatureBuilder() const {
   return complete.builder;
 }
 
-GenericSignature *TypeResolution::getGenericSignature() const {
+GenericSignature TypeResolution::getGenericSignature() const {
   switch (stage) {
   case TypeResolutionStage::Contextual:
     return dc->getGenericSignatureOfContext();
@@ -600,7 +600,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl, DeclContext *foundDC,
         // extension.
         //
         // Get the superclass of the 'Self' type parameter.
-        auto *sig = foundDC->getGenericSignatureOfContext();
+        auto sig = foundDC->getGenericSignatureOfContext();
         if (!sig)
           return ErrorType::get(ctx);
         auto superclassType = sig->getSuperclassBound(selfType);
@@ -771,7 +771,7 @@ Type TypeChecker::applyUnboundGenericArguments(
          "invalid arguments, use applyGenericArguments for diagnostic emitting");
 
   auto genericSig = decl->getGenericSignature();
-  assert(genericSig != nullptr);
+  assert(!genericSig.isNull());
 
   TypeSubstitutionMap subs;
 

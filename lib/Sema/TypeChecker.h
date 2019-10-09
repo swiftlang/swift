@@ -1065,10 +1065,10 @@ public:
   /// \param inferenceSources Additional types to infer requirements from.
   ///
   /// \returns the resulting generic signature.
-  static GenericSignature *checkGenericSignature(
+  static GenericSignature checkGenericSignature(
                         GenericParamList *genericParams,
                         DeclContext *dc,
-                        GenericSignature *outerSignature,
+                        GenericSignature outerSignature,
                         bool allowConcreteGenericParams,
                         SmallVector<Requirement, 2> additionalRequirements = {},
                         SmallVector<TypeLoc, 2> inferenceSources = {});
@@ -2199,7 +2199,7 @@ std::pair<unsigned, DeclName> getObjCMethodDiagInfo(
                                 AbstractFunctionDecl *method);
 
 bool areGenericRequirementsSatisfied(const DeclContext *DC,
-                                     const GenericSignature *sig,
+                                     GenericSignature sig,
                                      SubstitutionMap Substitutions,
                                      bool isExtension);
 

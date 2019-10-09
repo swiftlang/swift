@@ -388,7 +388,8 @@ ValueDecl *RequirementFailure::getDeclRef() const {
       do {
         if (auto *parent = DC->getAsDecl()) {
           if (auto *GC = parent->getAsGenericContext()) {
-            if (GC->getGenericSignature() != Signature)
+            // FIXME: Is this intending an exact match?
+            if (GC->getGenericSignature().getPointer() != Signature.getPointer())
               continue;
 
             // If this is a signature if an extension
@@ -410,7 +411,7 @@ ValueDecl *RequirementFailure::getDeclRef() const {
   return getAffectedDeclFromType(getOwnerType());
 }
 
-GenericSignature *RequirementFailure::getSignature(ConstraintLocator *locator) {
+GenericSignature RequirementFailure::getSignature(ConstraintLocator *locator) {
   if (isConditional())
     return Conformance->getGenericSignature();
 
@@ -436,7 +437,7 @@ const DeclContext *RequirementFailure::getRequirementDC() const {
   auto *DC = AffectedDecl->getDeclContext();
 
   do {
-    if (auto *sig = DC->getGenericSignatureOfContext()) {
+    if (auto sig = DC->getGenericSignatureOfContext()) {
       if (sig->isRequirementSatisfied(req))
         return DC;
     }
@@ -769,8 +770,8 @@ void GenericArgumentsMismatchFailure::emitNoteForMismatch(int position) {
   // to parameter conversions, let's use parameter type as a source of
   // generic parameter information.
   auto paramSourceTy =
-      locator->isLastElement(ConstraintLocator::ApplyArgToParam) ? getRequired()
-                                                                 : getActual();
+      locator->isLastElement<LocatorPathElt::ApplyArgToParam>() ? getRequired()
+                                                                : getActual();
 
   auto genericTypeDecl = paramSourceTy->getAnyGeneric();
   auto param = genericTypeDecl->getGenericParams()->getParams()[position];
@@ -1248,7 +1249,7 @@ bool MissingOptionalUnwrapFailure::diagnoseAsError() {
   // r-value adjustment because base could be an l-value type.
   // We want to fix both cases by only diagnose one of them,
   // otherwise this is just going to result in a duplcate diagnostic.
-  if (getLocator()->isLastElement(ConstraintLocator::UnresolvedMember))
+  if (getLocator()->isLastElement<LocatorPathElt::UnresolvedMember>())
     return false;
 
   if (auto assignExpr = dyn_cast<AssignExpr>(anchor))
@@ -2037,7 +2038,7 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 
   Optional<ContextualTypePurpose> CTP;
   // Easy case were failure has been identified as contextual already.
-  if (locator->isLastElement(ConstraintLocator::ContextualType)) {
+  if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     CTP = getContextualTypePurpose();
   } else {
     // Here we need to figure out where where `nil` is located.
@@ -3598,7 +3599,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   //
   // foo(bar) // `() -> Void` vs. `(Int) -> Void`
   // ```
-  if (locator->isLastElement(ConstraintLocator::ApplyArgToParam)) {
+  if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>()) {
     auto info = *getFunctionArgApplyInfo(locator);
 
     auto *argExpr = info.getArgExpr();
@@ -3614,7 +3615,7 @@ bool MissingArgumentsFailure::diagnoseAsError() {
   // func foo() {}
   // let _: (Int) -> Void = foo
   // ```
-  if (locator->isLastElement(ConstraintLocator::ContextualType)) {
+  if (locator->isLastElement<LocatorPathElt::ContextualType>()) {
     auto &cs = getConstraintSystem();
     emitDiagnostic(anchor->getLoc(), diag::cannot_convert_initializer_value,
                    getType(anchor), resolveType(cs.getContextualType()));
@@ -3887,7 +3888,7 @@ bool MissingArgumentsFailure::diagnoseClosure(ClosureExpr *closure) {
 
 bool MissingArgumentsFailure::diagnoseInvalidTupleDestructuring() const {
   auto *locator = getLocator();
-  if (!locator->isLastElement(ConstraintLocator::ApplyArgument))
+  if (!locator->isLastElement<LocatorPathElt::ApplyArgument>())
     return false;
 
   if (SynthesizedArgs.size() < 2)

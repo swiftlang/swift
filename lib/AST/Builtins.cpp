@@ -192,7 +192,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericSignature *Sig,
+                          GenericSignature Sig,
                           // SWIFT_ENABLE_TENSORFLOW
                           bool Rethrows = false) {
   assert(GenericParams && "Missing generic parameters");

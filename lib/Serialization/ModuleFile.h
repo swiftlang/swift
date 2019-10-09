@@ -318,7 +318,7 @@ private:
   MutableArrayRef<Serialized<Type>> Types;
 
   /// Generic signatures referenced by this module.
-  MutableArrayRef<Serialized<GenericSignature *>> GenericSignatures;
+  MutableArrayRef<Serialized<GenericSignature>> GenericSignatures;
 
   /// Substitution maps referenced by this module.
   MutableArrayRef<Serialized<SubstitutionMap>> SubstitutionMaps;
@@ -864,10 +864,10 @@ public:
   ModuleDecl *getModule(ArrayRef<Identifier> name, bool allowLoading = false);
 
   /// Returns the generic signature for the given ID.
-  GenericSignature *getGenericSignature(serialization::GenericSignatureID ID);
+  GenericSignature getGenericSignature(serialization::GenericSignatureID ID);
 
   /// Returns the generic signature for the given ID or the first error.
-  llvm::Expected<GenericSignature *>
+  llvm::Expected<GenericSignature>
   getGenericSignatureChecked(serialization::GenericSignatureID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if

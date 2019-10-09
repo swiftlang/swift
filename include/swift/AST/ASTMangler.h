@@ -173,20 +173,20 @@ public:
       const SILAutoDiffIndices &indices);
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathSetterThunkHelper(const AbstractStorageDecl *property,
-                                             GenericSignature *signature,
+                                             GenericSignature signature,
                                              CanType baseType,
                                              SubstitutionMap subs,
                                              ResilienceExpansion expansion);
   std::string mangleKeyPathEqualsHelper(ArrayRef<CanType> indices,
-                                        GenericSignature *signature,
+                                        GenericSignature signature,
                                         ResilienceExpansion expansion);
   std::string mangleKeyPathHashHelper(ArrayRef<CanType> indices,
-                                      GenericSignature *signature,
+                                      GenericSignature signature,
                                       ResilienceExpansion expansion);
 
   std::string mangleTypeForDebugger(Type decl, const DeclContext *DC);
@@ -307,8 +307,8 @@ protected:
   ///
   /// \returns \c true if a generic signature was appended, \c false
   /// if it was empty.
-  bool appendGenericSignature(const GenericSignature *sig,
-                              GenericSignature *contextSig = nullptr);
+  bool appendGenericSignature(GenericSignature sig,
+                              GenericSignature contextSig = nullptr);
 
   void appendRequirement(const Requirement &reqt);
 
@@ -334,8 +334,8 @@ protected:
   void appendBackingInitializerEntity(const VarDecl *var);
 
   CanType getDeclTypeForMangling(const ValueDecl *decl,
-                                 GenericSignature *&genericSig,
-                                 GenericSignature *&parentGenericSig);
+                                 GenericSignature &genericSig,
+                                 GenericSignature &parentGenericSig);
 
   void appendDeclType(const ValueDecl *decl, bool isFunctionMangling = false);
 

@@ -59,9 +59,9 @@ static bool isOpenedAnyObject(Type type) {
 }
 
 SubstitutionMap Solution::computeSubstitutions(
-                               GenericSignature *sig,
+                               GenericSignature sig,
                                ConstraintLocatorBuilder locatorBuilder) const {
-  if (sig == nullptr)
+  if (sig.isNull())
     return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.

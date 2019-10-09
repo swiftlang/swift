@@ -144,7 +144,7 @@ static bool areAccessorsOverrideCompatible(AbstractStorageDecl *storage,
 
 bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
                                   ValueDecl *parentDecl, Type parentDeclTy) {
-  auto *genericSig =
+  auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
   auto canDeclTy = declTy->getCanonicalType(genericSig);

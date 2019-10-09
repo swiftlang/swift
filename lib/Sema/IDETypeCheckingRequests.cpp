@@ -57,7 +57,7 @@ static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
     return true;
 
   (void)TypeChecker::createForContext(DC->getASTContext());
-  GenericSignature *genericSig = ED->getGenericSignature();
+  GenericSignature genericSig = ED->getGenericSignature();
   SubstitutionMap substMap = BaseTy->getContextSubstitutionMap(
       DC->getParentModule(), ED->getExtendedNominal());
   return areGenericRequirementsSatisfied(DC, genericSig, substMap,
@@ -75,7 +75,7 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   const GenericContext *genericDecl = VD->getAsGenericContext();
   if (!genericDecl)
     return true;
-  const GenericSignature *genericSig = genericDecl->getGenericSignature();
+  GenericSignature genericSig = genericDecl->getGenericSignature();
   if (!genericSig)
     return true;
 

@@ -4844,7 +4844,7 @@ namespace {
           result->getASTContext().evaluator.cacheOutput(
                 GenericParamListRequest{result}, std::move(genericParams));
 
-          auto *sig = Impl.buildGenericSignature(genericParams, dc);
+          auto sig = Impl.buildGenericSignature(genericParams, dc);
           result->setGenericSignature(sig);
         }
       } else {
@@ -8026,7 +8026,7 @@ DeclContext *ClangImporter::Implementation::importDeclContextImpl(
   return nullptr;
 }
 
-GenericSignature *ClangImporter::Implementation::buildGenericSignature(
+GenericSignature ClangImporter::Implementation::buildGenericSignature(
     GenericParamList *genericParams, DeclContext *dc) {
   SmallVector<GenericTypeParamType *, 2> genericParamTypes;
   for (auto param : *genericParams) {
@@ -8061,7 +8061,7 @@ GenericSignature *ClangImporter::Implementation::buildGenericSignature(
       SwiftContext.evaluator,
       AbstractGenericSignatureRequest{
         nullptr, std::move(genericParamTypes), std::move(requirements)},
-      nullptr);
+      GenericSignature());
 }
 
 DeclContext *
