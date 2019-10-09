@@ -335,7 +335,7 @@ function(_compile_swift_files
 
     if (NOT SWIFTFILE_IS_STDLIB_CORE)
       list(APPEND swift_module_flags
-           "-Xfrontend -experimental-skip-non-inlinable-function-bodies")
+           "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
     endif()
 
     # If we have extra regexp flags, check if we match any of the regexps. If so
