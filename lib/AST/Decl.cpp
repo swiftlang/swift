@@ -6560,29 +6560,7 @@ ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
                                   getLoc(), ctx.Id_self, this);
   (*selfDecl)->setImplicit();
 
-  // If we already have an interface type, compute the 'self' parameter type.
-  // Otherwise, we'll do it later.
-  if (hasInterfaceType())
-    computeSelfDeclType();
-
   return *selfDecl;
-}
-
-void AbstractFunctionDecl::computeSelfDeclType() {
-  assert(hasImplicitSelfDecl());
-  assert(hasInterfaceType());
-
-  auto *selfDecl = getImplicitSelfDecl(/*createIfNeeded=*/false);
-
-  // If we haven't created a 'self' parameter yet, do nothing, we'll compute
-  // the type later.
-  if (selfDecl == nullptr)
-    return;
-
-  auto selfParam = computeSelfParam(this,
-                                    /*isInitializingCtor*/true,
-                                    /*wantDynamicSelf*/true);
-  selfDecl->setInterfaceType(selfParam.getPlainType());
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {
@@ -6706,14 +6684,6 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
 
   // Record the interface type.
   setInterfaceType(funcTy);
-
-  // Compute the type of the 'self' parameter if we're created one already.
-  if (hasSelf)
-    computeSelfDeclType();
-      
-  // Make sure that there are no unresolved dependent types in the
-  // generic signature.
-  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 bool AbstractFunctionDecl::hasInlinableBodyText() const {

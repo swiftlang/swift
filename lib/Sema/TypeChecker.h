@@ -1353,9 +1353,6 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
-  /// Type check a parameter list.
-  static bool typeCheckParameterList(ParameterList *PL);
-
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.

@@ -586,8 +586,6 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
                                    TargetImpl target,
                                    bool isLValue,
                                    ASTContext &ctx) {
-  (void)accessor->getInterfaceType();
-  
   // Local function to "finish" the expression, creating a member reference
   // to the given sequence of underlying variables.
   Optional<EnclosingSelfPropertyWrapperAccess> enclosingSelfAccess;

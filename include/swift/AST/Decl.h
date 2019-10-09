@@ -5832,8 +5832,6 @@ public:
 private:
   void computeNeedsNewVTableEntry();
 
-  void computeSelfDeclType();
-
 public:
   /// Compute the interface type of this function declaration from the
   /// parameter types.
