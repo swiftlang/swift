@@ -1362,6 +1362,29 @@ public:
   void cacheResult(ParamSpecifier value) const;
 };
 
+/// Determines the result type of a function or element type of a subscript.
+class ResultTypeRequest
+    : public SimpleRequest<ResultTypeRequest,
+                           Type(ValueDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  TypeLoc &getResultTypeLoc() const;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

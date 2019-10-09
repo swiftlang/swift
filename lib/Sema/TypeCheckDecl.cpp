@@ -3920,8 +3920,7 @@ bool swift::isMemberOperator(FuncDecl *decl, Type type) {
   return false;
 }
 
-static Type buildAddressorResultType(TypeChecker &TC,
-                                     AccessorDecl *addressor,
+static Type buildAddressorResultType(AccessorDecl *addressor,
                                      Type valueType) {
   assert(addressor->getAccessorKind() == AccessorKind::Address ||
          addressor->getAccessorKind() == AccessorKind::MutableAddress);
@@ -3933,27 +3932,57 @@ static Type buildAddressorResultType(TypeChecker &TC,
   return valueType->wrapInPointer(pointerKind);
 }
 
+llvm::Expected<Type>
+ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
+  auto &ctx = decl->getASTContext();
 
-static void validateResultType(ValueDecl *decl,
-                               TypeLoc &resultTyLoc) {
-  // Nothing to do if there's no result type loc to set into.
-  if (resultTyLoc.isNull())
-    return;
+  // Accessors always inherit their result type from their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+    auto *storage = accessor->getStorage();
 
-  // Check the result type. It is allowed to be opaque.
+    switch (accessor->getAccessorKind()) {
+    // For getters, set the result type to the value type.
+    case AccessorKind::Get:
+      return storage->getValueInterfaceType();
+
+    // For setters and observers, set the old/new value parameter's type
+    // to the value type.
+    case AccessorKind::DidSet:
+    case AccessorKind::WillSet:
+    case AccessorKind::Set:
+      return TupleType::getEmpty(ctx);
+
+    // Addressor result types can get complicated because of the owner.
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+      return buildAddressorResultType(accessor, storage->getValueInterfaceType());
+
+    // Coroutine accessors don't mention the value type directly.
+    // If we add yield types to the function type, we'll need to update this.
+    case AccessorKind::Read:
+    case AccessorKind::Modify:
+      return TupleType::getEmpty(ctx);
+    }
+  }
+
+  auto *resultTyRepr = getResultTypeLoc().getTypeRepr();
+
+  // Nothing to do if there's no result type.
+  if (resultTyRepr == nullptr)
+    return TupleType::getEmpty(ctx);
+
+  // Handle opaque types.
   if (decl->getOpaqueResultTypeRepr()) {
     auto *opaqueDecl = decl->getOpaqueResultTypeDecl();
-    resultTyLoc.setType(
-        opaqueDecl
-        ? opaqueDecl->getDeclaredInterfaceType()
-        : ErrorType::get(decl->getASTContext()));
-  } else {
-    auto *dc = decl->getInnermostDeclContext();
-    auto resolution = TypeResolution::forInterface(dc);
-    TypeChecker::validateType(dc->getASTContext(),
-                              resultTyLoc, resolution,
-                              TypeResolverContext::FunctionResult);
+    return (opaqueDecl
+            ? opaqueDecl->getDeclaredInterfaceType()
+            : ErrorType::get(ctx));
   }
+
+  auto *dc = decl->getInnermostDeclContext();
+  auto resolution = TypeResolution::forInterface(dc);
+  return resolution.resolveType(
+      resultTyRepr, TypeResolverContext::FunctionResult);
 }
 
 llvm::Expected<ParamSpecifier>
@@ -4230,51 +4259,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(FD);
 
-    // Accessors should pick up various parts of their type signatures
-    // directly from the storage declaration instead of re-deriving them.
-    // FIXME: should this include the generic signature?
-    if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
-      auto storage = accessor->getStorage();
-
-      // Propagate the value type into the correct position.
-      switch (accessor->getAccessorKind()) {
-      // For getters, set the result type to the value type.
-      case AccessorKind::Get: {
-        auto type = storage->getValueInterfaceType();
-        accessor->getBodyResultTypeLoc().setType(type);
-        break;
-      }
-
-      // For setters and observers, set the old/new value parameter's type
-      // to the value type.
-      case AccessorKind::DidSet:
-      case AccessorKind::WillSet:
-      case AccessorKind::Set: {
-        accessor->getBodyResultTypeLoc().setType(TupleType::getEmpty(Context));
-        break;
-      }
-
-      // Addressor result types can get complicated because of the owner.
-      case AccessorKind::Address:
-      case AccessorKind::MutableAddress: {
-        auto type = storage->getValueInterfaceType();
-        if (Type resultType =
-              buildAddressorResultType(*this, accessor, type)) {
-          accessor->getBodyResultTypeLoc().setType(resultType);
-        }
-        break;
-      }
-
-      // These don't mention the value type directly.
-      // If we add yield types to the function type, we'll need to update this.
-      case AccessorKind::Read:
-      case AccessorKind::Modify:
-        accessor->getBodyResultTypeLoc().setType(TupleType::getEmpty(Context));
-        break;
-      }
-    }
-
-    validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
 
@@ -4295,37 +4279,28 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::Constructor: {
     auto *CD = cast<ConstructorDecl>(D);
-
     DeclValidationRAII IBV(CD);
-
     CD->computeType();
     break;
   }
 
   case DeclKind::Destructor: {
     auto *DD = cast<DestructorDecl>(D);
-
     DeclValidationRAII IBV(DD);
-
     DD->computeType();
     break;
   }
 
   case DeclKind::Subscript: {
     auto *SD = cast<SubscriptDecl>(D);
-
     DeclValidationRAII IBV(SD);
-
-    validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
-
     break;
   }
 
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
     DeclValidationRAII IBV(EED);
-
     EED->computeType();
     break;
   }

@@ -6178,17 +6178,15 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 }
 
 Type SubscriptDecl::getElementInterfaceType() const {
-  // Force type checking of the result TypeLoc.
-  (void) getInterfaceType();
-
-  auto type = getElementTypeLoc().getType();
-  if (!type)
-    return TupleType::getEmpty(getASTContext());
-  return type;
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<SubscriptDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           ErrorType::get(ctx));
 }
 
 void SubscriptDecl::computeType() {
-  auto elementTy = getElementTypeLoc().getType();
+  auto elementTy = getElementInterfaceType();
 
   SmallVector<AnyFunctionType::Param, 2> argTy;
   getIndices()->getParams(argTy);
@@ -6201,10 +6199,6 @@ void SubscriptDecl::computeType() {
 
   // Record the interface type.
   setInterfaceType(funcTy);
-      
-  // Make sure that there are no unresolved dependent types in the
-  // generic signature.
-  assert(!funcTy->findUnresolvedDependentMemberType());
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6338,7 +6332,9 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   }
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator, ParseAbstractFunctionBodyRequest{mutableThis}, nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParseAbstractFunctionBodyRequest{mutableThis},
+                           nullptr);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -6619,23 +6615,18 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 }
 
 void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
-  auto &ctx = getASTContext();
   auto sig = getGenericSignature();
   bool hasSelf = hasImplicitSelfDecl();
 
   // Result
   Type resultTy;
   if (auto fn = dyn_cast<FuncDecl>(this)) {
-    resultTy = fn->getBodyResultTypeLoc().getType();
-    if (!resultTy) {
-      resultTy = TupleType::getEmpty(ctx);
-    }
-
+    resultTy = fn->getResultInterfaceType();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
     resultTy = ctor->getResultInterfaceType();
   } else {
     assert(isa<DestructorDecl>(this));
-    resultTy = TupleType::getEmpty(ctx);
+    resultTy = TupleType::getEmpty(getASTContext());
   }
 
   // (Args...) -> Result
@@ -6885,13 +6876,11 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  // Force type checking of the result TypeLoc.
-  (void) getInterfaceType();
-
-  auto resultTy = getBodyResultTypeLoc().getType();
-  if (!resultTy)
-    return TupleType::getEmpty(getASTContext());
-  return resultTy;
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           ErrorType::get(ctx));
 }
 
 bool FuncDecl::isUnaryOperator() const {
