@@ -22,6 +22,7 @@ internal protocol _AbstractStringStorage: _NSCopying {
   var isASCII: Bool { get }
   var start: UnsafePointer<UInt8> { get }
   var UTF16Length: Int { get }
+  var _UTF16Length: Int { get }
 }
 
 internal let _cocoaASCIIEncoding:UInt = 1 /* NSASCIIStringEncoding */
@@ -155,7 +156,7 @@ extension _AbstractStringStorage {
           (memcmp(start, otherStart, count) == 0)) ? 1 : 0
       }
 
-      if UTF16Length != otherUTF16Length {
+      if _UTF16Length != otherUTF16Length {
         return 0
       }
 
@@ -228,14 +229,18 @@ final internal class __StringStorage
 
 #if _runtime(_ObjC)
 
-  @objc(length)
-  final internal var UTF16Length: Int {
+  final internal var _UTF16Length: Int {
     @_effects(readonly) @inline(__always) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
+  
+  @objc(length)
+  final internal var UTF16Length: Int {
+    return _UTF16Length
+  }
 
-  @objc
+  @objc dynamic
   final internal var hash: UInt {
     @_effects(readonly) get {
       if isASCII {
@@ -246,14 +251,14 @@ final internal class __StringStorage
   }
 
   @objc(characterAtIndex:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
-  @_effects(releasenone)
+  @_effects(releasenone) dynamic
   final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
@@ -261,7 +266,7 @@ final internal class __StringStorage
   }
 
   @objc(_fastCStringContents:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
@@ -272,26 +277,26 @@ final internal class __StringStorage
   }
 
   @objc(UTF8String)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     return start
   }
 
   @objc(cStringUsingEncoding:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
-  @_effects(releasenone)
+  @_effects(releasenone) dynamic
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
     return _getCString(outputPtr, maxLength, encoding)
   }
 
-  @objc
+  @objc dynamic
   final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
       if isASCII {
@@ -302,12 +307,12 @@ final internal class __StringStorage
   }
 
   @objc(isEqualToString:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func isEqual(to other: AnyObject?) -> Int8 {
     return _isEqual(other)
   }
 
-  @objc(copyWithZone:)
+  @objc(copyWithZone:) dynamic
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While __StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
@@ -736,14 +741,18 @@ final internal class __SharedStringStorage
 
 #if _runtime(_ObjC)
 
-  @objc(length)
-  final internal var UTF16Length: Int {
-    @_effects(readonly) get {
+  final internal var _UTF16Length: Int {
+    @_effects(readonly) @inline(__always) get {
       return asString.utf16.count // UTF16View special-cases ASCII for us.
     }
   }
+  
+  @objc(length) dynamic
+  final internal var UTF16Length: Int {
+    return _UTF16Length
+  }
 
-  @objc
+  @objc dynamic
   final internal var hash: UInt {
     @_effects(readonly) get {
       if isASCII {
@@ -754,21 +763,21 @@ final internal class __SharedStringStorage
   }
 
   @objc(characterAtIndex:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func character(at offset: Int) -> UInt16 {
     let str = asString
     return str.utf16[str._toUTF16Index(offset)]
   }
 
   @objc(getCharacters:range:)
-  @_effects(releasenone)
+  @_effects(releasenone) dynamic
   final internal func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
     _getCharacters(buffer, aRange)
   }
 
-  @objc
+  @objc dynamic
   final internal var fastestEncoding: UInt {
     @_effects(readonly) get {
       if isASCII {
@@ -779,7 +788,7 @@ final internal class __SharedStringStorage
   }
 
   @objc(_fastCStringContents:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func _fastCStringContents(
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
@@ -790,19 +799,19 @@ final internal class __SharedStringStorage
   }
 
   @objc(UTF8String)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
     return start
   }
 
   @objc(cStringUsingEncoding:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func cString(encoding: UInt) -> UnsafePointer<UInt8>? {
     return _cString(encoding: encoding)
   }
 
   @objc(getCString:maxLength:encoding:)
-  @_effects(releasenone)
+  @_effects(releasenone) dynamic
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
@@ -810,12 +819,12 @@ final internal class __SharedStringStorage
   }
 
   @objc(isEqualToString:)
-  @_effects(readonly)
+  @_effects(readonly) dynamic
   final internal func isEqual(to other:AnyObject?) -> Int8 {
     return _isEqual(other)
   }
 
-  @objc(copyWithZone:)
+  @objc(copyWithZone:) dynamic
   final internal func copy(with zone: _SwiftNSZone?) -> AnyObject {
     // While __StringStorage instances aren't immutable in general,
     // mutations may only occur when instances are uniquely referenced.
