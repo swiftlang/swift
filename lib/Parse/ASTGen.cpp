@@ -63,7 +63,7 @@ ASTGen::generateDeclAttributes(const Syntax &D, SourceLoc Loc,
   if (auto firstTok = D.getFirstToken()) {
     auto declLoc = advanceLocBegin(Loc, *firstTok);
     if (hasDeclAttributes(declLoc))
-      return getDeclAttributes(declLoc);
+      return takeDeclAttributes(declLoc);
   }
   return DeclAttributes();
 }
@@ -234,7 +234,7 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
 
   auto exprLoc = advanceLocBegin(Loc, E);
   if (hasExpr(exprLoc))
-    return getExpr(exprLoc);
+    return takeExpr(exprLoc);
 
   if (auto identifierExpr = E.getAs<IdentifierExprSyntax>())
     result = generate(*identifierExpr, Loc);
@@ -1457,37 +1457,35 @@ TypeRepr *ASTGen::lookupType(TypeSyntax Type) {
 }
 
 void ASTGen::addExpr(Expr *E, const SourceLoc Loc) {
-#ifndef NDEBUG
-  if (hasExpr(Loc)) {
-    bool PrevIsSubExpr = false;
-    Expr *Prev = Exprs.find(Loc)->second;
-    E->forEachChildExpr([&](Expr *Child) {
-      if (Child == Prev)
-        PrevIsSubExpr = true;
-      return Child;
-    });
-    assert(PrevIsSubExpr);
-  }
-#endif
-  Exprs.insert({Loc, E});
+  assert(!hasExpr(Loc));
+  Exprs[Loc] = E;
 }
 
 bool ASTGen::hasExpr(const SourceLoc Loc) const {
   return Exprs.find(Loc) != Exprs.end();
 }
 
-Expr *ASTGen::getExpr(const SourceLoc Loc) const {
-  return Exprs.find(Loc)->second;
+Expr *ASTGen::takeExpr(const SourceLoc Loc) {
+  auto I = Exprs.find(Loc);
+  assert(I != Exprs.end());
+  auto expr = I->second;
+  Exprs.erase(I);
+  return expr;
 }
 
 void ASTGen::addDeclAttributes(DeclAttributes attrs, SourceLoc Loc) {
-  ParsedDeclAttrs.insert({Loc, attrs});
+  assert(!hasDeclAttributes(Loc));
+  ParsedDeclAttrs[Loc] = attrs;
 }
 
 bool ASTGen::hasDeclAttributes(SourceLoc Loc) const {
   return ParsedDeclAttrs.find(Loc) != ParsedDeclAttrs.end();
 }
 
-DeclAttributes ASTGen::getDeclAttributes(SourceLoc Loc) const {
-  return ParsedDeclAttrs.find(Loc)->second;
+DeclAttributes ASTGen::takeDeclAttributes(SourceLoc Loc) {
+  auto I = ParsedDeclAttrs.find(Loc);
+  assert(I != ParsedDeclAttrs.end());
+  auto attrs = I->second;
+  ParsedDeclAttrs.erase(I);
+  return attrs;
 }

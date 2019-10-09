@@ -235,11 +235,11 @@ private:
 public:
   void addExpr(Expr *Expr, const SourceLoc Loc);
   bool hasExpr(const SourceLoc Loc) const;
-  Expr *getExpr(const SourceLoc Loc) const;
+  Expr *takeExpr(const SourceLoc Loc);
 
   void addDeclAttributes(DeclAttributes attrs, const SourceLoc Loc);
   bool hasDeclAttributes(SourceLoc Loc) const;
-  DeclAttributes getDeclAttributes(const SourceLoc Loc) const;
+  DeclAttributes takeDeclAttributes(const SourceLoc Loc);
 };
 } // namespace swift
 
