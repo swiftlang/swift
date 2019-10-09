@@ -439,7 +439,7 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
-        !isa<SubscriptDecl>(DC);
+        !isa<SubscriptDecl>(DC) && !isa<EnumElementDecl>(DC);
 }
 
 namespace {

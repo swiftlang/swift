@@ -1874,6 +1874,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     return AFD;
   if (auto SD = dyn_cast<SubscriptDecl>(D))
     return SD;
+  if (auto EED = dyn_cast<EnumElementDecl>(D))
+    return EED;
 
   llvm_unreachable("Unknown Decl : DeclContext kind");
 }
@@ -3554,23 +3556,23 @@ public:
       }
     }
 
-    // Read payload parameter list, if it exists.
-    ParameterList *paramList = nullptr;
-    if (hasPayload) {
-      paramList = MF.readParameterList();
-    }
-
     DeclContext *DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = MF.createDecl<EnumElementDecl>(SourceLoc(),
                                                name,
-                                               paramList,
+                                               nullptr,
                                                SourceLoc(),
                                                nullptr,
                                                DC);
     declOrOffset = elem;
+
+    // Read payload parameter list, if it exists.
+    if (hasPayload) {
+      auto *paramList = MF.readParameterList();
+      elem->setParameterList(paramList);
+    }
 
     // Deserialize the literal raw value, if any.
     switch ((EnumElementRawValueKind)rawValueKindID) {

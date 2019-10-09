@@ -4182,14 +4182,6 @@ EnumCaseDecl *EnumCaseDecl::create(SourceLoc CaseLoc,
   return ::new (buf) EnumCaseDecl(CaseLoc, Elements, DC);
 }
 
-EnumElementDecl *EnumDecl::getElement(Identifier Name) const {
-  // FIXME: Linear search is not great for large enum decls.
-  for (EnumElementDecl *Elt : getAllElements())
-    if (Elt->getName() == Name)
-      return Elt;
-  return nullptr;
-}
-
 bool EnumDecl::hasPotentiallyUnavailableCaseValue() const {
   switch (static_cast<AssociatedValueCheck>(Bits.EnumDecl.HasAssociatedValues)) {
     case AssociatedValueCheck::Unchecked:
@@ -7070,6 +7062,18 @@ SourceRange FuncDecl::getSourceRange() const {
   return StartLoc;
 }
 
+EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
+                                 ParameterList *Params,
+                                 SourceLoc EqualsLoc,
+                                 LiteralExpr *RawValueExpr,
+                                 DeclContext *DC)
+  : DeclContext(DeclContextKind::EnumElementDecl, DC),
+    ValueDecl(DeclKind::EnumElement, DC, Name, IdentifierLoc),
+    EqualsLoc(EqualsLoc),
+    RawValueExpr(RawValueExpr) {
+  setParameterList(Params);
+}
+
 SourceRange EnumElementDecl::getSourceRange() const {
   if (RawValueExpr && !RawValueExpr->isImplicit())
     return {getStartLoc(), RawValueExpr->getEndLoc()};
@@ -7125,6 +7129,13 @@ Type EnumElementDecl::getArgumentInterfaceType() const {
     elements.emplace_back(eltType, param.getLabel());
   }
   return TupleType::get(elements, ctx);
+}
+
+void EnumElementDecl::setParameterList(ParameterList *params) {
+  Params = params;
+
+  if (params)
+    params->setDeclContextOfParamDecls(this);
 }
 
 EnumCaseDecl *EnumElementDecl::getParentCase() const {
