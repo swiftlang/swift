@@ -20,11 +20,22 @@ public func fabs<T: FloatingPoint>(_ x: T) -> T {
 }
 
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+@differentiable(
+  vjp: _vjpSqrt
+  where T : Differentiable & FloatingPoint, T == T.TangentVector
+)
 public func sqrt<T: FloatingPoint>(_ x: T) -> T {
   return x.squareRoot()
 }
 
 @_transparent
+// SWIFT_ENABLE_TENSORFLOW
+@differentiable(
+  wrt: (x, y, z),
+  vjp: _vjpFma
+  where T : Differentiable & FloatingPoint, T == T.TangentVector
+)
 public func fma<T: FloatingPoint>(_ x: T, _ y: T, _ z: T) -> T {
   return z.addingProduct(x, y)
 }
@@ -82,6 +93,24 @@ public func frexp<T: BinaryFloatingPoint>(_ x: T) -> (T, Int) {
   return (x.significand / 2, Int(x.exponent + 1))
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+@usableFromInline
+func _vjpSqrt<T: FloatingPoint & Differentiable> (
+  _ x: T
+) -> (T, (T) -> T) where T == T.TangentVector {
+  let value = x.squareRoot()
+  return (value, { v in v / (2 * value) })
+}
+
+@usableFromInline
+func _vjpFma<T: FloatingPoint & Differentiable> (
+  _ x: T,
+  _ y: T,
+  _ z: T
+) -> (T, (T) -> (T, T, T)) where T == T.TangentVector {
+  return (fma(x, y, z), { v in (v * y, v * x, v) })
+}
+
 %for T in ['Float','Double']:
 @available(swift, deprecated: 4.2, renamed: "scalbn")
 @_transparent
@@ -103,8 +132,24 @@ func _vjpExp(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
 }
 
 @usableFromInline
+func _vjpExp2(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  let value = exp2(x)
+  return (value, { v in v * ${T}(M_LN2) * value })
+}
+
+@usableFromInline
 func _vjpLog(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
   return (log(x), { v in v / x })
+}
+
+@usableFromInline
+func _vjpLog10(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (log10(x), { v in v * ${T}(M_LOG10E) / x })
+}
+
+@usableFromInline
+func _vjpLog2(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (log2(x), { v in v / (${T}(M_LN2) * x) })
 }
 
 @usableFromInline
@@ -121,6 +166,72 @@ func _vjpCos(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
 func _vjpTan(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
   let value = tan(x)
   return (value, { v in v * (1 + value * value) })
+}
+
+@usableFromInline
+func _vjpAsin(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (asin(x), { v in v / sqrt(1 - x * x) })
+}
+
+@usableFromInline
+func _vjpAcos(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (acos(x), { v in -v / sqrt(1 - x * x) })
+}
+
+@usableFromInline
+func _vjpAtan(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (atan(x), { v in v / (1 + x * x) })
+}
+
+@usableFromInline
+func _vjpSinh(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (sinh(x), { v in v * cosh(x) })
+}
+
+@usableFromInline
+func _vjpCosh(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (cosh(x), { v in v * sinh(x) })
+}
+
+@usableFromInline
+func _vjpTanh(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  let value = tanh(x)
+  return (value, { v in v * (1 - value * value) })
+}
+
+@usableFromInline
+func _vjpAsinh(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (asinh(x), { v in v / sqrt(1 + x * x) })
+}
+
+@usableFromInline
+func _vjpAcosh(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (acosh(x), { v in v / sqrt(x * x - 1) })
+}
+
+@usableFromInline
+func _vjpAtanh(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (atanh(x), { v in v / (1 - x * x) })
+}
+
+@usableFromInline
+func _vjpExpm1(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (expm1(x), { v in exp(x) * v })
+}
+
+@usableFromInline
+func _vjpLog1p(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (log1p(x), { v in v / (x + 1) })
+}
+
+@usableFromInline
+func _vjpErf(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (erf(x), { v in v * ${T}(M_2_SQRTPI) * exp(-x * x) })
+}
+
+@usableFromInline
+func _vjpErfc(_ x: ${T}) -> (${T}, (${T}) -> ${T}) {
+  return (erfc(x), { v in v * -${T}(M_2_SQRTPI) * exp(-x * x) })
 }
 %   if T == 'Float80':
 #endif
@@ -201,7 +312,14 @@ UnaryIntrinsicFunctions = [
 ]
 
 # SWIFT_ENABLE_TENSORFLOW
-HasVJP = ["exp", "log", "tan", "cos", "sin"]
+HasVJP = [
+    'acos', 'asin', 'atan', 'tan',
+    'acosh', 'asinh', 'atanh', 'cosh', 'sinh', 'tanh',
+    'expm1',
+    'log1p',
+    'erf', 'erfc',
+    'cos', 'sin', 'exp', 'exp2', 'log', 'log10', 'log2'
+]
 
 def AllFloatTypes():
     for bits in allFloatBits:
