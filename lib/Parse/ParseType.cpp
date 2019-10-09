@@ -899,9 +899,8 @@ Parser::parseOldStyleProtocolComposition() {
       replacement = "Any";
     } else {
       auto extractText = [&](ParsedTypeSyntax &Type) -> StringRef {
-        auto SourceRange = Type.getRaw()
-          .getDeferredRange(/*includeTrivia=*/false);
-        return SourceMgr.extractText(SourceRange);
+        auto SourceRange = Type.getRaw().getDeferredRange();
+        return SourceMgr.extractText(SourceRange).trim();
       };
       auto Begin = Protocols.begin();
       replacement += extractText(*Begin);
