@@ -6178,10 +6178,13 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 }
 
 Type SubscriptDecl::getElementInterfaceType() const {
-  auto elementTy = getInterfaceType();
-  if (elementTy->is<ErrorType>())
-    return elementTy;
-  return elementTy->castTo<AnyFunctionType>()->getResult();
+  // Force type checking of the result TypeLoc.
+  (void) getInterfaceType();
+
+  auto type = getElementTypeLoc().getType();
+  if (!type)
+    return TupleType::getEmpty(getASTContext());
+  return type;
 }
 
 void SubscriptDecl::computeType() {
@@ -6629,18 +6632,7 @@ void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
     }
 
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    auto *dc = ctor->getDeclContext();
-
-    if (hasSelf) {
-      if (!dc->isTypeContext())
-        resultTy = ErrorType::get(ctx);
-      else
-        resultTy = dc->getSelfInterfaceType();
-    }
-
-    // Adjust result type for failability.
-    if (ctor->isFailable())
-      resultTy = OptionalType::get(resultTy);
+    resultTy = ctor->getResultInterfaceType();
   } else {
     assert(isa<DestructorDecl>(this));
     resultTy = TupleType::getEmpty(ctx);
@@ -6893,14 +6885,13 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  Type resultTy = getInterfaceType();
-  if (resultTy.isNull() || resultTy->is<ErrorType>())
-    return resultTy;
+  // Force type checking of the result TypeLoc.
+  (void) getInterfaceType();
 
-  if (hasImplicitSelfDecl())
-    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-
-  return resultTy->castTo<AnyFunctionType>()->getResult();
+  auto resultTy = getBodyResultTypeLoc().getType();
+  if (!resultTy)
+    return TupleType::getEmpty(getASTContext());
+  return resultTy;
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -7153,10 +7144,19 @@ SourceRange ConstructorDecl::getSourceRange() const {
 }
 
 Type ConstructorDecl::getResultInterfaceType() const {
-  Type ArgTy = getInterfaceType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  return ArgTy;
+  Type resultTy;
+
+  auto *dc = getDeclContext();
+  if (!dc->isTypeContext())
+    resultTy = ErrorType::get(getASTContext());
+  else
+    resultTy = dc->getSelfInterfaceType();
+
+  // Adjust result type for failability.
+  if (isFailable())
+    return OptionalType::get(resultTy);
+
+  return resultTy;
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {
