@@ -896,16 +896,23 @@ namespace {
         DifferentiableFunctionExtractee::Original,
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
-      for (auto kind : {AutoDiffAssociatedFunctionKind::JVP,
-                        AutoDiffAssociatedFunctionKind::VJP}) {
+      for (AutoDiffAssociatedFunctionKind kind :
+           {AutoDiffAssociatedFunctionKind::JVP,
+            AutoDiffAssociatedFunctionKind::VJP}) {
         auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
             paramIndices, 0, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
+        auto extractee = DifferentiableFunctionExtractee(kind);
+
+        // A bug caused by implicit conversions caused us to get the wrong
+        // extractee, so assert that we have the right extractee to prevent
+        // reoccurrence of the bug.
+        assert(extractee.getExtracteeAsAssociatedFunction() ==
+               Optional<AutoDiffAssociatedFunctionKind>(kind));
+
         children.push_back(Child{
-          DifferentiableFunctionExtractee(kind),
-          TC.getTypeLowering(silTy, getResilienceExpansion())
-        });
+            extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
       }
       assert(children.size() == 3);
     }
