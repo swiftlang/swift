@@ -917,12 +917,12 @@ public:
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
                          llvm::function_ref<ParserStatus()> callback);
-  ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
-                               llvm::Optional<ParsedTokenSyntax> &LastComma,
-                               llvm::Optional<ParsedTokenSyntax> &Right,
-                               llvm::SmallVectorImpl<ParsedSyntax>& Junk,
-                               bool AllowSepAfterLast, Diag<> ErrorDiag,
-                               llvm::function_ref<ParserStatus()> callback);
+  template <typename ParsedNode>
+  ParserStatus parseListSyntax(
+      SmallVectorImpl<ParsedNode> &elements, bool AllowEmpty,
+      bool AllowSepAfterLast, llvm::function_ref<bool()> isAtCloseTok,
+      llvm::function_ref<ParserStatus(typename ParsedNode::Builder &)>
+          callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);
@@ -1428,6 +1428,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
+  ParsedSyntaxResult<ParsedExprSyntax> parseExpressionSyntax(Diag<> ID);
   ParserResult<Expr> parseExpr(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/false);
   }
@@ -1454,6 +1455,7 @@ public:
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprSuperSyntax();
   ParserResult<Expr> parseExprStringLiteral();
 
   // todo [gsoc]: create new result type for ParsedSyntax
@@ -1581,14 +1583,22 @@ public:
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprCollectionSyntax();
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprArraySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                       ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprDictionarySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                            ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
+
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprPoundUnknownSyntax(Optional<ParsedTokenSyntax> &&LSquare,
+                              SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
-
-  void validateCollectionElement(ParserResult<Expr> element);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing
