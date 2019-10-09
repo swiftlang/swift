@@ -3965,13 +3965,11 @@ public:
   };
   using IndirectFormalResultIter =
       llvm::filter_iterator<const SILResultInfo *, IndirectFormalResultFilter>;
-  using IndirectFormalResultRange = IteratorRange<IndirectFormalResultIter>;
+  using IndirectFormalResultRange = iterator_range<IndirectFormalResultIter>;
 
   /// A range of SILResultInfo for all formally indirect results.
   IndirectFormalResultRange getIndirectFormalResults() const {
-    auto filter =
-        llvm::make_filter_range(getResults(), IndirectFormalResultFilter());
-    return makeIteratorRange(filter.begin(), filter.end());
+    return llvm::make_filter_range(getResults(), IndirectFormalResultFilter());
   }
 
   struct DirectFormalResultFilter {
@@ -3981,13 +3979,11 @@ public:
   };
   using DirectFormalResultIter =
       llvm::filter_iterator<const SILResultInfo *, DirectFormalResultFilter>;
-  using DirectFormalResultRange = IteratorRange<DirectFormalResultIter>;
+  using DirectFormalResultRange = iterator_range<DirectFormalResultIter>;
 
   /// A range of SILResultInfo for all formally direct results.
   DirectFormalResultRange getDirectFormalResults() const {
-    auto filter =
-        llvm::make_filter_range(getResults(), DirectFormalResultFilter());
-    return makeIteratorRange(filter.begin(), filter.end());
+    return llvm::make_filter_range(getResults(), DirectFormalResultFilter());
   }
 
   /// Get a single non-address SILType that represents all formal direct

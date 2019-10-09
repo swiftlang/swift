@@ -37,8 +37,7 @@ static void findAllClangImports(const clang::Module *module,
     modules.insert(getTopLevelName(imported));
   }
 
-  for (auto sub :
-       makeIteratorRange(module->submodule_begin(), module->submodule_end())) {
+  for (auto sub : module->submodules()) {
     findAllClangImports(sub, modules);
   }
 }
