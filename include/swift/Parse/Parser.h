@@ -1456,6 +1456,9 @@ public:
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
   ParsedSyntaxResult<ParsedExprSyntax> parseExprSuperSyntax();
+  ParserResult<Expr> parseExprUnresolvedMember(bool isExprBasic);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprUnresolvedMemberSyntax(bool isExprBasic);
   ParserResult<Expr> parseExprStringLiteral();
 
   // todo [gsoc]: create new result type for ParsedSyntax

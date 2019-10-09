@@ -88,6 +88,8 @@ public:
   Expr *generate(const syntax::ArrayExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::DictionaryExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::TupleExprSyntax &E, const SourceLoc Loc);
+  Expr *generate(const syntax::FunctionCallExprSyntax &E, const SourceLoc Loc);
+  Expr *generate(const syntax::MemberAccessExprSyntax &E, const SourceLoc Loc);
   Expr *generate(const syntax::EditorPlaceholderExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::SpecializeExprSyntax &Expr, const SourceLoc Loc);
@@ -107,6 +109,8 @@ public:
   Expr *generate(const syntax::PoundDsohandleExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::ObjectLiteralExprSyntax &Expr,
+                 const SourceLoc Loc);
+  Expr *generate(const syntax::CodeCompletionExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::UnknownExprSyntax &Expr, const SourceLoc Loc);
 
