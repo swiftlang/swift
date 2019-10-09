@@ -4880,16 +4880,17 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
           ? emitDiagnostic(argExpr->getLoc(),
                            diag::single_tuple_parameter_mismatch_special,
                            choice->getDescriptiveKind(), paramTy, subsStr)
-          : emitDiagnostic(
-                argExpr->getLoc(), diag::single_tuple_parameter_mismatch_normal,
-                choice->getDescriptiveKind(), name, paramTy, subsStr);
+          : emitDiagnostic(argExpr->getLoc(),
+                           diag::single_tuple_parameter_mismatch_normal,
+                           choice->getDescriptiveKind(), name, paramTy, subsStr);
+
 
   auto newLeftParenLoc = argExpr->getStartLoc();
   if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
     auto firstArgLabel = TE->getElementName(0);
     // Cover situations like:
     //
-    // func foo<T>(x: T) {}
+    // func foo(x: (Int, Int)) {}
     // foo(x: 0, 1)
     //
     // Where left paren should be suggested after the label,
@@ -4904,9 +4905,24 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
     }
   }
 
-  diagnostic.highlight(argExpr->getSourceRange())
-      .fixItInsertAfter(newLeftParenLoc, "(")
-      .fixItInsert(argExpr->getEndLoc(), ")");
+  // If the parameter is a generic parameter, it's hard to say
+  // whether use of a tuple is really intended here, so let's
+  // attach a fix-it to a note instead of the diagnostic message
+  // to indicate that it's not the only right solution possible.
+  if (auto *typeVar = ParamType->getAs<TypeVariableType>()) {
+    if (typeVar->getImpl().getGenericParameter()) {
+      diagnostic.flush();
+
+      emitDiagnostic(argExpr->getLoc(), diag::note_maybe_forgot_to_form_tuple)
+          .fixItInsertAfter(newLeftParenLoc, "(")
+          .fixItInsert(argExpr->getEndLoc(), ")");
+    }
+  } else {
+    diagnostic.highlight(argExpr->getSourceRange())
+        .fixItInsertAfter(newLeftParenLoc, "(")
+        .fixItInsert(argExpr->getEndLoc(), ")");
+  }
+
   return true;
 }
 

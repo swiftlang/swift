@@ -236,6 +236,7 @@ struct Initialization {
   var x2: Double
 
   @Wrapper(stored: 17) // expected-error {{initializer expects a single parameter of type 'T' [with T = (wrappedValue: Int, stored: Int)]}}
+  // expected-note@-1 {{did you mean to pass a tuple?}}
   var x3 = 42
 
   @Wrapper(stored: 17)
