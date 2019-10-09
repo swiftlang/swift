@@ -49,7 +49,6 @@
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 // SWIFT_ENABLE_TENSORFLOW
-#include "llvm/IR/TypeBuilder.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Transforms/Utils/Local.h"

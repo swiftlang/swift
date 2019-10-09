@@ -19,7 +19,6 @@
 
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/Module.h"
-#include "llvm/IR/TypeBuilder.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Types.h"
