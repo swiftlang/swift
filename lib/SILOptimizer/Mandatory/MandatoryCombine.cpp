@@ -282,6 +282,12 @@ class MandatoryCombine final : public SILFunctionTransform {
   void run() override {
     auto *function = getFunction();
 
+    // If this function is an external declaration, bail. We only want to visit
+    // functions with bodies.
+    if (function->isExternalDeclaration()) {
+      return;
+    }
+
     MandatoryCombiner combiner(createdInstructions);
     bool madeChange = combiner.runOnFunction(*function);
 
