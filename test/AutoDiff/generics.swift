@@ -293,6 +293,16 @@ extension TF_817 {
   }
 }
 
+// TF-886: Test `partial_apply` of linear map subset parameters thunk.
+@differentiable
+func TF_886_foo<T, U: Differentiable>(_: Float, _: T, _: U) -> Float {
+  return 0
+}
+@differentiable
+func TF_886_bar<T>(x: Float, y: T) -> Float {
+  return TF_886_foo(x, y, 0)
+}
+
 // Test layout requirements.
 
 // The layout requirement is "contextual": the requirement is not on `T`, the

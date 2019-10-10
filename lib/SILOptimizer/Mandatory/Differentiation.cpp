@@ -1160,7 +1160,8 @@ public:
   /// Get or create an associated function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
   /// value and original function operand.
-  SILFunction *getOrCreateSubsetParametersThunkForLinearMap(
+  std::pair<SILFunction *, SubstitutionMap>
+  getOrCreateSubsetParametersThunkForLinearMap(
       SILFunction *assocFn, CanSILFunctionType linearMapType,
       CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
       SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
@@ -8105,7 +8106,7 @@ public:
 };
 } // end anonymous namespace
 
-SILFunction *
+std::pair<SILFunction *, SubstitutionMap>
 ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     SILFunction *parentThunk, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
@@ -8114,8 +8115,8 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
              << "Getting a subset parameters thunk for " << linearMapType
              << " from " << actualIndices << " to " << desiredIndices << '\n');
 
-  SubstitutionMap interfaceSubs = parentThunk->getForwardingSubstitutionMap();
-  GenericEnvironment *genericEnv = parentThunk->getGenericEnvironment();
+  SubstitutionMap interfaceSubs;
+  GenericEnvironment *genericEnv = nullptr;
   auto thunkType = buildThunkType(
       parentThunk, linearMapType, targetType, genericEnv, interfaceSubs,
       /*withoutActuallyEscaping*/ true,
@@ -8148,7 +8149,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       ProfileCounter(), IsThunk, IsNotDynamic);
 
   if (!thunk->empty())
-    return thunk;
+    return {thunk, interfaceSubs};
 
   thunk->setGenericEnvironment(genericEnv);
   thunk->setOwnershipEliminated();
@@ -8296,7 +8297,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     for (auto *alloc : reversed(localAllocations))
       builder.createDeallocStack(loc, alloc);
     builder.createReturn(loc, ai);
-    return thunk;
+    return {thunk, interfaceSubs};
   }
 
   // If pullback thunk, return only the desired results and clean up the
@@ -8332,7 +8333,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   builder.createReturn(loc, result);
 
   getGeneratedFunctions().push_back(thunk);
-  return thunk;
+  return {thunk, interfaceSubs};
 }
 
 std::pair<SILFunction *, SubstitutionMap>
@@ -8472,22 +8473,25 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   auto linearMapTargetType = targetType->getResults().back().getSILStorageType()
       .castTo<SILFunctionType>();
 
-  auto *innerThunk = getOrCreateSubsetParametersThunkForLinearMap(
-      thunk, linearMapType, linearMapTargetType, kind,
-      desiredIndices, actualIndices);
+  SILFunction *linearMapThunk;
+  SubstitutionMap linearMapSubs;
+  std::tie(linearMapThunk, linearMapSubs) =
+      getOrCreateSubsetParametersThunkForLinearMap(
+          thunk, linearMapType, linearMapTargetType, kind,
+          desiredIndices, actualIndices);
 
-  auto *innerThunkFRI = builder.createFunctionRef(loc, innerThunk);
-  auto *newDerivative = builder.createPartialApply(
-      loc, innerThunkFRI, thunk->getForwardingSubstitutionMap(), {linearMap},
+  auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
+  auto *thunkedLinearMap = builder.createPartialApply(
+      loc, linearMapThunkFRI, linearMapSubs, {linearMap},
       ParameterConvention::Direct_Guaranteed);
 
   assert(origFnType->getResults().size() == 1);
   if (origFnType->getResults().front().isFormalDirect()) {
     auto result = joinElements(
-        {originalDirectResult, newDerivative}, builder, loc);
+        {originalDirectResult, thunkedLinearMap}, builder, loc);
     builder.createReturn(loc, result);
   } else {
-    builder.createReturn(loc, newDerivative);
+    builder.createReturn(loc, thunkedLinearMap);
   }
 
   getGeneratedFunctions().push_back(thunk);
