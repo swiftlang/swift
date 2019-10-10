@@ -53,6 +53,7 @@ protected:
   bool findModule(AccessPathElem moduleID,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                   bool &isFramework, bool &isSystemModule);
 
   /// Attempts to search the provided directory for a loadable serialized
@@ -70,19 +71,29 @@ protected:
   virtual std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
+      StringRef ModuleSourceInfoFilename,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) = 0;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
 
   std::error_code
   openModuleFiles(AccessPathElem ModuleID,
                   StringRef ModulePath, StringRef ModuleDocPath,
+                  StringRef ModuleSourceInfoName,
                   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   std::error_code
   openModuleDocFile(AccessPathElem ModuleID,
                     StringRef ModuleDocPath,
                     std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer);
+
+  void
+  openModuleSourceInfoFileIfPresent(AccessPathElem ModuleID,
+                                    StringRef ModulePath,
+                                    StringRef ModuleSourceInfoFileName,
+                  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer);
 
   /// If the module loader subclass knows that all options have been tried for
   /// loading an architecture-specific file out of a swiftmodule bundle, try
@@ -116,6 +127,7 @@ public:
   FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
+                    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
                     bool isFramework, bool treatAsPartialModule);
 
   /// Check whether the module with a given name can be imported without
@@ -163,8 +175,10 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
+      StringRef ModuleSourceInfoFilename,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
   bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
                                    StringRef moduleName,
@@ -203,8 +217,10 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
+      StringRef ModuleSourceInfoFilename,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) override;
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+      std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
 
   bool maybeDiagnoseTargetMismatch(SourceLoc sourceLocation,
                                    StringRef moduleName,
@@ -316,6 +332,8 @@ public:
   Optional<unsigned> getSourceOrderForDecl(const Decl *D) const override;
 
   Optional<StringRef> getGroupNameByUSR(StringRef USR) const override;
+
+  Optional<BasicDeclLocs> getBasicLocsForDecl(const Decl *D) const override;
 
   void collectAllGroups(std::vector<StringRef> &Names) const override;
 
