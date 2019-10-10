@@ -3684,14 +3684,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
   assert(Resolver && "missing resolver");
 }
 
-void AssociatedTypeDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  auto &ctx = getASTContext();
-  auto interfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(interfaceTy, ctx));
-}
-
 Type AssociatedTypeDecl::getDefaultDefinitionType() const {
   return evaluateOrDefault(getASTContext().evaluator,
            DefaultDefinitionTypeRequest{const_cast<AssociatedTypeDecl *>(this)},

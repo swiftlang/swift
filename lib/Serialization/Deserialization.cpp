@@ -2363,8 +2363,6 @@ public:
         &MF, defaultDefinitionID);
     declOrOffset = assocType;
 
-    assocType->computeType();
-
     assert(!assocType->getDeclaredInterfaceType()->hasError() &&
            "erroneous associated type");
 

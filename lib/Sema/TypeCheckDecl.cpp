@@ -4157,7 +4157,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
-    assocType->computeType();
+    auto interfaceTy = assocType->getDeclaredInterfaceType();
+    assocType->setInterfaceType(MetatypeType::get(interfaceTy, Context));
     break;
   }
 

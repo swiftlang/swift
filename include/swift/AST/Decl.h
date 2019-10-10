@@ -3176,10 +3176,6 @@ public:
     TrailingWhere = trailingWhereClause;
   }
 
-  /// Set the interface type of this associated type declaration to a dependent
-  /// member type of 'Self'.
-  void computeType();
-
   /// Retrieve the associated type "anchor", which is the associated type
   /// declaration that will be used to describe this associated type in the
   /// ABI.
