@@ -1906,8 +1906,7 @@ getParamIndex(const ParameterList *paramList, const ParamDecl *decl) {
   return None;
 }
 
-static void
-checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
+static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   if (PD->getDefaultArgumentKind() != DefaultArgumentKind::Inherited)
     return;
 
@@ -1919,18 +1918,17 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
   // The containing decl should be a designated initializer.
   auto ctor = dyn_cast<ConstructorDecl>(DC);
   if (!ctor || ctor->isConvenienceInit()) {
-    TC.diagnose(
-        PD, diag::inherited_default_value_not_in_designated_constructor);
+    PD->diagnose(diag::inherited_default_value_not_in_designated_constructor);
     return;
   }
 
   // The decl it overrides should also be a designated initializer.
   auto overridden = ctor->getOverriddenDecl();
   if (!overridden || overridden->isConvenienceInit()) {
-    TC.diagnose(
-        PD, diag::inherited_default_value_used_in_non_overriding_constructor);
+    PD->diagnose(
+        diag::inherited_default_value_used_in_non_overriding_constructor);
     if (overridden)
-      TC.diagnose(overridden, diag::overridden_here);
+      overridden->diagnose(diag::overridden_here);
     return;
   }
 
@@ -1939,8 +1937,8 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
   assert(idx && "containing decl does not contain param?");
   ParamDecl *equivalentParam = overridden->getParameters()->get(*idx);
   if (equivalentParam->getDefaultArgumentKind() == DefaultArgumentKind::None) {
-    TC.diagnose(PD, diag::corresponding_param_not_defaulted);
-    TC.diagnose(equivalentParam, diag::inherited_default_param_here);
+    PD->diagnose(diag::corresponding_param_not_defaulted);
+    equivalentParam->diagnose(diag::inherited_default_param_here);
   }
 }
 
@@ -1948,7 +1946,7 @@ checkInheritedDefaultValueRestrictions(TypeChecker &TC, ParamDecl *PD) {
 static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
                                   ValueDecl *VD) {
   for (auto *param : *params) {
-    checkInheritedDefaultValueRestrictions(tc, param);
+    checkInheritedDefaultValueRestrictions(param);
     if (!param->getDefaultValue() ||
         !param->hasInterfaceType() ||
         param->getInterfaceType()->hasError())
