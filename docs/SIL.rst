@@ -5609,15 +5609,15 @@ differentiable_function
                       sil-differentiable-function-parameter-indices?
                       sil-differentiable-function-order?
                       sil-value ':' sil-type
-                      sil-differentiable-function-associated-functions-clause?
+                      sil-differentiable-function-derivative-functions-clause?
                       
   sil-differentiable-function-parameter-indices ::=
       '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
   sil-differentiable-function-order ::= '[' 'order' [0-9]+ ']'
-  sil-differentiable-associated-functions-clause ::=
-      'with' sil-differentiable-associated-function-list
-      (',' sil-differentiable-associated-function-list)*
-  sil-differentiable-function-associated-function-list ::=
+  sil-differentiable-derivative-functions-clause ::=
+      'with' sil-differentiable-derivative-function-list
+      (',' sil-differentiable-derivative-function-list)*
+  sil-differentiable-function-derivative-function-list ::=
       '{' sil-value ',' sil-value '}'
 
   differentiable_function [wrt 0] %0 : $(T) -> T \
