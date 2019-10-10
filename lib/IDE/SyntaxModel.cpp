@@ -49,6 +49,72 @@ struct SyntaxModelContext::Implementation {
       SrcMgr(SrcFile.getASTContext().SourceMgr) {}
 };
 
+/// Matches the tokens in the argument of an image or file literal expression if
+/// its argument is itself a literal string, e.g:
+///   #imageLiteral(resourceName: "foo.png")
+///   #fileLiteral(resourceName: "foo.txt")
+/// If the given tokens start with the expected tokens and they all appear on
+///  the same line, the source location beyond the final matched token and
+///  number of matched tokens are returned. Otherwise None is returned.
+static Optional<std::pair<SourceLoc, unsigned>>
+matchImageOrFileLiteralArg(ArrayRef<Token> Tokens) {
+  const unsigned NUM_TOKENS = 5;
+  if (Tokens.size() < NUM_TOKENS)
+    return None;
+  const tok kinds[NUM_TOKENS] = {
+      tok::l_paren,
+      tok::identifier, tok::colon, tok::string_literal,
+      tok::r_paren
+  };
+  for (unsigned i = 0; i < NUM_TOKENS; ++i) {
+    // FIXME: some editors don't handle multi-line object literals very well,
+    // so don't report them as object literals for now.
+    if (Tokens[i].getKind() != kinds[i] || Tokens[i].isAtStartOfLine())
+      return None;
+  }
+  if (Tokens[1].getText() != "resourceName")
+    return None;
+  auto EndToken = Tokens[NUM_TOKENS-1];
+  return std::make_pair(EndToken.getLoc().getAdvancedLoc(EndToken.getLength()),
+                        NUM_TOKENS);
+}
+
+/// Matches the tokens in the argument of an image literal expression if its
+/// arguments are themselves number literals, e.g:
+///   #colorLiteral(red: 1.0, green: 1.0, blue: 0.5, alpha: 1.0)
+/// If the given tokens start with the expected tokens and they all appear on
+/// the same line, the source location beyond the final matched token and number
+/// of matched tokens are returned. Otherwise None is returned.
+static Optional<std::pair<SourceLoc, unsigned>>
+matchColorLiteralArg(ArrayRef<Token> Tokens) {
+  const unsigned NUM_TOKENS = 17;
+  if (Tokens.size() < NUM_TOKENS)
+    return None;
+  const tok kinds[NUM_TOKENS] = {
+    tok::l_paren,
+    tok::identifier, tok::colon, tok::floating_literal, tok::comma,
+    tok::identifier, tok::colon, tok::floating_literal, tok::comma,
+    tok::identifier, tok::colon, tok::floating_literal, tok::comma,
+    tok::identifier, tok::colon, tok::floating_literal,
+    tok::r_paren
+  };
+  for (unsigned i = 0; i < NUM_TOKENS; ++i) {
+    auto Kind = Tokens[i].getKind();
+    if (Kind == tok::integer_literal)
+        Kind = tok::floating_literal;
+    // FIXME: some editors don't handle multi-line object literals very well,
+    // so don't report them as object literals for now.
+    if (Kind != kinds[i] || Tokens[i].isAtStartOfLine())
+      return None;
+  }
+  if (Tokens[1].getText() != "red" || Tokens[5].getText() != "green" ||
+      Tokens[9].getText() != "blue" || Tokens[13].getText() != "alpha")
+    return None;
+  auto EndToken = Tokens[NUM_TOKENS-1];
+  return std::make_pair(EndToken.getLoc().getAdvancedLoc(EndToken.getLength()),
+                        NUM_TOKENS);
+}
+
 SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
   : Impl(*new Implementation(SrcFile)) {
   const bool IsPlayground = Impl.LangOpts.Playground;
@@ -89,13 +155,38 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
 #define KEYWORD(X) case tok::kw_##X:
 #include "swift/Syntax/TokenKinds.def"
 #undef KEYWORD
-        case tok::contextual_keyword:
+      case tok::contextual_keyword:
         Kind = SyntaxNodeKind::Keyword;
         break;
 
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto) case tok::pound_##Name:
-#include "swift/Syntax/TokenKinds.def"
-        Kind = SyntaxNodeKind::Keyword;
+      // Note: the below only handles object literals where each argument is a
+      // single literal. If the arguments are more complex than that we rely on
+      // there being an ObjectLiteralExpr in the AST and convert the individual
+      // tokens within its range into a single object literal in
+      // ModelASTWalker. We only bother with the below so that in the most
+      // common cases we still present object literals as object literals when
+      // the ObjectLiteralExpr doesn't appear in the AST (which can happen when
+      // they appear within an invalid expression).
+      case tok::pound_fileLiteral:
+      case tok::pound_imageLiteral:
+        if (auto Match = matchImageOrFileLiteralArg(Tokens.slice(I+1))) {
+          Kind = SyntaxNodeKind::ObjectLiteral;
+          Length = SM.getByteDistance(Loc, Match->first);
+          // skip over the extra matched tokens
+          I += Match->second - 1;
+        } else {
+          Kind = SyntaxNodeKind::Keyword;
+        }
+        break;
+      case tok::pound_colorLiteral:
+        if (auto Match = matchColorLiteralArg(Tokens.slice(I+1))) {
+          Kind = SyntaxNodeKind::ObjectLiteral;
+          Length = SM.getByteDistance(Loc, Match->first);
+          // skip over the matches tokens
+          I += Match->second - 1;
+        } else {
+          Kind = SyntaxNodeKind::Keyword;
+        }
         break;
 
 #define POUND_COND_DIRECTIVE_KEYWORD(Name) case tok::pound_##Name:
@@ -428,6 +519,15 @@ void ModelASTWalker::visitSourceFile(SourceFile &SrcFile,
     passNode(TokNode);
 }
 
+static bool shouldTreatAsSingleToken(const SyntaxStructureNode &Node,
+                                     const SourceManager &SM) {
+  // Avoid passing the individual syntax tokens corresponding to single-line
+  // object literal expressions, as they will be reported as a single token.
+  return Node.Kind == SyntaxStructureKind::ObjectLiteralExpression &&
+    SM.getLineNumber(Node.Range.getStart()) ==
+    SM.getLineNumber(Node.Range.getEnd());
+}
+
 std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
   if (isVisitedBefore(E))
     return {false, E};
@@ -497,8 +597,10 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
     SN.BodyRange =
       innerCharSourceRangeFromSourceRange(SM, ObjectE->getSourceRange());
-    // Consider the object literal as a single syntax token for highlighting.
-    passNonTokenNode({SyntaxNodeKind::ObjectLiteral, SN.Range});
+    // Consider the object literal as a single syntax token for highlighting if
+    // it spans a single line.
+    if (shouldTreatAsSingleToken(SN, SM))
+      passNonTokenNode({SyntaxNodeKind::ObjectLiteral, SN.Range});
     pushStructureNode(SN, E);
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
     SyntaxStructureNode SN;
@@ -1256,14 +1358,10 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
   return Walker.walkToNodePost(Node);
 }
 
-static bool shouldAvoidPssingSyntaxToken(const SyntaxStructureNode &Node) {
-  return Node.Kind == SyntaxStructureKind::ObjectLiteralExpression;
-}
-
 bool ModelASTWalker::pushStructureNode(const SyntaxStructureNode &Node,
                                        const ASTNodeType& ASTNode) {
   SubStructureStack.emplace_back(Node, ASTNode);
-  if (shouldAvoidPssingSyntaxToken(Node))
+  if (shouldTreatAsSingleToken(Node, SM))
     AvoidPassingSyntaxToken ++;
 
   if (!passTokenNodesUntil(Node.Range.getStart(),
@@ -1279,7 +1377,7 @@ bool ModelASTWalker::popStructureNode() {
   assert(!SubStructureStack.empty());
   SyntaxStructureNode Node = SubStructureStack.back().StructureNode;
   SWIFT_DEFER {
-    if (shouldAvoidPssingSyntaxToken(Node)) {
+    if (shouldTreatAsSingleToken(Node, SM)) {
       assert(AvoidPassingSyntaxToken);
       AvoidPassingSyntaxToken --;
     }
