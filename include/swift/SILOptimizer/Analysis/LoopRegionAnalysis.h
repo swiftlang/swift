@@ -591,11 +591,11 @@ public:
     return getSubregionData().rend();
   }
 
-  llvm::iterator_range<subregion_iterator> getSubregions() const {
+  iterator_range<subregion_iterator> getSubregions() const {
     return {subregion_begin(), subregion_end()};
   }
 
-  llvm::iterator_range<subregion_reverse_iterator>
+  iterator_range<subregion_reverse_iterator>
   getReverseSubregions() const {
     return {subregion_rbegin(), subregion_rend()};
   }
@@ -674,7 +674,7 @@ public:
   unsigned succ_size() const { return Succs.size(); }
 
 private:
-  using InnerSuccRange = IteratorRange<decltype(Succs)::const_iterator>;
+  using InnerSuccRange = iterator_range<decltype(Succs)::const_iterator>;
 
 public:
   using SuccRange =
@@ -964,7 +964,7 @@ public:
   const_iterator end() const { return IDToRegionMap.end(); }
   unsigned size() const { return IDToRegionMap.size(); }
   bool empty() const { return IDToRegionMap.empty(); }
-  llvm::iterator_range<const_iterator> getRegions() const {
+  iterator_range<const_iterator> getRegions() const {
     return {begin(), end()};
   }
 
