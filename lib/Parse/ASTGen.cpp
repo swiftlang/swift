@@ -248,6 +248,8 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*arrayExpr, Loc);
   else if (auto dictionaryExpr = E.getAs<DictionaryExprSyntax>())
     result = generate(*dictionaryExpr, Loc);
+  else if (auto tupleExpr = E.getAs<TupleExprSyntax>())
+    result = generate(*tupleExpr, Loc);
   else if (auto integerLiteralExpr = E.getAs<IntegerLiteralExprSyntax>())
     result = generate(*integerLiteralExpr, Loc);
   else if (auto floatLiteralExpr = E.getAs<FloatLiteralExprSyntax>())
@@ -525,6 +527,72 @@ Expr *ASTGen::generate(const DictionaryExprSyntax &E, const SourceLoc Loc) {
   return DictionaryExpr::create(Context, LSquareLoc, elements, commaLocs,
                                 RSquareLoc);
 }
+
+Expr *ASTGen::generate(const TupleExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<Expr *, 2> exprs;
+  SmallVector<Identifier, 2> exprLabels;
+  SmallVector<SourceLoc, 2> exprLabelLocs;
+  generateExprTupleElementList(E.getElementList(), Loc,
+  /*isForCallArguments=*/false, exprs, exprLabels,
+                               exprLabelLocs);
+
+  SourceLoc leftLoc = advanceLocBegin(Loc, E.getLeftParen());
+  SourceLoc rightLoc = advanceLocEnd(Loc, E);
+
+  // A tuple with a single, unlabeled element is just parentheses.
+  if (exprs.size() == 1 && exprLabels.empty()) {
+    return new (Context) ParenExpr(leftLoc, exprs[0], rightLoc,
+                                   /*hasTrailingClosure=*/false);
+  }
+
+  return TupleExpr::create(Context, leftLoc, exprs, exprLabels, exprLabelLocs,
+                           rightLoc, /*HasTrailingClosure=*/false,
+                           /*Implicit=*/false);
+}
+
+void ASTGen::generateExprTupleElementList(const TupleExprElementListSyntax &elements,
+                                          const SourceLoc Loc, bool isForCallArguments,
+                                          SmallVectorImpl<Expr *> &exprs,
+                                  SmallVectorImpl<Identifier> &exprLabels,
+                                  SmallVectorImpl<SourceLoc> &exprLabelLocs) {
+  auto isFirst = true;
+  for (auto elem : elements) {
+    auto *subExpr = generate(elem.getExpression(), Loc);
+    if (!subExpr)
+      continue;
+
+    // Handle call arguments specially because it may need argument labels.
+    if (P.CodeCompletion && isForCallArguments && !elem.getLabel())
+      if (auto CCExpr = elem.getExpression().getAs<CodeCompletionExprSyntax>())
+        if (!CCExpr->getBase() && !CCExpr->getPeriodOrParen())
+          P.CodeCompletion->completeCallArg(cast<CodeCompletionExpr>(subExpr),
+                                              isFirst);
+    isFirst = false;
+
+    Identifier fieldName;
+    SourceLoc fieldNameLoc;
+    if (auto label = elem.getLabel()) {
+      fieldNameLoc = advanceLocBegin(Loc, *label);
+      if (label->getTokenKind() == tok::identifier)
+        fieldName = Context.getIdentifier(label->getIdentifierText());
+    }
+
+    // Don't populate label vectors unless we see at least one label.
+    if (!exprLabels.empty()) {
+      exprLabels.push_back(fieldName);
+      exprLabelLocs.push_back(fieldNameLoc);
+    } else if (fieldNameLoc.isValid()) {
+      exprLabels.resize(exprs.size());
+      exprLabelLocs.resize(exprs.size());
+      exprLabels.push_back(fieldName);
+      exprLabelLocs.push_back(fieldNameLoc);
+    }
+    exprs.push_back(subExpr);
+  }
+  assert((exprLabels.size() == 0 || exprs.size() == exprLabels.size()) &&
+         exprLabels.size() == exprLabelLocs.size());
+}
+
 
 Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,
                        const SourceLoc Loc) {
