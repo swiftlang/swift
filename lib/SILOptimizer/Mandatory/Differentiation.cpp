@@ -1146,9 +1146,11 @@ public:
   /// purposes.
   void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 
-  /// Get or create an associated function index subset thunk from
+  /// Get or create an associated function parameter index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
-  /// value and original function operand.
+  /// value and original function operand. Returns a pair of the parameter
+  /// index subset thunk and its interface substitution map (used to partially
+  /// apply the thunk).
   /// Calls `getOrCreateSubsetParametersThunkForLinearMap` to thunk the linear
   /// map returned by the associated function.
   std::pair<SILFunction *, SubstitutionMap>
@@ -1157,9 +1159,11 @@ public:
       AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
       SILAutoDiffIndices actualIndices);
 
-  /// Get or create an associated function index subset thunk from
+  /// Get or create an associated function parameter index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given associated function
-  /// value and original function operand.
+  /// value and original function operand. Returns a pair of the parameter
+  /// index subset thunk and its interface substitution map (used to partially
+  /// apply the thunk).
   std::pair<SILFunction *, SubstitutionMap>
   getOrCreateSubsetParametersThunkForLinearMap(
       SILFunction *assocFn, CanSILFunctionType linearMapType,
