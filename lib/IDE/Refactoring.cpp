@@ -545,7 +545,7 @@ public:
   RenameRangeCollector(const ValueDecl *D, StringRef newName)
       : newName(newName.str()) {
     llvm::raw_string_ostream OS(USR);
-    printDeclUSR(D, OS);
+    printValueDeclUSR(D, OS);
   }
 
   ArrayRef<RenameLoc> results() const { return locations; }

@@ -587,6 +587,8 @@ static unsigned getUnnamedParamIndex(const ParamDecl *D) {
 
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D->getDeclContext())) {
     ParamList = AFD->getParameters();
+  } else if (auto EED = dyn_cast<EnumElementDecl>(D->getDeclContext())) {
+    ParamList = EED->getParameterList();
   } else {
     auto ACE = cast<AbstractClosureExpr>(D->getDeclContext());
     ParamList = ACE->getParameters();
