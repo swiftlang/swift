@@ -92,7 +92,7 @@ extension Vector: Differentiable where T: Differentiable {}
 func inferredConformancesGeneric<T, U>(_: @differentiable (Vector<T>) -> Vector<U>) {}
 
 func nondiffVectorFunc(x: Vector<Int>) -> Vector<Int> {}
-// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to 'Differentiable}}
+// expected-error @+1 {{global function 'inferredConformancesGeneric' requires that 'Int' conform to '_Differentiable}}
 inferredConformancesGeneric(nondiffVectorFunc)
 
 func diffVectorFunc(x: Vector<Float>) -> Vector<Float> {}

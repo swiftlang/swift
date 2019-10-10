@@ -32,8 +32,7 @@
 using namespace swift;
 using namespace irgen;
 
-/// A pair of `@differentiable` function extractee and differentiation order.
-using DiffFuncIndex = std::pair<DifferentiableFunctionExtractee, unsigned>;
+using DiffFuncIndex = DifferentiableFunctionExtractee;
 
 namespace {
 class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
@@ -49,27 +48,24 @@ public:
   AutoDiffIndexSubset *ParameterIndices;
 
   std::string getFieldName() const {
-    auto extractee = std::get<0>(Index);
-    auto differentiationOrder = std::get<1>(Index);
-    switch (extractee) {
+    switch (Index) {
     case DifferentiableFunctionExtractee::Original:
       return "original";
     case DifferentiableFunctionExtractee::JVP:
-      return "jvp_" + llvm::itostr(differentiationOrder);
+      return "jvp";
     case DifferentiableFunctionExtractee::VJP:
-      return "vjp_" + llvm::itostr(differentiationOrder);
+      return "vjp";
     }
   }
 
   SILType getType(IRGenModule &IGM, SILType t) const {
     auto fnTy = t.castTo<SILFunctionType>();
     auto origFnTy = fnTy->getWithoutDifferentiability();
-    if (std::get<0>(Index) == DifferentiableFunctionExtractee::Original)
+    if (Index == DifferentiableFunctionExtractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
-    auto differentiationOrder = std::get<1>(Index);
-    auto kind = *std::get<0>(Index).getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        ParameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
+    auto kind = *Index.getExtracteeAsDerivativeFunction();
+    auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
+        ParameterIndices, /*resultIndex*/ 0, kind,
         IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
@@ -154,13 +150,12 @@ public:
   }
 
   SILType getType(DiffFuncIndex field) {
-    if (std::get<0>(field) == DifferentiableFunctionExtractee::Original)
+    if (field == DifferentiableFunctionExtractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy->getCanonicalType());
-    auto differentiationOrder = std::get<1>(field);
-    auto kind = *std::get<0>(field).getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, /*resultIndex*/ 0, differentiationOrder, kind,
-        IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
+    auto kind = *field.getExtracteeAsDerivativeFunction();
+    auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
+        parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
+        LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
   }
 
@@ -175,12 +170,7 @@ const TypeInfo *
 TypeConverter::convertDifferentiableFunctionType(SILFunctionType *type) {
   assert(type->isDifferentiable());
   DiffFuncTypeBuilder builder(IGM, type);
-  SmallVector<DiffFuncIndex, 3> fields;
-  fields.push_back(
-      std::make_pair(DifferentiableFunctionExtractee::Original, 0));
-  fields.push_back(
-      std::make_pair(DifferentiableFunctionExtractee::JVP, 1));
-  fields.push_back(
-      std::make_pair(DifferentiableFunctionExtractee::VJP, 1));
-  return builder.layout(fields);
+  return builder.layout({DifferentiableFunctionExtractee::Original,
+                         DifferentiableFunctionExtractee::JVP,
+                         DifferentiableFunctionExtractee::VJP});
 }

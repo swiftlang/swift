@@ -30,8 +30,6 @@ set(SWIFTLIB_ESSENTIAL
   ASCII.swift
   Assert.swift
   AssertCommon.swift
-  # SWIFT_ENABLE_TENSORFLOW
-  AutoDiff.swift
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
@@ -208,6 +206,9 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
+  Differentiable.swift
+  # SWIFT_ENABLE_TENSORFLOW
+  DifferentiationSupport.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift

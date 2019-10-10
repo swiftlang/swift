@@ -994,11 +994,10 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static ValueDecl *getAutoDiffApplyAssociatedFunction(
-    ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
-    unsigned arity, unsigned order, bool rethrows) {
+static ValueDecl *getAutoDiffApplyDerivativeFunction(
+    ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
+    unsigned arity, bool rethrows) {
   assert(arity >= 1);
-  assert(order == 1 && "higher-order differentiation is not supported yet");
   // JVP:
   //   <...T...(arity), R> (@differentiable (...T) throws -> R, ...T)
   //       rethrows -> (R, (...T.TangentVector) -> R.TangentVector)
@@ -1007,11 +1006,8 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   //       rethrows -> (R, (R.TangentVector) -> ...T.TangentVector)
   unsigned numGenericParams = 1 + arity;
   BuiltinGenericSignatureBuilder builder(Context, numGenericParams);
-  // Look up the Differentiable protocol.
-  SmallVector<ValueDecl *, 1> diffableProtoLookup;
-  Context.lookupInSwiftModule("Differentiable", diffableProtoLookup);
-  assert(diffableProtoLookup.size() == 1);
-  auto *diffableProto = cast<ProtocolDecl>(diffableProtoLookup.front());
+  // Get the `Differentiable` protocol.
+  auto *diffableProto = Context.getProtocol(KnownProtocolKind::Differentiable);
   // Create type parameters and add conformance constraints.
   auto fnResultGen = makeGenericParam(arity);
   builder.addConformanceRequirement(fnResultGen, diffableProto);
@@ -1039,20 +1035,20 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
     }
   };
   // Eagerly build the type of the first arg, then use that to compute the type
-  // of the associated function type.
+  // of the derivative function type.
   auto *origFnTy =
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
       origFnTy->getExtInfo().withNoEscape(false));
-  auto *paramIndices = AutoDiffParameterIndices::get(
-      SmallBitVector(origFnTy->getNumParams(), true), Context);
-  // Generator for the resultant function type, i.e. the AD associated function.
+  auto *paramIndices = AutoDiffIndexSubset::get(
+      Context, SmallBitVector(origFnTy->getNumParams(), true));
+  // Generator for the resultant function type, i.e. the AD derivative function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
-        auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
-            paramIndices, /*resultIndex*/ 0, /*differentiationOrder*/ 1, kind,
+        auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+            paramIndices, /*resultIndex*/ 0, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));
-        return assocFnTy->getResult();
+        return derivativeFnTy->getResult();
       }};
   builder.addParameter(firstArgGen);
   for (auto argGen : fnArgGens)
@@ -1844,14 +1840,14 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
   // SWIFT_ENABLE_TENSORFLOW
   if (OperationName.startswith("autodiffApply_")) {
-    AutoDiffAssociatedFunctionKind kind;
-    unsigned arity, order;
+    AutoDiffDerivativeFunctionKind kind;
+    unsigned arity;
     bool rethrows;
     if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
-                                                 order, rethrows))
+                                                 rethrows))
       return nullptr;
-    return getAutoDiffApplyAssociatedFunction(Context, Id, kind, arity,
-                                              order, rethrows);
+    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
+                                              rethrows);
   }
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)
 #define BUILTIN(id, name, Attrs) .Case(name, BuiltinValueKind::id)

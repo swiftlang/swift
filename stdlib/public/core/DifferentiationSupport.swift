@@ -1,8 +1,8 @@
-//===--- AutoDiff.swift ---------------------------------------*- swift -*-===//
+//===--- DifferentiationSupport.swift -------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -12,7 +12,8 @@
 //
 // SWIFT_ENABLE_TENSORFLOW
 //
-// This file defines support for automatic differentiation.
+// This file defines support for differentiable programming and deep learning
+// APIs.
 //
 //===----------------------------------------------------------------------===//
 
@@ -101,8 +102,9 @@ public extension VectorProtocol {
   }
 }
 
-/* Note: These default-implemented operators will slow down type-checking
-   performance and break existing code.
+/*
+// Note: These default-implemented operators will slow down type-checking
+// performance and break existing code.
 
 public extension VectorProtocol {
   static func + (lhs: Self, rhs: VectorSpaceScalar) -> Self {
@@ -148,50 +150,6 @@ public extension VectorProtocol where VectorSpaceScalar : SignedNumeric {
   }
 }
 */
-
-/// A type that mathematically represents a differentiable manifold whose
-/// tangent spaces are finite-dimensional.
-public protocol Differentiable {
-  /// A type representing a differentiable value’s derivatives.
-  ///
-  /// Mathematically, this is equivalent to the tangent bundle of the
-  /// differentiable manifold represented by the differentiable type.
-  associatedtype TangentVector: Differentiable & AdditiveArithmetic
-    where TangentVector.TangentVector == TangentVector
-
-  /// Moves `self` along the given direction. In Riemannian geometry, this is
-  /// equivalent to exponential map, which moves `self` on the geodesic surface
-  /// along the given tangent vector.
-  mutating func move(along direction: TangentVector)
-
-  /// A tangent vector such that `move(along: zeroTangentVector)` will not
-  /// modify `self`.
-  /// - Note: `zeroTangentVector` can be `TangentVector.zero` in most cases,
-  ///   but types whose tangent vectors depend on instance properties of `self`
-  ///   need to provide a different implementation. For example, the tangent
-  ///   vector of an `Array` depends on the array’s `count`.
-  @available(*, deprecated, message: """
-      `zeroTangentVector` derivation has not been implemented; do not use \
-      this property
-      """)
-  var zeroTangentVector: TangentVector { get }
-}
-
-public extension Differentiable {
-  // This is a temporary solution that allows us to add `zeroTangentVector`
-  // without implementing derived conformances. This property is marked
-  // unavailable because it will produce incorrect results when tangent vectors
-  // depend on instance properties of `self`.
-  // FIXME: Implement derived conformance and remove this default
-  // implementation.
-  var zeroTangentVector: TangentVector { .zero }
-}
-
-public extension Differentiable where TangentVector == Self {
-  mutating func move(along direction: TangentVector) {
-    self += direction
-  }
-}
 
 /// A type that is differentiable in the Euclidean space.
 /// The type may represent a vector space, or consist of a vector space and some
@@ -1077,8 +1035,9 @@ public extension Array where Element: Differentiable {
 }
 
 //===----------------------------------------------------------------------===//
-// JVP Diagnostics
+// JVP diagnostics
 //===----------------------------------------------------------------------===//
+
 @_silgen_name("_printJVPErrorAndExit")
 public func _printJVPErrorAndExit() -> Never {
     fatalError("""

@@ -72,37 +72,39 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *
-SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef assocFnDeclRef,
-                                       SILFunction *assocFn,
-                                       CanSILFunctionType assocFnTy) {
-  auto *autoDiffFuncId = assocFnDeclRef.autoDiffAssociatedFunctionIdentifier;
+SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef derivativeFnDeclRef,
+                                       SILFunction *derivativeFn,
+                                       CanSILFunctionType derivativeFnTy) {
+  auto *autoDiffFuncId =
+      derivativeFnDeclRef.autoDiffDerivativeFunctionIdentifier;
   assert(autoDiffFuncId);
-  auto *assocFnDecl = assocFnDeclRef.getDecl();
+  auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
 
   SILGenFunctionBuilder builder(*this);
-  auto originalFn = assocFnDeclRef.asAutoDiffOriginalFunction();
+  auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
   auto originalLinkage = originalFn.getLinkage(ForDefinition);
-  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
-      originalLinkage, /*isAssocFnExported*/ true);
-  auto name = assocFnDeclRef.mangle();
+  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
+      originalLinkage, /*isDerivativeFnExported*/ true);
+  auto name = derivativeFnDeclRef.mangle();
   auto *thunk = builder.getOrCreateFunction(
-      assocFnDecl, name, linkage, assocFnTy, IsBare, IsTransparent,
-      assocFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+      derivativeFnDecl, name, linkage, derivativeFnTy, IsBare, IsTransparent,
+      derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
+      IsThunk);
   if (!thunk->empty())
     return thunk;
 
-  if (auto genSig = assocFnTy->getGenericSignature())
+  if (auto genSig = derivativeFnTy->getGenericSignature())
     thunk->setGenericEnvironment(genSig->getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
-  auto loc = assocFnDeclRef.getAsRegularLocation();
+  auto loc = derivativeFnDeclRef.getAsRegularLocation();
   SGF.collectThunkParams(loc, params);
-  auto assocFnRef = SGF.B.createFunctionRef(loc, assocFn);
-  auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(assocFnTy);
+  auto derivativeFnRef = SGF.B.createFunctionRef(loc, derivativeFn);
+  auto autoDiffDerivativeFnSILTy = SILType::getPrimitiveObjectType(derivativeFnTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());
   auto apply = SGF.emitApplyWithRethrow(
-      loc, assocFnRef, autoDiffAssocFnSILTy,
+      loc, derivativeFnRef, autoDiffDerivativeFnSILTy,
       SGF.getForwardingSubstitutionMap(), args);
   SGF.B.createReturn(loc, apply);
   return thunk;
@@ -110,22 +112,24 @@ SILGenModule::getOrCreateAutoDiffThunk(SILDeclRef assocFnDeclRef,
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
-    SILDeclRef assocFnDeclRef, CanSILFunctionType constantTy) {
-  auto *autoDiffFuncId = assocFnDeclRef.autoDiffAssociatedFunctionIdentifier;
+    SILDeclRef derivativeFnDeclRef, CanSILFunctionType constantTy) {
+  auto *autoDiffFuncId =
+      derivativeFnDeclRef.autoDiffDerivativeFunctionIdentifier;
   assert(autoDiffFuncId);
-  auto *assocFnDecl = assocFnDeclRef.getDecl();
+  auto *derivativeFnDecl = derivativeFnDeclRef.getDecl();
 
   SILGenFunctionBuilder builder(*this);
-  auto originalFn = assocFnDeclRef.asAutoDiffOriginalFunction();
+  auto originalFn = derivativeFnDeclRef.asAutoDiffOriginalFunction();
   auto originalLinkage = originalFn.getLinkage(ForDefinition);
-  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
-      originalLinkage, /*isAssocFnExported*/ true);
+  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
+      originalLinkage, /*isDerivativeFnExported*/ true);
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
-  auto name = assocFnDeclRef.mangle() + "_vtable_entry_thunk";
+  auto name = derivativeFnDeclRef.mangle() + "_vtable_entry_thunk";
   auto *thunk = builder.getOrCreateFunction(
-      assocFnDecl, name, linkage, constantTy, IsBare, IsTransparent,
-      assocFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(), IsThunk);
+      derivativeFnDecl, name, linkage, constantTy, IsBare, IsTransparent,
+      derivativeFnDeclRef.isSerialized(), IsNotDynamic, ProfileCounter(),
+      IsThunk);
   if (!thunk->empty())
     return thunk;
 
@@ -133,22 +137,21 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
     thunk->setGenericEnvironment(genSig->getGenericEnvironment());
   SILGenFunction SGF(*this, *thunk, SwiftModule);
   SmallVector<ManagedValue, 4> params;
-  auto loc = assocFnDeclRef.getAsRegularLocation();
+  auto loc = derivativeFnDeclRef.getAsRegularLocation();
   SGF.collectThunkParams(loc, params);
   auto originalFnRef = SGF.emitGlobalFunctionRef(loc, originalFn);
-  auto loweredIndices = autoDiffFuncId->getParameterIndices()->getLowered(
-      SGF.getASTContext(),
-      assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
+  auto *loweredIndices = autodiff::getLoweredParameterIndices(
+      autoDiffFuncId->getParameterIndices(),
+      derivativeFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
   auto diffFn = SGF.B.createDifferentiableFunction(
-      loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
-  auto diffAssocFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
-      /*differentiationOrder*/ 1, diffFn);
-  auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
+      loc, loweredIndices, originalFnRef);
+  auto diffDerivativeFn = SGF.B.createDifferentiableFunctionExtract(
+      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()), diffFn);
+  auto autoDiffDerivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());
   auto apply = SGF.emitApplyWithRethrow(
-      loc, diffAssocFn, autoDiffAssocFnSILTy,
+      loc, diffDerivativeFn, autoDiffDerivativeFnSILTy,
       SGF.getForwardingSubstitutionMap(), args);
   SGF.B.createReturn(loc, apply);
   return thunk;
@@ -181,7 +184,7 @@ getNextUncurryLevelRef(SILGenFunction &SGF, SILLocation loc, SILDeclRef thunk,
   // SWIFT_ENABLE_TENSORFLOW
   SILDeclRef next = SILDeclRef(vd, thunk.kind, /*isCurried*/ false,
                                /*isForeign*/ false,
-                               thunk.autoDiffAssociatedFunctionIdentifier);
+                               thunk.autoDiffDerivativeFunctionIdentifier);
   assert(!next.isCurried);
 
   auto constantInfo = SGF.SGM.Types.getConstantInfo(next);

@@ -2653,8 +2653,8 @@ static bool conformsToDifferentiable(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Returns true if the given type's `TangentVector` is equal to itself in the given
-/// module.
+/// Returns true if the given type's `TangentVector` is equal to itself in the
+/// given module.
 static bool tangentVectorEqualSelf(Type type, DeclContext *DC) {
   assert(conformsToDifferentiable(type, DC));
   auto &ctx = type->getASTContext();
@@ -2668,18 +2668,24 @@ static bool tangentVectorEqualSelf(Type type, DeclContext *DC) {
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-/// Creates a `AutoDiffParameterIndices` for the given function type,
-/// inferring all differentiation parameters.
+/// Creates a `AutoDiffIndexSubset` for the given function type, representing
+/// all inferred differentiation parameters.
 /// The differentiation parameters are inferred to be:
 /// - All parameters of the function type that conform to `Differentiable`.
-/// - If the function type's result is a function type, then also all
-///   parameters of the function result type that conform to `Differentiable`.
-AutoDiffParameterIndices *
+/// - If the function type's result is a function type (i.e. it is a curried
+///   method type), then also all parameters of the function result type that
+///   conform to `Differentiable`.
+AutoDiffIndexSubset *
 TypeChecker::inferDifferentiableParameters(
     AbstractFunctionDecl *AFD, GenericEnvironment *derivativeGenEnv) {
   auto &ctx = AFD->getASTContext();
   auto *functionType = AFD->getInterfaceType()->castTo<AnyFunctionType>();
-  AutoDiffParameterIndicesBuilder builder(functionType);
+  auto numUncurriedParams = functionType->getNumParams();
+  if (auto *resultFnType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  llvm::SmallBitVector parameterBits(numUncurriedParams);
   SmallVector<Type, 4> allParamTypes;
 
   // Returns true if the i-th parameter type is differentiable.
@@ -2713,15 +2719,15 @@ TypeChecker::inferDifferentiableParameters(
     allParamTypes.push_back(param.getPlainType());
 
   // Set differentiation parameters.
-  for (unsigned i : range(builder.size()))
+  for (unsigned i : range(parameterBits.size()))
     if (isDifferentiableParam(i))
-      builder.setParameter(i);
+      parameterBits.set(i);
 
-  return builder.build(ctx);
+  return AutoDiffIndexSubset::get(ctx, parameterBits);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static FuncDecl *resolveAutoDiffAssociatedFunction(
+static FuncDecl *resolveAutoDiffDerivativeFunction(
     TypeChecker &TC, DeclNameWithLoc specifier, AbstractFunctionDecl *original,
     Type expectedTy, std::function<bool(FuncDecl *)> isValid) {
   auto nameLoc = specifier.Loc.getBaseNameLoc();
@@ -2744,9 +2750,9 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
                 specifier.Name);
   };
 
-  // Returns true if the original function and associated function candidate are
+  // Returns true if the original function and derivative function candidate are
   // defined in compatible type contexts. If the original function and the
-  // associated function have different parents, or if they both have no type
+  // derivative function have different parents, or if they both have no type
   // context and are in different modules, return false.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     // Check if both functions are top-level.
@@ -2769,7 +2775,7 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
   };
 
   // If the original function is exported (i.e. it is public or
-  // @usableFromInline), then the associated functions must also be exported.
+  // @usableFromInline), then the derivative functions must also be exported.
   // Returns true on error.
   auto checkAccessControl = [&](FuncDecl *func) {
     if (!isABIPublic(original))
@@ -2876,13 +2882,13 @@ static bool checkFunctionSignature(
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-// Computes `AutoDiffParameterIndices` from the given parsed differentiation
+// Computes `AutoDiffIndexSubset` from the given parsed differentiation
 // parameters (possibly empty) for the given function and derivative generic
 // environment, then verifies that the parameter indices are valid.
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
-static AutoDiffParameterIndices *computeDifferentiationParameters(
+static AutoDiffIndexSubset *computeDifferentiationParameters(
     TypeChecker &TC, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
     AbstractFunctionDecl *function, GenericEnvironment *derivativeGenEnv,
     StringRef attrName, SourceLoc attrLoc
@@ -2930,7 +2936,12 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
         function, derivativeGenEnv);
 
   // Otherwise, build parameter indices from parsed differentiation parameters.
-  AutoDiffParameterIndicesBuilder builder(functionType);
+  auto numUncurriedParams = functionType->getNumParams();
+  if (auto *resultFnType =
+          functionType->getResult()->getAs<AnyFunctionType>()) {
+    numUncurriedParams += resultFnType->getNumParams();
+  }
+  llvm::SmallBitVector parameterBits(numUncurriedParams);
   int lastIndex = -1;
   for (unsigned i : indices(parsedWrtParams)) {
     auto paramLoc = parsedWrtParams[i].getLoc();
@@ -2953,7 +2964,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
                       diag::diff_params_clause_params_not_original_order);
           return nullptr;
         }
-        builder.setParameter(index);
+        parameterBits.set(index);
         lastIndex = index;
         break;
       }
@@ -2969,7 +2980,7 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
           TC.diagnose(paramLoc, diag::diff_params_clause_self_must_be_first);
           return nullptr;
         }
-        builder.setParameter(builder.size() - 1);
+        parameterBits.set(parameterBits.size() - 1);
         break;
       }
       case ParsedAutoDiffParameter::Kind::Ordered: {
@@ -2984,19 +2995,19 @@ static AutoDiffParameterIndices *computeDifferentiationParameters(
               diag::diff_params_clause_params_not_original_order);
           return nullptr;
         }
-        builder.setParameter(index);
+        parameterBits.set(index);
         lastIndex = index;
         break;
       }
     }
   }
-  return builder.build(TC.Context);
+  return AutoDiffIndexSubset::get(TC.Context, parameterBits);
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Computes `AutoDiffIndexSubset` from the given parsed transposing
-// parameters (possibly empty) for the given function, then verifies
-// that the parameter indices are valid.
+// Computes `AutoDiffIndexSubset` from the given parsed transposing parameters
+// (possibly empty) for the given function, then verifies that the parameter
+// indices are valid.
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
@@ -3100,16 +3111,16 @@ static AutoDiffIndexSubset *computeTransposingParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Checks if the given `AutoDiffParameterIndices` instance is valid for the
-// given function type in the given derivative generic environment and module
+// Checks if the given `AutoDiffIndexSubset` instance is valid for the given
+// function type in the given derivative generic environment and module
 // context. Returns true on error.
 // The parsed differentiation parameters and attribute location are used in
 // diagnostics.
 static bool checkDifferentiationParameters(
-    TypeChecker &TC, AbstractFunctionDecl *AFD,
-    AutoDiffParameterIndices *indices, AnyFunctionType *functionType,
-    GenericEnvironment *derivativeGenEnv, ModuleDecl *module,
-    ArrayRef<ParsedAutoDiffParameter> parsedWrtParams, SourceLoc attrLoc) {
+    TypeChecker &TC, AbstractFunctionDecl *AFD, AutoDiffIndexSubset *indices,
+    AnyFunctionType *functionType, GenericEnvironment *derivativeGenEnv,
+    ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
+    SourceLoc attrLoc) {
   // Diagnose empty parameter indices. This occurs when no `wrt` clause is
   // declared and no differentiation parameters can be inferred.
   if (indices->isEmpty()) {
@@ -3119,7 +3130,7 @@ static bool checkDifferentiationParameters(
 
   // Check that differentiation parameters have allowed types.
   SmallVector<Type, 4> wrtParamTypes;
-  indices->getSubsetParameterTypes(functionType, wrtParamTypes);
+  autodiff::getSubsetParameterTypes(indices, functionType, wrtParamTypes);
   for (unsigned i : range(wrtParamTypes.size())) {
     SourceLoc loc = parsedWrtParams.empty()
         ? attrLoc
@@ -3173,7 +3184,7 @@ static bool checkTransposingParameters(
     ModuleDecl *module, ArrayRef<ParsedAutoDiffParameter> parsedWrtParams,
     SourceLoc attrLoc) {
   // Check that differentiation parameters have allowed types.
-    for (unsigned i : indices(wrtParamTypes)) {
+  for (unsigned i : range(wrtParamTypes.size())) {
     auto wrtParamType = wrtParamTypes[i];
     if (!wrtParamType->hasTypeParameter())
       wrtParamType = wrtParamType->mapTypeOutOfContext();
@@ -3319,7 +3330,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
   //   for serialization.
-  // - Compute generic signature for autodiff associated functions based on
+  // - Compute generic signature for autodiff derivative functions based on
   //   the original function's generate signature and the attribute's where
   //   clause requirements.
   GenericSignature *whereClauseGenSig = nullptr;
@@ -3353,7 +3364,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return;
     }
 
-    // Build a new generic signature for autodiff associated functions.
+    // Build a new generic signature for autodiff derivative functions.
     GenericSignatureBuilder builder(ctx);
     // Add the original function's generic signature.
     builder.addGenericSignature(originalGenSig);
@@ -3408,7 +3419,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto parsedWrtParams = attr->getParsedParameters();
   // Get checked wrt param indices.
   // This is defined only for compiler-synthesized attributes.
-  AutoDiffParameterIndices *checkedWrtParamIndices =
+  AutoDiffIndexSubset *checkedWrtParamIndices =
       attr->getParameterIndices();
 
   // Compute the derivative function type.
@@ -3465,10 +3476,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the JVP declaration, if it exists.
   if (attr->getJVP()) {
     AnyFunctionType *expectedJVPFnTy =
-        originalFnTy->getAutoDiffAssociatedFunctionType(
+        originalFnTy->getAutoDiffDerivativeFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
-            /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::JVP,
-            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
+            AutoDiffDerivativeFunctionKind::JVP, lookupConformance,
+            whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
       TC.validateDecl(jvpCandidate);
@@ -3477,7 +3488,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           jvpCandidate->getInterfaceType()->getCanonicalType());
     };
 
-    FuncDecl *jvp = resolveAutoDiffAssociatedFunction(
+    FuncDecl *jvp = resolveAutoDiffDerivativeFunction(
         TC, attr->getJVP().getValue(), original, expectedJVPFnTy, isValidJVP);
 
     if (!jvp) {
@@ -3491,10 +3502,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the VJP declaration, if it exists.
   if (attr->getVJP()) {
     AnyFunctionType *expectedVJPFnTy =
-        originalFnTy->getAutoDiffAssociatedFunctionType(
+        originalFnTy->getAutoDiffDerivativeFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
-            /*differentiationOrder*/ 1, AutoDiffAssociatedFunctionKind::VJP,
-            lookupConformance, whereClauseGenSig, /*makeSelfParamFirst*/ true);
+            AutoDiffDerivativeFunctionKind::VJP, lookupConformance,
+            whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
       TC.validateDecl(vjpCandidate);
@@ -3503,7 +3514,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           vjpCandidate->getInterfaceType()->getCanonicalType());
     };
 
-    FuncDecl *vjp = resolveAutoDiffAssociatedFunction(
+    FuncDecl *vjp = resolveAutoDiffDerivativeFunction(
         TC, attr->getVJP().getValue(), original, expectedVJPFnTy, isValidVJP);
 
     if (!vjp) {
@@ -3582,8 +3593,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
   auto valueResultElt = derivativeResultTupleType->getElement(0);
   auto funcResultElt = derivativeResultTupleType->getElement(1);
-  // Get derivative kind and associated function identifier.
-  AutoDiffAssociatedFunctionKind kind;
+  // Get derivative kind and derivative function identifier.
+  AutoDiffDerivativeFunctionKind kind;
   if (valueResultElt.getName().str() != "value") {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_value_label);
@@ -3591,9 +3602,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   if (funcResultElt.getName().str() == "differential") {
-    kind = AutoDiffAssociatedFunctionKind::JVP;
+    kind = AutoDiffDerivativeFunctionKind::JVP;
   } else if (funcResultElt.getName().str() == "pullback") {
-    kind = AutoDiffAssociatedFunctionKind::VJP;
+    kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_func_label);
@@ -3705,7 +3716,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   attr->setOriginalFunction(originalFn);
 
   // Get checked wrt param indices.
-  AutoDiffParameterIndices *checkedWrtParamIndices =
+  AutoDiffIndexSubset *checkedWrtParamIndices =
       attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
@@ -3738,8 +3749,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
 
   // Gather differentiation parameters.
   SmallVector<Type, 4> wrtParamTypes;
-  checkedWrtParamIndices->getSubsetParameterTypes(
-      originalFnType, wrtParamTypes);
+  autodiff::getSubsetParameterTypes(checkedWrtParamIndices, originalFnType,
+                                    wrtParamTypes);
 
   auto diffParamElts =
       map<SmallVector<TupleTypeElt, 4>>(wrtParamTypes, [&](Type paramType) {
@@ -3762,7 +3773,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // Compute expected differential/pullback type.
   auto funcEltType = funcResultElt.getType();
   Type expectedFuncEltType;
-  if (kind == AutoDiffAssociatedFunctionKind::JVP) {
+  if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
         diffParamElts, [&](TupleTypeElt elt) {
           return AnyFunctionType::Param(elt.getType());
@@ -3823,10 +3834,10 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                                     /*vjp*/ None,
                                     derivative->getGenericSignature());
     switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       da->setJVPFunction(derivative);
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       da->setVJPFunction(derivative);
       break;
     }
@@ -3850,7 +3861,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // `@differentiating` attribute. Otherwise, register the derivative in the
   // `@differentiable` attribute.
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
+  case AutoDiffDerivativeFunctionKind::JVP:
     // If there's a different registered derivative, emit an error.
     if ((da->getJVP() &&
          da->getJVP()->Name.getBaseName() != derivative->getBaseName()) ||
@@ -3862,7 +3873,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     }
     da->setJVPFunction(derivative);
     break;
-  case AutoDiffAssociatedFunctionKind::VJP:
+  case AutoDiffDerivativeFunctionKind::VJP:
     // If there's a different registered derivative, emit an error.
     if ((da->getVJP() &&
          da->getVJP()->Name.getBaseName() != derivative->getBaseName()) ||

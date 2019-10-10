@@ -245,7 +245,7 @@ public func TF_688<Scalar: Differentiable>(
   reduction(x)
 }
 
-// TF-697: Test generic requirements of generated AD associated function.
+// TF-697: Test generic requirements of generated derivative function.
 protocol TF_697_Module: Differentiable {
     associatedtype Input
     associatedtype Output: Differentiable
@@ -272,6 +272,25 @@ extension TF_697_Sequential: TF_697_Layer where Layer1: TF_697_Layer {
     func callLayer(_ input: Layer1.Input) -> Layer2.Output {
         layer2.callLayer(layer1.callLayer(input))
     }
+}
+
+// TF-817: Test remapping `apply` callee types in derivative function context.
+struct TF_817<T> {
+  func foo(_ index: Int) -> T {
+    fatalError()
+  }
+}
+extension TF_817: Differentiable where T: Differentiable {
+  @differentiating(foo)
+  func vjpFoo(index: Int) -> (value: T, pullback: (T.TangentVector) -> (TangentVector)) {
+    fatalError()
+  }
+}
+extension TF_817 {
+  @differentiable(wrt: self where T: Differentiable)
+  public func test(index: Int) -> T {
+    return self.foo(0) // crash happened here
+  }
 }
 
 // Test layout requirements.

@@ -379,8 +379,8 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
-std::string ASTMangler::mangleAutoDiffAssociatedFunctionHelper(
-    StringRef name, AutoDiffAssociatedFunctionKind kind,
+std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
+    StringRef name, AutoDiffDerivativeFunctionKind kind,
     const SILAutoDiffIndices &indices) {
   // TODO(TF-20): Make the mangling scheme robust.
   // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
@@ -388,10 +388,10 @@ std::string ASTMangler::mangleAutoDiffAssociatedFunctionHelper(
 
   Buffer << "AD__" << name << '_';
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
+  case AutoDiffDerivativeFunctionKind::JVP:
     Buffer << "_jvp_";
     break;
-  case AutoDiffAssociatedFunctionKind::VJP:
+  case AutoDiffDerivativeFunctionKind::VJP:
     Buffer << "_vjp_";
     break;
   }

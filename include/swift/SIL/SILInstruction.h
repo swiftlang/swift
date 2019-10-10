@@ -7846,8 +7846,8 @@ class TryApplyInst final
 
 // SWIFT_ENABLE_TENSORFLOW
 /// `differentiable_function` - given a function and differentiation indices and
-/// its associated differentiation functions, create an `@differentiable`
-/// function that represents a bundle of these functions and configurations.
+/// its derivative functions, create an `@differentiable` function that
+/// represents a bundle of these functions and configurations.
 class DifferentiableFunctionInst final :
     public InstructionBaseWithTrailingOperands<
                SILInstructionKind::DifferentiableFunctionInst,
@@ -7855,69 +7855,78 @@ class DifferentiableFunctionInst final :
 private:
   friend SILBuilder;
   /// Differentiation parameter indices.
-  AutoDiffIndexSubset *parameterIndices;
-  /// The order of differentiation.
-  unsigned differentiationOrder;
-  /// The number of operands. The first operand is always the original function.
-  /// The rest of operands determined by the order of differentiation and whether
-  /// this is the new AD model or the legacy reverse-mode AD model.
-  unsigned numOperands;
+  AutoDiffIndexSubset *ParameterIndices;
+  /// Indicates whether derivative functions (JVP/VJP) exist.
+  bool HasDerivativeFunctions;
 
-  DifferentiableFunctionInst(SILModule &module, SILDebugLocation debugLoc,
-                             AutoDiffIndexSubset *parameterIndices,
-                             unsigned differentiationOrder,
-                             SILValue originalFunction,
-                             ArrayRef<SILValue> associatedFunctions);
+  DifferentiableFunctionInst(
+      SILDebugLocation DebugLoc, AutoDiffIndexSubset *ParameterIndices,
+      SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
+      bool HasOwnership);
+
+  static SILType getDifferentiableFunctionType(
+      SILValue Original, AutoDiffIndexSubset *ParameterIndices);
+
+  static ValueOwnershipKind getMergedOwnershipKind(
+      SILValue Original, ArrayRef<SILValue> DerivativeFunctions);
 
 public:
   static DifferentiableFunctionInst *create(
-      SILModule &module, SILDebugLocation debugLoc,
-      AutoDiffIndexSubset *parameterIndices, unsigned differentiationOrder,
-      SILValue originalFunction, ArrayRef<SILValue> associatedFunctions);
-
-  static SILType getAutoDiffType(SILValue original,
-                                 unsigned differentiationOrder,
-                                 AutoDiffIndexSubset *parameterIndices);
+      SILModule &Module, SILDebugLocation DebugLoc,
+      AutoDiffIndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
+      bool HasOwnership);
 
   /// Returns the original function.
-  SILValue getOriginalFunction() const { return getAllOperands()[0].get(); }
+  SILValue getOriginalFunction() const { return getOperand(0); }
 
   /// Returns differentiation indices.
-  AutoDiffIndexSubset *getParameterIndices() const {
-    return parameterIndices;
+  AutoDiffIndexSubset *getParameterIndices() const { return ParameterIndices; }
+
+  /// Returns true if derivative functions (JVP/VJP) exist.
+  bool hasDerivativeFunctions() const { return HasDerivativeFunctions; }
+
+  /// Returns the derivative functions, namely the JVP and VJP functions, if
+  /// they exist. Otherwise, return None.
+  Optional<std::pair<SILValue, SILValue>>
+  getOptionalDerivativeFunctionPair() const {
+    if (!HasDerivativeFunctions)
+      return None;
+    return std::make_pair(getOperand(1), getOperand(2));
   }
 
-  /// Returns the differentiation order.
-  unsigned getDifferentiationOrder() const {
-    return differentiationOrder;
-  }
-
-  unsigned getNumAssociatedFunctions() const {
-    return numOperands - 1;
-  }
-
-  bool hasAssociatedFunctions() const {
-    return numOperands > 1;
-  }
-
-  ArrayRef<Operand> getAssociatedFunctions() const {
+  ArrayRef<Operand> getDerivativeFunctionArray() const {
     return getAllOperands().drop_front();
   }
 
-  std::pair<SILValue, SILValue>
-  getAssociatedFunctionPair(unsigned differentiationOrder) const;
+  /// Returns the JVP function.
+  SILValue getJVPFunction() const {
+    assert(HasDerivativeFunctions);
+    return getOperand(1);
+  }
 
-  SILValue getAssociatedFunction(unsigned differentiationOrder,
-                                 AutoDiffAssociatedFunctionKind kind) const;
+  /// Returns the VJP function.
+  SILValue getVJPFunction() const {
+    assert(HasDerivativeFunctions);
+    return getOperand(2);
+  }
+
+  /// Returns the derivative function (JVP or VJP) that matches the given kind.
+  SILValue getDerivativeFunction(AutoDiffDerivativeFunctionKind kind) const {
+    switch (kind) {
+    case AutoDiffDerivativeFunctionKind::JVP: return getJVPFunction();
+    case AutoDiffDerivativeFunctionKind::VJP: return getVJPFunction();
+    }
+  }
 };
 
 /// `differentiable_function_extract` - given an `@differentiable` function
-/// representing a bundle of the original function and associated functions,
+/// representing a bundle of the original function and derivative functions,
 /// extract the specified function.
 class DifferentiableFunctionExtractInst
     : public InstructionBase<
           SILInstructionKind::DifferentiableFunctionExtractInst,
-          OwnershipForwardingSingleValueInst> {
+          SingleValueInstruction> {
 public:
   struct Extractee {
     enum innerty : unsigned {
@@ -7927,58 +7936,40 @@ public:
     } rawValue;
     Extractee() = default;
     Extractee(innerty rawValue) : rawValue(rawValue) {}
-    Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
-    Extractee(AutoDiffAssociatedFunctionKind kind);
+    explicit Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
+    Extractee(AutoDiffDerivativeFunctionKind kind);
     explicit Extractee(StringRef name);
     operator innerty() const { return rawValue; }
 
-    Optional<AutoDiffAssociatedFunctionKind>
-    getExtracteeAsAssociatedFunction() const;
+    Optional<AutoDiffDerivativeFunctionKind>
+    getExtracteeAsDerivativeFunction() const;
   };
 
 private:
   /// The extractee.
   Extractee extractee;
-  /// The differentiation order. A zero value is only legal when the extractee
-  /// is the original function, and it is a private representation only.
-  unsigned differentiationOrder;
   /// The list containing the `@differentiable` function operand.
   FixedOperandList<1> operands;
 
   static SILType
-  getExtracteeType(SILValue function, Extractee extractee,
-                   unsigned differentiationOrder, SILModule &module);
+  getExtracteeType(SILValue function, Extractee extractee, SILModule &module);
 
 public:
   explicit DifferentiableFunctionExtractInst(
       SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
-      unsigned differentiationOrder, SILValue theFunction);
+      SILValue theFunction);
 
-  Extractee getExtractee() const {
-    return extractee;
-  }
+  Extractee getExtractee() const { return extractee; }
 
-  AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
-    auto kind = extractee.getExtracteeAsAssociatedFunction();
+  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
+    auto kind = extractee.getExtracteeAsDerivativeFunction();
     assert(kind);
     return *kind;
   }
 
-  SILValue getFunctionOperand() const {
-    return operands[0].get();
-  }
-
-  unsigned getDifferentiationOrder() const {
-    return differentiationOrder;
-  }
-
-  ArrayRef<Operand> getAllOperands() const {
-    return operands.asArray();
-  }
-
-  MutableArrayRef<Operand> getAllOperands() {
-    return operands.asArray();
-  }
+  SILValue getFunctionOperand() const { return operands[0].get(); }
+  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
 
 typedef DifferentiableFunctionExtractInst::Extractee

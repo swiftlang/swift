@@ -623,12 +623,8 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
       auto derivedParameters = derivedDA->getParameterIndices();
       // If base and derived parameter indices are both defined, check whether
       // base parameter indices are a subset of derived parameter indices.
-      if (derivedParameters &&
-          baseParameters &&
-          AutoDiffIndexSubset::get(
-              ctx, baseParameters->parameters)
-              ->isSubsetOf(AutoDiffIndexSubset::get(
-                  ctx, derivedParameters->parameters))) {
+      if (derivedParameters && baseParameters &&
+          baseParameters->isSubsetOf(derivedParameters)) {
         defined = true;
         break;
       }
@@ -649,13 +645,12 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
     auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
         derivedAFD, nullptr);
     bool omitWrtClause = !baseParameters ||
-        baseParameters->parameters.count() ==
-        inferredParameters->parameters.count();
+        baseParameters->getNumIndices() == inferredParameters->getNumIndices();
     // Get `@differentiable` attribute description.
     std::string baseDAString;
     llvm::raw_string_ostream stream(baseDAString);
     baseDA->print(stream, derivedDecl, omitWrtClause,
-                  /*omitAssociatedFunctions*/ true);
+                  /*omitDerivativeFunctions*/ true);
     diags.diagnose(
         derivedDecl, diag::overriding_decl_missing_differentiable_attr,
         StringRef(stream.str()).trim());
@@ -683,12 +678,8 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
       // If the parameter indices of `derivedDA` are a subset of those of
       // `baseDA`, then `baseDA` subsumes `derivedDA` and the function is
       // marked as overridden.
-      if (derivedParameters &&
-            baseParameters &&
-            AutoDiffIndexSubset::get(
-                ctx, derivedParameters->parameters)
-              ->isSubsetOf(AutoDiffIndexSubset::get(
-                  ctx, baseParameters->parameters))) {
+      if (derivedParameters && baseParameters &&
+          derivedParameters->isSubsetOf(baseParameters)) {
         overrides = false;
         break;
       }

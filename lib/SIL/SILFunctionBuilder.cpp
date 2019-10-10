@@ -80,7 +80,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
   // - Thunks. Those are currently handled in SILGenThunk.cpp.
   if ((!isa<AccessorDecl>(decl) || cast<AccessorDecl>(decl)->isGetter()) &&
       constant.kind != SILDeclRef::Kind::DefaultArgGenerator &&
-      !constant.autoDiffAssociatedFunctionIdentifier &&
+      !constant.autoDiffDerivativeFunctionIdentifier &&
       !constant.isStoredPropertyInitializer() &&
       !constant.isThunk()) {
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
@@ -90,9 +90,8 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       // necessary hack regarding deserialization.
       if (!paramIndices)
         continue;
-      auto *loweredParamIndices = paramIndices->getLowered(
-          F->getASTContext(),
-          decl->getInterfaceType()->castTo<AnyFunctionType>());
+      auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
+          paramIndices, decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);
       // Get JVP/VJP names.
       std::string jvpName, vjpName;
@@ -100,15 +99,15 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
       if (auto *jvpFn = A->getJVPFunction()) {
         Mangle::ASTMangler mangler;
         jvpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffAssociatedFunctionHelper(
-                constant.mangle(), AutoDiffAssociatedFunctionKind::JVP,
+            mangler.mangleAutoDiffDerivativeFunctionHelper(
+                constant.mangle(), AutoDiffDerivativeFunctionKind::JVP,
                 indices)).str();
       }
       if (auto *vjpFn = A->getVJPFunction()) {
         Mangle::ASTMangler mangler;
         vjpName = ctx.getIdentifier(
-            mangler.mangleAutoDiffAssociatedFunctionHelper(
-                constant.mangle(), AutoDiffAssociatedFunctionKind::VJP,
+            mangler.mangleAutoDiffDerivativeFunctionHelper(
+                constant.mangle(), AutoDiffDerivativeFunctionKind::VJP,
                 indices)).str();
       }
       auto *silDiffAttr = SILDifferentiableAttr::create(

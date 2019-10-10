@@ -5431,10 +5431,8 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
     DifferentiableFunctionExpr *E, SGFContext C) {
   auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
-  // TODO(rxwei): Use the order specified in E's function type.
   auto *diffFunc = SGF.B.createDifferentiableFunction(
-      E, destTy->getDifferentiationParameterIndices(), /*order*/ 1,
-      origFunc.forward(SGF));
+      E, destTy->getDifferentiationParameterIndices(), origFunc.forward(SGF));
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 

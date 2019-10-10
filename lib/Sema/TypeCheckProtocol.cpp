@@ -561,10 +561,8 @@ swift::matchWitness(
           witnessDiffAttrs, [&](const DifferentiableAttr *witnessDiffAttr) {
             return witnessDiffAttr->getParameterIndices() &&
                    reqDiffAttr->getParameterIndices() &&
-                   AutoDiffIndexSubset::get(
-                       ctx, witnessDiffAttr->getParameterIndices()->parameters)
-                     ->isSupersetOf(AutoDiffIndexSubset::get(
-                         ctx, reqDiffAttr->getParameterIndices()->parameters));
+                   witnessDiffAttr->getParameterIndices()
+                     ->isSupersetOf(reqDiffAttr->getParameterIndices());
           });
       if (!reqDiffAttrMatch) {
         auto implicitDiffAttr = false;
@@ -2259,13 +2257,13 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
         reqAttr->getDerivativeGenericEnvironment(original);
     auto *inferredParameters = TypeChecker::inferDifferentiableParameters(
         original, whereClauseGenEnv);
-    bool omitWrtClause = reqAttr->getParameterIndices()->parameters.count() ==
-                         inferredParameters->parameters.count();
+    bool omitWrtClause = reqAttr->getParameterIndices()->getNumIndices() ==
+                         inferredParameters->getNumIndices();
     // Get `@differentiable` attribute description.
     std::string reqDiffAttrString;
     llvm::raw_string_ostream stream(reqDiffAttrString);
     reqAttr->print(stream, req, omitWrtClause,
-                   /*omitAssociatedFunctions*/ true);
+                   /*omitDerivativeFunctions*/ true);
     diags.diagnose(match.Witness,
                    diag::protocol_witness_missing_differentiable_attr,
                    StringRef(stream.str()).trim());

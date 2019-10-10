@@ -1872,21 +1872,19 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 // SWIFT_ENABLE_TENSORFLOW
 void IRGenSILFunction::
 visitDifferentiableFunctionInst(DifferentiableFunctionInst *i) {
-  // The original function and associated functions can be thin or thick.
+  // The original function and derivative functions can be thin or thick.
   auto origExp = getLoweredExplosion(i->getOriginalFunction());
   Explosion e;
   e.add(origExp.claimAll());
-  for (auto &assocFnOp : i->getAssociatedFunctions())
-    e.add(getLoweredExplosion(assocFnOp.get()).claimAll());
+  assert(i->hasDerivativeFunctions());
+  for (auto &derivFnOperand : i->getDerivativeFunctionArray())
+    e.add(getLoweredExplosion(derivFnOperand.get()).claimAll());
   setLoweredExplosion(i, e);
 }
 
 void IRGenSILFunction::
 visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i) {
-  unsigned structFieldOffset = 0;
-  if (i->getExtractee() != DifferentiableFunctionExtractee::Original)
-    structFieldOffset = 1 + autodiff::getOffsetForAutoDiffAssociatedFunction(
-      i->getDifferentiationOrder(), i->getAssociatedFunctionKind());
+  unsigned structFieldOffset = i->getExtractee().rawValue;
   unsigned fieldSize = 1;
   auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
   if (fnRepr == SILFunctionTypeRepresentation::Thick) {
@@ -1894,6 +1892,7 @@ visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i) {
     fieldSize = 2;
   }
   auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  assert(diffFnExp.size() == fieldSize * 3);
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)diffFnExp.claimAll();

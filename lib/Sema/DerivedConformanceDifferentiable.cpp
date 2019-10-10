@@ -621,7 +621,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
     // Now that this member is in the `TangentVector` type, it should be marked
     // `@differentiable` so that the differentiation transform will synthesize
-    // associated functions for it. We only add this to public stored
+    // derivative functions for it. We only add this to public stored
     // properties, because their access outside the module will go through a
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&
@@ -646,13 +646,8 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
           C, /*implicit*/ true, SourceLoc(), SourceLoc(),
           /*linear*/ false, {}, None, None, derivativeGenSig);
       member->getAttrs().add(diffableAttr);
-      // Compute getter parameter indices.
-      auto *getterType = member->getAccessor(AccessorKind::Get)
-                             ->getInterfaceType()
-                             ->castTo<AnyFunctionType>();
-      AutoDiffParameterIndicesBuilder builder(getterType);
-      builder.setParameter(0);
-      diffableAttr->setParameterIndices(builder.build(C));
+      // Set getter `@differentiable` attribute parameter indices.
+      diffableAttr->setParameterIndices(AutoDiffIndexSubset::get(C, 1, {0}));
     }
   }
 
