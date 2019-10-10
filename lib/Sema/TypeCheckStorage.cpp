@@ -269,9 +269,8 @@ void swift::validatePatternBindingEntries(TypeChecker &tc,
 llvm::Expected<bool>
 IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
-  auto storageDC = storage->getDeclContext();
-  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
-                 storageDC->hasValueSemantics());
+  bool result = (!storage->isStatic() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
 
   // 'lazy' overrides the normal accessor-based rules and heavily
   // restricts what accessors can be used.  The getter is considered
@@ -299,7 +298,7 @@ IsGetterMutatingRequest::evaluate(Evaluator &evaluator,
 
   // Protocol requirements are always written as '{ get }' or '{ get set }';
   // the @_borrowed attribute determines if getReadImpl() becomes Get or Read.
-  if (isa<ProtocolDecl>(storageDC))
+  if (isa<ProtocolDecl>(storage->getDeclContext()))
     return checkMutability(AccessorKind::Get);
 
   switch (storage->getReadImpl()) {
@@ -325,9 +324,8 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
                                   AbstractStorageDecl *storage) const {
   // By default, the setter is mutating if we have an instance member of a
   // value type, but this can be overridden below.
-  auto storageDC = storage->getDeclContext();
-  bool result = (!storage->isStatic() && storageDC->isTypeContext() &&
-                 storageDC->hasValueSemantics());
+  bool result = (!storage->isStatic() &&
+                 doesContextHaveValueSemantics(storage->getDeclContext()));
 
   // If we have an attached property wrapper, the setter is mutating
   // or not based on the composition of the wrappers.
