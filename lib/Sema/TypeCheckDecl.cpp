@@ -4173,7 +4173,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Class:
   case DeclKind::Protocol: {
     auto nominal = cast<NominalTypeDecl>(D);
-    nominal->computeType();
+    Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
+    nominal->setInterfaceType(MetatypeType::get(declaredInterfaceTy, Context));
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we

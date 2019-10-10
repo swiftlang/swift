@@ -3365,10 +3365,6 @@ public:
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
 
-  /// Set the interface type of this nominal type to the metatype of the
-  /// declared interface type.
-  void computeType();
-
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
   Type getDeclaredType() const;

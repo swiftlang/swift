@@ -2437,8 +2437,6 @@ public:
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
 
-    theStruct->computeType();
-
     handleInherited(theStruct,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
@@ -3220,8 +3218,6 @@ public:
       proto->setImplicit();
     proto->setIsObjC(isObjC);
 
-    proto->computeType();
-
     proto->setCircularityCheck(CircularityCheck::Checked);
 
     proto->setLazyRequirementSignature(&MF,
@@ -3424,8 +3420,6 @@ public:
     if (inheritsSuperclassInitializers)
       theClass->setInheritsSuperclassInitializers();
 
-    theClass->computeType();
-
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
@@ -3499,8 +3493,6 @@ public:
     theEnum->setIsObjC(isObjC);
 
     theEnum->setRawType(MF.getType(rawTypeID));
-
-    theEnum->computeType();
 
     auto rawInheritedIDs = rawInheritedAndDependencyIDs.slice(0, numInherited);
     handleInherited(theEnum, rawInheritedIDs);

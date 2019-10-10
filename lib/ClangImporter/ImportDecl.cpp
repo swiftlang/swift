@@ -2364,7 +2364,6 @@ namespace {
           decl, AccessLevel::Public, loc,
           importedName.getDeclName().getBaseIdentifier(),
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
-      enumDecl->computeType();
       enumDecl->setMemberLoader(&Impl, 0);
       return enumDecl;
     }
@@ -2733,7 +2732,6 @@ namespace {
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-        structDecl->computeType();
         structDecl->setAddedImplicitInitializers();
 
         auto options = getDefaultMakeStructRawValuedOptions();
@@ -2783,7 +2781,6 @@ namespace {
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
-          errorWrapper->computeType();
           errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
@@ -2853,7 +2850,6 @@ namespace {
             decl, AccessLevel::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->setHasFixedRawValues();
-        enumDecl->computeType();
 
         // Annotate as 'frozen' if appropriate.
         if (enumKind == EnumKind::FrozenEnum)
@@ -3214,7 +3210,6 @@ namespace {
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
-      result->computeType();
       result->setAddedImplicitInitializers();
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
@@ -4660,7 +4655,6 @@ namespace {
           Impl.importSourceLoc(decl->getBeginLoc()),
           Impl.importSourceLoc(decl->getLocation()), name, None,
           /*TrailingWhere=*/nullptr);
-      result->computeType();
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
@@ -4705,7 +4699,6 @@ namespace {
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
-        result->computeType();
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
@@ -4809,8 +4802,6 @@ namespace {
       } else {
         return nullptr;
       }
-
-      result->computeType();
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
@@ -5291,7 +5282,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
       nullptr, dc);
-  theClass->computeType();
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
@@ -5458,7 +5448,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-  structDecl->computeType();
   structDecl->setAddedImplicitInitializers();
 
   // Import the type of the underlying storage
@@ -5738,7 +5727,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-  structDecl->computeType();
   structDecl->setAddedImplicitInitializers();
 
   makeStructRawValued(Impl, structDecl, underlyingType,

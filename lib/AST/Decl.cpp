@@ -3368,16 +3368,6 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-void NominalTypeDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  Type declaredInterfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(declaredInterfaceTy, getASTContext()));
-
-  if (declaredInterfaceTy->hasError())
-    setInvalid();
-}
-
 enum class DeclTypeKind : unsigned {
   DeclaredType,
   DeclaredInterfaceType
