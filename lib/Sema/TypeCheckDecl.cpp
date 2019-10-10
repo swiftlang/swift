@@ -3249,6 +3249,20 @@ public:
                      FD->getFullName());
       }
     }
+
+    // If the function is exported to C, it must be representable in (Obj-)C.
+    // FIXME: This needs to be moved to its own request if we want to
+    // productize @_cdecl.
+    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      Optional<ForeignErrorConvention> errorConvention;
+      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
+                                errorConvention)) {
+        if (FD->hasThrows()) {
+          FD->setForeignErrorConvention(*errorConvention);
+          TC.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
+        }
+      }
+    }
   }
 
   void visitModuleDecl(ModuleDecl *) { }
@@ -4108,10 +4122,6 @@ static void validateParameterType(ParamDecl *decl) {
 }
 
 void TypeChecker::validateDecl(ValueDecl *D) {
-  // Generic parameters are validated as part of their context.
-  if (isa<GenericTypeParamDecl>(D))
-    return;
-
   // Handling validation failure due to re-entrancy is left
   // up to the caller, who must call hasInterfaceType() to
   // check that validateDecl() returned a fully-formed decl.
@@ -4139,13 +4149,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::MissingMember:
-    llvm_unreachable("not a value decl");
-
   case DeclKind::Module:
-    return;
-      
+  case DeclKind::OpaqueType:
   case DeclKind::GenericTypeParam:
-    llvm_unreachable("handled above");
+    llvm_unreachable("should not get here");
+    return;
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
@@ -4158,9 +4166,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeAlias->computeType();
     break;
   }
-      
-  case DeclKind::OpaqueType:
-    break;
 
   case DeclKind::Enum:
   case DeclKind::Struct:
@@ -4254,40 +4259,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   }
 
   case DeclKind::Func:
-  case DeclKind::Accessor: {
-    auto *FD = cast<FuncDecl>(D);
-
-    DeclValidationRAII IBV(FD);
-
-    // FIXME: Roll all of this interface type computation into a request.
-    FD->computeType();
-
-    // If the function is exported to C, it must be representable in (Obj-)C.
-    if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      Optional<ForeignErrorConvention> errorConvention;
-      if (isRepresentableInObjC(FD, ObjCReason::ExplicitlyCDecl,
-                                errorConvention)) {
-        if (FD->hasThrows()) {
-          FD->setForeignErrorConvention(*errorConvention);
-          diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
-        }
-      }
-    }
-    
-    break;
-  }
-
-  case DeclKind::Constructor: {
-    auto *CD = cast<ConstructorDecl>(D);
-    DeclValidationRAII IBV(CD);
-    CD->computeType();
-    break;
-  }
-
+  case DeclKind::Accessor:
+  case DeclKind::Constructor:
   case DeclKind::Destructor: {
-    auto *DD = cast<DestructorDecl>(D);
-    DeclValidationRAII IBV(DD);
-    DD->computeType();
+    auto *AFD = cast<AbstractFunctionDecl>(D);
+    DeclValidationRAII IBV(AFD);
+    AFD->computeType();
     break;
   }
 
