@@ -520,7 +520,7 @@ static void printDifferentiableAttrArguments(
       stream << diffParamsString;
     }
   }
-  // Print associated function names, unless they are to be omitted.
+  // Print derivative function names, unless they are to be omitted.
   if (!omitDerivativeFunctions) {
     // Print jvp function name, if specified.
     if (auto jvp = attr->getJVP()) {

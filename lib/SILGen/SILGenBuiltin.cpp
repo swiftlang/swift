@@ -1040,7 +1040,7 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   for (auto& arg : args.drop_front(1))
     origFnArgVals.push_back(arg.getValue());
 
-  // Get the associated function.
+  // Get the derivative function.
   SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, kind, origFnVal);
   auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();

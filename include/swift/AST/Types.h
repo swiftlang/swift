@@ -3100,10 +3100,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Given `indices` and `kind`, calculates the type of the corresponding
-  /// autodiff associated function.
+  /// autodiff derivative function.
   ///
   /// By default, if the original type has a self parameter list and parameter
-  /// indices include self, the computed associated function type will return a
+  /// indices include self, the computed derivative function type will return a
   /// linear map taking/returning self's tangent *last* instead of first, for
   /// consistency with SIL.
   ///
@@ -3121,11 +3121,11 @@ public:
       GenericSignature *whereClauseGenericSignature = nullptr,
       bool makeSelfParamFirst = false);
 
-  /// Given the type of an autodiff associated function, returns the
+  /// Given the type of an autodiff derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
   
-  /// Given the type of a transposing associated function, returns the
+  /// Given the type of a transposing derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *
   getTransposeOriginalFunctionType(TransposingAttr *attr,

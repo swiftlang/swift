@@ -4677,7 +4677,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
       curryLevels.back(), curryLevels.back()->getParams(), retTy,
       curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
 
-  // Wrap the associated function type in additional curry levels.
+  // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
@@ -4716,7 +4716,7 @@ AnyFunctionType::getAutoDiffOriginalFunctionType() {
       curryLevels.back(), curryLevels.back()->getParams(), originalResult,
       curryLevels.size() == 1 ? getOptGenericSignature() : nullptr);
 
-  // Wrap the associated function type in additional curry levels.
+  // Wrap the derivative function type in additional curry levels.
   auto curryLevelsWithoutLast =
       ArrayRef<AnyFunctionType *>(curryLevels).drop_back(1);
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {

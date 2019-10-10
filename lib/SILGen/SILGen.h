@@ -148,15 +148,15 @@ public:
                                CanSILFunctionType constantTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff associated function thunk for the given
-  /// SILDeclRef, SILFunction, and associated function type.
+  /// Get or create an autodiff derivative function thunk for the given
+  /// SILDeclRef, SILFunction, and derivative function type.
   SILFunction *getOrCreateAutoDiffThunk(SILDeclRef derivativeFnRef,
                                         SILFunction *derivativeFn,
                                         CanSILFunctionType derivativeFnTy);
 
   // SWIFT_ENABLE_TENSORFLOW
-  /// Get or create an autodiff associated function vtable entry thunk for the
-  /// given SILDeclRef and associated function type.
+  /// Get or create an autodiff derivative function vtable entry thunk for the
+  /// given SILDeclRef and derivative function type.
   SILFunction *
   getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
                                       CanSILFunctionType derivativeFnTy);

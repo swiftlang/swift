@@ -878,7 +878,7 @@ private:
   /// Saved for deletion during cleanup.
   SmallVector<SILFunction *, 32> generatedFunctions;
 
-  /// List of associated function references, generated via
+  /// List of derivative function references, generated via
   /// `emitDerivativeFunctionReference`.
   /// Saved for deletion during cleanup.
   SmallVector<SILValue, 32> generatedDerivativeFunctionReferences;
@@ -1131,7 +1131,7 @@ public:
       DifferentiationInvoker invoker);
 
   /// Process the given `differentiable_function` instruction, filling in
-  /// missing associated functions if necessary.
+  /// missing derivative functions if necessary.
   bool processDifferentiableFunctionInst(DifferentiableFunctionInst *dfi);
 
   /// Fold `differentiable_function_extract` users of the given
@@ -1145,19 +1145,19 @@ public:
   /// purposes.
   void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 
-  /// Get or create an associated function index subset thunk from
-  /// `actualIndices` to `desiredIndices` for the given associated function
+  /// Get or create an derivative function index subset thunk from
+  /// `actualIndices` to `desiredIndices` for the given derivative function
   /// value and original function operand.
   /// Calls `getOrCreateSubsetParametersThunkForLinearMap` to thunk the linear
-  /// map returned by the associated function.
+  /// map returned by the derivative function.
   std::pair<SILFunction *, SubstitutionMap>
   getOrCreateSubsetParametersThunkForDerivativeFunction(
       SILValue origFnOperand, SILValue assocFn,
       AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
       SILAutoDiffIndices actualIndices);
 
-  /// Get or create an associated function index subset thunk from
-  /// `actualIndices` to `desiredIndices` for the given associated function
+  /// Get or create an derivative function index subset thunk from
+  /// `actualIndices` to `desiredIndices` for the given derivative function
   /// value and original function operand.
   SILFunction *getOrCreateSubsetParametersThunkForLinearMap(
       SILFunction *assocFn, CanSILFunctionType linearMapType,
@@ -1165,7 +1165,7 @@ public:
       SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
 
 public:
-  /// Declare an external reference to an associated function of `original`,
+  /// Declare an external reference to an derivative function of `original`,
   /// given a `[differentiable]` attribute of `original` and the associated
   /// function kind.
   SILFunction *
@@ -1705,7 +1705,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
 
-  // Get the associated function generic signature.
+  // Get the derivative function generic signature.
   CanGenericSignature assocFnGenSig = nullptr;
   if (auto *assocFnGenEnv = assocFn->getGenericEnvironment())
     assocFnGenSig =
@@ -2530,9 +2530,9 @@ static SubstitutionMap getSubstitutionMap(
   return substMap;
 }
 
-/// Emits a reference to an associated function of `original`, differentiated
+/// Emits a reference to an derivative function of `original`, differentiated
 /// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
-/// the associated function and the actual indices that the associated function
+/// the derivative function and the actual indices that the derivative function
 /// is with respect to.
 ///
 /// Returns `None` on failure, signifying that a diagnostic has been emitted.
@@ -2554,15 +2554,15 @@ emitDerivativeFunctionReference(
 
   // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind matches
   // the given kind and desired differentiation parameter indices, simply
-  // extract the associated function of its function operand, retain the
-  // associated function, and return it.
+  // extract the derivative function of its function operand, retain the
+  // derivative function, and return it.
   if (auto *inst = original->getDefiningInstruction())
     if (auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(inst))
       if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
         functionSource = dfei->getFunctionOperand();
 
   // If `functionSource` is a `@differentiable` function, just extract the
-  // associated function.
+  // derivative function.
   if (auto diffableFnType =
           functionSource->getType().castTo<SILFunctionType>()) {
     if (diffableFnType->isDifferentiable()) {
@@ -2711,7 +2711,7 @@ emitDerivativeFunctionReference(
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-    // Emit a `witness_method` instruction for the associated function.
+    // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalIndices.parameters, minimalIndices.source,
@@ -2758,7 +2758,7 @@ emitDerivativeFunctionReference(
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-    // Emit a `class_method` instruction for the associated function.
+    // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalIndices.parameters, minimalIndices.source,
@@ -7980,7 +7980,7 @@ bool ADContext::processDifferentiableAttribute(
     attr->setJVPName(jvpName);
   }
 
-  // If differentiation is triggered by `[differentiable]`, associated function
+  // If differentiation is triggered by `[differentiable]`, derivative function
   // should share linkage of original function.
   auto isAssocFnExported =
       invoker.getKind() ==
@@ -8334,7 +8334,7 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
     AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
   LLVM_DEBUG(getADDebugStream()
-             << "Getting a subset parameters thunk for associated function "
+             << "Getting a subset parameters thunk for derivative function "
              << assocFn << " of the original function " << origFnOperand
              << " from " << actualIndices << " to " << desiredIndices << '\n');
 
@@ -8441,7 +8441,7 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
         loc, classOperand, assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));
   }
-  assert(assocRef && "Expected associated function to be resolved");
+  assert(assocRef && "Expected derivative function to be resolved");
 
   assocSubstMap = assocSubstMap.subst(thunk->getForwardingSubstitutionMap());
   assocFnType = assocRef->getType().castTo<SILFunctionType>();
@@ -8592,7 +8592,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
     getGeneratedDerivativeFunctionReferences().push_back(assocFn);
 
     // If desired indices are a subset of actual indices, create a "subset
-    // indices thunk" and destroy the emitted associated function reference.
+    // indices thunk" and destroy the emitted derivative function reference.
     // - For JVPs: the thunked JVP returns a differential taking fewer
     //   parameters (using `.zero` for the dropped parameters).
     // - For VJPs: the thunked VJP returns a pullback that drops the unused
@@ -8606,7 +8606,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
         getASTContext(), actualIndices.parameters->getCapacity());
     if (actualIndices.source != desiredIndices.source ||
         !actualIndices.parameters->equals(extendedDesiredIndices)) {
-      // Destroy the already emitted associated function reference because it
+      // Destroy the already emitted derivative function reference because it
       // is no longer used.
       builder.emitDestroyValueOperation(loc, assocFn);
       // Check if underlying original function reference has been partially
@@ -8661,7 +8661,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
 
     assocFns.push_back(assocFn);
   }
-  // Deallocate temporary buffers used for creating associated functions.
+  // Deallocate temporary buffers used for creating derivative functions.
   for (auto *buf : reversed(newBuffersToDealloc))
     builder.createDeallocStack(loc, buf);
 
@@ -8701,7 +8701,7 @@ void ADContext::foldDifferentiableFunctionExtraction(
       dfei->eraseFromParent();
       continue;
     }
-    // Fold associated function extractors.
+    // Fold derivative function extractors.
     auto assocFnValue =
         source->getDerivativeFunction(dfei->getDerivativeFunctionKind());
     dfei->replaceAllUsesWith(assocFnValue);

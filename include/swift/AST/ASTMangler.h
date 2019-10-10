@@ -155,9 +155,9 @@ public:
                                              ModuleDecl *Module);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Mangle the autodiff associated function (JVP/VJP) with the given:
+  // Mangle the derivative function (JVP/VJP) with the given:
   // - Mangled original function name.
-  // - Associated function kind.
+  // - Derivative function kind.
   // - Parameter/result indices.
   std::string mangleAutoDiffDerivativeFunctionHelper(
       StringRef name, AutoDiffDerivativeFunctionKind kind,

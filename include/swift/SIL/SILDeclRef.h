@@ -157,7 +157,7 @@ struct SILDeclRef {
   
   // SWIFT_ENABLE_TENSORFLOW
   /// When this is non-null, it modifies the SILDeclRef to refer to the
-  /// corresponding autodiff associated function.
+  /// corresponding autodiff derivative function.
   AutoDiffDerivativeFunctionIdentifier *autoDiffDerivativeFunctionIdentifier;
 
   /// Produces a null SILDeclRef.
@@ -363,7 +363,7 @@ struct SILDeclRef {
   }
 
   /// Returns the entry point for the original function corresponding to an
-  /// autodiff associated function.
+  /// autodiff derivative function.
   SILDeclRef asAutoDiffOriginalFunction() const {
     assert(autoDiffDerivativeFunctionIdentifier);
     SILDeclRef r = *this;

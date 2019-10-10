@@ -1035,14 +1035,14 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
     }
   };
   // Eagerly build the type of the first arg, then use that to compute the type
-  // of the associated function type.
+  // of the derivative function type.
   auto *origFnTy =
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
       origFnTy->getExtInfo().withNoEscape(false));
   auto *paramIndices = AutoDiffIndexSubset::get(
       Context, SmallBitVector(origFnTy->getNumParams(), true));
-  // Generator for the resultant function type, i.e. the AD associated function.
+  // Generator for the resultant function type, i.e. the AD derivative function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(

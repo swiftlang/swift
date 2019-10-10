@@ -431,7 +431,7 @@ struct AutoDiffLinearMapKind {
   operator innerty() const { return rawValue; }
 };
 
-/// The kind of an associated function.
+/// The kind of an derivative function.
 struct AutoDiffDerivativeFunctionKind {
   enum innerty : uint8_t {
    // The Jacobian-vector products function.
@@ -452,7 +452,7 @@ struct AutoDiffDerivativeFunctionKind {
 };
 
 /// In conjunction with the original function declaration, identifies an
-/// autodiff associated function.
+/// autodiff derivative function.
 ///
 /// Is uniquely allocated within an ASTContext so that it can be hashed and
 /// compared by opaque pointer value.
@@ -523,7 +523,7 @@ bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
                                    AutoDiffDerivativeFunctionKind &kind,
                                    unsigned &arity, bool &rethrows);
 
-/// Computes the correct linkage for an associated function given the linkage of
+/// Computes the correct linkage for an derivative function given the linkage of
 /// the original function. If the original linkage is not external and
 /// `isDerivativeFnExported` is true, use the original function's linkage. Otherwise,
 /// return hidden linkage.
