@@ -878,10 +878,10 @@ private:
   /// Saved for deletion during cleanup.
   SmallVector<SILFunction *, 32> generatedFunctions;
 
-  /// List of associated function references, generated via
-  /// `emitAssociatedFunctionReference`.
+  /// List of derivative function references, generated via
+  /// `emitDerivativeFunctionReference`.
   /// Saved for deletion during cleanup.
-  SmallVector<SILValue, 32> generatedAssociatedFunctionReferences;
+  SmallVector<SILValue, 32> generatedDerivativeFunctionReferences;
 
   /// The AdditiveArithmetic protocol in the standard library.
   ProtocolDecl *additiveArithmeticProtocol =
@@ -933,8 +933,8 @@ public:
     return generatedFunctions;
   }
 
-  SmallVector<SILValue, 32> &getGeneratedAssociatedFunctionReferences() {
-    return generatedAssociatedFunctionReferences;
+  SmallVector<SILValue, 32> &getGeneratedDerivativeFunctionReferences() {
+    return generatedDerivativeFunctionReferences;
   }
 
   ProtocolDecl *getAdditiveArithmeticProtocol() const {
@@ -969,9 +969,9 @@ public:
       original->removeDifferentiableAttr(attr);
     }
     // Delete all references to generated functions.
-    for (auto assocFn : generatedAssociatedFunctionReferences) {
+    for (auto derivativeFn : generatedDerivativeFunctionReferences) {
       if (auto *fnRef =
-              peerThroughFunctionConversions<FunctionRefInst>(assocFn)) {
+              peerThroughFunctionConversions<FunctionRefInst>(derivativeFn)) {
         fnRef->replaceAllUsesWithUndef();
         fnRef->eraseFromParent();
       }
@@ -1109,9 +1109,9 @@ public:
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc,
       AutoDiffIndexSubset *parameterIndices, SILValue original,
-      Optional<std::pair<SILValue, SILValue>> associatedFunctions = None) {
+      Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None) {
     auto *dfi = builder.createDifferentiableFunction(
-        loc, parameterIndices, original, associatedFunctions);
+        loc, parameterIndices, original, derivativeFunctions);
     processedDifferentiableFunctionInsts.erase(dfi);
     return dfi;
   }
@@ -1131,7 +1131,7 @@ public:
       DifferentiationInvoker invoker);
 
   /// Process the given `differentiable_function` instruction, filling in
-  /// missing associated functions if necessary.
+  /// missing derivative functions if necessary.
   bool processDifferentiableFunctionInst(DifferentiableFunctionInst *dfi);
 
   /// Fold `differentiable_function_extract` users of the given
@@ -1145,33 +1145,33 @@ public:
   /// purposes.
   void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 
-  /// Get or create an associated function index subset thunk from
-  /// `actualIndices` to `desiredIndices` for the given associated function
+  /// Get or create a derivative function index subset thunk from
+  /// `actualIndices` to `desiredIndices` for the given derivative function
   /// value and original function operand.
   /// Calls `getOrCreateSubsetParametersThunkForLinearMap` to thunk the linear
-  /// map returned by the associated function.
+  /// map returned by the derivative function.
   std::pair<SILFunction *, SubstitutionMap>
-  getOrCreateSubsetParametersThunkForAssociatedFunction(
-      SILValue origFnOperand, SILValue assocFn,
-      AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
+  getOrCreateSubsetParametersThunkForDerivativeFunction(
+      SILValue origFnOperand, SILValue derivativeFn,
+      AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
       SILAutoDiffIndices actualIndices);
 
-  /// Get or create an associated function index subset thunk from
-  /// `actualIndices` to `desiredIndices` for the given associated function
+  /// Get or create a derivative function index subset thunk from
+  /// `actualIndices` to `desiredIndices` for the given derivative function
   /// value and original function operand.
   SILFunction *getOrCreateSubsetParametersThunkForLinearMap(
-      SILFunction *assocFn, CanSILFunctionType linearMapType,
-      CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
+      SILFunction *derivativeFn, CanSILFunctionType linearMapType,
+      CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
       SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
 
 public:
-  /// Declare an external reference to an associated function of `original`,
+  /// Declare an external reference to a derivative function of `original`,
   /// given a `[differentiable]` attribute of `original` and the associated
   /// function kind.
   SILFunction *
-  declareExternalAssociatedFunction(SILFunction *original,
+  declareExternalDerivativeFunction(SILFunction *original,
                                     SILDifferentiableAttr *attr, StringRef name,
-                                    AutoDiffAssociatedFunctionKind kind);
+                                    AutoDiffDerivativeFunctionKind kind);
 
   template <typename ...T, typename ...U>
   InFlightDiagnostic diagnose(SourceLoc loc, Diag<T...> diag,
@@ -1682,17 +1682,17 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
     return;
 
-  AutoDiffAssociatedFunctionKind assocFnKind(kind);
-  auto assocFnType = remappedOrigFnSubstTy->getAutoDiffAssociatedFunctionType(
-      parameters, source, assocFnKind, context.getTypeConverter(),
+  AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
+  auto derivativeFnType = remappedOrigFnSubstTy->getAutoDiffDerivativeFunctionType(
+      parameters, source, derivativeFnKind, context.getTypeConverter(),
       LookUpConformanceInModule(derivative->getModule().getSwiftModule()));
 
-  auto assocFnResultTypes =
-      assocFnType->getAllResultsType().castTo<TupleType>();
-  assocFnResultTypes->getElement(assocFnResultTypes->getElements().size() - 1);
+  auto derivativeFnResultTypes =
+      derivativeFnType->getAllResultsType().castTo<TupleType>();
+  derivativeFnResultTypes->getElement(derivativeFnResultTypes->getElements().size() - 1);
   auto linearMapSILType = SILType::getPrimitiveObjectType(
-      assocFnResultTypes
-          ->getElement(assocFnResultTypes->getElements().size() - 1)
+      derivativeFnResultTypes
+          ->getElement(derivativeFnResultTypes->getElements().size() - 1)
           .getType()
           ->getCanonicalType());
   addLinearMapDecl(ai, linearMapSILType);
@@ -1700,21 +1700,21 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
 
 void LinearMapInfo::generateDifferentiationDataStructures(
     ADContext &context, const SILAutoDiffIndices &indices,
-    SILFunction *assocFn) {
+    SILFunction *derivativeFn) {
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
 
-  // Get the associated function generic signature.
-  CanGenericSignature assocFnGenSig = nullptr;
-  if (auto *assocFnGenEnv = assocFn->getGenericEnvironment())
-    assocFnGenSig =
-        assocFnGenEnv->getGenericSignature()->getCanonicalSignature();
+  // Get the derivative function generic signature.
+  CanGenericSignature derivativeFnGenSig = nullptr;
+  if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
+    derivativeFnGenSig =
+        derivativeFnGenEnv->getGenericSignature()->getCanonicalSignature();
 
   // Create linear map struct for each original block.
   for (auto &origBB : *original) {
     auto *linearMapStruct =
-        createLinearMapStruct(&origBB, indices, assocFnGenSig);
+        createLinearMapStruct(&origBB, indices, derivativeFnGenSig);
     linearMapStructs.insert({&origBB, linearMapStruct});
   }
 
@@ -1731,7 +1731,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   }
   for (auto &origBB : *original) {
     auto *traceEnum =
-        createBranchingTraceDecl(&origBB, indices, assocFnGenSig, loopInfo);
+        createBranchingTraceDecl(&origBB, indices, derivativeFnGenSig, loopInfo);
     branchingTraceDecls.insert({&origBB, traceEnum});
     if (origBB.isEntry())
       continue;
@@ -1808,7 +1808,7 @@ public:
   PostDominanceInfo *postDomInfo;
 
   DifferentiableActivityInfo &getActivityInfo(
-      GenericSignature *assocGenSig, AutoDiffAssociatedFunctionKind kind) {
+      GenericSignature *assocGenSig, AutoDiffDerivativeFunctionKind kind) {
     auto activityInfoLookup = activityInfoMap.find(assocGenSig);
     if (activityInfoLookup != activityInfoMap.end())
       return activityInfoLookup->getSecond();
@@ -2530,9 +2530,9 @@ static SubstitutionMap getSubstitutionMap(
   return substMap;
 }
 
-/// Emits a reference to an associated function of `original`, differentiated
+/// Emits a reference to a derivative function of `original`, differentiated
 /// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
-/// the associated function and the actual indices that the associated function
+/// the derivative function and the actual indices that the derivative function
 /// is with respect to.
 ///
 /// Returns `None` on failure, signifying that a diagnostic has been emitted.
@@ -2544,9 +2544,9 @@ static SubstitutionMap getSubstitutionMap(
 ///
 /// FIXME: This is too complicated and needs to be rewritten.
 static Optional<std::pair<SILValue, SILAutoDiffIndices>>
-emitAssociatedFunctionReference(
+emitDerivativeFunctionReference(
     ADContext &context, SILBuilder &builder, SILAutoDiffIndices desiredIndices,
-    AutoDiffAssociatedFunctionKind kind, SILValue original,
+    AutoDiffDerivativeFunctionKind kind, SILValue original,
     DifferentiationInvoker invoker,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
 
@@ -2554,15 +2554,15 @@ emitAssociatedFunctionReference(
 
   // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind matches
   // the given kind and desired differentiation parameter indices, simply
-  // extract the associated function of its function operand, retain the
-  // associated function, and return it.
+  // extract the derivative function of its function operand, retain the
+  // derivative function, and return it.
   if (auto *inst = original->getDefiningInstruction())
     if (auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(inst))
       if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
         functionSource = dfei->getFunctionOperand();
 
   // If `functionSource` is a `@differentiable` function, just extract the
-  // associated function.
+  // derivative function.
   if (auto diffableFnType =
           functionSource->getType().castTo<SILFunctionType>()) {
     if (diffableFnType->isDifferentiable()) {
@@ -2576,13 +2576,13 @@ emitAssociatedFunctionReference(
       }
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(
           functionSource.getLoc(), functionSource);
-      SILValue assocFn = builder.createDifferentiableFunctionExtract(
+      SILValue derivativeFn = builder.createDifferentiableFunctionExtract(
           borrowedDiffFunc.getLoc(), kind, borrowedDiffFunc);
-      assocFn =
-          builder.emitCopyValueOperation(functionSource.getLoc(), assocFn);
+      derivativeFn =
+          builder.emitCopyValueOperation(functionSource.getLoc(), derivativeFn);
       builder.emitEndBorrowOperation(functionSource.getLoc(), borrowedDiffFunc);
       SILAutoDiffIndices indices(0, desiredIndices.parameters);
-      return std::make_pair(assocFn, indices);
+      return std::make_pair(derivativeFn, indices);
     }
   }
 
@@ -2657,18 +2657,18 @@ emitAssociatedFunctionReference(
     if (context.processDifferentiableAttribute(
             originalFn, minimalAttr, invoker))
       return None;
-    SILFunction *assocFn = nullptr;
+    SILFunction *derivativeFn = nullptr;
     switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       assert(!minimalAttr->getJVPName().empty() && "Expected JVP name");
-      assocFn = context.getModule().lookUpFunction(minimalAttr->getJVPName());
+      derivativeFn = context.getModule().lookUpFunction(minimalAttr->getJVPName());
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       assert(!minimalAttr->getVJPName().empty() && "Expected VJP name");
-      assocFn = context.getModule().lookUpFunction(minimalAttr->getVJPName());
+      derivativeFn = context.getModule().lookUpFunction(minimalAttr->getVJPName());
       break;
     }
-    auto *assocFnRef = builder.createFunctionRef(loc, assocFn);
+    auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
     // Tentative solution: clone a new reabstraction thunk where function
     // argument has a `@differentiable` function type.
@@ -2676,9 +2676,9 @@ emitAssociatedFunctionReference(
       // Handle here.
     }
     auto convertedRef = reapplyFunctionConversion(
-        assocFnRef, originalFRI, original, builder, loc,
+        derivativeFnRef, originalFRI, original, builder, loc,
         newBuffersToDealloc,
-        assocFn->getLoweredFunctionType()->getGenericSignature());
+        derivativeFn->getLoweredFunctionType()->getGenericSignature());
     return std::make_pair(convertedRef, minimalAttr->getIndices());
   }
 
@@ -2711,17 +2711,17 @@ emitAssociatedFunctionReference(
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-    // Emit a `witness_method` instruction for the associated function.
+    // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
-    auto assocType = originalType->getAutoDiffAssociatedFunctionType(
+    auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalIndices.parameters, minimalIndices.source,
         kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
-    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+    auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalAttr->getParameterIndices(), context.getASTContext());
     auto *ref = builder.createWitnessMethod(
         loc, witnessMethod->getLookupType(), witnessMethod->getConformance(),
-        requirementDeclRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
+        requirementDeclRef.asAutoDiffDerivativeFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(assocType));
     auto convertedRef =
         reapplyFunctionConversion(ref, witnessMethod, original, builder, loc,
@@ -2758,18 +2758,18 @@ emitAssociatedFunctionReference(
           diag::autodiff_member_subset_indices_not_differentiable);
       return None;
     }
-    // Emit a `class_method` instruction for the associated function.
+    // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
-    auto assocType = originalType->getAutoDiffAssociatedFunctionType(
+    auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalIndices.parameters, minimalIndices.source,
         kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
-    auto *autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+    auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalAttr->getParameterIndices(),
         context.getASTContext());
     auto *ref = builder.createClassMethod(
         loc, classMethodInst->getOperand(),
-        methodDeclRef.asAutoDiffAssociatedFunction(autoDiffFuncId),
+        methodDeclRef.asAutoDiffDerivativeFunction(autoDiffFuncId),
         SILType::getPrimitiveObjectType(assocType));
     auto convertedRef =
         reapplyFunctionConversion(ref, classMethodInst, original, builder, loc,
@@ -3316,7 +3316,7 @@ private:
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
         vjp->getLoweredFunctionType()->getGenericSignature(),
-        AutoDiffAssociatedFunctionKind::VJP);
+        AutoDiffDerivativeFunctionKind::VJP);
     LLVM_DEBUG(
         dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
     return activityInfo;
@@ -4238,7 +4238,7 @@ private:
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
         jvp->getLoweredFunctionType()->getGenericSignature(),
-        AutoDiffAssociatedFunctionKind::JVP);
+        AutoDiffDerivativeFunctionKind::JVP);
     LLVM_DEBUG(
         dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
     return activityInfo;
@@ -7831,26 +7831,26 @@ bool VJPEmitter::run() {
 //===----------------------------------------------------------------------===//
 
 SILFunction *
-ADContext::declareExternalAssociatedFunction(
+ADContext::declareExternalDerivativeFunction(
     SILFunction *original, SILDifferentiableAttr *attr, StringRef name,
-    AutoDiffAssociatedFunctionKind kind) {
+    AutoDiffDerivativeFunctionKind kind) {
   auto &module = getModule();
   auto &indices = attr->getIndices();
   auto originalTy = original->getLoweredFunctionType();
   auto originalLoc = original->getLocation();
   auto assocGenSig = getDerivativeGenericSignature(attr, original);
-  auto assocFnTy = originalTy->getAutoDiffAssociatedFunctionType(
+  auto derivativeFnTy = originalTy->getAutoDiffDerivativeFunctionType(
       indices.parameters, indices.source, kind, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
   SILOptFunctionBuilder fb(getTransform());
   // Create external function declaration.
-  auto *assocFn = fb.createFunction(
-      SILLinkage::PublicExternal, name, assocFnTy,
+  auto *derivativeFn = fb.createFunction(
+      SILLinkage::PublicExternal, name, derivativeFnTy,
       /*genericEnv*/ nullptr, originalLoc, original->isBare(), IsNotTransparent,
       original->isSerialized(), original->isDynamicallyReplaceable());
   // Note: Setting debug scope prevents crashes during later transforms.
-  assocFn->setDebugScope(new (module) SILDebugScope(originalLoc, assocFn));
-  return assocFn;
+  derivativeFn->setDebugScope(new (module) SILDebugScope(originalLoc, derivativeFn));
+  return derivativeFn;
 }
 
 static SILFunction *createEmptyVJP(
@@ -7869,8 +7869,8 @@ static SILFunction *createEmptyVJP(
   // === Create an empty VJP. ===
   Mangle::ASTMangler mangler;
   auto vjpName = original->getASTContext().getIdentifier(
-      mangler.mangleAutoDiffAssociatedFunctionHelper(
-          original->getName(), AutoDiffAssociatedFunctionKind::VJP, indices))
+      mangler.mangleAutoDiffDerivativeFunctionHelper(
+          original->getName(), AutoDiffDerivativeFunctionKind::VJP, indices))
               .str();
   auto vjpGenericSig = getDerivativeGenericSignature(attr, original);
 
@@ -7883,13 +7883,13 @@ static SILFunction *createEmptyVJP(
   auto *vjpGenericEnv = vjpGenericSig
       ? vjpGenericSig->getGenericEnvironment()
       : nullptr;
-  auto vjpType = originalTy->getAutoDiffAssociatedFunctionType(
-      indices.parameters, indices.source, AutoDiffAssociatedFunctionKind::VJP,
+  auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
+      indices.parameters, indices.source, AutoDiffDerivativeFunctionKind::VJP,
       module.Types, LookUpConformanceInModule(module.getSwiftModule()),
       vjpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
+  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
       original->getLinkage(), isExported);
   auto *vjp = fb.createFunction(linkage, vjpName, vjpType, vjpGenericEnv,
                                 original->getLocation(), original->isBare(),
@@ -7919,8 +7919,8 @@ static SILFunction *createEmptyJVP(
   // === Create an empty JVP. ===
   Mangle::ASTMangler mangler;
   auto jvpName = original->getASTContext().getIdentifier(
-      mangler.mangleAutoDiffAssociatedFunctionHelper(
-          original->getName(), AutoDiffAssociatedFunctionKind::JVP, indices))
+      mangler.mangleAutoDiffDerivativeFunctionHelper(
+          original->getName(), AutoDiffDerivativeFunctionKind::JVP, indices))
               .str();
   auto jvpGenericSig = getDerivativeGenericSignature(attr, original);
 
@@ -7933,13 +7933,13 @@ static SILFunction *createEmptyJVP(
   auto *jvpGenericEnv = jvpGenericSig
       ? jvpGenericSig->getGenericEnvironment()
       : nullptr;
-  auto jvpType = originalTy->getAutoDiffAssociatedFunctionType(
+  auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       indices.parameters, indices.source,
-      AutoDiffAssociatedFunctionKind::JVP, module.Types,
+      AutoDiffDerivativeFunctionKind::JVP, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), jvpGenericSig);
 
   SILOptFunctionBuilder fb(context.getTransform());
-  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
+  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
       original->getLinkage(), isExported);
   auto *jvp = fb.createFunction(linkage, jvpName, jvpType, jvpGenericEnv,
                                 original->getLocation(), original->isBare(),
@@ -7968,21 +7968,21 @@ bool ADContext::processDifferentiableAttribute(
   } else if (original->isExternalDeclaration()) {
     Mangle::ASTMangler mangler;
     jvpName = original->getASTContext().getIdentifier(
-        mangler.mangleAutoDiffAssociatedFunctionHelper(
-            original->getName(), AutoDiffAssociatedFunctionKind::JVP,
+        mangler.mangleAutoDiffDerivativeFunctionHelper(
+            original->getName(), AutoDiffDerivativeFunctionKind::JVP,
             attr->getIndices())).str();
   }
   if (!jvpName.empty()) {
     jvp = module.lookUpFunction(jvpName);
     if (!jvp)
-      jvp = declareExternalAssociatedFunction(
-          original, attr, jvpName, AutoDiffAssociatedFunctionKind::JVP);
+      jvp = declareExternalDerivativeFunction(
+          original, attr, jvpName, AutoDiffDerivativeFunctionKind::JVP);
     attr->setJVPName(jvpName);
   }
 
-  // If differentiation is triggered by `[differentiable]`, associated function
+  // If differentiation is triggered by `[differentiable]`, derivative function
   // should share linkage of original function.
-  auto isAssocFnExported =
+  auto isDerivativeFnExported =
       invoker.getKind() ==
           DifferentiationInvoker::Kind::SILDifferentiableAttribute;
 
@@ -7996,15 +7996,15 @@ bool ADContext::processDifferentiableAttribute(
   } else if (original->isExternalDeclaration()) {
     Mangle::ASTMangler mangler;
     vjpName = original->getASTContext().getIdentifier(
-        mangler.mangleAutoDiffAssociatedFunctionHelper(
-            original->getName(), AutoDiffAssociatedFunctionKind::VJP,
+        mangler.mangleAutoDiffDerivativeFunctionHelper(
+            original->getName(), AutoDiffDerivativeFunctionKind::VJP,
             attr->getIndices())).str();
   }
   if (!vjpName.empty()) {
     vjp = module.lookUpFunction(vjpName);
     if (!vjp)
-      vjp = declareExternalAssociatedFunction(
-          original, attr, vjpName, AutoDiffAssociatedFunctionKind::VJP);
+      vjp = declareExternalDerivativeFunction(
+          original, attr, vjpName, AutoDiffDerivativeFunctionKind::VJP);
     attr->setVJPName(vjpName);
   }
 
@@ -8017,7 +8017,7 @@ bool ADContext::processDifferentiableAttribute(
         diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
 
-    jvp = createEmptyJVP(*this, original, attr, isAssocFnExported);
+    jvp = createEmptyJVP(*this, original, attr, isDerivativeFnExported);
     getGeneratedFunctions().push_back(jvp);
 
     // For now, only do JVP generation if the flag is enabled and if custom VJP
@@ -8076,7 +8076,7 @@ bool ADContext::processDifferentiableAttribute(
         diagnoseUnsupportedControlFlow(*this, original, invoker))
       return true;
 
-    vjp = createEmptyVJP(*this, original, attr, isAssocFnExported);
+    vjp = createEmptyVJP(*this, original, attr, isDerivativeFnExported);
     getGeneratedFunctions().push_back(vjp);
     VJPEmitter emitter(*this, original, attr, vjp, invoker);
     return emitter.run();
@@ -8101,7 +8101,7 @@ public:
 SILFunction *
 ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     SILFunction *parentThunk, CanSILFunctionType linearMapType,
-    CanSILFunctionType targetType, AutoDiffAssociatedFunctionKind kind,
+    CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
     SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices) {
   LLVM_DEBUG(getADDebugStream()
              << "Getting a subset parameters thunk for " << linearMapType
@@ -8117,10 +8117,10 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   // TODO(TF-685): Use more principled mangling for thunks.
   std::string thunkName;
   switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       thunkName = "differential";
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       thunkName = "pullback";
   }
   Mangle::ASTMangler mangler;
@@ -8218,7 +8218,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   //   - Thunk arguments (when parameter index is in both desired and actual
   //     indices).
   //   - Zeros (when parameter is not in desired indices).
-  case AutoDiffAssociatedFunctionKind::JVP: {
+  case AutoDiffDerivativeFunctionKind::JVP: {
     // Forward all indirect results.
     arguments.append(thunk->getIndirectResults().begin(),
                      thunk->getIndirectResults().end());
@@ -8248,7 +8248,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   //     actual indices).
   //   - Zeros (when parameter is not in desired indices).
   // - All actual arguments.
-  case AutoDiffAssociatedFunctionKind::VJP: {
+  case AutoDiffDerivativeFunctionKind::VJP: {
     auto toIndirectResultsIter = thunk->getIndirectResults().begin();
     auto useNextResult = [&]() {
       arguments.push_back(*toIndirectResultsIter++);
@@ -8285,7 +8285,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
 
   // If differential thunk, deallocate local allocations and directly return
   // `apply` result.
-  if (kind == AutoDiffAssociatedFunctionKind::JVP) {
+  if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     for (auto *alloc : reversed(localAllocations))
       builder.createDeallocStack(loc, alloc);
     builder.createReturn(loc, ai);
@@ -8329,13 +8329,13 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
 }
 
 std::pair<SILFunction *, SubstitutionMap>
-ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
-    SILValue origFnOperand, SILValue assocFn,
-    AutoDiffAssociatedFunctionKind kind, SILAutoDiffIndices desiredIndices,
+ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
+    SILValue origFnOperand, SILValue derivativeFn,
+    AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
     SILAutoDiffIndices actualIndices) {
   LLVM_DEBUG(getADDebugStream()
-             << "Getting a subset parameters thunk for associated function "
-             << assocFn << " of the original function " << origFnOperand
+             << "Getting a subset parameters thunk for derivative function "
+             << derivativeFn << " of the original function " << origFnOperand
              << " from " << actualIndices << " to " << desiredIndices << '\n');
 
   auto origFnType = origFnOperand->getType().castTo<SILFunctionType>();
@@ -8343,30 +8343,30 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
 
   // Compute target type for thunking.
-  auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
-  auto targetType = origFnType->getAutoDiffAssociatedFunctionType(
+  auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
+  auto targetType = origFnType->getAutoDiffDerivativeFunctionType(
       desiredIndices.parameters, desiredIndices.source, kind, module.Types,
       lookupConformance);
-  auto *caller = assocFn->getFunction();
+  auto *caller = derivativeFn->getFunction();
   if (targetType->hasArchetype()) {
     auto substTargetType = caller->mapTypeIntoContext(
         targetType->mapTypeOutOfContext())->getCanonicalType();
     targetType = SILType::getPrimitiveObjectType(substTargetType)
         .castTo<SILFunctionType>();
   }
-  assert(assocFnType->getNumParameters() == targetType->getNumParameters());
-  assert(assocFnType->getNumResults() == targetType->getNumResults());
+  assert(derivativeFnType->getNumParameters() == targetType->getNumParameters());
+  assert(derivativeFnType->getNumResults() == targetType->getNumResults());
 
   // Build thunk type.
   SubstitutionMap interfaceSubs;
   GenericEnvironment *genericEnv = nullptr;
   auto thunkType = buildThunkType(
-      assocFn->getFunction(), assocFnType, targetType, genericEnv,
+      derivativeFn->getFunction(), derivativeFnType, targetType, genericEnv,
       interfaceSubs, /*withoutActuallyEscaping*/ false,
       DifferentiationThunkKind::IndexSubset);
 
   // FIXME: The logic for resolving `assocRef` does not reapply function
-  // conversions, which is problematic if `assocFn` is a `partial_apply`
+  // conversions, which is problematic if `derivativeFn` is a `partial_apply`
   // instruction.
   StringRef origName;
   if (auto *origFnRef =
@@ -8381,15 +8381,15 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   // TODO(TF-685): Use more principled mangling for thunks.
   std::string thunkName;
   switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       thunkName = "jvp";
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       thunkName = "vjp";
   }
   Mangle::ASTMangler mangler;
   auto fromInterfaceType =
-      assocFnType->mapTypeOutOfContext()->getCanonicalType();
+      derivativeFnType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = targetType->mapTypeOutOfContext()->getCanonicalType();
   CanType dynamicSelfType;
   thunkName = "AD__orig_" + origName.str() + "_" +
@@ -8415,25 +8415,25 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
   createEntryArguments(thunk);
 
   SubstitutionMap assocSubstMap;
-  if (auto *partialApply = dyn_cast<PartialApplyInst>(assocFn))
+  if (auto *partialApply = dyn_cast<PartialApplyInst>(derivativeFn))
     assocSubstMap = partialApply->getSubstitutionMap();
 
   // FIXME: The logic for resolving `assocRef` does not reapply function
-  // conversions, which is problematic if `assocFn` is a `partial_apply`
+  // conversions, which is problematic if `derivativeFn` is a `partial_apply`
   // instruction.
   SILValue assocRef;
-  if (auto *assocFnRef =
-          peerThroughFunctionConversions<FunctionRefInst>(assocFn)) {
-    auto *assoc = assocFnRef->getReferencedFunctionOrNull();
+  if (auto *derivativeFnRef =
+          peerThroughFunctionConversions<FunctionRefInst>(derivativeFn)) {
+    auto *assoc = derivativeFnRef->getReferencedFunctionOrNull();
     assocRef = builder.createFunctionRef(loc, assoc);
   } else if (auto *assocMethodInst =
-                 peerThroughFunctionConversions<WitnessMethodInst>(assocFn)) {
+                 peerThroughFunctionConversions<WitnessMethodInst>(derivativeFn)) {
     assocRef = builder.createWitnessMethod(
         loc, assocMethodInst->getLookupType(),
         assocMethodInst->getConformance(), assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));
   } else if (auto *assocMethodInst =
-                 peerThroughFunctionConversions<ClassMethodInst>(assocFn)) {
+                 peerThroughFunctionConversions<ClassMethodInst>(derivativeFn)) {
     auto classOperand = thunk->getArgumentsWithoutIndirectResults().back();
     auto classOperandType = assocMethodInst->getOperand()->getType();
     assert(classOperand->getType() == classOperandType);
@@ -8441,15 +8441,15 @@ ADContext::getOrCreateSubsetParametersThunkForAssociatedFunction(
         loc, classOperand, assocMethodInst->getMember(),
         thunk->mapTypeIntoContext(assocMethodInst->getType()));
   }
-  assert(assocRef && "Expected associated function to be resolved");
+  assert(assocRef && "Expected derivative function to be resolved");
 
   assocSubstMap = assocSubstMap.subst(thunk->getForwardingSubstitutionMap());
-  assocFnType = assocRef->getType().castTo<SILFunctionType>();
+  derivativeFnType = assocRef->getType().castTo<SILFunctionType>();
 
   SmallVector<SILValue, 4> arguments;
   arguments.append(thunk->getArguments().begin(), thunk->getArguments().end());
-  assert(arguments.size() == assocFnType->getNumParameters() +
-                                 assocFnType->getNumIndirectFormalResults());
+  assert(arguments.size() == derivativeFnType->getNumParameters() +
+                                 derivativeFnType->getNumIndirectFormalResults());
   auto *apply = builder.createApply(
       loc, assocRef, assocSubstMap, arguments, /*isNonThrowing*/ false);
 
@@ -8576,28 +8576,28 @@ SILValue ADContext::promoteToDifferentiableFunction(
   }
 
   SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
-  SmallVector<SILValue, 2> assocFns;
+  SmallVector<SILValue, 2> derivativeFns;
   SmallVector<AllocStackInst *, 2> newBuffersToDealloc;
-  for (auto assocFnKind : {AutoDiffAssociatedFunctionKind::JVP,
-                           AutoDiffAssociatedFunctionKind::VJP}) {
-    auto assocFnAndIndices = emitAssociatedFunctionReference(
-        *this, builder, desiredIndices, assocFnKind, origFnOperand, invoker,
+  for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
+                           AutoDiffDerivativeFunctionKind::VJP}) {
+    auto derivativeFnAndIndices = emitDerivativeFunctionReference(
+        *this, builder, desiredIndices, derivativeFnKind, origFnOperand, invoker,
         newBuffersToDealloc);
     // Show an error at the operator, highlight the argument, and show a note
     // at the definition site of the argument.
-    if (!assocFnAndIndices)
+    if (!derivativeFnAndIndices)
       return nullptr;
 
-    auto assocFn = assocFnAndIndices->first;
-    getGeneratedAssociatedFunctionReferences().push_back(assocFn);
+    auto derivativeFn = derivativeFnAndIndices->first;
+    getGeneratedDerivativeFunctionReferences().push_back(derivativeFn);
 
     // If desired indices are a subset of actual indices, create a "subset
-    // indices thunk" and destroy the emitted associated function reference.
+    // indices thunk" and destroy the emitted derivative function reference.
     // - For JVPs: the thunked JVP returns a differential taking fewer
     //   parameters (using `.zero` for the dropped parameters).
     // - For VJPs: the thunked VJP returns a pullback that drops the unused
     //   tangent values.
-    auto actualIndices = assocFnAndIndices->second;
+    auto actualIndices = derivativeFnAndIndices->second;
     // NOTE: `desiredIndices` may come from a partially-applied function and
     // have smaller capacity than `actualIndices`. We expect this logic to go
     // away when we support `@differentiable` partial apply.
@@ -8606,9 +8606,9 @@ SILValue ADContext::promoteToDifferentiableFunction(
         getASTContext(), actualIndices.parameters->getCapacity());
     if (actualIndices.source != desiredIndices.source ||
         !actualIndices.parameters->equals(extendedDesiredIndices)) {
-      // Destroy the already emitted associated function reference because it
+      // Destroy the already emitted derivative function reference because it
       // is no longer used.
-      builder.emitDestroyValueOperation(loc, assocFn);
+      builder.emitDestroyValueOperation(loc, derivativeFn);
       // Check if underlying original function reference has been partially
       // applied with arguments. If so, produce an error: parameter subset
       // thunks do not yet support this case because partially applied arguments
@@ -8633,42 +8633,42 @@ SILValue ADContext::promoteToDifferentiableFunction(
       SILFunction *thunk;
       SubstitutionMap interfaceSubs;
       std::tie(thunk, interfaceSubs) =
-          getOrCreateSubsetParametersThunkForAssociatedFunction(
-              origFnOperand, assocFn, assocFnKind, desiredIndices,
+          getOrCreateSubsetParametersThunkForDerivativeFunction(
+              origFnOperand, derivativeFn, derivativeFnKind, desiredIndices,
               actualIndices);
       auto *thunkFRI = builder.createFunctionRef(loc, thunk);
       if (auto genSig =
               thunk->getLoweredFunctionType()->getGenericSignature()) {
-        assocFn = builder.createPartialApply(
+        derivativeFn = builder.createPartialApply(
             loc, thunkFRI, interfaceSubs, {},
             ParameterConvention::Direct_Guaranteed);
       } else {
-        assocFn = thunkFRI;
+        derivativeFn = thunkFRI;
       }
     }
-    auto expectedAssocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
-        parameterIndices, resultIndex, assocFnKind, getTypeConverter(),
+    auto expectedDerivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
+        parameterIndices, resultIndex, derivativeFnKind, getTypeConverter(),
         LookUpConformanceInModule(getModule().getSwiftModule()));
-    // If `assocFn` is `@convention(thin)` but is expected to be
+    // If `derivativeFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.
-    if (expectedAssocFnTy->getRepresentation()
+    if (expectedDerivativeFnTy->getRepresentation()
             == SILFunctionTypeRepresentation::Thick &&
-        assocFn->getType().castTo<SILFunctionType>()->getRepresentation()
+        derivativeFn->getType().castTo<SILFunctionType>()->getRepresentation()
             == SILFunctionTypeRepresentation::Thin) {
-      assocFn = builder.createThinToThickFunction(
-          loc, assocFn, SILType::getPrimitiveObjectType(expectedAssocFnTy));
+      derivativeFn = builder.createThinToThickFunction(
+          loc, derivativeFn, SILType::getPrimitiveObjectType(expectedDerivativeFnTy));
     }
 
-    assocFns.push_back(assocFn);
+    derivativeFns.push_back(derivativeFn);
   }
-  // Deallocate temporary buffers used for creating associated functions.
+  // Deallocate temporary buffers used for creating derivative functions.
   for (auto *buf : reversed(newBuffersToDealloc))
     builder.createDeallocStack(loc, buf);
 
   auto origFnCopy = builder.emitCopyValueOperation(loc, origFnOperand);
   auto *newDFI = createDifferentiableFunction(
       builder, loc, parameterIndices, origFnCopy,
-      std::make_pair(assocFns[0], assocFns[1]));
+      std::make_pair(derivativeFns[0], derivativeFns[1]));
   resultIndices[dfi] = resultIndex;
   getDifferentiableFunctionInsts().push_back(dfi);
 
@@ -8701,10 +8701,10 @@ void ADContext::foldDifferentiableFunctionExtraction(
       dfei->eraseFromParent();
       continue;
     }
-    // Fold associated function extractors.
-    auto assocFnValue =
-        source->getDerivativeFunction(dfei->getAssociatedFunctionKind());
-    dfei->replaceAllUsesWith(assocFnValue);
+    // Fold derivative function extractors.
+    auto derivativeFnValue =
+        source->getDerivativeFunction(dfei->getDerivativeFunctionKind());
+    dfei->replaceAllUsesWith(derivativeFnValue);
     dfei->eraseFromParent();
   }
   // If the `differentiable_function` instruction has no remaining uses, erase

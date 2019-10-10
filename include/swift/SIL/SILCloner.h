@@ -973,7 +973,7 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
   Optional<std::pair<SILValue, SILValue>> derivativeFns = None;
   if (Inst->hasDerivativeFunctions())
     derivativeFns = std::make_pair(getOpValue(Inst->getJVPFunction()),
-                              getOpValue(Inst->getVJPFunction()));
+                                   getOpValue(Inst->getVJPFunction()));
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),

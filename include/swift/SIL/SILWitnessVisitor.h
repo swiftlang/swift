@@ -181,13 +181,13 @@ private:
     asDerived().addMethod(funcDeclRef);
 
     for (auto *DA : func->getAttrs().getAttributes<DifferentiableAttr>()) {
-      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP,
+      asDerived().addMethod(funcDeclRef.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
               DA->getParameterIndices(), func->getASTContext())));
-      asDerived().addMethod(funcDeclRef.asAutoDiffAssociatedFunction(
-          AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP,
+      asDerived().addMethod(funcDeclRef.asAutoDiffDerivativeFunction(
+          AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
               DA->getParameterIndices(), func->getASTContext())));
     }
   }

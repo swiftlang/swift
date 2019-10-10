@@ -1872,7 +1872,7 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 // SWIFT_ENABLE_TENSORFLOW
 void IRGenSILFunction::
 visitDifferentiableFunctionInst(DifferentiableFunctionInst *i) {
-  // The original function and associated functions can be thin or thick.
+  // The original function and derivative functions can be thin or thick.
   auto origExp = getLoweredExplosion(i->getOriginalFunction());
   Explosion e;
   e.add(origExp.claimAll());

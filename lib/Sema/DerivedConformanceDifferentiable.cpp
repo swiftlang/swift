@@ -621,7 +621,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
 
     // Now that this member is in the `TangentVector` type, it should be marked
     // `@differentiable` so that the differentiation transform will synthesize
-    // associated functions for it. We only add this to public stored
+    // derivative functions for it. We only add this to public stored
     // properties, because their access outside the module will go through a
     // call to the getter.
     if (member->getEffectiveAccess() > AccessLevel::Internal &&

@@ -480,7 +480,7 @@ static std::string getTransposingParametersClauseString(
 static void printDifferentiableAttrArguments(
     const DifferentiableAttr *attr, ASTPrinter &printer, PrintOptions Options,
     const Decl *D, bool omitWrtClause = false,
-    bool omitAssociatedFunctions = false) {
+    bool omitDerivativeFunctions = false) {
   // Create a temporary string for the attribute argument text.
   std::string attrArgText;
   llvm::raw_string_ostream stream(attrArgText);
@@ -520,8 +520,8 @@ static void printDifferentiableAttrArguments(
       stream << diffParamsString;
     }
   }
-  // Print associated function names, unless they are to be omitted.
-  if (!omitAssociatedFunctions) {
+  // Print derivative function names, unless they are to be omitted.
+  if (!omitDerivativeFunctions) {
     // Print jvp function name, if specified.
     if (auto jvp = attr->getJVP()) {
       printCommaIfNecessary();
@@ -1517,11 +1517,11 @@ GenericEnvironment *DifferentiableAttr::getDerivativeGenericEnvironment(
 
 void DifferentiableAttr::print(llvm::raw_ostream &OS, const Decl *D,
                                bool omitWrtClause,
-                               bool omitAssociatedFunctions) const {
+                               bool omitDerivativeFunctions) const {
   StreamPrinter P(OS);
   P << "@" << getAttrName();
   printDifferentiableAttrArguments(this, P, PrintOptions(), D, omitWrtClause,
-                                   omitAssociatedFunctions);
+                                   omitDerivativeFunctions);
 }
 
 // SWIFT_ENABLE_TENSORFLOW

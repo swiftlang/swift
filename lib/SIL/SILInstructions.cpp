@@ -625,12 +625,12 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
 }
 
 DifferentiableFunctionExtractInst::Extractee::Extractee(
-    AutoDiffAssociatedFunctionKind kind) {
+    AutoDiffDerivativeFunctionKind kind) {
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
+  case AutoDiffDerivativeFunctionKind::JVP:
     rawValue = JVP;
     return;
-  case AutoDiffAssociatedFunctionKind::VJP:
+  case AutoDiffDerivativeFunctionKind::VJP:
     rawValue = VJP;
     return;
   }
@@ -646,16 +646,16 @@ DifferentiableFunctionExtractInst::Extractee::Extractee(StringRef string) {
   rawValue = *result;
 }
 
-Optional<AutoDiffAssociatedFunctionKind>
-DifferentiableFunctionExtractInst::Extractee::getExtracteeAsAssociatedFunction()
+Optional<AutoDiffDerivativeFunctionKind>
+DifferentiableFunctionExtractInst::Extractee::getExtracteeAsDerivativeFunction()
     const {
   switch (rawValue) {
   case Original:
     return None;
   case JVP:
-    return {AutoDiffAssociatedFunctionKind::JVP};
+    return {AutoDiffDerivativeFunctionKind::JVP};
   case VJP:
-    return {AutoDiffAssociatedFunctionKind::VJP};
+    return {AutoDiffDerivativeFunctionKind::VJP};
   }
 }
 
@@ -664,12 +664,12 @@ getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getExtInfo().isDifferentiable());
   auto originalFnTy = fnTy->getWithoutDifferentiability();
-  auto kindOpt = extractee.getExtracteeAsAssociatedFunction();
+  auto kindOpt = extractee.getExtracteeAsDerivativeFunction();
   if (!kindOpt) {
     assert(extractee == Extractee::Original);
     return SILType::getPrimitiveObjectType(originalFnTy);
   }
-  auto resultFnTy = originalFnTy->getAutoDiffAssociatedFunctionType(
+  auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
         fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
         *kindOpt, module.Types,
         LookUpConformanceInModule(module.getSwiftModule()));

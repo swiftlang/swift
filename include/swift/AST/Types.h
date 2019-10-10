@@ -3100,10 +3100,10 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Given `indices` and `kind`, calculates the type of the corresponding
-  /// autodiff associated function.
+  /// autodiff derivative function.
   ///
   /// By default, if the original type has a self parameter list and parameter
-  /// indices include self, the computed associated function type will return a
+  /// indices include self, the computed derivative function type will return a
   /// linear map taking/returning self's tangent *last* instead of first, for
   /// consistency with SIL.
   ///
@@ -3114,18 +3114,18 @@ public:
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original
   /// function, including `@differentiable`.
-  AnyFunctionType *getAutoDiffAssociatedFunctionType(
+  AnyFunctionType *getAutoDiffDerivativeFunctionType(
       AutoDiffIndexSubset *indices, unsigned resultIndex,
-      AutoDiffAssociatedFunctionKind kind,
+      AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr,
       bool makeSelfParamFirst = false);
 
-  /// Given the type of an autodiff associated function, returns the
+  /// Given the type of an autodiff derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *getAutoDiffOriginalFunctionType();
   
-  /// Given the type of a transposing associated function, returns the
+  /// Given the type of a transposing derivative function, returns the
   /// corresponding original function type.
   AnyFunctionType *
   getTransposeOriginalFunctionType(TransposingAttr *attr,
@@ -4222,11 +4222,11 @@ public:
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
-  CanSILFunctionType getAutoDiffAssociatedFunctionType(
+  CanSILFunctionType getAutoDiffDerivativeFunctionType(
       AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
-      AutoDiffAssociatedFunctionKind kind, Lowering::TypeConverter &TC,
+      AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
-      CanGenericSignature associatedFunctionGenericSignature = nullptr);
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.

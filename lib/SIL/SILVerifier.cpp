@@ -1505,9 +1505,9 @@ public:
       require(jvpType, "The JVP function must have a function type");
       require(!jvpType->isDifferentiable(),
               "The JVP function must not be @differentiable");
-      auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
+      auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), /*resultIndex*/ 0,
-          AutoDiffAssociatedFunctionKind::JVP, TC,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(jvpType),
                       SILType::getPrimitiveObjectType(expectedJVPType),
@@ -1517,9 +1517,9 @@ public:
       require(vjpType, "The VJP function must have a function type");
       require(!vjpType->isDifferentiable(),
               "The VJP function must not be @differentiable");
-      auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
+      auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
           dfi->getParameterIndices(), /*resultIndex*/ 0,
-          AutoDiffAssociatedFunctionKind::VJP, TC,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
           LookUpConformanceInModule(M));
       requireSameType(SILType::getPrimitiveObjectType(vjpType),
                       SILType::getPrimitiveObjectType(expectedVJPType),

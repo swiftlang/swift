@@ -245,7 +245,7 @@ public func TF_688<Scalar: Differentiable>(
   reduction(x)
 }
 
-// TF-697: Test generic requirements of generated AD associated function.
+// TF-697: Test generic requirements of generated derivative function.
 protocol TF_697_Module: Differentiable {
     associatedtype Input
     associatedtype Output: Differentiable

@@ -431,8 +431,8 @@ struct AutoDiffLinearMapKind {
   operator innerty() const { return rawValue; }
 };
 
-/// The kind of an associated function.
-struct AutoDiffAssociatedFunctionKind {
+/// The kind of a derivative function.
+struct AutoDiffDerivativeFunctionKind {
   enum innerty : uint8_t {
    // The Jacobian-vector products function.
    JVP = 0,
@@ -440,11 +440,11 @@ struct AutoDiffAssociatedFunctionKind {
    VJP = 1
   } rawValue;
 
-  AutoDiffAssociatedFunctionKind() = default;
-  AutoDiffAssociatedFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  AutoDiffAssociatedFunctionKind(AutoDiffLinearMapKind linMapKind)
+  AutoDiffDerivativeFunctionKind() = default;
+  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
       : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
-  explicit AutoDiffAssociatedFunctionKind(StringRef string);
+  explicit AutoDiffDerivativeFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
   AutoDiffLinearMapKind getLinearMapKind() {
     return (AutoDiffLinearMapKind::innerty)rawValue;
@@ -452,27 +452,27 @@ struct AutoDiffAssociatedFunctionKind {
 };
 
 /// In conjunction with the original function declaration, identifies an
-/// autodiff associated function.
+/// autodiff derivative function.
 ///
 /// Is uniquely allocated within an ASTContext so that it can be hashed and
 /// compared by opaque pointer value.
-class AutoDiffAssociatedFunctionIdentifier : public llvm::FoldingSetNode {
-  const AutoDiffAssociatedFunctionKind kind;
+class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
+  const AutoDiffDerivativeFunctionKind kind;
   AutoDiffIndexSubset *const parameterIndices;
 
-  AutoDiffAssociatedFunctionIdentifier(
-      AutoDiffAssociatedFunctionKind kind,
+  AutoDiffDerivativeFunctionIdentifier(
+      AutoDiffDerivativeFunctionKind kind,
       AutoDiffIndexSubset *parameterIndices) :
     kind(kind), parameterIndices(parameterIndices) {}
 
 public:
-  AutoDiffAssociatedFunctionKind getKind() const { return kind; }
+  AutoDiffDerivativeFunctionKind getKind() const { return kind; }
   AutoDiffIndexSubset *getParameterIndices() const {
     return parameterIndices;
   }
 
-  static AutoDiffAssociatedFunctionIdentifier *get(
-      AutoDiffAssociatedFunctionKind kind,
+  static AutoDiffDerivativeFunctionIdentifier *get(
+      AutoDiffDerivativeFunctionKind kind,
       AutoDiffIndexSubset *parameterIndices, ASTContext &C);
 
   void Profile(llvm::FoldingSetNodeID &ID) {
@@ -520,15 +520,15 @@ AutoDiffIndexSubset *getLoweredParameterIndices(AutoDiffIndexSubset *indices,
 /// `Builtin.autodiffApply`, e.g. `Builtin.autodiffApply_jvp_arity2_order1`.
 /// Returns true if the function name is parsed successfully.
 bool getBuiltinAutoDiffApplyConfig(StringRef operationName,
-                                   AutoDiffAssociatedFunctionKind &kind,
+                                   AutoDiffDerivativeFunctionKind &kind,
                                    unsigned &arity, bool &rethrows);
 
-/// Computes the correct linkage for an associated function given the linkage of
+/// Computes the correct linkage for a derivative function given the linkage of
 /// the original function. If the original linkage is not external and
-/// `isAssocFnExported` is true, use the original function's linkage. Otherwise,
-/// return hidden linkage.
-SILLinkage getAutoDiffAssociatedFunctionLinkage(SILLinkage originalLinkage,
-                                                bool isAssocFnExported);
+/// `isDerivativeFnExported` is true, use the original function's linkage.
+/// Otherwise, return hidden linkage.
+SILLinkage getAutoDiffDerivativeFunctionLinkage(SILLinkage originalLinkage,
+                                                bool isDerivativeFnExported);
 
 } // end namespace autodiff
 

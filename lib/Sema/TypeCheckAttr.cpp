@@ -2727,7 +2727,7 @@ TypeChecker::inferDifferentiableParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static FuncDecl *resolveAutoDiffAssociatedFunction(
+static FuncDecl *resolveAutoDiffDerivativeFunction(
     TypeChecker &TC, DeclNameWithLoc specifier, AbstractFunctionDecl *original,
     Type expectedTy, std::function<bool(FuncDecl *)> isValid) {
   auto nameLoc = specifier.Loc.getBaseNameLoc();
@@ -2750,9 +2750,9 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
                 specifier.Name);
   };
 
-  // Returns true if the original function and associated function candidate are
+  // Returns true if the original function and derivative function candidate are
   // defined in compatible type contexts. If the original function and the
-  // associated function have different parents, or if they both have no type
+  // derivative function have different parents, or if they both have no type
   // context and are in different modules, return false.
   std::function<bool(FuncDecl *)> hasValidTypeContext = [&](FuncDecl *func) {
     // Check if both functions are top-level.
@@ -2775,7 +2775,7 @@ static FuncDecl *resolveAutoDiffAssociatedFunction(
   };
 
   // If the original function is exported (i.e. it is public or
-  // @usableFromInline), then the associated functions must also be exported.
+  // @usableFromInline), then the derivative functions must also be exported.
   // Returns true on error.
   auto checkAccessControl = [&](FuncDecl *func) {
     if (!isABIPublic(original))
@@ -3330,7 +3330,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Handle 'where' clause, if it exists.
   // - Resolve attribute where clause requirements and store in the attribute
   //   for serialization.
-  // - Compute generic signature for autodiff associated functions based on
+  // - Compute generic signature for autodiff derivative functions based on
   //   the original function's generate signature and the attribute's where
   //   clause requirements.
   GenericSignature *whereClauseGenSig = nullptr;
@@ -3364,7 +3364,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
       return;
     }
 
-    // Build a new generic signature for autodiff associated functions.
+    // Build a new generic signature for autodiff derivative functions.
     GenericSignatureBuilder builder(ctx);
     // Add the original function's generic signature.
     builder.addGenericSignature(originalGenSig);
@@ -3476,9 +3476,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the JVP declaration, if it exists.
   if (attr->getJVP()) {
     AnyFunctionType *expectedJVPFnTy =
-        originalFnTy->getAutoDiffAssociatedFunctionType(
+        originalFnTy->getAutoDiffDerivativeFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
-            AutoDiffAssociatedFunctionKind::JVP, lookupConformance,
+            AutoDiffDerivativeFunctionKind::JVP, lookupConformance,
             whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidJVP = [&](FuncDecl *jvpCandidate) {
@@ -3488,7 +3488,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           jvpCandidate->getInterfaceType()->getCanonicalType());
     };
 
-    FuncDecl *jvp = resolveAutoDiffAssociatedFunction(
+    FuncDecl *jvp = resolveAutoDiffDerivativeFunction(
         TC, attr->getJVP().getValue(), original, expectedJVPFnTy, isValidJVP);
 
     if (!jvp) {
@@ -3502,9 +3502,9 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   // Resolve the VJP declaration, if it exists.
   if (attr->getVJP()) {
     AnyFunctionType *expectedVJPFnTy =
-        originalFnTy->getAutoDiffAssociatedFunctionType(
+        originalFnTy->getAutoDiffDerivativeFunctionType(
             checkedWrtParamIndices, /*resultIndex*/ 0,
-            AutoDiffAssociatedFunctionKind::VJP, lookupConformance,
+            AutoDiffDerivativeFunctionKind::VJP, lookupConformance,
             whereClauseGenSig, /*makeSelfParamFirst*/ true);
 
     auto isValidVJP = [&](FuncDecl *vjpCandidate) {
@@ -3514,7 +3514,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
           vjpCandidate->getInterfaceType()->getCanonicalType());
     };
 
-    FuncDecl *vjp = resolveAutoDiffAssociatedFunction(
+    FuncDecl *vjp = resolveAutoDiffDerivativeFunction(
         TC, attr->getVJP().getValue(), original, expectedVJPFnTy, isValidVJP);
 
     if (!vjp) {
@@ -3593,8 +3593,8 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   }
   auto valueResultElt = derivativeResultTupleType->getElement(0);
   auto funcResultElt = derivativeResultTupleType->getElement(1);
-  // Get derivative kind and associated function identifier.
-  AutoDiffAssociatedFunctionKind kind;
+  // Get derivative kind and derivative function identifier.
+  AutoDiffDerivativeFunctionKind kind;
   if (valueResultElt.getName().str() != "value") {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_value_label);
@@ -3602,9 +3602,9 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
   if (funcResultElt.getName().str() == "differential") {
-    kind = AutoDiffAssociatedFunctionKind::JVP;
+    kind = AutoDiffDerivativeFunctionKind::JVP;
   } else if (funcResultElt.getName().str() == "pullback") {
-    kind = AutoDiffAssociatedFunctionKind::VJP;
+    kind = AutoDiffDerivativeFunctionKind::VJP;
   } else {
     TC.diagnose(attr->getLocation(),
                 diag::differentiating_attr_invalid_result_tuple_func_label);
@@ -3773,7 +3773,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // Compute expected differential/pullback type.
   auto funcEltType = funcResultElt.getType();
   Type expectedFuncEltType;
-  if (kind == AutoDiffAssociatedFunctionKind::JVP) {
+  if (kind == AutoDiffDerivativeFunctionKind::JVP) {
     auto diffParams = map<SmallVector<AnyFunctionType::Param, 4>>(
         diffParamElts, [&](TupleTypeElt elt) {
           return AnyFunctionType::Param(elt.getType());
@@ -3834,10 +3834,10 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
                                     /*vjp*/ None,
                                     derivative->getGenericSignature());
     switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       da->setJVPFunction(derivative);
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       da->setVJPFunction(derivative);
       break;
     }
@@ -3861,7 +3861,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   // `@differentiating` attribute. Otherwise, register the derivative in the
   // `@differentiable` attribute.
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP:
+  case AutoDiffDerivativeFunctionKind::JVP:
     // If there's a different registered derivative, emit an error.
     if ((da->getJVP() &&
          da->getJVP()->Name.getBaseName() != derivative->getBaseName()) ||
@@ -3873,7 +3873,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     }
     da->setJVPFunction(derivative);
     break;
-  case AutoDiffAssociatedFunctionKind::VJP:
+  case AutoDiffDerivativeFunctionKind::VJP:
     // If there's a different registered derivative, emit an error.
     if ((da->getVJP() &&
          da->getVJP()->Name.getBaseName() != derivative->getBaseName()) ||

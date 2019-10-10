@@ -1545,7 +1545,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   unsigned uncurryLevel = 0;
   bool IsObjC = false;
   // SWIFT_ENABLE_TENSORFLOW
-  AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId = nullptr;
+  AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
@@ -1635,13 +1635,13 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         // SWIFT_ENABLE_TENSORFLOW
         ParseState = 3;
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
-        AutoDiffAssociatedFunctionKind kind;
+        AutoDiffDerivativeFunctionKind kind;
         AutoDiffIndexSubset *parameterIndices = nullptr;
 
         if (Id.str() == "jvp")
-          kind = AutoDiffAssociatedFunctionKind::JVP;
+          kind = AutoDiffDerivativeFunctionKind::JVP;
         else if (Id.str() == "vjp")
-          kind = AutoDiffAssociatedFunctionKind::VJP;
+          kind = AutoDiffDerivativeFunctionKind::VJP;
         else
           llvm_unreachable("Should only have JVP and VJP here");
 
@@ -1658,7 +1658,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         }
         P.consumeToken();
 
-        autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
             kind, parameterIndices, SILMod.getASTContext());
 
         break;
@@ -2960,9 +2960,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     // Parse an optional operand list `with { <operand> , <operand> }`.
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
       P.consumeToken(tok::identifier);
-      // Parse associated function values as an operand list.
+      // Parse derivative function values as an operand list.
       // FIXME(rxwei): Change this to *not* require a type signature once
-      // we can infer AD associated function types.
+      // we can infer derivative function types.
       SILValue derivFn1, derivFn2;
       if (P.parseToken(tok::l_brace,
               diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
@@ -3003,7 +3003,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
         P.parseToken(tok::r_square,
                      diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "associated function kind"))
+                     "derivative function kind"))
       return true;
     if (parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))

@@ -349,15 +349,15 @@ void SILDeclRef::print(raw_ostream &OS) const {
     OS << ((isDot || uncurryLevel != 0) ? '.' : '!')  << "direct";
 
   // SWIFT_ENABLE_TENSORFLOW
-  if (autoDiffAssociatedFunctionIdentifier) {
-    auto *autoDiffFuncId = autoDiffAssociatedFunctionIdentifier;
+  if (autoDiffDerivativeFunctionIdentifier) {
+    auto *autoDiffFuncId = autoDiffDerivativeFunctionIdentifier;
     OS << ((isDot || uncurryLevel != 0 || isForeign || isDirectReference)
                ? '.' : '!');
     switch (autoDiffFuncId->getKind()) {
-    case AutoDiffAssociatedFunctionKind::JVP:
+    case AutoDiffDerivativeFunctionKind::JVP:
       OS << "jvp.";
       break;
-    case AutoDiffAssociatedFunctionKind::VJP:
+    case AutoDiffDerivativeFunctionKind::VJP:
       OS << "vjp.";
       break;
     }
