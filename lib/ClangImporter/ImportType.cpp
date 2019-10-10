@@ -1720,11 +1720,10 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     // It doesn't actually matter which DeclContext we use, so just use the
     // imported header unit.
     auto paramInfo = createDeclWithClangNode<ParamDecl>(
-        param, AccessLevel::Private,
-        ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), name,
+        param, AccessLevel::Private, SourceLoc(), SourceLoc(), name,
         importSourceLoc(param->getLocation()), bodyName,
         ImportedHeaderUnit);
-
+    paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo,
                                 importedType.isImplicitlyUnwrapped());
@@ -1738,11 +1737,11 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
         BoundGenericType::get(SwiftContext.getArrayDecl(), Type(),
                               {SwiftContext.TheAnyType});
     auto name = SwiftContext.getIdentifier("varargs");
-    auto param = new (SwiftContext) ParamDecl(ParamDecl::Specifier::Default,
-                                              SourceLoc(), SourceLoc(),
+    auto param = new (SwiftContext) ParamDecl(SourceLoc(), SourceLoc(),
                                               Identifier(), SourceLoc(),
                                               name,
                                               ImportedHeaderUnit);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(paramTy);
 
     param->setVariadic();
@@ -2038,10 +2037,11 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     // It doesn't actually matter which DeclContext we use, so just
     // use the imported header unit.
     auto type = TupleType::getEmpty(SwiftContext);
-    auto var = new (SwiftContext) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+    auto var = new (SwiftContext) ParamDecl(SourceLoc(),
                                             SourceLoc(), argName,
                                             SourceLoc(), argName,
                                             ImportedHeaderUnit);
+    var->setSpecifier(ParamSpecifier::Default);
     var->setInterfaceType(type);
     swiftParams.push_back(var);
   };
@@ -2157,11 +2157,11 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
     // Set up the parameter info.
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           ParamDecl::Specifier::Default,
                                            SourceLoc(), SourceLoc(), name,
                                            importSourceLoc(param->getLocation()),
                                            bodyName,
                                            ImportedHeaderUnit);
+    paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(swiftParamTy);
     recordImplicitUnwrapForDecl(paramInfo, paramIsIUO);
 
@@ -2269,11 +2269,11 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
     Identifier argLabel = functionName.getDeclName().getArgumentNames().front();
     auto paramInfo
       = createDeclWithClangNode<ParamDecl>(param, AccessLevel::Private,
-                                           ParamDecl::Specifier::Default,
                                            /*let loc*/SourceLoc(),
                                            /*label loc*/SourceLoc(),
                                            argLabel, nameLoc, bodyName,
                                            /*dummy DC*/ImportedHeaderUnit);
+    paramInfo->setSpecifier(ParamSpecifier::Default);
     paramInfo->setInterfaceType(propertyTy);
 
     *params = ParameterList::create(SwiftContext, paramInfo);

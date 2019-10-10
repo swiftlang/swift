@@ -472,8 +472,7 @@ mapParsedParameters(Parser &parser,
                          Identifier argName, SourceLoc argNameLoc,
                          Identifier paramName, SourceLoc paramNameLoc)
   -> ParamDecl * {
-    auto param = new (ctx) ParamDecl(ParamDecl::Specifier::Default,
-                                     paramInfo.SpecifierLoc,
+    auto param = new (ctx) ParamDecl(paramInfo.SpecifierLoc,
                                      argNameLoc, argName,
                                      paramNameLoc, paramName,
                                      parser.CurDeclContext);
@@ -530,7 +529,8 @@ mapParsedParameters(Parser &parser,
       // Non-closure parameters require a type.
       if (!param->isInvalid())
         parser.diagnose(param->getLoc(), diag::missing_parameter_type);
-      
+
+      param->setSpecifier(ParamSpecifier::Default);
       setInvalid();
     } else if (paramInfo.SpecifierLoc.isValid()) {
       StringRef specifier;
@@ -552,7 +552,12 @@ mapParsedParameters(Parser &parser,
                       specifier);
       paramInfo.SpecifierLoc = SourceLoc();
       paramInfo.SpecifierKind = ParamDecl::Specifier::Default;
+
+      param->setSpecifier(ParamSpecifier::Default);
+    } else {
+      param->setSpecifier(ParamSpecifier::Default);
     }
+
     return param;
   };
 

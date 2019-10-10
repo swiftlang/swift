@@ -18,6 +18,7 @@
 SWIFT_TYPEID(AncestryFlags)
 SWIFT_TYPEID(CtorInitializerKind)
 SWIFT_TYPEID(GenericSignature)
+SWIFT_TYPEID(ParamSpecifier)
 SWIFT_TYPEID(PropertyWrapperBackingPropertyInfo)
 SWIFT_TYPEID(PropertyWrapperTypeInfo)
 SWIFT_TYPEID(Requirement)
