@@ -1426,12 +1426,10 @@ static void convertBBArgType(SILBuilder &argBuilder, SILType newSILType,
   }
 }
 
-static bool containsFunctionType(SILType ty) {
-  if (auto tuple = ty.getAs<TupleType>()) {
-    for (TupleTypeElt elem : tuple->getElements()) {
-      auto canElem = CanType(elem.getRawType());
-      auto elemTy = SILType::getPrimitiveObjectType(canElem);
-      if (containsFunctionType(elemTy))
+static bool containsFunctionType(CanType ty) {
+  if (auto tuple = dyn_cast<TupleType>(ty)) {
+    for (auto elt : tuple.getElementTypes()) {
+      if (containsFunctionType(elt))
         return true;
     }
     return false;
@@ -1439,7 +1437,7 @@ static bool containsFunctionType(SILType ty) {
   if (auto optionalType = ty.getOptionalObjectType()) {
     return containsFunctionType(optionalType);
   }
-  return ty.is<SILFunctionType>();
+  return isa<SILFunctionType>(ty);
 }
 
 void LoadableStorageAllocation::convertApplyResults() {
@@ -1466,7 +1464,7 @@ void LoadableStorageAllocation::convertApplyResults() {
         auto numFuncTy = llvm::count_if(origSILFunctionType->getResults(),
             [](const SILResultInfo &origResult) {
               auto resultStorageTy = origResult.getSILStorageType();
-                return containsFunctionType(resultStorageTy);
+              return containsFunctionType(resultStorageTy.getASTType());
             });
         assert(numFuncTy != 0 &&
                "Expected a SILFunctionType inside the result Type");
