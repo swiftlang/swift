@@ -5623,10 +5623,9 @@ differentiable_function
   differentiable_function [wrt 0] %0 : $(T) -> T \
     with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
-Bundles a function with its associated differentiation functions into a
-``@differentiable`` function. There are two derivative functions:
-a Jacobian-vector products (JVP) function and a vector-Jacobian products (VJP)
-function.
+Bundles a function with its derivative functions into a ``@differentiable``
+function. There are two derivative functions: a Jacobian-vector products (JVP)
+function and a vector-Jacobian products (VJP) function.
 
 ``[wrt ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all

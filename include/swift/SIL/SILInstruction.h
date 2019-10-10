@@ -7846,8 +7846,8 @@ class TryApplyInst final
 
 // SWIFT_ENABLE_TENSORFLOW
 /// `differentiable_function` - given a function and differentiation indices and
-/// its associated differentiation functions, create an `@differentiable`
-/// function that represents a bundle of these functions and configurations.
+/// its derivative functions, create an `@differentiable` function that
+/// represents a bundle of these functions and configurations.
 class DifferentiableFunctionInst final :
     public InstructionBaseWithTrailingOperands<
                SILInstructionKind::DifferentiableFunctionInst,
