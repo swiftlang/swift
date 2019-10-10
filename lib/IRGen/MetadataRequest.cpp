@@ -512,15 +512,28 @@ CanType IRGenModule::getRuntimeReifiedType(CanType type) {
   }));
 }
 
+static bool containsPrivateType(CanType ty) {
+  return ty.findIf([](Type t) -> bool {
+    if (auto *nominal = t->getAnyNominal()) {
+      if (nominal->getEffectiveAccess() <= AccessLevel::FilePrivate)
+        return true;
+    }
+    return false;
+  });
+}
+
 CanType IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type) {
   // Substitute away opaque types whose underlying types we're allowed to
   // assume are constant.
   if (type->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    // The underlying type could contain a private type from a different TU.
+    if (!containsPrivateType(underlyingTy))
+      return underlyingTy;
   }
 
   return type;
@@ -533,8 +546,12 @@ SILType IRGenModule::substOpaqueTypesWithUnderlyingTypes(
   if (type.getASTType()->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    type = type.subst(getSILModule(), replacer, replacer, genericSig,
-                      /*substitute opaque*/ true);
+    auto underlyingTy =
+        type.subst(getSILModule(), replacer, replacer, genericSig,
+                   /*substitute opaque*/ true);
+    // The underlying type could contain a private type from a different TU.
+    if (!containsPrivateType(underlyingTy.getASTType()))
+      return underlyingTy;
   }
 
   return type;
@@ -548,11 +565,14 @@ IRGenModule::substOpaqueTypesWithUnderlyingTypes(CanType type,
   if (type->hasOpaqueArchetype()) {
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(getSwiftModule(),
                                                   ResilienceExpansion::Maximal);
-    conformance = conformance.subst(type, replacer, replacer,
-                                    SubstFlags::SubstituteOpaqueArchetypes);
-    type = type.subst(replacer, replacer,
-                      SubstFlags::SubstituteOpaqueArchetypes)
-      ->getCanonicalType();
+    auto substConformance = conformance.subst(
+        type, replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
+    auto underlyingTy =
+        type.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes)
+            ->getCanonicalType();
+    // The underlying type could contain a private type from a different TU.
+    if (!containsPrivateType(underlyingTy))
+      return std::make_pair(underlyingTy, substConformance);
   }
 
   return std::make_pair(type, conformance);
