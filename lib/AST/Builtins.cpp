@@ -1045,10 +1045,10 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   // Generator for the resultant function type, i.e. the AD associated function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
-        auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
+        auto derivativeFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
             paramIndices, /*resultIndex*/ 0, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));
-        return assocFnTy->getResult();
+        return derivativeFnTy->getResult();
       }};
   builder.addParameter(firstArgGen);
   for (auto argGen : fnArgGens)

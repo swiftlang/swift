@@ -899,10 +899,10 @@ namespace {
       for (AutoDiffAssociatedFunctionKind kind :
                {AutoDiffAssociatedFunctionKind::JVP,
                 AutoDiffAssociatedFunctionKind::VJP}) {
-        auto assocFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
+        auto derivativeFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
             paramIndices, 0, kind, TC,
             LookUpConformanceInModule(&TC.M));
-        auto silTy = SILType::getPrimitiveObjectType(assocFnTy);
+        auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         DifferentiableFunctionExtractee extractee(kind);
         // Assert that we have the right extractee. A terrible bug in the past
         // was caused by implicit conversions from `unsigned` to

@@ -150,16 +150,16 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   /// Get or create an autodiff associated function thunk for the given
   /// SILDeclRef, SILFunction, and associated function type.
-  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef assocFnRef,
-                                        SILFunction *assocFn,
-                                        CanSILFunctionType assocFnTy);
+  SILFunction *getOrCreateAutoDiffThunk(SILDeclRef derivativeFnRef,
+                                        SILFunction *derivativeFn,
+                                        CanSILFunctionType derivativeFnTy);
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Get or create an autodiff associated function vtable entry thunk for the
   /// given SILDeclRef and associated function type.
   SILFunction *
-  getOrCreateAutoDiffClassMethodThunk(SILDeclRef assocFnRef,
-                                      CanSILFunctionType assocFnTy);
+  getOrCreateAutoDiffClassMethodThunk(SILDeclRef derivativeFnRef,
+                                      CanSILFunctionType derivativeFnTy);
 
   /// Emit a vtable thunk for a derived method if its natural abstraction level
   /// diverges from the overridden base method. If no thunking is needed,
@@ -187,8 +187,8 @@ public:
   /// - The last result in the returned pullback.
   SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
-      SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
-      bool reorderSelf);
+      SILFunction *derivativeFn,
+      AutoDiffAssociatedFunctionKind derivativeFnKind, bool reorderSelf);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

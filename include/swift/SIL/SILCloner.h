@@ -970,14 +970,14 @@ template<typename ImplClass>
 void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
     DifferentiableFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  Optional<std::pair<SILValue, SILValue>> assocFns = None;
+  Optional<std::pair<SILValue, SILValue>> derivativeFns = None;
   if (Inst->hasDerivativeFunctions())
-    assocFns = std::make_pair(getOpValue(Inst->getJVPFunction()),
+    derivativeFns = std::make_pair(getOpValue(Inst->getJVPFunction()),
                               getOpValue(Inst->getVJPFunction()));
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
-                getOpValue(Inst->getOriginalFunction()), assocFns));
+                getOpValue(Inst->getOriginalFunction()), derivativeFns));
 }
 
 template<typename ImplClass>

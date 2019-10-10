@@ -1041,19 +1041,19 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     origFnArgVals.push_back(arg.getValue());
 
   // Get the associated function.
-  SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
+  SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
       loc, kind, origFnVal);
-  auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
+  auto derivativeFnType = derivativeFn->getType().castTo<SILFunctionType>();
 
-  // We don't need to destroy the original function or retain the `assocFn`,
-  // because they are trivial (because they are @noescape).
+  // We don't need to destroy the original function or retain the
+  // `derivativeFn`, because they are trivial (because they are @noescape).
   assert(origFnVal->getType().isTrivial(SGF.F));
-  assert(assocFn->getType().isTrivial(SGF.F));
-  bool assocFnNeedsDestroy = false;
+  assert(derivativeFn->getType().isTrivial(SGF.F));
+  bool derivativeFnNeedsDestroy = false;
 
   // Unwrap curry levels.
   SmallVector<SILFunctionType *, 2> curryLevels;
-  SILFunctionType *currentLevel = assocFnType;
+  SILFunctionType *currentLevel = derivativeFnType;
   unsigned numParameters = 0;
   while (currentLevel != nullptr) {
     curryLevels.push_back(currentLevel);
@@ -1074,7 +1074,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 #endif
 
   // Apply all the curry levels except the last one, whose results we handle
-  // specially. We overwrite `assocFn` with the application results.
+  // specially. We overwrite `derivativeFn` with the application results.
   unsigned currentParameter = 0;
   auto curryLevelsWithoutLast =
       ArrayRef<SILFunctionType *>(curryLevels).drop_back(1);
@@ -1082,17 +1082,17 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
     auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
         currentParameter, curryLevel->getNumParameters());
     auto applyResult = SGF.B.createApply(
-        loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+        loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
         /*isNonThrowing*/ false);
     currentParameter += curryLevel->getNumParameters();
 
-    assocFn = applyResult;
+    derivativeFn = applyResult;
 
-    // Our new `assocFn` needs to be released because it's an owned result from
-    // a function call.
+    // Our new `derivativeFn` needs to be released because it's an owned result
+    // from a function call.
     assert(curryLevel->getSingleResult().getConvention() ==
            ResultConvention::Owned);
-    assocFnNeedsDestroy = true;
+    derivativeFnNeedsDestroy = true;
   }
 
   assert(curryLevels.back()->getNumResults() == 2);
@@ -1109,10 +1109,10 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
         currentParameter);
     for (auto origFnArgVal : curryLevelArgVals)
       applyArgs.push_back(origFnArgVal);
-    auto differential = SGF.B.createApply(
-        loc, assocFn, SubstitutionMap(), applyArgs, /*isNonThrowing*/ false);
+    auto differential = SGF.B.createApply(loc, derivativeFn, SubstitutionMap(),
+                                          applyArgs, /*isNonThrowing*/ false);
 
-    assocFn = SILValue();
+    derivativeFn = SILValue();
 
     SGF.B.createStore(loc, differential,
                       SGF.B.createTupleElementAddr(loc, indResBuffer, 1),
@@ -1125,10 +1125,10 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
   auto curryLevelArgVals = ArrayRef<SILValue>(origFnArgVals).slice(
       currentParameter);
   auto resultTuple = SGF.B.createApply(
-      loc, assocFn, SubstitutionMap(), curryLevelArgVals,
+      loc, derivativeFn, SubstitutionMap(), curryLevelArgVals,
       /*isNonThrowing*/ false);
 
-  assocFn = SILValue();
+  derivativeFn = SILValue();
 
   return SGF.emitManagedRValueWithCleanup(resultTuple);
 }
