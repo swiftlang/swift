@@ -157,6 +157,10 @@ bool TypeBase::isAny() {
   return isEqual(getASTContext().TheAnyType);
 }
 
+bool TypeBase::isHole() {
+  return isEqual(getASTContext().TheUnresolvedType);
+}
+
 bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }

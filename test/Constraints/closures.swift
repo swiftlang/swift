@@ -372,7 +372,7 @@ func rdar21078316() {
   var foo : [String : String]?
   var bar : [(String, String)]?
   bar = foo.map { ($0, $1) }  // expected-error {{contextual closure type '([String : String]) throws -> [(String, String)]' expects 1 argument, but 2 were used in closure body}}
-  // expected-error@-1:19 {{cannot convert value of type '([String : String], Any)' to closure result type '[(String, String)]'}}
+  // expected-error@-1:19 {{cannot convert value of type '(Dictionary<String, String>, _)' to closure result type '[(String, String)]'}}
 }
 
 
@@ -821,7 +821,7 @@ func rdar_40537960() {
   }
 
   var arr: [S] = []
-  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<Any>'}}
+  _ = A(arr, fn: { L($0.v) }) // expected-error {{cannot convert value of type 'L' to closure result type 'R<P>'}}
   // expected-error@-1 {{generic parameter 'P' could not be inferred}}
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{8-8=<[S], <#P: P_40537960#>>}}
 }

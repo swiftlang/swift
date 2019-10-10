@@ -121,7 +121,7 @@ protocol P {} // expected-error {{invalid redeclaration of 'P'}}
 // expected-note@-1 {{did you mean 'P'?}}
 
 func hasTypo() {
-  _ = P.a.a // expected-error {{type 'Generic<Any>' has no member 'a'}}
+  _ = P.a.a // expected-error {{type 'Generic<T>' has no member 'a'}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 }
 

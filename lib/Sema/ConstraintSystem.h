@@ -3033,7 +3033,7 @@ public:
   ///
   /// The resulting types can be compared canonically, so long as additional
   /// type equivalence requirements aren't introduced between comparisons.
-  Type simplifyType(Type type) const;
+  Type simplifyType(Type type, bool forDiagnostics = false) const;
 
   /// Simplify a type, by replacing type variables with either their
   /// fixed types (if available) or their representatives.

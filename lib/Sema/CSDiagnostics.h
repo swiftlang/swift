@@ -98,7 +98,7 @@ public:
   /// Resolve type variables present in the raw type, if any.
   Type resolveType(Type rawType, bool reconstituteSugar = false,
                    bool wantRValue = true) const {
-    auto resolvedType = CS.simplifyType(rawType);
+    auto resolvedType = CS.simplifyType(rawType, /*forDiagnostics*/true);
 
     if (reconstituteSugar)
       resolvedType = resolvedType->reconstituteSugar(/*recursive*/ true);
@@ -782,12 +782,7 @@ protected:
 
 private:
   Type resolve(Type rawType) {
-    auto type = resolveType(rawType)->getWithoutSpecifierType();
-    if (auto *BGT = type->getAs<BoundGenericType>()) {
-      if (BGT->hasUnresolvedType())
-        return BGT->getDecl()->getDeclaredInterfaceType();
-    }
-    return type;
+    return resolveType(rawType)->getWithoutSpecifierType();
   }
 
   /// Try to add a fix-it to convert a stored property into a computed

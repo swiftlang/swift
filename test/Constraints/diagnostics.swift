@@ -1296,7 +1296,7 @@ func rdar43525641(_ a: Int, _ b: Int = 0, c: Int = 0, _ d: Int) {}
 rdar43525641(1, c: 2, 3) // Ok
 
 struct Array {}
-let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Any>'}}
+let foo: Swift.Array = Array() // expected-error {{cannot convert value of type 'Array' to specified type 'Array<Element>'}}
 
 struct Error {}
 let bar: Swift.Error = Error() //expected-error {{value of type 'diagnostics.Error' does not conform to specified type 'Swift.Error'}}
@@ -1317,16 +1317,16 @@ takesArrayOfSetOfGenericArrays(1) // expected-error {{cannot convert value of ty
 func takesArrayOfGenericOptionals<T>(_ x: [T?]) {}
 takesArrayOfGenericOptionals(1) // expected-error {{cannot convert value of type 'Int' to expected argument type '[Int?]'}}
 func takesGenericDictionary<T, U>(_ x: [T : U]) {}  // expected-note {{in call to function 'takesGenericDictionary'}}
-takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Any]'}}
+takesGenericDictionary(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : U]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 // expected-error@-2 {{generic parameter 'U' could not be inferred}}
 typealias Z = Int
 func takesGenericDictionaryWithTypealias<T>(_ x: [T : Z]) {} // expected-note {{in call to function 'takesGenericDictionaryWithTypealias'}}
-takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[Any : Z]' (aka 'Dictionary<Any, Int>'}}
+takesGenericDictionaryWithTypealias(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '[T : Z]'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesGenericFunction<T>(_ x: ([T]) -> Void) {} // expected-note {{in call to function 'takesGenericFunction'}}
-takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any]) -> Void'}}
+takesGenericFunction(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T]) -> Void'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 func takesTuple<T>(_ x: ([T], [T])) {} // expected-note {{in call to function 'takesTuple'}}
-takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([Any], [Any])'}}
+takesTuple(true) // expected-error {{cannot convert value of type 'Bool' to expected argument type '([T], [T])'}}
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}

@@ -2313,7 +2313,7 @@ Type simplifyTypeImpl(const ConstraintSystem &cs, Type type,
   });
 }
 
-Type ConstraintSystem::simplifyType(Type type) const {
+Type ConstraintSystem::simplifyType(Type type, bool forDiagnostics) const {
   if (!type->hasTypeVariable())
     return type;
 
@@ -2321,8 +2321,13 @@ Type ConstraintSystem::simplifyType(Type type) const {
   return simplifyTypeImpl(
       *this, type,
       [&](TypeVariableType *tvt) -> Type {
-        if (auto fixed = getFixedType(tvt))
+        if (auto fixed = getFixedType(tvt)) {
+          if (forDiagnostics && fixed->isHole() &&
+              tvt->getImpl().getLocator()->isForGenericParameter())
+            return tvt->getImpl().getLocator()->getGenericParameter();
+
           return simplifyType(fixed);
+        }
 
         return getRepresentative(tvt);
       });

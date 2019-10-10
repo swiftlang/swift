@@ -740,7 +740,7 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   if (shouldAttemptFixes() && result.Bindings.empty() &&
       (isHole(typeVar) || result.isGenericParameter())) {
     result.IsHole = true;
-    result.addPotentialBinding({getASTContext().TheAnyType,
+    result.addPotentialBinding({getASTContext().TheUnresolvedType,
         AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
         typeVar->getImpl().getLocator()});
   }
