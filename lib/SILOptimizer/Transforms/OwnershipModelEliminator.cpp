@@ -285,9 +285,8 @@ static void splitDestructure(SILBuilder &B, SILInstruction *I, SILValue Op) {
     Result->replaceAllUsesWith(ProjInst);
   }
 
-  // We may have exposed trivially dead instructions due to
-  // simplifyInstruction... delete I and any such instructions!
-  recursivelyDeleteTriviallyDeadInstructions(I, true);
+  // Now that all of its uses have been eliminated, erase the destructure.
+  I->eraseFromParent();
 }
 
 bool OwnershipModelEliminatorVisitor::visitDestructureStructInst(
