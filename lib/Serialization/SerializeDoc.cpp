@@ -651,44 +651,23 @@ writer.write<uint32_t>(data.X.Column);
     return Result;
   }
 
-  Optional<DeclLocationsTableData> getLocDataFromSource(Decl *D, SourceFile *SF) {
-    if (SF->getFilename().empty())
-      return None;
-    if (!SF->getBufferID().hasValue())
-      return None;
-    auto &SM = D->getASTContext().SourceMgr;
-    DeclLocationsTableData Result;
-    // Use getDisplayNameForLoc could give use file name specified by #sourceLocation
-    SmallString<128> SourceFilePath = SM.getDisplayNameForLoc(D->getLoc());
-    llvm::sys::fs::make_absolute(SourceFilePath);
-    Result.SourceFileOffset = FWriter.getTextOffset(SourceFilePath);
-    Result.Loc = getLineColumn(SM, D->getLoc());
-    Result.StartLoc = getLineColumn(SM, D->getStartLoc());
-    Result.EndLoc = getLineColumn(SM, D->getEndLoc());
-    return Result;
-  }
-
   Optional<DeclLocationsTableData> getLocData(Decl *D) {
     auto *File = D->getDeclContext()->getModuleScopeContext();
-    if (auto *SF = dyn_cast<SourceFile>(File)) {
-      // Get location from source when we have access to the source.
-      return getLocDataFromSource(D, SF);
-    } else {
-      // Merge modules.
-      auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
-      if (!Locs.hasValue())
-        return None;
-      DeclLocationsTableData Result;
-      Result.SourceFileOffset = FWriter.getTextOffset(Locs->SourceFilePath);
+    auto Locs = cast<FileUnit>(File)->getBasicLocsForDecl(D);
+    if (!Locs.hasValue())
+      return None;
+    DeclLocationsTableData Result;
+    llvm::SmallString<128> AbsolutePath = Locs->SourceFilePath;
+    llvm::sys::fs::make_absolute(AbsolutePath);
+    Result.SourceFileOffset = FWriter.getTextOffset(AbsolutePath.str());
 #define COPY_LINE_COLUMN(X)                                                   \
 Result.X.Line = Locs->X.Line;                                                 \
 Result.X.Column = Locs->X.Column;
-      COPY_LINE_COLUMN(Loc)
-      COPY_LINE_COLUMN(StartLoc)
-      COPY_LINE_COLUMN(EndLoc)
+    COPY_LINE_COLUMN(Loc)
+    COPY_LINE_COLUMN(StartLoc)
+    COPY_LINE_COLUMN(EndLoc)
 #undef COPY_LINE_COLUMN
-      return Result;
-    }
+    return Result;
   }
 
   bool shouldSerializeSourceLoc(Decl *D) {
