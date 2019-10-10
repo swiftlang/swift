@@ -576,6 +576,27 @@ static bool textMatchesPropertyName(StringRef text,
   return false;
 }
 
+namespace {
+/// Describes the role that a particular name has within a
+/// signature, which can affect how we omit needless words.
+enum class NameRole {
+  /// The base name of a function or method.
+  BaseName,
+
+  /// The first parameter of a function or method.
+  FirstParameter,
+
+  // Subsequent parameters in a function or method.
+  SubsequentParameter,
+
+  // The name of a property.
+  Property,
+
+  // A partial name; used internally.
+  Partial,
+};
+} // end anonymous namespace
+
 static StringRef omitNeedlessWords(StringRef name,
                                    OmissionTypeName typeName,
                                    NameRole role,
