@@ -3876,9 +3876,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   // Propagate access control and versioned-ness.
   DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
 
-  // Wire up generic environment of DD.
-  DD->setGenericSignature(CD->getGenericSignatureOfContext());
-
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
   if (ctx.LangOpts.EnableObjCInterop)

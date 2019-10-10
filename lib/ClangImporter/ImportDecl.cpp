@@ -1715,7 +1715,6 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(elementTy), dc,
                      getter->getClangNode());
 
-  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1769,7 +1768,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      valueIndicesPL,
                      TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
                      setter->getClangNode());
-  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -3735,8 +3733,6 @@ namespace {
                                     nameLoc, bodyParams, resultTy,
                                     /*throws*/ false, dc, decl);
 
-      result->setGenericSignature(dc->getGenericSignatureOfContext());
-
       if (!dc->isModuleScopeContext()) {
         if (selfIsInOut)
           result->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -4323,8 +4319,6 @@ namespace {
 
       // Record the return type.
       result->getBodyResultTypeLoc().setType(resultTy);
-
-      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -6331,7 +6325,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   addObjCAttribute(result, selector);
 
   // Calculate the function type of the result.
-  result->setGenericSignature(dc->getGenericSignatureOfContext());
   result->computeType();
 
   Impl.recordImplicitUnwrapForDecl(result,
@@ -6761,8 +6754,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   Impl.importAttributes(getterObjCMethod, getterThunk);
   if (setterObjCMethod)
     Impl.importAttributes(setterObjCMethod, setterThunk);
-
-  subscript->setGenericSignature(dc->getGenericSignatureOfContext());
 
   subscript->setIsSetterMutating(false);
   makeComputed(subscript, getterThunk, setterThunk);

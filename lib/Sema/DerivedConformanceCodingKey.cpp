@@ -144,7 +144,6 @@ static ValueDecl *deriveInitDecl(DerivedConformance &derived, Type paramType,
   synthesizer(initDecl);
 
   // Compute the interface type of the initializer.
-  initDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   initDecl->computeType();
 
   initDecl->setAccess(derived.Nominal->getFormalAccess());
