@@ -5636,7 +5636,7 @@ with the original function. When a ``with`` clause is not specified, the first
 operand will be differentiated to produce derivative functions, and a ``with``
 clause will be added to the instruction.
 
-In raw SIL, it is optional to provide an derivative function ``with`` clause.
+In raw SIL, it is optional to provide a derivative function ``with`` clause.
 In canonical SIL, a ``with`` clause is mandatory.
 
 
@@ -5659,7 +5659,7 @@ differentiable_function_extract
   differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
   differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
 
-Extracts the original function or an derivative function from the given
+Extracts the original function or a derivative function from the given
 ``@differentiable`` function. It must be provided with an extractee:
 ``[original]``, ``[jvp]`` or ``[vjp]``.
 

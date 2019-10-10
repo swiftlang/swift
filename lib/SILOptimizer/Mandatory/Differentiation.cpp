@@ -1145,7 +1145,7 @@ public:
   /// purposes.
   void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 
-  /// Get or create an derivative function index subset thunk from
+  /// Get or create a derivative function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given derivative function
   /// value and original function operand.
   /// Calls `getOrCreateSubsetParametersThunkForLinearMap` to thunk the linear
@@ -1156,7 +1156,7 @@ public:
       AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
       SILAutoDiffIndices actualIndices);
 
-  /// Get or create an derivative function index subset thunk from
+  /// Get or create a derivative function index subset thunk from
   /// `actualIndices` to `desiredIndices` for the given derivative function
   /// value and original function operand.
   SILFunction *getOrCreateSubsetParametersThunkForLinearMap(
@@ -1165,7 +1165,7 @@ public:
       SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
 
 public:
-  /// Declare an external reference to an derivative function of `original`,
+  /// Declare an external reference to a derivative function of `original`,
   /// given a `[differentiable]` attribute of `original` and the associated
   /// function kind.
   SILFunction *
@@ -2530,7 +2530,7 @@ static SubstitutionMap getSubstitutionMap(
   return substMap;
 }
 
-/// Emits a reference to an derivative function of `original`, differentiated
+/// Emits a reference to a derivative function of `original`, differentiated
 /// with respect to a superset of `desiredIndices`. Returns the `SILValue` for
 /// the derivative function and the actual indices that the derivative function
 /// is with respect to.
