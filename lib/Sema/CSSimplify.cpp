@@ -3007,13 +3007,38 @@ bool ConstraintSystem::repairFailures(
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
 
-    auto result = matchTypes(lhs, rhs, ConstraintKind::ArgumentConversion,
-        TypeMatchFlags::TMF_ApplyingFix,
-        locator.withPathElement(ConstraintLocator::FunctionArgument));
+    auto isPointerType = [](Type type) -> bool {
+      return bool(
+          type->lookThroughAllOptionalTypes()->getAnyPointerElementType());
+    };
 
-    if (result.isSuccess())
-      conversionsOrFixes.push_back(AllowAutoClosurePointerConversion::create(
-          *this, lhs, rhs, getConstraintLocator(locator)));
+    // Let's see whether this is an implicit conversion to a pointer type
+    // which is invalid in @autoclosure context e.g. from `inout`, Array
+    // or String.
+    if (!isPointerType(lhs) && isPointerType(rhs)) {
+      auto result = matchTypes(
+          lhs, rhs, ConstraintKind::ArgumentConversion,
+          TypeMatchFlags::TMF_ApplyingFix,
+          locator.withPathElement(ConstraintLocator::FunctionArgument));
+
+      if (result.isSuccess())
+        conversionsOrFixes.push_back(AllowAutoClosurePointerConversion::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+
+    // In situations like this:
+    //
+    // struct S<T> {}
+    // func foo(_: @autoclosure () -> S<Int>) {}
+    // foo(S<String>())
+    //
+    // Generic type conversion mismatch is a better fix which is going to
+    // point to the generic arguments that did not align properly.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
+    conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
