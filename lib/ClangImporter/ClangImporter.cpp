@@ -1055,22 +1055,12 @@ ClangImporter::create(ASTContext &ctx, const ClangImporterOptions &importerOpts,
       overlayFileSystem->pushOverlay(importerOpts.InMemoryOutputFileSystem);
       clangFileSystem = overlayFileSystem;
     }
-    if (!ctx.SearchPathOpts.VFSOverlayFiles.empty() ||
-        importerOpts.ForceUseSwiftVirtualFileSystem ||
-        importerOpts.InMemoryOutputFileSystem) {
-      // If the clang instance has overlays it means the user has provided
-      // -ivfsoverlay options.  We're going to clobber their file system with
-      // the Swift file system, so warn about it.
-      if (!instance.getHeaderSearchOpts().VFSOverlayFiles.empty()) {
-        ctx.Diags.diagnose(SourceLoc(), diag::clang_vfs_overlay_is_ignored);
-      }
-      // SWIFT_ENABLE_TENSORFLOW
-      instance.setVirtualFileSystem(clangFileSystem);
-    }
+    // TODO(asuhan): Check this, CompilerInstance::setVirtualFileSystem removed in
+    // https://github.com/apple/swift-clang/commit/5f92395a7e64526f6f94f31a9d143f81a69e9209.
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
         clang::createVFSFromCompilerInvocation(instance.getInvocation(),
                                                instance.getDiagnostics(),
-                                               ctx.SourceMgr.getFileSystem());
+                                               clangFileSystem);
     instance.createFileManager(std::move(VFS));
   }
 
