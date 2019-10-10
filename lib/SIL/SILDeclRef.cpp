@@ -694,9 +694,9 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
         autoDiffAssociatedFunctionIdentifier->getParameterIndices(),
         getDecl()->getInterfaceType()->castTo<AnyFunctionType>());
     SILAutoDiffIndices indices(/*source*/ 0, silParameterIndices);
-    auto assocFnKind = autoDiffAssociatedFunctionIdentifier->getKind();
+    auto derivativeFnKind = autoDiffAssociatedFunctionIdentifier->getKind();
     return mangler.mangleAutoDiffAssociatedFunctionHelper(
-        originalMangled, assocFnKind, indices);
+        originalMangled, derivativeFnKind, indices);
   }
 
   // As a special case, Clang functions and globals don't get mangled at all.

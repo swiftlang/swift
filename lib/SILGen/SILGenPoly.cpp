@@ -3311,22 +3311,24 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
         return AbstractionPattern(
             pattern.getGenericSignature(), getAssocFnTy(patternType, kind));
       };
-  auto createAssocFnThunk = [&](AutoDiffAssociatedFunctionKind kind)
-      -> ManagedValue {
-    auto assocFnInputOrigType = getAssocFnPattern(inputOrigTypeNotDiff, kind);
-    auto assocFnInputSubstType = getAssocFnTy(inputSubstTypeNotDiff, kind);
-    auto assocFnOutputOrigType = getAssocFnPattern(outputOrigTypeNotDiff,
+  auto createAssocFnThunk =
+      [&](AutoDiffAssociatedFunctionKind kind) -> ManagedValue {
+    auto derivativeFnInputOrigType =
+        getAssocFnPattern(inputOrigTypeNotDiff, kind);
+    auto derivativeFnInputSubstType = getAssocFnTy(inputSubstTypeNotDiff, kind);
+    auto derivativeFnOutputOrigType = getAssocFnPattern(outputOrigTypeNotDiff,
                                                    kind);
-    auto assocFnOutputSubstType = getAssocFnTy(outputSubstTypeNotDiff, kind);
-    auto &assocFnExpectedTL = SGF.getTypeLowering(assocFnOutputOrigType,
-                                                  assocFnOutputSubstType);
-    SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
+    auto derivativeFnOutputSubstType =
+        getAssocFnTy(outputSubstTypeNotDiff, kind);
+    auto &derivativeFnExpectedTL = SGF.getTypeLowering(
+        derivativeFnOutputOrigType, derivativeFnOutputSubstType);
+    SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
         loc, kind, borrowedFnValue.getValue());
-    assocFn = SGF.B.emitCopyValueOperation(loc, assocFn);
-    auto managedAssocFn = SGF.emitManagedRValueWithCleanup(assocFn);
-    return createThunk(SGF, loc, managedAssocFn, assocFnInputOrigType,
-                       assocFnInputSubstType, assocFnOutputOrigType,
-                       assocFnOutputSubstType, assocFnExpectedTL);
+    derivativeFn = SGF.B.emitCopyValueOperation(loc, derivativeFn);
+    auto managedAssocFn = SGF.emitManagedRValueWithCleanup(derivativeFn);
+    return createThunk(SGF, loc, managedAssocFn, derivativeFnInputOrigType,
+                       derivativeFnInputSubstType, derivativeFnOutputOrigType,
+                       derivativeFnOutputSubstType, derivativeFnExpectedTL);
   };
 
   auto jvpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::JVP);
@@ -3666,59 +3668,61 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 SILFunction *
 SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
     SILFunction *original, SILAutoDiffIndices &indices,
-    SILFunction *assocFn, AutoDiffAssociatedFunctionKind assocFnKind,
+    SILFunction *derivativeFn, AutoDiffAssociatedFunctionKind derivativeFnKind,
     bool reorderSelf) {
-  auto assocFnType = assocFn->getLoweredFunctionType();
+  auto derivativeFnType = derivativeFn->getLoweredFunctionType();
 
   // TODO(TF-685): Use principled thunk mangling.
   // Do not simply reuse reabstraction thunk mangling.
   Mangle::ASTMangler mangler;
   auto name = getASTContext().getIdentifier(
       mangler.mangleAutoDiffAssociatedFunctionHelper(
-          original->getName(), assocFnKind, indices)).str();
+          original->getName(), derivativeFnKind, indices)).str();
 
   Lowering::GenericContextScope genericContextScope(
-      Types, assocFnType->getGenericSignature());
-  auto *thunkGenericEnv = assocFnType->getGenericSignature()
-      ? assocFnType->getGenericSignature()->getGenericEnvironment()
+      Types, derivativeFnType->getGenericSignature());
+  auto *thunkGenericEnv = derivativeFnType->getGenericSignature()
+      ? derivativeFnType->getGenericSignature()->getGenericEnvironment()
       : nullptr;
 
   auto origFnType = original->getLoweredFunctionType();
   auto origAssocFnType = origFnType->getAutoDiffAssociatedFunctionType(
       indices.parameters, indices.source,
-      assocFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
-      assocFnType->getGenericSignature());
+      derivativeFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
+      derivativeFnType->getGenericSignature());
   assert(!origAssocFnType->getExtInfo().hasContext());
 
-  auto loc = assocFn->getLocation();
+  auto loc = derivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
   auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
       original->getLinkage(), /*isAssocFnExported*/ true);
   auto *thunk = fb.getOrCreateFunction(
       loc, name, linkage, origAssocFnType, IsBare, IsNotTransparent,
-      assocFn->isSerialized(), assocFn->isDynamicallyReplaceable(),
-      assocFn->getEntryCount(), assocFn->isThunk(),
-      assocFn->getClassSubclassScope());
+      derivativeFn->isSerialized(), derivativeFn->isDynamicallyReplaceable(),
+      derivativeFn->getEntryCount(), derivativeFn->isThunk(),
+      derivativeFn->getClassSubclassScope());
   if (!thunk->empty())
     return thunk;
   thunk->setGenericEnvironment(thunkGenericEnv);
 
-  SILGenFunction thunkSGF(*this, *thunk, assocFn->getDeclContext());
+  SILGenFunction thunkSGF(*this, *thunk, derivativeFn->getDeclContext());
   SmallVector<ManagedValue, 4> params;
   SmallVector<SILArgument *, 4> indirectResults;
   thunkSGF.collectThunkParams(loc, params, &indirectResults);
 
-  auto *assocFnRef = thunkSGF.B.createFunctionRef(loc, assocFn);
-  auto assocFnRefType = assocFnRef->getType().castTo<SILFunctionType>();
+  auto *derivativeFnRef = thunkSGF.B.createFunctionRef(loc, derivativeFn);
+  auto derivativeFnRefType =
+      derivativeFnRef->getType().castTo<SILFunctionType>();
 
   // Collect thunk arguments, converting ownership.
   SmallVector<SILValue, 8> arguments;
   for (auto *indRes : indirectResults)
     arguments.push_back(indRes);
-  forwardFunctionArguments(thunkSGF, loc, assocFnRefType, params, arguments);
+  forwardFunctionArguments(thunkSGF, loc, derivativeFnRefType, params,
+                           arguments);
   // Apply function argument.
   auto apply = thunkSGF.emitApplyWithRethrow(
-      loc, assocFnRef, /*substFnType*/ assocFnRef->getType(),
+      loc, derivativeFnRef, /*substFnType*/ derivativeFnRef->getType(),
       thunk->getForwardingSubstitutionMap(), arguments);
 
   // Create return instruction in the thunk, first deallocating local
@@ -3734,7 +3738,9 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   // If self ordering is not necessary and linear map types are unchanged,
   // return the `apply` instruction.
   auto linearMapFnType = cast<SILFunctionType>(
-      thunk->mapTypeIntoContext(assocFnRefType->getResults().back().getType())
+      thunk
+          ->mapTypeIntoContext(
+              derivativeFnRefType->getResults().back().getType())
           ->getCanonicalType());
   auto targetLinearMapFnType = thunk->mapTypeIntoContext(
       origAssocFnType->getResults().back().getSILStorageType())
@@ -3749,7 +3755,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   extractAllElements(apply, loc, thunkSGF.B, directResults);
   auto linearMap = thunkSGF.emitManagedRValueWithCleanup(directResults.back());
   assert(linearMap.getType().castTo<SILFunctionType>() == linearMapFnType);
-  auto linearMapKind = assocFnKind.getLinearMapKind();
+  auto linearMapKind = derivativeFnKind.getLinearMapKind();
   linearMap = thunkSGF.getThunkedAutoDiffLinearMap(
       linearMap, linearMapKind, linearMapFnType, targetLinearMapFnType,
       reorderSelf);

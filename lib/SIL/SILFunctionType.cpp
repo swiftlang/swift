@@ -154,16 +154,16 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
 // given an existing associated function generic signature. All differentiation
 // parameters are constrained to conform to `Differentiable`.
 static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
-    CanGenericSignature assocFnGenSig,
+    CanGenericSignature derivativeFnGenSig,
     ArrayRef<SILParameterInfo> originalParameters,
     AutoDiffIndexSubset *parameterIndices, ModuleDecl *module) {
-  if (!assocFnGenSig)
+  if (!derivativeFnGenSig)
     return nullptr;
   auto &ctx = module->getASTContext();
   GenericSignatureBuilder builder(ctx);
 
   // Add associated function generic signature.
-  builder.addGenericSignature(assocFnGenSig);
+  builder.addGenericSignature(derivativeFnGenSig);
   // Constrain all wrt parameters to conform to `Differentiable`.
   auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
@@ -182,7 +182,8 @@ static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffAssociatedFunctionKind kind, TypeConverter &TC,
-    LookupConformanceFn lookupConformance, CanGenericSignature assocFnGenSig) {
+    LookupConformanceFn lookupConformance,
+    CanGenericSignature derivativeFnGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -203,11 +204,11 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
       wrtParams.push_back(valueAndIndex.value());
 
   // Get the canonical associated function generic signature.
-  if (!assocFnGenSig)
-    assocFnGenSig = getGenericSignature();
-  assocFnGenSig = getAutoDiffAssociatedFunctionGenericSignature(
-      assocFnGenSig, getParameters(), parameterIndices, &TC.M);
-  Lowering::GenericContextScope genericContextScope(TC, assocFnGenSig);
+  if (!derivativeFnGenSig)
+    derivativeFnGenSig = getGenericSignature();
+  derivativeFnGenSig = getAutoDiffAssociatedFunctionGenericSignature(
+      derivativeFnGenSig, getParameters(), parameterIndices, &TC.M);
+  Lowering::GenericContextScope genericContextScope(TC, derivativeFnGenSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](
@@ -310,12 +311,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   newResults.reserve(getNumResults() + 1);
   for (auto &result : getResults()) {
     auto mappedResult = result.getWithType(
-        result.getType()->getCanonicalType(assocFnGenSig));
+        result.getType()->getCanonicalType(derivativeFnGenSig));
     newResults.push_back(mappedResult);
   }
-  newResults.push_back({closureType->getCanonicalType(assocFnGenSig),
+  newResults.push_back({closureType->getCanonicalType(derivativeFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(assocFnGenSig, getExtInfo(),
+  return SILFunctionType::get(derivativeFnGenSig, getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               getParameters(), getYields(), newResults,
                               getOptionalErrorResult(), ctx,
