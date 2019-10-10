@@ -597,10 +597,11 @@ enum class NameRole {
 };
 } // end anonymous namespace
 
-static StringRef omitNeedlessWords(StringRef name,
-                                   OmissionTypeName typeName,
-                                   NameRole role,
-                                   const InheritedNameSet *allPropertyNames);
+static StringRef
+omitTrailingTypeNameWithSpecialCases(StringRef name,
+                                     OmissionTypeName typeName,
+                                     NameRole role,
+                                     const InheritedNameSet *allPropertyNames);
 
 /// Returns the iterator pointing to the first word in \p name that starts the
 /// match for \p typeName (anchored at the end of \p name).
@@ -676,9 +677,9 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
         nameWord.back() == 's') {
       // Check <element name>s.
       auto shortenedNameWord = nameWordRevIter.base().getPriorStr().drop_back();
-      auto newShortenedNameWord
-        = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
-                            NameRole::Partial, allPropertyNames);
+      auto newShortenedNameWord = omitTrailingTypeNameWithSpecialCases(
+          shortenedNameWord, typeName.CollectionElement, NameRole::Partial,
+          allPropertyNames);
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
@@ -800,10 +801,10 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
   return scratch.copyString(newName);
 }
 
-static StringRef omitNeedlessWords(StringRef name,
-                                   OmissionTypeName typeName,
-                                   NameRole role,
-                                   const InheritedNameSet *allPropertyNames) {
+static StringRef
+omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
+                                     NameRole role,
+                                     const InheritedNameSet *allPropertyNames) {
   // If we have no name or no type name, there is nothing to do.
   if (name.empty() || typeName.empty()) return name;
 
@@ -1266,9 +1267,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   // Strip the context type from the base name of a method.
   if (!isProperty) {
-    StringRef newBaseName = ::omitSelfTypeFromBaseName(baseName, contextType,
-                                                       allPropertyNames,
-                                                       scratch);
+    StringRef newBaseName = omitSelfTypeFromBaseName(baseName, contextType,
+                                                     allPropertyNames, scratch);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;
@@ -1277,11 +1277,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
   if (paramTypes.empty()) {
     if (resultTypeMatchesContext) {
-      StringRef newBaseName = ::omitNeedlessWords(
-                                baseName,
-                                resultType,
-                                NameRole::Property,
-                                allPropertyNames);
+      StringRef newBaseName = omitTrailingTypeNameWithSpecialCases(
+          baseName, resultType, NameRole::Property, allPropertyNames);
       if (newBaseName != baseName) {
         baseName = newBaseName;
         anyChanges = true;
@@ -1292,11 +1289,8 @@ bool swift::omitNeedlessWords(StringRef &baseName,
   }
 
   if (camel_case::getFirstWord(baseName) == "set") {
-    StringRef newBaseName = ::omitNeedlessWords(
-                              baseName,
-                              contextType,
-                              NameRole::Property,
-                              allPropertyNames);
+    StringRef newBaseName = omitTrailingTypeNameWithSpecialCases(
+        baseName, contextType, NameRole::Property, allPropertyNames);
     if (newBaseName != baseName) {
       baseName = newBaseName;
       anyChanges = true;
@@ -1323,10 +1317,9 @@ bool swift::omitNeedlessWords(StringRef &baseName,
 
     // Omit needless words from the name.
     StringRef name = role == NameRole::BaseName ? baseName : argNames[i];
-    StringRef newName = ::omitNeedlessWords(name, paramTypes[i], role,
-                                            role == NameRole::BaseName 
-                                              ? allPropertyNames
-                                              : nullptr);
+    StringRef newName = omitTrailingTypeNameWithSpecialCases(
+        name, paramTypes[i], role,
+        role == NameRole::BaseName ? allPropertyNames : nullptr);
 
     if (name == newName) continue;
 
