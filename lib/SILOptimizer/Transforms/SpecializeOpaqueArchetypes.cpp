@@ -33,15 +33,22 @@ using namespace swift;
 
 static Type substOpaqueTypesWithUnderlyingTypes(
     Type ty, SILFunction *context) {
+  auto *dc = context->getDeclContext();
+  if (!dc)
+    dc = context->getModule().getSwiftModule();
+
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context->getModule().getSwiftModule(), context->getResilienceExpansion());
+      dc, context->getResilienceExpansion());
   return ty.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
 static SubstitutionMap
 substOpaqueTypesWithUnderlyingTypes(SubstitutionMap map, SILFunction *context) {
+  auto *dc = context->getDeclContext();
+  if (!dc)
+    dc = context->getModule().getSwiftModule();
   ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-      context->getModule().getSwiftModule(), context->getResilienceExpansion());
+      dc, context->getResilienceExpansion());
   return map.subst(replacer, replacer, SubstFlags::SubstituteOpaqueArchetypes);
 }
 
@@ -324,11 +331,13 @@ protected:
     SILType &Sty = TypeCache[Ty];
     if (Sty)
       return Sty;
+    auto *dc = Original.getDeclContext();
+    if (!dc)
+      dc = Original.getModule().getSwiftModule();
 
-   // Apply the opaque types substitution.
+    // Apply the opaque types substitution.
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        Original.getModule().getSwiftModule(),
-        Original.getResilienceExpansion());
+        dc, Original.getResilienceExpansion());
     Sty = Ty.subst(Original.getModule(), replacer, replacer,
                    CanGenericSignature(), true);
     return Sty;
@@ -342,10 +351,12 @@ protected:
 
   ProtocolConformanceRef remapConformance(Type type,
                                           ProtocolConformanceRef conf) {
+    auto *dc = Original.getDeclContext();
+    if (!dc)
+      dc = Original.getModule().getSwiftModule();
     // Apply the opaque types substitution.
     ReplaceOpaqueTypesWithUnderlyingTypes replacer(
-        Original.getModule().getSwiftModule(),
-        Original.getResilienceExpansion());
+        dc, Original.getResilienceExpansion());
     return conf.subst(type, replacer, replacer,
                       SubstFlags::SubstituteOpaqueArchetypes);
   }
@@ -493,6 +504,9 @@ class OpaqueArchetypeSpecializer : public SILFunctionTransform {
 
       return ty.findIf([=](Type type) -> bool {
         if (auto opaqueTy = type->getAs<OpaqueTypeArchetypeType>()) {
+          auto *dc = context->getDeclContext();
+          if (!dc)
+            dc = context->getModule().getSwiftModule();
           auto opaque = opaqueTy->getDecl();
           return ReplaceOpaqueTypesWithUnderlyingTypes::
               shouldPerformSubstitution(opaque,
