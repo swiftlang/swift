@@ -3578,8 +3578,6 @@ public:
     }
     }
 
-    elem->computeType();
-
     if (isImplicit)
       elem->setImplicit();
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),

@@ -6983,34 +6983,6 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-void EnumElementDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  auto &ctx = getASTContext();
-  auto *ED = getParentEnum();
-
-  // The type of the enum element is either (Self.Type) -> Self
-  // or (Self.Type) -> (Args...) -> Self.
-  auto resultTy = ED->getDeclaredInterfaceType();
-
-  AnyFunctionType::Param selfTy(MetatypeType::get(resultTy, ctx));
-
-  if (auto *PL = getParameterList()) {
-    SmallVector<AnyFunctionType::Param, 4> argTy;
-    PL->getParams(argTy);
-
-    resultTy = FunctionType::get(argTy, resultTy);
-  }
-
-  if (auto genericSig = ED->getGenericSignature())
-    resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
-  else
-    resultTy = FunctionType::get({selfTy}, resultTy);
-
-  // Record the interface type.
-  setInterfaceType(resultTy);
-}
-
 Type EnumElementDecl::getArgumentInterfaceType() const {
   if (!hasAssociatedValues())
     return nullptr;

@@ -4292,7 +4292,29 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::EnumElement: {
     auto *EED = cast<EnumElementDecl>(D);
     DeclValidationRAII IBV(EED);
-    EED->computeType();
+
+    auto *ED = EED->getParentEnum();
+
+    // The type of the enum element is either (Self.Type) -> Self
+    // or (Self.Type) -> (Args...) -> Self.
+    auto resultTy = ED->getDeclaredInterfaceType();
+
+    AnyFunctionType::Param selfTy(MetatypeType::get(resultTy, Context));
+
+    if (auto *PL = EED->getParameterList()) {
+      SmallVector<AnyFunctionType::Param, 4> argTy;
+      PL->getParams(argTy);
+
+      resultTy = FunctionType::get(argTy, resultTy);
+    }
+
+    if (auto genericSig = ED->getGenericSignature())
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
+    else
+      resultTy = FunctionType::get({selfTy}, resultTy);
+
+    // Record the interface type.
+    EED->setInterfaceType(resultTy);
     break;
   }
   }

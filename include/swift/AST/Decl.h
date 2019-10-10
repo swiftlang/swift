@@ -6358,10 +6358,6 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  /// Set the interface type of this enum element to the constructor function
-  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
-  void computeType();
-
   Type getArgumentInterfaceType() const;
 
   void setParameterList(ParameterList *params);

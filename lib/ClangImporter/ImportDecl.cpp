@@ -5623,9 +5623,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
       decl, AccessLevel::Public, SourceLoc(), name, nullptr,
       SourceLoc(), rawValueExpr, theEnum);
 
-  // Give the enum element the appropriate type.
-  element->computeType();
-
   Impl.importAttributes(decl, element);
 
   return element;
