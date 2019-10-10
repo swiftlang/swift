@@ -2649,10 +2649,17 @@ void ASTMangler::appendDependentProtocolConformance(
 void ASTMangler::appendConcreteProtocolConformance(
                                       const ProtocolConformance *conformance) {
   auto module = conformance->getDeclContext()->getParentModule();
-  if (!CurGenericSignature && conformance->getGenericSignature()) {
-    CurGenericSignature =
-        conformance->getGenericSignature()->getCanonicalSignature();
-  }
+
+  // It's possible that we might not have a generic signature here to get
+  // the conformance access path (for example, when mangling types for
+  // debugger). In that case, we can use the generic signature of the
+  // conformance (if it's present).
+  auto conformanceSig = conformance->getGenericSignature();
+  auto shouldUseConformanceSig = !CurGenericSignature && conformanceSig;
+  llvm::SaveAndRestore<CanGenericSignature> savedSignature(
+      CurGenericSignature, shouldUseConformanceSig
+                               ? conformanceSig->getCanonicalSignature()
+                               : CurGenericSignature);
 
   // Conforming type.
   Type conformingType = conformance->getType();
