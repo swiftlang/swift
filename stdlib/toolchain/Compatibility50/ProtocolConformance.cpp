@@ -20,6 +20,7 @@
 #include "Overrides.h"
 #include "../../public/runtime/Private.h"
 #include "swift/Basic/Lazy.h"
+#include <dlfcn.h>
 #include <mach-o/dyld.h>
 #include <mach-o/getsect.h>
 #include <objc/runtime.h>
@@ -89,13 +90,25 @@ static void registerAddImageCallback(void *) {
   _dyld_register_func_for_add_image(addImageCallback);
 }
 
+static const Metadata *getObjCClassMetadata(const ClassMetadata *c) {
+  // Look up swift_getObjCClassMetadata dynamically. This handles the case
+  // where the main executable can't link against libswiftCore.dylib because
+  // it will be loaded dynamically from a location that isn't known at build
+  // time.
+  using FPtr = const Metadata *(*)(const ClassMetadata *);
+  FPtr func = SWIFT_LAZY_CONSTANT(
+    reinterpret_cast<FPtr>(dlsym(RTLD_DEFAULT, "swift_getObjCClassMetadata")));
+
+  return func(c);
+}
+
 // Clone of private helper swift::_swiftoverride_class_getSuperclass
 // for use in the override implementation.
 static const Metadata *_swift50override_class_getSuperclass(
                                                     const Metadata *theClass) {
   if (const ClassMetadata *classType = theClass->getClassObject()) {
     if (classHasSuperclass(classType))
-      return getMetadataForClass(classType->Superclass);
+      return getObjCClassMetadata(classType->Superclass);
   }
   
   if (const ForeignClassMetadata *foreignClassType
