@@ -2853,6 +2853,7 @@ namespace {
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
             decl, AccessLevel::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
+        enumDecl->setHasFixedRawValues();
         enumDecl->computeType();
 
         // Annotate as 'frozen' if appropriate.
