@@ -879,11 +879,16 @@ ParserResult<Stmt> Parser::parseStmtYield(SourceLoc tryLoc) {
                            lpLoc,
                            yields, yieldLabels, yieldLabelLocs,
                            rpLoc,
-                           trailingClosure,
-                           SyntaxKind::ExprList);
+                           trailingClosure);
     assert(trailingClosure == nullptr);
-    assert(yieldLabels.empty());
-    assert(yieldLabelLocs.empty());
+    if (!yieldLabelLocs.empty()) {
+      for (auto labelLoc : yieldLabelLocs) {
+        if (labelLoc.isValid()) {
+          diagnose(labelLoc, diag::unexpected_arg_label_yield);
+          break;
+        }
+      }
+    }
   } else {
     SourceLoc beginLoc = Tok.getLoc();
 
