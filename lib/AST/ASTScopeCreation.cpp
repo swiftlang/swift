@@ -25,6 +25,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
@@ -186,26 +187,8 @@ class ScopeCreator final {
   ASTContext &ctx;
 
 public:
-  /// Because type checking can mutate the AST, eagerly build the tree, then
-  /// freeze it
-  enum class Temperature {
-    Warm,     // Can be lazy
-    Freezing, // Should expand everything eagerly
-    Frozen    // No more changes, except when Decls are added to the source file
-  };
-
-private:
-  /// Because type checking can mutate the AST, eagerly build the tree, then
-  /// freeze it
-  Temperature temperature = Temperature::Warm;
-
-public:
   ASTSourceFileScope *const sourceFileScope;
   ASTContext &getASTContext() const { return ctx; }
-  bool getIsFrozen() const { return temperature == Temperature::Frozen; }
-  bool getIsFreezing() const { return temperature == Temperature::Freezing; }
-  void beFreezing() { temperature = Temperature::Freezing; }
-  void beFrozen() { temperature = Temperature::Frozen; }
 
   /// The AST can have duplicate nodes, and we don't want to create scopes for
   /// those.
@@ -222,15 +205,25 @@ public:
 
   /// Given an array of ASTNodes or Decl pointers, add them
   /// Return the resultant insertionPoint
-  ASTScopeImpl *addSiblingsToScopeTree(ASTScopeImpl *const insertionPoint,
-                                       ArrayRef<ASTNode> nodesOrDeclsToAdd) {
+  ASTScopeImpl *
+  addSiblingsToScopeTree(ASTScopeImpl *const insertionPoint,
+                         ASTScopeImpl *const organicInsertionPoint,
+                         ArrayRef<ASTNode> nodesOrDeclsToAdd) {
     auto *ip = insertionPoint;
     for (auto nd : expandIfConfigClausesThenCullAndSortElementsOrMembers(
              nodesOrDeclsToAdd)) {
-      if (shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd))
-        ip = addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
-      else
+      if (!shouldThisNodeBeScopedWhenFoundInSourceFileBraceStmtOrType(nd)) {
+        // FIXME: Could the range get lost if the node is ever reexpanded?
         ip->widenSourceRangeForIgnoredASTNode(nd);
+      } else {
+        const unsigned preCount = ip->getChildren().size();
+        auto *const newIP =
+            addToScopeTreeAndReturnInsertionPoint(nd, ip).getPtrOr(ip);
+        if (ip != organicInsertionPoint)
+          ip->increaseASTAncestorScopeCount(ip->getChildren().size() -
+                                            preCount);
+        ip = newIP;
+      }
     }
     return ip;
   }
@@ -300,9 +293,9 @@ public:
     // IDE/complete_property_delegate_attribute.swift fails because we try to
     // expand a member whose source range is backwards.
     (void)SM;
-    assert((d->getStartLoc().isInvalid() ||
-            !SM.isBeforeInBuffer(d->getEndLoc(), d->getStartLoc())) &&
-           "end-before-start will break tree search via location");
+    ASTScopeAssert(d->getStartLoc().isInvalid() ||
+                       !SM.isBeforeInBuffer(d->getEndLoc(), d->getStartLoc()),
+                   "end-before-start will break tree search via location");
     return true;
   }
 
@@ -313,8 +306,8 @@ public:
   template <typename Scope, typename... Args>
   ASTScopeImpl *constructExpandAndInsertUncheckable(ASTScopeImpl *parent,
                                                     Args... args) {
-    assert(!Scope(args...).getReferrent() &&
-           "Not checking for duplicate ASTNode but class supports it");
+    ASTScopeAssert(!Scope(args...).getReferrent(),
+                   "Not checking for duplicate ASTNode but class supports it");
     return constructExpandAndInsert<Scope>(parent, args...);
   }
 
@@ -322,8 +315,9 @@ public:
   NullablePtr<ASTScopeImpl>
   ifUniqueConstructExpandAndInsert(ASTScopeImpl *parent, Args... args) {
     Scope dryRun(args...);
-    assert(dryRun.getReferrent() &&
-           "Checking for duplicate ASTNode but class does not support it");
+    ASTScopeAssert(
+        dryRun.getReferrent(),
+        "Checking for duplicate ASTNode but class does not support it");
     if (scopedNodes.insert(&dryRun))
       return constructExpandAndInsert<Scope>(parent, args...);
     return nullptr;
@@ -334,7 +328,7 @@ public:
                                                          Args... args) {
     if (auto s = ifUniqueConstructExpandAndInsert<Scope>(parent, args...))
       return s.get();
-    llvm_unreachable("Scope should have been unique");
+    ASTScope_unreachable("Scope should have been unique");
   }
 
 private:
@@ -347,8 +341,8 @@ private:
         return ip;
     }
     ASTScopeImpl *insertionPoint = child->expandAndBeCurrent(*this);
-    assert(child->verifyThatThisNodeComeAfterItsPriorSibling() &&
-           "Ensure search will work");
+    ASTScopeAssert(child->verifyThatThisNodeComeAfterItsPriorSibling(),
+                   "Ensure search will work");
     return insertionPoint;
   }
 
@@ -387,6 +381,7 @@ private:
 
   // A safe way to discover this, without creating a circular request.
   // Cannot call getAttachedPropertyWrappers.
+  // rdar://55263708
   static bool hasAttachedPropertyWrapper(VarDecl *vd) {
     return AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(vd).isValid();
   }
@@ -488,9 +483,8 @@ private:
           expansion.push_back(cond);
         if (clause.isActive) {
           // rdar://53922172
-          assert(isInAnActiveNode && "Clause should not be marked "
-                                     "active unless it's context is "
-                                     "active");
+          ASTScopeAssert(isInAnActiveNode, "Clause should not be marked active "
+                                           "unless it's context is active");
           // get inactive nodes that nest in active clauses
           for (auto n : clause.Elements) {
             if (auto *const d = n.dyn_cast<Decl *>())
@@ -513,8 +507,9 @@ private:
     // When working on rdar://53971116 may have to cull more.
     std::vector<ASTNode> culled;
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
-      assert(!n.isDecl(DeclKind::Accessor) &&
-             "Should not find accessors in iterable types or brace statements");
+      ASTScopeAssert(
+          !n.isDecl(DeclKind::Accessor),
+          "Should not find accessors in iterable types or brace statements");
       return isLocalizable(n) && !n.isDecl(DeclKind::Var) &&
              !n.isDecl(DeclKind::EnumCase);
     });
@@ -577,13 +572,13 @@ private:
         dumpPBD(pbd, "prev");
       if (auto *pbd = dyn_cast<PatternBindingDecl>(d)) {
         dumpPBD(pbd, "curr");
-        llvm_unreachable("found colliding pattern binding decls");
+        ASTScope_unreachable("found colliding pattern binding decls");
       }
       llvm::errs() << "Two same kind decls at same loc: \n";
       lastD->dump(llvm::errs());
       llvm::errs() << "and\n";
       d->dump(llvm::errs());
-      llvm_unreachable("Two same kind decls; unexpected kinds");
+      ASTScope_unreachable("Two same kind decls; unexpected kinds");
     }
   }
 
@@ -617,7 +612,8 @@ private:
       dumpRangeable(n2, llvm::errs());
     }
 #endif
-    assert(startOrder * endOrder != -1 && "Start order contradicts end order");
+    ASTScopeAssert(startOrder * endOrder != -1,
+                   "Start order contradicts end order");
     return startOrder + endOrder < 1;
   }
 
@@ -636,18 +632,18 @@ public:
     // they get created directly by the pattern code.
     // Doing otherwise distorts the source range
     // of their parents.
-    assert(!n.isDecl(DeclKind::Accessor) && "Should not see accessors here");
+    ASTScopeAssert(!n.isDecl(DeclKind::Accessor),
+                   "Should not see accessors here");
     // Can occur in illegal code
     if (auto *const s = n.dyn_cast<Stmt *>()) {
       if (auto *const bs = dyn_cast<BraceStmt>(s))
-        assert(bs->getNumElements() == 0 && "Might mess up insertion point");
+        ASTScopeAssert(bs->getNumElements() == 0,
+                       "Might mess up insertion point");
     }
     return !n.isDecl(DeclKind::Var);
   }
 
-  bool shouldBeLazy() const {
-    return !getIsFreezing() && ctx.LangOpts.LazyASTScopes;
-  }
+  bool shouldBeLazy() const { return ctx.LangOpts.LazyASTScopes; }
 
 public:
   /// For debugging. Return true if scope tree contains all the decl contexts in
@@ -657,11 +653,9 @@ public:
     auto allDeclContexts = findLocalizableDeclContextsInAST();
     llvm::DenseMap<const DeclContext *, const ASTScopeImpl *> bogusDCs;
     bool rebuilt = false;
-    if (!getIsFrozen()) {
-      sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
-        rebuilt |= scope->reexpandIfObsolete(*this);
-      });
-    }
+    sourceFileScope->preOrderDo([&](ASTScopeImpl *scope) {
+      rebuilt |= scope->reexpandIfObsolete(*this);
+    });
     sourceFileScope->postOrderDo([&](ASTScopeImpl *scope) {
       if (auto *dc = scope->getDeclContext().getPtrOrNull()) {
         auto iter = allDeclContexts.find(dc);
@@ -730,7 +724,7 @@ public:
   void *operator new(size_t bytes, const ASTContext &ctx,
                      unsigned alignment = alignof(ScopeCreator));
   void *operator new(size_t Bytes, void *Mem) {
-    assert(Mem);
+    ASTScopeAssert(Mem, "Allocation failed");
     return Mem;
   }
 };
@@ -741,36 +735,46 @@ public:
 
 ASTScope::ASTScope(SourceFile *SF) : impl(createScopeTree(SF)) {}
 
-void ASTScope::buildScopeTreeEagerly() {
-  impl->buildScopeTreeEagerly();
+void ASTScope::buildFullyExpandedTree() { impl->buildFullyExpandedTree(); }
+
+void ASTScope::
+    buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals() {
+  impl->buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
 }
 
 ASTSourceFileScope *ASTScope::createScopeTree(SourceFile *SF) {
   ScopeCreator *scopeCreator = new (SF->getASTContext()) ScopeCreator(SF);
-  scopeCreator->sourceFileScope->addNewDeclsToScopeTree();
   return scopeCreator->sourceFileScope;
 }
 
-void ASTSourceFileScope::buildScopeTreeEagerly() {
-  scopeCreator->beFreezing();
-  // Eagerly expand any decls already in the tree.
-  preOrderDo([&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
+void ASTSourceFileScope::buildFullyExpandedTree() {
   addNewDeclsToScopeTree();
-  scopeCreator->beFrozen();
+  preOrderChildrenDo(
+      [&](ASTScopeImpl *s) { s->reexpandIfObsolete(*scopeCreator); });
+}
+
+void ASTSourceFileScope::
+    buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals() {
+  addNewDeclsToScopeTree();
 }
 
 void ASTSourceFileScope::addNewDeclsToScopeTree() {
-  assert(SF && scopeCreator);
+  ASTScopeAssert(SF && scopeCreator,
+                 "Must already have a SourceFile and a ScopeCreator.");
   ArrayRef<Decl *> decls = SF->Decls;
   // Assume that decls are only added at the end, in source order
   ArrayRef<Decl *> newDecls = decls.slice(numberOfDeclsAlreadySeen);
   std::vector<ASTNode> newNodes(newDecls.begin(), newDecls.end());
   insertionPoint =
-      scopeCreator->addSiblingsToScopeTree(insertionPoint, newNodes);
+      scopeCreator->addSiblingsToScopeTree(insertionPoint, this, newNodes);
+
+  // TODO: use regular expansion machinery for ASTSourceFileScope
+  // rdar://55562483
   numberOfDeclsAlreadySeen = SF->Decls.size();
+  setWasExpanded();
 
   // Too slow to perform all the time:
-  //    assert(scopeCreator->containsAllDeclContextsFromAST() &&
+  //    ASTScopeAssert(scopeCreator->containsAllDeclContextsFromAST(),
   //           "ASTScope tree missed some DeclContexts or made some up");
 }
 
@@ -896,7 +900,7 @@ public:
 #pragma mark special-case creation
 
   ASTScopeImpl *visitSourceFile(SourceFile *, ASTScopeImpl *, ScopeCreator &) {
-    llvm_unreachable("SourceFiles are orphans.");
+    ASTScope_unreachable("SourceFiles are orphans.");
   }
 
   NullablePtr<ASTScopeImpl> visitYieldStmt(YieldStmt *ys, ASTScopeImpl *p,
@@ -974,8 +978,9 @@ public:
   NullablePtr<ASTScopeImpl> visitIfConfigDecl(IfConfigDecl *icd,
                                               ASTScopeImpl *p,
                                               ScopeCreator &scopeCreator) {
-    llvm_unreachable("Should be handled inside of "
-                     "expandIfConfigClausesThenCullAndSortElementsOrMembers");
+    ASTScope_unreachable(
+        "Should be handled inside of "
+        "expandIfConfigClausesThenCullAndSortElementsOrMembers");
   }
 
   NullablePtr<ASTScopeImpl> visitReturnStmt(ReturnStmt *rs, ASTScopeImpl *p,
@@ -1057,12 +1062,9 @@ void ASTScopeImpl::addChild(ASTScopeImpl *child, ASTContext &ctx) {
     haveAddedCleanup = true;
   }
   storedChildren.push_back(child);
-  assert(!child->getParent() && "child should not already have parent");
+  ASTScopeAssert(!child->getParent(), "child should not already have parent");
   child->parent = this;
   clearCachedSourceRangesOfMeAndAncestors();
-  // It's possible that some callees do lookups back into the tree.
-  // So make sure childrenCountWhenLastExpanded is up to date.
-  setChildrenCountWhenLastExpanded();
 }
 
 void ASTScopeImpl::removeChildren() {
@@ -1084,11 +1086,17 @@ void ASTScopeImpl::disownDescendants(ScopeCreator &scopeCreator) {
 ASTScopeImpl *ASTScopeImpl::expandAndBeCurrent(ScopeCreator &scopeCreator) {
   auto *insertionPoint = expandSpecifically(scopeCreator);
   if (scopeCreator.shouldBeLazy()) {
-    assert(!insertionPointForDeferredExpansion() ||
-           insertionPointForDeferredExpansion().get() == insertionPoint);
+    ASTScopeAssert(!insertionPointForDeferredExpansion() ||
+                       insertionPointForDeferredExpansion().get() ==
+                           insertionPoint,
+                   "In order for lookups into lazily-expanded scopes to be "
+                   "accurate before expansion, the insertion point before "
+                   "expansion must be the same as after expansion.");
   }
+  setWasExpanded();
   beCurrent();
-  assert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()));
+  ASTScopeAssert(checkSourceRangeAfterExpansion(scopeCreator.getASTContext()),
+                 "Bad range.");
   return insertionPoint;
 }
 
@@ -1178,9 +1186,9 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   // we cannot make a scope for it, since no source range.
   if (patternEntry.getOriginalInit() &&
       isLocalizable(patternEntry.getOriginalInit())) {
-    assert(
+    ASTScopeAssert(
         !getSourceManager().isBeforeInBuffer(
-            patternEntry.getOriginalInit()->getStartLoc(), decl->getStartLoc()) &&
+            patternEntry.getOriginalInit()->getStartLoc(), decl->getStartLoc()),
         "Original inits are always after the '='");
     scopeCreator
         .constructExpandAndInsertUncheckable<PatternEntryInitializerScope>(
@@ -1190,8 +1198,8 @@ PatternEntryDeclScope::expandAScopeThatCreatesANewInsertionPoint(
   forEachVarDeclWithLocalizableAccessors(scopeCreator, [&](VarDecl *var) {
     scopeCreator.ifUniqueConstructExpandAndInsert<VarDeclScope>(this, var);
   });
-  assert(!handleUseBeforeDef &&
-         "next line is wrong otherwise; would need a use scope");
+  ASTScopeAssert(!handleUseBeforeDef,
+                 "next line is wrong otherwise; would need a use scope");
 
   return {getParent().get(), "When not handling use-before-def, succeeding "
                              "code just goes in the same scope as this one"};
@@ -1229,7 +1237,7 @@ ConditionalClauseScope::expandAScopeThatCreatesANewInsertionPoint(
     return {ccPatternUseScope,
             "Succeeding code must be in scope of conditional variables"};
   }
-  llvm_unreachable("Unhandled StmtConditionKind in switch");
+  ASTScope_unreachable("Unhandled StmtConditionKind in switch");
 }
 
 AnnotatedInsertionPoint
@@ -1262,7 +1270,7 @@ BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   // TODO: remove the sort after performing rdar://53254395
   auto *insertionPoint =
-      scopeCreator.addSiblingsToScopeTree(this, stmt->getElements());
+      scopeCreator.addSiblingsToScopeTree(this, this, stmt->getElements());
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumBraceStmtASTScopeExpansions;
   return {
@@ -1288,7 +1296,7 @@ TopLevelCodeScope::expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &
 
 void ASTSourceFileScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  llvm_unreachable("expanded by addNewDeclsToScopeTree()");
+  ASTScope_unreachable("expanded by addNewDeclsToScopeTree()");
 }
 
 // Create child scopes for every declaration in a body.
@@ -1338,8 +1346,12 @@ void EnumElementScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   if (auto *pl = decl->getParameterList())
     scopeCreator.constructExpandAndInsertUncheckable<ParameterListScope>(
         this, pl, nullptr);
-  // might contain a closure
-  scopeCreator.addToScopeTree(decl->getRawValueExpr(), this);
+  // The invariant that the raw value expression can never introduce a new scope
+  // is checked in Parse.  However, this guarantee is not future-proof.  Compute
+  // and add the raw value expression anyways just to be defensive.
+  //
+  // FIXME: Re-enable this.  It currently crashes for malformed enum cases.
+  // scopeCreator.addToScopeTree(decl->getStructuralRawValueExpr(), this);
 }
 
 void AbstractFunctionBodyScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
@@ -1483,7 +1495,8 @@ void DefaultArgumentInitializerScope::
     expandAScopeThatDoesNotCreateANewInsertionPoint(
         ScopeCreator &scopeCreator) {
   auto *initExpr = decl->getDefaultValue();
-  assert(initExpr);
+  ASTScopeAssert(initExpr,
+                 "Default argument initializer must have an initializer.");
   scopeCreator.addToScopeTree(initExpr, this);
 }
 
@@ -1598,8 +1611,8 @@ AbstractPatternEntryScope::AbstractPatternEntryScope(
     PatternBindingDecl *declBeingScoped, unsigned entryIndex,
     DeclVisibilityKind vis)
     : decl(declBeingScoped), patternEntryIndex(entryIndex), vis(vis) {
-  assert(entryIndex < declBeingScoped->getPatternList().size() &&
-         "out of bounds");
+  ASTScopeAssert(entryIndex < declBeingScoped->getPatternList().size(),
+                 "out of bounds");
 }
 
 void AbstractPatternEntryScope::forEachVarDeclWithLocalizableAccessors(
@@ -1648,7 +1661,8 @@ bool ASTScopeImpl::isATypeDeclScope() const {
 void ScopeCreator::forEachClosureIn(
     Expr *expr, function_ref<void(NullablePtr<CaptureListExpr>, ClosureExpr *)>
                     foundClosure) {
-  assert(expr);
+  ASTScopeAssert(expr,
+                 "If looking for closures, must have an expression to search.");
 
   /// AST walker that finds top-level closures in an expression.
   class ClosureFinder : public ASTWalker {
@@ -1719,7 +1733,7 @@ void GenericTypeOrExtensionScope::expandBody(ScopeCreator &) {}
 
 void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
   auto nodes = asNodeVector(getIterableDeclContext().get()->getMembers());
-  scopeCreator.addSiblingsToScopeTree(this, nodes);
+  scopeCreator.addSiblingsToScopeTree(this, this, nodes);
   if (auto *s = scopeCreator.getASTContext().Stats)
     ++s->getFrontendCounters().NumIterableTypeBodyASTScopeExpansions;
 }
@@ -1727,19 +1741,22 @@ void IterableTypeScope::expandBody(ScopeCreator &scopeCreator) {
 #pragma mark - reexpandIfObsolete
 
 bool ASTScopeImpl::reexpandIfObsolete(ScopeCreator &scopeCreator) {
-  if (scopeCreator.getIsFrozen() ||
-      (isCurrent() &&
-          !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup))
+  if (isCurrent() &&
+      !scopeCreator.getASTContext().LangOpts.StressASTScopeLookup) {
+    ASTScopeAssert(getWasExpanded(), "Cannot be current if unexpanded.");
     return false;
+  }
   reexpand(scopeCreator);
   return true;
 }
 
 void ASTScopeImpl::reexpand(ScopeCreator &scopeCreator) {
-  auto scopesToReuse = rescueScopesToReuse();
+  auto astAncestorScopes = rescueASTAncestorScopesForReuseFromMeOrDescendants();
   disownDescendants(scopeCreator);
+  // If the expansion recurses back into the tree for lookup, the ASTAncestor
+  // scopes will have already been rescued and won't be found!
   expandAndBeCurrent(scopeCreator);
-  addReusedScopes(scopesToReuse);
+  replaceASTAncestorScopes(astAncestorScopes);
 }
 
 #pragma mark getScopeCreator
@@ -1799,8 +1816,15 @@ NullablePtr<ASTScopeImpl>
 IterableTypeScope::insertionPointForDeferredExpansion() {
   return portion->insertionPointForDeferredExpansion(this);
 }
+
 NullablePtr<ASTScopeImpl>
-Portion::insertionPointForDeferredExpansion(IterableTypeScope *) const {
+GenericTypeOrExtensionWholePortion::insertionPointForDeferredExpansion(
+    IterableTypeScope *s) const {
+  return s->getParent().get();
+}
+NullablePtr<ASTScopeImpl>
+GenericTypeOrExtensionWherePortion::insertionPointForDeferredExpansion(
+    IterableTypeScope *) const {
   return nullptr;
 }
 NullablePtr<ASTScopeImpl>
@@ -1809,23 +1833,46 @@ IterableTypeBodyPortion::insertionPointForDeferredExpansion(
   return s->getParent().get();
 }
 
+bool ASTScopeImpl::isCurrent() const {
+  return getWasExpanded() && isCurrentIfWasExpanded();
+}
 
 void ASTScopeImpl::beCurrent() {}
-bool ASTScopeImpl::isCurrent() const { return true; }
+bool ASTScopeImpl::isCurrentIfWasExpanded() const { return true; }
 
 void IterableTypeScope::beCurrent() { portion->beCurrent(this); }
-bool IterableTypeScope::isCurrent() const { return portion->isCurrent(this); }
+bool IterableTypeScope::isCurrentIfWasExpanded() const {
+  return portion->isCurrentIfWasExpanded(this);
+}
 
-void Portion::beCurrent(IterableTypeScope *) const {}
-bool Portion::isCurrent(const IterableTypeScope *) const { return true; }
-
+void GenericTypeOrExtensionWholePortion::beCurrent(IterableTypeScope *s) const {
+  s->makeWholeCurrent();
+}
+bool GenericTypeOrExtensionWholePortion::isCurrentIfWasExpanded(
+    const IterableTypeScope *s) const {
+  return s->isWholeCurrent();
+}
+void GenericTypeOrExtensionWherePortion::beCurrent(IterableTypeScope *) const {}
+bool GenericTypeOrExtensionWherePortion::isCurrentIfWasExpanded(
+    const IterableTypeScope *) const {
+  return true;
+}
 void IterableTypeBodyPortion::beCurrent(IterableTypeScope *s) const {
   s->makeBodyCurrent();
 }
-bool IterableTypeBodyPortion::isCurrent(const IterableTypeScope *s) const {
+bool IterableTypeBodyPortion::isCurrentIfWasExpanded(
+    const IterableTypeScope *s) const {
   return s->isBodyCurrent();
 }
 
+void IterableTypeScope::makeWholeCurrent() {
+  ASTScopeAssert(getWasExpanded(), "Should have been expanded");
+}
+bool IterableTypeScope::isWholeCurrent() const {
+  // Whole starts out unexpanded, and is lazily built but will have at least a
+  // body scope child
+  return getWasExpanded();
+}
 void IterableTypeScope::makeBodyCurrent() {
   memberCount = getIterableDeclContext().get()->getMemberCount();
 }
@@ -1836,13 +1883,12 @@ bool IterableTypeScope::isBodyCurrent() const {
 void AbstractFunctionBodyScope::beCurrent() {
   bodyWhenLastExpanded = decl->getBody(false);
 }
-bool AbstractFunctionBodyScope::isCurrent() const {
+bool AbstractFunctionBodyScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == decl->getBody(false);
-  ;
 }
 
 void TopLevelCodeScope::beCurrent() { bodyWhenLastExpanded = decl->getBody(); }
-bool TopLevelCodeScope::isCurrent() const {
+bool TopLevelCodeScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == decl->getBody();
 }
 
@@ -1861,11 +1907,12 @@ void PatternEntryDeclScope::beCurrent() {
     return;
   varCountWhenLastExpanded = countVars(getPatternEntry());
 }
-bool PatternEntryDeclScope::isCurrent() const {
+bool PatternEntryDeclScope::isCurrentIfWasExpanded() const {
   if (initWhenLastExpanded != getPatternEntry().getOriginalInit())
     return false;
   if (assumeVarsDoNotGetAdded && varCountWhenLastExpanded) {
-    assert(varCountWhenLastExpanded == countVars(getPatternEntry()));
+    ASTScopeAssert(varCountWhenLastExpanded == countVars(getPatternEntry()),
+                   "Vars were not supposed to be added to a pattern entry.");
     return true;
   }
   return countVars(getPatternEntry()) == varCountWhenLastExpanded;
@@ -1874,62 +1921,69 @@ bool PatternEntryDeclScope::isCurrent() const {
 void WholeClosureScope::beCurrent() {
   bodyWhenLastExpanded = closureExpr->getBody();
 }
-bool WholeClosureScope::isCurrent() const {
+bool WholeClosureScope::isCurrentIfWasExpanded() const {
   return bodyWhenLastExpanded == closureExpr->getBody();
 }
 
-#pragma mark getParentOfRescuedScopes
-NullablePtr<ASTScopeImpl> ASTScopeImpl::getParentOfRescuedScopes() {
+#pragma mark getParentOfASTAncestorScopesToBeRescued
+NullablePtr<ASTScopeImpl>
+ASTScopeImpl::getParentOfASTAncestorScopesToBeRescued() {
   return this;
 }
 NullablePtr<ASTScopeImpl>
-AbstractFunctionBodyScope::getParentOfRescuedScopes() {
+AbstractFunctionBodyScope::getParentOfASTAncestorScopesToBeRescued() {
   // Reexpansion always creates a new body as the first child
+  // That body contains the scopes to be rescued.
   return getChildren().empty() ? nullptr : getChildren().front();
 }
-NullablePtr<ASTScopeImpl> TopLevelCodeScope::getParentOfRescuedScopes() {
+NullablePtr<ASTScopeImpl>
+TopLevelCodeScope::getParentOfASTAncestorScopesToBeRescued() {
   // Reexpansion always creates a new body as the first child
+  // That body contains the scopes to be rescued.
   return getChildren().empty() ? nullptr : getChildren().front();
 }
 
 #pragma mark rescuing & reusing
-std::vector<ASTScopeImpl *> ASTScopeImpl::rescueScopesToReuse() {
-  if (auto *p = getParentOfRescuedScopes().getPtrOrNull()) {
-    return p->rescueYoungestChildren(p->getChildren().size() -
-                                     p->childrenCountWhenLastExpanded);
+std::vector<ASTScopeImpl *>
+ASTScopeImpl::rescueASTAncestorScopesForReuseFromMeOrDescendants() {
+  if (auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull()) {
+    return p->rescueASTAncestorScopesForReuseFromMe();
   }
+  ASTScopeAssert(
+      getASTAncestorScopeCount() == 0,
+      "If receives ASTAncestor scopes, must know where to find parent");
   return {};
 }
 
-void ASTScopeImpl::addReusedScopes(ArrayRef<ASTScopeImpl *> scopesToAdd) {
-  auto *p = getParentOfRescuedScopes().getPtrOrNull();
+void ASTScopeImpl::replaceASTAncestorScopes(
+    ArrayRef<ASTScopeImpl *> scopesToAdd) {
+  auto *p = getParentOfASTAncestorScopesToBeRescued().getPtrOrNull();
   if (!p) {
-    assert(scopesToAdd.empty() && "Non-empty body disappeared?!");
+    ASTScopeAssert(scopesToAdd.empty(), "Non-empty body disappeared?!");
     return;
   }
   auto &ctx = getASTContext();
   for (auto *s : scopesToAdd) {
     p->addChild(s, ctx);
-    assert(s->verifyThatThisNodeComeAfterItsPriorSibling() &&
-           "Ensure search will work");
+    ASTScopeAssert(s->verifyThatThisNodeComeAfterItsPriorSibling(),
+                   "Ensure search will work");
   }
+  p->increaseASTAncestorScopeCount(scopesToAdd.size());
 }
 
 std::vector<ASTScopeImpl *>
-ASTScopeImpl::rescueYoungestChildren(const unsigned int count) {
-  std::vector<ASTScopeImpl *> youngestChildren;
-  for (unsigned i = getChildren().size() - count; i < getChildren().size(); ++i)
-    youngestChildren.push_back(getChildren()[i]);
+ASTScopeImpl::rescueASTAncestorScopesForReuseFromMe() {
+  std::vector<ASTScopeImpl *> astAncestorScopes;
+  for (unsigned i = getChildren().size() - getASTAncestorScopeCount();
+       i < getChildren().size(); ++i)
+    astAncestorScopes.push_back(getChildren()[i]);
   // So they don't get disowned and children cleared.
-  for (unsigned i = 0; i < count; ++i) {
+  for (unsigned i = 0; i < getASTAncestorScopeCount(); ++i) {
     storedChildren.back()->emancipate();
     storedChildren.pop_back();
   }
-  return youngestChildren;
-}
-
-void ASTScopeImpl::setChildrenCountWhenLastExpanded() {
-  childrenCountWhenLastExpanded = getChildren().size();
+  resetASTAncestorScopeCount();
+  return astAncestorScopes;
 }
 
 bool AbstractFunctionDeclScope::shouldCreateAccessorScope(

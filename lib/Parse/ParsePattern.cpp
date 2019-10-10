@@ -19,6 +19,8 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
@@ -894,8 +896,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             /*isExprBasic=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
-                                            trailingClosure,
-                                            SyntaxKind::Unknown);
+                                            trailingClosure);
         if (status.isSuccess()) {
           backtrack.cancelBacktrack();
           
@@ -1169,6 +1170,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
   // matching-pattern ::= expr
   // Fall back to expression parsing for ambiguous forms. Name lookup will
   // disambiguate.
+  DeferringContextRAII Deferring(*SyntaxContext);
   ParserResult<Expr> subExpr =
     parseExprImpl(diag::expected_pattern, isExprBasic);
   ParserStatus status = subExpr;

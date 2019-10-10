@@ -32,11 +32,11 @@ using namespace swift;
 using namespace Lowering;
 
 SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
-                                     GenericSignature *specializedSig)
+                                     GenericSignature specializedSig)
     : kind(kind), exported(exported), specializedSignature(specializedSig) { }
 
 SILSpecializeAttr *SILSpecializeAttr::create(SILModule &M,
-                                             GenericSignature *specializedSig,
+                                             GenericSignature specializedSig,
                                              bool exported,
                                              SpecializationKind kind) {
   void *buf = M.allocate(sizeof(SILSpecializeAttr), alignof(SILSpecializeAttr));
@@ -223,7 +223,7 @@ SILType GenericEnvironment::mapTypeIntoContext(SILModule &M,
   auto genericSig = getGenericSignature()->getCanonicalSignature();
   return type.subst(M,
                     QueryInterfaceTypeSubstitutions(this),
-                    LookUpConformanceInSignature(*genericSig),
+                    LookUpConformanceInSignature(genericSig.getPointer()),
                     genericSig);
 }
 

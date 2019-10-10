@@ -403,6 +403,8 @@ public:
                                    Optional<SILDebugVariable> Var = None,
                                    bool hasDynamicLifetime = false) {
     Loc.markAsPrologue();
+    assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
+           "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocStackInst::create(getSILDebugLocation(Loc), elementType,
                                          getFunction(), C.OpenedArchetypes,
                                          Var, hasDynamicLifetime));
@@ -443,6 +445,8 @@ public:
                                Optional<SILDebugVariable> Var = None,
                                bool hasDynamicLifetime = false) {
     Loc.markAsPrologue();
+    assert((!dyn_cast_or_null<VarDecl>(Loc.getAsASTNode<Decl>()) || Var) &&
+           "location is a VarDecl, but SILDebugVariable is empty");
     return insert(AllocBoxInst::create(getSILDebugLocation(Loc), BoxType, *F,
                                        C.OpenedArchetypes, Var,
                                        hasDynamicLifetime));

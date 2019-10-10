@@ -1123,7 +1123,7 @@ static StringRef printGenericSignature(SDKContext &Ctx, Decl *D, bool Canonical)
   }
   PrintOptions Opts = getTypePrintOpts(Ctx.getOpts());
   if (auto *GC = D->getAsGenericContext()) {
-    if (auto *Sig = GC->getGenericSignature()) {
+    if (auto Sig = GC->getGenericSignature()) {
       if (Canonical)
         Sig->getCanonicalSignature()->print(OS, Opts);
       else
@@ -1679,7 +1679,7 @@ SwiftDeclCollector::constructVarNode(ValueDecl *VD) {
 SDKNode *swift::ide::api::
 SwiftDeclCollector::constructTypeAliasNode(TypeAliasDecl *TAD) {
   auto Alias = SDKNodeInitInfo(Ctx, TAD).createSDKNode(SDKNodeKind::DeclTypeAlias);
-  Alias->addChild(constructTypeNode(TAD->getUnderlyingTypeLoc().getType()));
+  Alias->addChild(constructTypeNode(TAD->getUnderlyingType()));
   return Alias;
 }
 

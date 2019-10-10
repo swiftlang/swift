@@ -17,8 +17,10 @@ the Swift programming language. SIL accommodates the following use cases:
   such as definitive initialization of variables and constructors, code
   reachability, switch coverage.
 - High-level optimization passes, including retain/release optimization,
-  dynamic method devirtualization, closure inlining, memory allocation promotion,
-  and generic function instantiation.
+  dynamic method devirtualization, closure inlining, promoting heap allocations
+  to stack allocations, promoting stack allocations to SSA registers, scalar
+  replacement of aggregates (splitting aggregate allocations into multiple
+  smaller allocations), and generic function instantiation.
 - A stable distribution format that can be used to distribute "fragile"
   inlineable or generic code with Swift library modules, to be optimized into
   client binaries.

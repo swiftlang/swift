@@ -56,12 +56,6 @@ private:
   /// Cached for convenience.
   Identifier ID_CFTypeRef;
 
-  /// The protocol type 'NSCopying', or a null type if Foundation has not been
-  /// imported.
-  ///
-  /// Cached for convenience.
-  Optional<Type> NSCopyingType;
-
   Implementation getImpl();
 
 public:
@@ -80,7 +74,7 @@ public:
   ///
   /// All members must have the same parent type. The list must not be empty.
   void
-  printAdHocCategory(llvm::iterator_range<const ValueDecl * const *> members);
+  printAdHocCategory(iterator_range<const ValueDecl * const *> members);
 
   /// Returns the name of an <os/object.h> type minus the leading "OS_",
   /// or an empty string if \p decl is not an <os/object.h> type.

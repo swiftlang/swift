@@ -381,8 +381,17 @@ ERROR(cannot_convert_argument_value,none,
       (Type,Type))
 
 NOTE(candidate_has_invalid_argument_at_position,none,
-     "candidate expects value of type %0 at position #%1",
+     "candidate expects value of type %0 for parameter #%1",
      (Type, unsigned))
+
+ERROR(cannot_convert_array_to_variadic,none,
+      "cannot pass array of type %0 as variadic arguments of type %1",
+      (Type,Type))
+NOTE(candidate_would_match_array_to_variadic,none,
+     "candidate would match if array elements were passed as"
+     " variadic arguments of type %0", (Type))
+NOTE(suggest_pass_elements_directly,none,
+     "remove brackets to pass array elements directly", ())
 
 ERROR(cannot_convert_argument_value_generic,none,
       "cannot convert value of type %0 (%1) to expected argument type %2 (%3)",
@@ -395,6 +404,12 @@ ERROR(cannot_convert_partial_argument_value_protocol,none,
 
 ERROR(cannot_convert_argument_value_nil,none,
       "'nil' is not compatible with expected argument type %0", (Type))
+
+ERROR(cannot_convert_condition_value,none,
+      "cannot convert value of type %0 to expected condition type %1",
+      (Type, Type))
+ERROR(cannot_convert_condition_value_nil,none,
+      "'nil' is not compatible with expected condition type %0", (Type))
 
 ERROR(cannot_yield_rvalue_by_reference_same_type,none,
       "cannot yield immutable value of type %0 as an inout yield", (Type))
@@ -1101,6 +1116,8 @@ ERROR(missing_argument_named,none,
       "missing argument for parameter %0 in call", (Identifier))
 ERROR(missing_argument_positional,none,
       "missing argument for parameter #%0 in call", (unsigned))
+ERROR(missing_arguments_in_call,none,
+      "missing arguments for parameters %0 in call", (StringRef))
 ERROR(extra_argument_named,none,
       "extra argument %0 in call", (Identifier))
 ERROR(extra_argument_positional,none,
@@ -1671,10 +1688,19 @@ ERROR(cannot_use_nil_with_this_type,none,
 ERROR(use_of_equal_instead_of_equality,none,
       "use of '=' in a boolean context, did you mean '=='?", ())
 
+ERROR(type_cannot_conform, none,
+      "%select{|value of protocol }0type %1 cannot conform to %2; "
+      "only struct/enum/class types can conform to protocols",
+      (bool, Type, Type))
+NOTE(required_by_opaque_return,none,
+    "required by opaque return type of %0 %1", (DescriptiveDeclKind, DeclName))
+NOTE(required_by_decl,none,
+     "required by %0 %1 where %2 = %3",
+     (DescriptiveDeclKind, DeclName, Type, Type))
+NOTE(required_by_decl_ref,none,
+     "required by referencing %0 %1 on %2 where %3 = %4",
+     (DescriptiveDeclKind, DeclName, Type, Type, Type))
 
-ERROR(protocol_does_not_conform_objc,none,
-      "protocol type %0 cannot conform to %1 because only concrete "
-      "types can conform to protocols", (Type, Type))
 ERROR(protocol_does_not_conform_static,none,
       "%0 cannot be used as a type conforming to protocol %1 because %1 "
       "has static requirements",
@@ -2652,6 +2678,8 @@ ERROR(dynamic_self_invalid_method,none,
       "covariant 'Self' can only appear at the top level of method result type", ())
 ERROR(dynamic_self_stored_property_init,none,
       "covariant 'Self' type cannot be referenced from a stored property initializer", ())
+ERROR(dynamic_self_default_arg,none,
+      "covariant 'Self' type cannot be referenced from a default argument expression", ())
 
 //------------------------------------------------------------------------------
 // MARK: Type Check Attributes
@@ -3471,8 +3499,14 @@ ERROR(single_tuple_parameter_mismatch_special,none,
 ERROR(single_tuple_parameter_mismatch_normal,none,
       "%0 %1 expects a single parameter of type %2%3",
       (DescriptiveDeclKind, DeclBaseName, Type, StringRef))
+NOTE(note_maybe_forgot_to_form_tuple,none,
+     "did you mean to pass a tuple?", ())
 ERROR(unknown_single_tuple_parameter_mismatch,none,
       "single parameter of type %0 is expected in call", (Type))
+ERROR(cannot_convert_single_tuple_into_multiple_arguments,none,
+      "%0 %select{%1 |}2expects %3 separate arguments"
+      "%select{|; remove extra parentheses to change tuple into separate arguments}4",
+      (DescriptiveDeclKind, DeclName, bool, unsigned, bool))
 
 ERROR(enum_element_pattern_assoc_values_mismatch,none,
       "pattern with associated values does not match enum case %0",
@@ -3621,9 +3655,6 @@ ERROR(sugar_type_not_found,none,
       "broken standard library: cannot find "
       "%select{Array|Optional|ImplicitlyUnwrappedOptional|Dictionary|"
       "Error}0 type", (unsigned))
-ERROR(pointer_type_not_found,none,
-      "broken standard library: cannot find "
-      "%select{UnsafePointer|UnsafeMutablePointer}0 type", (unsigned))
 ERROR(optional_intrinsics_not_found,none,
       "broken standard library: cannot find intrinsic operations on "
       "Optional<T>", ())
@@ -4508,8 +4539,6 @@ ERROR(property_wrapper_wrong_initial_value_init, none,
       (DeclName, Type, Type))
 ERROR(property_wrapper_failable_init, none,
       "%0 cannot be failable", (DeclName))
-ERROR(property_wrapper_ambiguous_initial_value_init, none,
-  "property wrapper type %0 has multiple initial-value initializers", (Type))
 ERROR(property_wrapper_ambiguous_default_value_init, none,
   "property wrapper type %0 has multiple default-value initializers", (Type))
 ERROR(property_wrapper_type_requirement_not_accessible,none,

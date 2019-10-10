@@ -82,3 +82,23 @@ class Foo {
 func testFoo<T: Foo>(_: T) {
   let _: X<T> = .init(foo: \.optBar!.optWibble?.boolProperty)
 }
+
+// rdar://problem/56131416
+
+enum Rdar56131416 {
+  struct Pass<T> {}
+  static func f<T, U>(_ value: T, _ prop: KeyPath<T, U>) -> Pass<U> { fatalError() }
+
+  struct Fail<T> {}
+  static func f<T, U>(_ value: T, _ transform: (T) -> U) -> Fail<U> { fatalError() }
+  
+  static func takesCorrectType(_: Pass<UInt>) {}
+}
+
+func rdar56131416() {
+  // This call should not be ambiguous.
+  let result = Rdar56131416.f(1, \.magnitude) // no-error
+  
+  // This type should be selected correctly.
+  Rdar56131416.takesCorrectType(result)
+}

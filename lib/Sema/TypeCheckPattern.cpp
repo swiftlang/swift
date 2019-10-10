@@ -21,6 +21,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -694,9 +695,11 @@ static bool validateTypedPattern(TypeChecker &TC,
     auto named = dyn_cast<NamedPattern>(
                            TP->getSubPattern()->getSemanticsProvidingPattern());
     if (named) {
-      auto opaqueTy = TC.getOrCreateOpaqueResultType(resolution,
-                                                     named->getDecl(),
-                                                     opaqueRepr);
+      auto *var = named->getDecl();
+      auto opaqueDecl = var->getOpaqueResultTypeDecl();
+      auto opaqueTy = (opaqueDecl
+                       ? opaqueDecl->getDeclaredInterfaceType()
+                       : ErrorType::get(TC.Context));
       TL.setType(named->getDecl()->getDeclContext()
                                  ->mapTypeIntoContext(opaqueTy));
       hadError = opaqueTy->hasError();
@@ -791,8 +794,10 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
 
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL,
-                                         TypeResolution resolution,
+                                         DeclContext *dc,
                                          TypeResolutionOptions options) {
+  auto resolution = TypeResolution::forInterface(dc);
+
   bool hadError = false;
   
   for (auto param : *PL) {
@@ -1131,6 +1136,10 @@ recur:
 
     var->getTypeLoc() = tyLoc;
     var->getTypeLoc().setType(var->getType());
+
+    // FIXME: Should probably just remove the forbidden prefix stuff, it no
+    // longer makes a lot of sense in a request-based world.
+    checkForForbiddenPrefix(var);
 
     // If we are inferring a variable to have type AnyObject.Type,
     // "()", an uninhabited type, or optional thereof, emit a diagnostic.
@@ -1497,7 +1506,7 @@ recur:
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    validateDeclForNameLookup(elt);
+    auto argType = elt->getArgumentInterfaceType();
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
@@ -1510,7 +1519,7 @@ recur:
       }
       
       Type elementType;
-      if (auto argType = elt->getArgumentInterfaceType())
+      if (argType)
         elementType = enumTy->getTypeOfMember(elt->getModuleContext(),
                                               elt, argType);
       else
@@ -1524,7 +1533,7 @@ recur:
       if (coercePatternToType(sub, resolution, elementType, newSubOptions))
         return true;
       EEP->setSubPattern(sub);
-    } else if (auto argType = elt->getArgumentInterfaceType()) {
+    } else if (argType) {
       // Else if the element pattern has no sub-pattern but the element type has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.

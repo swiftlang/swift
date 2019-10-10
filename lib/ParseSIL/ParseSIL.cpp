@@ -16,6 +16,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Timer.h"
@@ -1516,6 +1517,9 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         ParseState = 1;
       } else if (!ParseState && Id.str() == "propertyinit") {
         Kind = SILDeclRef::Kind::StoredPropertyInitializer;
+        ParseState = 1;
+      } else if (!ParseState && Id.str() == "backinginit") {
+        Kind = SILDeclRef::Kind::PropertyWrapperBackingInitializer;
         ParseState = 1;
       } else if (Id.str() == "foreign") {
         IsObjC = true;
@@ -3114,7 +3118,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SmallVector<SILType, 4> operandTypes;
     {
       Scope genericsScope(&P, ScopeKind::Generics);
-      generics = P.maybeParseGenericParams().getPtrOrNull();
+      generics = P.parseSILGenericParams().getPtrOrNull();
       patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
       
       if (P.parseToken(tok::l_paren, diag::expected_tok_in_sil_instr, "("))
@@ -3214,7 +3218,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
 
-    CanGenericSignature canSig = nullptr;
+    CanGenericSignature canSig = CanGenericSignature();
     if (patternEnv && patternEnv->getGenericSignature()) {
       canSig = patternEnv->getGenericSignature()->getCanonicalSignature();
     }
@@ -5496,13 +5500,14 @@ bool SILParserTUState::parseDeclSIL(Parser &P) {
           // Resolve types and convert requirements.
           FunctionState.convertRequirements(FunctionState.F,
                                             Attr.requirements, requirements);
-          GenericSignature *genericSig = evaluateOrDefault(
+          auto *fenv = FunctionState.F->getGenericEnvironment();
+          auto genericSig = evaluateOrDefault(
               P.Context.evaluator,
               AbstractGenericSignatureRequest{
-                FunctionState.F->getGenericEnvironment()->getGenericSignature(),
+                fenv->getGenericSignature().getPointer(),
                 /*addedGenericParams=*/{ },
                 std::move(requirements)},
-                nullptr);
+                GenericSignature());
           FunctionState.F->addSpecializeAttr(SILSpecializeAttr::create(
               FunctionState.F->getModule(), genericSig, Attr.exported,
               Attr.kind));
@@ -5719,7 +5724,7 @@ bool SILParserTUState::parseSILProperty(Parser &P) {
   GenericEnvironment *patternEnv;
   Scope toplevelScope(&P, ScopeKind::TopLevel);
   Scope genericsScope(&P, ScopeKind::Generics);
-  generics = P.maybeParseGenericParams().getPtrOrNull();
+  generics = P.parseSILGenericParams().getPtrOrNull();
   patternEnv = handleSILGenericParams(P.Context, generics, &P.SF);
   
   if (patternEnv) {
@@ -6032,7 +6037,7 @@ Optional<ProtocolConformanceRef> SILParser::parseProtocolConformance(
   // Make sure we don't leave it uninitialized in the caller
   genericEnv = nullptr;
 
-  auto *genericParams = P.maybeParseGenericParams().getPtrOrNull();
+  auto *genericParams = P.parseSILGenericParams().getPtrOrNull();
   if (genericParams) {
     genericEnv = handleSILGenericParams(P.Context, genericParams, &P.SF);
   }

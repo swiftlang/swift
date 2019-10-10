@@ -500,7 +500,27 @@ struct ImmutableAddressUseVerifier {
       if (inst->isTypeDependentOperand(*use))
         continue;
 
+      // TODO: Can this switch be restructured so break -> error, continue ->
+      // next iteration, return -> return the final result.
       switch (inst->getKind()) {
+      case SILInstructionKind::BuiltinInst: {
+        // If we are processing a polymorphic builtin that takes an address,
+        // skip the builtin. This is because the builtin must be specialized to
+        // a non-memory reading builtin that works on trivial object values
+        // before the diagnostic passes end (or be DCEed) or we emit a
+        // diagnostic.
+        if (auto builtinKind = cast<BuiltinInst>(inst)->getBuiltinKind()) {
+          if (isPolymorphicBuiltin(*builtinKind)) {
+            break;
+          }
+        }
+
+        // Otherwise this is a builtin that we are not expecting to see, so bail
+        // and assert.
+        llvm::errs() << "Unhandled, unexpected builtin instruction: " << *inst;
+        llvm_unreachable("invoking standard assertion failure");
+        break;
+      }
       case SILInstructionKind::MarkDependenceInst:
       case SILInstructionKind::LoadBorrowInst:
       case SILInstructionKind::DebugValueAddrInst:
@@ -1630,8 +1650,10 @@ public:
 
   void checkBuiltinInst(BuiltinInst *BI) {
     // Check for special constraints on llvm intrinsics.
-    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic)
+    if (BI->getIntrinsicInfo().ID != llvm::Intrinsic::not_intrinsic) {
       verifyLLVMIntrinsic(BI, BI->getIntrinsicInfo().ID);
+      return;
+    }
   }
   
   void checkFunctionRefBaseInst(FunctionRefBaseInst *FRI) {
@@ -2005,13 +2027,14 @@ public:
         require(initConv.getNumDirectSILResults() == 1,
                 "wrong number of init function results");
         require(Dest->getType().getObjectType() ==
-                initConv.getDirectSILResultTypes().front(),
+                *initConv.getDirectSILResultTypes().begin(),
                 "wrong init function result type");
         break;
       case 1:
         require(initConv.getNumDirectSILResults() == 0,
                 "wrong number of init function results");
-        require(Dest->getType() == initConv.getIndirectSILResultTypes().front(),
+        require(Dest->getType() ==
+                *initConv.getIndirectSILResultTypes().begin(),
                 "wrong indirect init function result type");
         break;
       default:

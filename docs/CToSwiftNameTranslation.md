@@ -1,6 +1,6 @@
 # Name Translation from C to Swift
 
-This document gives a high-level description of how C and Objective-C declarations are translated to Swift, with particular focus on how names are adjusted. It is not attempting to be a *complete* description of everything the compiler does except with regards to how *names* are transformed; even there, some special cases that only apply to Apple's SDKs have been omitted.
+This document gives a high-level description of how C and Objective-C declarations are translated to Swift, with particular focus on how names are adjusted. It is not attempting to be a *complete* description of everything the compiler does except with regards to how *names* are transformed; even there, some special cases that only apply to Apple's SDKs have been omitted. The example code shown is for illustrative purposes and does not always include all parts of an imported API's interface.
 
 ## Word boundaries
 
@@ -212,6 +212,29 @@ Additionally, typedefs for `void *` or `const void *` that are themselves annota
 If a typedef's underlying type is itself a "CF pointer" typedef, the "alias" typedef will be imported as a regular typealias, with the suffix "Ref" still dropped from its name (if present) unless doing so would conflict with another declaration in the same module as the typedef.
 
 
+## Objective-C Properties
+
+By default, most property names are not transformed at all. However, if the getter of a property overrides a superclass or adopted protocol method that is also a property accessor, the Swift name of the overridden accessor's property will be used for consistency. If there's more than one such name, one is chosen arbitrarily.
+
+Properties with the type `BOOL` or `Boolean` use the name of the getter as the name of the Swift property by default, rather than the name of the property in Objective-C. This accounts for a difference in Swift and Objective-C naming conventions for boolean properties that use "is".
+
+```objc
+@property(getter=isContrivedExample) BOOL contrivedExample;
+@property BOOL hasAnotherForm;
+```
+
+```swift
+var isContrivedExample: Bool { get set }
+var hasAnotherForm: Bool { get set }
+```
+
+_This rule should probably have applied to C's native `bool` as well._
+
+A property declaration with the `SwiftImportPropertyAsAccessors` API note will not be imported at all, and its accessors will be imported as methods. Additionally, properties whose names start with "accessibility" in the NSAccessibility protocol are always imported as methods, as are properties whose names start with "accessibility" in an `@interface` declaration (class or category) that provides the adoption of NSAccessibility.
+
+_Objective-C code has historically not been consistent about whether the NSAccessibility declarations should be considered properties and therefore the Swift compiler chooses to import them as methods, as a sort of lowest common denominator._
+
+
 ## `swift_private`
 
 The `swift_private` Clang attribute prepends `__` onto the base name of any declaration being imported except initializers. For initializers with no arguments, a dummy `Void` argument with the name `__` is inserted; otherwise, the label for the first argument has `__` prepended. This transformation takes place after any other name manipulation, unless the declaration has a custom name. It will not occur if the declaration is an override; in that case the name needs to match the overridden declaration.
@@ -237,6 +260,279 @@ The purpose of this annotation is to allow a more idiomatic implementation to be
 _The original intent of the `swift_private` attribute was additionally to limit access to a Swift module with the same name as the owning Clang module, e.g. the Swift half of a mixed-source framework. However, this restriction has not been implemented as of Swift 5.1._
 
 _For "historical reasons", the `swift_private` attribute is ignored on factory methods with no arguments imported as initializers. This is essentially matching the behavior of older Swift compilers for source compatibility in case someone has marked such a factory method as `swift_private`._
+
+
+## Custom names
+
+The `swift_name` Clang attribute can be used to control how a declaration imports into Swift. If it's valid, the value of the `swift_name` attribute always overrides any other name transformation rules (prefix-stripping, underscore-prepending, etc.)
+
+### Types and globals
+
+The `swift_name` attribute can be used to give a type or a global a custom name. In the simplest form, the value of the attribute must be a valid Swift identifier.
+
+```objc
+__attribute__((swift_name("SpacecraftCoordinates")))
+struct SPKSpacecraftCoordinates {
+  double x, y, z, t; // space and time, of course
+};
+
+// Usually seen as NS_SWIFT_NAME.
+```
+
+```swift
+struct SpacecraftCoordinates {
+  var x, y, z, t: Double
+}
+```
+
+### Import-as-member
+
+A custom name that starts with an identifier followed by a period is taken to be a member name. The identifier should be the imported Swift name of a C/Objective-C type in the same module. In this case, the type or global will be imported as a static member of the named type.
+
+```objc
+__attribute__((swift_name("SpacecraftCoordinates.earth")))
+extern const struct SPKSpacecraftCoordinates SPKSpacecraftCoordinatesEarth;
+```
+
+```swift
+extension SpacecraftCoordinates {
+  static var earth: SpacecraftCoordinates { get }
+}
+```
+
+Note that types cannot be imported as members of protocols.
+
+_The "in the same module" restriction is considered a technical limitation; a forward declaration of the base type will work around it._
+
+
+### C functions with custom names
+
+The `swift_name` attribute can be used to give a C function a custom name. The value of the attribute must be a full Swift function name, including parameter labels.
+
+```objc
+__attribute__((swift_name("doSomething(to:bar:)")))
+void doSomethingToFoo(Foo *foo, int bar);
+```
+
+```swift
+func doSomething(to foo: UnsafeMutablePointer<Foo>, bar: Int32)
+```
+
+An underscore can be used in place of an empty parameter label, as in Swift.
+
+A C function with zero arguments and a non-`void` return type can also be imported as a computed variable by using the `getter:` prefix on the name. A function with one argument and a `void` return type can optionally serve as the setter for that variable using `setter:`.
+
+```objc
+__attribute__((swift_name("getter:globalCounter()")))
+int getGlobalCounter(void);
+__attribute__((swift_name("setter:globalCounter(_:)")))
+void setGlobalCounter(int newValue);
+```
+
+```swift
+var globalCounter: Int32 { get set }
+```
+
+Note that the argument lists must still be present even though the name used is the name of the variable. (Also note the `void` parameter list to specify a C function with zero arguments. This is required!)
+
+Variables with setters and no getters are not supported.
+
+
+#### Import-as-member
+
+Like types and globals, functions can be imported as static members of types.
+
+```objc
+__attribute__((swift_name("NSSound.beep()")))
+void NSBeep(void);
+```
+
+```swift
+extension NSSound {
+  static func beep()
+}
+```
+
+However, by giving a parameter the label `self`, a function can also be imported as an instance member of a type __T__. In this case, the parameter labeled `self` must either have the type __T__ itself, or be a pointer to __T__. The latter is only valid if __T__ is imported as a value type; if the pointer is non-`const`, the resulting method will be `mutating`. If __T__ is a class, the function will be `final`.
+
+```objc
+typedef struct {
+  int value;
+} Counter;
+
+__attribute__((swift_name("Counter.printValue(self:)")))
+void CounterPrintValue(Counter c);
+__attribute__((swift_name("Counter.printValue2(self:)")))
+void CounterPrintValue2(const Counter *c);
+__attribute__((swift_name("Counter.resetValue(self:)")))
+void CounterResetValue(Counter *c);
+```
+
+```swift
+struct Counter {
+  var value: Int32 { get set }
+}
+
+extension Counter {
+  func printValue()
+  func printValue2()
+  mutating func resetValue()
+}
+```
+
+This also applies to getters and setters, to be imported as instance properties.
+
+```objc
+__attribute__((swift_name("getter:Counter.absoluteValue(self:)")))
+int CounterGetAbsoluteValue(Counter c);
+```
+
+```swift
+extension Counter {
+  var absoluteValue: Int32 { get }
+}
+```
+
+Finally, functions can be imported as initializers as well by using the base name `init`. These are considered "factory" initializers and are never inherited or overridable. They must not have a `self` parameter.
+
+```objc
+__attribute__((swift_name("Counter.init(initialValue:)")))
+Counter CounterCreateWithInitialValue(int value);
+```
+
+```swift
+extension Counter {
+  /* non-inherited */ init(initialValue value: Int32)
+}
+```
+
+
+### Enumerators (enum cases)
+
+The `swift_name` attribute can be used to rename enumerators. As mentioned above, not only does no further prefix-stripping occur on the resulting name, but the presence of a custom name removes the enum case from the computation of a prefix for the other cases.
+
+```
+// Actual example from Apple's SDKs; in fact, the first shipping example of
+// swift_name on an enumerator at all!
+typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
+  NSXMLInvalidKind = 0,
+  NSXMLDocumentKind,
+  NSXMLElementKind,
+  NSXMLAttributeKind,
+  NSXMLNamespaceKind,
+  NSXMLProcessingInstructionKind,
+  NSXMLCommentKind,
+  NSXMLTextKind,
+  NSXMLDTDKind NS_SWIFT_NAME(DTDKind),
+  NSXMLEntityDeclarationKind,
+  NSXMLAttributeDeclarationKind,
+  NSXMLElementDeclarationKind,
+  NSXMLNotationDeclarationKind
+};
+```
+
+```
+public enum Kind : UInt {
+  case invalid
+  case document
+  case element
+  case attribute
+  case namespace
+  case processingInstruction
+  case comment
+  case text
+  case DTDKind
+  case entityDeclaration
+  case attributeDeclaration
+  case elementDeclaration
+  case notationDeclaration
+}
+```
+
+Although enumerators always have global scope in C, they are often imported as members in Swift, and thus the `swift_name` attribute cannot be used to import them as members of another type unless the enum type is anonymous.
+
+_Currently, `swift_name` does not even allow importing an enum case as a member of the enum type itself, even if the enum is not recognized as an `@objc` enum, error code enum, or option set (i.e. the situation where a case is imported as a global constant)._
+
+
+### Fields of structs and unions; Objective-C properties
+
+The `swift_name` attribute can be applied to rename a struct or union field or an Objective-C property (whether on a class or a protocol). The value of the attribute must be a valid Swift identifier.
+
+```objc
+struct SPKSpaceflightBooking {
+  const SPKLocation * _Nullable destination;
+  bool roundTrip __attribute__((swift_name("isRoundTrip")));
+};
+```
+
+```swift
+struct SPKSpaceflightBooking {
+  var destination: UnsafePointer<SPKLocation>?
+  var isRoundTrip: Bool
+}
+```
+
+
+### Objective-C methods
+
+The `swift_name` attribute can be used to give an Objective-C method a custom name. The value of the attribute must be a full Swift function name, including parameter labels.
+
+```objc
+- (void)doSomethingToFoo:(Foo *)foo bar:(int)bar
+  __attribute__((swift_name("doSomethingImportant(to:bar:)")));
+```
+
+```swift
+func doSomethingImportant(to foo: UnsafeMutablePointer<Foo>, bar: Int32)
+```
+
+As with functions, an underscore can be used to represent an empty parameter label.
+
+Methods that follow the NSError out-parameter convention may provide one fewer parameter label than the number of parameters in the original method to indicate that a parameter should be dropped, but they do not have to. The `swift_error` attribute is still respected even when using a custom name for purposes of transforming an NSError out-parameter and the method return type.
+
+```objc
+- (BOOL)doSomethingRiskyAndReturnError:(NSError **)error
+  __attribute__((swift_name("doSomethingRisky()")));
+- (BOOL)doSomethingContrived:(NSString *)action error:(NSError **)outError
+  __attribute__((swift_name("doSomethingContrived(_:error:)")));
+```
+
+```swift
+func doSomethingRisky() throws
+func doSomethingContrived(_ action: String, error: ()) throws
+```
+
+A base name of "init" can be used on a *class* method that returns `instancetype` or the containing static type in order to import that method as an initializer. Any other custom name *prevents* a class method from being imported as an initializer even if it would normally be inferred as one.
+
+```objc
++ (Action *)makeActionWithHandler:(void(^)(void))handler
+  __attribute__((swift_name("init(handler:)")));
++ (instancetype)makeActionWithName:(NSString *)name
+  __attribute__((swift_name("init(name:)")));
+```
+
+```swift
+/* non-inherited */ init(handler: () -> Void)
+init(name: String)
+```
+
+A no-argument method imported as an initializer can be given a dummy argument label to disambiguate it from the no-argument `init()`, whether the method is an init-family instance method or a factory class method in Objective-C.
+
+```objc
+- (instancetype)initSafely
+  __attribute__((swift_name("init(safe:)")));
++ (instancetype)makeDefaultAction
+  __attribute__((swift_name("init(default:)")));
+```
+
+```swift
+init(safe: ())
+init(default: ())
+```
+
+A custom name on an instance method with one of Objective-C's subscript selectors (`objectAtIndexedSubscript:`, `objectForKeyedSubscript:`, `setObject:atIndexedSubscript:`, or `setObject:forKeyedSubscript:`) prevents that method from being imported as a subscript or used as the accessor for another subscript.
+
+_Currently, this only works if *both* methods in a read/write subscript are given custom names; if just one is, a read/write subscript will still be formed. A read-only subscript only has one method to rename._
 
 
 ## More to come...

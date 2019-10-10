@@ -38,10 +38,6 @@ SILType SILType::getBridgeObjectType(const ASTContext &C) {
   return SILType(C.TheBridgeObjectType, SILValueCategory::Object);
 }
 
-SILType SILType::getUnknownObjectType(const ASTContext &C) {
-  return getPrimitiveObjectType(C.TheUnknownObjectType);
-}
-
 SILType SILType::getRawPointerType(const ASTContext &C) {
   return getPrimitiveObjectType(C.TheRawPointerType);
 }
@@ -139,18 +135,13 @@ bool SILType::canRefCast(SILType operTy, SILType resultTy, SILModule &M) {
 
 SILType SILType::getFieldType(VarDecl *field,
                               TypeConverter &TC) const {
-  auto baseTy = getASTType();
-
-  if (!field->hasInterfaceType())
-    TC.Context.getLazyResolver()->resolveDeclSignature(field);
-
   AbstractionPattern origFieldTy = TC.getAbstractionPattern(field);
   CanType substFieldTy;
   if (field->hasClangNode()) {
     substFieldTy = origFieldTy.getType();
   } else {
     substFieldTy =
-      baseTy->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
+      getASTType()->getTypeOfMember(&TC.M, field, nullptr)->getCanonicalType();
   }
 
   auto loweredTy = TC.getLoweredRValueType(origFieldTy, substFieldTy);
@@ -174,9 +165,6 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt,
     assert(elt == TC.Context.getOptionalSomeDecl());
     return SILType(objectType, getCategory());
   }
-
-  if (!elt->hasInterfaceType())
-    TC.Context.getLazyResolver()->resolveDeclSignature(elt);
 
   // If the case is indirect, then the payload is boxed.
   if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
@@ -223,8 +211,6 @@ bool SILType::isHeapObjectReferenceType() const {
   if (Ty->isEqual(C.TheNativeObjectType))
     return true;
   if (Ty->isEqual(C.TheBridgeObjectType))
-    return true;
-  if (Ty->isEqual(C.TheUnknownObjectType))
     return true;
   if (is<SILBoxType>())
     return true;

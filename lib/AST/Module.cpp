@@ -23,6 +23,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LazyResolver.h"
@@ -33,6 +34,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -101,6 +103,7 @@ void BuiltinUnit::LookupCache::lookupValue(
                                           const_cast<BuiltinUnit*>(&M));
       TAD->setUnderlyingType(Ty);
       TAD->setAccess(AccessLevel::Public);
+      TAD->computeType();
       Entry = TAD;
     }
   }
@@ -395,9 +398,6 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx)
   setImplicit();
   setInterfaceType(ModuleType::get(this));
 
-  // validateDecl() should return immediately given a ModuleDecl.
-  setValidationToChecked();
-
   setAccess(AccessLevel::Public);
 }
 
@@ -475,10 +475,9 @@ TypeDecl * ModuleDecl::lookupLocalType(StringRef MangledName) const {
 }
 
 OpaqueTypeDecl *
-ModuleDecl::lookupOpaqueResultType(StringRef MangledName,
-                                   LazyResolver *resolver) {
+ModuleDecl::lookupOpaqueResultType(StringRef MangledName) {
   for (auto file : getFiles()) {
-    auto OTD = file->lookupOpaqueResultType(MangledName, resolver);
+    auto OTD = file->lookupOpaqueResultType(MangledName);
     if (OTD)
       return OTD;
   }
@@ -670,9 +669,8 @@ void SourceFile::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
 void
 SourceFile::getOpaqueReturnTypeDecls(SmallVectorImpl<OpaqueTypeDecl*> &Results)
 const {
-  for (auto &member : ValidatedOpaqueReturnTypes) {
-    Results.push_back(member.second);
-  }
+  auto result = const_cast<SourceFile *>(this)->getOpaqueReturnTypeDecls();
+  llvm::copy(result, std::back_inserter(Results));
 }
 
 TypeDecl *SourceFile::lookupLocalType(llvm::StringRef mangledName) const {
@@ -1806,41 +1804,39 @@ void SourceFile::createReferencedNameTracker() {
   ReferencedNames.emplace(ReferencedNameTracker());
 }
 
+ArrayRef<OpaqueTypeDecl *> SourceFile::getOpaqueReturnTypeDecls() {
+  for (auto *vd : UnvalidatedDeclsWithOpaqueReturnTypes) {
+    if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
+      auto inserted = ValidatedOpaqueReturnTypes.insert(
+                {opaqueDecl->getOpaqueReturnTypeIdentifier().str(),
+                 opaqueDecl});
+      if (inserted.second) {
+        OpaqueReturnTypes.push_back(opaqueDecl);
+      }
+    }
+  }
+
+  UnvalidatedDeclsWithOpaqueReturnTypes.clear();
+  return OpaqueReturnTypes;
+}
+
 OpaqueTypeDecl *
-SourceFile::lookupOpaqueResultType(StringRef MangledName,
-                                   LazyResolver *resolver) {
+SourceFile::lookupOpaqueResultType(StringRef MangledName) {
   // Check already-validated decls.
   auto found = ValidatedOpaqueReturnTypes.find(MangledName);
   if (found != ValidatedOpaqueReturnTypes.end())
     return found->second;
-  
+    
   // If there are unvalidated decls with opaque types, go through and validate
   // them now.
-  if (resolver && !UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
-    while (!UnvalidatedDeclsWithOpaqueReturnTypes.empty()) {
-      ValueDecl *decl = *UnvalidatedDeclsWithOpaqueReturnTypes.begin();
-      UnvalidatedDeclsWithOpaqueReturnTypes.erase(decl);
-      resolver->resolveDeclSignature(decl);
-    }
-    
-    found = ValidatedOpaqueReturnTypes.find(MangledName);
-    if (found != ValidatedOpaqueReturnTypes.end())
-      return found->second;
-  }
+  (void) getOpaqueReturnTypeDecls();
+
+  found = ValidatedOpaqueReturnTypes.find(MangledName);
+  if (found != ValidatedOpaqueReturnTypes.end())
+    return found->second;
   
   // Otherwise, we don't have a matching opaque decl.
   return nullptr;
-}
-
-void SourceFile::markDeclWithOpaqueResultTypeAsValidated(ValueDecl *vd) {
-  UnvalidatedDeclsWithOpaqueReturnTypes.erase(vd);
-  if (auto opaqueDecl = vd->getOpaqueResultTypeDecl()) {
-    auto inserted = ValidatedOpaqueReturnTypes.insert(
-              {opaqueDecl->getOpaqueReturnTypeIdentifier().str(), opaqueDecl});
-    if (inserted.second) {
-      OpaqueReturnTypes.push_back(opaqueDecl);
-    }
-  }
 }
 
 //===----------------------------------------------------------------------===//

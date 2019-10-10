@@ -1196,13 +1196,13 @@ enum Z {
 
 func sr11160_extra() {
   switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
-                      // expected-note@-1 {{add missing case: '.z1(let a)'}}
+                      // expected-note@-1 {{add missing case: '.z1(a: let a)'}}
   case .z2(_, _): ()
   case .z3(_): ()
   }
 
   switch Z.z1(a: 1) { // expected-error {{switch must be exhaustive}}
-                      // expected-note@-1 {{add missing case: '.z2(let a, let b)'}}
+                      // expected-note@-1 {{add missing case: '.z2(a: let a, b: let b)'}}
   case .z1(_): ()
   case .z3(_): ()
   }

@@ -18,6 +18,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 
@@ -69,6 +70,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
 
     std::tie(body, isTypeChecked) = (afd->Synthesizer.Fn)(
         afd, afd->Synthesizer.Context);
+    assert(body && "cannot synthesize a null body");
     afd->setBodyKind(isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
     return body;
   }

@@ -61,7 +61,7 @@ OverloadCandidate::OverloadCandidate(ValueDecl *decl, bool skipCurriedSelf)
     : declOrExpr(decl), skipCurriedSelf(skipCurriedSelf), substituted(false) {
 
   if (auto *PD = dyn_cast<ParamDecl>(decl)) {
-    if (PD->hasValidSignature())
+    if (PD->hasInterfaceType())
       entityType = PD->getType();
     else
       entityType = PD->getASTContext().TheUnresolvedType;
@@ -284,8 +284,9 @@ CalleeCandidateInfo::ClosenessResultTy CalleeCandidateInfo::evaluateCloseness(
     void extraArgument(unsigned argIdx) override {
       result = CC_ArgumentCountMismatch;
     }
-    void missingArgument(unsigned paramIdx) override {
+    Optional<unsigned> missingArgument(unsigned paramIdx) override {
       result = CC_ArgumentCountMismatch;
+      return None;
     }
     bool missingLabel(unsigned paramIdx) override {
       result = CC_ArgumentLabelMismatch;
@@ -593,9 +594,7 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn,
       auto ctors = TypeChecker::lookupConstructors(
           CS.DC, instanceType, NameLookupFlags::IgnoreAccessControl);
       for (auto ctor : ctors) {
-        if (!ctor.getValueDecl()->hasInterfaceType())
-          CS.getTypeChecker().validateDeclForNameLookup(ctor.getValueDecl());
-        if (ctor.getValueDecl()->hasInterfaceType())
+        if (ctor.getValueDecl()->getInterfaceType())
           candidates.push_back({ ctor.getValueDecl(), 1 });
       }
     }

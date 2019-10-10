@@ -4,7 +4,7 @@
 // Run the (mandatory) passes on which constant evaluator depends, and test the
 // constant evaluator on the SIL produced after the dependent passes are run.
 //
-// RUN: not %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > /dev/null 2> %t/error-output
+// RUN: not %target-sil-opt -silgen-cleanup -raw-sil-inst-lowering -allocbox-to-stack -mandatory-inlining -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_silgen.sil > %t/constant_evaluable_subset_test.sil 2> %t/error-output
 //
 // RUN: %FileCheck %s < %t/error-output
 //
@@ -192,8 +192,8 @@ internal func interpretIntTruncations() -> Int8 {
 @_semantics("constant_evaluable")
 internal func testInvalidIntTruncations(a: Int32) -> Int8 {
   return Int8(a)
-    // CHECK: note: assertion failed with message: Fatal error: Not enough bits to represent the passed value: {{.*}}/Integers.swift:
-    // CHECK: note: assertion failed during this call
+    // CHECK: note: {{.*}}: Not enough bits to represent the passed value
+    // CHECK: note: operation performed during this call traps
     // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
 }
 
@@ -238,8 +238,8 @@ internal func interpretSingedUnsignedConversions() -> UInt32 {
 @_semantics("constant_evaluable")
 internal func testInvalidSingedUnsignedConversions(a: Int64) -> UInt64 {
   return UInt64(a)
-    // CHECK: note: assertion failed with message: Fatal error: Negative value is not representable: {{.*}}/Integers.swift:
-    // CHECK: note: assertion failed during this call
+    // CHECK: note: {{.*}}: Negative value is not representable
+    // CHECK: note: operation performed during this call traps
     // CHECK: function_ref @$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
 }
 
@@ -341,8 +341,8 @@ func interpretIntAddOverflow() -> Int8 {
 @_semantics("constant_evaluable")
 func testDivideByZero(_ x: Int, _ y: Int) -> Int {
   return x / y
-    // CHECK: note: assertion failed with message: Fatal error: Division by zero: {{.*}}/IntegerTypes.swift:
-    // CHECK: note: assertion failed here
+    // CHECK: note: {{.*}}: Division by zero
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
@@ -350,18 +350,45 @@ func interpretDivideByZero() -> Int {
   return testDivideByZero(127, 0)
 }
 
+// CHECK-LABEL: @testDividingFullWidthByZero
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testDividingFullWidthByZero(_ x: Int, _ y: Int, _ z: UInt) -> Int {
+  return x.dividingFullWidth((y, z)).1
+} // CHECK: note: {{.*}}: Division by zero
+  // CHECK: note: operation performed during this call traps
+
+@_semantics("test_driver")
+func interpretDividingFullWidthByZero() -> Int {
+  return testDividingFullWidthByZero(0, 1, 1)
+}
+
 // CHECK-LABEL: @testDivideOverflow
 // CHECK: error: not constant evaluable
 @_semantics("constant_evaluable")
 func testDivideOverflow(_ x: Int8, _ y: Int8) -> Int8 {
   return x / y
-    // CHECK: note: assertion failed with message: Fatal error: Division results in an overflow: {{.*}}/IntegerTypes.swift:
-    // CHECK: note: assertion failed here
+    // CHECK: note: {{.*}}: Division results in an overflow
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
 func interpretDivideOverflow() -> Int8 {
   return testDivideOverflow(-128, -1)
+}
+
+// CHECK-LABEL: @testDistance
+// CHECK: error: not constant evaluable
+@_semantics("constant_evaluable")
+func testDistance(_ x: UInt, _ y: UInt) -> Int {
+  return x.distance(to: y)
+    // CHECK: note: {{.*}}: Distance is not representable in Int
+    // CHECK: note: operation performed during this call traps
+}
+
+@_semantics("test_driver")
+func interpretDistanceTest() -> Int {
+  return testDistance(0, UInt.max)
 }
 
 // CHECK-LABEL: @testInOut
@@ -692,4 +719,68 @@ func testIndirectEnum(_ nat: Nat) -> Bool {
 @_semantics("test_driver")
 func interpretIndirectEnum() -> Bool {
   return testIndirectEnum(.succ(.zero))
+}
+
+// CHECK-LABEL: @testEmptyArrayInit
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testEmptyArrayInit() -> [Int] {
+  return Array<Int>()
+}
+
+@_semantics("test_driver")
+func interpretEmptyArrayInit() -> [Int] {
+  return testEmptyArrayInit()
+}
+
+// CHECK-LABEL: @testEmptyArrayLiteral
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testEmptyArrayLiteral() -> [Int] {
+  return []
+}
+
+@_semantics("test_driver")
+func interpretEmptyArrayLiteral() -> [Int] {
+  return testEmptyArrayLiteral()
+}
+
+// CHECK-LABEL: @testArrayLiteral
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayLiteral(_ x: Int, _ y: Int) -> [Int] {
+  return [x, y, 4]
+}
+
+@_semantics("test_driver")
+func interpretArrayLiteral() -> [Int] {
+  return testArrayLiteral(2, 3)
+}
+
+// CHECK-LABEL: @testArrayAppend
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayAppend(_ x: Int) -> [Int] {
+  var a: [Int] = []
+  a.append(x)
+  return a
+}
+
+@_semantics("test_driver")
+func interpretArrayAppend() -> [Int] {
+  return testArrayAppend(25)
+}
+
+// CHECK-LABEL: @testArrayAppendNonEmpty
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testArrayAppendNonEmpty(_ x: String) -> [String] {
+  var a: [String] = ["ls", "cat", "echo", "cd"]
+  a.append(x)
+  return a
+}
+
+@_semantics("test_driver")
+func interpretArrayAppendNonEmpty() -> [String] {
+  return testArrayAppendNonEmpty("mkdir")
 }

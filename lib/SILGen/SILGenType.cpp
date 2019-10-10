@@ -25,6 +25,8 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -151,7 +153,8 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass,
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
       cast<AbstractFunctionDecl>(derivedDecl)->getGenericEnvironment(), loc,
-      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic);
+      IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+      ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
 
   PrettyStackTraceSILFunction trace("generating vtable thunk", thunk);
@@ -1033,6 +1036,14 @@ public:
       emitTypeMemberGlobalVariable(SGM, vd);
       visitAccessors(vd);
       return;
+    }
+
+    // If this variable has an attached property wrapper with an initialization
+    // function, emit the backing initializer function.
+    if (auto wrapperInfo = vd->getPropertyWrapperBackingPropertyInfo()) {
+      if (wrapperInfo.initializeFromOriginal && !vd->isStatic()) {
+        SGM.emitPropertyWrapperBackingInitializer(vd);
+      }
     }
 
     visitAbstractStorageDecl(vd);

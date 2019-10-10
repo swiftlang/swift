@@ -29,6 +29,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/RawComment.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Dwarf.h"
@@ -438,7 +439,7 @@ static ASTContext &getContext(ModuleOrSourceFile DC) {
 
 static bool shouldSerializeAsLocalContext(const DeclContext *DC) {
   return DC->isLocalContext() && !isa<AbstractFunctionDecl>(DC) &&
-        !isa<SubscriptDecl>(DC);
+        !isa<SubscriptDecl>(DC) && !isa<EnumElementDecl>(DC);
 }
 
 namespace {
@@ -528,7 +529,7 @@ LocalDeclContextID Serializer::addLocalDeclContextRef(const DeclContext *DC) {
 }
 
 GenericSignatureID
-Serializer::addGenericSignatureRef(const GenericSignature *sig) {
+Serializer::addGenericSignatureRef(GenericSignature sig) {
   if (!sig)
     return 0;
   return GenericSignaturesToSerialize.addRef(sig);
@@ -1169,7 +1170,7 @@ void Serializer::writeGenericRequirements(ArrayRef<Requirement> requirements,
   }
 }
 
-void Serializer::writeASTBlockEntity(const GenericSignature *sig) {
+void Serializer::writeASTBlockEntity(GenericSignature sig) {
   using namespace decls_block;
 
   assert(sig);
@@ -2797,7 +2798,7 @@ public:
 
     auto contextID = S.addDeclContextRef(typeAlias->getDeclContext());
 
-    auto underlying = typeAlias->getUnderlyingTypeLoc().getType();
+    auto underlying = typeAlias->getUnderlyingType();
 
     llvm::SmallSetVector<Type, 4> dependencies;
     collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
@@ -3261,10 +3262,10 @@ public:
     //
     // FIXME: Once accessor synthesis and getInterfaceType() itself are
     // request-ified this goes away.
-    if (!fn->hasValidSignature()) {
+    if (!fn->hasInterfaceType()) {
       assert(fn->isImplicit());
-      S.M->getASTContext().getLazyResolver()->resolveDeclSignature(
-          const_cast<AccessorDecl *>(fn));
+      // FIXME: Remove this one
+      (void)fn->getInterfaceType();
     }
 
     using namespace decls_block;
@@ -3341,7 +3342,7 @@ public:
     if (elem->getParentEnum()->isObjC()) {
       // Currently ObjC enums always have integer raw values.
       rawValueKind = EnumElementRawValueKind::IntegerLiteral;
-      auto ILE = cast<IntegerLiteralExpr>(elem->getRawValueExpr());
+      auto ILE = cast<IntegerLiteralExpr>(elem->getStructuralRawValueExpr());
       RawValueText = ILE->getDigitsText();
       isNegative = ILE->isNegative();
       isRawValueImplicit = ILE->isImplicit();
@@ -3717,7 +3718,7 @@ public:
   void visitTypeAliasType(const TypeAliasType *alias) {
     using namespace decls_block;
     const TypeAliasDecl *typeAlias = alias->getDecl();
-    auto underlyingType = typeAlias->getUnderlyingTypeLoc().getType();
+    auto underlyingType = typeAlias->getUnderlyingType();
 
     unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasTypeLayout::Code];
     TypeAliasTypeLayout::emitRecord(
@@ -3895,7 +3896,7 @@ public:
     using namespace decls_block;
     assert(!fnTy->isNoEscape());
 
-    auto *genericSig = fnTy->getGenericSignature();
+    auto genericSig = fnTy->getGenericSignature();
     unsigned abbrCode = S.DeclTypeAbbrCodes[GenericFunctionTypeLayout::Code];
     GenericFunctionTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
         S.addTypeRef(fnTy->getResult()),
@@ -4601,8 +4602,15 @@ void Serializer::writeAST(ModuleOrSourceFile DC,
     nextFile->getOpaqueReturnTypeDecls(opaqueReturnTypeDecls);
 
     for (auto TD : localTypeDecls) {
+
+      // FIXME: We should delay parsing function bodies so these type decls
+      //        don't even get added to the file.
+      if (TD->getDeclContext()->getInnermostSkippedFunctionContext())
+        continue;
+
       hasLocalTypes = true;
       Mangle::ASTMangler Mangler;
+
       std::string MangledName =
           evaluateOrDefault(M->getASTContext().evaluator,
                             MangleLocalTypeDeclRequest { TD },
@@ -4737,6 +4745,7 @@ void swift::serializeToBuffers(
   ModuleOrSourceFile DC, const SerializationOptions &options,
   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
   const SILModule *M) {
 
   assert(!StringRef::withNullAsEmpty(options.OutputPath).empty());
@@ -4773,6 +4782,22 @@ void swift::serializeToBuffers(
       *moduleDocBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
                            std::move(buf), options.DocOutputPath);
   }
+
+  if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
+    SharedTimer timer("Serialization, swiftsourceinfo, to buffer");
+    llvm::SmallString<1024> buf;
+    llvm::raw_svector_ostream stream(buf);
+    writeSourceInfoToStream(stream, DC);
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.SourceInfoOutputPath,
+                         [&](raw_ostream &out) {
+      out << stream.str();
+      return false;
+    });
+    if (moduleSourceInfoBuffer)
+      *moduleSourceInfoBuffer = llvm::make_unique<llvm::SmallVectorMemoryBuffer>(
+        std::move(buf), options.SourceInfoOutputPath);
+  }
 }
 
 void swift::serialize(ModuleOrSourceFile DC,
@@ -4803,6 +4828,16 @@ void swift::serialize(ModuleOrSourceFile DC,
                          [&](raw_ostream &out) {
       SharedTimer timer("Serialization, swiftdoc");
       writeDocToStream(out, DC, options.GroupInfoPath);
+      return false;
+    });
+  }
+
+  if (!StringRef::withNullAsEmpty(options.SourceInfoOutputPath).empty()) {
+    (void)withOutputFile(getContext(DC).Diags,
+                         options.SourceInfoOutputPath,
+                         [&](raw_ostream &out) {
+      SharedTimer timer("Serialization, swiftsourceinfo");
+      writeSourceInfoToStream(out, DC);
       return false;
     });
   }

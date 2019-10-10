@@ -180,14 +180,17 @@ private:
   ArrayRef<ParsedRawSyntaxNode> getParts() const {
     return llvm::makeArrayRef(getStorage()).drop_front(Offset);
   }
+  MutableArrayRef<ParsedRawSyntaxNode> getParts() {
+    return llvm::makeMutableArrayRef(getStorage().data(), getStorage().size()).drop_front(Offset);
+  }
 
   ParsedRawSyntaxNode makeUnknownSyntax(SyntaxKind Kind,
-                                  ArrayRef<ParsedRawSyntaxNode> Parts);
+                                  MutableArrayRef<ParsedRawSyntaxNode> Parts);
   ParsedRawSyntaxNode createSyntaxAs(SyntaxKind Kind,
-                                     ArrayRef<ParsedRawSyntaxNode> Parts,
+                                     MutableArrayRef<ParsedRawSyntaxNode> Parts,
                                      SyntaxNodeCreationKind nodeCreateK);
   Optional<ParsedRawSyntaxNode> bridgeAs(SyntaxContextKind Kind,
-                              ArrayRef<ParsedRawSyntaxNode> Parts);
+                              MutableArrayRef<ParsedRawSyntaxNode> Parts);
 
   ParsedRawSyntaxNode finalizeSourceFile();
 
@@ -276,27 +279,17 @@ public:
   }
 
   /// Returns the topmost Syntax node.
-  template <typename SyntaxNode> SyntaxNode topNode() {
-    ParsedRawSyntaxNode TopNode = getStorage().back();
+  template <typename SyntaxNode> SyntaxNode topNode();
 
-    if (TopNode.isRecorded()) {
-      OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-      return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
-    }
-    
-    return getSyntaxCreator().createNode<SyntaxNode>(TopNode);
-  }
-
-  template <typename SyntaxNode>
-  llvm::Optional<SyntaxNode> popIf() {
+  template <typename SyntaxNode> llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
     if (Storage.size() <= Offset)
       return llvm::None;
-    auto rawNode = Storage.back();
-    if (!SyntaxNode::kindof(rawNode.getKind()))
+    if (!SyntaxNode::kindof(Storage.back().getKind()))
       return llvm::None;
+    auto rawNode = std::move(Storage.back());
     Storage.pop_back();
-    return SyntaxNode(rawNode);
+    return SyntaxNode(std::move(rawNode));
   }
 
   ParsedTokenSyntax popToken();
@@ -374,6 +367,25 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
                             "Only meant for use in the debugger");
 };
+
+template <typename SyntaxNode>
+inline SyntaxNode SyntaxParsingContext::topNode() {
+  ParsedRawSyntaxNode &TopNode = getStorage().back();
+  if (TopNode.isRecorded()) {
+    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
+    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
+  }
+  return getSyntaxCreator().createNode<SyntaxNode>(TopNode.copyDeferred());
+}
+
+template <> inline TokenSyntax SyntaxParsingContext::topNode<TokenSyntax>() {
+  ParsedRawSyntaxNode &TopNode = getStorage().back();
+  if (TopNode.isRecorded()) {
+    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
+    return getSyntaxCreator().getLibSyntaxNodeFor<TokenSyntax>(OpaqueNode);
+  }
+  return getSyntaxCreator().createToken(TopNode.copyDeferred());
+}
 
 } // namespace swift
 #endif // SWIFT_SYNTAX_PARSING_CONTEXT_H

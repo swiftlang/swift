@@ -45,12 +45,11 @@ enum NonconformingMemberKind {
 static SmallVector<ParamDecl *, 3>
 associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(elt);
-
+    // FIXME: Remove this once getInterfaceType() on a ParamDecl works.
+    (void) elt->getInterfaceType();
+    
     auto PL = elt->getParameterList();
     if (!PL)
       continue;
@@ -85,19 +84,15 @@ static bool allAssociatedValuesConformToProtocol(DeclContext *DC,
 static SmallVector<VarDecl *, 3>
 storedPropertiesNotConformingToProtocol(DeclContext *DC, StructDecl *theStruct,
                                         ProtocolDecl *protocol) {
-  auto lazyResolver = DC->getASTContext().getLazyResolver();
   auto storedProperties = theStruct->getStoredProperties();
   SmallVector<VarDecl *, 3> nonconformingProperties;
   for (auto propertyDecl : storedProperties) {
     if (!propertyDecl->isUserAccessible())
       continue;
 
-    if (!propertyDecl->hasInterfaceType())
-      lazyResolver->resolveDeclSignature(propertyDecl);
-    if (!propertyDecl->hasInterfaceType())
-      nonconformingProperties.push_back(propertyDecl);
-
     auto type = propertyDecl->getValueInterfaceType();
+    if (!type)
+      nonconformingProperties.push_back(propertyDecl);
 
     if (!TypeChecker::conformsToProtocol(DC->mapTypeIntoContext(type), protocol,
                                          DC, None)) {
@@ -776,7 +771,6 @@ deriveEquatable_eq(
   eqDecl->computeType();
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  eqDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(eqDecl);
 
@@ -901,7 +895,6 @@ deriveHashable_hashInto(
   hashDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
-  hashDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(hashDecl);
 
@@ -1169,9 +1162,6 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
   // _hashValue(for:)
   auto *hashFunc = C.getHashValueForDecl();
-  if (!hashFunc->hasInterfaceType())
-    static_cast<TypeChecker *>(C.getLazyResolver())->validateDecl(hashFunc);
-
   auto substitutions = SubstitutionMap::get(
       hashFunc->getGenericSignature(),
       [&](SubstitutableType *dependentType) {
@@ -1255,14 +1245,12 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
-  getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setValidationToChecked();
   hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,

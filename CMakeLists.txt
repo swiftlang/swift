@@ -125,7 +125,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.1")
+set(SWIFT_VERSION "5.1.1")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")
@@ -996,6 +996,7 @@ if(SWIFT_NEED_EXPLICIT_LIBDISPATCH)
                         -DCMAKE_CXX_COMPILER=${SWIFT_LIBDISPATCH_CXX_COMPILER}
                         -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
                         -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+                        -DCMAKE_INSTALL_LIBDIR=lib
                         -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
                         -DCMAKE_LINKER=${CMAKE_LINKER}
                         -DCMAKE_RANLIB=${CMAKE_RANLIB}

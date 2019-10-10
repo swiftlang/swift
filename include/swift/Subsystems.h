@@ -187,6 +187,11 @@ namespace swift {
     /// If set, dumps wall time taken to type check each expression to
     /// llvm::errs().
     DebugTimeExpressions = 1 << 3,
+
+    /// If set, the typechecker will skip typechecking non-inlinable function
+    /// bodies. Set this if you're trying to quickly emit a module or module
+    /// interface without a full compilation.
+    SkipNonInlinableFunctionBodies = 1 << 4,
   };
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve
@@ -282,6 +287,7 @@ namespace swift {
                           const SerializationOptions &opts,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                           std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
+                          std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
                           const SILModule *M = nullptr);
 
   /// Get the CPU, subtarget feature options, and triple to use when emitting code.

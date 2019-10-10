@@ -799,14 +799,14 @@ func testOptionalTypeParsing(_ a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}} expected-note {{expected an argument list of type '(Int, Int)'}}
-
+  if x & 4.0 {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
   if (x & 4.0) {}   // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
-
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
   if !(x & 4.0) {}  // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
   // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'Bool'}}
-  
-  if x & x {} // expected-error {{'Int' is not convertible to 'Bool'}}
+
+  if x & x {} // expected-error {{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization
@@ -858,10 +858,10 @@ _ = _.foo // expected-error {{type of expression is ambiguous without more conte
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
-    func f(_ x: Int, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
+    func f(_ x: Bool, _ y: Int, _ z: String = "") {} // expected-note 2 {{'f' declared here}}
     func g<T>(_ x: T, _ y: T, _ z: String = "") {} // expected-note 2 {{'g' declared here}}
 
-    f(1) // expected-error{{missing argument for parameter #2 in call}}
+    f(false) // expected-error{{missing argument for parameter #2 in call}}
     g(1) // expected-error{{missing argument for parameter #2 in call}}
     func h() -> Int { return 1 }
     f(h() == 1) // expected-error{{missing argument for parameter #2 in call}}

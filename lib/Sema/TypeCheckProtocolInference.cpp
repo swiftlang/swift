@@ -188,15 +188,12 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // Invalid case.
     if (extendedNominal == nullptr)
       return true;
-
+    
     // Assume unconstrained concrete extensions we found witnesses in are
     // always viable.
     if (!isa<ProtocolDecl>(extendedNominal))
       return !extension->isConstrainedExtension();
-
-    // Build a generic signature.
-    tc.validateExtension(extension);
-
+    
     // FIXME: The extension may not have a generic signature set up yet as
     // resolving signatures may trigger associated type inference.  This cycle
     // is now detectable and we should look into untangling it
@@ -204,6 +201,9 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     if (!extension->hasComputedGenericSignature())
       return true;
 
+    // Build a generic signature.
+    auto extensionSig = extension->getGenericSignature();
+    
     // The condition here is a bit more fickle than
     // `isExtensionApplied`. That check would prematurely reject
     // extensions like `P where AssocType == T` if we're relying on a
@@ -212,8 +212,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     // because those have to be explicitly declared on the type somewhere
     // so won't be affected by whatever answer inference comes up with.
     auto selfTy = extension->getSelfInterfaceType();
-    for (const Requirement &reqt
-         : extension->getGenericSignature()->getRequirements()) {
+    for (const Requirement &reqt : extensionSig->getRequirements()) {
       switch (reqt.getKind()) {
       case RequirementKind::Conformance:
       case RequirementKind::Superclass:
@@ -448,8 +447,7 @@ AssociatedTypeInference::inferTypeWitnessesViaValueWitnesses(
     }
 
     // Validate the requirement.
-    tc.validateDecl(req);
-    if (req->isInvalid() || !req->hasValidSignature())
+    if (!req->getInterfaceType() || req->isInvalid())
       continue;
 
     // Check whether any of the associated types we care about are
@@ -494,10 +492,13 @@ static Type mapErrorTypeToOriginal(Type type) {
 static Type getWitnessTypeForMatching(TypeChecker &tc,
                                       NormalProtocolConformance *conformance,
                                       ValueDecl *witness) {
-  if (!witness->hasInterfaceType())
-    tc.validateDecl(witness);
+  if (witness->isRecursiveValidation())
+    return Type();
 
-  if (witness->isInvalid() || !witness->hasValidSignature())
+  // FIXME: This is here to trigger the isInvalid() computation.
+  (void) witness->getInterfaceType();
+
+  if (witness->isInvalid())
     return Type();
 
   if (!witness->getDeclContext()->isTypeContext()) {
@@ -766,7 +767,6 @@ AssociatedTypeDecl *AssociatedTypeInference::findDefaultedAssociatedType(
                                              TypeChecker &tc,
                                              AssociatedTypeDecl *assocType) {
   // If this associated type has a default, we're done.
-  tc.validateDecl(assocType);
   if (assocType->hasDefaultDefinitionType())
     return assocType;
 
@@ -929,7 +929,7 @@ AssociatedTypeInference::computeAbstractTypeWitness(
   }
 
   // If there is a generic parameter of the named type, use that.
-  if (auto *genericSig = dc->getGenericSignatureOfContext()) {
+  if (auto genericSig = dc->getGenericSignatureOfContext()) {
     for (auto gp : genericSig->getInnermostGenericParams()) {
       if (gp->getName() == assocType->getName())
         return dc->mapTypeIntoContext(gp);
@@ -1075,6 +1075,11 @@ AssociatedTypeInference::getSubstOptionsWithCurrentTypeWitnesses() {
       }
 
       Type type = self->typeWitnesses.begin(assocType)->first;
+
+      // FIXME: Get rid of this hack.
+      if (auto *aliasTy = dyn_cast<TypeAliasType>(type.getPointer()))
+        type = aliasTy->getSinglyDesugaredType();
+
       return type->mapTypeOutOfContext().getPointer();
     };
   return options;
@@ -2032,10 +2037,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   SWIFT_DEFER { ResolvingWitnesses.erase(requirement); };
 
   // Make sure we've validated the requirement.
-  if (!requirement->hasInterfaceType())
-    TC.validateDecl(requirement);
-
-  if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+  if (!requirement->getInterfaceType() || requirement->isInvalid()) {
     Conformance->setInvalid();
     return;
   }

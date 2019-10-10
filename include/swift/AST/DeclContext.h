@@ -357,7 +357,7 @@ public:
 
   /// Retrieve the innermost generic signature of this context or any
   /// of its parents.
-  GenericSignature *getGenericSignatureOfContext() const;
+  GenericSignature getGenericSignatureOfContext() const;
 
   /// Retrieve the innermost archetypes of this context or any
   /// of its parents.
@@ -407,6 +407,15 @@ public:
   const Decl *getInnermostDeclarationDeclContext() const {
     return
         const_cast<DeclContext *>(this)->getInnermostDeclarationDeclContext();
+  }
+
+  /// Returns the innermost context that is an AbstractFunctionDecl whose
+  /// body has been skipped.
+  LLVM_READONLY
+  DeclContext *getInnermostSkippedFunctionContext();
+  const DeclContext *getInnermostSkippedFunctionContext() const {
+    return
+        const_cast<DeclContext *>(this)->getInnermostSkippedFunctionContext();
   }
 
   /// Returns the semantic parent of this context.  A context has a
@@ -460,6 +469,10 @@ public:
   /// Returns true if this context may possibly contain members visible to
   /// AnyObject dynamic lookup.
   bool mayContainMembersAccessedByDynamicLookup() const;
+
+  /// Extensions are only allowed at the level in a file
+  /// FIXME: do this for Protocols, too someday
+  bool canBeParentOfExtension() const;
 
   /// Returns true if lookups within this context could affect downstream files.
   ///
@@ -654,7 +667,7 @@ public:
 
 /// The range of declarations stored within an iterable declaration
 /// context.
-typedef IteratorRange<DeclIterator> DeclRange;
+using DeclRange = iterator_range<DeclIterator>;
 
 /// The kind of an \c IterableDeclContext.
 enum class IterableDeclContextKind : uint8_t {  

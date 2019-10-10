@@ -136,8 +136,6 @@ static CanType getKnownType(Optional<CanType> &cacheSlot, ASTContext &C,
       if (!typeDecl)
         return CanType();
 
-      assert(typeDecl->hasInterfaceType() &&
-             "bridged type must be type-checked");
       return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
     })();
   }
@@ -715,7 +713,7 @@ static std::pair<AbstractionPattern, CanType> updateResultTypeForForeignError(
 /// If we ever add that ability, it will be a different capture list
 /// from the function to which the argument is attached.
 static void
-lowerCaptureContextParameters(TypeConverter &TC, AnyFunctionRef function,
+lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
                               CanGenericSignature genericSig,
                               ResilienceExpansion expansion,
                               SmallVectorImpl<SILParameterInfo> &inputs) {
@@ -725,8 +723,7 @@ lowerCaptureContextParameters(TypeConverter &TC, AnyFunctionRef function,
   // canonicalize references to the generic parameters that may appear in
   // non-canonical types in that context. We need the original generic
   // signature from the AST for that.
-  auto origGenericSig = function.getGenericSignature();
-
+  auto origGenericSig = function.getAnyFunctionRef()->getGenericSignature();
   auto loweredCaptures = TC.getLoweredLocalCaptures(function);
 
   for (auto capture : loweredCaptures.getCaptures()) {
@@ -999,18 +996,12 @@ static CanSILFunctionType getSILFunctionType(
                                 yields, coroutineKind);
   
   // Lower the capture context parameters, if any.
-  //
-  // *NOTE* Currently default arg generators can not capture anything.
-  // If we ever add that ability, it will be a different capture list
-  // from the function to which the argument is attached.
-  if (constant && !constant->isDefaultArgGenerator()) {
-    if (auto function = constant->getAnyFunctionRef()) {
-      auto expansion = ResilienceExpansion::Maximal;
-      if (constant->isSerialized())
-        expansion = ResilienceExpansion::Minimal;
-      lowerCaptureContextParameters(TC, *function, genericSig, expansion,
-                                    inputs);
-    }
+  if (constant && constant->getAnyFunctionRef()) {
+    auto expansion = ResilienceExpansion::Maximal;
+    if (constant->isSerialized())
+      expansion = ResilienceExpansion::Minimal;
+    lowerCaptureContextParameters(TC, *constant, genericSig, expansion,
+                                  inputs);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -1295,6 +1286,7 @@ static CanSILFunctionType getNativeSILFunctionType(
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
+    case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     case SILDeclRef::Kind::IVarInitializer:
     case SILDeclRef::Kind::IVarDestroyer: {
       auto conv = DefaultConventions(NormalParameterConvention::Guaranteed);
@@ -1822,6 +1814,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
     llvm_unreachable("Unexpected Kind of foreign SILDeclRef");
   }
 
@@ -2052,6 +2045,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
     case SILDeclRef::Kind::GlobalAccessor:
     case SILDeclRef::Kind::DefaultArgGenerator:
     case SILDeclRef::Kind::StoredPropertyInitializer:
+    case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
       return SILFunctionTypeRepresentation::Thin;
 
     case SILDeclRef::Kind::Func:
@@ -2601,6 +2595,7 @@ static AbstractFunctionDecl *getBridgedFunction(SILDeclRef declRef) {
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::DefaultArgGenerator:
   case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
     return nullptr;

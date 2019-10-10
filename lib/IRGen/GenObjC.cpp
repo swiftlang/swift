@@ -184,7 +184,8 @@ llvm::Value *irgen::emitObjCAutoreleaseReturnValue(IRGenFunction &IGF,
 }
 
 namespace {
-  /// A type-info implementation suitable for Builtin.UnknownObject.
+  /// A type-info implementation suitable for AnyObject on platforms with ObjC
+  /// interop.
   class UnknownTypeInfo : public HeapTypeInfo<UnknownTypeInfo> {
   public:
     UnknownTypeInfo(llvm::PointerType *storageType, Size size,
@@ -192,7 +193,7 @@ namespace {
       : HeapTypeInfo(storageType, size, spareBits, align) {
     }
 
-    /// Builtin.UnknownObject requires ObjC reference-counting.
+    /// AnyObject requires ObjC reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Unknown;
     }
@@ -363,6 +364,11 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
                                                "coalesced,no_dead_strip"));
 
+  // Mark used to prevent DCE of public unreferenced protocols to ensure
+  // that they are available for external use when a used module is used
+  // as a library.
+  addUsedGlobal(protocolLabel);
+
   // Introduce a variable to reference the protocol.
   auto *protocolRef =
       new llvm::GlobalVariable(Module, Int8PtrTy, /*constant*/ false,
@@ -373,6 +379,11 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
                                              "coalesced,no_dead_strip"));
+
+  // Mark used to prevent DCE of public unreferenced protocols to ensure
+  // that they are available for external use when a used module is used
+  // as a library.
+  addUsedGlobal(protocolRef);
 
   ObjCProtocolPair pair{protocolRecord, protocolRef};
   ObjCProtocols.insert({proto, pair});
@@ -458,6 +469,7 @@ namespace {
       case SILDeclRef::Kind::StoredPropertyInitializer:
       case SILDeclRef::Kind::EnumElement:
       case SILDeclRef::Kind::GlobalAccessor:
+      case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
         llvm_unreachable("Method does not have a selector");
 
       case SILDeclRef::Kind::Destroyer:

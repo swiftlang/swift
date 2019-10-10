@@ -9,8 +9,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c -primary-file {{.*}}/file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-01-[[MODULE01:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-01-[[SWIFTDOC01:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-01-[[OBJ01:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -43,6 +43,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}file-01-[[SWIFTDOC01]].swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}file-01-[[MODULE01]].swiftsourceinfo"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
@@ -54,8 +58,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} -primary-file {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-02-[[SWIFTDOC02:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-02-[[OBJ02:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} -primary-file {{.*}}file-02.swift{{(\\")?}} {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-02-[[MODULE02:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-02-[[SWIFTDOC02:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-02-[[OBJ02:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -88,6 +92,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}file-02-[[SWIFTDOC02]].swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}file-02-[[MODULE02]].swiftsourceinfo"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
@@ -99,8 +107,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*}}swift{{c?(\.EXE)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} -primary-file {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-03-[[SWIFTDOC03:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-03-[[OBJ03:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
+// CHECK-NEXT:   "command": "{{.*}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*}}file-01.swift{{(\\")?}} {{.*}}file-02.swift{{(\\")?}} -primary-file {{.*}}file-03.swift{{(\\")?}} {{.*}}main.swift{{(\\")?}} -emit-module-path {{.*}}file-03-[[MODULE03:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*}}file-03-[[SWIFTDOC03:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*}}file-03-[[OBJ03:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -133,6 +141,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}file-03-[[SWIFTDOC03]].swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}file-03-[[MODULE03]].swiftsourceinfo"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
@@ -144,8 +156,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "compile",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -c {{.*[\\/]}}file-01.swift{{(\\")?}} {{.*[\\/]}}file-02.swift{{(\\")?}} {{.*[\\/]}}file-03.swift{{(\\")?}} -primary-file {{.*[\\/]}}main.swift{{(\\")?}} -emit-module-path {{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*[\\/]}}main-[[SWIFTDOCMAIN:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o{{(\\")?}}",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -c {{.*[\\/]}}file-01.swift{{(\\")?}} {{.*[\\/]}}file-02.swift{{(\\")?}} {{.*[\\/]}}file-03.swift{{(\\")?}} -primary-file {{.*[\\/]}}main.swift{{(\\")?}} -emit-module-path {{.*[\\/]}}main-[[MODULEMAIN:[a-z0-9]+]].swiftmodule{{(\\")?}} -emit-module-doc-path {{.*[\\/]}}main-[[SWIFTDOCMAIN:[a-z0-9]+]].swiftdoc{{(\\")?}} {{.*}} -module-name main -o {{.*[\\/]}}main-[[OBJMAIN:[a-z0-9]+]].o{{(\\")?}}",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-c",
@@ -178,6 +190,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "{{.*[\\/]}}main-[[SWIFTDOCMAIN]].swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "{{.*[\\/]}}main-[[MODULEMAIN]].swiftsourceinfo"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "pid": -{{[1-9][0-9]*}},
@@ -233,8 +249,8 @@
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "began",
 // CHECK-NEXT:   "name": "merge-module",
-// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.EXE)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}file-01-[[MODULE01]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-02-[[MODULE02]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-03-[[MODULE03]].swiftmodule{{(\\")?}} {{.*[\\/]}}main-[[MODULEMAIN]].swiftmodule{{(\\")?}} {{.*}} -emit-module-doc-path main.swiftdoc -module-name main -o main.swiftmodule",
-// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.EXE)?}}",
+// CHECK-NEXT:   "command": "{{.*[\\/]}}swift{{c?(\.exe)?(\\")?}} -frontend -merge-modules -emit-module {{.*[\\/]}}file-01-[[MODULE01]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-02-[[MODULE02]].swiftmodule{{(\\")?}} {{.*[\\/]}}file-03-[[MODULE03]].swiftmodule{{(\\")?}} {{.*[\\/]}}main-[[MODULEMAIN]].swiftmodule{{(\\")?}} {{.*}} -emit-module-doc-path main.swiftdoc -emit-module-source-info-path main.swiftsourceinfo -module-name main -o main.swiftmodule",
+// CHECK-NEXT:   "command_executable": "{{.*[\\/]}}swift{{c?(\.exe)?}}",
 // CHECK-NEXT:   "command_arguments": [
 // CHECK-NEXT:     "-frontend",
 // CHECK-NEXT:     "-merge-modules",
@@ -245,6 +261,8 @@
 // CHECK-NEXT:     "{{.*[\\/]}}main-[[MODULEMAIN]].swiftmodule",
 // CHECK:          "-emit-module-doc-path",
 // CHECK-NEXT:     "main.swiftdoc",
+// CHECK:          "-emit-module-source-info-path",
+// CHECK-NEXT:     "main.swiftsourceinfo",
 // CHECK-NEXT:     "-module-name",
 // CHECK-NEXT:     "main",
 // CHECK-NEXT:     "-o",
@@ -264,6 +282,10 @@
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "type": "swiftdoc",
 // CHECK-NEXT:       "path": "main.swiftdoc"
+// CHECK-NEXT:     },
+// CHECK-NEXT:     {
+// CHECK-NEXT:       "type": "swiftsourceinfo",
+// CHECK-NEXT:       "path": "main.swiftsourceinfo"
 // CHECK-NEXT:     }
 // CHECK-NEXT:   ],
 // CHECK-NEXT:   "pid": {{[1-9][0-9]*}},

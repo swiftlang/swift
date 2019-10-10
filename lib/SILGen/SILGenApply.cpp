@@ -1111,7 +1111,7 @@ public:
       .asForeign(!isConstructorWithGeneratedAllocatorThunk(e->getDecl())
                  && requiresForeignEntryPoint(e->getDecl()));
 
-    auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(afd);
+    auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     if (afd->getDeclContext()->isLocalContext() &&
         !captureInfo.hasGenericParamCaptures())
       subs = SubstitutionMap();
@@ -1142,7 +1142,8 @@ public:
     // If the decl ref requires captures, emit the capture params.
     if (!captureInfo.getCaptures().empty()) {
       SmallVector<ManagedValue, 4> captures;
-      SGF.emitCaptures(e, afd, CaptureEmission::ImmediateApplication,
+      SGF.emitCaptures(e, SILDeclRef(afd),
+                       CaptureEmission::ImmediateApplication,
                        captures);
       applyCallee->setCaptures(std::move(captures));
     }
@@ -1163,17 +1164,18 @@ public:
     // really producing a closure object.
     SILDeclRef constant(e);
 
+    auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
+
     SubstitutionMap subs;
-    if (e->getCaptureInfo().hasGenericParamCaptures())
+    if (captureInfo.hasGenericParamCaptures())
       subs = SGF.getForwardingSubstitutionMap();
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
     // If the closure requires captures, emit them.
-    bool hasCaptures = SGF.SGM.M.Types.hasLoweredLocalCaptures(e);
-    if (hasCaptures) {
+    if (!captureInfo.getCaptures().empty()) {
       SmallVector<ManagedValue, 4> captures;
-      SGF.emitCaptures(e, e, CaptureEmission::ImmediateApplication,
+      SGF.emitCaptures(e, constant, CaptureEmission::ImmediateApplication,
                        captures);
       applyCallee->setCaptures(std::move(captures));
     }
@@ -4038,6 +4040,26 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
     return firstLevelResult;
   }
 
+  Optional<ResultPlanPtr> resultPlan;
+  Optional<ArgumentScope> argScope;
+  Optional<CalleeTypeInfo> calleeTypeInfo;
+  SILLocation loc = uncurriedSites[0].Loc;
+  SILFunctionConventions substConv(substFnType, SGF.SGM.M);
+
+  // If we have a named builtin and have an indirect out parameter, compute a
+  // result plan/arg scope before we prepare arguments.
+  if (!specializedEmitter.isLateEmitter() &&
+      substConv.hasIndirectSILResults()) {
+    calleeTypeInfo.emplace(callee.getTypeInfo(SGF, false /*isCurried*/));
+
+    calleeTypeInfo->origResultType = origFormalType.getFunctionResultType();
+    calleeTypeInfo->substResultType = callee.getSubstFormalType().getResult();
+
+    resultPlan.emplace(ResultPlanBuilder::computeResultPlan(
+        SGF, *calleeTypeInfo, loc, uncurriedContext));
+    argScope.emplace(SGF, loc);
+  }
+
   // Emit the arguments.
   SmallVector<ManagedValue, 4> uncurriedArgs;
   Optional<SILLocation> uncurriedLoc;
@@ -4047,36 +4069,64 @@ CallEmission::applySpecializedEmitter(SpecializedEmitter &specializedEmitter,
                               firstLevelResult.foreignSelf, uncurriedArgs,
                               uncurriedLoc, formalApplyType);
 
-  // If we have a late emitter, just delegate to that emitter and return.
+  // If we have a late emitter, now that we have emitted our arguments, call the
+  // emitter.
   if (specializedEmitter.isLateEmitter()) {
     auto emitter = specializedEmitter.getLateEmitter();
-    ManagedValue mv = emitter(SGF, *uncurriedLoc,
-                              callee.getSubstitutions(),
+    ManagedValue mv = emitter(SGF, loc, callee.getSubstitutions(),
                               uncurriedArgs, uncurriedContext);
-    firstLevelResult.value =
-        RValue(SGF, *uncurriedLoc, formalApplyType.getResult(), mv);
+    firstLevelResult.value = RValue(SGF, loc, formalApplyType.getResult(), mv);
     return firstLevelResult;
   }
 
-  // Named Builtins.
+  // Otherwise, we must have a named builtin.
   assert(specializedEmitter.isNamedBuiltin());
   auto builtinName = specializedEmitter.getBuiltinName();
-  SmallVector<SILValue, 4> consumedArgs;
+
+  // Prepare our raw args.
+  SmallVector<SILValue, 4> rawArgs;
+
+  // First get the indirect result addrs and add them to rawArgs. We want to be
+  // able to handle them specially later as well, so we keep them in two arrays.
+  if (resultPlan.hasValue())
+    (*resultPlan)->gatherIndirectResultAddrs(SGF, loc, rawArgs);
+
+  // Then add all arguments to our array, copying them if they are not at +1
+  // yet.
   for (auto arg : uncurriedArgs) {
     // Named builtins are by default assumed to take all arguments at +1 i.e.,
     // as Owned or Trivial. Named builtins that don't follow this convention
     // must use a specialized emitter.
-    auto maybePlusOne = arg.ensurePlusOne(SGF, uncurriedLoc.getValue());
-    consumedArgs.push_back(maybePlusOne.forward(SGF));
+    auto maybePlusOne = arg.ensurePlusOne(SGF, loc);
+    rawArgs.push_back(maybePlusOne.forward(SGF));
   }
-  SILFunctionConventions substConv(substFnType, SGF.SGM.M);
-  auto resultVal = SGF.B.createBuiltin(uncurriedLoc.getValue(), builtinName,
-                                       substConv.getSILResultType(),
-                                       callee.getSubstitutions(),
-                                       consumedArgs);
-  firstLevelResult.value =
-      RValue(SGF, *uncurriedLoc, formalApplyType.getResult(),
-             SGF.emitManagedRValueWithCleanup(resultVal));
+
+  SILValue rawResult =
+      SGF.B.createBuiltin(loc, builtinName, substConv.getSILResultType(),
+                          callee.getSubstitutions(), rawArgs);
+
+  if (argScope.hasValue())
+    std::move(argScope)->pop();
+
+  // If we have a direct result, it will consist of a single value even if
+  // formally we have multiple values. We could handle this better today by
+  // using multiple return values instead of a tuple.
+  SmallVector<ManagedValue, 1> directResultsArray;
+  if (!substConv.hasIndirectSILResults()) {
+    directResultsArray.push_back(SGF.emitManagedRValueWithCleanup(rawResult));
+  }
+
+  ArrayRef<ManagedValue> directResultsFinal(directResultsArray);
+
+  // Then finish our value.
+  if (resultPlan.hasValue()) {
+    firstLevelResult.value =
+        std::move(*resultPlan)
+            ->finish(SGF, loc, formalApplyType.getResult(), directResultsFinal);
+  } else {
+    firstLevelResult.value = RValue(
+        SGF, *uncurriedLoc, formalApplyType.getResult(), directResultsFinal[0]);
+  }
   return firstLevelResult;
 }
 
@@ -4380,14 +4430,14 @@ RValue SILGenFunction::emitApply(ResultPlanPtr &&resultPlan,
   }
 
   // Emit the raw application.
-  GenericSignature *genericSig =
+  GenericSignature genericSig =
     fn.getType().castTo<SILFunctionType>()->getGenericSignature();
 
   // When calling a closure that's defined in a generic context but does not
   // capture any generic parameters, we will have substitutions, but the
   // function type won't have a generic signature. Drop the substitutions in
   // this case.
-  if (genericSig == nullptr) {
+  if (genericSig.isNull()) {
     subs = SubstitutionMap();
 
   // Otherwise, the substitutions should match the generic signature.
@@ -4956,30 +5006,6 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   return emission.apply(C);
 }
 
-RValue SILGenFunction::emitApplyPropertyWrapperAllocator(SILLocation loc,
-                                                          SubstitutionMap subs,
-                                                          SILDeclRef ctorRef,
-                                                          Type wrapperTy,
-                                                    CanAnyFunctionType funcTy) {
-  Callee callee = Callee::forDirect(*this, ctorRef, subs, loc);
-
-  MetatypeType *MTty = MetatypeType::get(wrapperTy);
-  auto metatypeVal = B.createMetatype(loc, getLoweredType(MTty));
-  ManagedValue mtManagedVal = ManagedValue::forUnmanaged(metatypeVal);
-  RValue metatypeRVal(*this, loc, MTty->getCanonicalType(), mtManagedVal);
-
-  ArgumentSource ArgSrc(loc, std::move(metatypeRVal));
-  FormalEvaluationScope writebacks(*this);
-  CallEmission emission(*this, std::move(callee), std::move(writebacks));
-
-  AnyFunctionType::Param selfParam((Type(MTty)), Identifier(),
-                                   ParameterTypeFlags());
-  emission.addSelfParam(loc, std::move(ArgSrc), selfParam, funcTy.getResult());
-
-  RValue RV = emission.apply();
-  return RV;
-}
-
 /// Emit a literal that applies the various initializers.
 RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   ConcreteDeclRef builtinInit;
@@ -5197,7 +5223,7 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
   // The accessor might be a local function that does not capture any
   // generic parameters, in which case we don't want to pass in any
   // substitutions.
-  auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(decl);
+  auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
   if (decl->getDeclContext()->isLocalContext() &&
       !captureInfo.hasGenericParamCaptures()) {
     subs = SubstitutionMap();
@@ -5259,11 +5285,10 @@ emitSpecializedAccessorFunctionRef(SILGenFunction &SGF,
                                              substitutions, isOnSelfParameter);
   
   // Collect captures if the accessor has them.
-  auto accessorFn = cast<AbstractFunctionDecl>(constant.getDecl());
-  if (SGF.SGM.M.Types.hasLoweredLocalCaptures(accessorFn)) {
+  if (SGF.SGM.M.Types.hasLoweredLocalCaptures(constant)) {
     assert(!selfValue && "local property has self param?!");
     SmallVector<ManagedValue, 4> captures;
-    SGF.emitCaptures(loc, accessorFn, CaptureEmission::ImmediateApplication,
+    SGF.emitCaptures(loc, constant, CaptureEmission::ImmediateApplication,
                      captures);
     callee.setCaptures(std::move(captures));
   }

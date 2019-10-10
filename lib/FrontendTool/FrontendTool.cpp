@@ -406,7 +406,8 @@ static bool writeSIL(SILModule &SM, ModuleDecl *M, bool EmitVerboseSIL,
   auto OS = getFileOutputStream(OutputFilename, M->getASTContext());
   if (!OS) return true;
   SM.print(*OS, EmitVerboseSIL, M, SortSIL);
-  return false;
+
+  return M->getASTContext().hadError();
 }
 
 static bool writeSIL(SILModule &SM, const PrimarySpecificPaths &PSPs,
@@ -749,13 +750,16 @@ static void dumpAndPrintScopeMap(CompilerInvocation &Invocation,
 
   if (Invocation.getFrontendOptions().DumpScopeMapLocations.empty()) {
     llvm::errs() << "***Complete scope map***\n";
+    scope.buildFullyExpandedTree();
     scope.print(llvm::errs());
     return;
   }
   // Probe each of the locations, and dump what we find.
   for (auto lineColumn :
-       Invocation.getFrontendOptions().DumpScopeMapLocations)
+       Invocation.getFrontendOptions().DumpScopeMapLocations) {
+    scope.buildFullyExpandedTree();
     scope.dumpOneScopeMapLocation(lineColumn);
+  }
 }
 
 static SourceFile *getPrimaryOrMainSourceFile(CompilerInvocation &Invocation,

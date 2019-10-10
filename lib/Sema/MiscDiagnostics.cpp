@@ -2140,6 +2140,12 @@ public:
       }
     }
 
+    // Don't walk into implicit accessors, since eg. an observer's setter
+    // references the variable, but we don't want to consider it as a real
+    // "use".
+    if (isa<AccessorDecl>(D) && D->isImplicit())
+      return false;
+
     if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
       // If this is a nested function with a capture list, mark any captured
       // variables.
@@ -3961,7 +3967,7 @@ void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
   if (!TC.Context.isSwiftVersionAtLeast(5))
     diagnoseDeprecatedWritableKeyPath(TC, E, DC);
   if (!TC.getLangOpts().DisableAvailabilityChecking)
-    diagAvailability(TC, E, const_cast<DeclContext*>(DC));
+    diagAvailability(E, const_cast<DeclContext*>(DC));
   if (TC.Context.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(TC, DC, E);
 }
@@ -4174,10 +4180,7 @@ static OmissionTypeName getTypeNameForOmission(Type type) {
 Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
   auto &Context = afd->getASTContext();
 
-  if (!afd->hasInterfaceType())
-    validateDecl(afd);
-
-  if (afd->isInvalid() || isa<DestructorDecl>(afd))
+  if (!afd->getInterfaceType() || afd->isInvalid() || isa<DestructorDecl>(afd))
     return None;
 
   DeclName name = afd->getFullName();
@@ -4257,10 +4260,7 @@ Optional<DeclName> TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
 Optional<Identifier> TypeChecker::omitNeedlessWords(VarDecl *var) {
   auto &Context = var->getASTContext();
 
-  if (!var->hasInterfaceType())
-    validateDecl(var);
-
-  if (var->isInvalid() || !var->hasInterfaceType())
+  if (!var->getInterfaceType() || var->isInvalid())
     return None;
 
   if (var->getName().empty())

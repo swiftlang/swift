@@ -159,7 +159,7 @@ class RDar16666631 {
    var i: Int
    var d: Double
    var s: String
-   init(i: Int, d: Double, s: String) {
+   init(i: Int, d: Double, s: String) { // expected-note {{'init(i:d:s:)' declared here}}
       self.i = i
       self.d = d
       self.s = s
@@ -168,9 +168,7 @@ class RDar16666631 {
       self.init(i: i, d: 0.1, s: s)
    }
 }
-let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{incorrect argument label in call (have 'i:d:', expected 'i:s:')}}
-// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
-
+let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{missing argument for parameter 's' in call}} {{43-43=, s: <#String#>}}
 
 struct S {
   init() {

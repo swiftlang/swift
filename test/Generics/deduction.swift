@@ -22,7 +22,7 @@ func useIdentity(_ x: Int, y: Float, i32: Int32) {
 
   // Deduction where the result type and input type can get different results
   var xx : X, yy : Y
-  xx = identity(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
+  xx = identity(yy) // expected-error{{cannot assign value of type 'Y' to type 'X'}}
   xx = identity2(yy) // expected-error{{cannot convert value of type 'Y' to expected argument type 'X'}}
 }
 
@@ -208,20 +208,20 @@ func callMin(_ x: Int, y: Int, a: Float, b: Float) {
   min2(a, b) // expected-error{{argument type 'Float' does not conform to expected type 'IsBefore'}}
 }
 
-func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{'R.Element' = 'Double'}}
+func rangeOfIsBefore<R : IteratorProtocol>(_ range: R) where R.Element : IsBefore {} // expected-note {{where 'R.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
 
 func callRangeOfIsBefore(_ ia: [Int], da: [Double]) {
   rangeOfIsBefore(ia.makeIterator())
-  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'Double' conform to 'IsBefore'}}
+  rangeOfIsBefore(da.makeIterator()) // expected-error{{global function 'rangeOfIsBefore' requires that 'IndexingIterator<[Double]>.Element' (aka 'Double') conform to 'IsBefore'}}
 }
 
 func testEqualIterElementTypes<A: IteratorProtocol, B: IteratorProtocol>(_ a: A, _ b: B) where A.Element == B.Element {}
-// expected-note@-1 {{where 'A.Element' = 'Int', 'B.Element' = 'Double'}}
+// expected-note@-1 {{where 'A.Element' = 'IndexingIterator<[Int]>.Element' (aka 'Int'), 'B.Element' = 'IndexingIterator<[Double]>.Element' (aka 'Double')}}
 func compareIterators() {
   var a: [Int] = []
   var b: [Double] = []
   testEqualIterElementTypes(a.makeIterator(), b.makeIterator())
-  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'Int' and 'Double' be equivalent}}
+  // expected-error@-1 {{global function 'testEqualIterElementTypes' requires the types 'IndexingIterator<[Int]>.Element' (aka 'Int') and 'IndexingIterator<[Double]>.Element' (aka 'Double') be equivalent}}
 }
 
 protocol P_GI {

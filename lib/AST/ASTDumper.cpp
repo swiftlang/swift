@@ -22,6 +22,7 @@
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/QuotedString.h"
@@ -616,9 +617,9 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD) {
       printCommon(TAD, "typealias");
       PrintWithColorRAII(OS, TypeColor) << " type='";
-      if (TAD->getUnderlyingTypeLoc().getType()) {
+      if (auto underlying = TAD->getUnderlyingType()) {
         PrintWithColorRAII(OS, TypeColor)
-          << TAD->getUnderlyingTypeLoc().getType().getString();
+          << underlying.getString();
       } else {
         PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
       }
@@ -987,9 +988,17 @@ namespace {
       if (P->isAutoClosure())
         OS << " autoclosure";
 
-      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None)
+      if (P->getDefaultArgumentKind() != DefaultArgumentKind::None) {
         printField("default_arg",
                    getDefaultArgumentKindString(P->getDefaultArgumentKind()));
+      }
+
+      if (P->getDefaultValue() &&
+        !P->getDefaultArgumentCaptureInfo().isTrivial()) {
+        OS << " ";
+        P->getDefaultArgumentCaptureInfo().print(
+          PrintWithColorRAII(OS, CapturesColor).getOS());
+      }
 
       if (auto init = P->getDefaultValue()) {
         OS << " expression=\n";
@@ -3166,7 +3175,7 @@ static void dumpSubstitutionMapRec(
     SubstitutionMap map, llvm::raw_ostream &out,
     SubstitutionMap::DumpStyle style, unsigned indent,
     llvm::SmallPtrSetImpl<const ProtocolConformance *> &visited) {
-  auto *genericSig = map.getGenericSignature();
+  auto genericSig = map.getGenericSignature();
   out.indent(indent);
 
   auto printParen = [&](char p) {
@@ -3175,7 +3184,7 @@ static void dumpSubstitutionMapRec(
   printParen('(');
   SWIFT_DEFER { printParen(')'); };
   out << "substitution_map generic_signature=";
-  if (genericSig == nullptr) {
+  if (genericSig.isNull()) {
     out << "<nullptr>";
     return;
   }
@@ -3364,7 +3373,6 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinRawPointer, builtin_raw_pointer)
     TRIVIAL_TYPE_PRINTER(BuiltinNativeObject, builtin_native_object)
     TRIVIAL_TYPE_PRINTER(BuiltinBridgeObject, builtin_bridge_object)
-    TRIVIAL_TYPE_PRINTER(BuiltinUnknownObject, builtin_unknown_object)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
 
@@ -3378,6 +3386,12 @@ namespace {
     void visitTypeAliasType(TypeAliasType *T, StringRef label) {
       printCommon(label, "type_alias_type");
       printField("decl", T->getDecl()->printRef());
+      PrintWithColorRAII(OS, TypeColor) << " underlying='";
+      if (auto underlying = T->getSinglyDesugaredType()) {
+        PrintWithColorRAII(OS, TypeColor) << underlying->getString();
+      } else {
+        PrintWithColorRAII(OS, TypeColor) << "<<<unresolved>>>";
+      }
       if (T->getParent())
         printRec("parent", T->getParent());
 
@@ -3761,6 +3775,10 @@ void TypeBase::dump(raw_ostream &os, unsigned indent) const {
   // Make sure to print type variables.
   llvm::SaveAndRestore<bool> X(ctx.LangOpts.DebugConstraintSolver, true);
   Type(const_cast<TypeBase *>(this)).dump(os, indent);
+}
+
+void GenericSignatureImpl::dump() const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).dump();
 }
 
 void GenericEnvironment::dump(raw_ostream &os) const {

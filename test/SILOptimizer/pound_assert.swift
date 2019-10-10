@@ -668,3 +668,68 @@ func evaluate<T>(addressOnlyEnum: AddressOnlyEnum<T>) -> Int {
 
 #assert(evaluate(addressOnlyEnum: .double(IntContainer(value: 1))) == 2)
 #assert(evaluate(addressOnlyEnum: .triple(IntContainer(value: 1))) == 3)
+
+//===----------------------------------------------------------------------===//
+// Arrays
+//===----------------------------------------------------------------------===//
+
+// When the const-evaluator evaluates this struct, it forces evaluation of the
+// `arr` value.
+struct ContainsArray {
+  let x: Int
+  let arr: [Int]
+}
+
+func arrayInitEmptyTopLevel() {
+  let c = ContainsArray(x: 1, arr: Array())
+  #assert(c.x == 1)
+}
+
+func arrayInitEmptyLiteralTopLevel() {
+  // TODO: More work necessary for array initialization using literals to work
+  // at the top level.
+  // expected-note@+1 {{cannot evaluate expression as constant here}}
+  let c = ContainsArray(x: 1, arr: [])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+func arrayInitLiteral() {
+  // TODO: More work necessary for array initialization using literals to work
+  // at the top level.
+  // expected-note @+1 {{cannot evaluate expression as constant here}}
+  let c = ContainsArray(x: 1, arr: [2, 3, 4])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+func arrayInitNonConstantElementTopLevel(x: Int) {
+  // expected-note @+1 {{cannot evaluate expression as constant here}}
+  let c = ContainsArray(x: 1, arr: [x])
+  // expected-error @+1 {{#assert condition not constant}}
+  #assert(c.x == 1)
+}
+
+func arrayInitEmptyFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: Array())
+}
+
+func invokeArrayInitEmptyFlowSensitive() {
+  #assert(arrayInitEmptyFlowSensitive().x == 1)
+}
+
+func arrayInitEmptyLiteralFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: [])
+}
+
+func invokeArrayInitEmptyLiteralFlowSensitive() {
+  #assert(arrayInitEmptyLiteralFlowSensitive().x == 1)
+}
+
+func arrayInitLiteralFlowSensitive() -> ContainsArray {
+  return ContainsArray(x: 1, arr: [2, 3, 4])
+}
+
+func invokeArrayInitLiteralFlowSensitive() {
+  #assert(arrayInitLiteralFlowSensitive().x == 1)
+}

@@ -511,7 +511,7 @@ struct ErrorInFunctionSignatureResultArrayType5 {
 
 
 struct ErrorInFunctionSignatureResultArrayType11 { // expected-note{{in declaration of 'ErrorInFunctionSignatureResultArrayType11'}}
-  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{21-21=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{expected '{' in body of function declaration}} expected-error {{expected declaration}}
+  func foo() -> Int[(a){a++}] { // expected-error {{consecutive declarations on a line must be separated by ';'}} {{20-20=;}} expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{expected '{' in body of function declaration}} expected-error {{expected declaration}}
   }
 }
 
@@ -570,8 +570,9 @@ class SR771 {
 extension SR771 {
     print("The room where it happened, the room where it happened")
     // expected-error @-1 {{expected 'func' keyword in instance method declaration}}
-    // expected-error @-2 {{invalid redeclaration of 'print()'}}
-    // expected-error @-3 {{expected parameter name followed by ':'}}
+    // expected-error @-2 {{expected '{' in body of function declaration}}
+    // expected-error @-3 {{invalid redeclaration of 'print()'}}
+    // expected-error @-4 {{expected parameter name followed by ':'}}
 }
 
 
@@ -663,7 +664,7 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {} // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{expected ',' separator}} expected-error {{expected parameter name followed by ':'}}
+func a(s: S[{{g) -> Int {} // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
 }}}
 #endif
   

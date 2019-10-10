@@ -18,6 +18,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/SourceManager.h"
@@ -524,13 +525,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     pushStructureNode(SN, E);
   } else if (auto *Tup = dyn_cast<TupleExpr>(E)) {
     auto *ParentE = Parent.getAsExpr();
-    if (isCurrentCallArgExpr(Tup)) {
-      for (unsigned I = 0; I < Tup->getNumElements(); ++ I) {
-        SourceLoc NameLoc = Tup->getElementNameLoc(I);
-        if (NameLoc.isValid())
-          passTokenNodesUntil(NameLoc, PassNodesBehavior::ExcludeNodeAtLocation);
-      }
-    } else if (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE)) {
+    if (!isCurrentCallArgExpr(Tup) && (!ParentE || !isa<InterpolatedStringLiteralExpr>(ParentE))) {
       SyntaxStructureNode SN;
       SN.Kind = SyntaxStructureKind::TupleExpression;
       SN.Range = charSourceRangeFromSourceRange(SM, Tup->getSourceRange());
@@ -791,6 +786,9 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     pushStructureNode(SN, NTD);
 
   } else if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    // Normally bindExtension() would take care of computing the extended
+    // nominal. It must be done before asking for generic parameters.
+    ED->computeExtendedNominal();
     SyntaxStructureNode SN;
     setDecl(SN, D);
     SN.Kind = SyntaxStructureKind::Extension;
@@ -918,7 +916,7 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
                                          EnumElemD->getName().getLength());
         }
 
-        if (auto *E = EnumElemD->getRawValueExpr()) {
+        if (auto *E = EnumElemD->getRawValueUnchecked()) {
           SourceRange ElemRange = E->getSourceRange();
           SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
                                  charSourceRangeFromSourceRange(SM, ElemRange));

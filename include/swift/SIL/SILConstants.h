@@ -28,14 +28,52 @@ class SILValue;
 class SILBuilder;
 class SerializedSILLoader;
 
-struct APIntSymbolicValue;
-struct ArraySymbolicValue;
+struct SymbolicArrayStorage;
 struct DerivedAddressValue;
 struct EnumWithPayloadSymbolicValue;
 struct SymbolicValueMemoryObject;
 struct UnknownSymbolicValue;
 
 extern llvm::cl::opt<unsigned> ConstExprLimit;
+
+/// An abstract class that exposes functions for allocating symbolic values.
+/// The implementors of this class have to determine where to allocate them and
+/// and manage the lifetime of the allocated symbolic values.
+class SymbolicValueAllocator {
+public:
+  virtual ~SymbolicValueAllocator() {}
+
+  /// Allocate raw bytes.
+  /// \param byteSize number of bytes to allocate.
+  /// \param alignment alignment for the allocated bytes.
+  virtual void *allocate(unsigned long byteSize, unsigned alignment) = 0;
+
+  /// Allocate storage for a given number of elements of a specific type
+  /// provided as a template parameter. Precondition: \c T must have an
+  /// accesible zero argument constructor.
+  /// \param numElts number of elements of the type to allocate.
+  template <typename T> T *allocate(unsigned numElts) {
+    T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
+    for (unsigned i = 0; i != numElts; ++i)
+      new (res + i) T();
+    return res;
+  }
+};
+
+/// A class that allocates symbolic values in a local bump allocator. The
+/// lifetime of the bump allocator is same as the lifetime of \c this object.
+class SymbolicValueBumpAllocator : public SymbolicValueAllocator {
+private:
+  llvm::BumpPtrAllocator bumpAllocator;
+
+public:
+  SymbolicValueBumpAllocator() {}
+  ~SymbolicValueBumpAllocator() {}
+
+  void *allocate(unsigned long byteSize, unsigned alignment) {
+    return bumpAllocator.Allocate(byteSize, alignment);
+  }
+};
 
 /// When we fail to constant fold a value, this captures a reason why,
 /// allowing the caller to produce a specific diagnostic.  The "Unknown"
@@ -58,12 +96,8 @@ public:
     /// Integer overflow detected.
     Overflow,
 
-    /// Unspecified trap detected.
+    /// Trap detected. Traps will a message as a payload.
     Trap,
-
-    /// Assertion failure detected. These have an associated message unlike
-    /// traps.
-    AssertionFailure,
 
     /// An operation was applied over operands whose symbolic values were
     /// constants but were not valid for the operation.
@@ -111,14 +145,20 @@ private:
   // Auxiliary information for different unknown kinds.
   union {
     SILFunction *function;
-    const char *failedAssertMessage;
+    const char *trapMessage;
   } payload;
 
 public:
   UnknownKind getKind() { return kind; }
 
   static bool isUnknownKindWithPayload(UnknownKind kind) {
-    return kind == UnknownKind::CalleeImplementationUnknown;
+    switch (kind) {
+    case UnknownKind::CalleeImplementationUnknown:
+    case UnknownKind::Trap:
+      return true;
+    default:
+      return false;
+    }
   }
 
   static UnknownReason create(UnknownKind kind) {
@@ -141,57 +181,23 @@ public:
     return payload.function;
   }
 
-  static UnknownReason createAssertionFailure(const char *message,
-                                              size_t size) {
-    assert(message[size] == '\0' && "message must be null-terminated");
+  static UnknownReason createTrap(StringRef message,
+                                  SymbolicValueAllocator &allocator) {
+    // Copy and null terminate the string.
+    size_t size = message.size();
+    char *messagePtr = allocator.allocate<char>(size + 1);
+    std::uninitialized_copy(message.begin(), message.end(), messagePtr);
+    messagePtr[size] = '\0';
+
     UnknownReason reason;
-    reason.kind = UnknownKind::AssertionFailure;
-    reason.payload.failedAssertMessage = message;
+    reason.kind = UnknownKind::Trap;
+    reason.payload.trapMessage = messagePtr;
     return reason;
   }
 
-  const char *getAssertionFailureMessage() {
-    assert(kind == UnknownKind::AssertionFailure);
-    return payload.failedAssertMessage;
-  }
-};
-
-/// An abstract class that exposes functions for allocating symbolic values.
-/// The implementors of this class have to determine where to allocate them and
-/// and manage the lifetime of the allocated symbolic values.
-class SymbolicValueAllocator {
-public:
-  virtual ~SymbolicValueAllocator() {}
-
-  /// Allocate raw bytes.
-  /// \param byteSize number of bytes to allocate.
-  /// \param alignment alignment for the allocated bytes.
-  virtual void *allocate(unsigned long byteSize, unsigned alignment) = 0;
-
-  /// Allocate storage for a given number of elements of a specific type
-  /// provided as a template parameter. Precondition: \c T must have an
-  /// accesible zero argument constructor.
-  /// \param numElts number of elements of the type to allocate.
-  template <typename T> T *allocate(unsigned numElts) {
-    T *res = (T *)allocate(sizeof(T) * numElts, alignof(T));
-    for (unsigned i = 0; i != numElts; ++i)
-      new (res + i) T();
-    return res;
-  }
-};
-
-/// A class that allocates symbolic values in a local bump allocator. The
-/// lifetime of the bump allocator is same as the lifetime of \c this object.
-class SymbolicValueBumpAllocator : public SymbolicValueAllocator {
-private:
-  llvm::BumpPtrAllocator bumpAllocator;
-
-public:
-  SymbolicValueBumpAllocator() {}
-  ~SymbolicValueBumpAllocator() {}
-
-  void *allocate(unsigned long byteSize, unsigned alignment) {
-    return bumpAllocator.Allocate(byteSize, alignment);
+  const char *getTrapMessage() {
+    assert(kind == UnknownKind::Trap);
+    return payload.trapMessage;
   }
 };
 
@@ -249,6 +255,12 @@ private:
 
     /// This represents an index *into* a memory object.
     RK_DerivedAddress,
+
+    /// This represents the internal storage of an array.
+    RK_ArrayStorage,
+
+    /// This represents an array.
+    RK_Array,
   };
 
   union {
@@ -292,6 +304,31 @@ private:
     /// When this SymbolicValue is of "DerivedAddress" kind, this pointer stores
     /// information about the memory object and access path of the access.
     DerivedAddressValue *derivedAddress;
+
+    // The following fields are for representing an Array.
+    //
+    // In Swift, an array is a non-trivial struct that stores a reference to an
+    // internal storage: _ContiguousArrayStorage. Though arrays have value
+    // semantics in Swift, it is not the case in SIL. In SIL, an array can be
+    // mutated by taking the address of the internal storage i.e., through a
+    // shared, mutable pointer to the internal storage of the array. In fact,
+    // this is how an array initialization is lowered in SIL. Therefore, the
+    // symbolic representation of an array is an addressable "memory cell"
+    // (i.e., a SymbolicValueMemoryObject) containing the array storage. The
+    // array storage is modeled by the type: SymbolicArrayStorage. This
+    // representation of the array enables obtaining the address of the internal
+    // storage and modifying the array through that address. Array operations
+    // such as `append` that mutate an array must clone the internal storage of
+    // the array, following the semantics of the Swift implementation of those
+    // operations.
+
+    /// Representation of array storage (RK_ArrayStorage). SymbolicArrayStorage
+    /// is a container for a sequence of symbolic values.
+    SymbolicArrayStorage *arrayStorage;
+
+    /// When this symbolic value is of an "Array" kind, this stores a memory
+    /// object that contains a SymbolicArrayStorage value.
+    SymbolicValueMemoryObject *array;
   } value;
 
   RepresentationKind representationKind : 8;
@@ -340,6 +377,12 @@ public:
 
     /// This value represents the address of, or into, a memory object.
     Address,
+
+    /// This represents an internal array storage.
+    ArrayStorage,
+
+    /// This represents an array value.
+    Array,
 
     /// These values are generally only seen internally to the system, external
     /// clients shouldn't have to deal with them.
@@ -464,6 +507,32 @@ public:
   /// Return just the memory object for an address value.
   SymbolicValueMemoryObject *getAddressValueMemoryObject() const;
 
+  /// Create a symbolic array storage containing \c elements.
+  static SymbolicValue
+  getSymbolicArrayStorage(ArrayRef<SymbolicValue> elements, CanType elementType,
+                          SymbolicValueAllocator &allocator);
+
+  /// Create a symbolic array using the given symbolic array storage, which
+  /// contains the array elements.
+  static SymbolicValue getArray(Type arrayType, SymbolicValue arrayStorage,
+                                SymbolicValueAllocator &allocator);
+
+  /// Return the elements stored in this SymbolicValue of "ArrayStorage" kind.
+  ArrayRef<SymbolicValue> getStoredElements(CanType &elementType) const;
+
+  /// Return the symbolic value representing the internal storage of this array.
+  SymbolicValue getStorageOfArray() const;
+
+  /// Return the symbolic value representing the address of the element of this
+  /// array at the given \c index. The return value is a derived address whose
+  /// base is the memory object \c value.array (which contains the array
+  /// storage) and whose accesspath is \c index.
+  SymbolicValue getAddressOfArrayElement(SymbolicValueAllocator &allocator,
+                                         unsigned index) const;
+
+  /// Return the type of this array symbolic value.
+  Type getArrayType() const;
+
   //===--------------------------------------------------------------------===//
   // Helpers
 
@@ -487,7 +556,7 @@ public:
   void dump() const;
 };
 
-static_assert(sizeof(SymbolicValue) == 2 * sizeof(void *),
+static_assert(sizeof(SymbolicValue) == 2 * sizeof(uint64_t),
               "SymbolicValue should stay small");
 static_assert(std::is_pod<SymbolicValue>::value,
               "SymbolicValue should stay POD");
@@ -538,7 +607,6 @@ private:
   SymbolicValueMemoryObject(const SymbolicValueMemoryObject &) = delete;
   void operator=(const SymbolicValueMemoryObject &) = delete;
 };
-
 } // end namespace swift
 
 #endif

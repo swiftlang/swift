@@ -44,7 +44,6 @@
 
 namespace swift {
   using llvm::make_range;
-  using llvm::iterator_range;
 
   template<typename T>
   inline auto reversed(T &&container)

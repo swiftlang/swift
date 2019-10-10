@@ -27,7 +27,7 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/CommandLine.h"
@@ -102,6 +102,14 @@ static void addMandatoryOptPipeline(SILPassPipelinePlan &P) {
   // there.
   const auto &Options = P.getOptions();
   P.addClosureLifetimeFixup();
+
+#ifndef NDEBUG
+  // Add a verification pass to check our work when skipping non-inlinable
+  // function bodies.
+  if (Options.SkipNonInlinableFunctionBodies)
+    P.addNonInlinableFunctionSkippingChecker();
+#endif
+
   if (Options.shouldOptimize()) {
     P.addSemanticARCOpts();
     P.addDestroyHoisting();

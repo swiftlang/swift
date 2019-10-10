@@ -64,7 +64,9 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
     // Create a step evaluator and run it on the function.
     SymbolicValueBumpAllocator allocator;
     ConstExprStepEvaluator stepEvaluator(allocator, fun,
+                                         getOptions().AssertConfig,
                                          /*trackCallees*/ true);
+    bool previousEvaluationHadFatalError = false;
 
     for (auto currI = fun->getEntryBlock()->begin();;) {
       auto *inst = &(*currI);
@@ -83,12 +85,30 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
 
       if (!applyInst || !callee ||
           !callee->hasSemanticsAttr(constantEvaluableSemanticsAttr)) {
+
+        // Ignore these instructions if we had a fatal error already.
+        if (previousEvaluationHadFatalError) {
+          if (isa<TermInst>(inst)) {
+            assert(false && "non-constant control flow in the test driver");
+          }
+          ++currI;
+          continue;
+        }
+
         std::tie(nextInstOpt, errorVal) =
             stepEvaluator.tryEvaluateOrElseMakeEffectsNonConstant(currI);
-        assert(nextInstOpt && "non-constant control flow in the test driver");
+        if (!nextInstOpt) {
+          // This indicates an error in the test driver.
+          errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
+          assert(false && "non-constant control flow in the test driver");
+        }
         currI = nextInstOpt.getValue();
         continue;
       }
+
+      assert(!previousEvaluationHadFatalError &&
+             "cannot continue evaluation of test driver as previous call "
+             "resulted in non-skippable evaluation error.");
 
       // Here, a function annotated as "constant_evaluable" is called.
       llvm::errs() << "@" << demangleSymbolName(callee->getName()) << "\n";
@@ -101,17 +121,40 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
         errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
       }
 
-      if (!nextInstOpt) {
-        break; // This instruction should be the end of the test driver.
+      if (nextInstOpt) {
+        currI = nextInstOpt.getValue();
+        continue;
       }
-      currI = nextInstOpt.getValue();
+
+      // Here, a non-skippable error like "instruction-limit exceeded" has been
+      // encountered during evaluation. Proceed to the next instruction but
+      // ensure that an assertion failure occurs if there is any instruction
+      // to evaluate after this instruction.
+      ++currI;
+      previousEvaluationHadFatalError = true;
     }
 
-    // Record functions that were called during this evaluation to detect
-    // whether the test drivers in the SILModule cover all function annotated
-    // as "constant_evaluable".
+    // For every function seen during the evaluation of this constant evaluable
+    // function:
+    // 1. Record it so as to detect whether the test drivers in the SILModule
+    // cover all function annotated as "constant_evaluable".
+    //
+    // 2. If the callee is annotated as constant_evaluable and is imported from
+    // a different Swift module (other than stdlib), check that the function is
+    // marked as Onone. Otherwise, it could have been optimized, which will
+    // break constant evaluability.
     for (SILFunction *callee : stepEvaluator.getFuncsCalledDuringEvaluation()) {
       evaluatedFunctions.insert(callee);
+
+      SILModule &calleeModule = callee->getModule();
+      if (callee->isAvailableExternally() &&
+          callee->hasSemanticsAttr(constantEvaluableSemanticsAttr) &&
+          callee->getOptimizationMode() != OptimizationMode::NoOptimization) {
+        diagnose(calleeModule.getASTContext(),
+                 callee->getLocation().getSourceLoc(),
+                 diag::constexpr_imported_func_not_onone,
+                 demangleSymbolName(callee->getName()));
+      }
     }
   }
 

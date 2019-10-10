@@ -854,7 +854,7 @@ static void skipGenericRequirements(llvm::BitstreamCursor &Cursor) {
   }
 }
 
-GenericSignature *ModuleFile::getGenericSignature(
+GenericSignature ModuleFile::getGenericSignature(
     serialization::GenericSignatureID ID) {
   auto signature = getGenericSignatureChecked(ID);
   if (!signature)
@@ -862,7 +862,7 @@ GenericSignature *ModuleFile::getGenericSignature(
   return signature.get();
 }
 
-Expected<GenericSignature *>
+Expected<GenericSignature>
 ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
   using namespace decls_block;
 
@@ -1120,10 +1120,14 @@ static void filterValues(Type expectedTy, ModuleDecl *expectedModule,
 
     if (isType != isa<TypeDecl>(value))
       return true;
-    if (!value->hasInterfaceType())
-      return true;
-    if (canTy && value->getInterfaceType()->getCanonicalType() != canTy)
-      return true;
+
+    // If we're expecting a type, make sure this decl has the expected type.
+    if (canTy)  {
+      auto ifaceTy = value->getInterfaceType();
+      if (!ifaceTy || !ifaceTy->isEqual(canTy))
+        return true;
+    }
+
     if (value->isStatic() != isStatic)
       return true;
     if (value->hasClangNode() != importedFromClang)
@@ -1257,7 +1261,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     auto name = getIdentifier(DefiningDeclNameID);
     pathTrace.addOpaqueReturnType(name);
     
-    if (auto opaque = baseModule->lookupOpaqueResultType(name.str(), nullptr)) {
+    if (auto opaque = baseModule->lookupOpaqueResultType(name.str())) {
       values.push_back(opaque);
     }
     break;
@@ -1367,7 +1371,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
 
   // Filters for values discovered in the remaining path pieces.
   ModuleDecl *M = nullptr;
-  CanGenericSignature genericSig = nullptr;
+  CanGenericSignature genericSig = CanGenericSignature();
 
   // For remaining path pieces, filter or drill down into the results we have.
   while (--pathLen) {
@@ -1596,7 +1600,7 @@ giveUpFastPath:
 
       ValueDecl *base = values.front();
 
-      GenericSignature *currentSig = nullptr;
+      GenericSignature currentSig = GenericSignature();
       if (auto nominal = dyn_cast<NominalTypeDecl>(base)) {
         if (genericSig) {
           // Find an extension in the requested module that has the
@@ -1660,8 +1664,7 @@ giveUpFastPath:
       pathTrace.addOpaqueReturnType(name);
     
       auto lookupModule = M ? M : baseModule;
-      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str(),
-                                                               nullptr)) {
+      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
       }
       break;
@@ -1871,6 +1874,8 @@ DeclContext *ModuleFile::getDeclContext(DeclContextID DCID) {
     return AFD;
   if (auto SD = dyn_cast<SubscriptDecl>(D))
     return SD;
+  if (auto EED = dyn_cast<EnumElementDecl>(D))
+    return EED;
 
   llvm_unreachable("Unknown Decl : DeclContext kind");
 }
@@ -2241,8 +2246,6 @@ public:
       if (!filenameForPrivate.empty())
         MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
-
-    decl->setValidationToChecked();
   }
 
   /// Deserializes decl attribute and attribute-like records from
@@ -2287,10 +2290,13 @@ public:
                                               SourceLoc(), genericParams, DC);
     declOrOffset = alias;
 
-    alias->setGenericSignature(MF.getGenericSignature(genericSigID));
+    auto genericSig = MF.getGenericSignature(genericSigID);
+    alias->setGenericSignature(genericSig);
 
-    alias->setUnderlyingType(MF.getType(underlyingTypeID));
-
+    auto underlying = MF.getType(underlyingTypeID);
+    alias->setUnderlyingType(underlying);
+    alias->computeType();
+    
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
     else
@@ -2548,7 +2554,8 @@ public:
     if (initKind.hasValue())
       ctx.evaluator.cacheOutput(InitKindRequest{ctor},
                                 std::move(initKind.getValue()));
-    ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
+                              std::move(needsNewVTableEntry));
 
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     if (auto *overridden = ctor->getOverriddenDecl()) {
@@ -2709,8 +2716,9 @@ public:
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     if (opaqueReturnTypeID) {
-      var->setOpaqueResultTypeDecl(
-                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{var},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
     // If this is a lazy property, record its backing storage.
@@ -2819,7 +2827,7 @@ public:
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry, isTransparent;
-    DeclID opaqueResultTypeDeclID;
+    DeclID opaqueReturnTypeID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2834,7 +2842,7 @@ public:
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          opaqueResultTypeDeclID,
+                                          opaqueReturnTypeID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3023,11 +3031,14 @@ public:
       fn->setImplicit();
     fn->setIsObjC(isObjC);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
-    fn->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
+                              std::move(needsNewVTableEntry));
 
-    if (opaqueResultTypeDeclID)
-      fn->setOpaqueResultTypeDecl(
-                     cast<OpaqueTypeDecl>(MF.getDecl(opaqueResultTypeDeclID)));
+    if (opaqueReturnTypeID) {
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{fn},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
 
     // Set the interface type.
     fn->computeType();
@@ -3289,9 +3300,12 @@ public:
 
     auto result = MF.createDecl<InfixOperatorDecl>(
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), SourceLoc(),
-        cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get()),
-        ctx.AllocateCopy(designatedNominalTypes));
-
+        ArrayRef<Identifier>{}, ArrayRef<SourceLoc>{});
+    result->setDesignatedNominalTypes(ctx.AllocateCopy(designatedNominalTypes));
+    ctx.evaluator.cacheOutput(
+        OperatorPrecedenceGroupRequest{result},
+        std::move(cast_or_null<PrecedenceGroupDecl>(precedenceGroup.get())));
+    
     declOrOffset = result;
     return result;
   }
@@ -3476,6 +3490,11 @@ public:
       MF.fatal();
 
     theEnum->setAddedImplicitInitializers();
+    // @objc enums have all their raw values checked.
+    if (isObjC) {
+      theEnum->setHasFixedRawValues();
+    }
+    
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -3537,23 +3556,23 @@ public:
       }
     }
 
-    // Read payload parameter list, if it exists.
-    ParameterList *paramList = nullptr;
-    if (hasPayload) {
-      paramList = MF.readParameterList();
-    }
-
     DeclContext *DC = MF.getDeclContext(contextID);
     if (declOrOffset.isComplete())
       return declOrOffset;
 
     auto elem = MF.createDecl<EnumElementDecl>(SourceLoc(),
                                                name,
-                                               paramList,
+                                               nullptr,
                                                SourceLoc(),
                                                nullptr,
                                                DC);
     declOrOffset = elem;
+
+    // Read payload parameter list, if it exists.
+    if (hasPayload) {
+      auto *paramList = MF.readParameterList();
+      elem->setParameterList(paramList);
+    }
 
     // Deserialize the literal raw value, if any.
     switch ((EnumElementRawValueKind)rawValueKindID) {
@@ -3694,8 +3713,9 @@ public:
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     
     if (opaqueReturnTypeID) {
-      subscript->setOpaqueResultTypeDecl(
-                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{subscript},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
     
     return subscript;
@@ -4395,7 +4415,7 @@ public:
     // Look through compatibility aliases that are now unavailable.
     if (alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType();
+      return alias->getUnderlyingType();
     }
 
     return alias->getDeclaredInterfaceType();
@@ -4463,7 +4483,7 @@ public:
     if (alias &&
         alias->getAttrs().isUnavailable(ctx) &&
         alias->isCompatibilityAlias()) {
-      return alias->getUnderlyingTypeLoc().getType().subst(subMap);
+      return alias->getUnderlyingType().subst(subMap);
     }
 
     auto parentType = parentTypeOrError.get();
@@ -4491,7 +4511,7 @@ public:
       // using the Type wrapper.
       const TypeBase *underlyingTy = nullptr;
       while (alias->isCompatibilityAlias()) {
-        underlyingTy = alias->getUnderlyingTypeLoc().getType().getPointer();
+        underlyingTy = alias->getUnderlyingType().getPointer();
 
         // If the underlying type is itself a typealias, it might be another
         // compatibility alias, meaning we need to go around the loop again.
@@ -4567,7 +4587,7 @@ public:
     TypeID resultID;
     uint8_t rawRepresentation;
     bool noescape = false, throws;
-    GenericSignature *genericSig = nullptr;
+    GenericSignature genericSig = GenericSignature();
 
     if (!isGeneric) {
       decls_block::FunctionTypeLayout::readRecord(scratch, resultID,
@@ -4630,11 +4650,11 @@ public:
     }
 
     if (!isGeneric) {
-      assert(genericSig == nullptr);
+      assert(genericSig.isNull());
       return FunctionType::get(params, resultTy.get(), info);
     }
 
-    assert(genericSig != nullptr);
+    assert(!genericSig.isNull());
     return GenericFunctionType::get(genericSig, params, resultTy.get(), info);
   }
 
@@ -5043,7 +5063,7 @@ public:
       witnessMethodConformance = MF.readConformance(MF.DeclTypeCursor);
     }
 
-    GenericSignature *genericSig = MF.getGenericSignature(rawGenericSig);
+    GenericSignature genericSig = MF.getGenericSignature(rawGenericSig);
 
     return SILFunctionType::get(genericSig, extInfo, coroutineKind.getValue(),
                                 calleeConvention.getValue(),

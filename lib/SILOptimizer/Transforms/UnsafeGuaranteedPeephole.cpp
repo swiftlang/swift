@@ -31,7 +31,6 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "unsafe-guaranteed-peephole"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -39,8 +38,9 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 

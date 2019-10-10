@@ -191,14 +191,17 @@ void TypeInfo::dump(std::ostream &OS, unsigned Indent) const {
   OS << '\n';
 }
 
-BuiltinTypeInfo::BuiltinTypeInfo(const BuiltinTypeDescriptor *descriptor)
+BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
+                                 RemoteRef<BuiltinTypeDescriptor> descriptor)
     : TypeInfo(TypeInfoKind::Builtin,
                descriptor->Size,
                descriptor->getAlignment(),
                descriptor->Stride,
                descriptor->NumExtraInhabitants,
                descriptor->isBitwiseTakable()),
-      Name(descriptor->getMangledTypeName(0)) {}
+      Name(builder.getTypeRefString(
+              builder.readTypeRef(descriptor, descriptor->TypeName)))
+{}
 
 /// Utility class for building values that contain witness tables.
 class ExistentialTypeInfoBuilder {
@@ -253,15 +256,14 @@ class ExistentialTypeInfoBuilder {
         continue;
       }
 
-      std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
-          TC.getBuilder().getFieldTypeInfo(P);
-      if (FD.first == nullptr) {
+      auto FD = TC.getBuilder().getFieldTypeInfo(P);
+      if (FD == nullptr) {
         DEBUG_LOG(std::cerr << "No field descriptor: "; P->dump())
         Invalid = true;
         continue;
       }
 
-      switch (FD.first->Kind) {
+      switch (FD->Kind) {
         case FieldDescriptorKind::ObjCProtocol:
           // Objective-C protocols do not have any witness tables.
           ObjC = true;
@@ -344,7 +346,7 @@ public:
       }
 
       const auto &FD = TC.getBuilder().getFieldTypeInfo(T);
-      if (FD.first == nullptr) {
+      if (FD == nullptr) {
         DEBUG_LOG(std::cerr << "No field descriptor: "; T->dump())
         Invalid = true;
         return;
@@ -352,7 +354,7 @@ public:
 
       // We have a valid superclass constraint. It only affects
       // lowering by class-constraining the entire existential.
-      switch (FD.first->Kind) {
+      switch (FD->Kind) {
       case FieldDescriptorKind::Class:
         Refcounting = ReferenceCounting::Native;
         LLVM_FALLTHROUGH;
@@ -579,7 +581,7 @@ TypeConverter::getReferenceTypeInfo(ReferenceKind Kind,
   //
   // Weak references do not have any extra inhabitants.
 
-  auto *BuiltinTI = Builder.getBuiltinTypeInfo(TR);
+  auto BuiltinTI = Builder.getBuiltinTypeInfo(TR);
   if (BuiltinTI == nullptr) {
     DEBUG_LOG(std::cerr << "No TypeInfo for reference type: "; TR->dump());
     return nullptr;
@@ -620,14 +622,13 @@ TypeConverter::getThinFunctionTypeInfo() {
   if (ThinFunctionTI != nullptr)
     return ThinFunctionTI;
 
-  auto *descriptor = getBuilder().getBuiltinTypeInfo(
-      getThinFunctionTypeRef());
+  auto descriptor = getBuilder().getBuiltinTypeInfo(getThinFunctionTypeRef());
   if (descriptor == nullptr) {
     DEBUG_LOG(std::cerr << "No TypeInfo for function type\n");
     return nullptr;
   }
 
-  ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(descriptor);
+  ThinFunctionTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), descriptor);
 
   return ThinFunctionTI;
 }
@@ -656,14 +657,13 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   if (AnyMetatypeTI != nullptr)
     return AnyMetatypeTI;
 
-  auto *descriptor = getBuilder().getBuiltinTypeInfo(
-      getAnyMetatypeTypeRef());
+  auto descriptor = getBuilder().getBuiltinTypeInfo(getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
     DEBUG_LOG(std::cerr << "No TypeInfo for metatype type\n");
     return nullptr;
   }
 
-  AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(descriptor);
+  AnyMetatypeTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), descriptor);
 
   return AnyMetatypeTI;
 }
@@ -987,8 +987,7 @@ public:
       BitwiseTakable(true), Kind(RecordKind::Invalid), Invalid(false) {}
 
   const TypeInfo *
-  build(const TypeRef *TR,
-        const std::pair<const FieldDescriptor *, const ReflectionInfo *> &FD) {
+  build(const TypeRef *TR, RemoteRef<FieldDescriptor> FD) {
     // Sort enum into payload and no-payload cases.
     unsigned NoPayloadCases = 0;
     std::vector<FieldTypeInfo> PayloadCases;
@@ -1060,7 +1059,7 @@ public:
 
       // If we have a fixed descriptor for this type, it is a fixed-size
       // multi-payload enum that possibly uses payload spare bits.
-      auto *FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
+      auto FixedDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR);
       if (FixedDescriptor) {
         Size = FixedDescriptor->Size;
         Alignment = FixedDescriptor->getAlignment();
@@ -1124,31 +1123,32 @@ public:
 
     /// Otherwise, get the fixed layout information from reflection
     /// metadata.
-    auto *descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
+    auto descriptor = TC.getBuilder().getBuiltinTypeInfo(B);
     if (descriptor == nullptr) {
       DEBUG_LOG(std::cerr << "No TypeInfo for builtin type: "; B->dump());
       return nullptr;
     }
-    return TC.makeTypeInfo<BuiltinTypeInfo>(descriptor);
+    return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), descriptor);
   }
 
   const TypeInfo *visitAnyNominalTypeRef(const TypeRef *TR) {
-    const auto &FD = TC.getBuilder().getFieldTypeInfo(TR);
-    if (FD.first == nullptr || FD.first->isStruct()) {
+    auto FD = TC.getBuilder().getFieldTypeInfo(TR);
+    if (FD == nullptr || FD->isStruct()) {
       // Maybe this type is opaque -- look for a builtin
       // descriptor to see if we at least know its size
       // and alignment.
       if (auto ImportedTypeDescriptor = TC.getBuilder().getBuiltinTypeInfo(TR))
-        return TC.makeTypeInfo<BuiltinTypeInfo>(ImportedTypeDescriptor);
+        return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(),
+                                                ImportedTypeDescriptor);
 
       // Otherwise, we're out of luck.
-      if (FD.first == nullptr) {
+      if (FD == nullptr) {
         DEBUG_LOG(std::cerr << "No TypeInfo for nominal type: "; TR->dump());
         return nullptr;
       }
     }
 
-    switch (FD.first->Kind) {
+    switch (FD->Kind) {
     case FieldDescriptorKind::Class:
       // A value of class type is a single retainable pointer.
       return TC.getReferenceTypeInfo(ReferenceKind::Strong,
@@ -1382,14 +1382,13 @@ const TypeInfo *TypeConverter::getTypeInfo(const TypeRef *TR) {
 
 const TypeInfo *TypeConverter::getClassInstanceTypeInfo(const TypeRef *TR,
                                                         unsigned start) {
-  std::pair<const FieldDescriptor *, const ReflectionInfo *> FD =
-      getBuilder().getFieldTypeInfo(TR);
-  if (FD.first == nullptr) {
+  auto FD = getBuilder().getFieldTypeInfo(TR);
+  if (FD == nullptr) {
     DEBUG_LOG(std::cerr << "No field descriptor: "; TR->dump());
     return nullptr;
   }
 
-  switch (FD.first->Kind) {
+  switch (FD->Kind) {
   case FieldDescriptorKind::Class:
   case FieldDescriptorKind::ObjCClass: {
     // Lower the class's fields using substitutions from the

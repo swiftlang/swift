@@ -1329,7 +1329,7 @@ DeclContext *FailureDiagnosis::findDeclContext(Expr *subExpr) const {
         // variables would be accessible to name lookup of the subexpression and
         // may thus leak in.  Reset them to UnresolvedTypes for safe measures.
         assert(llvm::all_of(*closure->getParameters(), [](const ParamDecl *PD) {
-          if (PD->hasValidSignature()) {
+          if (PD->hasInterfaceType()) {
             auto paramTy = PD->getType();
             return !(paramTy->hasTypeVariable() || paramTy->hasError());
           }
@@ -2147,7 +2147,6 @@ bool FailureDiagnosis::diagnoseImplicitSelfErrors(
 
 class ArgumentMatcher : public MatchCallArgumentListener {
   TypeChecker &TC;
-  Expr *FnExpr;
   Expr *ArgExpr;
   ArrayRef<AnyFunctionType::Param> &Parameters;
   const ParameterListInfo &ParamInfo;
@@ -2164,12 +2163,12 @@ class ArgumentMatcher : public MatchCallArgumentListener {
   SmallVector<ParamBinding, 4> Bindings;
 
 public:
-  ArgumentMatcher(Expr *fnExpr, Expr *argExpr,
+  ArgumentMatcher(Expr *argExpr,
                   ArrayRef<AnyFunctionType::Param> &params,
                   const ParameterListInfo &paramInfo,
                   SmallVectorImpl<AnyFunctionType::Param> &args,
                   CalleeCandidateInfo &CCI, bool isSubscript)
-      : TC(CCI.CS.TC), FnExpr(fnExpr), ArgExpr(argExpr), Parameters(params),
+      : TC(CCI.CS.TC), ArgExpr(argExpr), Parameters(params),
         ParamInfo(paramInfo), Arguments(args), CandidateInfo(CCI),
         IsSubscript(isSubscript) {}
 
@@ -2209,159 +2208,6 @@ public:
           .highlight(arg->getSourceRange());
 
     Diagnosed = true;
-  }
-
-  void missingArgument(unsigned missingParamIdx) override {
-    auto &param = Parameters[missingParamIdx];
-    Identifier name = param.getLabel();
-
-    // Search insertion index.
-    unsigned argIdx = 0;
-    for (int Idx = missingParamIdx - 1; Idx >= 0; --Idx) {
-      if (Bindings[Idx].empty())
-        continue;
-      argIdx = Bindings[Idx].back() + 1;
-      break;
-    }
-
-    unsigned insertableEndIdx = Arguments.size();
-    if (CandidateInfo.hasTrailingClosure)
-      insertableEndIdx -= 1;
-
-    // Build argument string for fix-it.
-    SmallString<32> insertBuf;
-    llvm::raw_svector_ostream insertText(insertBuf);
-
-    if (argIdx != 0)
-      insertText << ", ";
-    if (!name.empty())
-      insertText << name.str() << ": ";
-    Type Ty = param.getOldType();
-    // Explode inout type.
-    if (param.isInOut()) {
-      insertText << "&";
-      Ty = param.getPlainType();
-    }
-    // @autoclosure; the type should be the result type.
-    if (param.isAutoClosure())
-      Ty = param.getPlainType()->castTo<FunctionType>()->getResult();
-    insertText << "<#" << Ty << "#>";
-    if (argIdx == 0 && insertableEndIdx != 0)
-      insertText << ", ";
-
-    SourceLoc insertLoc;
-    if (argIdx > insertableEndIdx) {
-      // Unreachable for now.
-      // FIXME: matchCallArguments() doesn't detect "missing argument after
-      // trailing closure". E.g.
-      //   func fn(x: Int, y: () -> Int, z: Int) { ... }
-      //   fn(x: 1) { return 1 }
-      // is diagnosed as "missing argument for 'y'" (missingParamIdx 1).
-      // It should be "missing argument for 'z'" (missingParamIdx 2).
-    } else if (auto *TE = dyn_cast<TupleExpr>(ArgExpr)) {
-      // fn():
-      //   fn([argMissing])
-      // fn(argX, argY):
-      //   fn([argMissing, ]argX, argY)
-      //   fn(argX[, argMissing], argY)
-      //   fn(argX, argY[, argMissing])
-      // fn(argX) { closure }:
-      //   fn([argMissing, ]argX) { closure }
-      //   fn(argX[, argMissing]) { closure }
-      //   fn(argX[, closureLabel: ]{closure}[, argMissing)] // Not impl.
-      if (insertableEndIdx == 0)
-        insertLoc = TE->getRParenLoc();
-      else if (argIdx != 0)
-        insertLoc = Lexer::getLocForEndOfToken(
-            TC.Context.SourceMgr, TE->getElement(argIdx - 1)->getEndLoc());
-      else {
-        insertLoc = TE->getElementNameLoc(0);
-        if (insertLoc.isInvalid())
-          insertLoc = TE->getElement(0)->getStartLoc();
-      }
-    } else if (auto *PE = dyn_cast<ParenExpr>(ArgExpr)) {
-      assert(argIdx <= 1);
-      if (PE->getRParenLoc().isValid()) {
-        // fn(argX):
-        //   fn([argMissing, ]argX)
-        //   fn(argX[, argMissing])
-        // fn() { closure }:
-        //   fn([argMissing]) {closure}
-        //   fn([closureLabel: ]{closure}[, argMissing]) // Not impl.
-        if (insertableEndIdx == 0)
-          insertLoc = PE->getRParenLoc();
-        else if (argIdx == 0)
-          insertLoc = PE->getSubExpr()->getStartLoc();
-        else
-          insertLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                                 PE->getSubExpr()->getEndLoc());
-      } else {
-        // fn { closure }:
-        //   fn[(argMissing)] { closure }
-        //   fn[(closureLabel:] { closure }[, missingArg)]  // Not impl.
-        assert(!IsSubscript && "bracket less subscript");
-        assert(PE->hasTrailingClosure() &&
-               "paren less ParenExpr without trailing closure");
-        insertBuf.insert(insertBuf.begin(), '(');
-        insertBuf.insert(insertBuf.end(), ')');
-        insertLoc = Lexer::getLocForEndOfToken(TC.Context.SourceMgr,
-                                               FnExpr->getEndLoc());
-      }
-    } else {
-      auto &CS = CandidateInfo.CS;
-      (void)CS;
-      // FIXME: Due to a quirk of CSApply, we can end up without a
-      // ParenExpr if the argument has an '@lvalue TupleType'.
-      assert((isa<TupleType>(CS.getType(ArgExpr).getPointer()) ||
-              CS.getType(ArgExpr)->hasParenSugar()) &&
-             "unexpected argument expression type");
-      insertLoc = ArgExpr->getLoc();
-    }
-
-    assert(insertLoc.isValid() && "missing argument after trailing closure?");
-
-    if (name.empty()) {
-      TC.diagnose(insertLoc, diag::missing_argument_positional,
-                  missingParamIdx + 1)
-          .fixItInsert(insertLoc, insertText.str());
-    } else {
-      if (isPropertyWrapperImplicitInit()) {
-        auto TE = cast<TypeExpr>(FnExpr);
-        TC.diagnose(TE->getLoc(), diag::property_wrapper_missing_arg_init, name,
-                    TE->getInstanceType()->getString());
-      } else {
-        TC.diagnose(insertLoc, diag::missing_argument_named, name)
-            .fixItInsert(insertLoc, insertText.str());
-      }
-    }
-
-    auto candidate = CandidateInfo[0];
-    if (candidate.getDecl())
-      TC.diagnose(candidate.getDecl(), diag::decl_declared_here,
-                  candidate.getDecl()->getFullName());
-
-    Diagnosed = true;
-  }
-
-  bool isPropertyWrapperImplicitInit() {
-    auto TE = dyn_cast<TypeExpr>(FnExpr);
-    if (!TE)
-      return false;
-
-    auto instanceTy = TE->getInstanceType();
-    if (!instanceTy)
-      return false;
-
-    auto nominalDecl = instanceTy->getAnyNominal();
-    if (!(nominalDecl &&
-          nominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()))
-      return false;
-
-    if (auto *parentExpr = CandidateInfo.CS.getParentExpr(FnExpr)) {
-      return parentExpr->isImplicit() && isa<CallExpr>(parentExpr);
-    }
-
-    return false;
   }
 
   bool missingLabel(unsigned paramIdx) override {
@@ -2499,7 +2345,7 @@ diagnoseSingleCandidateFailures(CalleeCandidateInfo &CCI, Expr *fnExpr,
 
   // If we have a single candidate that failed to match the argument list,
   // attempt to use matchCallArguments to diagnose the problem.
-  return ArgumentMatcher(fnExpr, argExpr, params, paramInfo, args, CCI,
+  return ArgumentMatcher(argExpr, params, paramInfo, args, CCI,
                          isa<SubscriptExpr>(fnExpr))
       .diagnose();
 }
@@ -3461,11 +3307,16 @@ bool FailureDiagnosis::visitApplyExpr(ApplyExpr *callExpr) {
     //   case (let (_, _, _)) + 1: break
     // }
     if (callExpr->isImplicit() && overloadName == "~=") {
-      auto *locator =
-          CS.getConstraintLocator(callExpr,
-                                  {ConstraintLocator::ApplyArgument,
-                                   LocatorPathElt::ApplyArgToParam(0, 0)},
-                                  /*summaryFlags=*/0);
+      auto flags = ParameterTypeFlags();
+      if (calleeInfo.candidates.size() == 1)
+        if (auto fnType = calleeInfo.candidates[0].getFunctionType())
+          flags = fnType->getParams()[0].getParameterFlags();
+
+      auto *locator = CS.getConstraintLocator(
+          callExpr,
+          {ConstraintLocator::ApplyArgument,
+           LocatorPathElt::ApplyArgToParam(0, 0, flags)},
+          /*summaryFlags=*/0);
 
       ArgumentMismatchFailure failure(expr, CS, lhsType, rhsType, locator);
       return failure.diagnosePatternMatchingMismatch();
@@ -4300,8 +4151,6 @@ static bool diagnoseKeyPathComponents(ConstraintSystem &CS, KeyPathExpr *KPE,
 
     // Handle property references.
     if (auto var = dyn_cast<VarDecl>(found)) {
-      TC.validateDecl(var);
-
       // Resolve this component to the variable we found.
       auto varRef = ConcreteDeclRef(var);
       auto resolved =
@@ -5345,7 +5194,7 @@ diagnoseAmbiguousMultiStatementClosure(ClosureExpr *closure) {
         if (auto DRE = dyn_cast<DeclRefExpr>(childExpr)) {
           if (auto param = dyn_cast<ParamDecl>(DRE->getDecl())) {
             auto paramType =
-                param->hasValidSignature() ? param->getType() : Type();
+                param->hasInterfaceType() ? param->getType() : Type();
             if (!paramType || paramType->hasTypeVariable()) {
               hasUnresolvedParams = true;
               return nullptr;

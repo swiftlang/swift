@@ -15,11 +15,13 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/SourceManager.h"
@@ -152,7 +154,7 @@ unsigned DeclContext::getGenericContextDepth() const {
   return depth;
 }
 
-GenericSignature *DeclContext::getGenericSignatureOfContext() const {
+GenericSignature DeclContext::getGenericSignatureOfContext() const {
   auto dc = this;
   do {
     if (auto decl = dc->getAsDecl())
@@ -225,6 +227,17 @@ Decl *DeclContext::getInnermostDeclarationDeclContext() {
     if (auto decl = DC->getAsDecl())
       return isa<ModuleDecl>(decl) ? nullptr : decl;
   } while ((DC = DC->getParent()));
+
+  return nullptr;
+}
+
+DeclContext *DeclContext::getInnermostSkippedFunctionContext() {
+  auto dc = this;
+  do {
+    if (auto afd = dyn_cast<AbstractFunctionDecl>(dc))
+      if (afd->isBodySkipped())
+        return afd;
+  } while ((dc = dc->getParent()));
 
   return nullptr;
 }
@@ -474,6 +487,10 @@ bool DeclContext::mayContainMembersAccessedByDynamicLookup() const {
       return PD->getAttrs().hasAttribute<ObjCAttr>();
 
   return false;
+}
+
+bool DeclContext::canBeParentOfExtension() const {
+  return isa<SourceFile>(this);
 }
 
 bool DeclContext::walkContext(ASTWalker &Walker) {

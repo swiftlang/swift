@@ -18,10 +18,10 @@
 
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 
 #include "llvm/Support/CommandLine.h"
 

@@ -56,8 +56,26 @@ class Identifier {
 
   const char *Pointer;
   
+public:
+  enum : size_t {
+    NumLowBitsAvailable = 2,
+    RequiredAlignment = 1 << NumLowBitsAvailable,
+    SpareBitMask = ((intptr_t)1 << NumLowBitsAvailable) - 1
+  };
+
+private:
   /// Constructor, only accessible by ASTContext, which handles the uniquing.
-  explicit Identifier(const char *Ptr) : Pointer(Ptr) {}
+  explicit Identifier(const char *Ptr) : Pointer(Ptr) {
+    assert(((uintptr_t)Ptr & SpareBitMask) == 0
+           && "Identifier pointer does not use any spare bits");
+  }
+
+  /// A type with the alignment expected of a valid \c Identifier::Pointer .
+  struct alignas(uint32_t) Aligner {};
+
+  static_assert(alignof(Aligner) >= RequiredAlignment,
+                "Identifier table will provide enough spare bits");
+
 public:
   explicit Identifier() : Pointer(nullptr) {}
   
@@ -153,12 +171,15 @@ public:
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
   
   static Identifier getEmptyKey() {
-    return Identifier((const char*)
-                      llvm::DenseMapInfo<const void*>::getEmptyKey());
+    uintptr_t Val = static_cast<uintptr_t>(-1);
+    Val <<= NumLowBitsAvailable;
+    return Identifier((const char*)Val);
   }
+
   static Identifier getTombstoneKey() {
-    return Identifier((const char*)
-                      llvm::DenseMapInfo<const void*>::getTombstoneKey());
+    uintptr_t Val = static_cast<uintptr_t>(-2);
+    Val <<= NumLowBitsAvailable;
+    return Identifier((const char*)Val);
   }
 
 private:
@@ -202,7 +223,7 @@ namespace llvm {
     static inline swift::Identifier getFromVoidPointer(void *P) {
       return swift::Identifier::getFromOpaquePointer(P);
     }
-    enum { NumLowBitsAvailable = 2 };
+    enum { NumLowBitsAvailable = swift::Identifier::NumLowBitsAvailable };
   };
   
 } // end namespace llvm
@@ -221,15 +242,15 @@ public:
   };
   
 private:
-  /// In a special DeclName represenenting a subscript, this opaque pointer
+  /// In a special DeclName representing a subscript, this opaque pointer
   /// is used as the data of the base name identifier.
   /// This is an implementation detail that should never leak outside of
   /// DeclName.
-  static void *SubscriptIdentifierData;
+  static const Identifier::Aligner SubscriptIdentifierData;
   /// As above, for special constructor DeclNames.
-  static void *ConstructorIdentifierData;
+  static const Identifier::Aligner ConstructorIdentifierData;
   /// As above, for special destructor DeclNames.
-  static void *DestructorIdentifierData;
+  static const Identifier::Aligner DestructorIdentifierData;
 
   Identifier Ident;
 
@@ -239,23 +260,23 @@ public:
   DeclBaseName(Identifier I) : Ident(I) {}
 
   static DeclBaseName createSubscript() {
-    return DeclBaseName(Identifier((const char *)SubscriptIdentifierData));
+    return DeclBaseName(Identifier((const char *)&SubscriptIdentifierData));
   }
 
   static DeclBaseName createConstructor() {
-    return DeclBaseName(Identifier((const char *)ConstructorIdentifierData));
+    return DeclBaseName(Identifier((const char *)&ConstructorIdentifierData));
   }
 
   static DeclBaseName createDestructor() {
-    return DeclBaseName(Identifier((const char *)DestructorIdentifierData));
+    return DeclBaseName(Identifier((const char *)&DestructorIdentifierData));
   }
 
   Kind getKind() const {
-    if (Ident.get() == SubscriptIdentifierData) {
+    if (Ident.get() == (const char *)&SubscriptIdentifierData) {
       return Kind::Subscript;
-    } else if (Ident.get() == ConstructorIdentifierData) {
+    } else if (Ident.get() == (const char *)&ConstructorIdentifierData) {
       return Kind::Constructor;
-    } else if (Ident.get() == DestructorIdentifierData) {
+    } else if (Ident.get() == (const char *)&DestructorIdentifierData) {
         return Kind::Destructor;
     } else {
       return Kind::Normal;
@@ -720,7 +741,7 @@ namespace llvm {
     static inline swift::DeclName getFromVoidPointer(void *ptr) {
       return swift::DeclName::getFromOpaqueValue(ptr);
     }
-    enum { NumLowBitsAvailable = 0 };
+    enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclBaseName>::NumLowBitsAvailable - 2 };
   };
 
   // DeclNames hash just like pointers.

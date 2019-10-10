@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/STLExtras.h"
@@ -192,6 +193,8 @@ static void recordShadowedDeclsAfterSignatureMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
+    bool firstTopLevel = firstDecl->getDeclContext()->isModuleScopeContext();
+
     auto name = firstDecl->getBaseName();
 
     auto isShadowed = [&](ArrayRef<ModuleDecl::AccessPathTy> paths) {
@@ -218,6 +221,29 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
+      bool secondTopLevel = secondDecl->getDeclContext()->isModuleScopeContext();
+
+      // For member types, we skip most of the below rules. Instead, we allow
+      // member types defined in a subclass to shadow member types defined in
+      // a superclass.
+      if (isa<TypeDecl>(firstDecl) &&
+          isa<TypeDecl>(secondDecl) &&
+          !firstTopLevel &&
+          !secondTopLevel) {
+        auto *firstClass = firstDecl->getDeclContext()->getSelfClassDecl();
+        auto *secondClass = secondDecl->getDeclContext()->getSelfClassDecl();
+        if (firstClass && secondClass && firstClass != secondClass) {
+          if (firstClass->isSuperclassOf(secondClass)) {
+            shadowed.insert(firstDecl);
+            continue;
+          } else if (secondClass->isSuperclassOf(firstClass)) {
+            shadowed.insert(secondDecl);
+            continue;
+          }
+        }
+
+        continue;
+      }
 
       // Top-level type declarations in a module shadow other declarations
       // visible through the module's imports.
@@ -225,8 +251,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // [Backward compatibility] Note that members of types have the same
       // shadowing check, but we do it after dropping unavailable members.
       if (firstModule != secondModule &&
-          firstDecl->getDeclContext()->isModuleScopeContext() &&
-          secondDecl->getDeclContext()->isModuleScopeContext()) {
+          firstTopLevel && secondTopLevel) {
         auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
           firstModule, secondModule, dc);
         auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
@@ -303,8 +328,7 @@ static void recordShadowedDeclsAfterSignatureMatch(
       // shadowing check is performed after unavailable candidates have
       // already been dropped.
       if (firstModule != secondModule &&
-          !firstDecl->getDeclContext()->isModuleScopeContext() &&
-          !secondDecl->getDeclContext()->isModuleScopeContext()) {
+          !firstTopLevel && !secondTopLevel) {
         auto firstPaths = imports.getAllAccessPathsNotShadowedBy(
           firstModule, secondModule, dc);
         auto secondPaths = imports.getAllAccessPathsNotShadowedBy(
@@ -433,8 +457,6 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
   if (decls.size() < 2)
     return;
 
-  auto typeResolver = decls[0]->getASTContext().getLazyResolver();
-
   // Categorize all of the declarations based on their overload signatures.
   llvm::SmallDenseMap<CanType, llvm::TinyPtrVector<ValueDecl *>> collisions;
   llvm::SmallVector<CanType, 2> collisionTypes;
@@ -462,19 +484,16 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
     CanType signature;
 
     if (!isa<TypeDecl>(decl)) {
-      // We need an interface type here.
-      if (typeResolver)
-        typeResolver->resolveDeclSignature(decl);
-
       // If the decl is currently being validated, this is likely a recursive
       // reference and we'll want to skip ahead so as to avoid having its type
       // attempt to desugar itself.
-      if (!decl->hasValidSignature())
+      if (decl->isRecursiveValidation())
         continue;
+      auto ifaceType = decl->getInterfaceType();
 
       // FIXME: the canonical type makes a poor signature, because we don't
       // canonicalize away default arguments.
-      signature = decl->getInterfaceType()->getCanonicalType();
+      signature = ifaceType->getCanonicalType();
 
       // FIXME: The type of a variable or subscript doesn't include
       // enough context to distinguish entities from different
@@ -482,9 +501,6 @@ static void recordShadowedDecls(ArrayRef<ValueDecl *> decls,
       // type. This is layering a partial fix upon a total hack.
       if (auto asd = dyn_cast<AbstractStorageDecl>(decl))
         signature = asd->getOverloadSignatureType();
-    } else if (decl->getDeclContext()->isTypeContext()) {
-      // Do not apply shadowing rules for member types.
-      continue;
     }
 
     // Record this declaration based on its signature.
@@ -1813,7 +1829,7 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
       // Recognize Swift.AnyObject directly.
       if (typealias->getName().is("AnyObject")) {
         // TypeRepr version: Builtin.AnyObject
-        if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+        if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
           if (auto compound = dyn_cast<CompoundIdentTypeRepr>(typeRepr)) {
             auto components = compound->getComponents();
             if (components.size() == 2 &&
@@ -1825,9 +1841,10 @@ resolveTypeDeclsToNominal(Evaluator &evaluator,
         }
 
         // Type version: an empty class-bound existential.
-        if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
-          if (type->isAnyObject())
-            anyObject = true;
+        if (typealias->hasInterfaceType()) {
+          if (auto type = typealias->getUnderlyingType())
+            if (type->isAnyObject())
+              anyObject = true;
         }
       }
 
@@ -2091,7 +2108,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
     Evaluator &evaluator,
     TypeAliasDecl *typealias) const {
   // Prefer syntactic information when we have it.
-  if (auto typeRepr = typealias->getUnderlyingTypeLoc().getTypeRepr()) {
+  if (auto typeRepr = typealias->getUnderlyingTypeRepr()) {
     return directReferencesForTypeRepr(evaluator, typealias->getASTContext(),
                                        typeRepr, typealias);
   }
@@ -2099,7 +2116,7 @@ DirectlyReferencedTypeDecls UnderlyingTypeDeclsReferencedRequest::evaluate(
   // Fall back to semantic types.
   // FIXME: In the long run, we shouldn't need this. Non-syntactic results
   // should be cached.
-  if (auto type = typealias->getUnderlyingTypeLoc().getType()) {
+  if (auto type = typealias->getUnderlyingType()) {
     return directReferencesForType(type);
   }
 

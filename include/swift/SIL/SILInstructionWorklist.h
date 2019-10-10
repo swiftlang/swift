@@ -33,7 +33,7 @@
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
 

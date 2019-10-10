@@ -329,18 +329,12 @@ swift::matchWitness(
   if (req->getKind() != witness->getKind())
     return RequirementMatch(witness, MatchKind::KindConflict);
 
-  // If the witness has not been validated yet, do so now.
-  if (!witness->hasValidSignature()) {
-    auto &ctx = dc->getASTContext();
-    ctx.getLazyResolver()->resolveDeclSignature(witness);
-  }
-
   // If the witness is invalid, record that and stop now.
   if (witness->isInvalid())
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->hasValidSignature())
+  if (witness->isRecursiveValidation())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.
@@ -556,9 +550,9 @@ swift::matchWitness(
 /// multiple protocols or conformances.
 static const RequirementEnvironment &getOrCreateRequirementEnvironment(
     WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
-    DeclContext *dc, GenericSignature *reqSig, ProtocolDecl *proto,
+    DeclContext *dc, GenericSignature reqSig, ProtocolDecl *proto,
     ClassDecl *covariantSelf, ProtocolConformance *conformance) {
-  WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig,
+  WitnessChecker::RequirementEnvironmentCacheKey cacheKey(reqSig.getPointer(),
                                                           covariantSelf);
   auto cacheIter = reqEnvCache.find(cacheKey);
   if (cacheIter == reqEnvCache.end()) {
@@ -656,7 +650,7 @@ swift::matchWitness(TypeChecker &tc,
   Type openedFullWitnessType;
   Type reqType, openedFullReqType;
 
-  auto *reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
+  auto reqSig = req->getInnermostDeclContext()->getGenericSignatureOfContext();
 
   ClassDecl *covariantSelf = nullptr;
   if (witness->getDeclContext()->getExtendedProtocolDecl()) {
@@ -730,8 +724,8 @@ swift::matchWitness(TypeChecker &tc,
       selfTy = reqGenericEnv->mapTypeIntoContext(selfTy);
 
     // Open up the type of the requirement.
-    reqLocator = cs->getConstraintLocator(static_cast<Expr *>(nullptr),
-                                          LocatorPathElt::Requirement(req));
+    reqLocator = cs->getConstraintLocator(
+        static_cast<Expr *>(nullptr), LocatorPathElt::ProtocolRequirement(req));
     OpenedTypeMap reqReplacements;
     std::tie(openedFullReqType, reqType)
       = cs->getTypeOfMemberReference(selfTy, req, dc,
@@ -1543,8 +1537,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance,
   conformance->setState(ProtocolConformanceState::Checking);
   SWIFT_DEFER { conformance->setState(ProtocolConformanceState::Complete); };
 
-  TC.validateDecl(Proto);
-
+  // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface
+  // type.
+  (void)Proto->getInterfaceType();
+  
   // If the protocol itself is invalid, there's nothing we can do.
   if (Proto->isInvalid()) {
     conformance->setInvalid();
@@ -1769,7 +1765,7 @@ static Type getTypeForDisplay(ModuleDecl *module, ValueDecl *decl) {
   if (!decl->getDeclContext()->isTypeContext())
     return type;
 
-  GenericSignature *sigWithoutReqts = nullptr;
+  GenericSignature sigWithoutReqts = GenericSignature();
   if (auto genericFn = type->getAs<GenericFunctionType>()) {
     // For generic functions, build a new generic function... but strip off
     // the requirements. They don't add value.
@@ -1825,7 +1821,7 @@ static Type getRequirementTypeForDisplay(ModuleDecl *module,
 
     auto result = substType(fnTy->getResult(), /*result*/true);
 
-    auto *genericSig = fnTy->getOptGenericSignature();
+    auto genericSig = fnTy->getOptGenericSignature();
     if (genericSig) {
       if (genericSig->getGenericParams().size() > 1) {
         genericSig = GenericSignature::get(
@@ -2205,11 +2201,7 @@ ConformanceChecker::ConformanceChecker(
       Conformance(conformance), Loc(conformance->getLoc()),
       GlobalMissingWitnesses(GlobalMissingWitnesses),
       LocalMissingWitnessesStartIndex(GlobalMissingWitnesses.size()),
-      SuppressDiagnostics(suppressDiagnostics) {
-  // The protocol may have only been validatedDeclForNameLookup'd until
-  // here, so fill in any information that's missing.
-  tc.validateDecl(conformance->getProtocol());
-}
+      SuppressDiagnostics(suppressDiagnostics) { }
 
 ArrayRef<AssociatedTypeDecl *>
 ConformanceChecker::getReferencedAssociatedTypes(ValueDecl *req) {
@@ -2323,7 +2315,7 @@ bool ConformanceChecker::checkObjCTypeErasedGenerics(
   if (!classDecl->usesObjCGenericsModel()) return false;
 
   // Concrete types are okay.
-  if (!type->hasTypeParameter()) return false;
+  if (!type->getCanonicalType()->hasTypeParameter()) return false;
 
   // Find one of the generic parameters named. It doesn't matter
   // which one.
@@ -2480,7 +2472,8 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
-
+    aliasDecl->computeType();
+    
     aliasDecl->setImplicit();
     if (type->hasError())
       aliasDecl->setInvalid();
@@ -3393,7 +3386,7 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
                                                ProtocolDecl *proto,
                                                AssociatedTypeDecl *assocType, 
                                                Type type) {
-  auto *genericSig = proto->getGenericSignature();
+  auto genericSig = proto->getGenericSignature();
   auto *depTy = DependentMemberType::get(proto->getSelfInterfaceType(),
                                          assocType);
 
@@ -3403,6 +3396,8 @@ CheckTypeWitnessResult swift::checkTypeWitness(TypeChecker &tc, DeclContext *dc,
   Type contextType = type->hasTypeParameter() ? dc->mapTypeIntoContext(type)
                                               : type;
 
+  // FIXME: This is incorrect; depTy is written in terms of the protocol's
+  // associated types, and we need to substitute in known type witnesses.
   if (auto superclass = genericSig->getSuperclassBound(depTy)) {
     if (!superclass->isExactSuperclassOf(contextType))
       return superclass;
@@ -3850,11 +3845,8 @@ void ConformanceChecker::resolveValueWitnesses() {
       continue;
     }
 
-    // Make sure we've validated the requirement.
-    if (!requirement->hasInterfaceType())
-      TC.validateDecl(requirement);
-
-    if (requirement->isInvalid() || !requirement->hasValidSignature()) {
+    // Make sure we've got an interface type.
+    if (!requirement->getInterfaceType() || requirement->isInvalid()) {
       Conformance->setInvalid();
       continue;
     }
@@ -3970,7 +3962,7 @@ static void diagnoseConformanceFailure(Type T,
       TypeChecker::containsProtocol(T, Proto, DC, None)) {
 
     if (!T->isObjCExistentialType()) {
-      diags.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
+      diags.diagnose(ComplainLoc, diag::type_cannot_conform, true,
                      T, Proto->getDeclaredType());
       return;
     }

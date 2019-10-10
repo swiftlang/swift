@@ -60,8 +60,8 @@ func patterns(gir: GoodRange<Int>, gtr: GoodTupleIterator) {
   var sumf : Float
   for i : Int in gir { sum = sum + i }
   for i in gir { sum = sum + i }
-  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'Int' to expected type 'Float'}}
-  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'Int' does not conform to expected protocol 'ElementProtocol'}}
+  for f : Float in gir { sum = sum + f } // expected-error{{cannot convert sequence element type 'GoodRange<Int>.Element' (aka 'Int') to expected type 'Float'}}
+  for f : ElementProtocol in gir { } // expected-error {{sequence element type 'GoodRange<Int>.Element' (aka 'Int') does not conform to expected protocol 'ElementProtocol'}}
 
   for (i, f) : (Int, Float) in gtr { sum = sum + i }
 
@@ -179,7 +179,7 @@ func testOptionalSequence() {
 
 // Crash with (invalid) for each over an existential
 func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
-  for x in s { // expected-error {{protocol type 'Sequence' cannot conform to 'Sequence' because only concrete types can conform to protocols}}
+  for x in s { // expected-error {{value of protocol type 'Sequence' cannot conform to 'Sequence'; only struct/enum/class types can conform to protocols}}
     _ = x
   }
 }

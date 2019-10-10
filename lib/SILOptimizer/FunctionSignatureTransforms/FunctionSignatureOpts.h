@@ -26,7 +26,7 @@
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/DenseMap.h"
@@ -111,9 +111,13 @@ struct ArgumentDescriptor {
     return Arg->hasConvention(P);
   }
 
+  /// Returns true if all function signature opt passes are able to process
+  /// this.
   bool canOptimizeLiveArg() const {
-    if (Arg->getType().isObject())
+    if (Arg->getType().isObject()) {
       return true;
+    }
+
     // @in arguments of generic types can be processed.
     if (Arg->getType().hasArchetype() &&
         Arg->getType().isAddress() &&
@@ -194,6 +198,13 @@ struct FunctionSignatureTransformDescriptor {
   /// will use during our optimization.
   MutableArrayRef<ResultDescriptor> ResultDescList;
 
+  /// Are we going to make a change to this function?
+  bool Changed;
+
+  /// Does this function only have direct callers. In such a case we know that
+  /// all thunks we create will be eliminated so we can be more aggressive.
+  bool hasOnlyDirectInModuleCallers;
+
   /// Return a function name based on the current state of ArgumentDescList and
   /// ResultDescList.
   ///
@@ -214,6 +225,19 @@ struct FunctionSignatureTransformDescriptor {
   /// simply passes it through.
   void addThunkArgument(ArgumentDescriptor &AD, SILBuilder &Builder,
                         SILBasicBlock *BB, SmallVectorImpl<SILValue> &NewArgs);
+
+  /// Whether specializing the function will result in a thunk with the same
+  /// signature as the original function that calls through to the specialized
+  /// function.
+  ///
+  /// Such a thunk is necessary if there is (or could be) code that calls the
+  /// function which we are unable to specialize to match the function's
+  /// specialization.
+  bool willSpecializationIntroduceThunk() {
+    return !hasOnlyDirectInModuleCallers ||
+           OriginalFunction->isPossiblyUsedExternally() ||
+          OriginalFunction->isAvailableExternally();
+  }
 };
 
 class FunctionSignatureTransform {
@@ -287,15 +311,17 @@ private:
 public:
   /// Constructor.
   FunctionSignatureTransform(
-      SILOptFunctionBuilder &FunctionBuilder,
-      SILFunction *F, RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
+      SILOptFunctionBuilder &FunctionBuilder, SILFunction *F,
+      RCIdentityAnalysis *RCIA, EpilogueARCAnalysis *EA,
       Mangle::FunctionSignatureSpecializationMangler &Mangler,
       llvm::SmallDenseMap<int, int> &AIM,
       llvm::SmallVector<ArgumentDescriptor, 4> &ADL,
-      llvm::SmallVector<ResultDescriptor, 4> &RDL)
+      llvm::SmallVector<ResultDescriptor, 4> &RDL,
+      bool hasOnlyDirectInModuleCallers)
       : FunctionBuilder(FunctionBuilder),
-        TransformDescriptor{F, nullptr, AIM, false, ADL, RDL}, RCIA(RCIA),
-        EA(EA) {}
+        TransformDescriptor{F,   nullptr, AIM,   false,
+                            ADL, RDL,     false, hasOnlyDirectInModuleCallers},
+        RCIA(RCIA), EA(EA) {}
 
   /// Return the optimized function.
   SILFunction *getOptimizedFunction() {

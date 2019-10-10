@@ -22,6 +22,7 @@
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
@@ -755,10 +756,10 @@ public:
                                                 Decl *attachingTo);
   void printTrailingWhereClause(TrailingWhereClause *whereClause);
 
-  void printGenericSignature(const GenericSignature *genericSig,
+  void printGenericSignature(GenericSignature genericSig,
                              unsigned flags);
   void
-  printGenericSignature(const GenericSignature *genericSig, unsigned flags,
+  printGenericSignature(GenericSignature genericSig, unsigned flags,
                         llvm::function_ref<bool(const Requirement &)> filter);
   void printSingleDepthOfGenericSignature(
       TypeArrayView<GenericTypeParamType> genericParams,
@@ -1326,7 +1327,7 @@ static unsigned getDepthOfRequirement(const Requirement &req) {
   llvm_unreachable("bad RequirementKind");
 }
 
-static void getRequirementsAtDepth(const GenericSignature *genericSig,
+static void getRequirementsAtDepth(GenericSignature genericSig,
                                    unsigned depth,
                                    SmallVectorImpl<Requirement> &result) {
   for (auto reqt : genericSig->getRequirements()) {
@@ -1337,7 +1338,7 @@ static void getRequirementsAtDepth(const GenericSignature *genericSig,
   }
 }
 
-void PrintAST::printGenericSignature(const GenericSignature *genericSig,
+void PrintAST::printGenericSignature(GenericSignature genericSig,
                                      unsigned flags) {
   printGenericSignature(genericSig, flags,
                         // print everything
@@ -1345,7 +1346,7 @@ void PrintAST::printGenericSignature(const GenericSignature *genericSig,
 }
 
 void PrintAST::printGenericSignature(
-    const GenericSignature *genericSig, unsigned flags,
+    GenericSignature genericSig, unsigned flags,
     llvm::function_ref<bool(const Requirement &)> filter) {
   auto requirements = genericSig->getRequirements();
 
@@ -1974,7 +1975,7 @@ void PrintAST::printGenericDeclGenericParams(GenericContext *decl) {
 void PrintAST::printGenericDeclGenericRequirements(GenericContext *decl) {
   if (decl->isGeneric()) {
     if (auto genericSig = decl->getGenericSignature()) {
-      auto *baseGenericSig = decl->getParent()
+      auto baseGenericSig = decl->getParent()
           ->getGenericSignatureOfContext();
       printGenericSignature(genericSig, PrintRequirements,
                             [baseGenericSig](const Requirement &req) {
@@ -2126,8 +2127,8 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
     });
     printInherited(decl);
 
-    if (auto *genericSig = decl->getGenericSignature()) {
-      auto *baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
+    if (auto genericSig = decl->getGenericSignature()) {
+      auto baseGenericSig = decl->getExtendedNominal()->getGenericSignature();
       assert(baseGenericSig &&
              "an extension can't be generic if the base type isn't");
       printGenericSignature(genericSig, PrintRequirements,
@@ -2276,7 +2277,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
       printGenericDeclGenericParams(decl);
     });
   bool ShouldPrint = true;
-  Type Ty = decl->getUnderlyingTypeLoc().getType();
+  Type Ty = decl->getUnderlyingType();
 
   // If the underlying type is private, don't print it.
   if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
@@ -2294,7 +2295,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
     // preserving sugar.
     llvm::SaveAndRestore<GenericEnvironment*> setGenericEnv(Options.GenericEnv,
                                                 decl->getGenericEnvironment());
-    printTypeLoc(decl->getUnderlyingTypeLoc());
+    printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), Ty));
     printGenericDeclGenericRequirements(decl);
   }
 }
@@ -2892,7 +2893,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
-  auto *raw = elt->getRawValueExpr();
+  auto *raw = elt->getStructuralRawValueExpr();
   if (!raw || raw->isImplicit())
     return;
 
@@ -3600,7 +3601,6 @@ public:
   }
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinRawPointerType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinNativeObjectType)
-  ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnknownObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinBridgeObjectType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinUnsafeValueBufferType)
   ASTPRINTER_PRINT_BUILTINTYPE(BuiltinIntegerLiteralType)
@@ -3916,7 +3916,7 @@ public:
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
-  void printGenericSignature(const GenericSignature *genericSig,
+  void printGenericSignature(GenericSignature genericSig,
                              unsigned flags) {
     PrintAST(Printer, Options).printGenericSignature(genericSig, flags);
   }
@@ -4348,13 +4348,24 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   }
 }
 
+void GenericSignatureImpl::print(raw_ostream &OS, PrintOptions PO) const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(OS, PO);
+}
+void GenericSignatureImpl::print(ASTPrinter &Printer, PrintOptions PO) const {
+  GenericSignature(const_cast<GenericSignatureImpl *>(this)).print(Printer, PO);
+}
+
 void GenericSignature::print(raw_ostream &OS, PrintOptions Opts) const {
   StreamPrinter Printer(OS);
   print(Printer, Opts);
 }
 
 void GenericSignature::print(ASTPrinter &Printer, PrintOptions Opts) const {
-  PrintAST(Printer, Opts).printGenericSignature(this,
+  if (isNull()) {
+    Printer << "<null>";
+    return;
+  }
+  PrintAST(Printer, Opts).printGenericSignature(*this,
                                                 PrintAST::PrintParams |
                                                 PrintAST::PrintRequirements);
 }
@@ -4399,6 +4410,11 @@ void Requirement::print(raw_ostream &os, const PrintOptions &opts) const {
 
 void Requirement::print(ASTPrinter &printer, const PrintOptions &opts) const {
   PrintAST(printer, opts).printRequirement(*this);
+}
+
+std::string GenericSignatureImpl::getAsString() const {
+  return GenericSignature(const_cast<GenericSignatureImpl *>(this))
+      .getAsString();
 }
 
 std::string GenericSignature::getAsString() const {

@@ -37,9 +37,11 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
       id.AddPointer(elt.castTo<LocatorPathElt::GenericParameter>().getType());
       break;
 
-    case Requirement:
-      id.AddPointer(elt.castTo<LocatorPathElt::Requirement>().getDecl());
+    case ProtocolRequirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
+      id.AddPointer(reqElt.getDecl());
       break;
+    }
 
     case Witness:
       id.AddPointer(elt.castTo<LocatorPathElt::Witness>().getDecl());
@@ -175,22 +177,16 @@ bool ConstraintLocator::isForKeyPathComponent() const {
   });
 }
 
-bool ConstraintLocator::isLastElement(
-    ConstraintLocator::PathElementKind expectedKind) const {
-  auto path = getPath();
-  return !path.empty() && path.back().getKind() == expectedKind;
-}
-
 bool ConstraintLocator::isForGenericParameter() const {
-  return isLastElement(ConstraintLocator::GenericParameter);
+  return isLastElement<LocatorPathElt::GenericParameter>();
 }
 
 bool ConstraintLocator::isForSequenceElementType() const {
-  return isLastElement(ConstraintLocator::SequenceElementType);
+  return isLastElement<LocatorPathElt::SequenceElementType>();
 }
 
 bool ConstraintLocator::isForContextualType() const {
-  return isLastElement(ConstraintLocator::ContextualType);
+  return isLastElement<LocatorPathElt::ContextualType>();
 }
 
 GenericTypeParamType *ConstraintLocator::getGenericParameter() const {
@@ -344,9 +340,9 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
       out << "key path component #" << llvm::utostr(kpElt.getIndex());
       break;
     }
-    case Requirement: {
-      auto reqElt = elt.castTo<LocatorPathElt::Requirement>();
-      out << "requirement ";
+    case ProtocolRequirement: {
+      auto reqElt = elt.castTo<LocatorPathElt::ProtocolRequirement>();
+      out << "protocol requirement ";
       reqElt.getDecl()->dumpRef(out);
       break;
     }

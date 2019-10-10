@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/DJB.h"
@@ -500,4 +501,8 @@ void serialization::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC,
   }
 
   S.writeToStream(os);
+}
+
+void serialization::writeSourceInfoToStream(raw_ostream &os, ModuleOrSourceFile DC) {
+  os << "Some stuff";
 }

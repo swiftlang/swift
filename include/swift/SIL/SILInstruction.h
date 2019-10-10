@@ -168,12 +168,12 @@ public:
   reverse_iterator rbegin() const;
   reverse_iterator rend() const;
 
-  using range = llvm::iterator_range<iterator>;
+  using range = iterator_range<iterator>;
   range getValues() const;
-  using reverse_range = llvm::iterator_range<reverse_iterator>;
+  using reverse_range = iterator_range<reverse_iterator>;
   reverse_range getReversedValues() const;
 
-  using type_range = llvm::iterator_range<
+  using type_range = iterator_range<
     llvm::mapped_iterator<iterator, SILType(*)(SILValue), SILType>>;
   type_range getTypes() const;
 
@@ -523,6 +523,16 @@ public:
     getAllOperands()[Num1].swap(getAllOperands()[Num2]);
   }
 
+private:
+  /// Predicate used to filter OperandTypeRange.
+  struct OperandToType;
+
+public:
+  using OperandTypeRange =
+      OptionalTransformRange<ArrayRef<Operand>, OperandToType>;
+  // NOTE: We always skip type dependent operands.
+  OperandTypeRange getOperandTypes() const;
+
   /// Return the list of results produced by this instruction.
   bool hasResults() const { return !getResults().empty(); }
   SILInstructionResultArray getResults() const { return getResultsImpl(); }
@@ -698,6 +708,22 @@ SILInstruction::getOperandValues(bool skipTypeDependentOperands) const
     -> OperandValueRange {
   return OperandValueRange(getAllOperands(),
                            OperandToValue(*this, skipTypeDependentOperands));
+}
+
+struct SILInstruction::OperandToType {
+  const SILInstruction &i;
+
+  OperandToType(const SILInstruction &i) : i(i) {}
+
+  Optional<SILType> operator()(const Operand &use) const {
+    if (i.isTypeDependentOperand(use))
+      return None;
+    return use.get()->getType();
+  }
+};
+
+inline auto SILInstruction::getOperandTypes() const -> OperandTypeRange {
+  return OperandTypeRange(getAllOperands(), OperandToType(*this));
 }
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -1289,14 +1315,18 @@ public:
 /// arguments that are needed by DebugValueInst, DebugValueAddrInst,
 /// AllocStackInst, and AllocBoxInst.
 struct SILDebugVariable {
+  StringRef Name;
+  unsigned ArgNo : 16;
+  unsigned Constant : 1;
+
   SILDebugVariable() : ArgNo(0), Constant(false) {}
   SILDebugVariable(bool Constant, uint16_t ArgNo)
       : ArgNo(ArgNo), Constant(Constant) {}
   SILDebugVariable(StringRef Name, bool Constant, unsigned ArgNo)
       : Name(Name), ArgNo(ArgNo), Constant(Constant) {}
-  StringRef Name;
-  unsigned ArgNo : 16;
-  unsigned Constant : 1;
+  bool operator==(const SILDebugVariable &V) {
+    return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name;
+  }
 };
 
 /// A DebugVariable where storage for the strings has been
@@ -1835,7 +1865,8 @@ public:
   /// The operand number of the first argument.
   static unsigned getArgumentOperandNumber() { return NumStaticOperands; }
 
-  SILValue getCallee() const { return getAllOperands()[Callee].get(); }
+  const Operand *getCalleeOperand() const { return &getAllOperands()[Callee]; }
+  SILValue getCallee() const { return getCalleeOperand()->get(); }
 
   /// Gets the origin of the callee by looking through function type conversions
   /// until we find a function_ref, partial_apply, or unrecognized value.
@@ -3007,7 +3038,7 @@ public:
 
   /// Looks up the BuiltinKind of this builtin. Returns None if this is
   /// not a builtin.
-  llvm::Optional<BuiltinValueKind> getBuiltinKind() const {
+  Optional<BuiltinValueKind> getBuiltinKind() const {
     auto I = getBuiltinInfo();
     if (I.ID == BuiltinValueKind::None)
       return None;
@@ -7186,7 +7217,10 @@ private:
          ProfileCounter FalseBBCount, SILFunction &F);
 
 public:
-  SILValue getCondition() const { return getAllOperands()[ConditionIdx].get(); }
+  const Operand *getConditionOperand() const {
+    return &getAllOperands()[ConditionIdx];
+  }
+  SILValue getCondition() const { return getConditionOperand()->get(); }
   void setCondition(SILValue newCondition) {
     getAllOperands()[ConditionIdx].set(newCondition);
   }
@@ -7230,6 +7264,11 @@ public:
   MutableArrayRef<Operand> getFalseOperands() {
     // The remaining arguments are 'false' operands.
     return getAllOperands().slice(NumFixedOpers + getNumTrueArgs());
+  }
+
+  /// Returns true if \p op is mapped to the condition operand of the cond_br.
+  bool isConditionOperand(Operand *op) const {
+    return getConditionOperand() == op;
   }
 
   bool isConditionOperandIndex(unsigned OpIndex) const {

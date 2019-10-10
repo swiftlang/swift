@@ -76,20 +76,8 @@ Type swift::getMemberTypeForComparison(ASTContext &ctx, ValueDecl *member,
   assert((method || abstractStorage) && "Not a method or abstractStorage?");
   SubscriptDecl *subscript = dyn_cast_or_null<SubscriptDecl>(abstractStorage);
 
-  if (!member->hasInterfaceType()) {
-    auto lazyResolver = ctx.getLazyResolver();
-    assert(lazyResolver && "Need to resolve interface type");
-    lazyResolver->resolveDeclSignature(member);
-  }
-
   auto memberType = member->getInterfaceType();
   if (derivedDecl) {
-    if (!derivedDecl->hasInterfaceType()) {
-      auto lazyResolver = ctx.getLazyResolver();
-      assert(lazyResolver && "Need to resolve interface type");
-      lazyResolver->resolveDeclSignature(derivedDecl);
-    }
-
     auto *dc = derivedDecl->getDeclContext();
     auto owningType = dc->getDeclaredInterfaceType();
     assert(owningType);
@@ -156,7 +144,7 @@ static bool areAccessorsOverrideCompatible(AbstractStorageDecl *storage,
 
 bool swift::isOverrideBasedOnType(ValueDecl *decl, Type declTy,
                                   ValueDecl *parentDecl, Type parentDeclTy) {
-  auto *genericSig =
+  auto genericSig =
       decl->getInnermostDeclContext()->getGenericSignatureOfContext();
 
   auto canDeclTy = declTy->getCanonicalType(genericSig);
@@ -1965,4 +1953,23 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // so we don't try again.
   return matcher.checkPotentialOverrides(matches,
                                          OverrideCheckingAttempt::PerfectMatch);
+}
+
+llvm::Expected<bool>
+IsABICompatibleOverrideRequest::evaluate(Evaluator &evaluator,
+                                         ValueDecl *decl) const {
+  auto base = decl->getOverriddenDecl();
+  if (!base)
+    return false;
+
+  auto baseInterfaceTy = base->getInterfaceType();
+  auto derivedInterfaceTy = decl->getInterfaceType();
+
+  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
+
+  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
+      base, decl, baseInterfaceTy);
+
+  return derivedInterfaceTy->matches(overrideInterfaceTy,
+                                     TypeMatchFlags::AllowABICompatible);
 }

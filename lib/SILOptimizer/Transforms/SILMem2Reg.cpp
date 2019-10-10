@@ -20,23 +20,23 @@
 
 
 #define DEBUG_TYPE "sil-mem2reg"
-#include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
-#include "swift/SIL/Projection.h"
 #include "swift/SIL/TypeLowering.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "llvm/ADT/DenseSet.h"
+#include "swift/SILOptimizer/PassManager/Passes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Statistic.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
 #include <algorithm>
 #include <queue>
@@ -299,9 +299,15 @@ promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
   assert(DVAI->getOperand()->getType().isLoadable(*DVAI->getFunction()) &&
          "Unexpected promotion of address-only type!");
   assert(Value && "Expected valid value");
+  // Avoid inserting the same debug_value twice.
+  for (Operand *Use : Value->getUses())
+    if (auto *DVI = dyn_cast<DebugValueInst>(Use->getUser()))
+      if (*DVI->getVarInfo() == *DVAI->getVarInfo())
+        return;
   B.setInsertionPoint(DVAI);
   B.setCurrentDebugScope(DVAI->getDebugScope());
   B.createDebugValue(DVAI->getLoc(), Value, *DVAI->getVarInfo());
+
   DVAI->eraseFromParent();
 }
 

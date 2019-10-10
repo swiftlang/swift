@@ -498,16 +498,6 @@ Type ConstraintSystem::openUnboundGenericType(UnboundGenericType *unbound,
                                               ConstraintLocatorBuilder locator,
                                               OpenedTypeMap &replacements) {
   auto unboundDecl = unbound->getDecl();
-
-  // If the unbound decl hasn't been validated yet, we have a circular
-  // dependency that isn't being diagnosed properly.
-  //
-  // FIXME: Delete this condition.  He's dead Jim.
-  if (!unboundDecl->hasComputedGenericSignature()) {
-    TC.diagnose(unboundDecl, diag::circular_reference);
-    return Type();
-  }
-
   auto parentTy = unbound->getParent();
   if (parentTy) {
     parentTy = openUnboundGenericType(parentTy, locator);
@@ -607,7 +597,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
                                                    extension);
     }
 
-    if (auto *signature = decl->getGenericSignature()) {
+    if (auto signature = decl->getGenericSignature()) {
       cs.openGenericRequirements(
           extension, signature, /*skipProtocolSelfConstraint*/ true, locator,
           [&](Type type) {
@@ -632,7 +622,7 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
 
 Type ConstraintSystem::openUnboundGenericType(
     Type type, ConstraintLocatorBuilder locator) {
-  assert(!type->hasTypeParameter());
+  assert(!type->getCanonicalType()->hasTypeParameter());
 
   checkNestedTypeConstraints(*this, type, locator);
 
@@ -685,7 +675,7 @@ FunctionType *ConstraintSystem::openFunctionType(
        OpenedTypeMap &replacements,
        DeclContext *outerDC) {
   if (auto *genericFn = funcType->getAs<GenericFunctionType>()) {
-    auto *signature = genericFn->getGenericSignature();
+    auto signature = genericFn->getGenericSignature();
 
     openGenericParameters(outerDC, signature, replacements, locator);
 
@@ -829,7 +819,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(VarDecl *value, Type baseType,
         if (auto *param = dyn_cast<ParamDecl>(var))
           return getType(param);
 
-        if (!var->hasValidSignature()) {
+        if (!var->hasInterfaceType()) {
           if (!var->isInvalid()) {
             TC.diagnose(var->getLoc(), diag::recursive_decl_reference,
                         var->getDescriptiveKind(), var->getName());
@@ -1092,7 +1082,7 @@ static void bindArchetypesFromContext(
     }
 
     // If it's not generic, there's nothing to do.
-    auto *genericSig = parentDC->getGenericSignatureOfContext();
+    auto genericSig = parentDC->getGenericSignatureOfContext();
     if (!genericSig)
       break;
 
@@ -1107,10 +1097,10 @@ static void bindArchetypesFromContext(
 
 void ConstraintSystem::openGeneric(
        DeclContext *outerDC,
-       GenericSignature *sig,
+       GenericSignature sig,
        ConstraintLocatorBuilder locator,
        OpenedTypeMap &replacements) {
-  if (sig == nullptr)
+  if (!sig)
     return;
 
   openGenericParameters(outerDC, sig, replacements, locator);
@@ -1122,7 +1112,7 @@ void ConstraintSystem::openGeneric(
 }
 
 void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
-                                             GenericSignature *sig,
+                                             GenericSignature sig,
                                              OpenedTypeMap &replacements,
                                              ConstraintLocatorBuilder locator) {
   assert(sig);
@@ -1147,7 +1137,7 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
 }
 
 void ConstraintSystem::openGenericRequirements(
-    DeclContext *outerDC, GenericSignature *signature,
+    DeclContext *outerDC, GenericSignature signature,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
     llvm::function_ref<Type(Type)> substFn) {
   auto requirements = signature->getRequirements();
@@ -1216,8 +1206,8 @@ static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
 /// Determine whether the given locator is for a witness or requirement.
 static bool isRequirementOrWitness(const ConstraintLocatorBuilder &locator) {
   if (auto last = locator.last()) {
-    return last->getKind() == ConstraintLocator::Requirement ||
-    last->getKind() == ConstraintLocator::Witness;
+    return last->getKind() == ConstraintLocator::ProtocolRequirement ||
+           last->getKind() == ConstraintLocator::Witness;
   }
 
   return false;
@@ -1322,7 +1312,7 @@ ConstraintSystem::getTypeOfMemberReference(
 
     // If the storage is generic, add a generic signature.
     FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
-    if (auto *sig = innerDC->getGenericSignatureOfContext()) {
+    if (auto sig = innerDC->getGenericSignatureOfContext()) {
       funcType = GenericFunctionType::get(sig, {selfParam}, refType);
     } else {
       funcType = FunctionType::get({selfParam}, refType);
@@ -1473,7 +1463,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
   if (!type) {
-    decl->getASTContext().getLazyResolver()->resolveDeclSignature(decl);
     type = decl->getInterfaceType();
     if (!type) {
       return Type();
@@ -2923,11 +2912,12 @@ void constraints::simplifyLocator(Expr *&anchor,
 
       // Extract subexpression in parentheses.
       if (auto parenExpr = dyn_cast<ParenExpr>(anchor)) {
-        assert(elt.getArgIdx() == 0);
-
-        anchor = parenExpr->getSubExpr();
-        path = path.slice(1);
-        continue;
+        // This simplication request could be for a synthesized argument.
+        if (elt.getArgIdx() == 0) {
+          anchor = parenExpr->getSubExpr();
+          path = path.slice(1);
+          continue;
+        }
       }
       break;
     }
@@ -3051,6 +3041,22 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
   }
 
   return false;
+}
+
+bool constraints::hasAppliedSelf(ConstraintSystem &cs,
+                                 const OverloadChoice &choice) {
+  auto *decl = choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto baseType = choice.getBaseType();
+  if (baseType)
+    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
+
+  // In most cases where we reference a declaration with a curried self
+  // parameter, it gets dropped from the type of the reference.
+  return decl->hasCurriedSelf() &&
+         doesMemberRefApplyCurriedSelf(baseType, decl);
 }
 
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,

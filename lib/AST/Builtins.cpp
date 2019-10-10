@@ -16,6 +16,7 @@
 
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -79,8 +80,6 @@ Type swift::getBuiltinType(ASTContext &Context, StringRef Name) {
     return Context.TheRawPointerType;
   if (Name == "NativeObject")
     return Context.TheNativeObjectType;
-  if (Name == "UnknownObject")
-    return Context.TheUnknownObjectType;
   if (Name == "BridgeObject")
     return Context.TheBridgeObjectType;
   if (Name == "SILToken")
@@ -163,7 +162,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
         ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
                   Identifier(), SourceLoc(), Identifier(), DC);
     PD->setInterfaceType(argType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -180,7 +178,6 @@ getBuiltinFunction(Identifier Id, ArrayRef<Type> argTypes, Type ResType,
                              paramList,
                              TypeLoc::withoutLoc(ResType), DC);
   FD->computeType(Info);
-  FD->setValidationToChecked();
   FD->setImplicit();
   FD->setAccess(AccessLevel::Public);
   return FD;
@@ -192,7 +189,7 @@ getBuiltinGenericFunction(Identifier Id,
                           ArrayRef<AnyFunctionType::Param> ArgParamTypes,
                           Type ResType,
                           GenericParamList *GenericParams,
-                          GenericSignature *Sig) {
+                          GenericSignature Sig) {
   assert(GenericParams && "Missing generic parameters");
   auto &Context = ResType->getASTContext();
 
@@ -210,7 +207,6 @@ getBuiltinGenericFunction(Identifier Id,
                                       Identifier(), SourceLoc(),
                                       Identifier(), DC);
     PD->setInterfaceType(paramIfaceType);
-    PD->setValidationToChecked();
     PD->setImplicit();
     params.push_back(PD);
   }
@@ -229,7 +225,6 @@ getBuiltinGenericFunction(Identifier Id,
 
   func->setGenericSignature(Sig);
   func->computeType();
-  func->setValidationToChecked();
   func->setImplicit();
   func->setAccess(AccessLevel::Public);
 
@@ -458,7 +453,7 @@ namespace {
   private:
     GenericParamList *TheGenericParamList;
     SmallVector<GenericTypeParamDecl*, 2> GenericTypeParams;
-    GenericSignature *GenericSig = nullptr;
+    GenericSignature GenericSig = GenericSignature();
     SmallVector<AnyFunctionType::Param, 4> InterfaceParams;
     Type InterfaceResult;
 
@@ -478,7 +473,7 @@ namespace {
           ctx.evaluator,
           AbstractGenericSignatureRequest{
             nullptr, std::move(genericParamTypes), { }},
-          nullptr);
+          GenericSignature());
     }
 
     template <class G>
@@ -1180,6 +1175,15 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   }
 }
 
+static ValueDecl *getPolymorphicBinaryOperation(ASTContext &ctx,
+                                                Identifier id) {
+  BuiltinGenericSignatureBuilder builder(ctx);
+  builder.addParameter(makeGenericParam());
+  builder.addParameter(makeGenericParam());
+  builder.setResult(makeGenericParam());
+  return builder.build(id);
+}
+
 /// An array of the overloaded builtin kinds.
 static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
   OverloadedBuiltinKind::None,
@@ -1190,8 +1194,10 @@ static const OverloadedBuiltinKind OverloadedBuiltinKinds[] = {
    OverloadedBuiltinKind::Special,
 #define BUILTIN_CAST_OR_BITCAST_OPERATION(id, attrs, name) \
    OverloadedBuiltinKind::Special,
-#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload) \
-   OverloadedBuiltinKind::overload,
+#define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(id, name, attrs, overload)  \
+  OverloadedBuiltinKind::overload,
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+  OverloadedBuiltinKind::Special,
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload) \
    OverloadedBuiltinKind::overload,
 #define BUILTIN_BINARY_PREDICATE(id, name, attrs, overload) \
@@ -1242,6 +1248,13 @@ inline bool isBuiltinTypeOverloaded(Type T, OverloadedBuiltinKind OK) {
     return true;
   }
   llvm_unreachable("bad overloaded builtin kind");
+}
+
+bool swift::canBuiltinBeOverloadedForType(BuiltinValueKind ID, Type Ty) {
+  if (ID == BuiltinValueKind::None)
+    return false;
+
+  return isBuiltinTypeOverloaded(Ty, OverloadedBuiltinKinds[unsigned(ID)]);
 }
 
 /// Table of string intrinsic names indexed by enum value.
@@ -1361,6 +1374,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::HalfVecArgument:
   case IITDescriptor::VarArg:
   case IITDescriptor::Token:
+  case IITDescriptor::VecElementArgument:
   case IITDescriptor::VecOfAnyPtrsToElt:
     // These types cannot be expressed in swift yet.
     return Type();
@@ -1776,10 +1790,21 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     return getEndUnpairedAccessOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
-#define BUILTIN_BINARY_OPERATION(id, name, attrs, overload)  case BuiltinValueKind::id:
+#define BUILTIN_BINARY_OPERATION(id, name, attrs)
+#define BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(id, name, attrs, overload)  \
+  case BuiltinValueKind::id:
 #include "swift/AST/Builtins.def"
     if (Types.size() != 1) return nullptr;
       return getBinaryOperation(Id, Types[0]);
+
+#define BUILTIN(id, name, attrs)
+#define BUILTIN_BINARY_OPERATION(id, name, attrs)
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(id, name, attrs)                  \
+  case BuiltinValueKind::id:
+#include "swift/AST/Builtins.def"
+      if (!Types.empty())
+        return nullptr;
+      return getPolymorphicBinaryOperation(Context, Id);
 
 #define BUILTIN(id, name, Attrs)
 #define BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(id, name, _, attrs, overload)  case BuiltinValueKind::id:
@@ -2033,6 +2058,21 @@ StringRef swift::getBuiltinName(BuiltinValueKind ID) {
   llvm_unreachable("bad BuiltinValueKind");
 }
 
+bool swift::isPolymorphicBuiltin(BuiltinValueKind id) {
+  switch (id) {
+  case BuiltinValueKind::None:
+    llvm_unreachable("no builtin kind");
+#define BUILTIN(Id, Name, Attrs)                                               \
+  case BuiltinValueKind::Id:                                                   \
+    return false;
+#define BUILTIN_BINARY_OPERATION_POLYMORPHIC(Id, Name, Attrs)                  \
+  case BuiltinValueKind::Id:                                                   \
+    return true;
+#include "swift/AST/Builtins.def"
+  }
+  llvm_unreachable("bad BuiltinValueKind");
+}
+
 BuiltinTypeKind BuiltinType::getBuiltinTypeKind() const {
   // If we do not have a vector or an integer our job is easy.
   return BuiltinTypeKind(std::underlying_type<TypeKind>::type(getKind()));
@@ -2054,9 +2094,6 @@ StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
     break;
   case BuiltinTypeKind::BuiltinNativeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_NATIVEOBJECT);
-    break;
-  case BuiltinTypeKind::BuiltinUnknownObject:
-    printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_UNKNOWNOBJECT);
     break;
   case BuiltinTypeKind::BuiltinBridgeObject:
     printer << MAYBE_GET_NAMESPACED_BUILTIN(BUILTIN_TYPE_NAME_BRIDGEOBJECT);

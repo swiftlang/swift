@@ -17,7 +17,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -278,6 +278,10 @@ class CallerAnalysis::FunctionInfo {
   /// visibility of a protocol conformance or class.
   bool mayHaveIndirectCallers : 1;
 
+  /// Whether the function is sufficiently visible to be called by a different
+  /// module.
+  bool mayHaveExternalCallers : 1;
+
 public:
   FunctionInfo(SILFunction *f);
 
@@ -289,7 +293,8 @@ public:
   /// function (e.g. a specialized function) without needing to introduce a
   /// thunk since we can rewrite all of the callers to call the new function.
   bool foundAllCallers() const {
-    return hasOnlyCompleteDirectCallerSets() && !mayHaveIndirectCallers;
+    return hasOnlyCompleteDirectCallerSets() && !mayHaveIndirectCallers &&
+           !mayHaveExternalCallers;
   }
 
   /// Returns true if this function has at least one direct caller.

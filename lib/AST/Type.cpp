@@ -161,7 +161,7 @@ bool TypeBase::isAnyClassReferenceType() {
   return getCanonicalType().isAnyClassReferenceType();
 }
 
-bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
+bool CanType::isReferenceTypeImpl(CanType type, GenericSignatureImpl *sig,
                                   bool functionsCount) {
   switch (type->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
@@ -170,7 +170,6 @@ bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
     llvm_unreachable("sugared canonical type?");
 
   // These types are always class references.
-  case TypeKind::BuiltinUnknownObject:
   case TypeKind::BuiltinNativeObject:
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::Class:
@@ -248,7 +247,7 @@ bool CanType::isReferenceTypeImpl(CanType type, GenericSignature *sig,
 ///   - existentials with class or class protocol bounds
 /// But not:
 ///   - function types
-bool TypeBase::allowsOwnership(GenericSignature *sig) {
+bool TypeBase::allowsOwnership(GenericSignatureImpl *sig) {
   return getCanonicalType().allowsOwnership(sig);
 }
 
@@ -419,7 +418,7 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 
   auto *type = this;
 
-  GenericSignature *sig = dc->getGenericSignatureOfContext();
+  GenericSignature sig = dc->getGenericSignatureOfContext();
   if (auto *genericFn = type->getAs<GenericFunctionType>()) {
     sig = genericFn->getGenericSignature();
     type = FunctionType::get(genericFn->getParams(),
@@ -624,6 +623,28 @@ Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
   }
   return Type();
 }
+
+Type TypeBase::wrapInPointer(PointerTypeKind kind) {
+  ASTContext &ctx = getASTContext();
+  NominalTypeDecl *pointerDecl = ([&ctx, kind] {
+    switch (kind) {
+    case PTK_UnsafeMutableRawPointer:
+    case PTK_UnsafeRawPointer:
+      llvm_unreachable("these pointer types don't take arguments");
+    case PTK_UnsafePointer:
+      return ctx.getUnsafePointerDecl();
+    case PTK_UnsafeMutablePointer:
+      return ctx.getUnsafeMutablePointerDecl();
+    case PTK_AutoreleasingUnsafeMutablePointer:
+      return ctx.getAutoreleasingUnsafeMutablePointerDecl();
+    }
+    llvm_unreachable("bad kind");
+  }());
+
+  assert(pointerDecl);
+  return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
+}
+
 
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
@@ -1098,8 +1119,8 @@ CanType TypeBase::computeCanonicalType() {
       assert(resolver && "Need to resolve generic parameter depth");
       if (auto decl =
             gpDecl->getDeclContext()->getInnermostDeclarationDeclContext())
-        if (auto valueDecl = dyn_cast<ValueDecl>(decl))
-          resolver->resolveDeclSignature(valueDecl);
+        if (auto valueDecl = decl->getAsGenericContext())
+          (void)valueDecl->getGenericSignature();
     }
 
     assert(gpDecl->getDepth() != GenericTypeParamDecl::InvalidDepth &&
@@ -1230,7 +1251,7 @@ CanType TypeBase::computeCanonicalType() {
   return CanonicalType = CanType(Result);
 }
 
-CanType TypeBase::getCanonicalType(GenericSignature *sig) {
+CanType TypeBase::getCanonicalType(GenericSignature sig) {
   if (!sig)
     return getCanonicalType();
 
@@ -1669,7 +1690,7 @@ bool TypeBase::isBindableTo(Type b) {
         auto substSubMap = substBGT->getContextSubstitutionMap(
             moduleDecl, decl, decl->getGenericEnvironment());
 
-        auto *genericSig = decl->getGenericSignature();
+        auto genericSig = decl->getGenericSignature();
         for (auto gp : genericSig->getGenericParams()) {
           auto orig = Type(gp).subst(origSubMap)->getCanonicalType();
           auto subst = Type(gp).subst(substSubMap)->getCanonicalType();
@@ -2533,7 +2554,7 @@ OpaqueTypeArchetypeType::OpaqueTypeArchetypeType(OpaqueTypeDecl *OpaqueDecl,
 {
 }
 
-GenericSignature *OpaqueTypeArchetypeType::getBoundSignature() const {
+GenericSignature OpaqueTypeArchetypeType::getBoundSignature() const {
   return Environment->getGenericSignature();
 }
 
@@ -3113,8 +3134,8 @@ LookUpConformanceInSignature::operator()(CanType dependentType,
                                          ProtocolDecl *conformedProtocol) const {
   // FIXME: Should pass dependentType instead, once
   // GenericSignature::lookupConformance() does the right thing
-  return Sig.lookupConformance(conformingReplacementType->getCanonicalType(),
-                               conformedProtocol);
+  return Sig->lookupConformance(conformingReplacementType->getCanonicalType(),
+                                conformedProtocol);
 }
 
 Type DependentMemberType::substBaseType(ModuleDecl *module, Type substBase) {
@@ -3207,7 +3228,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     requirements.push_back(*substReqt);
   }
 
-  GenericSignature *genericSig = nullptr;
+  GenericSignature genericSig = GenericSignature();
   if (anySemanticChanges) {
     // If there were semantic changes, we need to build a new generic
     // signature.
@@ -3215,7 +3236,7 @@ static Type substGenericFunctionType(GenericFunctionType *genericFnType,
     genericSig = evaluateOrDefault(
         ctx.evaluator,
         AbstractGenericSignatureRequest{nullptr, genericParams, requirements},
-        nullptr);
+        GenericSignature());
   } else {
     // Use the mapped generic signature.
     genericSig = GenericSignature::get(genericParams, requirements);
@@ -3261,7 +3282,23 @@ static Type substType(Type derivedType,
                              boxTy->getLayout(),
                              newSubMap);
     }
-    
+
+    // Special-case TypeAliasType; we need to substitute conformances.
+    if (auto aliasTy = dyn_cast<TypeAliasType>(type)) {
+      Type parentTy;
+      if (auto origParentTy = aliasTy->getParent())
+        parentTy = substType(origParentTy,
+                             substitutions, lookupConformances, options);
+      auto underlyingTy = substType(aliasTy->getSinglyDesugaredType(),
+                                    substitutions, lookupConformances, options);
+      if (parentTy && parentTy->isExistentialType())
+        return underlyingTy;
+      auto subMap = aliasTy->getSubstitutionMap()
+          .subst(substitutions, lookupConformances, options);
+      return Type(TypeAliasType::get(aliasTy->getDecl(), parentTy,
+                                     subMap, underlyingTy));
+    }
+
     // We only substitute for substitutable types and dependent member types.
     
     // For dependent member types, we may need to look up the member if the
@@ -3453,7 +3490,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(ownerNominal == baseTy->getAnyNominal());
 
   // Gather all of the substitutions for all levels of generic arguments.
-  auto *genericSig = dc->getGenericSignatureOfContext();
+  auto genericSig = dc->getGenericSignatureOfContext();
   if (!genericSig)
     return substitutions;
 
@@ -3512,8 +3549,8 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     ModuleDecl *module, const DeclContext *dc,
     GenericEnvironment *genericEnv) {
-  auto *genericSig = dc->getGenericSignatureOfContext();
-  if (genericSig == nullptr)
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (genericSig.isNull())
     return SubstitutionMap();
   return SubstitutionMap::get(
     genericSig,
@@ -3540,7 +3577,7 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
       isa<SubscriptDecl>(member)) {
     auto *innerDC = member->getInnermostDeclContext();
     if (innerDC->isInnermostContextGeneric()) {
-      auto *sig = innerDC->getGenericSignatureOfContext();
+      auto sig = innerDC->getGenericSignatureOfContext();
       for (auto param : sig->getInnermostGenericParams()) {
         auto *genericParam = param->getCanonicalType()
             ->castTo<GenericTypeParamType>();
@@ -3558,9 +3595,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(
 SubstitutionMap TypeBase::getMemberSubstitutionMap(
     ModuleDecl *module, const ValueDecl *member,
     GenericEnvironment *genericEnv) {
-  auto *genericSig = member->getInnermostDeclContext()
+  auto genericSig = member->getInnermostDeclContext()
       ->getGenericSignatureOfContext();
-  if (genericSig == nullptr)
+  if (genericSig.isNull())
     return SubstitutionMap();
   auto subs = getMemberSubstitutions(member, genericEnv);
   return SubstitutionMap::get(
@@ -3963,33 +4000,29 @@ case TypeKind::Id:
 
     Type oldParentType = alias->getParent();
     Type newParentType;
-    if (oldParentType && !oldParentType->hasTypeParameter() &&
-        !oldParentType->hasArchetype()) {
+    if (oldParentType) {
       newParentType = oldParentType.transformRec(fn);
       if (!newParentType) return newUnderlyingType;
     }
 
     auto subMap = alias->getSubstitutionMap();
     for (Type oldReplacementType : subMap.getReplacementTypes()) {
-      if (oldReplacementType->hasTypeParameter() ||
-          oldReplacementType->hasArchetype())
-        return newUnderlyingType;
-
       Type newReplacementType = oldReplacementType.transformRec(fn);
       if (!newReplacementType)
         return newUnderlyingType;
 
       // If anything changed with the replacement type, we lose the sugar.
       // FIXME: This is really unfortunate.
-      if (!newReplacementType->isEqual(oldReplacementType))
+      if (newReplacementType.getPointer() != oldReplacementType.getPointer())
         return newUnderlyingType;
     }
 
-    if (oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
+    if (oldParentType.getPointer() == newParentType.getPointer() &&
+        oldUnderlyingType.getPointer() == newUnderlyingType.getPointer())
       return *this;
 
     return TypeAliasType::get(alias->getDecl(), newParentType, subMap,
-                                   newUnderlyingType);
+                              newUnderlyingType);
   }
 
   case TypeKind::Paren: {
@@ -4335,9 +4368,6 @@ ReferenceCounting TypeBase::getReferenceCounting() {
 
   case TypeKind::BuiltinBridgeObject:
     return ReferenceCounting::Bridge;
-
-  case TypeKind::BuiltinUnknownObject:
-    return ReferenceCounting::Unknown;
 
   case TypeKind::Class:
     return getClassReferenceCounting(cast<ClassType>(type)->getDecl());

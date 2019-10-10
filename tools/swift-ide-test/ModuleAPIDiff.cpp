@@ -736,7 +736,7 @@ public:
   }
 
   llvm::Optional<sma::GenericSignature>
-  convertToGenericSignature(GenericSignature *GS) {
+  convertToGenericSignature(GenericSignature GS) {
     if (!GS)
       return None;
     sma::GenericSignature ResultGS;
@@ -833,7 +833,7 @@ public:
   void visitTypeAliasDecl(TypeAliasDecl *TAD) {
     auto ResultTD = std::make_shared<sma::TypealiasDecl>();
     ResultTD->Name = convertToIdentifier(TAD->getName());
-    ResultTD->Type = convertToTypeName(TAD->getUnderlyingTypeLoc().getType());
+    ResultTD->Type = convertToTypeName(TAD->getUnderlyingType());
     // FIXME
     // ResultTD->Attributes = ?;
     Result.Typealiases.emplace_back(std::move(ResultTD));

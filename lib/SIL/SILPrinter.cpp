@@ -333,6 +333,9 @@ void SILDeclRef::print(raw_ostream &OS) const {
   case SILDeclRef::Kind::StoredPropertyInitializer:
     OS << "!propertyinit";
     break;
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    OS << "!backinginit";
+    break;
   }
 
   auto uncurryLevel = getParameterListCount() - 1;
@@ -1058,7 +1061,7 @@ public:
   }
 
   void printSubstitutions(SubstitutionMap Subs,
-                          GenericSignature *Sig = nullptr) {
+                          GenericSignature Sig = GenericSignature()) {
     if (!Subs.hasAnySubstitutableParams()) return;
 
     // FIXME: This is a hack to cope with cases where the substitution map uses

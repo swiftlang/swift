@@ -319,7 +319,7 @@ IRGenModule::getTypeRef(CanType type, CanGenericSignature sig,
 }
 
 std::pair<llvm::Constant *, unsigned>
-IRGenModule::getTypeRef(Type type, GenericSignature *genericSig,
+IRGenModule::getTypeRef(Type type, GenericSignature genericSig,
                         MangledTypeRefRole role) {
   return getTypeRef(type->getCanonicalType(genericSig),
       genericSig ? genericSig->getCanonicalSignature() : CanGenericSignature(),
@@ -348,7 +348,7 @@ IRGenModule::getLoweredTypeRef(SILType loweredType,
 llvm::Constant *
 IRGenModule::emitWitnessTableRefString(CanType type,
                                       ProtocolConformanceRef conformance,
-                                      GenericSignature *origGenericSig,
+                                      GenericSignature origGenericSig,
                                       bool shouldSetLowBit) {
   std::tie(type, conformance)
     = substOpaqueTypesWithUnderlyingTypes(type, conformance);
@@ -399,10 +399,12 @@ IRGenModule::emitWitnessTableRefString(CanType type,
 
             type = genericEnv->mapTypeIntoContext(type)->getCanonicalType();
           }
-          if (origType->hasTypeParameter())
+          if (origType->hasTypeParameter()) {
+            auto origSig = genericEnv->getGenericSignature();
             conformance = conformance.subst(origType,
               QueryInterfaceTypeSubstitutions(genericEnv),
-              LookUpConformanceInSignature(*genericEnv->getGenericSignature()));
+              LookUpConformanceInSignature(origSig.getPointer()));
+          }
           auto ret = emitWitnessTableRef(IGF, type, conformance);
           IGF.Builder.CreateRet(ret);
         }
@@ -517,7 +519,7 @@ protected:
   ///
   /// For reflection records which are demangled to produce type metadata
   /// in-process, pass MangledTypeRefRole::Metadata instead.
-  void addTypeRef(Type type, GenericSignature *genericSig,
+  void addTypeRef(Type type, GenericSignature genericSig,
                   MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     addTypeRef(type->getCanonicalType(genericSig),
@@ -566,7 +568,7 @@ protected:
         IGM.getAddrOfStringForTypeRef(mangledStr, role);
       B.addRelativeAddress(mangledName);
     } else {
-      addTypeRef(nominal->getDeclaredType(), /*genericSig*/nullptr, role);
+      addTypeRef(nominal->getDeclaredType(), GenericSignature(), role);
     }
   }
 
@@ -673,7 +675,7 @@ class FieldTypeMetadataBuilder : public ReflectionMetadataBuilder {
   const NominalTypeDecl *NTD;
 
   void addFieldDecl(const ValueDecl *value, Type type,
-                    GenericSignature *genericSig, bool indirect=false) {
+                    GenericSignature genericSig, bool indirect=false) {
     reflection::FieldRecordFlags flags;
     flags.setIsIndirectCase(indirect);
     if (auto var = dyn_cast<VarDecl>(value))
@@ -847,7 +849,14 @@ public:
   }
   
   void layout() override {
-    addTypeRef(type, CanGenericSignature());
+    if (type->isAnyObject()) {
+      // AnyObject isn't actually a builtin type; we're emitting it as the old
+      // Builtin.UnknownObject type for ABI compatibility.
+      B.addRelativeAddress(
+          IGM.getAddrOfStringForTypeRef("BO", MangledTypeRefRole::Reflection));
+    } else {
+      addTypeRef(type, CanGenericSignature());
+    }
 
     B.addInt32(ti->getFixedSize().getValue());
 
@@ -1120,6 +1129,7 @@ static std::string getReflectionSectionName(IRGenModule &IGM,
   switch (IGM.TargetInfo.OutputObjectFormat) {
   case llvm::Triple::UnknownObjectFormat:
     llvm_unreachable("unknown object format");
+  case llvm::Triple::XCOFF:
   case llvm::Triple::COFF:
     assert(FourCC.size() <= 4 &&
            "COFF section name length must be <= 8 characters");
@@ -1251,7 +1261,7 @@ emitAssociatedTypeMetadataRecord(const RootProtocolConformance *conformance) {
 void IRGenModule::emitBuiltinReflectionMetadata() {
   if (getSwiftModule()->isStdlibModule()) {
     BuiltinTypes.insert(Context.TheNativeObjectType);
-    BuiltinTypes.insert(Context.TheUnknownObjectType);
+    BuiltinTypes.insert(Context.getAnyObjectType());
     BuiltinTypes.insert(Context.TheBridgeObjectType);
     BuiltinTypes.insert(Context.TheRawPointerType);
     BuiltinTypes.insert(Context.TheUnsafeValueBufferType);

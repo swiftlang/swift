@@ -18,7 +18,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-RC<RawSyntax> Syntax::getRaw() const {
+const RC<RawSyntax> &Syntax::getRaw() const {
   return Data->getRaw();
 }
 
@@ -98,13 +98,19 @@ llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
   return Syntax {Root, ChildData.get()};
 }
 
-Optional<TokenSyntax> Syntax::getFirstToken() {
+Optional<Syntax> Syntax::getPreviousNode() const {
+  if (auto prev = getData().getPreviousNode())
+    return Syntax(Root, prev.get());
+  return None;
+}
+
+Optional<TokenSyntax> Syntax::getFirstToken() const {
   if (auto tok = getData().getFirstToken())
     return TokenSyntax(Root, tok.get());
   return None;
 }
 
-Optional<TokenSyntax> Syntax::getLastToken() {
+Optional<TokenSyntax> Syntax::getLastToken() const {
   if (auto tok = getData().getLastToken())
     return TokenSyntax(Root, tok.get());
   return None;

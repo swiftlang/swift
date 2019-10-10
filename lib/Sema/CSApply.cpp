@@ -59,9 +59,9 @@ static bool isOpenedAnyObject(Type type) {
 }
 
 SubstitutionMap Solution::computeSubstitutions(
-                               GenericSignature *sig,
+                               GenericSignature sig,
                                ConstraintLocatorBuilder locatorBuilder) const {
-  if (sig == nullptr)
+  if (sig.isNull())
     return SubstitutionMap();
 
   // Gather the substitutions from dependent types to concrete types.
@@ -1740,8 +1740,6 @@ namespace {
         return nullptr;
       }
 
-      tc.validateDecl(fn);
-      
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto genericSig = fn->getGenericSignature();
@@ -1920,14 +1918,13 @@ namespace {
       auto maxFloatTypeDecl = tc.Context.get_MaxBuiltinFloatTypeDecl();
 
       if (!maxFloatTypeDecl ||
-          !maxFloatTypeDecl->hasInterfaceType() ||
+          !maxFloatTypeDecl->getInterfaceType() ||
           !maxFloatTypeDecl->getDeclaredInterfaceType()->is<BuiltinFloatType>()) {
         tc.diagnose(expr->getLoc(), diag::no_MaxBuiltinFloatType_found);
         return nullptr;
       }
 
-      tc.validateDecl(maxFloatTypeDecl);
-      auto maxType = maxFloatTypeDecl->getUnderlyingTypeLoc().getType();
+      auto maxType = maxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, DeclBaseName::createConstructor(),
                         { tc.Context.Id_floatLiteral });
@@ -2478,41 +2475,54 @@ namespace {
                                          baseTyUnwrapped,
                                          memberName,
                                          defaultMemberLookupOptions);
-          
-          // Lookup didn't find anything, so return
+
+          // Filter out any functions, instance members, enum cases with
+          // associated values or variables whose type does not match the
+          // contextual type.
+          results.filter([&](const LookupResultEntry entry, bool isOuter) {
+            if (auto member = entry.getValueDecl()) {
+              if (isa<FuncDecl>(member))
+                return false;
+              if (member->isInstanceMember())
+                return false;
+              if (auto EED = dyn_cast<EnumElementDecl>(member)) {
+                return !EED->hasAssociatedValues();
+              }
+              if (auto VD = dyn_cast<VarDecl>(member)) {
+                auto baseType = DSCE->getType()->lookThroughAllOptionalTypes();
+                return VD->getInterfaceType()->isEqual(baseType);
+              }
+            }
+
+            // Filter out anything that's not one of the above. We don't care
+            // if we have a typealias named 'none' or a struct/class named
+            // 'none'.
+            return false;
+          });
+
           if (results.empty()) {
             return;
           }
           
           if (auto member = results.front().getValueDecl()) {
-            // Lookup returned a member that is an instance member,
-            // so return
-            if (member->isInstanceMember()) {
-              return;
-            }
-            
-            // Return if the member is an enum case w/ assoc values, as we only
-            // care (for now) about cases with no assoc values (like none)
-            if (auto EED = dyn_cast<EnumElementDecl>(member)) {
-              if (EED->hasAssociatedValues()) {
-                return;
-              }
-            }
-            
-            // Emit a diagnostic with some fixits
+            // Emit a diagnostic with some fix-its
             auto baseTyName = baseTy->getCanonicalType().getString();
             auto baseTyUnwrappedName = baseTyUnwrapped->getString();
             auto loc = DSCE->getLoc();
             auto startLoc = DSCE->getStartLoc();
-            
-            tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
-                        baseTyName, baseTyUnwrappedName, memberName.str());
-            
-            tc.diagnose(loc, swift::diag::optional_fixit_ambiguous_case_ref)
-              .fixItInsert(startLoc, "Optional");
-            tc.diagnose(loc, swift::diag::type_fixit_optional_ambiguous_case_ref,
+            tc.diagnoseWithNotes(
+                tc.diagnose(loc, swift::diag::optional_ambiguous_case_ref,
+                            baseTyName, baseTyUnwrappedName, memberName.str()),
+                [&]() {
+                  tc.diagnose(loc,
+                              swift::diag::optional_fixit_ambiguous_case_ref)
+                      .fixItInsert(startLoc, "Optional");
+                  tc.diagnose(
+                        loc,
+                        swift::diag::type_fixit_optional_ambiguous_case_ref,
                         baseTyUnwrappedName, memberName.str())
-              .fixItInsert(startLoc, baseTyUnwrappedName);
+                      .fixItInsert(startLoc, baseTyUnwrappedName);
+                });
           }
         }
       }
@@ -4116,7 +4126,6 @@ namespace {
       assert(method && "Didn't find a method?");
 
       // The declaration we found must be exposed to Objective-C.
-      tc.validateDecl(method);
       if (!method->isObjC()) {
         // If the method declaration lies in a protocol and we're providing
         // a default implementation of the method through a protocol extension
@@ -5384,10 +5393,11 @@ Expr *ExprRewriter::coerceCallArguments(
   auto params = funcType->getParams();
 
   // Local function to produce a locator to refer to the given parameter.
-  auto getArgLocator = [&](unsigned argIdx, unsigned paramIdx)
-                         -> ConstraintLocatorBuilder {
+  auto getArgLocator =
+      [&](unsigned argIdx, unsigned paramIdx,
+          ParameterTypeFlags flags) -> ConstraintLocatorBuilder {
     return locator.withPathElement(
-             LocatorPathElt::ApplyArgToParam(argIdx, paramIdx));
+        LocatorPathElt::ApplyArgToParam(argIdx, paramIdx, flags));
   };
 
   bool matchCanFail =
@@ -5499,8 +5509,9 @@ Expr *ExprRewriter::coerceCallArguments(
         }
 
         // Convert the argument.
-        auto convertedArg = coerceToType(arg, param.getPlainType(),
-                                         getArgLocator(argIdx, paramIdx));
+        auto convertedArg = coerceToType(
+            arg, param.getPlainType(),
+            getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
         if (!convertedArg)
           return nullptr;
 
@@ -5620,8 +5631,9 @@ Expr *ExprRewriter::coerceCallArguments(
       convertedArg = cs.TC.buildAutoClosureExpr(dc, arg, closureType);
       cs.cacheExprTypes(convertedArg);
     } else {
-      convertedArg =
-          coerceToType(arg, paramType, getArgLocator(argIdx, paramIdx));
+      convertedArg = coerceToType(
+          arg, paramType,
+          getArgLocator(argIdx, paramIdx, param.getParameterFlags()));
     }
 
     if (!convertedArg)
@@ -7343,7 +7355,7 @@ bool swift::exprNeedsParensInsideFollowingOperator(
     TypeChecker &TC, DeclContext *DC, Expr *expr,
     PrecedenceGroupDecl *followingPG) {
   if (expr->isInfixOperator()) {
-    auto exprPG = TC.lookupPrecedenceGroupForInfixOperator(DC, expr);
+    auto exprPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC, expr);
     if (!exprPG) return true;
 
     return TC.Context.associateInfixOperators(exprPG, followingPG)
@@ -7377,7 +7389,8 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
       return false;
 
   if (parent->isInfixOperator()) {
-    auto parentPG = TC.lookupPrecedenceGroupForInfixOperator(DC, parent);
+    auto parentPG = TypeChecker::lookupPrecedenceGroupForInfixOperator(DC,
+                                                                       parent);
     if (!parentPG) return true;
 
     // If the index is 0, this is on the LHS of the parent.
@@ -7396,10 +7409,10 @@ bool swift::exprNeedsParensOutsideFollowingOperator(
 bool swift::exprNeedsParensBeforeAddingNilCoalescing(TypeChecker &TC,
                                                      DeclContext *DC,
                                                      Expr *expr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
-                             SourceLoc());
-  if (!asPG) return true;
+  auto asPG = TypeChecker::lookupPrecedenceGroup(
+      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
+  if (!asPG)
+    return true;
   return exprNeedsParensInsideFollowingOperator(TC, DC, expr, asPG);
 }
 
@@ -7407,9 +7420,8 @@ bool swift::exprNeedsParensAfterAddingNilCoalescing(TypeChecker &TC,
                                                     DeclContext *DC,
                                                     Expr *expr,
                                                     Expr *rootExpr) {
-  auto asPG =
-    TC.lookupPrecedenceGroup(DC, DC->getASTContext().Id_NilCoalescingPrecedence,
-                             SourceLoc());
+  auto asPG = TypeChecker::lookupPrecedenceGroup(
+      DC, DC->getASTContext().Id_NilCoalescingPrecedence, SourceLoc());
   if (!asPG) return true;
   return exprNeedsParensOutsideFollowingOperator(TC, DC, expr, rootExpr, asPG);
 }

@@ -13,6 +13,7 @@
 #ifndef SWIFT_SERIALIZATION_MODULELOADER_H
 #define SWIFT_SERIALIZATION_MODULELOADER_H
 
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleLoader.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -277,7 +278,7 @@ public:
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
   
   virtual OpaqueTypeDecl *
-  lookupOpaqueResultType(StringRef MangledName, LazyResolver *resolver) override;
+  lookupOpaqueResultType(StringRef MangledName) override;
 
   virtual TypeDecl *
   lookupNestedType(Identifier name,
@@ -348,7 +349,7 @@ public:
   virtual const clang::Module *getUnderlyingClangModule() const override;
 
   virtual bool getAllGenericSignatures(
-                   SmallVectorImpl<GenericSignature*> &genericSignatures)
+                   SmallVectorImpl<GenericSignature> &genericSignatures)
                 override;
 
   static bool classof(const FileUnit *file) {

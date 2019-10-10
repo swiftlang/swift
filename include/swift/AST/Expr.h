@@ -19,13 +19,13 @@
 
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/DeclContext.h"
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/FunctionRefKind.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/TrailingCallArguments.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/TypeLoc.h"
-#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Availability.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -40,7 +40,9 @@ namespace swift {
   class ArchetypeType;
   class ASTContext;
   class AvailabilitySpec;
+  class IdentTypeRepr;
   class Type;
+  class TypeRepr;
   class ValueDecl;
   class Decl;
   class DeclRefExpr;

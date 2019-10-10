@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This file defines macros used for macro-metaprogramming with compiler-known
-// protocols.
+// protocols. Note that this mechanism does not look through an overlay into its
+// underlying module, so it typically cannot find Objective-C protocols.
 //
 //===----------------------------------------------------------------------===//
 

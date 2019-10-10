@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -212,7 +213,6 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       accessLevel = std::min(accessLevel, var->getFormalAccess());
 
-      ctx.getLazyResolver()->resolveDeclSignature(var);
       auto varInterfaceType = var->getValueInterfaceType();
 
       if (var->getAttrs().hasAttribute<LazyAttr>()) {
@@ -356,7 +356,7 @@ synthesizeStubBody(AbstractFunctionDecl *fn, void *) {
            /*isTypeChecked=*/true };
 }
 
-static std::tuple<GenericSignature *, GenericParamList *, SubstitutionMap>
+static std::tuple<GenericSignature, GenericParamList *, SubstitutionMap>
 configureGenericDesignatedInitOverride(ASTContext &ctx,
                                        ClassDecl *classDecl,
                                        Type superclassTy,
@@ -367,7 +367,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
   auto subMap = superclassTy->getContextSubstitutionMap(
       moduleDecl, superclassDecl);
 
-  GenericSignature *genericSig;
+  GenericSignature genericSig;
 
   // Inheriting initializers that have their own generic parameters
   auto *genericParams = superclassCtor->getGenericParams();
@@ -378,7 +378,7 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     // but change the depth of the generic parameters to be one greater
     // than the depth of the subclass.
     unsigned depth = 0;
-    if (auto *genericSig = classDecl->getGenericSignature())
+    if (auto genericSig = classDecl->getGenericSignature())
       depth = genericSig->getGenericParams().back()->getDepth() + 1;
 
     for (auto *param : genericParams->getParams()) {
@@ -408,10 +408,10 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
           newParam->getDeclaredInterfaceType()->castTo<GenericTypeParamType>());
     }
 
-    auto *superclassSig = superclassCtor->getGenericSignature();
+    auto superclassSig = superclassCtor->getGenericSignature();
 
     unsigned superclassDepth = 0;
-    if (auto *genericSig = superclassDecl->getGenericSignature())
+    if (auto genericSig = superclassDecl->getGenericSignature())
       superclassDepth = genericSig->getGenericParams().back()->getDepth() + 1;
 
     // We're going to be substituting the requirements of the base class
@@ -448,11 +448,11 @@ configureGenericDesignatedInitOverride(ASTContext &ctx,
     genericSig = evaluateOrDefault(
         ctx.evaluator,
         AbstractGenericSignatureRequest{
-          classDecl->getGenericSignature(),
+          classDecl->getGenericSignature().getPointer(),
           std::move(newParamTypes),
           std::move(requirements)
         },
-        nullptr);
+        GenericSignature());
   } else {
     genericSig = classDecl->getGenericSignature();
   }
@@ -538,9 +538,6 @@ synthesizeDesignatedInitOverride(AbstractFunctionDecl *fn, void *context) {
   auto &ctx = ctor->getASTContext();
 
   auto *superclassCtor = (ConstructorDecl *) context;
-
-  if (!superclassCtor->hasValidSignature())
-    ctx.getLazyResolver()->resolveDeclSignature(superclassCtor);
 
   // Reference to super.init.
   auto *selfDecl = ctor->getImplicitSelfDecl();
@@ -639,7 +636,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     return nullptr;
   }
 
-  GenericSignature *genericSig;
+  GenericSignature genericSig;
   GenericParamList *genericParams;
   SubstitutionMap subMap;
 
@@ -695,8 +692,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
 
-  ctor->setValidationToChecked();
-
   configureInheritedDesignatedInitAttributes(classDecl, ctor,
                                              superclassCtor, ctx);
 
@@ -707,8 +702,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // Note that this is a stub implementation.
     ctor->setStubImplementation(true);
 
-    // Stub constructors don't appear in the vtable.
-    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 
@@ -848,20 +841,6 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
   assert(!decl->hasUnreferenceableStorage() &&
          "User-defined structs cannot have unreferenceable storage");
 
-  // Bail out if we're validating one of our stored properties already;
-  // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
-
-      if (!var->hasValidSignature())
-        ctx.getLazyResolver()->resolveDeclSignature(var);
-      if (!var->hasValidSignature())
-        return;
-    }
-  }
-
   decl->setAddedImplicitInitializers();
 
   // Check whether there is a user-declared constructor or an instance
@@ -922,9 +901,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->hasValidSignature())
-          ctx.getLazyResolver()->resolveDeclSignature(ctor);
-        if (!ctor->hasValidSignature())
+        if (ctor->isRecursiveValidation())
           return;
       }
     }
@@ -1077,11 +1054,6 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
       auto kind = canInheritInitializers
                     ? DesignatedInitKind::Chaining
                     : DesignatedInitKind::Stub;
-
-      // We have a designated initializer. Create an override of it.
-      // FIXME: Validation makes sure we get a generic signature here.
-      if (!decl->hasValidSignature())
-        ctx.getLazyResolver()->resolveDeclSignature(decl);
 
       if (auto ctor = createDesignatedInitOverride(
                         decl, superclassCtor, kind, ctx)) {

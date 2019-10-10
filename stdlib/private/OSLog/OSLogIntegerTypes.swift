@@ -106,7 +106,7 @@ extension OSLogInterpolation {
   /// This function must be constant evaluable and all its arguments
   /// must be known at compile time.
   @inlinable
-  @_semantics("oslog.interpolation.getFormatSpecifier")
+  @_semantics("constant_evaluable")
   @_effects(readonly)
   @_optimize(none)
   internal func getIntegerFormatSpecifier<T>(
@@ -143,14 +143,16 @@ extension OSLogArguments {
   internal mutating func append<T>(
     _ value: @escaping () -> T
   ) where T: FixedWidthInteger {
-    argumentClosures!.append({ $0.serialize(value()) })
+    argumentClosures.append({ (position, _) in
+      serialize(value(), at: &position)
+    })
   }
 }
 
 /// Return the number of bytes needed for serializing an integer argument as
 /// specified by os_log. This function must be constant evaluable.
 @inlinable
-@_semantics("oslog.integers.sizeForEncoding")
+@_semantics("constant_evaluable")
 @_effects(readonly)
 @_optimize(none)
 internal func sizeForEncoding<T>(
@@ -159,15 +161,17 @@ internal func sizeForEncoding<T>(
   return type.bitWidth &>> logBitsPerByte
 }
 
-extension OSLogByteBufferBuilder {
-  /// Serialize an integer at the buffer location pointed to by `position`.
-  @usableFromInline
-  internal mutating func serialize<T>(
-    _ value: T
-  ) where T : FixedWidthInteger {
-    let byteCount = sizeForEncoding(T.self)
-    let dest = UnsafeMutableRawBufferPointer(start: position, count: byteCount)
-    withUnsafeBytes(of: value) { dest.copyMemory(from: $0) }
-    position += byteCount
-  }
+/// Serialize an integer at the buffer location that `position` points to and
+/// increment `position` by the byte size of `T`.
+@usableFromInline
+@_alwaysEmitIntoClient
+internal func serialize<T>(
+  _ value: T,
+  at bufferPosition: inout ByteBufferPointer
+) where T : FixedWidthInteger {
+  let byteCount = sizeForEncoding(T.self)
+  let dest =
+    UnsafeMutableRawBufferPointer(start: bufferPosition, count: byteCount)
+  withUnsafeBytes(of: value) { dest.copyMemory(from: $0) }
+  bufferPosition += byteCount
 }

@@ -478,7 +478,8 @@ AllowClosureParamDestructuring::create(ConstraintSystem &cs,
 
 bool AddMissingArguments::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
-  MissingArgumentsFailure failure(root, cs, NumSynthesized, getLocator());
+  MissingArgumentsFailure failure(root, cs, getSynthesizedArguments(),
+                                  getLocator());
   return failure.diagnose(asNote);
 }
 
@@ -706,14 +707,42 @@ bool AllowTupleSplatForSingleParameter::attempt(
 
   const auto &param = params.front();
 
-  auto *paramTy = param.getOldType()->getAs<TupleType>();
-  if (!paramTy || paramTy->getNumElements() != args.size())
+  if (param.isInOut() || param.isVariadic() || param.isAutoClosure())
+    return true;
+
+  auto paramTy = param.getOldType();
+
+  // Parameter type has to be either a tuple (with the same arity as
+  // argument list), or a type variable.
+  if (!(paramTy->is<TupleType>() &&
+        paramTy->castTo<TupleType>()->getNumElements() == args.size()) &&
+      !paramTy->is<TypeVariableType>())
     return true;
 
   SmallVector<TupleTypeElt, 4> argElts;
-  for (const auto &arg : args) {
-    argElts.push_back(
-        {arg.getPlainType(), arg.getLabel(), arg.getParameterFlags()});
+
+  for (unsigned index : indices(args)) {
+    const auto &arg = args[index];
+
+    auto label = arg.getLabel();
+    auto flags = arg.getParameterFlags();
+
+    // In situations where there is a single labeled parameter
+    // we need to form a tuple with omits first label e.g.
+    //
+    // func foo<T>(x: T) {}
+    // foo(x: 0, 1)
+    //
+    // We'd want to suggest argument list to be `x: (0, 1)` instead
+    // of `(x: 0, 1)` which would be incorrect.
+    if (index == 0 && param.getLabel() == label)
+      label = Identifier();
+
+    // Tuple can't have `inout` elements.
+    if (flags.isInOut())
+      return true;
+
+    argElts.push_back({arg.getPlainType(), label});
   }
 
   bindings[0].clear();
@@ -759,6 +788,26 @@ IgnoreContextualType *IgnoreContextualType::create(ConstraintSystem &cs,
       IgnoreContextualType(cs, resultTy, specifiedTy, locator);
 }
 
+bool IgnoreAssignmentDestinationType::diagnose(Expr *root, bool asNote) const {
+  auto &cs = getConstraintSystem();
+  auto *AE = cast<AssignExpr>(getAnchor());
+  auto CTP = isa<SubscriptExpr>(AE->getDest()) ? CTP_SubscriptAssignSource
+                                               : CTP_AssignSource;
+
+  ContextualFailure failure(
+      root, cs, CTP, getFromType(), getToType(),
+      cs.getConstraintLocator(AE->getSrc(), LocatorPathElt::ContextualType()));
+  return failure.diagnose(asNote);
+}
+
+IgnoreAssignmentDestinationType *
+IgnoreAssignmentDestinationType::create(ConstraintSystem &cs, Type sourceTy,
+                                        Type destTy,
+                                        ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      IgnoreAssignmentDestinationType(cs, sourceTy, destTy, locator);
+}
+
 bool AllowInOutConversion::diagnose(Expr *root, bool asNote) const {
   auto &cs = getConstraintSystem();
   InOutConversionFailure failure(root, cs, getFromType(), getToType(),
@@ -793,6 +842,36 @@ static bool isValueOfRawRepresentable(ConstraintSystem &cs,
   }
 
   return false;
+}
+
+ExpandArrayIntoVarargs *
+ExpandArrayIntoVarargs::attempt(ConstraintSystem &cs, Type argType,
+                                Type paramType,
+                                ConstraintLocatorBuilder locator) {
+  auto constraintLocator = cs.getConstraintLocator(locator);
+  auto elementType = cs.isArrayType(argType);
+  if (elementType &&
+      constraintLocator->getLastElementAs<LocatorPathElt::ApplyArgToParam>()
+          ->getParameterFlags()
+          .isVariadic()) {
+    auto options = ConstraintSystem::TypeMatchOptions(
+        ConstraintSystem::TypeMatchFlags::TMF_ApplyingFix |
+        ConstraintSystem::TypeMatchFlags::TMF_GenerateConstraints);
+    auto result =
+        cs.matchTypes(*elementType, paramType,
+                      ConstraintKind::ArgumentConversion, options, locator);
+    if (result.isSuccess())
+      return new (cs.getAllocator())
+          ExpandArrayIntoVarargs(cs, argType, paramType, constraintLocator);
+  }
+
+  return nullptr;
+}
+
+bool ExpandArrayIntoVarargs::diagnose(Expr *root, bool asNote) const {
+  ExpandArrayIntoVarargsFailure failure(
+      root, getConstraintSystem(), getFromType(), getToType(), getLocator());
+  return failure.diagnose(asNote);
 }
 
 ExplicitlyConstructRawRepresentable *

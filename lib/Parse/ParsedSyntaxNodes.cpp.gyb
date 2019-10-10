@@ -23,19 +23,19 @@
 using namespace swift;
 using namespace swift::syntax;
 
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   for child in node.children:
 %     if child.is_optional:
 Optional<Parsed${child.type_name}>
 Parsed${node.name}::getDeferred${child.name}() {
-  auto RawChild = getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}];
+  auto &RawChild = getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}];
   if (RawChild.isNull())
     return None;
-  return Parsed${child.type_name} {RawChild};
+  return Parsed${child.type_name} {RawChild.copyDeferred()};
 }
 %     else:
 Parsed${child.type_name} Parsed${node.name}::getDeferred${child.name}() {
-  return Parsed${child.type_name} {getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}]};
+  return Parsed${child.type_name} {getRaw().getDeferredChildren()[${node.name}::Cursor::${child.name}].copyDeferred()};
 }
 %     end
 

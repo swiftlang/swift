@@ -1788,8 +1788,6 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   }
   case TypeKind::BuiltinNativeObject:
     return &getNativeObjectTypeInfo();
-  case TypeKind::BuiltinUnknownObject:
-    return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
     return &getBridgeObjectTypeInfo();
   case TypeKind::BuiltinUnsafeValueBuffer:
@@ -1920,9 +1918,6 @@ namespace {
         return true;
 
       for (auto field : decl->getStoredProperties()) {
-        if (!field->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(field);
-
         if (visit(field->getInterfaceType()->getCanonicalType()))
           return true;
       }
@@ -1946,9 +1941,6 @@ namespace {
       for (auto elt : decl->getAllElements()) {
         if (!elt->hasAssociatedValues() || elt->isIndirect())
           continue;
-
-        if (!elt->hasInterfaceType())
-          IGM.Context.getLazyResolver()->resolveDeclSignature(elt);
 
         if (visit(elt->getArgumentInterfaceType()->getCanonicalType()))
           return true;
