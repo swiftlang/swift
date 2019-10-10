@@ -403,7 +403,7 @@ static bool _conformsToProtocols(const OpaqueValue *value,
   for (auto protocol : existentialType->getProtocols()) {
     if (!_conformsToProtocol(value, type, protocol, conformances))
       return false;
-    if (protocol.needsWitnessTable()) {
+    if (conformances != nullptr && protocol.needsWitnessTable()) {
       assert(*conformances != nullptr);
       ++conformances;
     }
@@ -1117,9 +1117,8 @@ swift_dynamicCastMetatypeImpl(const Metadata *sourceType,
 
   case MetadataKind::Existential: {
     auto targetTypeAsExistential = static_cast<const ExistentialTypeMetadata *>(targetType);
-    for (auto protocol : targetTypeAsExistential->getProtocols())
-      if (!swift_conformsToProtocol(sourceType, protocol.getSwiftProtocol()))
-        return nullptr;
+    if (!_conformsToProtocols(nullptr, sourceType, targetTypeAsExistential, nullptr))
+      return nullptr;
     return origSourceType;
   }
 
