@@ -1545,7 +1545,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   unsigned uncurryLevel = 0;
   bool IsObjC = false;
   // SWIFT_ENABLE_TENSORFLOW
-  AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId = nullptr;
+  AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
@@ -1635,25 +1635,15 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         // SWIFT_ENABLE_TENSORFLOW
         ParseState = 3;
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
-        AutoDiffAssociatedFunctionKind kind;
-        unsigned differentiationOrder;
+        AutoDiffDerivativeFunctionKind kind;
         AutoDiffIndexSubset *parameterIndices = nullptr;
 
         if (Id.str() == "jvp")
-          kind = AutoDiffAssociatedFunctionKind::JVP;
+          kind = AutoDiffDerivativeFunctionKind::JVP;
         else if (Id.str() == "vjp")
-          kind = AutoDiffAssociatedFunctionKind::VJP;
+          kind = AutoDiffDerivativeFunctionKind::VJP;
         else
           llvm_unreachable("Should only have JVP and VJP here");
-
-        if (!P.consumeIf(tok::period)) {
-          P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
-          return true;
-        }
-
-        if (parseInteger(differentiationOrder,
-                         diag::sil_const_expected_int_value))
-          return true;
 
         if (!P.consumeIf(tok::period)) {
           P.diagnose(P.Tok, diag::expected_tok_in_sil_instr, ".");
@@ -1668,9 +1658,8 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         }
         P.consumeToken();
 
-        autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
-            kind, differentiationOrder, parameterIndices,
-            SILMod.getASTContext());
+        autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
+            kind, parameterIndices, SILMod.getASTContext());
 
         break;
       } else
@@ -2937,7 +2926,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
     SmallVector<unsigned, 8> parameterIndices;
-    unsigned order = 1;
     // Parse optional `[wrt <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
         P.peekToken().is(tok::identifier) &&
@@ -2957,24 +2945,6 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                        "parameter index list"))
         return true;
     }
-    // Parse optional `[order <integer_literal>]`.
-    if (P.Tok.is(tok::l_square) &&
-        P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "order") {
-      P.consumeToken(tok::l_square);
-      P.consumeToken(tok::identifier);
-      // Parse an order.
-      if (P.parseUnsignedInteger(order, lastLoc,
-                                 diag::sil_inst_autodiff_expected_order) ||
-          P.parseToken(tok::r_square,
-                       diag::sil_inst_autodiff_attr_expected_rsquare,
-                       "differentiation order"))
-        return true;
-      if (order == 0) {
-        P.diagnose(lastLoc, diag::sil_inst_autodiff_expected_nonzero_order);
-        return true;
-      }
-    }
     // Parse the original function value.
     SILValue original;
     SourceLoc originalOperandLoc;
@@ -2986,29 +2956,24 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
                  diag::sil_inst_autodiff_expected_function_type_operand);
       return true;
     }
-    SmallVector<SILValue, 16> associatedFunctions;
-    // Parse optional operand lists `with { <operand> , <operand> }, ...`.
+    Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
+    // Parse an optional operand list `with { <operand> , <operand> }`.
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
       P.consumeToken(tok::identifier);
-      // Parse associated function values as operand lists. There are as many
-      // operand lists as the differentiation order.
-      associatedFunctions.reserve(2 * order);
-      for (unsigned listIdx = 0; listIdx < order; ++listIdx) {
-        // FIXME(rxwei): Change this to *not* require a type signature once
-        // we can infer AD associated function types.
-        SILValue newAssocFn1, newAssocFn2;
-        if (P.parseToken(tok::l_brace,
-                diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
-            parseTypedValueRef(newAssocFn1, B) ||
-            P.parseToken(tok::comma,
-                diag::sil_inst_autodiff_operand_list_expected_comma) ||
-            parseTypedValueRef(newAssocFn2, B) ||
-            P.parseToken(tok::r_brace,
-                         diag::sil_inst_autodiff_operand_list_expected_rbrace))
-          return true;
-        associatedFunctions.push_back(newAssocFn1);
-        associatedFunctions.push_back(newAssocFn2);
-      }
+      // Parse derivative function values as an operand list.
+      // FIXME(rxwei): Change this to *not* require a type signature once
+      // we can infer derivative function types.
+      SILValue derivFn1, derivFn2;
+      if (P.parseToken(tok::l_brace,
+              diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
+          parseTypedValueRef(derivFn1, B) ||
+          P.parseToken(tok::comma,
+              diag::sil_inst_autodiff_operand_list_expected_comma) ||
+          parseTypedValueRef(derivFn2, B) ||
+          P.parseToken(tok::r_brace,
+                       diag::sil_inst_autodiff_operand_list_expected_rbrace))
+        return true;
+      derivativeFunctions = std::make_pair(derivFn1, derivFn2);
       if (P.Tok.is(tok::l_brace)) {
         P.diagnose(P.Tok,
                    diag::sil_inst_autodiff_num_operand_list_order_mismatch);
@@ -3021,16 +2986,15 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
         AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
                                  parameterIndices);
     ResultVal = B.createDifferentiableFunction(
-        InstLoc, parameterIndicesSubset, order, original, associatedFunctions);
+        InstLoc, parameterIndicesSubset, original, derivativeFunctions);
     break;
   }
   
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
-    // Parse the rest of the instruction: an extractee, a differentiation order,
-    // a differentiable function operand, and a debug location.
+    // Parse the rest of the instruction: an extractee, a differentiable
+    // function operand, and a debug location.
     DifferentiableFunctionExtractee extractee;
     StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
-    unsigned order = 0;
     SILValue functionOperand;
     SourceLoc lastLoc;
     if (P.parseToken(tok::l_square,
@@ -3039,28 +3003,13 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
             diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
         P.parseToken(tok::r_square,
                      diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "associated function kind"))
+                     "derivative function kind"))
       return true;
-    if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "order") {
-      P.consumeToken(tok::l_square);
-      P.consumeToken(tok::identifier);
-      if (P.parseUnsignedInteger(order, lastLoc,
-                                 diag::sil_inst_autodiff_expected_order) ||
-          P.parseToken(tok::r_square,
-                       diag::sil_inst_autodiff_attr_expected_rsquare,
-                       "differentiation order"))
-        return true;
-      if (order == 0) {
-        P.diagnose(lastLoc, diag::sil_inst_autodiff_expected_nonzero_order);
-        return true;
-      }
-    }
     if (parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDifferentiableFunctionExtract(
-        InstLoc, extractee, order, functionOperand);
+        InstLoc, extractee, functionOperand);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

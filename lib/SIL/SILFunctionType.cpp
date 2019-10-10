@@ -114,9 +114,7 @@ SILFunctionType::getDifferentiationParameterIndices() {
 }
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices) {
-  // FIXME(rxwei): Handle differentiation order.
-
+    AutoDiffIndexSubset *parameterIndices) {
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
@@ -152,20 +150,20 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
                               getOptionalErrorResult(), getASTContext());
 }
 
-// Returns the canonical generic signature for an autodiff associated function
-// given an existing associated function generic signature. All differentiation
+// Returns the canonical generic signature for an autodiff derivative function
+// given an existing derivative function generic signature. All differentiation
 // parameters are constrained to conform to `Differentiable`.
-static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
-    CanGenericSignature assocFnGenSig,
+static CanGenericSignature getAutoDiffDerivativeFunctionGenericSignature(
+    CanGenericSignature derivativeFnGenSig,
     ArrayRef<SILParameterInfo> originalParameters,
     AutoDiffIndexSubset *parameterIndices, ModuleDecl *module) {
-  if (!assocFnGenSig)
+  if (!derivativeFnGenSig)
     return nullptr;
   auto &ctx = module->getASTContext();
   GenericSignatureBuilder builder(ctx);
 
-  // Add associated function generic signature.
-  builder.addGenericSignature(assocFnGenSig);
+  // Add derivative function generic signature.
+  builder.addGenericSignature(derivativeFnGenSig);
   // Constrain all wrt parameters to conform to `Differentiable`.
   auto source =
       GenericSignatureBuilder::FloatingRequirementSource::forAbstract();
@@ -181,11 +179,11 @@ static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
       ->getCanonicalSignature();
 }
 
-CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
+CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
     AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
-    unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    TypeConverter &TC, LookupConformanceFn lookupConformance,
-    CanGenericSignature assocFnGenSig) {
+    AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
+    LookupConformanceFn lookupConformance,
+    CanGenericSignature derivativeFnGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -205,12 +203,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     if (isWrtIndex(valueAndIndex.index()))
       wrtParams.push_back(valueAndIndex.value());
 
-  // Get the canonical associated function generic signature.
-  if (!assocFnGenSig)
-    assocFnGenSig = getGenericSignature();
-  assocFnGenSig = getAutoDiffAssociatedFunctionGenericSignature(
-      assocFnGenSig, getParameters(), parameterIndices, &TC.M);
-  Lowering::GenericContextScope genericContextScope(TC, assocFnGenSig);
+  // Get the canonical derivative function generic signature.
+  if (!derivativeFnGenSig)
+    derivativeFnGenSig = getGenericSignature();
+  derivativeFnGenSig = getAutoDiffDerivativeFunctionGenericSignature(
+      derivativeFnGenSig, getParameters(), parameterIndices, &TC.M);
+  Lowering::GenericContextScope genericContextScope(TC, derivativeFnGenSig);
 
   // Given a type, returns its formal SIL parameter info.
   auto getTangentParameterInfoForOriginalResult = [&](
@@ -261,7 +259,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
 
   CanSILFunctionType closureType;
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP: {
+  case AutoDiffDerivativeFunctionKind::JVP: {
     SmallVector<SILParameterInfo, 8> differentialParams;
     for (auto &param : wrtParams) {
       auto paramTan =
@@ -283,7 +281,7 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
         differentialResults, None, ctx);
     break;
   }
-  case AutoDiffAssociatedFunctionKind::VJP: {
+  case AutoDiffDerivativeFunctionKind::VJP: {
     SmallVector<SILParameterInfo, 8> pullbackParams;
     auto &origRes = getResults()[resultIndex];
     auto resultTan =
@@ -313,12 +311,12 @@ CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
   newResults.reserve(getNumResults() + 1);
   for (auto &result : getResults()) {
     auto mappedResult = result.getWithType(
-        result.getType()->getCanonicalType(assocFnGenSig));
+        result.getType()->getCanonicalType(derivativeFnGenSig));
     newResults.push_back(mappedResult);
   }
-  newResults.push_back({closureType->getCanonicalType(assocFnGenSig),
+  newResults.push_back({closureType->getCanonicalType(derivativeFnGenSig),
                         ResultConvention::Owned});
-  return SILFunctionType::get(assocFnGenSig, getExtInfo(),
+  return SILFunctionType::get(derivativeFnGenSig, getExtInfo(),
                               getCoroutineKind(), getCalleeConvention(),
                               getParameters(), getYields(), newResults,
                               getOptionalErrorResult(), ctx,
@@ -2336,25 +2334,24 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
                                             loweredInterfaceType);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // In the case of autodiff associated functions, the above computations
-  // determine `silFnType` by first computing the associated function type at
+  // In the case of autodiff derivative functions, the above computations
+  // determine `silFnType` by first computing the derivative function type at
   // the AST level and then lowering that. Unfortunately, the actual
   // SILFunctionType for the function is determined by first lowering the
-  // function's AST type, and then computing the associated function type at the
+  // function's AST type, and then computing the derivative function type at the
   // SIL level. "Lowering" does not commute with "getting the autodiff
   // associated type", so these two computations produce different results.
   // Therefore `silFnType` is not the actual type of the function that
   // `constant` refers to.
   //
   // We hackily fix this problem by redoing the computation in the right order.
-  if (auto *autoDiffFuncId = constant.autoDiffAssociatedFunctionIdentifier) {
+  if (auto *autoDiffFuncId = constant.autoDiffDerivativeFunctionIdentifier) {
     auto origFnConstantInfo =
         getConstantInfo(constant.asAutoDiffOriginalFunction());
     auto loweredIndices = autodiff::getLoweredParameterIndices(
         autoDiffFuncId->getParameterIndices(), formalInterfaceType);
-    silFnType = origFnConstantInfo.SILFnType->getAutoDiffAssociatedFunctionType(
-        loweredIndices, /*resultIndex*/ 0,
-        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
+    silFnType = origFnConstantInfo.SILFnType->getAutoDiffDerivativeFunctionType(
+        loweredIndices, /*resultIndex*/ 0, autoDiffFuncId->getKind(),
         *this, LookUpConformanceInModule(&M));
   }
 

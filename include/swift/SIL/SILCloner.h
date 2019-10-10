@@ -970,15 +970,14 @@ template<typename ImplClass>
 void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
     DifferentiableFunctionInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  SmallVector<SILValue, 16> mappedAssocFns;
-  mappedAssocFns.reserve(Inst->getNumAssociatedFunctions());
-  for (auto &fn : Inst->getAssociatedFunctions())
-    mappedAssocFns.push_back(getOpValue(fn.get()));
+  Optional<std::pair<SILValue, SILValue>> derivativeFns = None;
+  if (Inst->hasDerivativeFunctions())
+    derivativeFns = std::make_pair(getOpValue(Inst->getJVPFunction()),
+                                   getOpValue(Inst->getVJPFunction()));
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunction(
                 getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
-                Inst->getDifferentiationOrder(),
-                getOpValue(Inst->getOriginalFunction()), mappedAssocFns));
+                getOpValue(Inst->getOriginalFunction()), derivativeFns));
 }
 
 template<typename ImplClass>
@@ -988,7 +987,6 @@ visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *Inst) 
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunctionExtract(
                 getOpLocation(Inst->getLoc()), Inst->getExtractee(),
-                Inst->getDifferentiationOrder(),
                 getOpValue(Inst->getFunctionOperand())));
 }
 // SWIFT_ENABLE_TENSORFLOW END

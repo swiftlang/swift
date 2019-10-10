@@ -650,7 +650,7 @@ static bool overridesDifferentiableAttribute(ValueDecl *derivedDecl,
     std::string baseDAString;
     llvm::raw_string_ostream stream(baseDAString);
     baseDA->print(stream, derivedDecl, omitWrtClause,
-                  /*omitAssociatedFunctions*/ true);
+                  /*omitDerivativeFunctions*/ true);
     diags.diagnose(
         derivedDecl, diag::overriding_decl_missing_differentiable_attr,
         StringRef(stream.str()).trim());

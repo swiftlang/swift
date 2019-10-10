@@ -540,7 +540,7 @@ static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
   return nullptr;
 }
 
-static bool haveProfiledAssociatedFunction(SILDeclRef constant) {
+static bool haveProfiledDerivativeFunction(SILDeclRef constant) {
   return constant.isDefaultArgGenerator() || constant.isForeign ||
          constant.isCurried;
 }
@@ -552,7 +552,7 @@ static void setUpForProfiling(SILDeclRef constant, SILFunction *F,
     return;
 
   ASTNode profiledNode;
-  if (!haveProfiledAssociatedFunction(constant)) {
+  if (!haveProfiledDerivativeFunction(constant)) {
     if (constant.hasDecl()) {
       if (auto *fd = constant.getFuncDecl()) {
         if (fd->hasBody()) {
@@ -773,12 +773,12 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
              "Expected matching @differentiable and [differentiable]");
 
       auto lookUpConformance = LookUpConformanceInModule(M.getSwiftModule());
-      auto expectedJVPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
-          AutoDiffAssociatedFunctionKind::JVP, Types, lookUpConformance);
-      auto expectedVJPType = origSilFnType->getAutoDiffAssociatedFunctionType(
-          indices.parameters, indices.source, /*differentiationOrder*/ 1,
-          AutoDiffAssociatedFunctionKind::VJP, Types, lookUpConformance);
+      auto expectedJVPType = origSilFnType->getAutoDiffDerivativeFunctionType(
+          indices.parameters, indices.source,
+          AutoDiffDerivativeFunctionKind::JVP, Types, lookUpConformance);
+      auto expectedVJPType = origSilFnType->getAutoDiffDerivativeFunctionType(
+          indices.parameters, indices.source,
+          AutoDiffDerivativeFunctionKind::VJP, Types, lookUpConformance);
 
       // Self reordering is necessary if wrt at least two parameters, including
       // self.
@@ -797,15 +797,15 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         SILFunction *jvpThunk;
         auto *jvpFn = getFunction(SILDeclRef(jvpDecl), NotForDefinition);
         if (reorderSelf || jvpFn->getLoweredFunctionType() != expectedJVPType) {
-          jvpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, jvpFn, AutoDiffAssociatedFunctionKind::JVP,
+          jvpThunk = getOrCreateAutoDiffDerivativeFunctionThunk(
+              F, indices, jvpFn, AutoDiffDerivativeFunctionKind::JVP,
               reorderSelf);
         } else {
-          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::JVP, /*differentiationOrder*/ 1,
+          auto *id = AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::JVP,
               diffAttr->getParameterIndices(), AFD->getASTContext());
           jvpThunk = getOrCreateAutoDiffThunk(
-              constant.asAutoDiffAssociatedFunction(id), jvpFn,
+              constant.asAutoDiffDerivativeFunction(id), jvpFn,
               expectedJVPType);
         }
         silDiffAttr->setJVPName(jvpThunk->getName());
@@ -815,15 +815,15 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
         SILFunction *vjpThunk;
         auto *vjpFn = getFunction(SILDeclRef(vjpDecl), NotForDefinition);
         if (reorderSelf || vjpFn->getLoweredFunctionType() != expectedVJPType) {
-          vjpThunk = getOrCreateAutoDiffAssociatedFunctionThunk(
-              F, indices, vjpFn, AutoDiffAssociatedFunctionKind::VJP,
+          vjpThunk = getOrCreateAutoDiffDerivativeFunctionThunk(
+              F, indices, vjpFn, AutoDiffDerivativeFunctionKind::VJP,
               reorderSelf);
         } else {
-          auto *id = AutoDiffAssociatedFunctionIdentifier::get(
-              AutoDiffAssociatedFunctionKind::VJP, /*differentiationOrder*/ 1,
+          auto *id = AutoDiffDerivativeFunctionIdentifier::get(
+              AutoDiffDerivativeFunctionKind::VJP,
               diffAttr->getParameterIndices(), AFD->getASTContext());
           vjpThunk = getOrCreateAutoDiffThunk(
-              constant.asAutoDiffAssociatedFunction(id), vjpFn,
+              constant.asAutoDiffDerivativeFunction(id), vjpFn,
               expectedVJPType);
         }
         silDiffAttr->setVJPName(vjpThunk->getName());

@@ -1493,59 +1493,48 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void checkDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
-    require(dfi->getDifferentiationOrder() > 0,
-            "The differentiation order must be non-zero");
     auto origTy =
         dfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
     require(origTy, "The original function must have a function type");
     require(!origTy->isDifferentiable(),
             "The original function must not be @differentiable");
     if (F.getModule().getStage() == SILStage::Canonical ||
-        dfi->hasAssociatedFunctions()) {
-      for (auto order : range(1, dfi->getDifferentiationOrder() + 1)) {
-        auto pair = dfi->getAssociatedFunctionPair(order);
-        auto jvpType = pair.first->getType().getAs<SILFunctionType>();
-        require(jvpType, "The JVP function must have a function type");
-        require(!jvpType->isDifferentiable(),
-                "The JVP function must not be @differentiable");
-        auto expectedJVPType = origTy->getAutoDiffAssociatedFunctionType(
-            dfi->getParameterIndices(), /*resultIndex*/ 0, order,
-            AutoDiffAssociatedFunctionKind::JVP, TC,
-            LookUpConformanceInModule(M));
-        requireSameType(SILType::getPrimitiveObjectType(jvpType),
-                        SILType::getPrimitiveObjectType(expectedJVPType),
-                        "JVP type does not match expected JVP type");
-        auto vjpType = pair.second->getType().getAs<SILFunctionType>();
-        require(vjpType, "The VJP function must have a function type");
-        require(!vjpType->isDifferentiable(),
-                "The VJP function must not be @differentiable");
-        auto expectedVJPType = origTy->getAutoDiffAssociatedFunctionType(
-            dfi->getParameterIndices(), /*resultIndex*/ 0, order,
-            AutoDiffAssociatedFunctionKind::VJP, TC,
-            LookUpConformanceInModule(M));
-        requireSameType(SILType::getPrimitiveObjectType(vjpType),
-                        SILType::getPrimitiveObjectType(expectedVJPType),
-                        "VJP type does not match expected VJP type");
-      }
+        dfi->hasDerivativeFunctions()) {
+      auto jvp = dfi->getJVPFunction();
+      auto jvpType = jvp->getType().getAs<SILFunctionType>();
+      require(jvpType, "The JVP function must have a function type");
+      require(!jvpType->isDifferentiable(),
+              "The JVP function must not be @differentiable");
+      auto expectedJVPType = origTy->getAutoDiffDerivativeFunctionType(
+          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
+          LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(jvpType),
+                      SILType::getPrimitiveObjectType(expectedJVPType),
+                      "JVP type does not match expected JVP type");
+      auto vjp = dfi->getVJPFunction();
+      auto vjpType = vjp->getType().getAs<SILFunctionType>();
+      require(vjpType, "The VJP function must have a function type");
+      require(!vjpType->isDifferentiable(),
+              "The VJP function must not be @differentiable");
+      auto expectedVJPType = origTy->getAutoDiffDerivativeFunctionType(
+          dfi->getParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
+          LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(vjpType),
+                      SILType::getPrimitiveObjectType(expectedVJPType),
+                      "VJP type does not match expected VJP type");
     }
   }
   
   void checkDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
-    if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
-      require(dfei->getDifferentiationOrder() == 0,
-              "Differentiation order should not have been set when the "
-              "original function is being extracted");
-    else
-      require(dfei->getDifferentiationOrder() > 0,
-              "Extraction of associated functions requires a differentiation "
-              "order");
     auto fnTy = dfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
     require(fnTy->isDifferentiable(),
             "The function operand must be an '@differentiable' function");
   }
-  // SWIFT_ENABLE_TENSORFLOW
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void verifyLLVMIntrinsic(BuiltinInst *BI, llvm::Intrinsic::ID ID) {
     // Certain llvm intrinsic require constant values as their operands.

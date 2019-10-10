@@ -1555,7 +1555,7 @@ class DifferentiableAttr final
   AutoDiffIndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
-  /// The generic signature for autodiff associated functions. Resolved by the
+  /// The generic signature for autodiff derivative functions. Resolved by the
   /// type checker based on the original function's generic signature and the
   /// attribute's where clause requirements. This is set only if the attribute
   /// has a where clause.
@@ -1650,10 +1650,10 @@ public:
 
   // Print the attribute to the given stream.
   // If `omitWrtClause` is true, omit printing the `wrt:` clause.
-  // If `omitAssociatedFunctions` is true, omit printing associated functions.
+  // If `omitDerivativeFunctions` is true, omit printing derivative functions.
   void print(llvm::raw_ostream &OS, const Decl *D,
              bool omitWrtClause = false,
-             bool omitAssociatedFunctions = false) const;
+             bool omitDerivativeFunctions = false) const;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DAK_Differentiable;

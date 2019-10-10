@@ -5609,38 +5609,34 @@ differentiable_function
                       sil-differentiable-function-parameter-indices?
                       sil-differentiable-function-order?
                       sil-value ':' sil-type
-                      sil-differentiable-function-associated-functions-clause?
+                      sil-differentiable-function-derivative-functions-clause?
                       
   sil-differentiable-function-parameter-indices ::=
       '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
   sil-differentiable-function-order ::= '[' 'order' [0-9]+ ']'
-  sil-differentiable-associated-functions-clause ::=
-      'with' sil-differentiable-associated-function-list
-      (',' sil-differentiable-associated-function-list)*
-  sil-differentiable-function-associated-function-list ::=
+  sil-differentiable-derivative-functions-clause ::=
+      'with' sil-differentiable-derivative-function-list
+      (',' sil-differentiable-derivative-function-list)*
+  sil-differentiable-function-derivative-function-list ::=
       '{' sil-value ',' sil-value '}'
 
-  differentiable_function [wrt 0] [order 1] %0 : $(T) -> T \
+  differentiable_function [wrt 0] %0 : $(T) -> T \
     with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
-Bundles a function with its associated differentiation functions up to a
-specified differentiation order into an ``@differentiable`` function. There are
-two associated functions per differentiation order: a Jacobian-vector products
-(JVP) function and a vector-Jacobian products (VJP) function.
+Bundles a function with its derivative functions into a ``@differentiable``
+function. There are two derivative functions: a Jacobian-vector products (JVP)
+function and a vector-Jacobian products (VJP) function.
 
 ``[wrt ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
 parameters.
 
-``[order ...]`` specifies the maximum differentiation order for the resulting
-function. The number of lists of associated functions is equal to the order.
-
 A ``with`` clause specifies the differentiation functions associated
 with the original function. When a ``with`` clause is not specified, the first
-operand will be differentiated to produce associated functions, and a ``with``
+operand will be differentiated to produce derivative functions, and a ``with``
 clause will be added to the instruction.
 
-In raw SIL, it is optional to provide an associated function ``with`` clause.
+In raw SIL, it is optional to provide a derivative function ``with`` clause.
 In canonical SIL, a ``with`` clause is mandatory.
 
 
@@ -5660,12 +5656,12 @@ differentiable_function_extract
   sil-differentiable-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
 
   differentiable_function_extract [original] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [jvp] [order 1] %0 : $@differentiable (T) -> T
-  differentiable_function_extract [vjp] [order 1] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
+  differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
 
-Extracts the original function or an associated function from the given
-``@differentiable`` function at a specific differentiation order. It must be
-provided with an extractee: ``[original]``, ``[jvp]`` or ``[vjp]``.
+Extracts the original function or a derivative function from the given
+``@differentiable`` function. It must be provided with an extractee:
+``[original]``, ``[jvp]`` or ``[vjp]``.
 
 
 Assertion configuration
