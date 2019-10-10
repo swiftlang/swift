@@ -2654,11 +2654,23 @@ bool ConstraintSystem::repairFailures(
       auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
                                TMF_ApplyingFix, locator);
 
-      if (!result.isFailure()) {
-        conversionsOrFixes.push_back(
-            AllowInOutConversion::create(*this, lhs, rhs, loc));
-        break;
+      ConstraintFix *fix = nullptr;
+      if (result.isFailure()) {
+        // If this is a "destination" argument to a mutating operator
+        // like `+=`, let's consider it contextual and only attempt
+        // to fix type mismatch on the "source" right-hand side of
+        // such operators.
+        if (isOperatorArgument(loc) &&
+            loc->findLast<LocatorPathElt::ApplyArgToParam>()->getArgIdx() == 0)
+          break;
+
+        fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
+      } else {
+        fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
       }
+
+      conversionsOrFixes.push_back(fix);
+      break;
     }
 
     if (elt.getKind() != ConstraintLocator::ApplyArgToParam)

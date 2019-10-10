@@ -2142,6 +2142,12 @@ bool ContextualFailure::diagnoseConversionToNil() const {
 }
 
 void ContextualFailure::tryFixIts(InFlightDiagnostic &diagnostic) const {
+  auto *locator = getLocator();
+  // Can't apply any of the fix-its below if this failure
+  // is related to `inout` argument.
+  if (locator->isLastElement<LocatorPathElt::LValueConversion>())
+    return;
+
   if (trySequenceSubsequenceFixIts(diagnostic))
     return;
 
