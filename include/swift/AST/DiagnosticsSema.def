@@ -2881,7 +2881,7 @@ ERROR(differentiable_attr_ambiguous_function_identifier,none,
       "ambiguous or overloaded identifier %0 cannot be used in '@differentiable' "
       "attribute", (DeclName))
 ERROR(differentiable_attr_invalid_access,none,
-      "deriavtive function %0 is required to either be public or "
+      "derivative function %0 is required to either be public or "
       "'@usableFromInline' because the original function %1 is public or "
       "'@usableFromInline'", (DeclName, DeclName))
 ERROR(differentiable_attr_result_not_differentiable,none,
