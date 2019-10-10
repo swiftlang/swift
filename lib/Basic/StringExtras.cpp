@@ -465,7 +465,7 @@ StringRef swift::matchLeadingTypeName(StringRef name,
     return name;
 
   // Chop of the beginning of the name.
-  return name.substr(nameWordIter.getPosition());
+  return nameWordIter.getRestOfStr();
 }
 
 StringRef StringScratchSpace::copyString(StringRef string) {
@@ -675,16 +675,22 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
     if (!typeName.CollectionElement.empty() && nameWord.size() > 2 &&
         nameWord.back() == 's') {
       // Check <element name>s.
-      auto shortenedNameWord
-        = name.substr(0, nameWordRevIter.base().getPosition()-1);
+      auto shortenedNameWord = nameWordRevIter.base().getPriorStr().drop_back();
       auto newShortenedNameWord
         = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
                             NameRole::Partial, allPropertyNames);
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
+        auto newIter = llvm::make_reverse_iterator(WordIterator(name,
+                                                                targetSize));
+#ifndef NDEBUG
         while (nameWordRevIter.base().getPosition() > targetSize)
           ++nameWordRevIter;
+        assert(nameWordRevIter == newIter);
+#else
+        nameWordRevIter = newIter;
+#endif
         continue;
       }
     }
@@ -779,9 +785,8 @@ omitSelfTypeFromBaseName(StringRef name, OmissionTypeName typeName,
   if (textMatchesPropertyName(removedText, allPropertyNames))
     return name;
 
-  SmallString<16> newName =
-      name.substr(0, matchingRange->begin().getPosition());
-  newName += name.substr(matchingRange->end().getPosition());
+  SmallString<16> newName = matchingRange->begin().getPriorStr();
+  newName += matchingRange->end().getRestOfStr();
 
   // If we ended up with something that can't be a member name, do nothing.
   if (!canBeMemberName(newName))
@@ -829,7 +834,7 @@ static StringRef omitNeedlessWords(StringRef name,
   switch (role) {
   case NameRole::Property:
     // Always strip off type information.
-    name = name.substr(0, matchIter.getPosition());
+    name = matchIter.getPriorStr();
     break;
 
   case NameRole::BaseName:
@@ -846,7 +851,7 @@ static StringRef omitNeedlessWords(StringRef name,
         // type information, so long as there's something preceding the
         // preposition.
         if (previousWordIter != nameWords.begin())
-          name = name.substr(0, matchIter.getPosition());
+          name = matchIter.getPriorStr();
         break;
       }
 
@@ -857,13 +862,12 @@ static StringRef omitNeedlessWords(StringRef name,
       // Don't prune redundant type information from the base name if
       // there is a corresponding property (either singular or plural).
       if (role == NameRole::BaseName &&
-          textMatchesPropertyName(name.substr(matchIter.getPosition()),
-                                  allPropertyNames))
+          textMatchesPropertyName(matchIter.getRestOfStr(), allPropertyNames))
         return name;
 
       // Strip off the part of the name that is redundant with
       // type information.
-      name = name.substr(0, matchIter.getPosition());
+      name = matchIter.getPriorStr();
       break;
 
     case PartOfSpeech::Unknown:
