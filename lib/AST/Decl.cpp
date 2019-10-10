@@ -3546,25 +3546,6 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
-void TypeAliasDecl::computeType() {
-  assert(!hasInterfaceType());
-      
-  // Set the interface type of this declaration.
-  ASTContext &ctx = getASTContext();
-
-  auto genericSig = getGenericSignature();
-  SubstitutionMap subs;
-  if (genericSig)
-    subs = genericSig->getIdentitySubstitutionMap();
-
-  Type parent;
-  auto parentDC = getDeclContext();
-  if (parentDC->isTypeContext())
-    parent = parentDC->getSelfInterfaceType();
-  auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
-  setInterfaceType(MetatypeType::get(sugaredType, ctx));
-}
-
 Type TypeAliasDecl::getUnderlyingType() const {
   auto &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

@@ -4164,7 +4164,19 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
-    typeAlias->computeType();
+
+    auto genericSig = typeAlias->getGenericSignature();
+    SubstitutionMap subs;
+    if (genericSig)
+      subs = genericSig->getIdentitySubstitutionMap();
+
+    Type parent;
+    auto parentDC = typeAlias->getDeclContext();
+    if (parentDC->isTypeContext())
+      parent = parentDC->getSelfInterfaceType();
+    auto sugaredType = TypeAliasType::get(typeAlias, parent, subs,
+                                          typeAlias->getUnderlyingType());
+    typeAlias->setInterfaceType(MetatypeType::get(sugaredType, Context));
     break;
   }
 

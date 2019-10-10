@@ -1481,7 +1481,6 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
   typealias->setUnderlyingType(underlyingType);
   typealias->setAccess(AccessLevel::Public);
   typealias->setImplicit();
-  typealias->computeType();
 
   nominal->addMember(typealias);
 }
@@ -2542,7 +2541,6 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                   underlying->getDeclaredInterfaceType());
-              typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2562,7 +2560,6 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                 Impl.SwiftContext.getAnyObjectType());
-              typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2630,7 +2627,6 @@ namespace {
                                       Loc,
                                       /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftType);
-      Result->computeType();
       
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
@@ -2920,7 +2916,6 @@ namespace {
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
           alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
-          alias->computeType();
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -4001,7 +3996,6 @@ namespace {
           Loc,
           /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
-      Result->computeType();
 
       return Result;
     }
@@ -5128,7 +5122,6 @@ namespace {
       }
 
       typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-      typealias->computeType();
       return typealias;
     }
 
@@ -5363,7 +5356,6 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   }
 
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-  alias->computeType();
   
   // Record that this is the official version of this declaration.
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;

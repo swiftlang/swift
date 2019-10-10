@@ -2985,9 +2985,6 @@ public:
   /// Retrieve a sugared interface type containing the structure of the interface
   /// type before any semantic validation has occured.
   Type getStructuralType() const;
-
-  /// Set the interface type of this typealias declaration from the underlying type.
-  void computeType();
   
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;

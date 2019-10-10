@@ -2295,7 +2295,6 @@ public:
 
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
-    alias->computeType();
     
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);

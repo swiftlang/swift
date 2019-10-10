@@ -2471,7 +2471,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     /*genericparams*/nullptr, 
                                                     DC);
     aliasDecl->setUnderlyingType(type);
-    aliasDecl->computeType();
     
     aliasDecl->setImplicit();
     if (type->hasError())
