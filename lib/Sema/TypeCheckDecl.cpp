@@ -3989,6 +3989,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       assert(VD->hasInterfaceType());
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(VD);
+    // SWIFT_ENABLE_TENSORFLOW END
+
     // We're not really done with processing the signature yet, but
     // @objc checking requires the declaration to call itself validated
     // so that it can be considered as a witness.
@@ -4118,8 +4123,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
 
-    // TODO(TF-789): Figure out the proper way to typecheck these.
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
     checkDeclDifferentiableAttributes(FD);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     // Member functions need some special validation logic.
     if (FD->getDeclContext()->isTypeContext()) {
@@ -4164,6 +4171,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     typeCheckParameterList(CD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(CD);
+    // SWIFT_ENABLE_TENSORFLOW END
     break;
   }
 
@@ -4196,6 +4207,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         SF->markDeclWithOpaqueResultTypeAsValidated(SD);
       }
     }
+    // SWIFT_ENABLE_TENSORFLOW
+    // TODO(TF-789): Find proper way to type-check `@differentiable` attributes.
+    checkDeclDifferentiableAttributes(SD);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     break;
   }
