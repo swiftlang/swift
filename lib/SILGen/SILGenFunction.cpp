@@ -706,6 +706,14 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   CaptureInfo captureInfo;
   if (function.getAnyFunctionRef())
     captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
+  else {
+    // The expressions for these cannot capture.
+    assert(function.kind == SILDeclRef::Kind::StoredPropertyInitializer ||
+           function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer ||
+           (function.getDecl() && !function.getDecl()->getDeclContext()->isLocalContext()));
+    captureInfo = CaptureInfo::empty();
+  }
+
   auto interfaceType = value->getType()->mapTypeOutOfContext();
   emitProlog(captureInfo, params, /*selfParam=*/nullptr,
              dc, interfaceType, /*throws=*/false, SourceLoc());
