@@ -6145,22 +6145,6 @@ Type SubscriptDecl::getElementInterfaceType() const {
                            ErrorType::get(ctx));
 }
 
-void SubscriptDecl::computeType() {
-  auto elementTy = getElementInterfaceType();
-
-  SmallVector<AnyFunctionType::Param, 2> argTy;
-  getIndices()->getParams(argTy);
-
-  Type funcTy;
-  if (auto sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, argTy, elementTy);
-  else
-    funcTy = FunctionType::get(argTy, elementTy);
-
-  // Record the interface type.
-  setInterfaceType(funcTy);
-}
-
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
   // If the index type is an integral type, we have an indexed
   // subscript.

@@ -6734,7 +6734,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
 
   subscript->setIsSetterMutating(false);
   makeComputed(subscript, getterThunk, setterThunk);
-  subscript->computeType();
 
   Impl.recordImplicitUnwrapForDecl(subscript, isIUO);
 

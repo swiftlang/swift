@@ -5484,10 +5484,6 @@ public:
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
-  /// Compute the interface type of this subscript from the parameter and
-  /// element types.
-  void computeType();
-
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;

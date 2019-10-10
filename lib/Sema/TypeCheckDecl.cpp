@@ -4285,7 +4285,20 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Subscript: {
     auto *SD = cast<SubscriptDecl>(D);
     DeclValidationRAII IBV(SD);
-    SD->computeType();
+
+    auto elementTy = SD->getElementInterfaceType();
+
+    SmallVector<AnyFunctionType::Param, 2> argTy;
+    SD->getIndices()->getParams(argTy);
+
+    Type funcTy;
+    if (auto sig = SD->getGenericSignature())
+      funcTy = GenericFunctionType::get(sig, argTy, elementTy);
+    else
+      funcTy = FunctionType::get(argTy, elementTy);
+
+    // Record the interface type.
+    SD->setInterfaceType(funcTy);
     break;
   }
 

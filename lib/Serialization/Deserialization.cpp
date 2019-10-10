@@ -3691,7 +3691,6 @@ public:
     auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
     subscript->getElementTypeLoc().setType(elemInterfaceType);
     subscript->setImplicitlyUnwrappedOptional(isIUO);
-    subscript->computeType();
 
     if (isImplicit)
       subscript->setImplicit();
