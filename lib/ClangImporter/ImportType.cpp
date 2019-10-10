@@ -1799,7 +1799,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
     const clang::EnumDecl *enumDef = enumTy->getDecl()->getDefinition();
     if (enumDef && nameImporter.getEnumKind(enumDef) == EnumKind::Options) {
       auto enumName = enumDef->getName();
-      for (auto word : reversed(camel_case::getWords(enumName))) {
+      for (auto word : llvm::reverse(camel_case::getWords(enumName))) {
         if (camel_case::sameWordIgnoreFirstCase(word, "options"))
           return DefaultArgumentKind::EmptyArray;
       }
@@ -1821,7 +1821,7 @@ DefaultArgumentKind ClangImporter::Implementation::inferDefaultArgument(
           emptyDictionaryKind = DefaultArgumentKind::NilLiteral;
 
         bool sawInfo = false;
-        for (auto word : reversed(camel_case::getWords(searchStr))) {
+        for (auto word : llvm::reverse(camel_case::getWords(searchStr))) {
           if (camel_case::sameWordIgnoreFirstCase(word, "options"))
             return emptyDictionaryKind;
 

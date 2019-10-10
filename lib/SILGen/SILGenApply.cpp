@@ -4198,7 +4198,7 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
   }
 
   // Uncurry the arguments in calling convention order.
-  for (auto &argSet : reversed(args))
+  for (auto &argSet : llvm::reverse(args))
     uncurriedArgs.append(argSet.begin(), argSet.end());
   args = {};
 

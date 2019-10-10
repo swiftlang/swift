@@ -5518,7 +5518,7 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
           SGFContext::AllowImmediatePlusZero).getAsSingleValue(*this, LE);
     }
 
-    for (auto &FVE : reversed(forceValueExprs)) {
+    for (auto &FVE : llvm::reverse(forceValueExprs)) {
       const TypeLowering &optTL = getTypeLowering(FVE->getSubExpr()->getType());
       bool isImplicitUnwrap = FVE->isImplicit() &&
           FVE->isForceOfImplicitlyUnwrappedOptional();

@@ -3344,7 +3344,7 @@ namespace {
 
       // Local function to add the optional injections to final result.
       auto addFinalOptionalInjections = [&](Expr *result) {
-        for (auto destType : reversed(destOptionalInjections)) {
+        for (auto destType : llvm::reverse(destOptionalInjections)) {
           result =
             cs.cacheType(new (tc.Context) InjectIntoOptionalExpr(result,
                                                                  destType));

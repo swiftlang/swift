@@ -408,7 +408,7 @@ void OpaqueStorageAllocation::allocateOpaqueStorage() {
 
   // Create an AllocStack for every opaque value defined in the function.  Visit
   // values in post-order to create storage for aggregates before subobjects.
-  for (auto &valueStorageI : reversed(pass.valueStorageMap))
+  for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap))
     allocateForValue(valueStorageI.first, valueStorageI.second);
 }
 
@@ -1507,7 +1507,7 @@ void AddressLowering::runOnFunction(SILFunction *F) {
   //
   // Add the rest of the instructions to the dead list in post order.
   // FIXME: make sure we cleaned up address-only BB arguments.
-  for (auto &valueStorageI : reversed(pass.valueStorageMap)) {
+  for (auto &valueStorageI : llvm::reverse(pass.valueStorageMap)) {
     // TODO: MultiValueInstruction: ApplyInst
     auto *deadInst = dyn_cast<SingleValueInstruction>(valueStorageI.first);
     if (!deadInst)
