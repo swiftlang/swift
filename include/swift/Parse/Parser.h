@@ -1560,7 +1560,8 @@ public:
                                       TypeRepr *&explicitResultType,
                                       SourceLoc &inLoc);
 
-  Expr *parseExprAnonClosureArg();
+  ParserResult<Expr> parseExprAnonClosureArg();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprDollarIdentifier();
   ParserResult<Expr> parseExprParenOrTuple();
   ParsedSyntaxResult<ParsedExprSyntax> parseExprTupleSyntax();
   ParserStatus parseExprTupleElementListSyntax(

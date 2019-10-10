@@ -1604,7 +1604,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
   }
 
   case tok::dollarident: // $1
-    return makeParserResult(parseExprAnonClosureArg());
+    return parseExprAnonClosureArg();
 
   case tok::kw__: // _
     ExprContext.setCreateSyntax(SyntaxKind::DiscardAssignmentExpr);
@@ -2873,69 +2873,21 @@ ParserResult<Expr> Parser::parseExprClosure() {
 
 ///   expr-anon-closure-argument:
 ///     dollarident
-Expr *Parser::parseExprAnonClosureArg() {
-  SyntaxParsingContext ExprContext(SyntaxContext, SyntaxKind::IdentifierExpr);
-  StringRef Name = Tok.getText();
-  SourceLoc Loc = consumeToken(tok::dollarident);
-  assert(Name[0] == '$' && "Not a dollarident");
-
-  // We know from the lexer that this is all-numeric.
-
-  unsigned ArgNo = 0;
-  if (Name.substr(1).getAsInteger(10, ArgNo)) {
-    diagnose(Loc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
-    return new (Context) ErrorExpr(Loc);
-  }
-
-  // If this is a closure expression that did not have any named parameters,
-  // generate the anonymous variables we need.
-  auto closure = dyn_cast_or_null<ClosureExpr>(
-      dyn_cast<AbstractClosureExpr>(CurDeclContext));
-  if (!closure) {
-    if (Context.LangOpts.DebuggerSupport) {
-      auto refKind = DeclRefKind::Ordinary;
-      auto identifier = Context.getIdentifier(Name);
-      return new (Context) UnresolvedDeclRefExpr(DeclName(identifier), refKind,
-                                                 DeclNameLoc(Loc));
-    }
-    diagnose(Loc, diag::anon_closure_arg_not_in_closure);
-    return new (Context) ErrorExpr(Loc);
-  }
-  // When the closure already has explicit parameters, offer their names as
-  // replacements.
-  if (auto *params = closure->getParameters()) {
-    if (ArgNo < params->size() && params->get(ArgNo)->hasName()) {
-      auto paramName = params->get(ArgNo)->getNameStr();
-      diagnose(Loc, diag::anon_closure_arg_in_closure_with_args_typo, paramName)
-        .fixItReplace(Loc, paramName);
-      return new (Context) DeclRefExpr(params->get(ArgNo), DeclNameLoc(Loc),
-                                       /*Implicit=*/false);
-    } else {
-      diagnose(Loc, diag::anon_closure_arg_in_closure_with_args);
-      return new (Context) ErrorExpr(Loc);
-    }
-  }
-
-  auto leftBraceLoc = AnonClosureVars.back().first;
-  auto &decls = AnonClosureVars.back().second;
-  while (ArgNo >= decls.size()) {
-    unsigned nextIdx = decls.size();
-    SmallVector<char, 4> StrBuf;
-    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
-    Identifier ident = Context.getIdentifier(varName);
-    SourceLoc varLoc = leftBraceLoc;
-    auto *var = new (Context)
-        ParamDecl(SourceLoc(), SourceLoc(),
-                  Identifier(), varLoc, ident, closure);
-    var->setSpecifier(ParamSpecifier::Default);
-    var->setImplicit();
-    decls.push_back(var);
-  }
-
-  return new (Context) DeclRefExpr(decls[ArgNo], DeclNameLoc(Loc),
-                                   /*Implicit=*/false);
+ParsedSyntaxResult<ParsedExprSyntax>
+Parser::parseExprDollarIdentifier() {
+  return makeParsedResult(ParsedSyntaxRecorder::makeIdentifierExpr(
+      consumeTokenSyntax(tok::dollarident), None, *SyntaxContext));
 }
 
+ParserResult<Expr> Parser::parseExprAnonClosureArg() {
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseExprDollarIdentifier();
+  SyntaxContext->addSyntax(parsed.get());
+  auto syntax = SyntaxContext->topNode<ExprSyntax>();
+  return makeParserResult(parsed.getStatus(),
+                          Generator.generate(syntax, leadingLoc));
+  return parsed.getStatus();
+}
 
 /// Parse a tuple expression or a paren expression.
 ///

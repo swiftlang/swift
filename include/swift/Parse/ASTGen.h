@@ -125,6 +125,9 @@ public:
                                     SmallVectorImpl<Identifier> &exprLabels,
                                     SmallVectorImpl<SourceLoc> &exprLabelLocs);
 
+  Expr *generateDollarIdentifier(const syntax::IdentifierExprSyntax &E,
+                                 const SourceLoc Loc);
+
 private:
   void validateCollectionElement(Expr *elementExpr);
 

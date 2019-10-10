@@ -4479,7 +4479,6 @@ void CodeCompletionCallbacksImpl::completeStmtOrExpr(CodeCompletionExpr *E) {
 }
 
 void CodeCompletionCallbacksImpl::completePostfixExprBeginning(CodeCompletionExpr *E) {
-  assert(P.Tok.is(tok::code_complete));
 
   // Don't produce any results in an enum element.
   if (InEnumElementRawValue)

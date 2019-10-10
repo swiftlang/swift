@@ -343,10 +343,76 @@ std::pair<DeclName, DeclNameLoc> ASTGen::generateUnqualifiedDeclName(
   return {name, nameLoc};
 }
 
+Expr *ASTGen::generateDollarIdentifier(const IdentifierExprSyntax &E,
+                                       const SourceLoc Loc) {
+  assert(E.getIdentifier().getTokenKind() == tok::dollarident &&
+         !E.getDeclNameArguments().hasValue());
+  auto Name = E.getIdentifier().getText();
+  auto tokLoc = advanceLocBegin(Loc, E);
+
+  unsigned ArgNo = 0;
+  if (Name.substr(1).getAsInteger(10, ArgNo)) {
+    P.diagnose(tokLoc.getAdvancedLoc(1), diag::dollar_numeric_too_large);
+    return new (Context) ErrorExpr(tokLoc);
+  }
+
+  // If this is a closure expression that did not have any named parameters,
+  // generate the anonymous variables we need.
+  auto closure = dyn_cast_or_null<ClosureExpr>(
+      dyn_cast<AbstractClosureExpr>(P.CurDeclContext));
+  if (!closure) {
+    if (Context.LangOpts.DebuggerSupport) {
+      auto refKind = DeclRefKind::Ordinary;
+      auto identifier = Context.getIdentifier(Name);
+      return new (Context) UnresolvedDeclRefExpr(DeclName(identifier), refKind,
+                                                 DeclNameLoc(tokLoc));
+    }
+    P.diagnose(tokLoc, diag::anon_closure_arg_not_in_closure);
+    return new (Context) ErrorExpr(tokLoc);
+  }
+  // When the closure already has explicit parameters, offer their names as
+  // replacements.
+  if (auto *params = closure->getParameters()) {
+    if (ArgNo < params->size() && params->get(ArgNo)->hasName()) {
+      auto paramName = params->get(ArgNo)->getNameStr();
+      P.diagnose(tokLoc, diag::anon_closure_arg_in_closure_with_args_typo, paramName)
+        .fixItReplace(tokLoc, paramName);
+      return new (Context) DeclRefExpr(params->get(ArgNo), DeclNameLoc(tokLoc),
+                                       /*Implicit=*/false);
+    } else {
+      P.diagnose(tokLoc, diag::anon_closure_arg_in_closure_with_args);
+      return new (Context) ErrorExpr(tokLoc);
+    }
+  }
+
+  auto leftBraceLoc = P.AnonClosureVars.back().first;
+  auto &decls = P.AnonClosureVars.back().second;
+  while (ArgNo >= decls.size()) {
+    unsigned nextIdx = decls.size();
+    SmallVector<char, 4> StrBuf;
+    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
+    Identifier ident = Context.getIdentifier(varName);
+    SourceLoc varLoc = leftBraceLoc;
+    auto *var = new (Context) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
+                                        varLoc, ident, closure);
+    var->setSpecifier(ParamSpecifier::Default);
+    var->setImplicit();
+    decls.push_back(var);
+  }
+
+  return new (Context) DeclRefExpr(decls[ArgNo], DeclNameLoc(tokLoc),
+                                   /*Implicit=*/false);
+}
+
 Expr *ASTGen::generate(const IdentifierExprSyntax &E, const SourceLoc Loc) {
   auto idTok = E.getIdentifier();
   DeclName name;
   DeclNameLoc nameLoc;
+
+  // Handle dollar identifiers. (e.g. '$1').
+  if (E.getIdentifier().getTokenKind() == tok::dollarident)
+    return generateDollarIdentifier(E, Loc);
+
   std::tie(name, nameLoc) = generateUnqualifiedDeclName(
       E.getIdentifier(), E.getDeclNameArguments(), Loc);
 
