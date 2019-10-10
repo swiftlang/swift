@@ -1988,6 +1988,15 @@ for host in "${ALL_HOSTS[@]}"; do
         -DINTERNAL_INSTALL_PREFIX="local"
     )
 
+    if [[ "$(uname -s)" == "Linux" ]] ; then
+        # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
+        # space/time efficient than -g on that platform.
+        llvm_cmake_options=(
+            "${llvm_cmake_options[@]}"
+            -DLLVM_USE_SPLIT_DWARF:BOOL=YES
+        )
+    fi
+
     if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
         swift_cmake_options=(
             "${swift_cmake_options[@]}"
