@@ -1943,8 +1943,7 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
 }
 
 /// Check the default arguments that occur within this pattern.
-static void checkDefaultArguments(TypeChecker &tc, ParameterList *params,
-                                  ValueDecl *VD) {
+static void checkDefaultArguments(TypeChecker &tc, ParameterList *params) {
   for (auto *param : *params) {
     checkInheritedDefaultValueRestrictions(param);
     if (!param->getDefaultValue() ||
@@ -2598,7 +2597,7 @@ public:
     (void) SD->getImplInfo();
 
     TC.checkParameterAttributes(SD->getIndices());
-    checkDefaultArguments(TC, SD->getIndices(), SD);
+    checkDefaultArguments(TC, SD->getIndices());
 
     if (SD->getDeclContext()->getSelfClassDecl()) {
       checkDynamicSelfType(SD, SD->getValueInterfaceType());
@@ -3219,7 +3218,7 @@ public:
     if (FD->getDeclContext()->getSelfClassDecl())
       checkDynamicSelfType(FD, FD->getResultInterfaceType());
 
-    checkDefaultArguments(TC, FD->getParameters(), FD);
+    checkDefaultArguments(TC, FD->getParameters());
 
     // Validate 'static'/'class' on functions in extensions.
     auto StaticSpelling = FD->getStaticSpelling();
@@ -3277,7 +3276,7 @@ public:
 
     if (auto *PL = EED->getParameterList()) {
       TC.checkParameterAttributes(PL);
-      checkDefaultArguments(TC, PL, EED);
+      checkDefaultArguments(TC, PL);
     }
 
     // We don't yet support raw values on payload cases.
@@ -3537,7 +3536,7 @@ public:
       TC.definedFunctions.push_back(CD);
     }
 
-    checkDefaultArguments(TC, CD->getParameters(), CD);
+    checkDefaultArguments(TC, CD->getParameters());
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
