@@ -4569,8 +4569,7 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
 
 AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *indices, unsigned resultIndex,
-    unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    LookupConformanceFn lookupConformance,
+    AutoDiffAssociatedFunctionKind kind, LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
@@ -4581,7 +4580,6 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // "Closure" and then use common code to wrap "Closure" in the outer function
   // type.
 
-  assert(differentiationOrder == 1 && "only order 1 currently supported");
   assert(!indices->isEmpty() && "there must be at least one wrt index");
 
   auto &ctx = getASTContext();

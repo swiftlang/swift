@@ -4829,13 +4829,12 @@ AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
 
 AutoDiffAssociatedFunctionIdentifier *
 AutoDiffAssociatedFunctionIdentifier::get(
-    AutoDiffAssociatedFunctionKind kind, unsigned differentiationOrder,
-    AutoDiffIndexSubset *parameterIndices, ASTContext &C) {
+    AutoDiffAssociatedFunctionKind kind, AutoDiffIndexSubset *parameterIndices,
+    ASTContext &C) {
   assert(parameterIndices);
   auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
   llvm::FoldingSetNodeID id;
   id.AddInteger((unsigned)kind);
-  id.AddInteger(differentiationOrder);
   id.AddPointer(parameterIndices);
 
   void *insertPos;
@@ -4846,7 +4845,7 @@ AutoDiffAssociatedFunctionIdentifier::get(
   void *mem = C.Allocate(sizeof(AutoDiffAssociatedFunctionIdentifier),
                          alignof(AutoDiffAssociatedFunctionIdentifier));
   auto *newNode = ::new (mem) AutoDiffAssociatedFunctionIdentifier(
-      kind, differentiationOrder, parameterIndices);
+      kind, parameterIndices);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

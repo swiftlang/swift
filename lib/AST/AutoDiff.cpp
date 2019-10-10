@@ -123,19 +123,9 @@ void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *subset,
   }
 }
 
-unsigned autodiff::getOffsetForAutoDiffAssociatedFunction(
-    unsigned order, AutoDiffAssociatedFunctionKind kind) {
-  return (order - 1) * getNumAutoDiffAssociatedFunctions(order) + kind.rawValue;
-}
-
-unsigned
-autodiff::getNumAutoDiffAssociatedFunctions(unsigned differentiationOrder) {
-  return differentiationOrder * 2;
-}
-
 bool autodiff::getBuiltinAutoDiffApplyConfig(
     StringRef operationName, AutoDiffAssociatedFunctionKind &kind,
-    unsigned &arity, unsigned &order, bool &rethrows) {
+    unsigned &arity, bool &rethrows) {
   if (!operationName.startswith("autodiffApply_"))
     return false;
   operationName = operationName.drop_front(strlen("autodiffApply_"));
@@ -155,17 +145,6 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
     assert(arity > 0);
   } else {
     arity = 1;
-  }
-  // Parse '_order'.
-  if (operationName.startswith("_order")) {
-    operationName = operationName.drop_front(strlen("_order"));
-    auto orderStr = operationName.take_while(llvm::isDigit);
-    auto converted = llvm::to_integer(orderStr, order);
-    operationName = operationName.drop_front(orderStr.size());
-    assert(converted); (void)converted;
-    assert(order > 0);
-  } else {
-    order = 1;
   }
   // Parse '_rethrows'.
   if (operationName.startswith("_rethrows")) {

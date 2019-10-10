@@ -140,10 +140,9 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
       autoDiffFuncId->getParameterIndices(),
       assocFnDecl->getInterfaceType()->castTo<AnyFunctionType>());
   auto diffFn = SGF.B.createDifferentiableFunction(
-      loc, loweredIndices, /*differentiationOrder*/ 1, originalFnRef);
+      loc, loweredIndices, originalFnRef);
   auto diffAssocFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
-      /*differentiationOrder*/ 1, diffFn);
+      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()), diffFn);
   auto autoDiffAssocFnSILTy = SILType::getPrimitiveObjectType(constantTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());

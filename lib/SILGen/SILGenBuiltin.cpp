@@ -1032,7 +1032,7 @@ static ManagedValue emitBuiltinTypeTrait(SILGenFunction &SGF,
 
 // SWIFT_ENABLE_TENSORFLOW
 static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
-    AutoDiffAssociatedFunctionKind kind, unsigned arity, unsigned order,
+    AutoDiffAssociatedFunctionKind kind, unsigned arity,
     bool rethrows, SILGenFunction &SGF, SILLocation loc,
     SubstitutionMap substitutions, ArrayRef<ManagedValue> args, SGFContext C) {
   auto origFnVal = args[0].getValue();
@@ -1042,7 +1042,7 @@ static ManagedValue emitBuiltinAutoDiffApplyAssociatedFunction(
 
   // Get the associated function.
   SILValue assocFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, kind, /*differentiationOrder*/ 1, origFnVal);
+      loc, kind, origFnVal);
   auto assocFnType = assocFn->getType().castTo<SILFunctionType>();
 
   // We don't need to destroy the original function or retain the `assocFn`,
@@ -1144,12 +1144,12 @@ static ManagedValue emitBuiltinAutoDiffApply(SILGenFunction &SGF,
           ->getDecl());
   auto builtinName = builtinDecl->getName().str();
   AutoDiffAssociatedFunctionKind kind;
-  unsigned arity, order;
+  unsigned arity;
   bool rethrows;
   auto successfullyParsed = autodiff::getBuiltinAutoDiffApplyConfig(
-      builtinName, kind, arity, order, rethrows);
+      builtinName, kind, arity, rethrows);
   assert(successfullyParsed);
-  return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity, order,
+  return emitBuiltinAutoDiffApplyAssociatedFunction(kind, arity,
                                                     rethrows, SGF, loc,
                                                     substitutions, args, C);
 }

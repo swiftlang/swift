@@ -114,9 +114,7 @@ SILFunctionType::getDifferentiationParameterIndices() {
 }
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    unsigned differentiationOrder, AutoDiffIndexSubset *parameterIndices) {
-  // FIXME(rxwei): Handle differentiation order.
-
+    AutoDiffIndexSubset *parameterIndices) {
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
@@ -183,9 +181,8 @@ static CanGenericSignature getAutoDiffAssociatedFunctionGenericSignature(
 
 CanSILFunctionType SILFunctionType::getAutoDiffAssociatedFunctionType(
     AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
-    unsigned differentiationOrder, AutoDiffAssociatedFunctionKind kind,
-    TypeConverter &TC, LookupConformanceFn lookupConformance,
-    CanGenericSignature assocFnGenSig) {
+    AutoDiffAssociatedFunctionKind kind, TypeConverter &TC,
+    LookupConformanceFn lookupConformance, CanGenericSignature assocFnGenSig) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
   // VJP: (T...) -> ((R...),
@@ -2353,8 +2350,7 @@ const SILConstantInfo &TypeConverter::getConstantInfo(SILDeclRef constant) {
     auto loweredIndices = autodiff::getLoweredParameterIndices(
         autoDiffFuncId->getParameterIndices(), formalInterfaceType);
     silFnType = origFnConstantInfo.SILFnType->getAutoDiffAssociatedFunctionType(
-        loweredIndices, /*resultIndex*/ 0,
-        autoDiffFuncId->getDifferentiationOrder(), autoDiffFuncId->getKind(),
+        loweredIndices, /*resultIndex*/ 0, autoDiffFuncId->getKind(),
         *this, LookUpConformanceInModule(&M));
   }
 
