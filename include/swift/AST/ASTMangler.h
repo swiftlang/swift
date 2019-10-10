@@ -159,8 +159,8 @@ public:
   // - Mangled original function name.
   // - Associated function kind.
   // - Parameter/result indices.
-  std::string mangleAutoDiffAssociatedFunctionHelper(
-      StringRef name, AutoDiffAssociatedFunctionKind kind,
+  std::string mangleAutoDiffDerivativeFunctionHelper(
+      StringRef name, AutoDiffDerivativeFunctionKind kind,
       const SILAutoDiffIndices &indices);
 
   // SWIFT_ENABLE_TENSORFLOW

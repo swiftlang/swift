@@ -3292,16 +3292,16 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   auto *parameterIndices = AutoDiffIndexSubset::get(
       SGF.getASTContext(), parameterBits);
 
-  auto getAssocFnTy =
-      [&](CanAnyFunctionType fnTy, AutoDiffAssociatedFunctionKind kind)
+  auto getDerivativeFnTy =
+      [&](CanAnyFunctionType fnTy, AutoDiffDerivativeFunctionKind kind)
           -> CanAnyFunctionType {
-        auto assocTy = fnTy->getAutoDiffAssociatedFunctionType(
+        auto assocTy = fnTy->getAutoDiffDerivativeFunctionType(
             parameterIndices, /*resultIndex*/ 0,
             kind, LookUpConformanceInModule(SGF.SGM.M.getSwiftModule()));
         return cast<AnyFunctionType>(assocTy->getCanonicalType());
       };
-  auto getAssocFnPattern =
-      [&](AbstractionPattern pattern, AutoDiffAssociatedFunctionKind kind)
+  auto getDerivativeFnPattern =
+      [&](AbstractionPattern pattern, AutoDiffDerivativeFunctionKind kind)
           -> AbstractionPattern {
         // If pattern does not store an `AnyFunctionType`, return original
         // pattern. This logic handles opaque abstraction patterns.
@@ -3309,30 +3309,30 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
         if (!patternType)
           return pattern;
         return AbstractionPattern(
-            pattern.getGenericSignature(), getAssocFnTy(patternType, kind));
+            pattern.getGenericSignature(), getDerivativeFnTy(patternType, kind));
       };
-  auto createAssocFnThunk =
-      [&](AutoDiffAssociatedFunctionKind kind) -> ManagedValue {
+  auto createDerivativeFnThunk =
+      [&](AutoDiffDerivativeFunctionKind kind) -> ManagedValue {
     auto derivativeFnInputOrigType =
-        getAssocFnPattern(inputOrigTypeNotDiff, kind);
-    auto derivativeFnInputSubstType = getAssocFnTy(inputSubstTypeNotDiff, kind);
-    auto derivativeFnOutputOrigType = getAssocFnPattern(outputOrigTypeNotDiff,
+        getDerivativeFnPattern(inputOrigTypeNotDiff, kind);
+    auto derivativeFnInputSubstType = getDerivativeFnTy(inputSubstTypeNotDiff, kind);
+    auto derivativeFnOutputOrigType = getDerivativeFnPattern(outputOrigTypeNotDiff,
                                                    kind);
     auto derivativeFnOutputSubstType =
-        getAssocFnTy(outputSubstTypeNotDiff, kind);
+        getDerivativeFnTy(outputSubstTypeNotDiff, kind);
     auto &derivativeFnExpectedTL = SGF.getTypeLowering(
         derivativeFnOutputOrigType, derivativeFnOutputSubstType);
     SILValue derivativeFn = SGF.B.createDifferentiableFunctionExtract(
         loc, kind, borrowedFnValue.getValue());
     derivativeFn = SGF.B.emitCopyValueOperation(loc, derivativeFn);
-    auto managedAssocFn = SGF.emitManagedRValueWithCleanup(derivativeFn);
-    return createThunk(SGF, loc, managedAssocFn, derivativeFnInputOrigType,
+    auto managedDerivativeFn = SGF.emitManagedRValueWithCleanup(derivativeFn);
+    return createThunk(SGF, loc, managedDerivativeFn, derivativeFnInputOrigType,
                        derivativeFnInputSubstType, derivativeFnOutputOrigType,
                        derivativeFnOutputSubstType, derivativeFnExpectedTL);
   };
 
-  auto jvpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::JVP);
-  auto vjpThunk = createAssocFnThunk(AutoDiffAssociatedFunctionKind::VJP);
+  auto jvpThunk = createDerivativeFnThunk(AutoDiffDerivativeFunctionKind::JVP);
+  auto vjpThunk = createDerivativeFnThunk(AutoDiffDerivativeFunctionKind::VJP);
 
   SILValue convertedBundle = SGF.B.createDifferentiableFunction(
       loc, sourceType->getDifferentiationParameterIndices(),
@@ -3666,9 +3666,9 @@ SILGenFunction::getThunkedAutoDiffLinearMap(
 
 // SWIFT_ENABLE_TENSORFLOW
 SILFunction *
-SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
+SILGenModule::getOrCreateAutoDiffDerivativeFunctionThunk(
     SILFunction *original, SILAutoDiffIndices &indices,
-    SILFunction *derivativeFn, AutoDiffAssociatedFunctionKind derivativeFnKind,
+    SILFunction *derivativeFn, AutoDiffDerivativeFunctionKind derivativeFnKind,
     bool reorderSelf) {
   auto derivativeFnType = derivativeFn->getLoweredFunctionType();
 
@@ -3676,7 +3676,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
   // Do not simply reuse reabstraction thunk mangling.
   Mangle::ASTMangler mangler;
   auto name = getASTContext().getIdentifier(
-      mangler.mangleAutoDiffAssociatedFunctionHelper(
+      mangler.mangleAutoDiffDerivativeFunctionHelper(
           original->getName(), derivativeFnKind, indices)).str();
 
   Lowering::GenericContextScope genericContextScope(
@@ -3686,18 +3686,18 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
       : nullptr;
 
   auto origFnType = original->getLoweredFunctionType();
-  auto origAssocFnType = origFnType->getAutoDiffAssociatedFunctionType(
+  auto origDerivativeFnType = origFnType->getAutoDiffDerivativeFunctionType(
       indices.parameters, indices.source,
       derivativeFnKind, Types, LookUpConformanceInModule(M.getSwiftModule()),
       derivativeFnType->getGenericSignature());
-  assert(!origAssocFnType->getExtInfo().hasContext());
+  assert(!origDerivativeFnType->getExtInfo().hasContext());
 
   auto loc = derivativeFn->getLocation();
   SILGenFunctionBuilder fb(*this);
-  auto linkage = autodiff::getAutoDiffAssociatedFunctionLinkage(
-      original->getLinkage(), /*isAssocFnExported*/ true);
+  auto linkage = autodiff::getAutoDiffDerivativeFunctionLinkage(
+      original->getLinkage(), /*isDerivativeFnExported*/ true);
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, origAssocFnType, IsBare, IsNotTransparent,
+      loc, name, linkage, origDerivativeFnType, IsBare, IsNotTransparent,
       derivativeFn->isSerialized(), derivativeFn->isDynamicallyReplaceable(),
       derivativeFn->getEntryCount(), derivativeFn->isThunk(),
       derivativeFn->getClassSubclassScope());
@@ -3743,7 +3743,7 @@ SILGenModule::getOrCreateAutoDiffAssociatedFunctionThunk(
               derivativeFnRefType->getResults().back().getType())
           ->getCanonicalType());
   auto targetLinearMapFnType = thunk->mapTypeIntoContext(
-      origAssocFnType->getResults().back().getSILStorageType())
+      origDerivativeFnType->getResults().back().getSILStorageType())
           .castTo<SILFunctionType>();
   if (!reorderSelf && linearMapFnType == targetLinearMapFnType) {
     createReturn(apply);
@@ -4304,7 +4304,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
   switch (witnessKind) {
   case WitnessDispatchKind::Static:
     // SWIFT_ENABLE_TENSORFLOW
-    if (auto *autoDiffFuncId = witness.autoDiffAssociatedFunctionIdentifier) {
+    if (auto *autoDiffFuncId = witness.autoDiffDerivativeFunctionIdentifier) {
       auto originalFn = SGF.emitGlobalFunctionRef(
           loc, witness.asAutoDiffOriginalFunction());
       auto loweredIndices = autodiff::getLoweredParameterIndices(
@@ -4320,7 +4320,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
     return SGF.emitGlobalFunctionRef(loc, witness);
   case WitnessDispatchKind::Dynamic:
     // SWIFT_ENABLE_TENSORFLOW
-    assert(!witness.autoDiffAssociatedFunctionIdentifier);
+    assert(!witness.autoDiffDerivativeFunctionIdentifier);
     return SGF.emitDynamicMethodRef(loc, witness, witnessFTy).getValue();
   case WitnessDispatchKind::Witness: {
     auto typeAndConf =

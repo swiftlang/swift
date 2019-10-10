@@ -994,8 +994,8 @@ static ValueDecl *getGetObjCTypeEncodingOperation(ASTContext &Context,
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-static ValueDecl *getAutoDiffApplyAssociatedFunction(
-    ASTContext &Context, Identifier Id, AutoDiffAssociatedFunctionKind kind,
+static ValueDecl *getAutoDiffApplyDerivativeFunction(
+    ASTContext &Context, Identifier Id, AutoDiffDerivativeFunctionKind kind,
     unsigned arity, bool rethrows) {
   assert(arity >= 1);
   // JVP:
@@ -1045,7 +1045,7 @@ static ValueDecl *getAutoDiffApplyAssociatedFunction(
   // Generator for the resultant function type, i.e. the AD associated function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{
       [=, &Context](BuiltinGenericSignatureBuilder &builder) -> Type {
-        auto derivativeFnTy = origFnTy->getAutoDiffAssociatedFunctionType(
+        auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
             paramIndices, /*resultIndex*/ 0, kind,
             LookUpConformanceInModule(Context.TheBuiltinModule));
         return derivativeFnTy->getResult();
@@ -1840,13 +1840,13 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
   }
   // SWIFT_ENABLE_TENSORFLOW
   if (OperationName.startswith("autodiffApply_")) {
-    AutoDiffAssociatedFunctionKind kind;
+    AutoDiffDerivativeFunctionKind kind;
     unsigned arity;
     bool rethrows;
     if (!autodiff::getBuiltinAutoDiffApplyConfig(OperationName, kind, arity,
                                                  rethrows))
       return nullptr;
-    return getAutoDiffApplyAssociatedFunction(Context, Id, kind, arity,
+    return getAutoDiffApplyDerivativeFunction(Context, Id, kind, arity,
                                               rethrows);
   }
   auto BV = llvm::StringSwitch<BuiltinValueKind>(OperationName)

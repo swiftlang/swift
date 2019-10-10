@@ -5624,7 +5624,7 @@ differentiable_function
     with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
 Bundles a function with its associated differentiation functions into a
-``@differentiable`` function. There are two associated functions:
+``@differentiable`` function. There are two derivative functions:
 a Jacobian-vector products (JVP) function and a vector-Jacobian products (VJP)
 function.
 
@@ -5634,10 +5634,10 @@ parameters.
 
 A ``with`` clause specifies the differentiation functions associated
 with the original function. When a ``with`` clause is not specified, the first
-operand will be differentiated to produce associated functions, and a ``with``
+operand will be differentiated to produce derivative functions, and a ``with``
 clause will be added to the instruction.
 
-In raw SIL, it is optional to provide an associated function ``with`` clause.
+In raw SIL, it is optional to provide an derivative function ``with`` clause.
 In canonical SIL, a ``with`` clause is mandatory.
 
 
@@ -5660,7 +5660,7 @@ differentiable_function_extract
   differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
   differentiable_function_extract [vjp] %0 : $@differentiable (T) -> T
 
-Extracts the original function or an associated function from the given
+Extracts the original function or an derivative function from the given
 ``@differentiable`` function. It must be provided with an extractee:
 ``[original]``, ``[jvp]`` or ``[vjp]``.
 

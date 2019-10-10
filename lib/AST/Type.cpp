@@ -4567,9 +4567,9 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
   return cache(None);
 }
 
-AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
+AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
     AutoDiffIndexSubset *indices, unsigned resultIndex,
-    AutoDiffAssociatedFunctionKind kind, LookupConformanceFn lookupConformance,
+    AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
   //                 (T.TangentVector...) -> (R.TangentVector...))
@@ -4606,7 +4606,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   // JVP or VJP.
   Type closure;
   switch (kind) {
-  case AutoDiffAssociatedFunctionKind::JVP: {
+  case AutoDiffDerivativeFunctionKind::JVP: {
     // closure is the JVP "differential":
     //   (T.TangentVector...) -> (R.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> differentialParams;
@@ -4635,7 +4635,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
     closure = FunctionType::get(differentialParams, differentialResult);
     break;
   }
-  case AutoDiffAssociatedFunctionKind::VJP: {
+  case AutoDiffDerivativeFunctionKind::VJP: {
     // closure is the VJP "pullback":
     //   (R.TangentVector...) -> (T.TangentVector...)
     SmallVector<AnyFunctionType::Param, 8> pullbackParams;
@@ -4673,7 +4673,7 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   retElts.push_back(originalResult);
   retElts.push_back(closure);
   auto retTy = TupleType::get(retElts, ctx);
-  auto *associatedFunction = makeFunctionType(
+  auto *derivativeFunction = makeFunctionType(
       curryLevels.back(), curryLevels.back()->getParams(), retTy,
       curryLevels.size() == 1 ? whereClauseGenSig : nullptr);
 
@@ -4683,12 +4683,12 @@ AnyFunctionType *AnyFunctionType::getAutoDiffAssociatedFunctionType(
   for (auto pair : enumerate(reversed(curryLevelsWithoutLast))) {
     unsigned i = pair.index();
     AnyFunctionType *curryLevel = pair.value();
-    associatedFunction = makeFunctionType(
-        curryLevel, curryLevel->getParams(), associatedFunction,
+    derivativeFunction = makeFunctionType(
+        curryLevel, curryLevel->getParams(), derivativeFunction,
         i == curryLevelsWithoutLast.size() - 1 ? whereClauseGenSig : nullptr);
   }
 
-  return associatedFunction;
+  return derivativeFunction;
 }
 
 // SWIFT_ENABLE_TENSORFLOW

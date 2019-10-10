@@ -63,8 +63,8 @@ public:
     auto origFnTy = fnTy->getWithoutDifferentiability();
     if (Index == DifferentiableFunctionExtractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
-    auto kind = *Index.getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
+    auto kind = *Index.getExtracteeAsDerivativeFunction();
+    auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
         ParameterIndices, /*resultIndex*/ 0, kind,
         IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);
@@ -152,8 +152,8 @@ public:
   SILType getType(DiffFuncIndex field) {
     if (field == DifferentiableFunctionExtractee::Original)
       return SILType::getPrimitiveObjectType(origFnTy->getCanonicalType());
-    auto kind = *field.getExtracteeAsAssociatedFunction();
-    auto assocTy = origFnTy->getAutoDiffAssociatedFunctionType(
+    auto kind = *field.getExtracteeAsDerivativeFunction();
+    auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
     return SILType::getPrimitiveObjectType(assocTy);

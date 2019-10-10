@@ -1545,7 +1545,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
   unsigned uncurryLevel = 0;
   bool IsObjC = false;
   // SWIFT_ENABLE_TENSORFLOW
-  AutoDiffAssociatedFunctionIdentifier *autoDiffFuncId = nullptr;
+  AutoDiffDerivativeFunctionIdentifier *autoDiffFuncId = nullptr;
 
   if (!P.consumeIf(tok::sil_exclamation)) {
     // Construct SILDeclRef.
@@ -1635,13 +1635,13 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         // SWIFT_ENABLE_TENSORFLOW
         ParseState = 3;
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
-        AutoDiffAssociatedFunctionKind kind;
+        AutoDiffDerivativeFunctionKind kind;
         AutoDiffIndexSubset *parameterIndices = nullptr;
 
         if (Id.str() == "jvp")
-          kind = AutoDiffAssociatedFunctionKind::JVP;
+          kind = AutoDiffDerivativeFunctionKind::JVP;
         else if (Id.str() == "vjp")
-          kind = AutoDiffAssociatedFunctionKind::VJP;
+          kind = AutoDiffDerivativeFunctionKind::VJP;
         else
           llvm_unreachable("Should only have JVP and VJP here");
 
@@ -1658,7 +1658,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         }
         P.consumeToken();
 
-        autoDiffFuncId = AutoDiffAssociatedFunctionIdentifier::get(
+        autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
             kind, parameterIndices, SILMod.getASTContext());
 
         break;

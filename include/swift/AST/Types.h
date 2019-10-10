@@ -3114,9 +3114,9 @@ public:
   /// \note The original function type (`self`) need not be `@differentiable`.
   /// The resulting function will preserve all `ExtInfo` of the original
   /// function, including `@differentiable`.
-  AnyFunctionType *getAutoDiffAssociatedFunctionType(
+  AnyFunctionType *getAutoDiffDerivativeFunctionType(
       AutoDiffIndexSubset *indices, unsigned resultIndex,
-      AutoDiffAssociatedFunctionKind kind,
+      AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr,
       bool makeSelfParamFirst = false);
@@ -4222,11 +4222,11 @@ public:
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
-  CanSILFunctionType getAutoDiffAssociatedFunctionType(
+  CanSILFunctionType getAutoDiffDerivativeFunctionType(
       AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
-      AutoDiffAssociatedFunctionKind kind, Lowering::TypeConverter &TC,
+      AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
-      CanGenericSignature associatedFunctionGenericSignature = nullptr);
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr);
 
   /// Returns a bit vector that specifices which parameters you can
   /// differentiate with respect to for this differentiable function type. (e.g.

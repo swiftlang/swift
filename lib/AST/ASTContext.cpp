@@ -448,9 +448,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// For uniquifying `AutoDiffIndexSubset` allocations.
   llvm::FoldingSet<AutoDiffIndexSubset> AutoDiffIndexSubsets;
 
-  /// For uniquifying `AutoDiffAssociatedFunctionIdentifier` allocations.
-  llvm::FoldingSet<AutoDiffAssociatedFunctionIdentifier>
-      AutoDiffAssociatedFunctionIdentifiers;
+  /// For uniquifying `AutoDiffDerivativeFunctionIdentifier` allocations.
+  llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
+      AutoDiffDerivativeFunctionIdentifiers;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -4827,12 +4827,12 @@ AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   return newNode;
 }
 
-AutoDiffAssociatedFunctionIdentifier *
-AutoDiffAssociatedFunctionIdentifier::get(
-    AutoDiffAssociatedFunctionKind kind, AutoDiffIndexSubset *parameterIndices,
+AutoDiffDerivativeFunctionIdentifier *
+AutoDiffDerivativeFunctionIdentifier::get(
+    AutoDiffDerivativeFunctionKind kind, AutoDiffIndexSubset *parameterIndices,
     ASTContext &C) {
   assert(parameterIndices);
-  auto &foldingSet = C.getImpl().AutoDiffAssociatedFunctionIdentifiers;
+  auto &foldingSet = C.getImpl().AutoDiffDerivativeFunctionIdentifiers;
   llvm::FoldingSetNodeID id;
   id.AddInteger((unsigned)kind);
   id.AddPointer(parameterIndices);
@@ -4842,9 +4842,9 @@ AutoDiffAssociatedFunctionIdentifier::get(
   if (existing)
     return existing;
 
-  void *mem = C.Allocate(sizeof(AutoDiffAssociatedFunctionIdentifier),
-                         alignof(AutoDiffAssociatedFunctionIdentifier));
-  auto *newNode = ::new (mem) AutoDiffAssociatedFunctionIdentifier(
+  void *mem = C.Allocate(sizeof(AutoDiffDerivativeFunctionIdentifier),
+                         alignof(AutoDiffDerivativeFunctionIdentifier));
+  auto *newNode = ::new (mem) AutoDiffDerivativeFunctionIdentifier(
       kind, parameterIndices);
   foldingSet.InsertNode(newNode, insertPos);
 

@@ -25,8 +25,8 @@ bool SILAutoDiffIndices::operator==(const SILAutoDiffIndices &other) const {
   return source == other.source && parameters == other.parameters;
 }
 
-AutoDiffAssociatedFunctionKind::
-AutoDiffAssociatedFunctionKind(StringRef string) {
+AutoDiffDerivativeFunctionKind::
+AutoDiffDerivativeFunctionKind(StringRef string) {
   Optional<innerty> result =
       llvm::StringSwitch<Optional<innerty>>(string)
           .Case("jvp", JVP).Case("vjp", VJP);
@@ -124,16 +124,16 @@ void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *subset,
 }
 
 bool autodiff::getBuiltinAutoDiffApplyConfig(
-    StringRef operationName, AutoDiffAssociatedFunctionKind &kind,
+    StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
     unsigned &arity, bool &rethrows) {
   if (!operationName.startswith("autodiffApply_"))
     return false;
   operationName = operationName.drop_front(strlen("autodiffApply_"));
   // Parse 'jvp' or 'vjp'.
   if (operationName.startswith("jvp"))
-    kind = AutoDiffAssociatedFunctionKind::JVP;
+    kind = AutoDiffDerivativeFunctionKind::JVP;
   else if (operationName.startswith("vjp"))
-    kind = AutoDiffAssociatedFunctionKind::VJP;
+    kind = AutoDiffDerivativeFunctionKind::VJP;
   operationName = operationName.drop_front(3);
   // Parse '_arity'.
   if (operationName.startswith("_arity")) {
@@ -156,27 +156,27 @@ bool autodiff::getBuiltinAutoDiffApplyConfig(
   return operationName.empty();
 }
 
-SILLinkage autodiff::getAutoDiffAssociatedFunctionLinkage(
-    SILLinkage originalLinkage, bool isAssocFnExported) {
+SILLinkage autodiff::getAutoDiffDerivativeFunctionLinkage(
+    SILLinkage originalLinkage, bool isDerivativeFnExported) {
   // If the original is defined externally, then the AD pass is just generating
-  // associated functions for use in the current module and therefore these
-  // associated functions should not be visible outside the module.
+  // derivative functions for use in the current module and therefore these
+  // derivative functions should not be visible outside the module.
   if (isAvailableExternally(originalLinkage))
     return SILLinkage::Hidden;
 
   // If the original is public, then external modules may need to link the
-  // associated function. Return the linkage of the original function, unless
-  // the associated function is not exported (i.e. differentiation is not
+  // derivative function. Return the linkage of the original function, unless
+  // the derivative function is not exported (i.e. differentiation is not
   // explicitly requested via a `[differentiable]` attribute on the original
   // function).
   if (originalLinkage == SILLinkage::Public ||
       originalLinkage == SILLinkage::PublicNonABI ||
       originalLinkage == SILLinkage::Shared)
-    return isAssocFnExported ? originalLinkage : SILLinkage::Hidden;
+    return isDerivativeFnExported ? originalLinkage : SILLinkage::Hidden;
 
   // Otherwise, the original function is defined and used only in the current
   // module, so external modules will never try to access the associated
-  // function. Make the associated function hidden.
+  // function. Make the derivative function hidden.
   return SILLinkage::Hidden;
 }
 

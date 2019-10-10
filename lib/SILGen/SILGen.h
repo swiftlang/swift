@@ -185,10 +185,10 @@ public:
   /// If `reorderSelf` is true, reorder self so that it appears as:
   /// - The last parameter in the returned differential.
   /// - The last result in the returned pullback.
-  SILFunction *getOrCreateAutoDiffAssociatedFunctionThunk(
+  SILFunction *getOrCreateAutoDiffDerivativeFunctionThunk(
       SILFunction *original, SILAutoDiffIndices &indices,
       SILFunction *derivativeFn,
-      AutoDiffAssociatedFunctionKind derivativeFnKind, bool reorderSelf);
+      AutoDiffDerivativeFunctionKind derivativeFnKind, bool reorderSelf);
 
   /// Determine whether the given class has any instance variables that
   /// need to be destroyed.

@@ -7912,16 +7912,16 @@ public:
   }
 
   /// Returns the derivative function (JVP or VJP) that matches the given kind.
-  SILValue getDerivativeFunction(AutoDiffAssociatedFunctionKind kind) const {
+  SILValue getDerivativeFunction(AutoDiffDerivativeFunctionKind kind) const {
     switch (kind) {
-    case AutoDiffAssociatedFunctionKind::JVP: return getJVPFunction();
-    case AutoDiffAssociatedFunctionKind::VJP: return getVJPFunction();
+    case AutoDiffDerivativeFunctionKind::JVP: return getJVPFunction();
+    case AutoDiffDerivativeFunctionKind::VJP: return getVJPFunction();
     }
   }
 };
 
 /// `differentiable_function_extract` - given an `@differentiable` function
-/// representing a bundle of the original function and associated functions,
+/// representing a bundle of the original function and derivative functions,
 /// extract the specified function.
 class DifferentiableFunctionExtractInst
     : public InstructionBase<
@@ -7937,12 +7937,12 @@ public:
     Extractee() = default;
     Extractee(innerty rawValue) : rawValue(rawValue) {}
     explicit Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
-    Extractee(AutoDiffAssociatedFunctionKind kind);
+    Extractee(AutoDiffDerivativeFunctionKind kind);
     explicit Extractee(StringRef name);
     operator innerty() const { return rawValue; }
 
-    Optional<AutoDiffAssociatedFunctionKind>
-    getExtracteeAsAssociatedFunction() const;
+    Optional<AutoDiffDerivativeFunctionKind>
+    getExtracteeAsDerivativeFunction() const;
   };
 
 private:
@@ -7961,8 +7961,8 @@ public:
 
   Extractee getExtractee() const { return extractee; }
 
-  AutoDiffAssociatedFunctionKind getAssociatedFunctionKind() const {
-    auto kind = extractee.getExtracteeAsAssociatedFunction();
+  AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
+    auto kind = extractee.getExtracteeAsDerivativeFunction();
     assert(kind);
     return *kind;
   }
