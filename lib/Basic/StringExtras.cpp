@@ -680,13 +680,6 @@ static Words::iterator matchTypeNameFromBackWithSpecialCases(
       auto newShortenedNameWord
         = omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
                             NameRole::Partial, allPropertyNames);
-      if (shortenedNameWord == newShortenedNameWord &&
-          shortenedNameWord.back() == 'e') {
-        (void)shortenedNameWord.drop_back();
-        newShortenedNameWord =
-          omitNeedlessWords(shortenedNameWord, typeName.CollectionElement,
-                            NameRole::Partial, allPropertyNames);
-      }
 
       if (shortenedNameWord != newShortenedNameWord) {
         unsigned targetSize = newShortenedNameWord.size();
