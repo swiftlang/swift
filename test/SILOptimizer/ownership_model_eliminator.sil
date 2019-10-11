@@ -321,11 +321,24 @@ bb0(%0 : @owned $(Builtin.NativeObject, Builtin.Int32), %1 : @owned $TestArray2)
 
 // CHECK-LABEL: sil [canonical] @test_simplify_instruction : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int32) -> @owned Builtin.NativeObject {
 // CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject,
-// CHECK-NEXT:   return [[ARG]]
+// CHECK:   return [[ARG]]
 // CHECK: } // end sil function 'test_simplify_instruction'
 sil [canonical] [ossa] @test_simplify_instruction : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int32) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int32):
   %2 = tuple(%0 : $Builtin.NativeObject, %1 : $Builtin.Int32)
   (%3, %4) = destructure_tuple %2 : $(Builtin.NativeObject, Builtin.Int32)
   return %3 : $Builtin.NativeObject
+}
+
+// Just make sure that we do not crash on this function.
+//
+// CHECK-LABEL: sil @do_not_crash_due_to_debug_value_use : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
+// CHECK: } // end sil function 'do_not_crash_due_to_debug_value_use'
+sil [ossa] @do_not_crash_due_to_debug_value_use : $@convention(thin) (Builtin.Int32, Builtin.Int32) -> () {
+bb0(%0a : $Builtin.Int32, %0b : $Builtin.Int32):
+  %0 = tuple(%0a : $Builtin.Int32, %0b : $Builtin.Int32)
+  (%1, %2) = destructure_tuple %0 : $(Builtin.Int32, Builtin.Int32)
+  debug_value %0 : $(Builtin.Int32, Builtin.Int32), let, name "myName2"
+  %9999 = tuple()
+  return %9999 : $()
 }
