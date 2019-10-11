@@ -99,6 +99,11 @@ public:
   /// Deserialize all Properties in all SILModules.
   void getAllProperties();
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Deserialize all DifferentiabilityWitnesses in all SILModules.
+  void getAllDifferentiabilityWitnesses();
+  // SWIFT_ENABLE_TENSORFLOW END
+
   SerializedSILLoader(const SerializedSILLoader &) = delete;
   SerializedSILLoader(SerializedSILLoader &&) = delete;
   SerializedSILLoader &operator=(const SerializedSILLoader &) = delete;

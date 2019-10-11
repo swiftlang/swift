@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -42,8 +42,10 @@ class SILDifferentiabilityWitness
       public SILAllocated<SILDifferentiabilityWitness>
 {
 private:
-  /// The module which contains the SIL differentiability witness.
+  /// The module which contains the differentiability witness.
   SILModule &module;
+  /// The linkage of the differentiability witness.
+  SILLinkage linkage;
   /// The original function.
   SILFunction *originalFunction;
   /// The parameter indices.
@@ -60,19 +62,31 @@ private:
   /// devirtualization from another module.
   bool serialized;
 
-  SILDifferentiabilityWitness(SILModule &module, SILFunction *originalFunction,
+  SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
+                              SILFunction *originalFunction,
                               AutoDiffIndexSubset *parameterIndices,
                               AutoDiffIndexSubset *resultIndices,
                               GenericSignature *derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized)
-    : module(module), originalFunction(originalFunction),
+    : module(module), linkage(linkage), originalFunction(originalFunction),
       parameterIndices(parameterIndices), resultIndices(resultIndices),
       derivativeGenericSignature(derivativeGenSig), jvp(jvp), vjp(vjp),
       serialized(isSerialized) {}
 
 public:
+  /// The key type, used for uniquing `SILDifferentiabilityWitness` in
+  /// `SILModule`, original function, parameter indices, result indices, and
+  /// derivative generic signature.
+  using Key = std::tuple<const SILFunction *, AutoDiffIndexSubset *,
+                         AutoDiffIndexSubset *, GenericSignature *>;
+  Key getKey() {
+    return std::make_tuple(originalFunction, parameterIndices, resultIndices,
+                           derivativeGenericSignature);
+  }
+
   SILModule &getModule() const { return module; }
+  SILLinkage getLinkage() const { return linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }
   AutoDiffIndexSubset *getParameterIndices() const {
     return parameterIndices;
@@ -88,7 +102,7 @@ public:
   bool isSerialized() const { return serialized; }
 
   static SILDifferentiabilityWitness *create(
-      SILModule &module, SILFunction *originalFunction,
+      SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
       GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized);

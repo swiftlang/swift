@@ -2712,7 +2712,7 @@ static void printSILDifferentiabilityWitnesses(
   std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
     [] (const SILDifferentiabilityWitness *w1,
         const SILDifferentiabilityWitness *w2) -> bool {
-      // TODO: Sort based on more criteria.
+      // TODO: Sort based on more criteria for deterministic ordering.
       return w1->getOriginalFunction()->getName()
           .compare(w2->getOriginalFunction()->getName());
     }
@@ -3060,12 +3060,12 @@ void SILDefaultWitnessTable::dump() const {
 // SWIFT_ENABLE_TENSORFLOW
 void SILDifferentiabilityWitness::print(
     llvm::raw_ostream &OS, bool verbose) const {
-  // TODO(TF-867): Test SIL differentiability witness round-trip printing and
-  // parsing. It is currently untested and certainly broken.
-
-  // sil_differentiability_witness @original-function-name
+  // sil_differentiability_witness @original-function-name : $original-sil-type
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
-  OS << "sil_differentiability_witness @" << originalFunction->getName();
+  OS << "sil_differentiability_witness ";
+  printLinkage(OS, linkage, ForDefinition);
+  OS << "@" << originalFunction->getName() << " : "
+     << originalFunction->getLoweredType();
   // parameters (0, 1, ...)
   OS << " parameters (";
   interleave(parameterIndices->getIndices(),
@@ -3079,21 +3079,42 @@ void SILDifferentiabilityWitness::print(
   OS << ')';
   // wrt 0, 1, ...
   if (derivativeGenericSignature) {
-    OS << " where ";
     // NOTE: This needs to be changed if there is no utility for parsing
     // generic signatures. Idea: we could instead print the type of the original
     // function substituted into this generic signature.
-    derivativeGenericSignature->print(OS);
+    ArrayRef<Requirement> requirements;
+    SmallVector<Requirement, 4> requirementsScratch;
+    auto *origGenEnv = originalFunction->getGenericEnvironment();
+    if (derivativeGenericSignature) {
+      if (origGenEnv) {
+        requirementsScratch =
+            derivativeGenericSignature->requirementsNotSatisfiedBy(
+                origGenEnv->getGenericSignature());
+        requirements = requirementsScratch;
+      } else {
+        requirements = derivativeGenericSignature->getRequirements();
+      }
+    }
+    if (!requirements.empty()) {
+      OS << " where ";
+      auto SubPrinter = PrintOptions::printSIL();
+      interleave(requirements,
+                 [&](Requirement req) {
+                   req.print(OS, SubPrinter);
+                   return;
+                 },
+                 [&] { OS << ", "; });
+    }
   }
   // {
-  //   jvp: @jvp-function-name
-  //   vjp: @vjp-function-name
+  //   jvp: @jvp-function-name : $jvp-sil-type
+  //   vjp: @vjp-function-name : $vjp-sil-type
   // }
   OS << " {\n";
   if (jvp)
-    OS << "  jvp: @" << jvp->getName() << "\n";
+    OS << "  jvp: @" << jvp->getName() << " : " << jvp->getLoweredType() << "\n";
   if (vjp)
-    OS << "  vjp: @" << vjp->getName() << "\n";
+    OS << "  vjp: @" << vjp->getName() << " : " << vjp->getLoweredType() << "\n";
   OS << "}\n\n";
 }
 

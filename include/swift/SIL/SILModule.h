@@ -145,6 +145,9 @@ private:
   friend SILProperty;
   friend SILUndef;
   friend SILWitnessTable;
+  // SWIFT_ENABLE_TENSORFLOW
+  friend SILDifferentiabilityWitness;
+  // SWIFT_ENABLE_TENSORFLOW END
   friend Lowering::SILGenModule;
   friend Lowering::TypeConverter;
   class SerializationCallback;
@@ -202,10 +205,9 @@ private:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Lookup table for SIL differentiability witnesses from original functions.
-  /// Indexed by original function, parameter indices, result indices, and
-  /// derivative generic signature.
-  llvm::DenseMap<std::tuple<const SILFunction *, AutoDiffIndexSubset *,
-                            AutoDiffIndexSubset *, GenericSignature *>,
+  /// Indexed by key type: original function, parameter indices, result indices,
+  /// and derivative generic signature.
+  llvm::DenseMap<SILDifferentiabilityWitness::Key,
                  SILDifferentiabilityWitness *>
   DifferentiabilityWitnessMap;
 

@@ -94,6 +94,9 @@ bool Parser::parseTopLevel() {
     CASE_SIL(sil_global, SILGlobal)
     CASE_SIL(sil_witness_table, SILWitnessTable)
     CASE_SIL(sil_default_witness_table, SILDefaultWitnessTable)
+    // SWIFT_ENABLE_TENSORFLOW
+    CASE_SIL(sil_differentiability_witness, SILDifferentiabilityWitness)
+    // SWIFT_ENABLE_TENSORFLOW END
     CASE_SIL(sil_coverage_map, SILCoverageMap)
     CASE_SIL(sil_property, SILProperty)
     CASE_SIL(sil_scope, SILScope)
