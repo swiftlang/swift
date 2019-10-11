@@ -5379,7 +5379,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
         AutoDiffDerivativeFunctionKind::VJP, M.Types,
         LookUpConformanceInModule(M.getSwiftModule()),
         getDerivativeGenericSignature()->getCanonicalSignature());
-    SILVerifier(*jvp).requireSameType(
+    SILVerifier(*vjp).requireSameType(
         SILType::getPrimitiveObjectType(vjp->getLoweredFunctionType()),
         SILType::getPrimitiveObjectType(expectedVJPType),
         "VJP type does not match expected VJP type");
