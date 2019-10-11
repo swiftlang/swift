@@ -578,7 +578,7 @@ struct Score {
 /// An AST node that can gain type information while solving.
 using TypedNode =
     llvm::PointerUnion3<const Expr *, const TypeLoc *,
-                        const ParamDecl *>;
+                        const VarDecl *>;
 
 /// Display a score.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &out, const Score &score);
@@ -1065,7 +1065,7 @@ private:
   /// the types on the expression nodes.
   llvm::DenseMap<const Expr *, TypeBase *> ExprTypes;
   llvm::DenseMap<const TypeLoc *, TypeBase *> TypeLocTypes;
-  llvm::DenseMap<const ParamDecl *, TypeBase *> ParamTypes;
+  llvm::DenseMap<const VarDecl *, TypeBase *> VarTypes;
   llvm::DenseMap<std::pair<const KeyPathExpr *, unsigned>, TypeBase *>
       KeyPathComponentTypes;
 
@@ -1833,8 +1833,8 @@ public:
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes[typeLoc] = type.getPointer();
     } else {
-      auto param = node.get<const ParamDecl *>();
-      ParamTypes[param] = type.getPointer();
+      auto var = node.get<const VarDecl *>();
+      VarTypes[var] = type.getPointer();
     }
 
     // Record the fact that we ascribed a type to this node.
@@ -1858,8 +1858,8 @@ public:
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       TypeLocTypes.erase(typeLoc);
     } else {
-      auto param = node.get<const ParamDecl *>();
-      ParamTypes.erase(param);
+      auto var = node.get<const VarDecl *>();
+      VarTypes.erase(var);
     }
   }
 
@@ -1887,8 +1887,8 @@ public:
     } else if (auto typeLoc = node.dyn_cast<const TypeLoc *>()) {
       return TypeLocTypes.find(typeLoc) != TypeLocTypes.end();
     } else {
-      auto param = node.get<const ParamDecl *>();
-      return ParamTypes.find(param) != ParamTypes.end();
+      auto var = node.get<const VarDecl *>();
+      return VarTypes.find(var) != VarTypes.end();
     }
   }
 
@@ -1913,9 +1913,9 @@ public:
     return TypeLocTypes.find(&L)->second;
   }
 
-  Type getType(const ParamDecl *P) const {
-    assert(hasType(P) && "Expected type to have been set!");
-    return ParamTypes.find(P)->second;
+  Type getType(const VarDecl *VD) const {
+    assert(hasType(VD) && "Expected type to have been set!");
+    return VarTypes.find(VD)->second;
   }
 
   Type getType(const KeyPathExpr *KP, unsigned I) const {
