@@ -4310,9 +4310,6 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   if (isNameImplicit)
     result->setImplicit();
 
-  // AST Walker shouldn't go into the type recursively.
-  result->setIsTypeLocImplicit(true);
-
   return result;
 }
 

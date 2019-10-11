@@ -3652,7 +3652,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
     if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
       TyR = subscript->getElementTypeLoc().getTypeRepr();
     else
-      TyR = cast<VarDecl>(storage)->getTypeLoc().getTypeRepr();
+      TyR = cast<VarDecl>(storage)->getTypeRepr();
     break;
   }
 
@@ -3687,7 +3687,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
     }
 
     // Handle eg, 'inout Int!' or '__owned NSObject!'.
-    TyR = param->getTypeLoc().getTypeRepr();
+    TyR = param->getTypeRepr();
     if (auto *STR = dyn_cast_or_null<SpecifierTypeRepr>(TyR))
       TyR = STR->getBase();
     break;
@@ -3993,7 +3993,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     // Fall through.
   }
 
-  auto typeRepr = param->getTypeLoc().getTypeRepr();
+  auto typeRepr = param->getTypeRepr();
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
@@ -4027,10 +4027,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   return ParamSpecifier::Default;
 }
 
-static void validateParameterType(ParamDecl *decl) {
-  if (auto ty = decl->getTypeLoc().getType())
-    return;
-
+static Type validateParameterType(ParamDecl *decl) {
   auto *dc = decl->getDeclContext();
   auto resolution = TypeResolution::forInterface(dc);
 
@@ -4056,26 +4053,32 @@ static void validateParameterType(ParamDecl *decl) {
                        TypeResolverContext::FunctionInput);
   options |= TypeResolutionFlags::Direct;
 
-  auto &TL = decl->getTypeLoc();
+  auto TL = TypeLoc(decl->getTypeRepr());
 
   auto &ctx = dc->getASTContext();
-  TypeChecker::validateType(ctx, TL, resolution, options);
+  if (TypeChecker::validateType(ctx, TL, resolution, options)) {
+    decl->setInvalid();
+    return ErrorType::get(ctx);
+  }
 
   Type Ty = TL.getType();
   if (decl->isVariadic()) {
     Ty = TypeChecker::getArraySliceType(decl->getStartLoc(), Ty);
     if (Ty.isNull()) {
-      Ty = ErrorType::get(ctx);
+      decl->setInvalid();
+      return ErrorType::get(ctx);
     }
 
     // Disallow variadic parameters in enum elements.
     if (options.getBaseContext() == TypeResolverContext::EnumElementDecl) {
       decl->diagnose(diag::enum_element_ellipsis);
-      Ty = ErrorType::get(ctx);
+      decl->setInvalid();
+      return ErrorType::get(ctx);
     }
 
-    TL.setType(Ty);
+    return Ty;
   }
+  return TL.getType();
 }
 
 void TypeChecker::validateDecl(ValueDecl *D) {
@@ -4173,7 +4176,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         storage, accessor, PD);
       if (originalParam == nullptr) {
         auto type = storage->getValueInterfaceType();
-        PD->getTypeLoc().setType(type);
         PD->setInterfaceType(type);
         break;
       }
@@ -4184,13 +4186,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     }
 
-    if (!PD->getTypeLoc().getTypeRepr())
+    if (!PD->getTypeRepr())
       return;
 
-    validateParameterType(PD);
-
-    auto type = PD->getTypeLoc().getType();
-    PD->setInterfaceType(type);
+    auto ty = validateParameterType(PD);
+    PD->setInterfaceType(ty);
     break;
   }
 

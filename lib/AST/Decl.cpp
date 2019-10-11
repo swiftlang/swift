@@ -2579,7 +2579,7 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 }
 
 OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
-  TypeLoc returnLoc;
+  TypeRepr *returnRepr = nullptr;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
     if (auto *P = VD->getParentPattern()) {
       while (auto *PP = dyn_cast<ParenPattern>(P))
@@ -2591,19 +2591,19 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
           assert(NP->getDecl() == VD);
           (void) NP;
 
-          returnLoc = TP->getTypeLoc();
+          returnRepr = TP->getTypeLoc().getTypeRepr();
         }
       }
     } else {
-      returnLoc = VD->getTypeLoc();
+      returnRepr = VD->getTypeRepr();
     }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
-    returnLoc = FD->getBodyResultTypeLoc();
+    returnRepr = FD->getBodyResultTypeLoc().getTypeRepr();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
-    returnLoc = SD->getElementTypeLoc();
+    returnRepr = SD->getElementTypeLoc().getTypeRepr();
   }
 
-  return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnLoc.getTypeRepr());
+  return dyn_cast_or_null<OpaqueReturnTypeRepr>(returnRepr);
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
@@ -5175,7 +5175,7 @@ SourceRange VarDecl::getSourceRange() const {
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   // For a parameter, map back to its parameter to get the TypeLoc.
   if (auto *PD = dyn_cast<ParamDecl>(this)) {
-    if (auto typeRepr = PD->getTypeLoc().getTypeRepr())
+    if (auto typeRepr = PD->getTypeRepr())
       return typeRepr->getSourceRange();
   }
   
@@ -5726,35 +5726,25 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
       ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.SpecifierComputed = false;
-  Bits.ParamDecl.IsTypeLocImplicit = false;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
-/// Clone constructor, allocates a new ParamDecl identical to the first.
-/// Intentionally not defined as a copy constructor to avoid accidental copies.
-ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
-  : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getIntroducer(),
-            /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->getDeclContext(),
-            StorageIsMutable_t(!isImmutableSpecifier(PD->getSpecifier()))),
-    ArgumentName(PD->getArgumentName()),
-    ArgumentNameLoc(PD->getArgumentNameLoc()),
-    SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndFlags(nullptr, PD->DefaultValueAndFlags.getInt()) {
-  Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
-  Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
-  typeLoc = PD->getTypeLoc().clone(PD->getASTContext());
-  if (!withTypes && typeLoc.getTypeRepr())
-    typeLoc.setType(Type());
+ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
+  auto *Clone = new (Ctx) ParamDecl(
+      PD->getSpecifierLoc(), PD->getArgumentNameLoc(), PD->getArgumentName(),
+      PD->getArgumentNameLoc(), PD->getParameterName(), PD->getDeclContext());
+  Clone->DefaultValueAndFlags.setPointerAndInt(
+      nullptr, PD->DefaultValueAndFlags.getInt());
+  Clone->Bits.ParamDecl.defaultArgumentKind =
+      PD->Bits.ParamDecl.defaultArgumentKind;
+  if (auto *repr = PD->getTypeRepr())
+    Clone->setTypeRepr(repr->clone(Ctx));
 
-  if (withTypes && PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType());
-
-  setSpecifier(PD->getSpecifier());
-  setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  Clone->setSpecifier(PD->getSpecifier());
+  Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  return Clone;
 }
-
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {
@@ -5794,9 +5784,9 @@ SourceRange ParamDecl::getSourceRange() const {
     startLoc = APINameLoc;
   else if (nameLoc.isValid())
     startLoc = nameLoc;
-  else {
-    startLoc = getTypeLoc().getSourceRange().Start;
-  }
+  else if (auto *repr = getTypeRepr())
+    startLoc = repr->getStartLoc();
+
   if (startLoc.isInvalid())
     return SourceRange();
 
@@ -5810,9 +5800,9 @@ SourceRange ParamDecl::getSourceRange() const {
   }
   
   // If the typeloc has a valid location, use it to end the range.
-  if (auto typeRepr = getTypeLoc().getTypeRepr()) {
+  if (auto typeRepr = getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
-    if (endLoc.isValid() && !isTypeLocImplicit())
+    if (endLoc.isValid())
       return SourceRange(startLoc, endLoc);
   }
 
