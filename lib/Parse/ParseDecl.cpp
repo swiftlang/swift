@@ -2536,28 +2536,39 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  case TAK_differentiable: {
-    bool linear = false;
-    // Check if there is a 'linear' argument.
-    if (Tok.is(tok::l_paren) && peekToken().is(tok::identifier)) {
+  case TAK_differentiable:
+    status |= [&]() -> ParserStatus {
+      bool linear = false;
+      // Check if there is a 'linear' argument.
+      // If next tokens are not `'(' identifier`, break early.
+      if (!Tok.is(tok::l_paren) || !peekToken().is(tok::identifier))
+        return makeParserSuccess();
+
       Parser::BacktrackingScope backtrack(*this);
-      consumeToken(tok::l_paren);
+      SourceLoc LParenLoc = Tok.getLoc();
+      builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
 
       // Determine if we have '@differentiable(linear) (T) -> U'
       // or '@differentiable (linear) -> U'.
-      if (Tok.getText() == "linear" && consumeIf(tok::identifier)) {
+      if (Tok.getText() == "linear") {
+        builder.useArgument(consumeTokenSyntax(tok::identifier));
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
           linear = true;
           backtrack.cancelBacktrack();
-          consumeToken(tok::r_paren);
+          SourceLoc RParenLoc;
+          auto RParen = parseMatchingTokenSyntax(
+              tok::r_paren, RParenLoc, diag::differentiable_attribute_expected_rparen,
+              LParenLoc);
+          if (!RParen)
+            return makeParserError();
+          builder.useRightParen(std::move(*RParen));
         } else if (Tok.is(tok::l_paren)) {
           // Handle invalid '@differentiable(linear (T) -> U'
           diagnose(Tok, diag::differentiable_attribute_expected_rparen);
           backtrack.cancelBacktrack();
-          status.setIsParseError();
-          break;
+          return makeParserError();
         }
       } else if (Tok.is(tok::identifier)) {
         // No 'linear' arg or param type, but now checking if the token is being
@@ -2572,13 +2583,12 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
           diagnose(t, diag::unexpected_argument_differentiable, possibleArg);
           consumeToken(tok::r_paren);
           backtrack.cancelBacktrack();
-          status.setIsParseError();
-          break;
+          return makeParserError();
         }
       }
-    }
+      return makeParserSuccess();
+    }();
     break;
-  }
 
   case TAK_convention:
     status |= [&]() -> ParserStatus {
