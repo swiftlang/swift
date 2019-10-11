@@ -6830,7 +6830,8 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   Scope S(&P, ScopeKind::TopLevel);
   Scope Body(&P, ScopeKind::FunctionBody);
 
-  auto parseFunctionNameAndType = [&](SILFunction *&fn) -> bool {
+  // Parse a SIL function name.
+  auto parseFunctionName = [&](SILFunction *&fn) -> bool {
     Identifier name;
     SILType ty;
     SourceLoc fnNameLoc = P.Tok.getLoc();
@@ -6852,13 +6853,13 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     State.TUState.PotentialZombieFns.insert(fn);
     return false;
   };
-
-  SourceLoc lastLoc = P.getEndOfPreviousLoc();
-
+  // Parse original function name.
   SILFunction *originalFn;
-  if (parseFunctionNameAndType(originalFn))
+  if (parseFunctionName(originalFn))
     return true;
 
+  SourceLoc lastLoc = P.getEndOfPreviousLoc();
+  // Parse an index subset, prefaced with the given label.
   auto parseAutoDiffIndexSubset =
       [&](StringRef label, AutoDiffIndexSubset *& paramIndexSubset) -> bool {
     if (P.parseSpecificIdentifier(
@@ -6895,6 +6896,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
         P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, paramIndices);
     return false;
   };
+  // Parse parameter and result indices.
   AutoDiffIndexSubset *parameterIndices = nullptr;
   AutoDiffIndexSubset *resultIndices = nullptr;
   if (parseAutoDiffIndexSubset("parameters", parameterIndices))
@@ -6902,8 +6904,9 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   if (parseAutoDiffIndexSubset("results", resultIndices))
     return true;
 
+  // Parse a trailing 'where' clause (optional).
+  // This represents derivative generic signature requirements.
   GenericSignature *derivativeGenSig = nullptr;
-  // Parse a trailing 'where' clause if any.
   if (P.Tok.is(tok::kw_where)) {
     SourceLoc whereLoc;
     SmallVector<RequirementRepr, 4> requirementReprs;
@@ -6925,34 +6928,36 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
             nullptr);
   }
 
+  // Parse differentiability witness body.
   SILFunction *jvp = nullptr;
   SILFunction *vjp = nullptr;
   if (P.Tok.is(tok::l_brace)) {
-    SourceLoc LBraceLoc = P.Tok.getLoc();
+    // Parse '{'.
+    SourceLoc lBraceLoc = P.Tok.getLoc();
     P.consumeToken(tok::l_brace);
-
+    // Parse JVP (optional).
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_keyword,
                        ":"))
         return true;
       Scope Body(&P, ScopeKind::FunctionBody);
-      if (parseFunctionNameAndType(jvp))
+      if (parseFunctionName(jvp))
         return true;
     }
-
+    // Parse VJP (optional).
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "vjp") {
       P.consumeToken(tok::identifier);
       if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_keyword,
                        ":"))
         return true;
       Scope Body(&P, ScopeKind::FunctionBody);
-      if (parseFunctionNameAndType(vjp))
+      if (parseFunctionName(vjp))
         return true;
     }
-
+    // Parse '}'.
     if (P.parseMatchingToken(tok::r_brace, lastLoc, diag::expected_sil_rbrace,
-                             LBraceLoc))
+                             lBraceLoc))
       return true;
   }
 
