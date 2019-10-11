@@ -8075,6 +8075,35 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   }
 }
 
+Type ConstraintSystem::addJoinConstraint(
+    ConstraintLocator *locator,
+    ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {
+  switch (inputs.size()) {
+  case 0:
+    return Type();
+
+  case 1:
+    return inputs.front().first;
+
+  default:
+    // Produce the join below.
+    break;
+  }
+
+  // Create a type variable to capture the result of the join.
+  Type resultTy = createTypeVariable(locator,
+                                     (TVO_PrefersSubtypeBinding |
+                                      TVO_CanBindToNoEscape));
+
+  // Introduce conversions from each input type to the type variable.
+  for (const auto &input : inputs) {
+    addConstraint(
+      ConstraintKind::Conversion, input.first, resultTy, input.second);
+  }
+
+  return resultTy;
+}
+
 void ConstraintSystem::addExplicitConversionConstraint(
                                            Type fromType, Type toType,
                                            bool allowFixes,

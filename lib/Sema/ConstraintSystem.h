@@ -2130,6 +2130,17 @@ public:
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
 
+  /// Add a "join" constraint between a set of types, producing the common
+  /// supertype.
+  ///
+  /// Currently, a "join" is modeled by a set of conversion constraints to
+  /// a new type variable. At some point, we may want a new constraint kind
+  /// to cover the join.
+  ///
+  /// \returns the joined type, which is generally a new type variable.
+  Type addJoinConstraint(ConstraintLocator *locator,
+                         ArrayRef<std::pair<Type, ConstraintLocator *>> inputs);
+
   /// Add a key path application constraint to the constraint system.
   void addKeyPathApplicationConstraint(Type keypath, Type root, Type value,
                                        ConstraintLocatorBuilder locator,
