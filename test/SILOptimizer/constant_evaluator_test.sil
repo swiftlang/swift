@@ -449,7 +449,7 @@ bb0:
 sil hidden @interpretAndDiagnoseNonConstantVars : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %4 = struct_extract %0 : $Int, #Int._value
-    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: cannot evaluate expression as constant here
+    // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: encountered use of a variable not tracked by the evaluator
   %10 = tuple ()
   return %10 : $()
 }

@@ -93,7 +93,7 @@ bb0:
   %10 = builtin "cmp_slt_Int32"(%8 : $Builtin.Int32, %9 : $Builtin.Int32) : $Builtin.Int1
   cond_br %10, bb2, bb3
     // CHECK: {{.*}}:[[@LINE-1]]:{{.*}}: note: branch depends on non-constant value produced by an unevaluated instructions
-    // CHECK: {{.*}}: note: value mutable by an unevaluated instruction is not a constant
+    // CHECK: {{.*}}: note: result of an unevaluated instruction is not a constant
 bb2:
   br bb4
 
