@@ -4786,8 +4786,6 @@ protected:
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
-  TypeRepr *ParentRepr = nullptr;
-
   Type typeInContext;
 
 public:
@@ -4805,11 +4803,6 @@ public:
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
-
-  /// Retrieve the TypeRepr corresponding to the parsed type of the parent
-  /// pattern, if it exists.
-  TypeRepr *getTypeRepr() const { return ParentRepr; }
-  void setTypeRepr(TypeRepr *repr) { ParentRepr = repr; }
 
   bool hasType() const {
     // We have a type if either the type has been computed already or if
@@ -4863,6 +4856,14 @@ public:
   /// returns null.
   ///
   Pattern *getParentPattern() const;
+
+  /// Returns the parsed type of this variable declaration.  For parameters, this
+  /// is the parsed type the user explicitly wrote.  For variables, this is the
+  /// type the user wrote in the typed pattern that binds this variable.
+  ///
+  /// Note that there are many cases where the user may elide types.  This will
+  /// return null in those cases.
+  TypeRepr *getTypeReprOrParentPatternTypeRepr() const;
 
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
@@ -5158,6 +5159,8 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
 
+  TypeRepr *TyRepr = nullptr;
+
   struct StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
     Initializer *InitContext = nullptr;
@@ -5202,6 +5205,10 @@ public:
   SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
+
+  /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
+  TypeRepr *getTypeRepr() const { return TyRepr; }
+  void setTypeRepr(TypeRepr *repr) { TyRepr = repr; }
 
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);

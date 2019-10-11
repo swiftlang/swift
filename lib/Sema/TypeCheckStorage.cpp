@@ -2421,7 +2421,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
                                           StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     SourceLoc typeLoc;
-    if (auto *repr = var->getTypeRepr())
+    if (auto *repr = var->getTypeReprOrParentPatternTypeRepr())
       typeLoc = repr->getLoc();
     
     if (info.hasStorage()) {

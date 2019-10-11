@@ -1013,9 +1013,11 @@ recur:
 
     // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
-    var->setInterfaceType(interfaceType);
     var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
-    var->setTypeRepr(tyLoc.getTypeRepr());
+    // If there's no parent pattern binding then take this opportunity to
+    // set the interface type as well.
+    if (var->getParentPatternBinding() == nullptr)
+      var->setInterfaceType(interfaceType);
 
     // FIXME: Should probably just remove the forbidden prefix stuff, it no
     // longer makes a lot of sense in a request-based world.

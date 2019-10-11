@@ -2136,8 +2136,10 @@ private:
     // Before producing fatal error here, let's check if there are any "error"
     // diagnostics already emitted or waiting to be emitted. Because they are
     // a better indication of the problem.
-    if (!(hadAnyErrors() || TC.Context.hasDelayedConformanceErrors()))
+    if (!(hadAnyErrors() || TC.Context.hasDelayedConformanceErrors())) {
       TC.diagnose(expr->getLoc(), diag::failed_to_produce_diagnostic);
+      llvm_unreachable("");
+    }
   }
 };
 

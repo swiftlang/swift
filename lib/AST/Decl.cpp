@@ -2595,7 +2595,7 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
         }
       }
     } else {
-      returnRepr = VD->getTypeRepr();
+      returnRepr = VD->getTypeReprOrParentPatternTypeRepr();
     }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
     returnRepr = FD->getBodyResultTypeLoc().getTypeRepr();
@@ -5282,6 +5282,16 @@ Pattern *VarDecl::getParentPattern() const {
 
   // Otherwise, this is a case we do not know or understand. Return nullptr to
   // signal we do not have any information.
+  return nullptr;
+}
+
+TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
+  if (auto *param = dyn_cast<ParamDecl>(this))
+    return param->getTypeRepr();
+
+  if (auto *parentPattern = dyn_cast_or_null<TypedPattern>(getParentPattern()))
+      return parentPattern->getTypeLoc().getTypeRepr();
+
   return nullptr;
 }
 

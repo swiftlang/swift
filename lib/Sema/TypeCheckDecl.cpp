@@ -3663,7 +3663,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
     if (auto *subscript = dyn_cast<SubscriptDecl>(storage))
       TyR = subscript->getElementTypeLoc().getTypeRepr();
     else
-      TyR = cast<VarDecl>(storage)->getTypeRepr();
+      TyR = cast<VarDecl>(storage)->getTypeReprOrParentPatternTypeRepr();
     break;
   }
 
@@ -4251,20 +4251,25 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       break;
     }
 
-    // If we're already checking our PatternBindingDecl, bail out
-    // without setting our own 'is being validated' flag, since we
-    // will attempt validation again later.
-    if (PBD->isBeingValidated())
-      return;
-
-    // Attempt to infer the type using initializer expressions.
-    validatePatternBindingEntries(*this, PBD);
+    // If we're not being validated, validate our parent pattern binding and
+    // attempt to infer the interface type using the initializer expressions.
+    if (!PBD->isBeingValidated()) {
+      validatePatternBindingEntries(*this, PBD);
+    }
 
     auto parentPattern = VD->getParentPattern();
     if (PBD->isInvalid() || !parentPattern->hasType()) {
       parentPattern->setType(ErrorType::get(Context));
       setBoundVarsTypeError(parentPattern, Context);
     }
+
+    auto interfaceType = parentPattern->getType()->mapTypeOutOfContext();
+    // In SIL mode, VarDecls are written as having reference storage types.
+    if (!interfaceType->is<ReferenceStorageType>()) {
+      if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
+        interfaceType = checkReferenceOwnershipAttr(VD, interfaceType, attr);
+    }
+    VD->setInterfaceType(interfaceType);
 
     break;
   }
