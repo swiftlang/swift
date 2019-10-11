@@ -346,9 +346,7 @@ public:
 
   /// Expand or reexpand the scope if unexpanded or if not current.
   /// There are several places in the compiler that mutate the AST after the
-  /// fact, above and beyond adding Decls to the SourceFile. These are
-  /// documented in: rdar://53018839, rdar://53027266, rdar://53027733,
-  /// rdar://53028050
+  /// fact, above and beyond adding Decls to the SourceFile.
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
   unsigned getASTAncestorScopeCount() const { return astAncestorScopeCount; }
@@ -546,7 +544,7 @@ public:
   /// The number of \c Decls in the \c SourceFile that were already seen.
   /// Since parsing can be interleaved with type-checking, on every
   /// lookup, look at creating scopes for any \c Decls beyond this number.
-  /// rdar://55562483 Unify with numberOfChildrenWhenLastExpanded
+  /// TODO: Unify with numberOfChildrenWhenLastExpanded
   size_t numberOfDeclsAlreadySeen = 0;
 
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
@@ -1164,7 +1162,6 @@ public:
   /// false positives, that that doesn't hurt anything. However, the result of
   /// the conservative source range computation doesn't seem to be stable. So
   /// keep the original here, and use it for source range queries.
-  /// rdar://55263708
 
   const SourceRange sourceRangeWhenCreated;
 
@@ -1267,7 +1264,6 @@ protected:
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
-  // Should be able to remove this when rdar://53921703 is accomplished.
   Expr *initAsWrittenWhenCreated;
 
 public:

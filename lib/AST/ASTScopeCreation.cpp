@@ -383,7 +383,6 @@ private:
 
   // A safe way to discover this, without creating a circular request.
   // Cannot call getAttachedPropertyWrappers.
-  // rdar://55263708
   static bool hasAttachedPropertyWrapper(VarDecl *vd) {
     return AttachedPropertyWrapperScope::getSourceRangeOfVarDecl(vd).isValid();
   }
@@ -432,7 +431,7 @@ public:
       if (auto *specializeAttr = dyn_cast<SpecializeAttr>(attr))
         sortedSpecializeAttrs.push_back(specializeAttr);
     }
-    // Part of rdar://53921774 rm extra copy
+    // TODO: rm extra copy
     for (auto *specializeAttr : sortBySourceRange(sortedSpecializeAttrs))
       fn(specializeAttr);
   }
@@ -440,13 +439,14 @@ public:
   std::vector<ASTNode> expandIfConfigClausesThenCullAndSortElementsOrMembers(
       ArrayRef<ASTNode> input) const {
     auto cleanedupNodes = sortBySourceRange(cull(expandIfConfigClauses(input)));
-    // TODO: uncomment when working on rdar://53627317
+    // TODO: uncomment when working on not creating two pattern binding decls at
+    // same location.
     //    findCollidingPatterns(cleanedupNodes);
     return cleanedupNodes;
   }
 
 public:
-  /// When ASTScopes are enabled for code completion, rdar://53321156
+  /// When ASTScopes are enabled for code completion,
   /// IfConfigs will pose a challenge because we may need to field lookups into
   /// the inactive clauses, but the AST contains redundancy: the active clause's
   /// elements are present in the members or elements of an IterableTypeDecl or
@@ -484,7 +484,7 @@ private:
         if (auto *const cond = clause.Cond)
           expansion.push_back(cond);
         if (clause.isActive) {
-          // rdar://53922172
+          // TODO: Move this check into ASTVerifier
           ASTScopeAssert(isInAnActiveNode, "Clause should not be marked active "
                                            "unless it's context is active");
           // get inactive nodes that nest in active clauses
@@ -506,7 +506,8 @@ private:
   /// because they overlap EnumElements and AST includes the elements in the
   /// members.
   std::vector<ASTNode> cull(ArrayRef<ASTNode> input) const {
-    // When working on rdar://53971116 may have to cull more.
+    // TODO: Investigate whether to move the real EndLoc tracking of
+    // SubscriptDecl up into AbstractStorageDecl. May have to cull more.
     std::vector<ASTNode> culled;
     llvm::copy_if(input, std::back_inserter(culled), [&](ASTNode n) {
       ASTScopeAssert(
@@ -519,7 +520,8 @@ private:
   }
 
   /// TODO: The parser yields two decls at the same source loc with the same
-  /// kind. Call me when tackling rdar://53627317, then move this to
+  /// kind. TODO:  me when fixing parser's proclivity to create two
+  /// PatternBindingDecls at the same source location, then move this to
   /// ASTVerifier.
   ///
   /// In all cases the first pattern seems to carry the initializer, and the
@@ -584,7 +586,6 @@ private:
     }
   }
 
-  /// See rdar://53921962
   /// Templated to work on either ASTNodes, Decl*'s, or whatnot.
   template <typename Rangeable>
   std::vector<Rangeable>
@@ -921,9 +922,10 @@ public:
     auto *insertionPoint = parentScope;
     for (unsigned i = 0; i < patternBinding->getPatternList().size(); ++i) {
       // TODO: Won't need to do so much work to avoid creating one without
-      // a SourceRange once rdar://53627317 is done and
-      // getSourceRangeOfThisASTNode for PatternEntryDeclScope is simplified to
-      // use the PatternEntry's source range.
+      // a SourceRange once parser is fixed to not create two
+      // PatternBindingDecls with same locaiton and getSourceRangeOfThisASTNode
+      // for PatternEntryDeclScope is simplified to use the PatternEntry's
+      // source range.
       auto &patternEntry = patternBinding->getPatternList()[i];
       if (!patternEntry.getOriginalInit()) {
         bool found = false;
@@ -1027,7 +1029,6 @@ void ScopeCreator::addChildrenForAllLocalizableAccessorsInSourceOrder(
                 });
 
   // Sort in order to include synthesized ones, which are out of order.
-  // Part of rdar://53921774 rm extra copy
   for (auto *accessor : sortBySourceRange(accessorsToScope))
     addToScopeTree(accessor, parent);
 }
@@ -1302,7 +1303,8 @@ GenericTypeOrExtensionScope::expandAScopeThatCreatesANewInsertionPoint(
 AnnotatedInsertionPoint
 BraceStmtScope::expandAScopeThatCreatesANewInsertionPoint(
     ScopeCreator &scopeCreator) {
-  // TODO: remove the sort after performing rdar://53254395
+  // TODO: remove the sort after fixing parser to create brace statement
+  // elements in source order
   auto *insertionPoint =
       scopeCreator.addSiblingsToScopeTree(this, this, stmt->getElements());
   if (auto *s = scopeCreator.getASTContext().Stats)
@@ -1346,7 +1348,6 @@ void AbstractFunctionDeclScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     leaf = scopeCreator.addNestedGenericParamScopesToTree(
         decl, decl->getGenericParams(), leaf);
     if (isLocalizable(decl) && getParmsSourceLocOfAFD(decl).isValid()) {
-      // See rdar://54188611
       // swift::createDesignatedInitOverride just clones the parameters, so they
       // end up with a bogus SourceRange, maybe *before* the start of the
       // function.
@@ -1441,8 +1442,6 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   //    let v: C { for b : Int -> S((array: P { }
   // the body is implicit and it would overlap the source range of the expr
   // above.
-  //
-  // TODO: refer to rdar://53921962
   if (!stmt->getBody()->isImplicit()) {
     if (isLocalizable(stmt->getBody()))
       scopeCreator.constructExpandAndInsertUncheckable<ForEachPatternScope>(
@@ -1547,7 +1546,6 @@ ASTScopeImpl *GenericTypeOrExtensionWholePortion::expandScope(
   
   // Prevent circular request bugs caused by illegal input and
   // doing lookups that getExtendedNominal in the midst of getExtendedNominal.
-  // rdar://53972776
   if (scope->shouldHaveABody() && !scope->doesDeclHaveABody())
     return ip;
 
