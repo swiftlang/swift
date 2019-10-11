@@ -1989,12 +1989,14 @@ for host in "${ALL_HOSTS[@]}"; do
     )
 
     if [[ "$(uname -s)" == "Linux" ]] ; then
-        # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
-        # space/time efficient than -g on that platform.
-        llvm_cmake_options=(
-            "${llvm_cmake_options[@]}"
-            -DLLVM_USE_SPLIT_DWARF:BOOL=YES
-        )
+        if [[ $(is_cmake_debuginfo_build_type "${LLVM_BUILD_TYPE}") ]] ; then
+            # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
+            # space/time efficient than -g on that platform.
+            llvm_cmake_options=(
+                "${llvm_cmake_options[@]}"
+                -DLLVM_USE_SPLIT_DWARF:BOOL=YES
+            )
+        fi
     fi
 
     if [[ "${DARWIN_TOOLCHAIN_VERSION}" ]] ; then
