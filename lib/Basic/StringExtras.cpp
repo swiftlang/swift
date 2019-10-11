@@ -812,8 +812,6 @@ omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
   if (matchIter == nameWords.end())
     return name;
 
-  StringRef origName = name;
-
   // Handle complete name matches.
   if (matchIter == nameWords.begin()) {
     // If we're doing a partial match or we have an initial
@@ -832,59 +830,62 @@ omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
   switch (role) {
   case NameRole::Property:
     // Always strip off type information.
-    name = matchIter.getPriorStr();
     break;
 
-  case NameRole::BaseName:
   case NameRole::FirstParameter:
   case NameRole::Partial:
-  case NameRole::SubsequentParameter:
+  case NameRole::SubsequentParameter: {
+    // Classify the part of speech of the word before the type information we
+    // would strip off. We only want to strip it if the previous word is a
+    // preposition, verb, or gerund.
+    auto previousWordIter = std::prev(matchIter);
+    if (getPartOfSpeech(*previousWordIter) == PartOfSpeech::Unknown)
+      return name;
+    break;
+  }
+
+  case NameRole::BaseName: {
     // Classify the part of speech of the word before the type
     // information we would strip off.
     auto previousWordIter = std::prev(matchIter);
     switch (getPartOfSpeech(*previousWordIter)) {
     case PartOfSpeech::Preposition:
-      if (role == NameRole::BaseName) {
-        // Strip off the part of the name that is redundant with
-        // type information, so long as there's something preceding the
-        // preposition.
-        if (previousWordIter != nameWords.begin())
-          name = matchIter.getPriorStr();
-        break;
-      }
-
-      LLVM_FALLTHROUGH;
+      // If there's nothing preceding the preposition, don't strip anything.
+      if (previousWordIter == nameWords.begin())
+        return name;
+      break;
 
     case PartOfSpeech::Verb:
     case PartOfSpeech::Gerund:
       // Don't prune redundant type information from the base name if
       // there is a corresponding property (either singular or plural).
-      if (role == NameRole::BaseName &&
-          textMatchesPropertyName(matchIter.getRestOfStr(), allPropertyNames))
+      if (textMatchesPropertyName(matchIter.getRestOfStr(), allPropertyNames))
         return name;
-
-      // Strip off the part of the name that is redundant with
-      // type information.
-      name = matchIter.getPriorStr();
       break;
 
     case PartOfSpeech::Unknown:
       // Assume it's a noun or adjective; don't strip anything.
-      break;
+      return name;
     }
+
     break;
   }
+  }
+
+  // Strip off the part of the name that is redundant with
+  // type information.
+  StringRef newName = matchIter.getPriorStr();
 
   switch (role) {
   case NameRole::BaseName:
   case NameRole::Property:
     // If we ended up with something that can't be a member name, do nothing.
-    if (!canBeMemberName(name))
-      return origName;
+    if (!canBeMemberName(newName))
+      return name;
 
     // If we ended up with a vacuous name like "get" or "set", do nothing.
-    if (isVacuousName(name))
-      return origName;
+    if (isVacuousName(newName))
+      return name;
 
     break;
 
@@ -895,7 +896,7 @@ omitTrailingTypeNameWithSpecialCases(StringRef name, OmissionTypeName typeName,
   }
 
   // We're done.
-  return name;
+  return newName;
 }
 
 StringRef camel_case::toLowercaseInitialisms(StringRef string,
