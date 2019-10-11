@@ -7461,7 +7461,7 @@ namespace {
         auto builder =
             Rewriter.solution.builderTransformedClosures.find(closure);
         if (builder != Rewriter.solution.builderTransformedClosures.end()) {
-          auto singleExpr = builder->second.second;
+          auto singleExpr = builder->second.singleExpr;
           auto returnStmt = new (tc.Context) ReturnStmt(
              singleExpr->getStartLoc(), singleExpr, /*implicit=*/true);
           auto braceStmt = BraceStmt::create(
@@ -7586,7 +7586,7 @@ bool ConstraintSystem::applySolutionFixes(Expr *E, const Solution &solution) {
       if (auto *closure = dyn_cast<ClosureExpr>(E)) {
         auto result = solution.builderTransformedClosures.find(closure);
         if (result != solution.builderTransformedClosures.end()) {
-          auto *transformedExpr = result->second.second;
+          auto *transformedExpr = result->second.singleExpr;
           // Since this closure has been transformed into something
           // else let's look inside transformed expression instead.
           transformedExpr->walk(*this);

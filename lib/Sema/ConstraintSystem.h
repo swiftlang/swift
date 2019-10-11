@@ -502,6 +502,16 @@ enum ScoreKind {
 /// The number of score kinds.
 const unsigned NumScoreKinds = SK_LastScoreKind + 1;
 
+/// Describes what happened when a function builder transform was applied
+/// to a particular closure.
+struct AppliedBuilderTransform {
+  /// The builder type that was applied to the closure.
+  Type builderType;
+
+  /// The single expression to which the closure was transformed.
+  Expr *singleExpr;
+};
+
 /// Describes the fixed score of a solution to the constraint system.
 struct Score {
   unsigned Data[NumScoreKinds] = {};
@@ -656,7 +666,7 @@ public:
       Conformances;
 
   /// The set of closures that have been transformed by a function builder.
-  llvm::MapVector<ClosureExpr *, std::pair<Type, Expr *>>
+  llvm::MapVector<ClosureExpr *, AppliedBuilderTransform>
       builderTransformedClosures;
 
   /// Simplify the given type by substituting all occurrences of
@@ -1150,7 +1160,7 @@ private:
       CheckedConformances;
 
   /// The set of closures that have been transformed by a function builder.
-  SmallVector<std::tuple<ClosureExpr *, Type, Expr *>, 4>
+  std::vector<std::pair<ClosureExpr *, AppliedBuilderTransform>>
       builderTransformedClosures;
 
 public:
