@@ -985,7 +985,10 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
       emitDiagnostic(PD->getLoc(), diag::noescape_parameter, PD->getName());
 
   if (!PD->isAutoClosure()) {
-    note.fixItInsert(PD->getTypeLoc().getSourceRange().Start, "@escaping ");
+    SourceLoc reprLoc;
+    if (auto *repr = PD->getTypeRepr())
+      reprLoc = repr->getStartLoc();
+    note.fixItInsert(reprLoc, "@escaping ");
   } // TODO: add in a fixit for autoclosure
 
   return true;
@@ -4131,9 +4134,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
   // with parameters, if there are, we'll have to add
   // type information to the replacement argument.
   bool explicitTypes =
-      llvm::any_of(params->getArray(), [](const ParamDecl *param) {
-        return param->getTypeLoc().getTypeRepr();
-      });
+      llvm::any_of(params->getArray(),
+                   [](const ParamDecl *param) { return param->getTypeRepr(); });
 
   if (isMultiLineClosure)
     OS << '\n' << indent;

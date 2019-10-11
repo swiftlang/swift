@@ -430,8 +430,7 @@ buildIndexForwardingParamList(AbstractStorageDecl *storage,
 
   // Clone the parameter list over for a new decl, so we get new ParamDecls.
   auto indices = subscript->getIndices()->clone(context,
-                                                ParameterList::Implicit|
-                                                ParameterList::WithoutTypes);
+                                                ParameterList::Implicit);
 
   // Give all of the parameters meaningless names so that we can forward
   // them properly.  If it's declared anonymously, SILGen will think
@@ -2421,12 +2420,16 @@ PropertyWrapperBackingPropertyInfoRequest::evaluate(Evaluator &evaluator,
 static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
                                           StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
+    SourceLoc typeLoc;
+    if (auto *repr = var->getTypeRepr())
+      typeLoc = repr->getLoc();
+    
     if (info.hasStorage()) {
       // Protocols cannot have stored properties.
       if (var->isLet()) {
         var->diagnose(diag::protocol_property_must_be_computed_var)
-          .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
-          .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
+            .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
+            .fixItInsertAfter(typeLoc, " { get }");
       } else {
         auto diag = var->diagnose(diag::protocol_property_must_be_computed);
         auto braces = var->getBracesRange();
@@ -2434,7 +2437,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
         if (braces.isValid())
           diag.fixItReplace(braces, "{ get <#set#> }");
         else
-          diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
+          diag.fixItInsertAfter(typeLoc, " { get <#set#> }");
       }
     }
   }

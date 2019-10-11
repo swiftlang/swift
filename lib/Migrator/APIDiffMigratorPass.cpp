@@ -73,7 +73,7 @@ public:
 
     for (auto *Param: *Parent->getParameters()) {
       if (!--NextIndex) {
-        return findChild(Param->getTypeLoc());
+        return findChild(Param->getTypeRepr());
       }
     }
     llvm_unreachable("child index out of bounds");

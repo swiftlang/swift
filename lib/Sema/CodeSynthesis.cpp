@@ -652,8 +652,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited |
-       ParameterList::WithoutTypes);
+       ParameterList::Inherited);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -670,7 +669,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
-    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,

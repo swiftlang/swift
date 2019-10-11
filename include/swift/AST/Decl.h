@@ -369,20 +369,13 @@ protected:
     IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+1+NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
     /// Whether we've computed the specifier yet.
     SpecifierComputed : 1,
 
     /// The specifier associated with this parameter.  This determines
     /// the storage semantics of the value e.g. mutability.
     Specifier : 2,
-
-    /// True if the type is implicitly specified in the source, but this has an
-    /// apparently valid typeRepr.  This is used in accessors, which look like:
-    ///    set (value) {
-    /// but need to get the typeRepr from the property as a whole so Sema can
-    /// resolve the type.
-    IsTypeLocImplicit : 1,
 
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
@@ -4804,8 +4797,7 @@ protected:
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
-  /// This is the type specified, including location information.
-  TypeLoc typeLoc;
+  TypeRepr *ParentRepr = nullptr;
 
   Type typeInContext;
 
@@ -4825,8 +4817,10 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  TypeLoc &getTypeLoc() { return typeLoc; }
-  TypeLoc getTypeLoc() const { return typeLoc; }
+  /// Retrieve the TypeRepr corresponding to the parsed type of the parent
+  /// pattern, if it exists.
+  TypeRepr *getTypeRepr() const { return ParentRepr; }
+  void setTypeRepr(TypeRepr *repr) { ParentRepr = repr; }
 
   bool hasType() const {
     // We have a type if either the type has been computed already or if
@@ -5201,10 +5195,8 @@ public:
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
-  /// Clone constructor, allocates a new ParamDecl identical to the first.
-  /// Intentionally not defined as a typical copy constructor to avoid
-  /// accidental copies.
-  ParamDecl(ParamDecl *PD, bool withTypes);
+  /// Create a new ParamDecl identical to the first except without the interface type.
+  static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
   
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }
@@ -5221,10 +5213,7 @@ public:
   SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-    
-  bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
-  void setIsTypeLocImplicit(bool val) { Bits.ParamDecl.IsTypeLocImplicit = val; }
-  
+
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
   }
