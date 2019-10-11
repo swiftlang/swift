@@ -670,7 +670,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
-    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,

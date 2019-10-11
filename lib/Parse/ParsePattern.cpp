@@ -481,7 +481,7 @@ mapParsedParameters(Parser &parser,
     auto setInvalid = [&]{
       if (param->isInvalid())
         return;
-      param->getTypeLoc().setInvalidType(ctx);
+      param->getTypeRepr()->setInvalid();
       param->setInvalid();
     };
 
@@ -512,7 +512,7 @@ mapParsedParameters(Parser &parser,
                                                              "__owned",
                                                              parsingEnumElt);
       }
-      param->getTypeLoc() = TypeLoc(type);
+      param->setTypeRepr(type);
 
       // If there is `@autoclosure` attribute associated with the type
       // let's mark that in the declaration as well, because it
@@ -629,7 +629,7 @@ mapParsedParameters(Parser &parser,
           .fixItRemove(param.EllipsisLoc);
 
         param.EllipsisLoc = SourceLoc();
-      } else if (!result->getTypeLoc().getTypeRepr()) {
+      } else if (!result->getTypeRepr()) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(result->getSourceRange());
 

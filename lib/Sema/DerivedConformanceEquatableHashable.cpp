@@ -141,7 +141,7 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
         associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
     for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
       ctx.Diags.diagnose(
-          typeToDiagnose->getTypeLoc().getLoc(),
+          typeToDiagnose->getTypeRepr()->getLoc(),
           diag::missing_member_type_conformance_prevents_synthesis,
           NonconformingMemberKind::AssociatedValue,
           typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),

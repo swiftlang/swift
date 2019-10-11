@@ -1015,9 +1015,7 @@ recur:
     P->setType(type);
     var->setInterfaceType(interfaceType);
     var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
-
-    var->getTypeLoc() = tyLoc;
-    var->getTypeLoc().setType(var->getType());
+    var->setTypeRepr(tyLoc.getTypeRepr());
 
     // FIXME: Should probably just remove the forbidden prefix stuff, it no
     // longer makes a lot of sense in a request-based world.
@@ -1528,7 +1526,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     if (param->isInvalid())
       return true;
 
-    if (auto type = param->getTypeLoc().getType())
+    if (auto type = param->getType())
       return !isValidType(type);
 
     return true;

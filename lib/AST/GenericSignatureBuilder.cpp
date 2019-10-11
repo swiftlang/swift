@@ -5116,9 +5116,8 @@ void GenericSignatureBuilder::inferRequirements(
                                           ModuleDecl &module,
                                           ParameterList *params) {
   for (auto P : *params) {
-    inferRequirements(module, P->getTypeLoc().getType(),
-                      FloatingRequirementSource::forInferred(
-                          P->getTypeLoc().getTypeRepr()));
+    inferRequirements(module, P->getInterfaceType(),
+                      FloatingRequirementSource::forInferred(P->getTypeRepr()));
   }
 }
 

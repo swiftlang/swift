@@ -2425,8 +2425,8 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
       // Protocols cannot have stored properties.
       if (var->isLet()) {
         var->diagnose(diag::protocol_property_must_be_computed_var)
-          .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
-          .fixItInsertAfter(var->getTypeLoc().getLoc(), " { get }");
+            .fixItReplace(var->getParentPatternBinding()->getLoc(), "var")
+            .fixItInsertAfter(var->getTypeRepr()->getLoc(), " { get }");
       } else {
         auto diag = var->diagnose(diag::protocol_property_must_be_computed);
         auto braces = var->getBracesRange();
@@ -2434,7 +2434,8 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
         if (braces.isValid())
           diag.fixItReplace(braces, "{ get <#set#> }");
         else
-          diag.fixItInsertAfter(var->getTypeLoc().getLoc(), " { get <#set#> }");
+          diag.fixItInsertAfter(var->getTypeRepr()->getLoc(),
+                                " { get <#set#> }");
       }
     }
   }

@@ -2673,8 +2673,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
   auto isTupleDestructuring = [](ParamDecl *param) -> bool {
     if (!param->isInvalid())
       return false;
-    auto &typeLoc = param->getTypeLoc();
-    if (auto typeRepr = typeLoc.getTypeRepr())
+    if (auto *typeRepr = param->getTypeRepr())
       return !param->hasName() && isa<TupleTypeRepr>(typeRepr);
     return false;
   };
@@ -2685,7 +2684,6 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       continue;
 
     auto argName = "arg" + std::to_string(i);
-    auto typeLoc = param->getTypeLoc();
 
     SmallString<64> fixIt;
     llvm::raw_svector_ostream OS(fixIt);
@@ -2695,7 +2693,7 @@ parseClosureSignatureIfPresent(SmallVectorImpl<CaptureListEntry> &captureList,
       OS << '\n' << indent;
 
     OS << "let ";
-    printTupleNames(typeLoc.getTypeRepr(), OS);
+    printTupleNames(param->getTypeRepr(), OS);
     OS << " = " << argName << (isMultiLine ? "\n" + indent : "; ");
 
     diagnose(param->getStartLoc(), diag::anon_closure_tuple_param_destructuring)

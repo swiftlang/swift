@@ -4804,8 +4804,7 @@ protected:
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
 
-  /// This is the type specified, including location information.
-  TypeLoc typeLoc;
+  TypeRepr *ParentRepr = nullptr;
 
   Type typeInContext;
 
@@ -4825,8 +4824,10 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  TypeLoc &getTypeLoc() { return typeLoc; }
-  TypeLoc getTypeLoc() const { return typeLoc; }
+  /// Retrieve the TypeRepr corresponding to the parsed type of the parent
+  /// pattern, if it exists.
+  TypeRepr *getTypeRepr() const { return ParentRepr; }
+  void setTypeRepr(TypeRepr *repr) { ParentRepr = repr; }
 
   bool hasType() const {
     // We have a type if either the type has been computed already or if
