@@ -985,7 +985,10 @@ bool NoEscapeFuncToTypeConversionFailure::diagnoseParameterUse() const {
       emitDiagnostic(PD->getLoc(), diag::noescape_parameter, PD->getName());
 
   if (!PD->isAutoClosure()) {
-    note.fixItInsert(PD->getTypeRepr()->getStartLoc(), "@escaping ");
+    SourceLoc reprLoc;
+    if (auto *repr = PD->getTypeRepr())
+      reprLoc = repr->getStartLoc();
+    note.fixItInsert(reprLoc, "@escaping ");
   } // TODO: add in a fixit for autoclosure
 
   return true;

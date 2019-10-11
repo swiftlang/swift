@@ -5202,10 +5202,8 @@ public:
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
-  /// Clone constructor, allocates a new ParamDecl identical to the first.
-  /// Intentionally not defined as a typical copy constructor to avoid
-  /// accidental copies.
-  ParamDecl(ParamDecl *PD, bool withTypes);
+  /// Create a new ParamDecl identical to the first except without the interface type.
+  static ParamDecl *cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD);
   
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const { return ArgumentName; }

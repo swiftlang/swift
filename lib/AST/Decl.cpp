@@ -5731,29 +5731,23 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
 
-/// Clone constructor, allocates a new ParamDecl identical to the first.
-/// Intentionally not defined as a copy constructor to avoid accidental copies.
-ParamDecl::ParamDecl(ParamDecl *PD, bool withTypes)
-  : VarDecl(DeclKind::Param, /*IsStatic*/false, PD->getIntroducer(),
-            /*IsCaptureList*/false, PD->getNameLoc(), PD->getName(),
-            PD->getDeclContext(),
-            StorageIsMutable_t(!isImmutableSpecifier(PD->getSpecifier()))),
-    ArgumentName(PD->getArgumentName()),
-    ArgumentNameLoc(PD->getArgumentNameLoc()),
-    SpecifierLoc(PD->getSpecifierLoc()),
-    DefaultValueAndFlags(nullptr, PD->DefaultValueAndFlags.getInt()) {
-  Bits.ParamDecl.IsTypeLocImplicit = PD->Bits.ParamDecl.IsTypeLocImplicit;
-  Bits.ParamDecl.defaultArgumentKind = PD->Bits.ParamDecl.defaultArgumentKind;
+ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
+  auto *Clone = new (Ctx) ParamDecl(
+      PD->getSpecifierLoc(), PD->getArgumentNameLoc(), PD->getArgumentName(),
+      PD->getArgumentNameLoc(), PD->getParameterName(), PD->getDeclContext());
+  Clone->DefaultValueAndFlags.setPointerAndInt(
+      nullptr, PD->DefaultValueAndFlags.getInt());
+  Clone->Bits.ParamDecl.IsTypeLocImplicit =
+      PD->Bits.ParamDecl.IsTypeLocImplicit;
+  Clone->Bits.ParamDecl.defaultArgumentKind =
+      PD->Bits.ParamDecl.defaultArgumentKind;
   if (auto *repr = PD->getTypeRepr())
-    setTypeRepr(repr->clone(PD->getASTContext()));
+    Clone->setTypeRepr(repr->clone(PD->getASTContext()));
 
-  if (withTypes && PD->hasInterfaceType())
-    setInterfaceType(PD->getInterfaceType());
-
-  setSpecifier(PD->getSpecifier());
-  setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  Clone->setSpecifier(PD->getSpecifier());
+  Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
+  return Clone;
 }
-
 
 /// Retrieve the type of 'self' for the given context.
 Type DeclContext::getSelfTypeInContext() const {

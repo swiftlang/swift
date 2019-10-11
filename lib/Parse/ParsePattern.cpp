@@ -481,7 +481,6 @@ mapParsedParameters(Parser &parser,
     auto setInvalid = [&]{
       if (param->isInvalid())
         return;
-      param->getTypeRepr()->setInvalid();
       param->setInvalid();
     };
 
