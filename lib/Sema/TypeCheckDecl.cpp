@@ -1164,7 +1164,7 @@ IsFinalRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
 
       // Backing storage for 'lazy' or property wrappers is always final.
       if (VD->isLazyStorageProperty() ||
-          VD->getOriginalWrappedProperty())
+          VD->getOriginalWrappedProperty(PropertyWrapperSynthesizedPropertyKind::Backing))
         return true;
 
       if (auto *nominalDecl = VD->getDeclContext()->getSelfClassDecl()) {
