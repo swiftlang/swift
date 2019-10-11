@@ -53,7 +53,7 @@
         "swift-format": {
             "remote": { "id": "apple/swift-format" } },
         "llvm-project": {
-            "remote": { "id": "apple/llvm-project-v2" } }
+            "remote": { "id": "apple/llvm-project-v3" } }
     },
     "default-branch-scheme": "master",
     "branch-schemes": {
