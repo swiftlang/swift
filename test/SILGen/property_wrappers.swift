@@ -495,6 +495,18 @@ struct ComposedInit {
   }
 }
 
+// rdar://problem/55982409 - crash due to improperly inferred 'final'
+@propertyWrapper
+public struct MyWrapper<T> {
+  public var wrappedValue: T
+  public var projectedValue: Self { self }
+  public init(wrappedValue: T) { self.wrappedValue = wrappedValue }
+}
+
+open class TestMyWrapper {
+  public init() {}
+  @MyWrapper open var useMyWrapper: Int? = nil
+}
 
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
@@ -503,3 +515,6 @@ struct ComposedInit {
 // CHECK-NEXT:  #ClassUsingWrapper.init!allocator.1: (ClassUsingWrapper.Type) -> () -> ClassUsingWrapper : @$s17property_wrappers17ClassUsingWrapperCACycfC
 // CHECK-NEXT: #ClassUsingWrapper.deinit!deallocator.1: @$s17property_wrappers17ClassUsingWrapperCfD
 // CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_vtable [serialized] TestMyWrapper
+// CHECK: #TestMyWrapper.$useMyWrapper!getter.1
