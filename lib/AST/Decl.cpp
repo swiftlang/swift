@@ -1181,7 +1181,7 @@ createExtensionGenericParams(ASTContext &ctx,
   });
 
   GenericParamList *toParams = nullptr;
-  for (auto *gpList : reversed(allGenericParams)) {
+  for (auto *gpList : llvm::reverse(allGenericParams)) {
     gpList->setOuterParameters(toParams);
     toParams = gpList;
   }

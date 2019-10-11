@@ -1231,7 +1231,7 @@ namespace {
           Expr *target = nullptr;
           bool foundApply = false;
           bool foundRebind = false;
-          for (auto ancestor : reversed(ExprStack)) {
+          for (auto ancestor : llvm::reverse(ExprStack)) {
             if (isa<RebindSelfInConstructorExpr>(ancestor)) {
               // If we already have a rebind, then we're re-typechecking an
               // expression and are done.
@@ -2035,7 +2035,7 @@ void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
-  for (auto history : reversed(conformances)) {
+  for (auto history : llvm::reverse(conformances)) {
     diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
                    history.ConformingType, history.Protocol);
   }

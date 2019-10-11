@@ -1158,7 +1158,7 @@ GenericTypeParamType *ASTMangler::appendAssocType(DependentMemberType *DepTy,
   }
   if (auto gpRoot = dyn_cast<GenericTypeParamType>(base)) {
     bool first = true;
-    for (auto *member : reversed(path)) {
+    for (auto *member : llvm::reverse(path)) {
       appendAssociatedTypeName(member);
       appendListSeparator(first);
     }

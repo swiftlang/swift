@@ -664,7 +664,7 @@ Expr *swift::buildPropertyWrapperInitialValueCall(
   ASTContext &ctx = var->getASTContext();
   auto wrapperAttrs = var->getAttachedPropertyWrappers();
   Expr *initializer = value;
-  for (unsigned i : reversed(indices(wrapperAttrs))) {
+  for (unsigned i : llvm::reverse(indices(wrapperAttrs))) {
     Type wrapperType =
       backingStorageType ? computeWrappedValueType(var, backingStorageType, i)
                          : var->getAttachedPropertyWrapperType(i);
