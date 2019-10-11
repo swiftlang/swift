@@ -279,8 +279,7 @@ public:
   /// Cache of `@differentiable` attributes keyed by parameter indices. This
   /// helps us diagnose multiple `@differentiable`s that are with respect to the
   /// same set of parameters.
-  llvm::DenseMap<std::pair<Decl *, IndexSubset *>,
-                 DifferentiableAttr *>
+  llvm::DenseMap<std::pair<Decl *, IndexSubset *>, DifferentiableAttr *>
       DifferentiableAttrs;
 
 private:

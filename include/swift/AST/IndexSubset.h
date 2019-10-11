@@ -209,7 +209,7 @@ public:
   }
 
   void dump(llvm::raw_ostream &s = llvm::errs()) const {
-    s << "(autodiff_index_subset capacity=" << capacity << " indices=(";
+    s << "(index_subset capacity=" << capacity << " indices=(";
     interleave(getIndices(), [&s](unsigned i) { s << i; },
                [&s] { s << ", "; });
     s << "))";
