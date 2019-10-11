@@ -100,6 +100,8 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
     Inaccessible,
   };
 
+  auto valueVarType = valueVar->getValueInterfaceType();
+
   SmallVector<std::tuple<ConstructorDecl *, NonViableReason, Type>, 2>
       nonviable;
   SmallVector<ConstructorDecl *, 2> viableInitializers;
@@ -212,8 +214,7 @@ findSuitableWrapperInit(ASTContext &ctx, NominalTypeDecl *nominal,
 
       case NonViableReason::ParameterTypeMismatch:
         init->diagnose(diag::property_wrapper_wrong_initial_value_init,
-                       init->getFullName(), paramType,
-                       valueVar->getValueInterfaceType());
+                       init->getFullName(), paramType, valueVarType);
         valueVar->diagnose(diag::decl_declared_here, valueVar->getFullName());
         break;
       }
