@@ -36,7 +36,6 @@ namespace swift {
 class ASTContext;
 class AnyFunctionType;
 class SILFunctionType;
-template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
