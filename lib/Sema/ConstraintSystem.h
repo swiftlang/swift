@@ -2082,13 +2082,13 @@ public:
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
 
-  void recordHole(TypeVariableType *typeVar);
+  void recordPotentialHole(TypeVariableType *typeVar);
 
-  bool isHole(TypeVariableType *typeVar) const {
-    return isHoleAt(typeVar->getImpl().getLocator());
+  bool isPotentialHole(TypeVariableType *typeVar) const {
+    return isPotentialHoleAt(typeVar->getImpl().getLocator());
   }
 
-  bool isHoleAt(ConstraintLocator *locator) const {
+  bool isPotentialHoleAt(ConstraintLocator *locator) const {
     return bool(Holes.count(locator));
   }
 

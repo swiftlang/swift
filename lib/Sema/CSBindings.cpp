@@ -736,9 +736,9 @@ ConstraintSystem::getPotentialBindings(TypeVariableType *typeVar) const {
   }
 
   // If we don't have any potential bindings, allow generic
-  // parameters and holes to default to `Any`.
+  // parameters and potential holes to default to `Unresolved`.
   if (shouldAttemptFixes() && result.Bindings.empty() &&
-      (isHole(typeVar) || result.isGenericParameter())) {
+      (isPotentialHole(typeVar) || result.isGenericParameter())) {
     result.IsHole = true;
     result.addPotentialBinding({getASTContext().TheUnresolvedType,
         AllowedBindingKind::Exact, ConstraintKind::Defaultable, nullptr,
@@ -991,7 +991,7 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   if (Binding.isDefaultableBinding()) {
     cs.DefaultedConstraints.push_back(Binding.DefaultableBinding);
 
-    if (locator->isForGenericParameter() && cs.isHoleAt(locator)) {
+    if (locator->isForGenericParameter() && type->isHole()) {
       // Drop `generic parameter '...'` part of the locator to group all of the
       // missing generic parameters related to the same path together.
       auto path = locator->getPath();

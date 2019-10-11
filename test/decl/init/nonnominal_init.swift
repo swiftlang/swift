@@ -7,15 +7,10 @@ indirect enum Or<A, B> {
   case inr(B)
 }
 
-// FIXME: Port non_nominal_no_initializers diagnostic
 func deMorgan<A, B>(_ ne: Not<Or<A, B>>) -> And<Not<A>, Not<B>> {
   return And<Not<A>, Not<B>>(
-    Not<A> { a in ne(.left(a)) },
-    // expected-error@-1 {{type 'Not<A>' (aka '(A) -> Never') has no member 'init'}}
-    // expected-error@-2 {{type 'Or<A, B>' has no member 'left'}}
+    Not<A> { a in ne(.left(a)) }, // expected-error {{non-nominal type 'Not<A>' (aka '(A) -> Never') does not support explicit initialization}}
     Not<B> { a in ne(.right(a)) }
-    // expected-error@-1 {{type 'Not<B>' (aka '(B) -> Never') has no member 'init'}}
-    // expected-error@-2 {{type 'Or<A, B>' has no member 'right'}}
   )
 }
 
