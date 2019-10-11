@@ -230,7 +230,7 @@ then run the build product in Terminal.
 Swift toolchains are created using the script
 [build-toolchain](https://github.com/apple/swift/blob/master/utils/build-toolchain). This
 script is used by swift.org's CI to produce snapshots and can allow for one to
-locally reproduce such builds for development or distribution purposes. E.x.:
+locally reproduce such builds for development or distribution purposes. E.x.
 
 ```
   $ ./swift/utils/build-toolchain $BUNDLE_PREFIX
