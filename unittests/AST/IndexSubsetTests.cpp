@@ -9,10 +9,9 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-// SWIFT_ENABLE_TENSORFLOW
 
 #include "swift/AST/AutoDiff.h"
-#include "swift/AST/IndexSubsetTests.h"
+#include "swift/AST/IndexSubset.h"
 #include "TestContext.h"
 #include "gtest/gtest.h"
 
