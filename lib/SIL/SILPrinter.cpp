@@ -2712,7 +2712,7 @@ static void printSILDifferentiabilityWitnesses(
   std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
     [] (const SILDifferentiabilityWitness *w1,
         const SILDifferentiabilityWitness *w2) -> bool {
-      // TODO: Sort based on more criteria for deterministic ordering.
+      // TODO(TF-893): Sort based on more criteria for deterministic ordering.
       return w1->getOriginalFunction()->getName()
           .compare(w2->getOriginalFunction()->getName());
     }

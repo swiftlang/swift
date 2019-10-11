@@ -5359,8 +5359,8 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
 #endif
   auto origFnType = originalFunction->getLoweredFunctionType();
   if (jvp) {
-    // TODO: Change `SILFunctionType::getAutoDiffDerivativeFunctionType` to
-    // accept result indices.
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to accept result indices.
     auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
         getParameterIndices(), /*resultIndex*/ *resultIndices->begin(),
         AutoDiffDerivativeFunctionKind::JVP, M.Types,
@@ -5372,8 +5372,8 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
         "JVP type does not match expected JVP type");
   }
   if (vjp) {
-    // TODO: Change `SILFunctionType::getAutoDiffDerivativeFunctionType` to
-    // accept result indices.
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to result indices.
     auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
         getParameterIndices(), /*resultIndex*/ *resultIndices->begin(),
         AutoDiffDerivativeFunctionKind::VJP, M.Types,

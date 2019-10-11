@@ -429,7 +429,6 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
 std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
     SILDifferentiabilityWitnessKey key) {
   // TODO(TF-20): Make the mangling scheme robust.
-  // TODO(TF-680): Mangle derivative generic signature as well.
   beginManglingWithoutPrefix();
 
   auto originalName = std::get<0>(key);

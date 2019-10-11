@@ -6746,7 +6746,7 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// TODO: Dedupe with `SILParser::convertRequirements` upstream.
+// TODO(TF-893): Dedupe with `SILParser::convertRequirements` upstream.
 // Consider defining this as `Parser::convertRequirements`.
 static void convertRequirements(Parser &P, SILFunction *F,
                                 ArrayRef<RequirementRepr> From,
@@ -6956,7 +6956,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
-  // TODO: Parse `isSerialized` flag.
+  // TODO(TF-893): Parse `isSerialized` flag.
   bool isSerialized = false;
   SILDifferentiabilityWitness::create(
       M, *linkage, originalFn, parameterIndices, resultIndices,
