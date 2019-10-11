@@ -5350,6 +5350,43 @@ void SILGlobalVariable::verify() const {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Verify that a differentiability witness follows invariants.
+void SILDifferentiabilityWitness::verify(const SILModule &M) const {
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
+  auto origFnType = originalFunction->getLoweredFunctionType();
+  if (jvp) {
+    // TODO: Change `SILFunctionType::getAutoDiffDerivativeFunctionType` to
+    // accept result indices.
+    auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *resultIndices->begin(),
+        AutoDiffDerivativeFunctionKind::JVP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()),
+        getDerivativeGenericSignature()->getCanonicalSignature());
+    SILVerifier(*jvp).requireSameType(
+        SILType::getPrimitiveObjectType(jvp->getLoweredFunctionType()),
+        SILType::getPrimitiveObjectType(expectedJVPType),
+        "JVP type does not match expected JVP type");
+  }
+  if (vjp) {
+    // TODO: Change `SILFunctionType::getAutoDiffDerivativeFunctionType` to
+    // accept result indices.
+    auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *resultIndices->begin(),
+        AutoDiffDerivativeFunctionKind::VJP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()),
+        getDerivativeGenericSignature()->getCanonicalSignature());
+    SILVerifier(*jvp).requireSameType(
+        SILType::getPrimitiveObjectType(vjp->getLoweredFunctionType()),
+        SILType::getPrimitiveObjectType(expectedVJPType),
+        "VJP type does not match expected VJP type");
+  }
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Verify the module.
 void SILModule::verify() const {
 #ifdef NDEBUG
@@ -5433,6 +5470,22 @@ void SILModule::verify() const {
     }
     wt.verify(*this);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Check all differentiability witnesses.
+  LLVM_DEBUG(llvm::dbgs() <<
+             "*** Checking differentiability witnesses for duplicates ***\n");
+  llvm::DenseSet<SILDifferentiabilityWitnessKey> diffWitnesses;
+  for (auto &dw : getDifferentiabilityWitnesses()) {
+    LLVM_DEBUG(llvm::dbgs() << "Differentiability Witness:\n"; dw.dump());
+    if (!diffWitnesses.insert(dw.getKey()).second) {
+      llvm::errs() << "Differentiability witness redefined: ";
+      dw.dump();
+      assert(false && "triggering standard assertion failure routine");
+    }
+    dw.verify(*this);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   
   // Check property descriptors.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");

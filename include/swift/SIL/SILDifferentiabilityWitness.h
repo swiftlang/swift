@@ -75,6 +75,12 @@ private:
       serialized(isSerialized) {}
 
 public:
+  static SILDifferentiabilityWitness *create(
+      SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
+      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+      GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
+      bool isSerialized);
+
   SILDifferentiabilityWitnessKey getKey() const;
   SILModule &getModule() const { return module; }
   SILLinkage getLinkage() const { return linkage; }
@@ -92,11 +98,8 @@ public:
   SILFunction *getVJP() const { return vjp; }
   bool isSerialized() const { return serialized; }
 
-  static SILDifferentiabilityWitness *create(
-      SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
-      GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-      bool isSerialized);
+  /// Verify that the differentiability witness is well-formed.
+  void verify(const SILModule &M) const;
 
   void print(llvm::raw_ostream &OS, bool verbose = false) const;
   void dump() const;
