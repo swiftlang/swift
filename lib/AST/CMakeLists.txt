@@ -29,7 +29,7 @@ add_swift_host_library(swiftAST STATIC
   ASTVerifier.cpp
   ASTWalker.cpp
   Attr.cpp
-  AutoDiff.cpp
+  IndexSubset.cpp
   Availability.cpp
   AvailabilitySpec.cpp
   Builtins.cpp

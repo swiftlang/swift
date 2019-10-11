@@ -428,8 +428,8 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
 
-  /// For uniquifying `AutoDiffIndexSubset` allocations.
-  llvm::FoldingSet<AutoDiffIndexSubset> AutoDiffIndexSubsets;
+  /// For uniquifying `IndexSubset` allocations.
+  llvm::FoldingSet<IndexSubset> IndexSubsets;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -4621,9 +4621,9 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
 }
 
-AutoDiffIndexSubset *
-AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
-  auto &foldingSet = ctx.getImpl().AutoDiffIndexSubsets;
+IndexSubset *
+IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
+  auto &foldingSet = ctx.getImpl().IndexSubsets;
   llvm::FoldingSetNodeID id;
   unsigned capacity = indices.size();
   id.AddInteger(capacity);
@@ -4633,11 +4633,11 @@ AutoDiffIndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
   if (existing)
     return existing;
-  auto sizeToAlloc = sizeof(AutoDiffIndexSubset) +
+  auto sizeToAlloc = sizeof(IndexSubset) +
     getNumBitWordsNeededForCapacity(capacity);
-  auto *buf = reinterpret_cast<AutoDiffIndexSubset *>(
-    ctx.Allocate(sizeToAlloc, alignof(AutoDiffIndexSubset)));
-  auto *newNode = new (buf) AutoDiffIndexSubset(indices);
+  auto *buf = reinterpret_cast<IndexSubset *>(
+    ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
+  auto *newNode = new (buf) IndexSubset(indices);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }

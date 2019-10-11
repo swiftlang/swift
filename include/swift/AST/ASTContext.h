@@ -109,7 +109,7 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
-  class AutoDiffIndexSubset;
+  class IndexSubset;
 
   enum class KnownProtocolKind : uint8_t;
 
