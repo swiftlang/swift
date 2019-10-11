@@ -242,7 +242,7 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 /// The constrained derivative generic signature constrains all wrt parameters
 /// to conform to `Differentiable`.
 static GenericSignature *getConstrainedDerivativeGenericSignature(
-    CanSILFunctionType originalFnTy, AutoDiffIndexSubset *paramIndexSet,
+    CanSILFunctionType originalFnTy, IndexSubset *paramIndexSet,
     GenericSignature *derivativeGenSig) {
   if (!derivativeGenSig)
     derivativeGenSig = originalFnTy->getGenericSignature();
@@ -1007,7 +1007,7 @@ public:
   /// indices. Returns nullptr if no such attribute exists.
   SILDifferentiableAttr *lookUpMinimalDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    auto *minimalIndexSet = AutoDiffIndexSubset::getDefault(
+    auto *minimalIndexSet = IndexSubset::getDefault(
         getASTContext(),
         original->getLoweredFunctionType()->getNumParameters(), false);
     auto *indexSet = indices.parameters;
@@ -1041,13 +1041,13 @@ public:
   /// specified original function whose parameter indices are a minimal
   /// superset of the specified parameter indices. Returns nullptr if no such
   /// attribute exists.
-  std::pair<const DifferentiableAttr *, AutoDiffIndexSubset *>
+  std::pair<const DifferentiableAttr *, IndexSubset *>
   lookUpMinimalASTDifferentiableAttrAndIndexSubset(
       SILDeclRef originalDeclRef, CanSILFunctionType originalFnType,
       const SILAutoDiffIndices &indices) {
     auto *original = originalDeclRef.getDecl();
     const DifferentiableAttr *minimalAttr = nullptr;
-    auto *minimalIndexSet = AutoDiffIndexSubset::getDefault(
+    auto *minimalIndexSet = IndexSubset::getDefault(
         getASTContext(), originalFnType->getNumParameters(), false);
     auto *indexSet = indices.parameters;
     for (auto *da : original->getAttrs().getAttributes<DifferentiableAttr>()) {
@@ -1108,7 +1108,7 @@ public:
   /// pointer value as a previously processed and deleted instruction.
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc,
-      AutoDiffIndexSubset *parameterIndices, SILValue original,
+      IndexSubset *parameterIndices, SILValue original,
       Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None) {
     auto *dfi = builder.createDifferentiableFunction(
         loc, parameterIndices, original, derivativeFunctions);
@@ -1439,7 +1439,7 @@ public:
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
-  bool isVaried(SILValue value, AutoDiffIndexSubset *parameterIndices) const;
+  bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
 
   Activity getActivity(SILValue value,
@@ -1452,7 +1452,7 @@ public:
 /// indices, figure out whether the parent function is being differentiated with
 /// respect to this parameter, according to the indices.
 static bool isDifferentiationParameter(SILArgument *argument,
-                                       AutoDiffIndexSubset *indices) {
+                                       IndexSubset *indices) {
   if (!argument) return false;
   auto *function = argument->getFunction();
   auto paramArgs = function->getArgumentsWithoutIndirectResults();
@@ -1650,7 +1650,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   // - If the callee has `@differentiable` function type, use differentiation
   //   parameters from the function type.
   // - Otherwise, use the active parameters.
-  AutoDiffIndexSubset *parameters;
+  IndexSubset *parameters;
   auto origFnSubstTy = ai->getSubstCalleeType();
   auto remappedOrigFnSubstTy =
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
@@ -1658,7 +1658,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   if (remappedOrigFnSubstTy->isDifferentiable()) {
     parameters = remappedOrigFnSubstTy->getDifferentiationParameterIndices();
   } else {
-    parameters = AutoDiffIndexSubset::get(
+    parameters = IndexSubset::get(
         original->getASTContext(),
         ai->getArgumentsWithoutIndirectResults().size(),
         activeParamIndices);
@@ -2179,7 +2179,7 @@ bool DifferentiableActivityInfo::isVaried(
 }
 
 bool DifferentiableActivityInfo::isVaried(
-    SILValue value, AutoDiffIndexSubset *parameterIndices) const {
+    SILValue value, IndexSubset *parameterIndices) const {
   for (auto paramIdx : parameterIndices->getIndices())
     if (isVaried(value, paramIdx))
       return true;
@@ -2703,7 +2703,7 @@ emitDerivativeFunctionReference(
     }
     // Get the minimal `@differentiable` attribute and parameter index subset.
     const DifferentiableAttr *minimalAttr;
-    AutoDiffIndexSubset *minimalParamIndexSet;
+    IndexSubset *minimalParamIndexSet;
     std::tie(minimalAttr, minimalParamIndexSet) =
         context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
             requirementDeclRef, witnessMethodType, desiredIndices);
@@ -2750,7 +2750,7 @@ emitDerivativeFunctionReference(
     }
     // Get the minimal `@differentiable` attribute and parameter index subset.
     const DifferentiableAttr *minimalAttr;
-    AutoDiffIndexSubset *minimalParamIndexSet;
+    IndexSubset *minimalParamIndexSet;
     std::tie(minimalAttr, minimalParamIndexSet) =
         context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
             methodDeclRef, classMethodType, desiredIndices);
@@ -3764,7 +3764,7 @@ public:
     // Form expected indices, assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
-        AutoDiffIndexSubset::get(
+        IndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
 
@@ -5442,7 +5442,7 @@ public:
     // Form expected indices, assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
-        AutoDiffIndexSubset::get(
+        IndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
 

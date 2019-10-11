@@ -359,13 +359,13 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 // Returns the differentiation parameters clause string for the given function,
 // parameter indices, and parsed parameters.
 static std::string getDifferentiationParametersClauseString(
-    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
+    const AbstractFunctionDecl *function, IndexSubset *indices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   bool isInstanceMethod = function && function->isInstanceMember();
   std::string result;
   llvm::raw_string_ostream printer(result);
 
-  // Use parameter indices from `AutoDiffIndexSubset`, if specified.
+  // Use parameter indices from `IndexSubset`, if specified.
   if (indices) {
     auto parameters = indices->getBitVector();
     auto parameterCount = parameters.count();
@@ -417,14 +417,14 @@ static std::string getDifferentiationParametersClauseString(
 // Returns the differentiation parameters clause string for the given function,
 // parameter indices, and parsed parameters.
 static std::string getTransposingParametersClauseString(
-    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
+    const AbstractFunctionDecl *function, IndexSubset *indices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   bool isInstanceMethod = function && function->isInstanceMember();
   
   std::string result;
   llvm::raw_string_ostream printer(result);
   
-  // Use parameters from `AutoDiffIndexSubset`, if specified.
+  // Use parameters from `IndexSubset`, if specified.
   if (indices) {
     SmallBitVector parameters(indices->getBitVector());
     auto parameterCount = parameters.count();
@@ -1456,7 +1456,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
-                                       AutoDiffIndexSubset *indices,
+                                       IndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature *derivativeGenSig)
@@ -1484,7 +1484,7 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
-                           bool linear, AutoDiffIndexSubset *indices,
+                           bool linear, IndexSubset *indices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature *derivativeGenSig) {
@@ -1538,7 +1538,7 @@ DifferentiatingAttr::DifferentiatingAttr(
 
 DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
-    DeclNameWithLoc original, bool linear, AutoDiffIndexSubset *indices)
+    DeclNameWithLoc original, bool linear, IndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
       Original(std::move(original)), linear(linear), ParameterIndices(indices) {
 }
@@ -1558,7 +1558,7 @@ DifferentiatingAttr *
 DifferentiatingAttr::create(ASTContext &context, bool implicit,
                             SourceLoc atLoc, SourceRange baseRange,
                             DeclNameWithLoc original, bool linear,
-                            AutoDiffIndexSubset *indices) {
+                            IndexSubset *indices) {
   void *mem = context.Allocate(sizeof(DifferentiatingAttr),
                                alignof(DifferentiatingAttr));
   return new (mem) DifferentiatingAttr(context, implicit, atLoc, baseRange,
@@ -1579,7 +1579,7 @@ TransposingAttr::TransposingAttr(ASTContext &context, bool implicit,
 TransposingAttr::TransposingAttr(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  TypeRepr *baseType, DeclNameWithLoc original,
-                                 AutoDiffIndexSubset *indices)
+                                 IndexSubset *indices)
     : DeclAttribute(DAK_Transposing, atLoc, baseRange, implicit),
       BaseType(baseType), Original(std::move(original)),
       ParameterIndexSubset(indices) {}
@@ -1599,7 +1599,7 @@ TransposingAttr *
 TransposingAttr::create(ASTContext &context, bool implicit, SourceLoc atLoc,
                         SourceRange baseRange, TypeRepr *baseType,
                         DeclNameWithLoc original,
-                        AutoDiffIndexSubset *indices) {
+                        IndexSubset *indices) {
   void *mem =
       context.Allocate(sizeof(TransposingAttr), alignof(TransposingAttr));
   return new (mem) TransposingAttr(context, implicit, atLoc, baseRange,

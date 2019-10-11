@@ -579,7 +579,7 @@ TryApplyInst *TryApplyInst::create(
 
 // SWIFT_ENABLE_TENSORFLOW
 SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
-    SILValue originalFunction, AutoDiffIndexSubset *parameterIndices) {
+    SILValue originalFunction, IndexSubset *parameterIndices) {
   auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
   auto diffTy = fnTy->getWithDifferentiability(parameterIndices);
   return SILType::getPrimitiveObjectType(diffTy);
@@ -594,7 +594,7 @@ ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
 }
 
 DifferentiableFunctionInst::DifferentiableFunctionInst(
-    SILDebugLocation DebugLoc, AutoDiffIndexSubset *ParameterIndices,
+    SILDebugLocation DebugLoc, IndexSubset *ParameterIndices,
     SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
     bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
@@ -610,7 +610,7 @@ DifferentiableFunctionInst::DifferentiableFunctionInst(
 
 DifferentiableFunctionInst *DifferentiableFunctionInst::create(
     SILModule &Module, SILDebugLocation DebugLoc,
-    AutoDiffIndexSubset *ParameterIndices, SILValue OriginalFunction,
+    IndexSubset *ParameterIndices, SILValue OriginalFunction,
     Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
     bool HasOwnership) {
   auto derivativeFunctions = VJPAndJVPFunctions.hasValue()

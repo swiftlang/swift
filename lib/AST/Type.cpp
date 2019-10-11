@@ -4568,7 +4568,7 @@ Optional<VectorSpace> TypeBase::getAutoDiffAssociatedTangentSpace(
 }
 
 AnyFunctionType *AnyFunctionType::getAutoDiffDerivativeFunctionType(
-    AutoDiffIndexSubset *indices, unsigned resultIndex,
+    IndexSubset *indices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, LookupConformanceFn lookupConformance,
     GenericSignature *whereClauseGenSig, bool makeSelfParamFirst) {
   // JVP: (T...) -> ((R...),
@@ -4742,7 +4742,7 @@ makeFunctionType(ArrayRef<AnyFunctionType::Param> params, Type retTy,
 // Compute the original function type corresponding to the given transpose
 // function type.
 AnyFunctionType *AnyFunctionType::getTransposeOriginalFunctionType(
-    TransposingAttr *attr, AutoDiffIndexSubset *wrtParamIndices, bool wrtSelf) {
+    TransposingAttr *attr, IndexSubset *wrtParamIndices, bool wrtSelf) {
   unsigned transposeParamsIndex = 0;
   bool isCurried = getResult()->is<AnyFunctionType>();
   

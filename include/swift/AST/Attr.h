@@ -1552,7 +1552,7 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndices = nullptr;
+  IndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff derivative functions. Resolved by the
@@ -1571,7 +1571,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              bool linear, AutoDiffIndexSubset *indices,
+                              bool linear, IndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature *derivativeGenericSignature);
@@ -1587,7 +1587,7 @@ public:
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear, AutoDiffIndexSubset *indices,
+                                    bool linear, IndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature *derivativeGenSig);
@@ -1602,10 +1602,10 @@ public:
   /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffIndexSubset *getParameterIndices() const {
+  IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndices = pi;
   }
 
@@ -1681,7 +1681,7 @@ class DifferentiatingAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndices = nullptr;
+  IndexSubset *ParameterIndices = nullptr;
 
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
@@ -1691,7 +1691,7 @@ class DifferentiatingAttr final
   explicit DifferentiatingAttr(ASTContext &context, bool implicit,
                                SourceLoc atLoc, SourceRange baseRange,
                                DeclNameWithLoc original, bool linear,
-                               AutoDiffIndexSubset *indices);
+                               IndexSubset *indices);
 
 public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
@@ -1702,7 +1702,7 @@ public:
   static DifferentiatingAttr *create(ASTContext &context, bool implicit,
                                      SourceLoc atLoc, SourceRange baseRange,
                                      DeclNameWithLoc original, bool linear,
-                                     AutoDiffIndexSubset *indices);
+                                     IndexSubset *indices);
 
   DeclNameWithLoc getOriginal() const { return Original; }
                                       
@@ -1723,10 +1723,10 @@ public:
     return NumParsedParameters;
   }
 
-  AutoDiffIndexSubset *getParameterIndices() const {
+  IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndices = pi;
   }
 
@@ -1757,7 +1757,7 @@ class TransposingAttr final
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndexSubset = nullptr;
+  IndexSubset *ParameterIndexSubset = nullptr;
   
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
@@ -1767,7 +1767,7 @@ class TransposingAttr final
   explicit TransposingAttr(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
                            TypeRepr *baseType, DeclNameWithLoc original,
-                           AutoDiffIndexSubset *indices);
+                           IndexSubset *indices);
   
 public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
@@ -1778,7 +1778,7 @@ public:
   static TransposingAttr *create(ASTContext &context, bool implicit,
                                  SourceLoc atLoc, SourceRange baseRange,
                                  TypeRepr *baseType, DeclNameWithLoc original,
-                                 AutoDiffIndexSubset *indices);
+                                 IndexSubset *indices);
   
   TypeRepr *getBaseType() const { return BaseType; }
   DeclNameWithLoc getOriginal() const { return Original; }
@@ -1798,10 +1798,10 @@ public:
     return NumParsedParameters;
   }
   
-  AutoDiffIndexSubset *getParameterIndexSubset() const {
+  IndexSubset *getParameterIndexSubset() const {
     return ParameterIndexSubset;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndexSubset = pi;
   }
   
