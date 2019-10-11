@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE --dump-input fail %s
+// RUN: %target-run-simple-swift | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-codesign %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | %FileCheck %s
