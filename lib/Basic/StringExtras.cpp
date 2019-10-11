@@ -44,16 +44,13 @@ bool swift::canBeMemberName(StringRef identifier) {
     .Default(true);
 }
 
-PrepositionKind swift::getPrepositionKind(StringRef word) {
-#define DIRECTIONAL_PREPOSITION(Word)           \
-  if (word.equals_lower(#Word))                 \
-    return PK_Directional;
+bool swift::isPreposition(StringRef word) {
 #define PREPOSITION(Word)                       \
   if (word.equals_lower(#Word))                 \
-    return PK_Nondirectional;
+    return true;
 #include "PartsOfSpeech.def"
 
-  return PK_None;
+  return false;
 }
 
 PartOfSpeech swift::getPartOfSpeech(StringRef word) {

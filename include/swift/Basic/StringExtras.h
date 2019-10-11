@@ -36,16 +36,10 @@ namespace swift {
   /// Determine whether the given string can be the name of a member.
   bool canBeMemberName(StringRef identifier);
 
-  /// Describes the kind of preposition a word is.
-  enum PrepositionKind {
-    PK_None = 0,
-    PK_Directional,
-    PK_Nondirectional
-  };
-
-  /// Determine what kind of preposition the given word is, if any,
-  /// ignoring case.
-  PrepositionKind getPrepositionKind(StringRef word);
+  /// Returns true if the given word is one of Swift's known prepositions.
+  ///
+  /// This can be faster than getPartOfSpeech(StringRef).
+  bool isPreposition(StringRef word);
 
   /// Describes the part of speech of a particular word.
   enum class PartOfSpeech {
