@@ -2882,9 +2882,9 @@ static bool checkFunctionSignature(
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-// Computes `IndexSubset` from the given parsed differentiation
-// parameters (possibly empty) for the given function and derivative generic
-// environment, then verifies that the parameter indices are valid.
+// Computes `IndexSubset` from the given parsed differentiation parameters
+// (possibly empty) for the given function and derivative generic environment,
+// then verifies that the parameter indices are valid.
 // - If parsed parameters are empty, infer parameter indices.
 // - Otherwise, build parameter indices from parsed parameters.
 // The attribute name/location are used in diagnostics.
@@ -3111,9 +3111,9 @@ static IndexSubset *computeTransposingParameters(
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-// Checks if the given `IndexSubset` instance is valid for the given
-// function type in the given derivative generic environment and module
-// context. Returns true on error.
+// Checks if the given `IndexSubset` instance is valid for the given function
+// type in the given derivative generic environment and module context. Returns
+// true on error.
 // The parsed differentiation parameters and attribute location are used in
 // diagnostics.
 static bool checkDifferentiationParameters(
@@ -3419,8 +3419,7 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
   auto parsedWrtParams = attr->getParsedParameters();
   // Get checked wrt param indices.
   // This is defined only for compiler-synthesized attributes.
-  IndexSubset *checkedWrtParamIndices =
-      attr->getParameterIndices();
+  auto *checkedWrtParamIndices = attr->getParameterIndices();
 
   // Compute the derivative function type.
   auto derivativeFnTy = originalFnTy;
@@ -3716,8 +3715,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
   attr->setOriginalFunction(originalFn);
 
   // Get checked wrt param indices.
-  IndexSubset *checkedWrtParamIndices =
-      attr->getParameterIndices();
+  auto *checkedWrtParamIndices = attr->getParameterIndices();
 
   // Get the parsed wrt param indices, which have not yet been checked.
   // This is defined for parsed attributes.

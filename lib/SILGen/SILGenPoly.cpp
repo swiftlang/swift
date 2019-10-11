@@ -3289,8 +3289,7 @@ static ManagedValue createAutoDiffThunk(SILGenFunction &SGF,
   for (auto i : range(inputSubstType->getNumParams()))
     if (!inputSubstType->getParams()[i].isNonDifferentiable())
       parameterBits.set(i);
-  auto *parameterIndices = IndexSubset::get(
-      SGF.getASTContext(), parameterBits);
+  auto *parameterIndices = IndexSubset::get(SGF.getASTContext(), parameterBits);
 
   auto getDerivativeFnTy =
       [&](CanAnyFunctionType fnTy, AutoDiffDerivativeFunctionKind kind)
