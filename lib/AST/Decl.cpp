@@ -7086,11 +7086,8 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  if (!hasInterfaceType())
-    return nullptr;
-
   Type resultTy = getInterfaceType();
-  if (resultTy->is<ErrorType>())
+  if (resultTy.isNull() || resultTy->is<ErrorType>())
     return resultTy;
 
   if (hasImplicitSelfDecl())

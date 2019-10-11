@@ -663,7 +663,7 @@ case let (jeb):
 // rdar://19605164
 // expected-error@+2{{use of undeclared type 'S'}}
 struct Foo19605164 {
-func a(s: S[{{g) -> Int {} // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}} expected-error {{expected ',' separator}} expected-error {{expected parameter name followed by ':'}}
+func a(s: S[{{g) -> Int {} // expected-error {{expected ']' in array type}} expected-note {{to match this opening '['}}
 }}}
 #endif
   
