@@ -410,6 +410,10 @@ template<typename Class>
 inline char checkSourceLocType(SourceLoc (Class::*)() const);
 inline TwoChars checkSourceLocType(SourceLoc (Decl::*)() const);
 
+template<typename Class>
+inline char checkSourceLocType(SourceLoc (Class::*)(bool) const);
+inline TwoChars checkSourceLocType(SourceLoc (Decl::*)(bool) const);
+
 template<typename Class> 
 inline char checkSourceRangeType(SourceRange (Class::*)() const);
 inline TwoChars checkSourceRangeType(SourceRange (Decl::*)() const);
@@ -482,12 +486,33 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-SourceLoc Decl::getLoc() const {
+SourceLoc Decl::getLoc(bool SerializedOK) const {
 #define DECL(ID, X) \
 static_assert(sizeof(checkSourceLocType(&ID##Decl::getLoc)) == 2, \
               #ID "Decl is re-defining getLoc()");
 #include "swift/AST/DeclNodes.def"
-  return getLocFromSource();
+  if (isa<ModuleDecl>(this))
+    return SourceLoc();
+  auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
+  switch(File->getKind()) {
+  case FileUnitKind::Source:
+    return getLocFromSource();
+  case FileUnitKind::SerializedAST: {
+    if (!SerializedOK)
+      return SourceLoc();
+    if (auto Locs = File->getBasicLocsForDecl(this)) {
+      auto &SM = getASTContext().SourceMgr;
+      auto Loc = Locs->Loc;
+      return SM.getLocFromExternalSource(Locs->SourceFilePath, Loc.Line,
+                                         Loc.Column);
+    }
+    return SourceLoc();
+  }
+  case FileUnitKind::Builtin:
+  case FileUnitKind::ClangModule:
+  case FileUnitKind::DWARFModule:
+    return SourceLoc();
+  }
 }
 
 Expr *AbstractFunctionDecl::getSingleExpressionBody() const {

@@ -764,7 +764,7 @@ public:
 
   /// Returns the preferred location when referring to declarations
   /// in diagnostics.
-  SourceLoc getLoc() const;
+  SourceLoc getLoc(bool SerializedOK = true) const;
 
   /// Returns the source range of the entire declaration.
   SourceRange getSourceRange() const;
