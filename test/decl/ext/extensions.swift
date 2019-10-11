@@ -126,7 +126,7 @@ struct WrapperContext {
 }
 
 // Class-constrained extension where protocol does not impose class requirement
-
+// SR-11298
 protocol DoesNotImposeClassReq_1 {}
 	
 class JustAClass: DoesNotImposeClassReq_1 {
@@ -140,8 +140,8 @@ extension DoesNotImposeClassReq_1 where Self: JustAClass {
   }
 }
 	
-let instanceOfJustAClass = JustAClass() // expected-note {{change 'let' to 'var' to make it mutable}}
-instanceOfJustAClass.wrappingProperty = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass' is a 'let' constant}}
+let instanceOfJustAClass = JustAClass()
+instanceOfJustAClass.wrappingProperty = "" // Okay
 
 protocol DoesNotImposeClassReq_2 {
   var property: String { get set }
@@ -150,7 +150,7 @@ protocol DoesNotImposeClassReq_2 {
 extension DoesNotImposeClassReq_2 where Self : AnyObject {
   var wrappingProperty: String {
     get { property }
-    set { property = newValue } // Okay
+    set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }
 

@@ -2087,17 +2087,10 @@ OperatorPrecedenceGroupRequest::evaluate(Evaluator &evaluator,
   return group;
 }
 
-bool swift::doesContextHaveValueSemantics(DeclContext *dc) {
-  if (Type contextTy = dc->getDeclaredInterfaceType())
-    return !contextTy->hasReferenceSemantics();
-  return false;
-}
-
 llvm::Expected<SelfAccessKind>
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
-    if (!FD->isInstanceMember() ||
-        !doesContextHaveValueSemantics(FD->getDeclContext())) {
+    if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
       return SelfAccessKind::NonMutating;
     }
     return SelfAccessKind::Mutating;
@@ -2119,8 +2112,7 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
     case AccessorKind::MutableAddress:
     case AccessorKind::Set:
     case AccessorKind::Modify:
-      if (AD->isInstanceMember() &&
-          doesContextHaveValueSemantics(AD->getDeclContext()))
+      if (AD->isInstanceMember() && AD->getDeclContext()->hasValueSemantics())
         return SelfAccessKind::Mutating;
       break;
 

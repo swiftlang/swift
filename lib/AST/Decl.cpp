@@ -5628,10 +5628,16 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
-      // Do not suggest the fix it in implicit getters
+      // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
+
+        auto accessorDC = AD->getDeclContext();
+        // Do not suggest the fix-it if `Self` is a class type.
+        if (accessorDC->isTypeContext() && !accessorDC->hasValueSemantics()) {
+          return;
+        }
       }
 
       auto &d = getASTContext().Diags;
