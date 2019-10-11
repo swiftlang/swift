@@ -2,6 +2,24 @@
 
 // Round-trip parsing and printing test.
 
+// Swift source code (`-emit-silgen` output is below):
+//
+//   @differentiable(jvp: foo_jvp where T: Differentiable)
+//   @_silgen_name("foo")
+//   func foo<T>(_ x: T, _ y: Float) -> T { x }
+//
+//   @_silgen_name("foo_jvp")
+//   func foo_jvp<T: Differentiable>(_ x: T, _ y: Float) -> (T, (T.TangentVector, Float) -> T.TangentVector) {
+//     (x, { dx, dy in dx })
+//   }
+//
+//   @_silgen_name("foo_vjp")
+//   func foo_vjp<T: Differentiable>(_ x: T, _ y: Float) -> (T, (T.TangentVector) -> (T.TangentVector, Float)) {
+//     (x, { ($0, .zero) })
+//   }
+//
+// The `sil_differentiability_witness` at the end was manually written.
+
 sil_stage raw
 
 import Builtin
