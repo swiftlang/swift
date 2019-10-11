@@ -549,8 +549,8 @@ struct MultipleMemberAccesses {
 
 func sr10670() {
   struct S {
-    init(_ x: inout String) {} // expected-note {{candidate expects value of type 'String' for parameter #1}}
-    init(_ x: inout [Int]) {}  // expected-note {{candidate expects value of type '[Int]' for parameter #1}}
+    init(_ x: inout String) {} // expected-note {{candidate expects in-out value of type 'String' for parameter #1}}
+    init(_ x: inout [Int]) {}  // expected-note {{candidate expects in-out value of type '[Int]' for parameter #1}}
   }
   var a = 0
   S.init(&a) // expected-error {{no exact matches in call to initializer}}

@@ -5084,9 +5084,11 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsNote() {
+  auto *locator = getLocator();
   if (auto *callee = getCallee()) {
     emitDiagnostic(callee, diag::candidate_has_invalid_argument_at_position,
-                   getToType(), getParamPosition());
+                   getToType(), getParamPosition(),
+                   locator->isLastElement<LocatorPathElt::LValueConversion>());
     return true;
   }
 
