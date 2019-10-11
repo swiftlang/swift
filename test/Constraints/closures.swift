@@ -870,7 +870,7 @@ struct rdar30347997 {
 struct rdar43866352<Options> {
   func foo() {
     let callback: (inout Options) -> Void
-    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
+    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(Options) -> ()' to type '(inout Options) -> Void'}}
   }
 }
 

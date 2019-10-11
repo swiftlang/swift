@@ -369,20 +369,13 @@ protected:
     IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+1+NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+NumDefaultArgumentKindBits,
     /// Whether we've computed the specifier yet.
     SpecifierComputed : 1,
 
     /// The specifier associated with this parameter.  This determines
     /// the storage semantics of the value e.g. mutability.
     Specifier : 2,
-
-    /// True if the type is implicitly specified in the source, but this has an
-    /// apparently valid typeRepr.  This is used in accessors, which look like:
-    ///    set (value) {
-    /// but need to get the typeRepr from the property as a whole so Sema can
-    /// resolve the type.
-    IsTypeLocImplicit : 1,
 
     /// Information about a symbolic default argument, like #file.
     defaultArgumentKind : NumDefaultArgumentKindBits
@@ -5220,10 +5213,7 @@ public:
   SourceLoc getParameterNameLoc() const { return ParameterNameLoc; }
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
-    
-  bool isTypeLocImplicit() const { return Bits.ParamDecl.IsTypeLocImplicit; }
-  void setIsTypeLocImplicit(bool val) { Bits.ParamDecl.IsTypeLocImplicit = val; }
-  
+
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
   }

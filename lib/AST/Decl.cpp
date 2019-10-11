@@ -5726,7 +5726,6 @@ ParamDecl::ParamDecl(SourceLoc specifierLoc,
       ArgumentName(argumentName), ParameterNameLoc(parameterNameLoc),
       ArgumentNameLoc(argumentNameLoc), SpecifierLoc(specifierLoc) {
   Bits.ParamDecl.SpecifierComputed = false;
-  Bits.ParamDecl.IsTypeLocImplicit = false;
   Bits.ParamDecl.defaultArgumentKind =
     static_cast<unsigned>(DefaultArgumentKind::None);
 }
@@ -5737,12 +5736,10 @@ ParamDecl *ParamDecl::cloneWithoutType(const ASTContext &Ctx, ParamDecl *PD) {
       PD->getArgumentNameLoc(), PD->getParameterName(), PD->getDeclContext());
   Clone->DefaultValueAndFlags.setPointerAndInt(
       nullptr, PD->DefaultValueAndFlags.getInt());
-  Clone->Bits.ParamDecl.IsTypeLocImplicit =
-      PD->Bits.ParamDecl.IsTypeLocImplicit;
   Clone->Bits.ParamDecl.defaultArgumentKind =
       PD->Bits.ParamDecl.defaultArgumentKind;
   if (auto *repr = PD->getTypeRepr())
-    Clone->setTypeRepr(repr->clone(PD->getASTContext()));
+    Clone->setTypeRepr(repr->clone(Ctx));
 
   Clone->setSpecifier(PD->getSpecifier());
   Clone->setImplicitlyUnwrappedOptional(PD->isImplicitlyUnwrappedOptional());
@@ -5805,7 +5802,7 @@ SourceRange ParamDecl::getSourceRange() const {
   // If the typeloc has a valid location, use it to end the range.
   if (auto typeRepr = getTypeRepr()) {
     auto endLoc = typeRepr->getEndLoc();
-    if (endLoc.isValid() && !isTypeLocImplicit())
+    if (endLoc.isValid())
       return SourceRange(startLoc, endLoc);
   }
 
