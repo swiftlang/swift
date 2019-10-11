@@ -30,6 +30,7 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/NameLookup.h" // for DeclVisibilityKind
+#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
@@ -88,6 +89,14 @@ struct AnnotatedInsertionPoint {
   ASTScopeImpl *insertionPoint;
   const char *explanation;
 };
+} // namespace ast_scope
+
+namespace ast_scope {
+
+void simple_display(llvm::raw_ostream &out, const ASTScopeImpl *);
+void simple_display(llvm::raw_ostream &out, const ScopeCreator *);
+
+SourceLoc extractNearestSourceLoc(std::tuple<ASTScopeImpl *, ScopeCreator *>);
 
 #pragma mark the root ASTScopeImpl class
 
@@ -333,6 +342,11 @@ private:
 public:
   /// expandScope me, sending deferred nodes to my descendants.
   /// Return the scope into which to place subsequent decls
+  ASTScopeImpl *expandAndBeCurrentDetectingRecursion(ScopeCreator &);
+
+  /// Expand or reexpand the scope if unexpanded or if not current.
+  /// There are several places in the compiler that mutate the AST after the
+  /// fact, above and beyond adding Decls to the SourceFile.
   ASTScopeImpl *expandAndBeCurrent(ScopeCreator &);
 
   unsigned getASTAncestorScopeCount() const { return astAncestorScopeCount; }
@@ -344,6 +358,12 @@ protected:
   void setWasExpanded() { wasExpanded = true; }
   virtual ASTScopeImpl *expandSpecifically(ScopeCreator &) = 0;
   virtual void beCurrent();
+  virtual bool doesExpansionOnlyAddNewDeclsAtEnd() const;
+
+public:
+  bool isExpansionNeeded(const ScopeCreator &) const;
+
+protected:
   bool isCurrent() const;
   virtual bool isCurrentIfWasExpanded() const;
 
@@ -374,16 +394,7 @@ public:
 
   bool isATypeDeclScope() const;
 
-  /// There are several places in the compiler that mutate the AST after the
-  /// fact, above and beyond adding Decls to the SourceFile. These are
-  /// documented in: rdar://53018839, rdar://53027266, rdar://53027733,
-  /// rdar://53028050
-  /// Return true if did reexpand
-  bool reexpandIfObsolete(ScopeCreator &);
-
 private:
-  void reexpand(ScopeCreator &);
-
   virtual ScopeCreator &getScopeCreator();
 
 #pragma mark - - creation queries
@@ -533,8 +544,8 @@ public:
   /// The number of \c Decls in the \c SourceFile that were already seen.
   /// Since parsing can be interleaved with type-checking, on every
   /// lookup, look at creating scopes for any \c Decls beyond this number.
-  /// rdar://55562483 Unify with numberOfChildrenWhenLastExpanded
-  int numberOfDeclsAlreadySeen = 0;
+  /// TODO: Unify with numberOfChildrenWhenLastExpanded
+  size_t numberOfDeclsAlreadySeen = 0;
 
   ASTSourceFileScope(SourceFile *SF, ScopeCreator *scopeCreator);
 
@@ -548,7 +559,6 @@ protected:
 public:
   NullablePtr<DeclContext> getDeclContext() const override;
 
-  void addNewDeclsToScopeTree();
   void buildFullyExpandedTree();
   void
   buildEnoughOfTreeForTopLevelExpressionsButDontRequestGenericsOrExtendedNominals();
@@ -559,11 +569,15 @@ public:
 
 protected:
   ASTScopeImpl *expandSpecifically(ScopeCreator &scopeCreator) override;
+  bool isCurrentIfWasExpanded() const override;
+  void beCurrent() override;
+  bool doesExpansionOnlyAddNewDeclsAtEnd() const override;
 
   ScopeCreator &getScopeCreator() override;
 
 private:
-  void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
+  AnnotatedInsertionPoint
+  expandAScopeThatCreatesANewInsertionPoint(ScopeCreator &);
 };
 
 class Portion {
@@ -1148,7 +1162,6 @@ public:
   /// false positives, that that doesn't hurt anything. However, the result of
   /// the conservative source range computation doesn't seem to be stable. So
   /// keep the original here, and use it for source range queries.
-  /// rdar://55263708
 
   const SourceRange sourceRangeWhenCreated;
 
@@ -1251,7 +1264,6 @@ protected:
 };
 
 class PatternEntryInitializerScope final : public AbstractPatternEntryScope {
-  // Should be able to remove this when rdar://53921703 is accomplished.
   Expr *initAsWrittenWhenCreated;
 
 public:
