@@ -717,6 +717,10 @@ void DSEContext::mergeSuccessorLiveIns(SILBasicBlock *BB) {
   // dead for block with no successor.
   BlockState *C = getBlockState(BB);
   if (BB->succ_empty()) {
+    if (isa<UnreachableInst>(BB->getTerminator())) {
+      C->BBWriteSetOut.set();
+      return;
+    }
     C->BBWriteSetOut |= C->BBDeallocateLocation;
     return;
   }
