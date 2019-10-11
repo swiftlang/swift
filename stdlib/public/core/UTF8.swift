@@ -155,7 +155,9 @@ extension Unicode.UTF8: _UnicodeEncoding {
           _biasedBits: (UInt32(u0) | r) &+ 0b0__1000_0001__1000_0001__1110_0001)
       }
     }
-    else if _fastPath(FromEncoding.self == UTF8.self) {
+    else if _fastPath(
+      FromEncoding.self == UTF8.self || FromEncoding.self == Unicode.ASCII.self
+    ) {
       return _identityCast(content, to: UTF8.EncodedScalar.self)
     }
     return encode(FromEncoding.decode(content))

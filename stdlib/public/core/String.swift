@@ -401,7 +401,9 @@ extension String {
   public init<C: Collection, Encoding: Unicode.Encoding>(
     decoding codeUnits: C, as sourceEncoding: Encoding.Type
   ) where C.Iterator.Element == Encoding.CodeUnit {
-    guard _fastPath(sourceEncoding == UTF8.self) else {
+    guard _fastPath(
+      sourceEncoding == UTF8.self || sourceEncoding == Unicode.ASCII.self
+    ) else {
       self = String._fromCodeUnits(
         codeUnits, encoding: sourceEncoding, repair: true)!.0
       return
