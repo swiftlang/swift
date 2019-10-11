@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE %s
+// RUN: %target-run-simple-swift | %FileCheck --check-prefix CHECK --check-prefix CHECK-ONONE --dump-input fail %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-codesign %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | %FileCheck %s
@@ -132,17 +132,13 @@ anyClassToCOrE(D()).print() // CHECK: D!
 anyClassToCOrE(X()).print() // CHECK: E!
 
 protocol P {}
-@objc protocol PObjC {}
 struct PS: P {}
 enum PE: P {}
-class PC: P, PObjC {}
+class PC: P {}
 class PCSub: PC {}
 
 func nongenericAnyIsP(type: Any.Type) -> Bool {
   return type is P.Type
-}
-func nongenericAnyIsPObjC(type: Any.Type) -> Bool {
-  return type is PObjC.Type
 }
 func nongenericAnyIsPAndAnyObject(type: Any.Type) -> Bool {
   return type is (P & AnyObject).Type
@@ -163,17 +159,6 @@ print(nongenericAnyIsP(type: PC.self)) // CHECK: true
 print(genericAnyIs(type: PC.self, to: P.self)) // CHECK-ONONE: true
 print(nongenericAnyIsP(type: PCSub.self)) // CHECK: true
 print(genericAnyIs(type: PCSub.self, to: P.self)) // CHECK-ONONE: true
-
-// CHECK-LABEL: casting types to ObjC protocols with generics:
-print("casting types to ObjC protocols with generics:")
-print(nongenericAnyIsPObjC(type: PS.self)) // CHECK: false
-print(genericAnyIs(type: PS.self, to: PObjC.self)) // CHECK: false
-print(nongenericAnyIsPObjC(type: PE.self)) // CHECK: false
-print(genericAnyIs(type: PE.self, to: PObjC.self)) // CHECK: false
-print(nongenericAnyIsPObjC(type: PC.self)) // CHECK: true
-print(genericAnyIs(type: PC.self, to: PObjC.self)) // CHECK-ONONE: true
-print(nongenericAnyIsPObjC(type: PCSub.self)) // CHECK: true
-print(genericAnyIs(type: PCSub.self, to: PObjC.self)) // CHECK-ONONE: true
 
 // CHECK-LABEL: casting types to protocol & AnyObject existentials:
 print("casting types to protocol & AnyObject existentials:")
