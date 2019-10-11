@@ -481,6 +481,14 @@ public:
   }
 };
 
+/// The key type used for uniquing `SILDifferentiabilityWitness` in
+/// `SILModule`: original function name, parameter indices, result indices, and
+/// derivative generic signature.
+// TODO: Unify with `AutoDiffDerivativeFunctionIdentifier`.
+using SILDifferentiabilityWitnessKey =
+std::tuple<StringRef, AutoDiffIndexSubset *,
+           AutoDiffIndexSubset *, GenericSignature *>;
+
 /// Automatic differentiation utility namespace.
 namespace autodiff {
 /// Appends the subset's parameter's types to `result`, in the order in

@@ -207,9 +207,8 @@ private:
   /// Lookup table for SIL differentiability witnesses from original functions.
   /// Indexed by key type: original function, parameter indices, result indices,
   /// and derivative generic signature.
-  llvm::DenseMap<SILDifferentiabilityWitness::Key,
-                 SILDifferentiabilityWitness *>
-  DifferentiabilityWitnessMap;
+  llvm::DenseMap<SILDifferentiabilityWitnessKey, SILDifferentiabilityWitness *>
+      DifferentiabilityWitnessMap;
 
   /// The list of SILDifferentiabilityWitnesses in the module.
   DifferentiabilityWitnessListType differentiabilityWitnesses;

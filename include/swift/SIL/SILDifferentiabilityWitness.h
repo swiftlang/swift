@@ -75,16 +75,7 @@ private:
       serialized(isSerialized) {}
 
 public:
-  /// The key type, used for uniquing `SILDifferentiabilityWitness` in
-  /// `SILModule`, original function, parameter indices, result indices, and
-  /// derivative generic signature.
-  using Key = std::tuple<const SILFunction *, AutoDiffIndexSubset *,
-                         AutoDiffIndexSubset *, GenericSignature *>;
-  Key getKey() {
-    return std::make_tuple(originalFunction, parameterIndices, resultIndices,
-                           derivativeGenericSignature);
-  }
-
+  SILDifferentiabilityWitnessKey getKey() const;
   SILModule &getModule() const { return module; }
   SILLinkage getLinkage() const { return linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }

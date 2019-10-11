@@ -184,8 +184,11 @@ namespace {
     std::vector<BitOffset> PropertyOffset;
 
     // SWIFT_ENABLE_TENSORFLOW
+    /// Maps differentiability witness identifier to an ID.
+    Table DifferentiabilityWitnessList;
     /// Holds the list of SIL differentiability witnesses.
     std::vector<BitOffset> DifferentiabilityWitnessOffset;
+    uint32_t /*DeclID*/ NextDifferentiabilityWitnessID = 1;
     // SWIFT_ENABLE_TENSORFLOW END
 
     /// Give each SILBasicBlock a unique ID.
@@ -2282,18 +2285,21 @@ void SILSerializer::writeIndexTables() {
                 DefaultWitnessTableOffset);
   }
 
-  if (!PropertyOffset.empty()) {
-    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
-                PropertyOffset);
-  }
-  
   // SWIFT_ENABLE_TENSORFLOW
   if (!DifferentiabilityWitnessOffset.empty()) {
+    writeIndexTable(S, List,
+                    sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES,
+                    DifferentiabilityWitnessList);
     Offset.emit(ScratchRecord,
                 sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
                 DifferentiabilityWitnessOffset);
   }
   // SWIFT_ENABLE_TENSORFLOW END
+
+  if (!PropertyOffset.empty()) {
+    Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
+                PropertyOffset);
+  }
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
@@ -2488,6 +2494,14 @@ writeSILDefaultWitnessTable(const SILDefaultWitnessTable &wt) {
 // SWIFT_ENABLE_TENSORFLOW
 void SILSerializer::
 writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
+  Mangle::ASTMangler mangler;
+  auto mangledKey = mangler.mangleSILDifferentiabilityWitnessKey(dw.getKey());
+  size_t nameLength = mangledKey.size();
+  char *stringStorage =
+      static_cast<char *>(StringTable.Allocate(nameLength, 1));
+  std::memcpy(stringStorage, mangledKey.data(), nameLength);
+  DifferentiabilityWitnessList[StringRef(stringStorage, nameLength)] =
+      NextDifferentiabilityWitnessID++;
   DifferentiabilityWitnessOffset.push_back(Out.GetCurrentBitNo());
 
   auto *original = dw.getOriginalFunction();

@@ -59,6 +59,7 @@ namespace swift {
     Properties;
 
     // SWIFT_ENABLE_TENSORFLOW
+    std::unique_ptr<SerializedFuncTable> DifferentiabilityWitnessList;
     MutableArrayRef<
         ModuleFile::PartiallySerialized<SILDifferentiabilityWitness *>>
         DifferentiabilityWitnesses;
@@ -135,7 +136,7 @@ namespace swift {
     // SWIFT_ENABLE_TENSORFLOW
     SILDifferentiabilityWitness *
     readDifferentiabilityWitness(serialization::DeclID);
-    // SWIFT_ENABLE_TENSORFLOW
+    // SWIFT_ENABLE_TENSORFLOW END
 
     Optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
@@ -155,6 +156,10 @@ public:
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    // SWIFT_ENABLE_TENSORFLOW
+    SILDifferentiabilityWitness *
+    lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
+    // SWIFT_ENABLE_TENSORFLOW END
 
     /// Invalidate all cached SILFunctions.
     void invalidateFunctionCache();

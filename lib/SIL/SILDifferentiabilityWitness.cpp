@@ -34,3 +34,8 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   module.getDifferentiabilityWitnessList().push_back(diffWitness);
   return diffWitness;
 }
+
+SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
+  return std::make_tuple(originalFunction->getName(), parameterIndices,
+                         resultIndices, derivativeGenericSignature);
+}
