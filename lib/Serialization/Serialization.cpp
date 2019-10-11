@@ -3257,17 +3257,6 @@ public:
   }
 
   void visitAccessorDecl(const AccessorDecl *fn) {
-    // Accessor synthesis and type checking is now sufficiently lazy that
-    // we might have unvalidated accessors in a primary file.
-    //
-    // FIXME: Once accessor synthesis and getInterfaceType() itself are
-    // request-ified this goes away.
-    if (!fn->hasInterfaceType()) {
-      assert(fn->isImplicit());
-      // FIXME: Remove this one
-      (void)fn->getInterfaceType();
-    }
-
     using namespace decls_block;
     verifyAttrSerializable(fn);
 

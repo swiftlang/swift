@@ -369,7 +369,10 @@ protected:
     IsPropertyWrapperBackingProperty : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 2+1+NumDefaultArgumentKindBits,
+  SWIFT_INLINE_BITFIELD(ParamDecl, VarDecl, 1+2+1+NumDefaultArgumentKindBits,
+    /// Whether we've computed the specifier yet.
+    SpecifierComputed : 1,
+
     /// The specifier associated with this parameter.  This determines
     /// the storage semantics of the value e.g. mutability.
     Specifier : 2,
@@ -5158,6 +5161,13 @@ public:
   }
 };
 
+enum class ParamSpecifier : uint8_t {
+  Default = 0,
+  InOut = 1,
+  Shared = 2,
+  Owned = 3,
+};
+
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
   Identifier ArgumentName;
@@ -5184,16 +5194,10 @@ class ParamDecl : public VarDecl {
   llvm::PointerIntPair<StoredDefaultArgument *, 2, OptionSet<Flags>>
       DefaultValueAndFlags;
 
-public:
-  enum class Specifier : uint8_t {
-    Default = 0,
-    InOut = 1,
-    Shared = 2,
-    Owned = 3,
-  };
+  friend class ParamSpecifierRequest;
 
-  ParamDecl(Specifier specifier,
-            SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+public:
+  ParamDecl(SourceLoc specifierLoc, SourceLoc argumentNameLoc,
             Identifier argumentName, SourceLoc parameterNameLoc,
             Identifier parameterName, DeclContext *dc);
 
@@ -5323,10 +5327,17 @@ public:
   /// Determine whether this declaration is an anonymous closure parameter.
   bool isAnonClosureParam() const;
 
-  /// Return the raw specifier value for this parameter.
-  Specifier getSpecifier() const {
-    return static_cast<Specifier>(Bits.ParamDecl.Specifier);
+  using Specifier = ParamSpecifier;
+
+  Optional<Specifier> getCachedSpecifier() const {
+    if (Bits.ParamDecl.SpecifierComputed)
+      return Specifier(Bits.ParamDecl.Specifier);
+
+    return None;
   }
+
+  /// Return the raw specifier value for this parameter.
+  Specifier getSpecifier() const;
   void setSpecifier(Specifier Spec);
 
   /// Is the type of this parameter 'inout'?
@@ -5817,11 +5828,6 @@ public:
   void setSynthesized(bool value = true) {
     Bits.AbstractFunctionDecl.Synthesized = value;
   }
-
-private:
-  void computeNeedsNewVTableEntry();
-
-  void computeSelfDeclType();
 
 public:
   /// Compute the interface type of this function declaration from the

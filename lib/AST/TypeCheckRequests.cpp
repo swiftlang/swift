@@ -926,3 +926,17 @@ void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
   decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
   decl->LazySemanticInfo.NeedsNewVTableEntry = value;
 }
+
+//----------------------------------------------------------------------------//
+// ParamSpecifierRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ParamSpecifier> ParamSpecifierRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedSpecifier();
+}
+
+void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setSpecifier(specifier);
+}

@@ -231,10 +231,11 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
 
   // Build function of type T->() which prints the operand.
   auto *Arg = new (Context) ParamDecl(
-      ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(), Identifier(), Loc,
+      SourceLoc(), SourceLoc(), Identifier(), Loc,
       Context.getIdentifier("arg"), /*DC*/ newTopLevel);
   Arg->setType(E->getType());
   Arg->setInterfaceType(E->getType());
+  Arg->setSpecifier(ParamSpecifier::Default);
   auto params = ParameterList::createWithoutLoc(Arg);
 
   unsigned discriminator = TLC.claimNextClosureDiscriminator();

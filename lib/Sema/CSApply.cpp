@@ -4452,11 +4452,12 @@ namespace {
       auto closure = new (ctx)
           AutoClosureExpr(E, leafTy, discriminator, cs.DC);
       auto param = new (ctx) ParamDecl(
-          ParamDecl::Specifier::Default, SourceLoc(),
+          SourceLoc(),
           /*argument label*/ SourceLoc(), Identifier(),
           /*parameter name*/ SourceLoc(), ctx.getIdentifier("$0"), closure);
       param->setType(baseTy);
       param->setInterfaceType(baseTy->mapTypeOutOfContext());
+      param->setSpecifier(ParamSpecifier::Default);
 
       // The outer closure.
       //
@@ -4466,12 +4467,13 @@ namespace {
       auto outerClosure = new (ctx)
           AutoClosureExpr(closure, closureTy, discriminator, cs.DC);
       auto outerParam =
-          new (ctx) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+          new (ctx) ParamDecl(SourceLoc(),
                               /*argument label*/ SourceLoc(), Identifier(),
                               /*parameter name*/ SourceLoc(),
                               ctx.getIdentifier("$kp$"), outerClosure);
       outerParam->setType(keyPathTy);
       outerParam->setInterfaceType(keyPathTy->mapTypeOutOfContext());
+      outerParam->setSpecifier(ParamSpecifier::Default);
 
       // let paramRef = "$0"
       auto *paramRef = new (ctx)

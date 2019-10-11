@@ -1231,6 +1231,7 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Computes the raw values for an enum type.
 class EnumRawValuesRequest :
     public SimpleRequest<EnumRawValuesRequest,
                          bool (EnumDecl *, TypeResolutionStage),
@@ -1256,6 +1257,7 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determines if an override is ABI compatible with its base method.
 class IsABICompatibleOverrideRequest
     : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
                            CacheKind::Cached> {
@@ -1314,6 +1316,9 @@ public:
   void cacheResult(bool value) const;
 };
 
+/// Determines if a method override should introduce a new vtable entry,
+/// because the override is not ABI compatible, or the base method is
+/// less visible than the override.
 class NeedsNewVTableEntryRequest
     : public SimpleRequest<NeedsNewVTableEntryRequest,
                            bool(AbstractFunctionDecl *),
@@ -1333,6 +1338,28 @@ public:
   bool isCached() const { return true; }
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+/// Determines the specifier for a parameter (inout, __owned, etc).
+class ParamSpecifierRequest
+    : public SimpleRequest<ParamSpecifierRequest,
+                           ParamSpecifier(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ParamSpecifier>
+  evaluate(Evaluator &evaluator, ParamDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ParamSpecifier> getCachedResult() const;
+  void cacheResult(ParamSpecifier value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't
