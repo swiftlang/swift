@@ -24,6 +24,6 @@
 // Compare two Json files and we should see some differences.
 // RUN: %api-digester -diagnose-sdk -print-module --input-paths %t.dump1.json -input-paths %t.dump2.json -abi -o %t.result
 
-// RUN: %clang -E -P -x c %S/Outputs/Cake-binary-vs-interface.txt -o - | sed '/^\s*$/d' > %t.expected
-// RUN: %clang -E -P -x c %t.result -o - | sed '/^\s*$/d' > %t.result.tmp
+// RUN: sed 's|/[*].*[*]/||g' %S/Outputs/Cake-binary-vs-interface.txt | sed '/^\s*$/d' > %t.expected
+// RUN: sed 's|/[*].*[*]/||g' %t.result | sed '/^\s*$/d' > %t.result.tmp
 // RUN: diff -u %t.expected %t.result.tmp
