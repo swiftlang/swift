@@ -2683,7 +2683,7 @@ public:
 
     // Reverse the list, and write the parameter lists, from outermost
     // to innermost.
-    for (auto *genericParams : swift::reversed(allGenericParams))
+    for (auto *genericParams : llvm::reverse(allGenericParams))
       writeGenericParams(genericParams);
 
     writeMembers(id, extension->getMembers(), isClassExtension);

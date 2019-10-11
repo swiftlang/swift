@@ -1231,7 +1231,7 @@ void
 ModuleDecl::ReverseFullNameIterator::printForward(raw_ostream &out,
                                                   StringRef delim) const {
   SmallVector<StringRef, 8> elements(*this, {});
-  swift::interleave(swift::reversed(elements),
+  swift::interleave(llvm::reverse(elements),
                     [&out](StringRef next) { out << next; },
                     [&out, delim] { out << delim; });
 }
