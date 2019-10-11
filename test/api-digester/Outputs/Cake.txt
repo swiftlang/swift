@@ -38,6 +38,7 @@ cake: Func ownershipChange(_:_:) has parameter 1 changing from Shared to Owned
 cake: TypeAlias TChangesFromIntToString.T has underlying type change from Swift.Int to Swift.String
 
 /* Decl Attribute changes */
+cake: Class C5 is now without @objc
 cake: Enum IceKind is now without @frozen
 cake: Func C1.foo1() is now not static
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
