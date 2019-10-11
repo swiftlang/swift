@@ -1383,7 +1383,9 @@ using Activity = OptionSet<ActivityFlags>;
 class DifferentiableActivityInfo {
 private:
   DifferentiableActivityCollection &parent;
-  GenericSignature assocGenSig = GenericSignature();
+
+  /// The derivative generic signature.
+  GenericSignature derivativeGenericSignature;
 
   /// Input values, i.e. parameters (both direct and indirect).
   SmallVector<SILValue, 4> inputValues;
@@ -1400,6 +1402,17 @@ private:
 
   /// The original function.
   SILFunction &getFunction();
+
+  /// The conformance lookup function.
+  LookupConformanceFn getLookupConformanceFunction() {
+    // Look up in derivative generic signature, if defined.
+    if (derivativeGenericSignature)
+      return LookUpConformanceInSignature(
+          derivativeGenericSignature.getPointer());
+    // Otherwise, look up in the module.
+    return LookUpConformanceInModule(
+        getFunction().getModule().getSwiftModule());
+  }
 
   /// Perform analysis and populate sets.
   void analyze(DominanceInfo *di, PostDominanceInfo *pdi);
@@ -1420,7 +1433,8 @@ private:
 
 public:
   explicit DifferentiableActivityInfo(
-      DifferentiableActivityCollection &parent, GenericSignature assocGenSig);
+      DifferentiableActivityCollection &parent,
+      GenericSignature derivativeGenericSignature);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
@@ -1834,14 +1848,18 @@ DifferentiableActivityCollection::DifferentiableActivityCollection(
     : function(f), domInfo(di), postDomInfo(pdi) {}
 
 DifferentiableActivityInfo::DifferentiableActivityInfo(
-    DifferentiableActivityCollection &parent, GenericSignature assocGenSig)
-    : parent(parent), assocGenSig(assocGenSig) {
+    DifferentiableActivityCollection &parent, GenericSignature derivGenSig)
+    : parent(parent), derivativeGenericSignature(derivGenSig) {
   analyze(parent.domInfo, parent.postDomInfo);
+}
+
+SILFunction &DifferentiableActivityInfo::getFunction() {
+  return parent.function;
 }
 
 void DifferentiableActivityInfo::analyze(DominanceInfo *di,
                                          PostDominanceInfo *pdi) {
-  auto &function = parent.function;
+  auto &function = getFunction();
   LLVM_DEBUG(getADDebugStream()
              << "Running activity analysis on @" << function.getName() << '\n');
   // Inputs are just function's arguments, count `n`.
@@ -1905,11 +1923,11 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
         else if (auto *teai = dyn_cast<TupleElementAddrInst>(&inst)) {
           if (isVaried(teai->getOperand(), i)) {
             auto projType = teai->getType().getASTType();
-            if (assocGenSig && projType->hasArchetype())
-              projType = assocGenSig->getCanonicalTypeInContext(
+            if (derivativeGenericSignature && projType->hasArchetype())
+              projType = derivativeGenericSignature->getCanonicalTypeInContext(
                   projType->mapTypeOutOfContext());
             if (projType->getAutoDiffAssociatedTangentSpace(
-                LookUpConformanceInSignature(assocGenSig.getPointer())))
+                    getLookupConformanceFunction()))
               setVaried(teai, i);
           }
         }
