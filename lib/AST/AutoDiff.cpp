@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/Range.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -54,8 +55,8 @@ static unsigned countNumFlattenedElementTypes(Type type) {
 }
 
 // TODO(TF-874): Simplify this helper. See TF-874 for WIP.
-AutoDiffIndexSubset *
-autodiff::getLoweredParameterIndices(AutoDiffIndexSubset *indices,
+IndexSubset *
+autodiff::getLoweredParameterIndices(IndexSubset *indices,
                                      AnyFunctionType *type) {
   SmallVector<AnyFunctionType *, 2> curryLevels;
   unwrapCurryLevels(type, curryLevels);
@@ -85,13 +86,13 @@ autodiff::getLoweredParameterIndices(AutoDiffIndexSubset *indices,
     currentBitIndex += paramLoweredSize;
   }
 
-  return AutoDiffIndexSubset::get(
+  return IndexSubset::get(
       type->getASTContext(), totalLoweredSize, loweredIndices);
 }
 
 // TODO(TF-874): Simplify this helper and remove the `reverseCurryLevels` flag.
 // See TF-874 for WIP.
-void autodiff::getSubsetParameterTypes(AutoDiffIndexSubset *subset,
+void autodiff::getSubsetParameterTypes(IndexSubset *subset,
                                        AnyFunctionType *type,
                                        SmallVectorImpl<Type> &result,
                                        bool reverseCurryLevels) {
@@ -180,8 +181,8 @@ SILLinkage autodiff::getAutoDiffDerivativeFunctionLinkage(
   return SILLinkage::Hidden;
 }
 
-AutoDiffIndexSubset *
-AutoDiffIndexSubset::getFromString(ASTContext &ctx, StringRef string) {
+IndexSubset *
+IndexSubset::getFromString(ASTContext &ctx, StringRef string) {
   if (string.size() < 0) return nullptr;
   unsigned capacity = string.size();
   llvm::SmallBitVector indices(capacity);
@@ -194,7 +195,7 @@ AutoDiffIndexSubset::getFromString(ASTContext &ctx, StringRef string) {
   return get(ctx, indices);
 }
 
-std::string AutoDiffIndexSubset::getString() const {
+std::string IndexSubset::getString() const {
   std::string result;
   result.reserve(capacity);
   for (unsigned i : range(capacity))
@@ -202,7 +203,7 @@ std::string AutoDiffIndexSubset::getString() const {
   return result;
 }
 
-bool AutoDiffIndexSubset::isSubsetOf(AutoDiffIndexSubset *other) const {
+bool IndexSubset::isSubsetOf(IndexSubset *other) const {
   assert(capacity == other->capacity);
   for (auto index : range(numBitWords))
     if (getBitWord(index) & ~other->getBitWord(index))
@@ -210,7 +211,7 @@ bool AutoDiffIndexSubset::isSubsetOf(AutoDiffIndexSubset *other) const {
   return true;
 }
 
-bool AutoDiffIndexSubset::isSupersetOf(AutoDiffIndexSubset *other) const {
+bool IndexSubset::isSupersetOf(IndexSubset *other) const {
   assert(capacity == other->capacity);
   for (auto index : range(numBitWords))
     if (~getBitWord(index) & other->getBitWord(index))
@@ -218,11 +219,11 @@ bool AutoDiffIndexSubset::isSupersetOf(AutoDiffIndexSubset *other) const {
   return true;
 }
 
-AutoDiffIndexSubset *AutoDiffIndexSubset::adding(unsigned index,
+IndexSubset *IndexSubset::adding(unsigned index,
                                                  ASTContext &ctx) const {
   assert(index < getCapacity());
   if (contains(index))
-    return const_cast<AutoDiffIndexSubset *>(this);
+    return const_cast<IndexSubset *>(this);
   SmallBitVector newIndices(capacity);
   bool inserted = false;
   for (auto curIndex : getIndices()) {
@@ -235,18 +236,18 @@ AutoDiffIndexSubset *AutoDiffIndexSubset::adding(unsigned index,
   return get(ctx, newIndices);
 }
 
-AutoDiffIndexSubset *AutoDiffIndexSubset::extendingCapacity(
+IndexSubset *IndexSubset::extendingCapacity(
     ASTContext &ctx, unsigned newCapacity) const {
   assert(newCapacity >= capacity);
   if (newCapacity == capacity)
-    return const_cast<AutoDiffIndexSubset *>(this);
+    return const_cast<IndexSubset *>(this);
   SmallBitVector indices(newCapacity);
   for (auto index : getIndices())
     indices.set(index);
-  return AutoDiffIndexSubset::get(ctx, indices);
+  return IndexSubset::get(ctx, indices);
 }
 
-int AutoDiffIndexSubset::findNext(int startIndex) const {
+int IndexSubset::findNext(int startIndex) const {
   assert(startIndex < (int)capacity && "Start index cannot be past the end");
   unsigned bitWordIndex = 0, offset = 0;
   if (startIndex >= 0) {
@@ -269,7 +270,7 @@ int AutoDiffIndexSubset::findNext(int startIndex) const {
   return capacity;
 }
 
-int AutoDiffIndexSubset::findPrevious(int endIndex) const {
+int IndexSubset::findPrevious(int endIndex) const {
   assert(endIndex >= 0 && "End index cannot be before the start");
   int bitWordIndex = numBitWords - 1, offset = numBitsPerBitWord - 1;
   if (endIndex < (int)capacity) {

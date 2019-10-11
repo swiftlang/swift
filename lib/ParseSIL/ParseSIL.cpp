@@ -1050,7 +1050,7 @@ static bool parseDifferentiableAttr(
     return true;
   // Create a SILDifferentiableAttr and we are done.
   auto maxIndexRef = std::max_element(ParamIndices.begin(), ParamIndices.end());
-  auto *paramIndicesSubset = AutoDiffIndexSubset::get(
+  auto *paramIndicesSubset = IndexSubset::get(
       P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, ParamIndices);
   auto *Attr = SILDifferentiableAttr::create(
       SP.SILMod, {SourceIndex, paramIndicesSubset}, JVPName.str(),
@@ -1636,7 +1636,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
         ParseState = 3;
       } else if (Id.str() == "jvp" || Id.str() == "vjp") {
         AutoDiffDerivativeFunctionKind kind;
-        AutoDiffIndexSubset *parameterIndices = nullptr;
+        IndexSubset *parameterIndices = nullptr;
 
         if (Id.str() == "jvp")
           kind = AutoDiffDerivativeFunctionKind::JVP;
@@ -1650,7 +1650,7 @@ bool SILParser::parseSILDeclRef(SILDeclRef &Result,
           return true;
         }
 
-        parameterIndices = AutoDiffIndexSubset::getFromString(
+        parameterIndices = IndexSubset::getFromString(
             SILMod.getASTContext(), P.Tok.getText());
         if (!parameterIndices) {
           P.diagnose(P.Tok, diag::malformed_autodiff_parameter_indices);
@@ -2983,7 +2983,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     if (parseSILDebugLocation(InstLoc, B))
       return true;
     auto *parameterIndicesSubset =
-        AutoDiffIndexSubset::get(P.Context, fnType->getNumParameters(),
+        IndexSubset::get(P.Context, fnType->getNumParameters(),
                                  parameterIndices);
     ResultVal = B.createDifferentiableFunction(
         InstLoc, parameterIndicesSubset, original, derivativeFunctions);

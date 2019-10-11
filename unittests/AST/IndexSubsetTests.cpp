@@ -1,4 +1,4 @@
-//===----------------- AutoDiffIndexSubsetTests.cpp -----------------------===//
+//===------------------ IndexSubsetTests.cpp -----------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -12,112 +12,113 @@
 // SWIFT_ENABLE_TENSORFLOW
 
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/IndexSubsetTests.h"
 #include "TestContext.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
 using namespace swift::unittest;
 
-TEST(AutoDiffIndexSubset, NumBitWordsNeeded) {
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(0), 0u);
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(1), 1u);
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(5), 1u);
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
-                AutoDiffIndexSubset::numBitsPerBitWord - 1), 1u);
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
-                AutoDiffIndexSubset::numBitsPerBitWord), 2u);
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
-                AutoDiffIndexSubset::numBitsPerBitWord * 2 - 1), 2u);
-  EXPECT_EQ(AutoDiffIndexSubset::getNumBitWordsNeededForCapacity(
-                AutoDiffIndexSubset::numBitsPerBitWord * 2), 3u);
+TEST(IndexSubset, NumBitWordsNeeded) {
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(0), 0u);
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(1), 1u);
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(5), 1u);
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(
+                IndexSubset::numBitsPerBitWord - 1), 1u);
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(
+                IndexSubset::numBitsPerBitWord), 2u);
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(
+                IndexSubset::numBitsPerBitWord * 2 - 1), 2u);
+  EXPECT_EQ(IndexSubset::getNumBitWordsNeededForCapacity(
+                IndexSubset::numBitsPerBitWord * 2), 3u);
 }
 
-TEST(AutoDiffIndexSubset, BitWordIndexAndOffset) {
-  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(0),
+TEST(IndexSubset, BitWordIndexAndOffset) {
+  EXPECT_EQ(IndexSubset::getBitWordIndexAndOffset(0),
             std::make_pair(0u, 0u));
-  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(5),
+  EXPECT_EQ(IndexSubset::getBitWordIndexAndOffset(5),
             std::make_pair(0u, 5u));
-  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(8),
+  EXPECT_EQ(IndexSubset::getBitWordIndexAndOffset(8),
             std::make_pair(0u, 8u));
-  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(
-            AutoDiffIndexSubset::numBitsPerBitWord - 1),
-            std::make_pair(0u, AutoDiffIndexSubset::numBitsPerBitWord - 1));
-  EXPECT_EQ(AutoDiffIndexSubset::getBitWordIndexAndOffset(
-                AutoDiffIndexSubset::numBitsPerBitWord),
+  EXPECT_EQ(IndexSubset::getBitWordIndexAndOffset(
+            IndexSubset::numBitsPerBitWord - 1),
+            std::make_pair(0u, IndexSubset::numBitsPerBitWord - 1));
+  EXPECT_EQ(IndexSubset::getBitWordIndexAndOffset(
+                IndexSubset::numBitsPerBitWord),
             std::make_pair(1u, 0u));
 }
 
-TEST(AutoDiffIndexSubset, Equality) {
+TEST(IndexSubset, Equality) {
   TestContext ctx;
-  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0}),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0}));
-  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0, 2, 4}),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0, 2, 4}));
-  EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {}),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {}));
-  EXPECT_NE(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 1,
+  EXPECT_NE(IndexSubset::get(ctx.Ctx, /*capacity*/ 1,
                                      /*indices*/ {}),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 0,
                                      /*indices*/ {}));
-  EXPECT_NE(AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_NE(IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0}),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {}));
 }
 
-TEST(AutoDiffIndexSubset, Initializers) {
+TEST(IndexSubset, Initializers) {
   TestContext ctx;
   // Default init.
-  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
                                             /*includeAll*/ true),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0, 1, 2, 3, 4}));
-  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 5,
                                             /*includeAll*/ false),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
-  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
                                             /*includeAll*/ true),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 0,
                                      /*indices*/ {}));
-  EXPECT_EQ(AutoDiffIndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
+  EXPECT_EQ(IndexSubset::getDefault(ctx.Ctx, /*capacity*/ 0,
                                             /*includeAll*/ false),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
   // Bit vector init.
   {
     llvm::SmallBitVector bitVec(6);
     bitVec.set(1, 4);
-    EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, bitVec),
-              AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 6,
+    EXPECT_EQ(IndexSubset::get(ctx.Ctx, bitVec),
+              IndexSubset::get(ctx.Ctx, /*capacity*/ 6,
                                        /*indices*/ {1, 2, 3}));
   }
   {
     llvm::SmallBitVector bitVec(0);
-    EXPECT_EQ(AutoDiffIndexSubset::get(ctx.Ctx, bitVec),
-              AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0,
+    EXPECT_EQ(IndexSubset::get(ctx.Ctx, bitVec),
+              IndexSubset::get(ctx.Ctx, /*capacity*/ 0,
                                        /*indices*/ {}));
   }
   // String init.
-  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, "SSSSS"),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::getFromString(ctx.Ctx, "SSSSS"),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0, 1, 2, 3, 4}));
-  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, "UUUUU"),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
-  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, "SUSUS"),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  EXPECT_EQ(IndexSubset::getFromString(ctx.Ctx, "UUUUU"),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5, /*indices*/ {}));
+  EXPECT_EQ(IndexSubset::getFromString(ctx.Ctx, "SUSUS"),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                      /*indices*/ {0, 2, 4}));
-  EXPECT_EQ(AutoDiffIndexSubset::getFromString(ctx.Ctx, ""),
-            AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
+  EXPECT_EQ(IndexSubset::getFromString(ctx.Ctx, ""),
+            IndexSubset::get(ctx.Ctx, /*capacity*/ 0, /*indices*/ {}));
 }
 
-TEST(AutoDiffIndexSubset, Bits) {
+TEST(IndexSubset, Bits) {
   TestContext ctx;
-  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                             /*indices*/ {0, 2, 4});
   EXPECT_EQ(indices1->getNumBitWords(), 1u);
   EXPECT_EQ(indices1->getCapacity(), 5u);
@@ -127,7 +128,7 @@ TEST(AutoDiffIndexSubset, Bits) {
   EXPECT_FALSE(indices1->contains(3));
   EXPECT_TRUE(indices1->contains(4));
 
-  auto *indices2 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                             /*indices*/ {1, 3});
   EXPECT_EQ(indices2->getNumBitWords(), 1u);
   EXPECT_EQ(indices2->getCapacity(), 5u);
@@ -138,11 +139,11 @@ TEST(AutoDiffIndexSubset, Bits) {
   EXPECT_FALSE(indices2->contains(4));
 }
 
-TEST(AutoDiffIndexSubset, Iteration) {
+TEST(IndexSubset, Iteration) {
   TestContext ctx;
   // Test 1
   {
-    auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+    auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                               /*indices*/ {0, 2, 4});
     // Check forward iteration.
     EXPECT_EQ(indices1->findFirst(), 0);
@@ -161,7 +162,7 @@ TEST(AutoDiffIndexSubset, Iteration) {
   }
   // Test 2
   {
-    auto *indices2 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+    auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                               /*indices*/ {1, 3});
     // Check forward iteration.
     EXPECT_EQ(indices2->findFirst(), 1);
@@ -178,13 +179,13 @@ TEST(AutoDiffIndexSubset, Iteration) {
   }
 }
 
-TEST(AutoDiffIndexSubset, SupersetAndSubset) {
+TEST(IndexSubset, SupersetAndSubset) {
   TestContext ctx;
-  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  auto *indices1 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                             /*indices*/ {0, 2, 4});
   EXPECT_TRUE(indices1->isSupersetOf(indices1));
   EXPECT_TRUE(indices1->isSubsetOf(indices1));
-  auto *indices2 = AutoDiffIndexSubset::get(ctx.Ctx, /*capacity*/ 5,
+  auto *indices2 = IndexSubset::get(ctx.Ctx, /*capacity*/ 5,
                                             /*indices*/ {2});
   EXPECT_TRUE(indices2->isSupersetOf(indices2));
   EXPECT_TRUE(indices2->isSubsetOf(indices2));
@@ -193,62 +194,62 @@ TEST(AutoDiffIndexSubset, SupersetAndSubset) {
   EXPECT_TRUE(indices2->isSubsetOf(indices1));
 }
 
-TEST(AutoDiffIndexSubset, Insertion) {
+TEST(IndexSubset, Insertion) {
   TestContext ctx;
-  auto *indices1 = AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
+  auto *indices1 = IndexSubset::get(ctx.Ctx, 5, {0, 2, 4});
   EXPECT_EQ(indices1->adding(0, ctx.Ctx), indices1);
   EXPECT_EQ(indices1->adding(1, ctx.Ctx),
-            AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 1, 2, 4}));
+            IndexSubset::get(ctx.Ctx, 5, {0, 1, 2, 4}));
   EXPECT_EQ(indices1->adding(3, ctx.Ctx),
-            AutoDiffIndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
+            IndexSubset::get(ctx.Ctx, 5, {0, 2, 3, 4}));
 }
 
-TEST(AutoDiffIndexSubset, Lowering) {
+TEST(IndexSubset, Lowering) {
   TestContext testCtx;
   auto &C = testCtx.Ctx;
   // ((T, T)) -> ()
   EXPECT_EQ(
       autodiff::getLoweredParameterIndices(
-          AutoDiffIndexSubset::get(C, 1, {0}),
+          IndexSubset::get(C, 1, {0}),
           FunctionType::get({
               FunctionType::Param(
                   TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
               C.TheEmptyTupleType)),
-      AutoDiffIndexSubset::get(C, 2, {0, 1}));
+      IndexSubset::get(C, 2, {0, 1}));
   // ((), (T, T)) -> ()
   EXPECT_EQ(
       autodiff::getLoweredParameterIndices(
-          AutoDiffIndexSubset::get(C, 2, {1}),
+          IndexSubset::get(C, 2, {1}),
           FunctionType::get({
               FunctionType::Param(C.TheEmptyTupleType),
               FunctionType::Param(
                   TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
                                  C.TheEmptyTupleType)),
-      AutoDiffIndexSubset::get(C, 2, {0, 1}));
+      IndexSubset::get(C, 2, {0, 1}));
   // (T, (T, T)) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
-      AutoDiffIndexSubset::get(C, 2, {1}),
+      IndexSubset::get(C, 2, {1}),
       FunctionType::get({
           FunctionType::Param(C.TheAnyType),
           FunctionType::Param(
             TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
         C.TheEmptyTupleType)),
-    AutoDiffIndexSubset::get(C, 3, {1, 2}));
+    IndexSubset::get(C, 3, {1, 2}));
   // (T, (T, T)) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
-      AutoDiffIndexSubset::get(C, 2, {0, 1}),
+      IndexSubset::get(C, 2, {0, 1}),
       FunctionType::get({
           FunctionType::Param(C.TheAnyType),
           FunctionType::Param(
             TupleType::get({C.TheAnyType, C.TheAnyType}, C))},
         C.TheEmptyTupleType)),
-    AutoDiffIndexSubset::get(C, 3, {0, 1, 2}));
+    IndexSubset::get(C, 3, {0, 1, 2}));
   // (T, ((T, T)), (T, T), T) -> ()
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
-      AutoDiffIndexSubset::get(C, 4, {0, 1, 3}),
+      IndexSubset::get(C, 4, {0, 1, 3}),
       FunctionType::get({
           FunctionType::Param(C.TheAnyType),
           FunctionType::Param(
@@ -258,7 +259,7 @@ TEST(AutoDiffIndexSubset, Lowering) {
             TupleType::get({C.TheAnyType, C.TheAnyType}, C)),
           FunctionType::Param(C.TheAnyType)},
         C.TheEmptyTupleType)),
-    AutoDiffIndexSubset::get(C, 6, {0, 1, 2, 5}));
+    IndexSubset::get(C, 6, {0, 1, 2, 5}));
   // Method (T) -> ((T, T), (T, T), T) -> ()
   // TODO(TF-874): Fix this unit test.
   // The current actual result is:
@@ -266,7 +267,7 @@ TEST(AutoDiffIndexSubset, Lowering) {
 #if 0
   EXPECT_EQ(
     autodiff::getLoweredParameterIndices(
-      AutoDiffIndexSubset::get(C, 4, {0, 1, 3}),
+      IndexSubset::get(C, 4, {0, 1, 3}),
       FunctionType::get(
           {FunctionType::Param(C.TheAnyType)},
           FunctionType::get({
@@ -278,18 +279,18 @@ TEST(AutoDiffIndexSubset, Lowering) {
               C.TheEmptyTupleType)->withExtInfo(
                   FunctionType::ExtInfo().withSILRepresentation(
                   SILFunctionTypeRepresentation::Method)))),
-    AutoDiffIndexSubset::get(C, 6, {0, 1, 4, 5}));
+    IndexSubset::get(C, 6, {0, 1, 4, 5}));
 #endif
 }
 
-TEST(AutoDiffIndexSubset, GetSubsetParameterTypes) {
+TEST(IndexSubset, GetSubsetParameterTypes) {
   TestContext testCtx;
   auto &C = testCtx.Ctx;
   // (T, T) -> ()
   {
     SmallVector<Type, 8> subset;
     autodiff::getSubsetParameterTypes(
-        AutoDiffIndexSubset::get(C, 1, {0}),
+        IndexSubset::get(C, 1, {0}),
         FunctionType::get(
             {FunctionType::Param(C.TheAnyType),
              FunctionType::Param(C.TheAnyType)},
@@ -303,7 +304,7 @@ TEST(AutoDiffIndexSubset, GetSubsetParameterTypes) {
   {
     SmallVector<Type, 8> subset;
     autodiff::getSubsetParameterTypes(
-        AutoDiffIndexSubset::get(C, 3, {0, 1, 2}),
+        IndexSubset::get(C, 3, {0, 1, 2}),
         FunctionType::get(
             {FunctionType::Param(C.TheIEEE16Type)},
             FunctionType::get(

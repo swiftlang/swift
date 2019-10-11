@@ -3115,7 +3115,7 @@ public:
   /// The resulting function will preserve all `ExtInfo` of the original
   /// function, including `@differentiable`.
   AnyFunctionType *getAutoDiffDerivativeFunctionType(
-      AutoDiffIndexSubset *indices, unsigned resultIndex,
+      IndexSubset *indices, unsigned resultIndex,
       AutoDiffDerivativeFunctionKind kind,
       LookupConformanceFn lookupConformance,
       GenericSignature *whereClauseGenericSignature = nullptr,
@@ -3129,7 +3129,7 @@ public:
   /// corresponding original function type.
   AnyFunctionType *
   getTransposeOriginalFunctionType(TransposingAttr *attr,
-                                   AutoDiffIndexSubset *wrtParamIndices,
+                                   IndexSubset *wrtParamIndices,
                                    bool wrtSelf);
 
   AnyFunctionType *getWithoutDifferentiability() const;
@@ -4216,14 +4216,14 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      AutoDiffIndexSubset *parameterIndices);
+      IndexSubset *parameterIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 
   /// Returns the type of a differentiation function that is associated with
   /// a function of this type.
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
-      AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
+      IndexSubset *parameterIndices, unsigned resultIndex,
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr);
@@ -4232,7 +4232,7 @@ public:
   /// differentiate with respect to for this differentiable function type. (e.g.
   /// which parameters are not `@nondiff`). The function type must be
   /// differentiable.
-  AutoDiffIndexSubset *getDifferentiationParameterIndices();
+  IndexSubset *getDifferentiationParameterIndices();
 
   /// If this is a @convention(witness_method) function with a class
   /// constrained self parameter, return the class constraint for the
