@@ -2571,28 +2571,24 @@ namespace {
     }
     
     Type visitIfExpr(IfExpr *expr) {
-      // The conditional expression must conform to LogicValue.
+      // Condition must convert to Bool.
       auto boolDecl = CS.getASTContext().getBoolDecl();
       if (!boolDecl)
         return Type();
 
-      // Condition must convert to Bool.
       CS.addConstraint(ConstraintKind::Conversion,
                        CS.getType(expr->getCondExpr()),
                        boolDecl->getDeclaredType(),
                        CS.getConstraintLocator(expr->getCondExpr()));
 
       // The branches must be convertible to a common type.
-      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                            TVO_PrefersSubtypeBinding |
-                                            TVO_CanBindToNoEscape);
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getThenExpr()), resultTy,
-                       CS.getConstraintLocator(expr->getThenExpr()));
-      CS.addConstraint(ConstraintKind::Conversion,
-                       CS.getType(expr->getElseExpr()), resultTy,
-                       CS.getConstraintLocator(expr->getElseExpr()));
-      return resultTy;
+      return CS.addJoinConstraint(CS.getConstraintLocator(expr),
+          {
+            { CS.getType(expr->getThenExpr()),
+              CS.getConstraintLocator(expr->getThenExpr()) },
+            { CS.getType(expr->getElseExpr()),
+              CS.getConstraintLocator(expr->getElseExpr()) }
+          });
     }
     
     virtual Type visitImplicitConversionExpr(ImplicitConversionExpr *expr) {
