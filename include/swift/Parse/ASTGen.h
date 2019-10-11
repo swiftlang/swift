@@ -108,6 +108,8 @@ public:
                  const SourceLoc Loc);
   Expr *generate(const syntax::PoundDsohandleExprSyntax &Expr,
                  const SourceLoc Loc);
+  Expr *generate(const syntax::ObjcKeyPathExprSyntax &Expr,
+                 const SourceLoc Loc);
   Expr *generate(const syntax::ObjectLiteralExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::CodeCompletionExprSyntax &Expr,

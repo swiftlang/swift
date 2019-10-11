@@ -3988,6 +3988,12 @@ Expr *simplifyLocatorToAnchor(ConstraintLocator *locator);
 Expr *getArgumentExpr(Expr *expr, unsigned index);
 
 /// Determine whether given locator points to one of the arguments
+/// associated with the call to an operator. If the operator name
+/// is empty `true` is returned for any kind of operator.
+bool isOperatorArgument(ConstraintLocator *locator,
+                        StringRef expectedOperator = "");
+
+/// Determine whether given locator points to one of the arguments
 /// associated with implicit `~=` (pattern-matching) operator
 bool isArgumentOfPatternMatchingOperator(ConstraintLocator *locator);
 
