@@ -1,0 +1,126 @@
+// RUN: %target-sil-opt %s -module-name=sil_differentiability_witness_parse | %target-sil-opt -module-name=sil_differentiability_witness_parse | %FileCheck %s
+
+// Round-trip parsing and printing test.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+@differentiable(wrt: (x, y), jvp: foo_jvp where T : Differentiable)
+@_silgen_name("foo")
+func foo<T>(_ x: T, _ y: Float) -> T
+
+@_silgen_name("foo_jvp")
+func foo_jvp<T>(_ x: T, _ y: Float) -> (T, (T.TangentVector, Float) -> T.TangentVector) where T : Differentiable
+
+@_silgen_name("foo_vjp")
+func foo_vjp<T>(_ x: T, _ y: Float) -> (T, (T.TangentVector) -> (T.TangentVector, Float)) where T : Differentiable
+
+// main
+sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2 : $Builtin.Int32)        // user: %4
+  return %3 : $Int32                              // id: %4
+} // end sil function 'main'
+
+// foo
+sil hidden [differentiable source 0 wrt 0, 1 jvp @AD__foo__jvp_src_0_wrt_0_1 where T : Differentiable] [ossa] @foo : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+// %0                                             // user: %5
+// %1                                             // users: %5, %3
+// %2                                             // user: %4
+bb0(%0 : $*T, %1 : $*T, %2 : $Float):
+  debug_value_addr %1 : $*T, let, name "x", argno 1 // id: %3
+  debug_value %2 : $Float, let, name "y", argno 2 // id: %4
+  copy_addr %1 to [initialization] %0 : $*T       // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+} // end sil function 'foo'
+
+// foo_jvp
+sil hidden [ossa] @foo_jvp : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, Float) -> (@out T, @owned @callee_guaranteed (@in_guaranteed T.TangentVector, Float) -> @out T.TangentVector) {
+// %0                                             // user: %5
+// %1                                             // users: %5, %3
+// %2                                             // user: %4
+bb0(%0 : $*T, %1 : $*T, %2 : $Float):
+  debug_value_addr %1 : $*T, let, name "x", argno 1 // id: %3
+  debug_value %2 : $Float, let, name "y", argno 2 // id: %4
+  copy_addr %1 to [initialization] %0 : $*T       // id: %5
+  // function_ref closure #1 in foo_jvp<A>(_:_:)
+  %6 = function_ref @$s4main7foo_jvpyx_13TangentVectorQzAD_Sftctx_Sfts14DifferentiableRzlFA2D_SftcfU_ : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector // user: %7
+  %7 = partial_apply [callee_guaranteed] %6<T>() : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector // user: %8
+  return %7 : $@callee_guaranteed (@in_guaranteed T.TangentVector, Float) -> @out T.TangentVector // id: %8
+} // end sil function 'foo_jvp'
+
+// AD__foo__jvp_src_0_wrt_0_1
+sil hidden [transparent] [thunk] [ossa] @AD__foo__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector) {
+// %0                                             // user: %4
+// %1                                             // user: %4
+// %2                                             // user: %4
+bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $Float):
+  // function_ref foo_jvp
+  %3 = function_ref @foo_jvp : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector) // user: %4
+  %4 = apply %3<τ_0_0>(%0, %1, %2) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector) // user: %5
+  return %4 : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector // id: %5
+} // end sil function 'AD__foo__jvp_src_0_wrt_0_1'
+
+// closure #1 in foo_jvp<A>(_:_:)
+sil private [ossa] @$s4main7foo_jvpyx_13TangentVectorQzAD_Sftctx_Sfts14DifferentiableRzlFA2D_SftcfU_ : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T.TangentVector, Float) -> @out T.TangentVector {
+// %0                                             // user: %5
+// %1                                             // users: %5, %3
+// %2                                             // user: %4
+bb0(%0 : $*T.TangentVector, %1 : $*T.TangentVector, %2 : $Float):
+  debug_value_addr %1 : $*T.TangentVector, let, name "dx", argno 1 // id: %3
+  debug_value %2 : $Float, let, name "dy", argno 2 // id: %4
+  copy_addr %1 to [initialization] %0 : $*T.TangentVector // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6 : $()                                 // id: %7
+} // end sil function '$s4main7foo_jvpyx_13TangentVectorQzAD_Sftctx_Sfts14DifferentiableRzlFA2D_SftcfU_'
+
+// foo_vjp
+sil hidden [ossa] @foo_vjp : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, Float) -> (@out T, @owned @callee_guaranteed (@in_guaranteed T.TangentVector) -> (@out T.TangentVector, Float)) {
+// %0                                             // user: %5
+// %1                                             // users: %5, %3
+// %2                                             // user: %4
+bb0(%0 : $*T, %1 : $*T, %2 : $Float):
+  debug_value_addr %1 : $*T, let, name "x", argno 1 // id: %3
+  debug_value %2 : $Float, let, name "y", argno 2 // id: %4
+  copy_addr %1 to [initialization] %0 : $*T       // id: %5
+  // function_ref closure #1 in foo_vjp<A>(_:_:)
+  %6 = function_ref @$s4main7foo_vjpyx_13TangentVectorQz_SftADctx_Sfts14DifferentiableRzlFAD_SftADcfU_ : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float) // user: %7
+  %7 = partial_apply [callee_guaranteed] %6<T>() : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float) // user: %8
+  return %7 : $@callee_guaranteed (@in_guaranteed T.TangentVector) -> (@out T.TangentVector, Float) // id: %8
+} // end sil function 'foo_vjp'
+
+// closure #1 in foo_vjp<A>(_:_:)
+sil private [ossa] @$s4main7foo_vjpyx_13TangentVectorQz_SftADctx_Sfts14DifferentiableRzlFAD_SftADcfU_ : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T.TangentVector) -> (@out T.TangentVector, Float) {
+// %0                                             // user: %3
+// %1                                             // users: %3, %2
+bb0(%0 : $*T.TangentVector, %1 : $*T.TangentVector):
+  debug_value_addr %1 : $*T.TangentVector, let, name "$0", argno 1 // id: %2
+  copy_addr %1 to [initialization] %0 : $*T.TangentVector // id: %3
+  %4 = metatype $@thin Float.Type
+  %5 = alloc_stack $Float                         // users: %10, %9, %8
+  %6 = metatype $@thick Float.Type                // user: %8
+  // function_ref static AdditiveArithmetic<>.zero.getter
+  %7 = function_ref @$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvgZ : $@convention(method) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral> (@thick τ_0_0.Type) -> @out τ_0_0 // user: %8
+  %8 = apply %7<Float>(%5, %6) : $@convention(method) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral> (@thick τ_0_0.Type) -> @out τ_0_0
+  %9 = load [trivial] %5 : $*Float                // user: %11
+  dealloc_stack %5 : $*Float                      // id: %10
+  return %9 : $Float                              // id: %11
+} // end sil function '$s4main7foo_vjpyx_13TangentVectorQz_SftADctx_Sfts14DifferentiableRzlFAD_SftADcfU_'
+
+// static AdditiveArithmetic<>.zero.getter
+sil [serialized] [always_inline] @$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvgZ : $@convention(method) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral> (@thick τ_0_0.Type) -> @out τ_0_0
+
+sil_differentiability_witness hidden @foo : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0 parameters (0, 1) results (0) where τ_0_0 : _Differentiable {
+  jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+  vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+}
+
+// CHECK: sil_differentiability_witness hidden @foo : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0 parameters (0, 1) results (0) where τ_0_0 : _Differentiable {
+// CHECK:   jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+// CHECK:   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+// CHECK: }
