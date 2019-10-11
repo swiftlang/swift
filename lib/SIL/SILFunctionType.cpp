@@ -102,7 +102,7 @@ CanType SILFunctionType::getSelfInstanceType() const {
 }
 
 // SWIFT_ENABLE_TENSORFLOW
-AutoDiffIndexSubset *
+IndexSubset *
 SILFunctionType::getDifferentiationParameterIndices() {
   assert(isDifferentiable());
   SmallVector<unsigned, 8> result;
@@ -110,11 +110,11 @@ SILFunctionType::getDifferentiationParameterIndices() {
     if (valueAndIndex.value().getDifferentiability() !=
             SILParameterDifferentiability::NotDifferentiable)
       result.push_back(valueAndIndex.index());
-  return AutoDiffIndexSubset::get(getASTContext(), getNumParameters(), result);
+  return IndexSubset::get(getASTContext(), getNumParameters(), result);
 }
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    AutoDiffIndexSubset *parameterIndices) {
+    IndexSubset *parameterIndices) {
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
@@ -156,7 +156,7 @@ CanSILFunctionType SILFunctionType::getWithoutDifferentiability() {
 static CanGenericSignature getAutoDiffDerivativeFunctionGenericSignature(
     CanGenericSignature derivativeFnGenSig,
     ArrayRef<SILParameterInfo> originalParameters,
-    AutoDiffIndexSubset *parameterIndices, ModuleDecl *module) {
+    IndexSubset *parameterIndices, ModuleDecl *module) {
   if (!derivativeFnGenSig)
     return nullptr;
   auto &ctx = module->getASTContext();
@@ -180,7 +180,7 @@ static CanGenericSignature getAutoDiffDerivativeFunctionGenericSignature(
 }
 
 CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
-    AutoDiffIndexSubset *parameterIndices, unsigned resultIndex,
+    IndexSubset *parameterIndices, unsigned resultIndex,
     AutoDiffDerivativeFunctionKind kind, TypeConverter &TC,
     LookupConformanceFn lookupConformance,
     CanGenericSignature derivativeFnGenSig) {

@@ -242,7 +242,7 @@ static FuncDecl *findOperatorDeclInProtocol(DeclName operatorName,
 /// The constrained derivative generic signature constrains all wrt parameters
 /// to conform to `Differentiable`.
 static GenericSignature *getConstrainedDerivativeGenericSignature(
-    CanSILFunctionType originalFnTy, AutoDiffIndexSubset *paramIndexSet,
+    CanSILFunctionType originalFnTy, IndexSubset *paramIndexSet,
     GenericSignature *derivativeGenSig) {
   if (!derivativeGenSig)
     derivativeGenSig = originalFnTy->getGenericSignature();
@@ -1007,7 +1007,7 @@ public:
   /// indices. Returns nullptr if no such attribute exists.
   SILDifferentiableAttr *lookUpMinimalDifferentiableAttr(
       SILFunction *original, const SILAutoDiffIndices &indices) const {
-    auto *minimalIndexSet = AutoDiffIndexSubset::getDefault(
+    auto *minimalIndexSet = IndexSubset::getDefault(
         getASTContext(),
         original->getLoweredFunctionType()->getNumParameters(), false);
     auto *indexSet = indices.parameters;
@@ -1041,13 +1041,13 @@ public:
   /// specified original function whose parameter indices are a minimal
   /// superset of the specified parameter indices. Returns nullptr if no such
   /// attribute exists.
-  std::pair<const DifferentiableAttr *, AutoDiffIndexSubset *>
+  std::pair<const DifferentiableAttr *, IndexSubset *>
   lookUpMinimalASTDifferentiableAttrAndIndexSubset(
       SILDeclRef originalDeclRef, CanSILFunctionType originalFnType,
       const SILAutoDiffIndices &indices) {
     auto *original = originalDeclRef.getDecl();
     const DifferentiableAttr *minimalAttr = nullptr;
-    auto *minimalIndexSet = AutoDiffIndexSubset::getDefault(
+    auto *minimalIndexSet = IndexSubset::getDefault(
         getASTContext(), originalFnType->getNumParameters(), false);
     auto *indexSet = indices.parameters;
     for (auto *da : original->getAttrs().getAttributes<DifferentiableAttr>()) {
@@ -1108,7 +1108,7 @@ public:
   /// pointer value as a previously processed and deleted instruction.
   DifferentiableFunctionInst *createDifferentiableFunction(
       SILBuilder &builder, SILLocation loc,
-      AutoDiffIndexSubset *parameterIndices, SILValue original,
+      IndexSubset *parameterIndices, SILValue original,
       Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None) {
     auto *dfi = builder.createDifferentiableFunction(
         loc, parameterIndices, original, derivativeFunctions);
@@ -1145,9 +1145,11 @@ public:
   /// purposes.
   void foldDifferentiableFunctionExtraction(DifferentiableFunctionInst *source);
 
-  /// Get or create a derivative function index subset thunk from
-  /// `actualIndices` to `desiredIndices` for the given derivative function
-  /// value and original function operand.
+  /// Get or create a derivative function parameter index subset thunk from
+  /// `actualIndices` to `desiredIndices` for the given associated function
+  /// value and original function operand. Returns a pair of the parameter
+  /// index subset thunk and its interface substitution map (used to partially
+  /// apply the thunk).
   /// Calls `getOrCreateSubsetParametersThunkForLinearMap` to thunk the linear
   /// map returned by the derivative function.
   std::pair<SILFunction *, SubstitutionMap>
@@ -1156,11 +1158,14 @@ public:
       AutoDiffDerivativeFunctionKind kind, SILAutoDiffIndices desiredIndices,
       SILAutoDiffIndices actualIndices);
 
-  /// Get or create a derivative function index subset thunk from
-  /// `actualIndices` to `desiredIndices` for the given derivative function
-  /// value and original function operand.
-  SILFunction *getOrCreateSubsetParametersThunkForLinearMap(
-      SILFunction *derivativeFn, CanSILFunctionType linearMapType,
+  /// Get or create a derivative function parameter index subset thunk from
+  /// `actualIndices` to `desiredIndices` for the given associated function
+  /// value and original function operand. Returns a pair of the parameter
+  /// index subset thunk and its interface substitution map (used to partially
+  /// apply the thunk).
+  std::pair<SILFunction *, SubstitutionMap>
+  getOrCreateSubsetParametersThunkForLinearMap(
+      SILFunction *assocFn, CanSILFunctionType linearMapType,
       CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
       SILAutoDiffIndices desiredIndices, SILAutoDiffIndices actualIndices);
 
@@ -1434,7 +1439,7 @@ public:
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
   bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
-  bool isVaried(SILValue value, AutoDiffIndexSubset *parameterIndices) const;
+  bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
   bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
 
   Activity getActivity(SILValue value,
@@ -1447,7 +1452,7 @@ public:
 /// indices, figure out whether the parent function is being differentiated with
 /// respect to this parameter, according to the indices.
 static bool isDifferentiationParameter(SILArgument *argument,
-                                       AutoDiffIndexSubset *indices) {
+                                       IndexSubset *indices) {
   if (!argument) return false;
   auto *function = argument->getFunction();
   auto paramArgs = function->getArgumentsWithoutIndirectResults();
@@ -1645,7 +1650,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   // - If the callee has `@differentiable` function type, use differentiation
   //   parameters from the function type.
   // - Otherwise, use the active parameters.
-  AutoDiffIndexSubset *parameters;
+  IndexSubset *parameters;
   auto origFnSubstTy = ai->getSubstCalleeType();
   auto remappedOrigFnSubstTy =
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
@@ -1653,7 +1658,7 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
   if (remappedOrigFnSubstTy->isDifferentiable()) {
     parameters = remappedOrigFnSubstTy->getDifferentiationParameterIndices();
   } else {
-    parameters = AutoDiffIndexSubset::get(
+    parameters = IndexSubset::get(
         original->getASTContext(),
         ai->getArgumentsWithoutIndirectResults().size(),
         activeParamIndices);
@@ -2174,7 +2179,7 @@ bool DifferentiableActivityInfo::isVaried(
 }
 
 bool DifferentiableActivityInfo::isVaried(
-    SILValue value, AutoDiffIndexSubset *parameterIndices) const {
+    SILValue value, IndexSubset *parameterIndices) const {
   for (auto paramIdx : parameterIndices->getIndices())
     if (isVaried(value, paramIdx))
       return true;
@@ -2698,7 +2703,7 @@ emitDerivativeFunctionReference(
     }
     // Get the minimal `@differentiable` attribute and parameter index subset.
     const DifferentiableAttr *minimalAttr;
-    AutoDiffIndexSubset *minimalParamIndexSet;
+    IndexSubset *minimalParamIndexSet;
     std::tie(minimalAttr, minimalParamIndexSet) =
         context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
             requirementDeclRef, witnessMethodType, desiredIndices);
@@ -2745,7 +2750,7 @@ emitDerivativeFunctionReference(
     }
     // Get the minimal `@differentiable` attribute and parameter index subset.
     const DifferentiableAttr *minimalAttr;
-    AutoDiffIndexSubset *minimalParamIndexSet;
+    IndexSubset *minimalParamIndexSet;
     std::tie(minimalAttr, minimalParamIndexSet) =
         context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
             methodDeclRef, classMethodType, desiredIndices);
@@ -3759,7 +3764,7 @@ public:
     // Form expected indices, assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
-        AutoDiffIndexSubset::get(
+        IndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
 
@@ -5437,7 +5442,7 @@ public:
     // Form expected indices, assuming there's only one result.
     SILAutoDiffIndices indices(
         activeResultIndices.front(),
-        AutoDiffIndexSubset::get(
+        IndexSubset::get(
             getASTContext(), ai->getArgumentsWithoutIndirectResults().size(),
             activeParamIndices));
 
@@ -8098,7 +8103,7 @@ public:
 };
 } // end anonymous namespace
 
-SILFunction *
+std::pair<SILFunction *, SubstitutionMap>
 ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     SILFunction *parentThunk, CanSILFunctionType linearMapType,
     CanSILFunctionType targetType, AutoDiffDerivativeFunctionKind kind,
@@ -8107,8 +8112,8 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
              << "Getting a subset parameters thunk for " << linearMapType
              << " from " << actualIndices << " to " << desiredIndices << '\n');
 
-  SubstitutionMap interfaceSubs = parentThunk->getForwardingSubstitutionMap();
-  GenericEnvironment *genericEnv = parentThunk->getGenericEnvironment();
+  SubstitutionMap interfaceSubs;
+  GenericEnvironment *genericEnv = nullptr;
   auto thunkType = buildThunkType(
       parentThunk, linearMapType, targetType, genericEnv, interfaceSubs,
       /*withoutActuallyEscaping*/ true,
@@ -8141,7 +8146,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
       ProfileCounter(), IsThunk, IsNotDynamic);
 
   if (!thunk->empty())
-    return thunk;
+    return {thunk, interfaceSubs};
 
   thunk->setGenericEnvironment(genericEnv);
   thunk->setOwnershipEliminated();
@@ -8289,7 +8294,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
     for (auto *alloc : reversed(localAllocations))
       builder.createDeallocStack(loc, alloc);
     builder.createReturn(loc, ai);
-    return thunk;
+    return {thunk, interfaceSubs};
   }
 
   // If pullback thunk, return only the desired results and clean up the
@@ -8325,7 +8330,7 @@ ADContext::getOrCreateSubsetParametersThunkForLinearMap(
   builder.createReturn(loc, result);
 
   getGeneratedFunctions().push_back(thunk);
-  return thunk;
+  return {thunk, interfaceSubs};
 }
 
 std::pair<SILFunction *, SubstitutionMap>
@@ -8465,22 +8470,25 @@ ADContext::getOrCreateSubsetParametersThunkForDerivativeFunction(
   auto linearMapTargetType = targetType->getResults().back().getSILStorageType()
       .castTo<SILFunctionType>();
 
-  auto *innerThunk = getOrCreateSubsetParametersThunkForLinearMap(
-      thunk, linearMapType, linearMapTargetType, kind,
-      desiredIndices, actualIndices);
+  SILFunction *linearMapThunk;
+  SubstitutionMap linearMapSubs;
+  std::tie(linearMapThunk, linearMapSubs) =
+      getOrCreateSubsetParametersThunkForLinearMap(
+          thunk, linearMapType, linearMapTargetType, kind,
+          desiredIndices, actualIndices);
 
-  auto *innerThunkFRI = builder.createFunctionRef(loc, innerThunk);
-  auto *newDerivative = builder.createPartialApply(
-      loc, innerThunkFRI, thunk->getForwardingSubstitutionMap(), {linearMap},
+  auto *linearMapThunkFRI = builder.createFunctionRef(loc, linearMapThunk);
+  auto *thunkedLinearMap = builder.createPartialApply(
+      loc, linearMapThunkFRI, linearMapSubs, {linearMap},
       ParameterConvention::Direct_Guaranteed);
 
   assert(origFnType->getResults().size() == 1);
   if (origFnType->getResults().front().isFormalDirect()) {
     auto result = joinElements(
-        {originalDirectResult, newDerivative}, builder, loc);
+        {originalDirectResult, thunkedLinearMap}, builder, loc);
     builder.createReturn(loc, result);
   } else {
-    builder.createReturn(loc, newDerivative);
+    builder.createReturn(loc, thunkedLinearMap);
   }
 
   getGeneratedFunctions().push_back(thunk);

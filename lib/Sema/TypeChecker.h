@@ -2068,14 +2068,14 @@ public:
       const Optional<std::function<void()>> &invalidTypeCtxDiagnostic = None);
 
   /// SWIFT_ENABLE_TENSORFLOW
-  /// Creates an `AutoDiffIndexSubset` for the given function type, representing
+  /// Creates an `IndexSubset` for the given function type, representing
   /// all inferred differentiation parameters.
   /// The differentiation parameters are inferred to be:
   /// - All parameters of the function type that conform to `Differentiable`.
   /// - If the function type's result is a function type (i.e. it is a curried
   ///   method type), then also all parameters of the function result type that
   ///   conform to `Differentiable`.
-  static AutoDiffIndexSubset *
+  static IndexSubset *
   inferDifferentiableParameters(AbstractFunctionDecl *AFD,
                                 GenericEnvironment *derivativeGenEnv);
 };

@@ -511,7 +511,7 @@ public:
 
   /// SWIFT_ENABLE_TENSORFLOW
   DifferentiableFunctionInst *createDifferentiableFunction(
-      SILLocation Loc, AutoDiffIndexSubset *ParameterIndices,
+      SILLocation Loc, IndexSubset *ParameterIndices,
       SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> JVPAndVJPFunctions = None) {
     return insert(DifferentiableFunctionInst::create(

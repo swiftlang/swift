@@ -1040,7 +1040,7 @@ static ValueDecl *getAutoDiffApplyDerivativeFunction(
       firstArgGen.build(builder)->castTo<AnyFunctionType>();
   origFnTy = origFnTy->getWithoutDifferentiability()->withExtInfo(
       origFnTy->getExtInfo().withNoEscape(false));
-  auto *paramIndices = AutoDiffIndexSubset::get(
+  auto *paramIndices = IndexSubset::get(
       Context, SmallBitVector(origFnTy->getNumParams(), true));
   // Generator for the resultant function type, i.e. the AD derivative function.
   BuiltinGenericSignatureBuilder::LambdaGenerator resultGen{

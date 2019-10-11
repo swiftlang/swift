@@ -697,7 +697,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
 
     SmallVector<unsigned, 8> parameterIndices(rawParameterIndices.begin(),
                                               rawParameterIndices.end());
-    auto *parameterIndexSubset = AutoDiffIndexSubset::get(
+    auto *parameterIndexSubset = IndexSubset::get(
         MF->getContext(), fn->getLoweredFunctionType()->getNumParameters(),
         parameterIndices);
     SILAutoDiffIndices indices(source, parameterIndexSubset);
@@ -1544,7 +1544,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
                                      [](uint64_t i) { return (unsigned)i; });
     auto numParams = Attr;
     auto *paramIndices =
-        AutoDiffIndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
     SmallVector<SILValue, 3> operands;
     for (auto i = numParamIndices;
          i < numParamIndices + numOperands * 3; i += 3) {

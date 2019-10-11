@@ -38,14 +38,14 @@ namespace {
 class DiffFuncFieldInfo final : public RecordField<DiffFuncFieldInfo> {
 public:
   DiffFuncFieldInfo(DiffFuncIndex index, const TypeInfo &type,
-                    AutoDiffIndexSubset *parameterIndices)
+                    IndexSubset *parameterIndices)
       : RecordField(type), Index(index), ParameterIndices(parameterIndices) {}
 
   /// The field index.
   const DiffFuncIndex Index;
 
   /// The parameter indices.
-  AutoDiffIndexSubset *ParameterIndices;
+  IndexSubset *ParameterIndices;
 
   std::string getFieldName() const {
     switch (Index) {
@@ -115,7 +115,7 @@ class DiffFuncTypeBuilder
                                DiffFuncIndex> {
 
   SILFunctionType *origFnTy;
-  AutoDiffIndexSubset *parameterIndices;
+  IndexSubset *parameterIndices;
 
 public:
   DiffFuncTypeBuilder(IRGenModule &IGM, SILFunctionType *fnTy)
