@@ -39,7 +39,7 @@ void swift::setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType() && !var->getType()->hasError())
+    if (var->hasInterfaceType() && !var->getType()->hasError())
       return;
 
     var->markInvalid();

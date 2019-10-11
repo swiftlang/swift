@@ -792,7 +792,6 @@ public:
           /*IsStatic*/ false, VarDecl::Introducer::Var,
           /*IsCaptureList*/ false, S->getInLoc(),
           TC.Context.getIdentifier(name), DC);
-      iterator->setType(iteratorTy);
       iterator->setInterfaceType(iteratorTy->mapTypeOutOfContext());
       iterator->setImplicit();
       S->setIteratorVar(iterator);
@@ -1136,7 +1135,7 @@ public:
         }
         assert(isa<CaseStmt>(initialCaseVarDecl->getParentPatternStmt()));
 
-        if (vd->hasType() && initialCaseVarDecl->hasType() &&
+        if (vd->getInterfaceType() && initialCaseVarDecl->getType() &&
             !initialCaseVarDecl->isInvalid() &&
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
@@ -1322,8 +1321,6 @@ public:
           if (!prev->hasName() || expected->getName() != prev->getName()) {
             continue;
           }
-          if (prev->hasType())
-            expected->setType(prev->getType());
           if (prev->hasInterfaceType())
             expected->setInterfaceType(prev->getInterfaceType());
           break;

@@ -5007,24 +5007,11 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getType() const {
-  if (!typeInContext) {
-    const_cast<VarDecl *>(this)->typeInContext =
-      getDeclContext()->mapTypeIntoContext(
-        getInterfaceType());
-  }
-
-  return typeInContext;
-}
-
-void VarDecl::setType(Type t) {
-  assert(t.isNull() || !t->is<InOutType>());
-  typeInContext = t;
+  return getDeclContext()->mapTypeIntoContext(getInterfaceType());
 }
 
 void VarDecl::markInvalid() {
-  auto &Ctx = getASTContext();
-  setType(ErrorType::get(Ctx));
-  setInterfaceType(ErrorType::get(Ctx));
+  setInterfaceType(ErrorType::get(getASTContext()));
 }
 
 /// Returns whether the var is settable in the specified context: this
@@ -5269,9 +5256,6 @@ Pattern *VarDecl::getParentPattern() const {
           if (pat->containsVarDecl(this))
             return pat;
     }
-
-    //stmt->dump();
-    assert(0 && "Unknown parent pattern statement?");
   }
 
   // Otherwise, check if we have to walk our case stmt's var decl list to find
@@ -5290,7 +5274,7 @@ TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
     return param->getTypeRepr();
 
   if (auto *parentPattern = dyn_cast_or_null<TypedPattern>(getParentPattern()))
-      return parentPattern->getTypeLoc().getTypeRepr();
+    return parentPattern->getTypeRepr();
 
   return nullptr;
 }

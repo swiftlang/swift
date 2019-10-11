@@ -2110,7 +2110,6 @@ applyPropertyOwnership(VarDecl *prop,
   if (attrs & clang::ObjCPropertyDecl::OBJC_PR_weak) {
     prop->getAttrs().add(new (ctx)
                              ReferenceOwnershipAttr(ReferenceOwnership::Weak));
-    prop->setType(WeakStorageType::get(prop->getType(), ctx));
     prop->setInterfaceType(WeakStorageType::get(
         prop->getInterfaceType(), ctx));
     return;
@@ -2119,7 +2118,6 @@ applyPropertyOwnership(VarDecl *prop,
       (attrs & clang::ObjCPropertyDecl::OBJC_PR_unsafe_unretained)) {
     prop->getAttrs().add(
         new (ctx) ReferenceOwnershipAttr(ReferenceOwnership::Unmanaged));
-    prop->setType(UnmanagedStorageType::get(prop->getType(), ctx));
     prop->setInterfaceType(UnmanagedStorageType::get(
         prop->getInterfaceType(), ctx));
     return;

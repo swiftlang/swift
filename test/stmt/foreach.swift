@@ -6,6 +6,7 @@ struct BadContainer1 {
 
 func bad_containers_1(bc: BadContainer1) {
   for e in bc { } // expected-error{{type 'BadContainer1' does not conform to protocol 'Sequence'}}
+  // expected-error@-1{{variable 'e' is not bound by any pattern}}
 }
 
 struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does not conform to protocol 'Sequence'}}
@@ -14,6 +15,7 @@ struct BadContainer2 : Sequence { // expected-error{{type 'BadContainer2' does n
 
 func bad_containers_2(bc: BadContainer2) {
   for e in bc { }
+  // expected-error@-1{{variable 'e' is not bound by any pattern}}
 }
 
 struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does not conform to protocol 'Sequence'}}
@@ -22,6 +24,7 @@ struct BadContainer3 : Sequence { // expected-error{{type 'BadContainer3' does n
 
 func bad_containers_3(bc: BadContainer3) {
   for e in bc { }
+  // expected-error@-1{{variable 'e' is not bound by any pattern}}
 }
 
 struct BadIterator1 {}
@@ -33,6 +36,7 @@ struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does n
 
 func bad_containers_4(bc: BadContainer4) {
   for e in bc { }
+  // expected-error@-1{{variable 'e' is not bound by any pattern}}
 }
 
 // Pattern type-checking
@@ -126,6 +130,7 @@ func testForEachInference() {
 
   // Overloaded sequence not resolved contextually
   for v in getOvlSeq() { } // expected-error{{ambiguous use of 'getOvlSeq()'}}
+  // expected-error@-1{{variable 'v' is not bound by any pattern}}
 
   // Generic sequence resolved contextually
   for i: Int in getGenericSeq() { }
@@ -174,12 +179,14 @@ func testOptionalSequence() {
   for x in array {  // expected-error {{value of optional type '[Int]?' must be unwrapped}}
     // expected-note@-1{{coalesce}}
     // expected-note@-2{{force-unwrap}}
+    // expected-error@-3{{variable 'x' is not bound by any pattern}}
   }
 }
 
 // Crash with (invalid) for each over an existential
 func testExistentialSequence(s: Sequence) { // expected-error {{protocol 'Sequence' can only be used as a generic constraint because it has Self or associated type requirements}}
   for x in s { // expected-error {{value of protocol type 'Sequence' cannot conform to 'Sequence'; only struct/enum/class types can conform to protocols}}
+    // expected-error@-1{{variable 'x' is not bound by any pattern}}
     _ = x
   }
 }

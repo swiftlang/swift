@@ -998,26 +998,12 @@ recur:
     if (var->isInvalid())
       type = ErrorType::get(Context);
 
-    Type interfaceType = type;
-    if (interfaceType->hasArchetype())
-      interfaceType = interfaceType->mapTypeOutOfContext();
-
     // In SIL mode, VarDecls are written as having reference storage types.
-    if (type->is<ReferenceStorageType>()) {
-      assert(interfaceType->is<ReferenceStorageType>());
-      type = type->getReferenceStorageReferent();
-    } else {
-      if (auto *attr = var->getAttrs().getAttribute<ReferenceOwnershipAttr>())
-        interfaceType = checkReferenceOwnershipAttr(var, interfaceType, attr);
-    }
+    type = type->getReferenceStorageReferent();
 
     // Note that the pattern's type does not include the reference storage type.
     P->setType(type);
-    var->setType(var->getDeclContext()->mapTypeIntoContext(interfaceType));
-    // If there's no parent pattern binding then take this opportunity to
-    // set the interface type as well.
-    if (var->getParentPatternBinding() == nullptr)
-      var->setInterfaceType(interfaceType);
+    var->setNamingPattern(NP);
 
     // FIXME: Should probably just remove the forbidden prefix stuff, it no
     // longer makes a lot of sense in a request-based world.
@@ -1542,7 +1528,6 @@ void TypeChecker::coerceParameterListToType(ParameterList *P, ClosureExpr *CE,
     // trying to coerce argument to contextual type would mean erasing
     // valuable diagnostic information.
     if (isValidType(ty) || shouldOverwriteParam(param)) {
-      param->setType(ty);
       param->setInterfaceType(ty->mapTypeOutOfContext());
     }
   };

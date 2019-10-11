@@ -616,15 +616,15 @@ struct PatternBindingWithTwoVars1 { var x = 3, y = x }
 // expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
 
 struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
-// expected-error@-1 {{type 'PatternBindingWithTwoVars2' has no member 'y'}}
+// expected-error@-1 {{variable 'y' is not bound by any pattern}}
 
 // This one should be accepted, but for now PatternBindingDecl validation
 // circularity detection is not fine grained enough.
 struct PatternBindingWithTwoVars3 { var x = y, y = x }
-// expected-error@-1 {{type 'PatternBindingWithTwoVars3' has no member 'y'}}
+// expected-error@-1 {{variable 'y' is not bound by any pattern}}
 
 // https://bugs.swift.org/browse/SR-9015
 func sr9015() {
-  let closure1 = { closure2() } // expected-error {{let 'closure1' references itself}}
+  let closure1 = { closure2() } // expected-error {{variable 'closure1' is not bound by any pattern}}
   let closure2 = { closure1() }
 }

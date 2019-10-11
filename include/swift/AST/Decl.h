@@ -71,6 +71,7 @@ namespace swift {
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class ModuleDecl;
+  class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -4773,6 +4774,8 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
+  NamedPattern *NamingPattern = nullptr;
+
 public:
   enum class Introducer : uint8_t {
     Let = 0,
@@ -4785,8 +4788,6 @@ protected:
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
-
-  Type typeInContext;
 
 public:
   VarDecl(bool isStatic, Introducer introducer, bool isCaptureList,
@@ -4804,18 +4805,9 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  bool hasType() const {
-    // We have a type if either the type has been computed already or if
-    // this is a deserialized declaration with an interface type.
-    return !typeInContext.isNull();
-  }
-
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const;
-
-  /// Set the type of the variable within its context.
-  void setType(Type t);
 
   void markInvalid();
 
@@ -4904,6 +4896,9 @@ public:
     assert(v && v != this);
     Parent = v;
   }
+
+  NamedPattern *getNamingPattern() const { return NamingPattern; }
+  void setNamingPattern(NamedPattern *Pat) { NamingPattern = Pat; }
 
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's

@@ -233,7 +233,6 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   auto *Arg = new (Context) ParamDecl(
       SourceLoc(), SourceLoc(), Identifier(), Loc,
       Context.getIdentifier("arg"), /*DC*/ newTopLevel);
-  Arg->setType(E->getType());
   Arg->setInterfaceType(E->getType());
   Arg->setSpecifier(ParamSpecifier::Default);
   auto params = ParameterList::createWithoutLoc(Arg);
@@ -314,7 +313,6 @@ void REPLChecker::processREPLTopLevelExpr(Expr *E) {
   VarDecl *vd = new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                                       /*IsCaptureList*/false, E->getStartLoc(),
                                       name, &SF);
-  vd->setType(E->getType());
   vd->setInterfaceType(E->getType());
   SF.Decls.push_back(vd);
 
@@ -390,7 +388,6 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
                                         VarDecl::Introducer::Let,
                                         /*IsCaptureList*/false,
                                         PBD->getStartLoc(), name, &SF);
-    vd->setType(pattern->getType());
     vd->setInterfaceType(pattern->getType());
     SF.Decls.push_back(vd);
 

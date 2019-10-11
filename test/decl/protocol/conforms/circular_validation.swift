@@ -10,6 +10,7 @@ protocol P {
 struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}}
   static var x = 0 // expected-note {{candidate operates on a type, not an instance as required}}
   var x = S.x // expected-note {{candidate references itself}}
+  // expected-error@-1 {{variable 'x' is not bound by any pattern}}
 }
 
 // FIXME: Lousy diagnostics on this case.

@@ -721,9 +721,6 @@ static void checkRedeclaration(ASTContext &ctx, ValueDecl *current) {
 
     const auto markInvalid = [&current]() {
       current->setInvalid();
-      if (auto *varDecl = dyn_cast<VarDecl>(current))
-        if (varDecl->hasType())
-          varDecl->setType(ErrorType::get(varDecl->getType()));
       if (current->hasInterfaceType())
         current->setInterfaceType(ErrorType::get(current->getInterfaceType()));
     };
@@ -2395,7 +2392,7 @@ public:
   }
 
   void visitBoundVars(Pattern *P) {
-    P->forEachVariable([&] (VarDecl *VD) { this->visitBoundVariable(VD); });
+    P->forEachVariable([&](VarDecl *VD) { this->visitBoundVariable(VD); });
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *PBD) {
@@ -2462,8 +2459,7 @@ public:
         auto markVarAndPBDInvalid = [PBD, var] {
           PBD->setInvalid();
           var->setInvalid();
-          if (!var->hasType())
-            var->markInvalid();
+          var->markInvalid();
         };
         
         // Properties with an opaque return type need an initializer to
@@ -4242,28 +4238,58 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
     auto *PBD = VD->getParentPatternBinding();
+    if (PBD) {
+      // If we're not being validated, validate our parent pattern binding and
+      // attempt to infer the interface type using the initializer expressions.
+      if (!PBD->isBeingValidated()) {
+        validatePatternBindingEntries(*this, PBD);
+      }
 
-    // Note that we need to handle the fact that some VarDecls don't
-    // have a PatternBindingDecl, for example the iterator in a
-    // 'for ... in ...' loop.
-    if (PBD == nullptr) {
+      if (PBD->isInvalid()) {
+        VD->getParentPattern()->setType(ErrorType::get(Context));
+        setBoundVarsTypeError(VD->getParentPattern(), Context);
+        break;
+      }
+    } else if (!VD->getParentPatternStmt() && !VD->getParentVarDecl()) {
+      // No parent?  That's an error.
       VD->markInvalid();
       break;
     }
 
-    // If we're not being validated, validate our parent pattern binding and
-    // attempt to infer the interface type using the initializer expressions.
-    if (!PBD->isBeingValidated()) {
-      validatePatternBindingEntries(*this, PBD);
+    // Go digging for the named pattern that declares this variable.
+    auto *namingPattern = VD->getNamingPattern();
+    if (!namingPattern) {
+      auto *canVD = VD->getCanonicalVarDecl();
+      namingPattern = canVD->getNamingPattern();
+
+      // HACK: If no other diagnostic applies, emit a generic diagnostic about
+      // a variable being unbound. We can't do better than this at the
+      // moment because TypeCheckPattern does not reliably invalidate parts of
+      // the pattern AST on failure.
+      //
+      // Once that's through, this will only fire during circular validation.
+      if (!namingPattern) {
+        if (!VD->isInvalid() && !VD->getParentPattern()->isImplicit()) {
+          VD->diagnose(diag::variable_bound_by_no_pattern, VD->getName());
+        }
+
+        VD->getParentPattern()->setType(ErrorType::get(Context));
+        setBoundVarsTypeError(VD->getParentPattern(), Context);
+        VD->markInvalid();
+        break;
+      }
+    }
+    assert(namingPattern && "Bound variable with no naming pattern!");
+
+    if (!namingPattern->hasType()) {
+      namingPattern->setType(ErrorType::get(Context));
+      setBoundVarsTypeError(namingPattern, Context);
     }
 
-    auto parentPattern = VD->getParentPattern();
-    if (PBD->isInvalid() || !parentPattern->hasType()) {
-      parentPattern->setType(ErrorType::get(Context));
-      setBoundVarsTypeError(parentPattern, Context);
-    }
+    Type interfaceType = namingPattern->getType();
+    if (interfaceType->hasArchetype())
+      interfaceType = interfaceType->mapTypeOutOfContext();
 
-    auto interfaceType = parentPattern->getType()->mapTypeOutOfContext();
     // In SIL mode, VarDecls are written as having reference storage types.
     if (!interfaceType->is<ReferenceStorageType>()) {
       if (auto *attr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>())
