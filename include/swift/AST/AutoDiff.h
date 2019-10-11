@@ -19,10 +19,12 @@
 #ifndef SWIFT_AST_AUTODIFF_H
 #define SWIFT_AST_AUTODIFF_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/AST/IndexSubset.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallBitVector.h"
@@ -34,6 +36,7 @@ namespace swift {
 class ASTContext;
 class AnyFunctionType;
 class SILFunctionType;
+template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 

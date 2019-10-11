@@ -12,12 +12,9 @@
 
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILLinkage.h"
-#include "swift/Basic/LLVM.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
