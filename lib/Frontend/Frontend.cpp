@@ -511,11 +511,11 @@ Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPre
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
     return ModuleBuffers(std::move(*inputFileOrErr));
 
-  return ModuleBuffers(
-    std::move(*inputFileOrErr),
-    openModuleDoc(input).getValueOr(nullptr),
-    openModuleSourceInfo(input).getValueOr(nullptr)
-  );
+  auto swiftdoc = openModuleDoc(input);
+  auto sourceinfo = openModuleSourceInfo(input);
+  return ModuleBuffers(std::move(*inputFileOrErr),
+                       swiftdoc.hasValue() ? std::move(swiftdoc.getValue()) : nullptr,
+                       sourceinfo.hasValue() ? std::move(sourceinfo.getValue()) : nullptr);
 }
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
