@@ -4634,9 +4634,9 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   if (existing)
     return existing;
   auto sizeToAlloc = sizeof(IndexSubset) +
-    getNumBitWordsNeededForCapacity(capacity);
+      getNumBitWordsNeededForCapacity(capacity);
   auto *buf = reinterpret_cast<IndexSubset *>(
-    ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
+      ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
   auto *newNode = new (buf) IndexSubset(indices);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
