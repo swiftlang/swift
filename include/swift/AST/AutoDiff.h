@@ -243,8 +243,7 @@ public:
 /// derivative generic signature.
 // TODO(TF-893): Unify with `AutoDiffDerivativeFunctionIdentifier`.
 using SILDifferentiabilityWitnessKey =
-std::tuple<StringRef, AutoDiffIndexSubset *,
-           AutoDiffIndexSubset *, GenericSignature *>;
+    std::tuple<StringRef, IndexSubset *, IndexSubset *, GenericSignature *>;
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {

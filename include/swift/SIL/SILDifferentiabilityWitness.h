@@ -49,9 +49,9 @@ private:
   /// The original function.
   SILFunction *originalFunction;
   /// The parameter indices.
-  AutoDiffIndexSubset *parameterIndices;
+  IndexSubset *parameterIndices;
   /// The result indices.
-  AutoDiffIndexSubset *resultIndices;
+  IndexSubset *resultIndices;
   /// The derivative generic signature (optional).
   GenericSignature *derivativeGenericSignature;
   /// The JVP (Jacobian-vector products) derivative function.
@@ -64,8 +64,8 @@ private:
 
   SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
                               SILFunction *originalFunction,
-                              AutoDiffIndexSubset *parameterIndices,
-                              AutoDiffIndexSubset *resultIndices,
+                              IndexSubset *parameterIndices,
+                              IndexSubset *resultIndices,
                               GenericSignature *derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized)
@@ -77,7 +77,7 @@ private:
 public:
   static SILDifferentiabilityWitness *create(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-      AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
       GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
       bool isSerialized);
 
@@ -85,10 +85,10 @@ public:
   SILModule &getModule() const { return module; }
   SILLinkage getLinkage() const { return linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }
-  AutoDiffIndexSubset *getParameterIndices() const {
+  IndexSubset *getParameterIndices() const {
     return parameterIndices;
   }
-  AutoDiffIndexSubset *getResultIndices() const {
+  IndexSubset *getResultIndices() const {
     return resultIndices;
   }
   GenericSignature *getDerivativeGenericSignature() const {

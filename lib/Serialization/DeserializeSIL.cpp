@@ -3346,11 +3346,11 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   assert(parameterAndResultIndices.size() ==
              numParameterIndices + numResultIndices &&
          "Parameter/result indices count mismatch");
-  auto *parameterIndices = AutoDiffIndexSubset::get(
+  auto *parameterIndices = IndexSubset::get(
       MF->getContext(), original->getLoweredFunctionType()->getNumParameters(),
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_front(numParameterIndices));
-  auto *resultIndices = AutoDiffIndexSubset::get(
+  auto *resultIndices = IndexSubset::get(
       MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));

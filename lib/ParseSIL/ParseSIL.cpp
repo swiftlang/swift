@@ -6860,8 +6860,8 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
 
   SourceLoc lastLoc = P.getEndOfPreviousLoc();
   // Parse an index subset, prefaced with the given label.
-  auto parseAutoDiffIndexSubset =
-      [&](StringRef label, AutoDiffIndexSubset *& paramIndexSubset) -> bool {
+  auto parseIndexSubset =
+      [&](StringRef label, IndexSubset *& indexSubset) -> bool {
     if (P.parseSpecificIdentifier(
           label, diag::sil_diff_witness_expected_keyword, label))
       return true;
@@ -6892,16 +6892,16 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
     auto maxIndexRef =
         std::max_element(paramIndices.begin(), paramIndices.end());
-    paramIndexSubset = AutoDiffIndexSubset::get(
+    indexSubset = IndexSubset::get(
         P.Context, maxIndexRef ? *maxIndexRef + 1 : 0, paramIndices);
     return false;
   };
   // Parse parameter and result indices.
-  AutoDiffIndexSubset *parameterIndices = nullptr;
-  AutoDiffIndexSubset *resultIndices = nullptr;
-  if (parseAutoDiffIndexSubset("parameters", parameterIndices))
+  IndexSubset *parameterIndices = nullptr;
+  IndexSubset *resultIndices = nullptr;
+  if (parseIndexSubset("parameters", parameterIndices))
     return true;
-  if (parseAutoDiffIndexSubset("results", resultIndices))
+  if (parseIndexSubset("results", resultIndices))
     return true;
 
   // Parse a trailing 'where' clause (optional).

@@ -19,7 +19,7 @@ using namespace swift;
 
 SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
-    AutoDiffIndexSubset *parameterIndices, AutoDiffIndexSubset *resultIndices,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
     GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
     bool isSerialized) {
   void *buf = module.allocate(sizeof(SILDifferentiabilityWitness),
