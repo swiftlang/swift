@@ -1,4 +1,4 @@
-//===--- IndexSubset.h - Fixed-size subset of indices ---------------------===//
+//===---------- IndexSubset.h - Fixed-size subset of indices --------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -82,8 +82,8 @@ private:
   }
 
   explicit IndexSubset(const SmallBitVector &indices)
-  : capacity((unsigned)indices.size()),
-  numBitWords(getNumBitWordsNeededForCapacity(capacity)) {
+      : capacity((unsigned)indices.size()),
+        numBitWords(getNumBitWordsNeededForCapacity(capacity)) {
     std::uninitialized_fill_n(getBitWordsData(), numBitWords, 0);
     for (auto i : indices.set_bits()) {
       unsigned bitWordIndex, offset;
