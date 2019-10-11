@@ -119,7 +119,7 @@ bb0(%0 : $*Y, %1 : $X):
 // CHECK-LABEL: CG of deferringEdge
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: ([rc] %4)
 // CHECK-NEXT:    Arg %1 Esc: A, Succ:
-// CHECK-NEXT:    Val %3 Esc: %3, Succ: ([rc] %4), %0
+// CHECK-NEXT:    Val %3 Esc: %0,%3, Succ: ([rc] %4), %0
 // CHECK-NEXT:    Con [rc] %4 Esc: A, Succ: (%4.1)
 // CHECK-NEXT:    Con %4.1 Esc: A, Succ: %1
 // CHECK-NEXT:    Ret return Esc: R, Succ: %0
@@ -153,8 +153,8 @@ bb0:
 // CHECK-NEXT:    Val %1 Esc: A, Succ: ([rc] %2)
 // CHECK-NEXT:    Con [rc] %2 Esc: A, Succ: (%13)
 // CHECK-NEXT:    Val %4 Esc: A, Succ: ([rc] %2)
-// CHECK-NEXT:    Val %7 Esc: %11, Succ: ([rc] %2)
-// CHECK-NEXT:    Val %11 Esc: %11, Succ: ([rc] %2), %7, %13
+// CHECK-NEXT:    Val %7 Esc: %0,%11, Succ: ([rc] %2)
+// CHECK-NEXT:    Val %11 Esc: %0,%11, Succ: ([rc] %2), %7, %13
 // CHECK-NEXT:    Con %13 Esc: A, Succ: %0, %1, %4
 // CHECK-NEXT:    Ret return Esc: R, Succ: %13
 // CHECK-NEXT:  End
@@ -212,7 +212,7 @@ bb0(%0 : $LinkedNode):
 
 // CHECK-LABEL: CG of loadNext
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: ([rc] %3)
-// CHECK-NEXT:    Val %2 Esc: %2, Succ: ([rc] %3), %0, %4
+// CHECK-NEXT:    Val %2 Esc: %0,%2, Succ: ([rc] %3), %0, %4
 // CHECK-NEXT:    Con [rc] %3 Esc: A, Succ: (%4)
 // CHECK-NEXT:    Con %4 Esc: A, Succ: ([rc] %3)
 // CHECK-NEXT:    Ret return Esc: R, Succ: %4
@@ -407,11 +407,11 @@ sil @call_copy_addr_content : $@convention(thin) () -> () {
 // CHECK-NEXT:    Arg %1 Esc: G, Succ:
 // CHECK-NEXT:    Arg %2 Esc: A, Succ: (%2.1)
 // CHECK-NEXT:    Con %2.1 Esc: G, Succ:
-// CHECK-NEXT:    Val %3 Esc: %14,%15,%17, Succ: ([rc] %7)
-// CHECK-NEXT:    Val %6 Esc: %14,%15,%16, Succ: ([rc] %7)
+// CHECK-NEXT:    Val %3 Esc: %14,%15,%16,%17, Succ: ([rc] %7)
+// CHECK-NEXT:    Val %6 Esc: %14,%15,%16,%17, Succ: ([rc] %7)
 // CHECK-NEXT:    Con [rc] %7 Esc: %14,%15,%16,%17, Succ: (%7.1)
-// CHECK-NEXT:    Con %7.1 Esc: %14,%15,%16,%17, Succ: %2
-// CHECK-NEXT:    Val %12 Esc: %14,%15, Succ: %3, %6
+// CHECK-NEXT:    Con %7.1 Esc: %2,%14,%15,%16,%17, Succ: %2
+// CHECK-NEXT:    Val %12 Esc: %14,%15,%16,%17, Succ: %3, %6
 // CHECK-NEXT:  End
 sil @test_partial_apply : $@convention(thin) (Int64, @owned X, @owned Y) -> Int64 {
 bb0(%0 : $Int64, %1 : $X, %2 : $Y):
@@ -443,7 +443,7 @@ bb0(%0 : $Int64, %1 : $X, %2 : $Y):
 // CHECK-NEXT:    Con [rc] %4 Esc: A, Succ: (%4.1)
 // CHECK-NEXT:    Con %4.1 Esc: A, Succ: ([rc] %4.2)
 // CHECK-NEXT:    Con [rc] %4.2 Esc: G, Succ:
-// CHECK-NEXT:    Val %7 Esc: %8, Succ: %2
+// CHECK-NEXT:    Val %7 Esc: %2,%8, Succ: %2
 // CHECK-NEXT:  End
 sil @closure1 : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Int64>, @owned <τ_0_0> { var τ_0_0 } <Y>) -> Int64 {
 bb0(%0 : $X, %1 : $<τ_0_0> { var τ_0_0 } <Int64>, %2 : $<τ_0_0> { var τ_0_0 } <Y>):
@@ -762,7 +762,7 @@ sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error 
 // CHECK-NEXT:    Con %0.1 Esc: G, Succ:
 // CHECK-NEXT:    Val %1 Esc: %6, Succ: ([rc] %2)
 // CHECK-NEXT:    Con [rc] %2 Esc: %6, Succ: (%2.1)
-// CHECK-NEXT:    Con %2.1 Esc: %6, Succ: %0
+// CHECK-NEXT:    Con %2.1 Esc: %0,%6, Succ: %0
 // CHECK-NEXT:    Val %5 Esc: %6, Succ: %1
 // CHECK-NEXT:  End
 sil @test_release_of_partial_apply_with_box : $@convention(thin) (@owned Y) -> () {
@@ -970,7 +970,7 @@ bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: 
 // CHECK-NEXT:    Val %1 Esc: , Succ: (%2)
 // CHECK-NEXT:    Con %2 Esc: , Succ: (%2.1)
-// CHECK-NEXT:    Con %2.1 Esc: , Succ: %0
+// CHECK-NEXT:    Con %2.1 Esc: %0, Succ: %0
 // CHECK-NEXT:  End
 sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
@@ -1076,9 +1076,9 @@ sil_global @global_y : $SomeData
 // CHECK-LABEL: CG of test_node_merge_during_struct_inst
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%8)
 // CHECK-NEXT:    Val %1 Esc: G, Succ: (%8)
-// CHECK-NEXT:    Val %4 Esc: , Succ: (%8)
+// CHECK-NEXT:    Val %4 Esc: %0, Succ: (%8)
 // CHECK-NEXT:    Con %8 Esc: G, Succ: (%8), %1
-// CHECK-NEXT:    Val %10 Esc: , Succ: %0, %4, %8
+// CHECK-NEXT:    Val %10 Esc: %0, Succ: %0, %4, %8
 // CHECK-NEXT:  End
 sil @test_node_merge_during_struct_inst : $@convention(thin) (Y) -> () {
 bb0(%0 : $Y):
@@ -1183,7 +1183,7 @@ bb0(%0 : $*Array<X>):
 // CHECK-LABEL: CG of arraysemantics_get_element_address
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: ([rc] %0.1)
 // CHECK-NEXT:    Con [rc] %0.1 Esc: A, Succ: 
-// CHECK-NEXT:    Val %4 Esc: , Succ: [rc] %0.1
+// CHECK-NEXT:    Val %4 Esc: %0,%4, Succ: [rc] %0.1
 // CHECK-NEXT:  End
 sil @arraysemantics_get_element_address : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
@@ -1540,10 +1540,10 @@ bb0:
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: ([rc] %0.1)
 // CHECK-NEXT:    Con [rc] %0.1 Esc: A, Succ: (%0.2)
 // CHECK-NEXT:    Con %0.2 Esc: A, Succ: ([rc] %13)
-// CHECK-NEXT:    Val %2 Esc: %4, Succ: %0.2
-// CHECK-NEXT:    Val %4 Esc: %4, Succ: %2
-// CHECK-NEXT:    Val %7 Esc: %12, Succ: ([rc] %13), %0.2
-// CHECK-NEXT:    Val %12 Esc: %12, Succ: ([rc] %13), %7
+// CHECK-NEXT:    Val %2 Esc: %0,%2,%4,%7,%12, Succ: %0.2
+// CHECK-NEXT:    Val %4 Esc: %0,%2,%4,%7,%12, Succ: %2
+// CHECK-NEXT:    Val %7 Esc: %0,%2,%4,%7,%12, Succ: ([rc] %13), %0.2
+// CHECK-NEXT:    Val %12 Esc: %0,%2,%4,%7,%12, Succ: ([rc] %13), %7
 // CHECK-NEXT:    Con [rc] %13 Esc: A, Succ: (%14)
 // CHECK-NEXT:    Con %14 Esc: A, Succ: 
 // CHECK-LABEL: End
@@ -1597,10 +1597,10 @@ bb10(%arg2 : $LinkedNode):
 // CHECK-NEXT:    Arg %1 Esc: A, Succ: ([rc] %2)
 // CHECK-NEXT:    Con [rc] %2 Esc: A, Succ: (%3)
 // CHECK-NEXT:    Con %3 Esc: A, Succ: 
-// CHECK-NEXT:    Val %7 Esc: %7,%18, Succ: %0
-// CHECK-NEXT:    Val %12 Esc: %12,%14,%18, Succ: %1
-// CHECK-NEXT:    Val %14 Esc: %18, Succ: ([rc] %2), %1, %12
-// CHECK-NEXT:    Val %18 Esc: %18, Succ: %7, %14
+// CHECK-NEXT:    Val %7 Esc: %0,%1,%7,%12,%14,%18, Succ: %0
+// CHECK-NEXT:    Val %12 Esc: %0,%1,%7,%12,%14,%18, Succ: %1
+// CHECK-NEXT:    Val %14 Esc: %0,%1,%7,%12,%14,%18, Succ: ([rc] %2), %1, %12
+// CHECK-NEXT:    Val %18 Esc: %0,%1,%7,%12,%14,%18, Succ: %7, %14
 // CHECK-LABEL: End
 sil @testInitializePointsToMerge : $@convention(method) (@guaranteed C, @guaranteed C) -> C {
 bb0(%0: $C, %1 : $C):

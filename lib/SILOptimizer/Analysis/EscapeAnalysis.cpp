@@ -856,8 +856,11 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
     Changed = false;
     for (CGNode *Node : Nodes) {
       // Propagate the bits to all successor nodes.
-      Node->visitSuccessors([&Changed, Node](CGNode *succ) {
-        Changed |= succ->mergeUsePoints(Node);
+      if (Node->pointsTo) {
+        Changed |= Node->pointsTo->mergeUsePoints(Node);
+      }
+      Node->visitDefers([&Changed, Node](CGNode *defer, bool) {
+        Changed |= defer->mergeUsePoints(Node);
         return true;
       });
     }
@@ -2357,24 +2360,29 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
   if (ConGraph->isUsePoint(UsePoint, Node))
     return true;
 
-  assert(isPointer(V) && "should not have a node for a non-pointer");
+  // TODO: should we just check the Node->hasRC flag here? Currently it is
+  // not safe because this flag may be conservatively false.
+  if (V->getType().hasReferenceSemantics()) {
+    // In case V is the result of getUnderlyingObject, we also have to check
+    // the content node. Example:
+    //
+    //   %a = ref_element %r
+    //   apply %f(%a)
+    //
+    // The reference %r does not actually escape to the function call. But in
+    // case this API is called like
+    //
+    //   canEscapeToUsePoint(getUnderlyingObject(applyArgument))
+    //
+    // it would yield false, although the projected object address is passed to
+    // the function.
+    CGNode *ContentNode = getValueContent(ConGraph, V);
+    if (ContentNode->escapesInsideFunction(V))
+      return true;
 
-  // Check if the object "content" can escape to the called function.
-  // This will catch cases where V is a reference and a pointer to a stored
-  // property escapes.
-  // It's also important in case of a pointer assignment, e.g.
-  //    V = V1
-  //    apply(V1)
-  // In this case the apply is only a use-point for V1 and V1's content node.
-  // As V1's content node is the same as V's content node, we also make the
-  // check for the content node.
-  CGNode *ContentNode = getValueContent(ConGraph, V);
-  if (ContentNode->escapesInsideFunction(V))
-    return true;
-
-  if (ConGraph->isUsePoint(UsePoint, ContentNode))
-    return true;
-
+    if (ConGraph->isUsePoint(UsePoint, ContentNode))
+      return true;
+  }
   return false;
 }
 

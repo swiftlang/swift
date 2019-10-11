@@ -701,9 +701,6 @@ public:
 
     /// Adds an argument/instruction in which the node's value is used.
     int addUsePoint(CGNode *Node, SILNode *User) {
-      if (Node->getEscapeState() >= EscapeState::Global)
-        return -1;
-
       User = User->getRepresentativeSILNodeInObject();
       int Idx = (int)UsePoints.size();
       assert(UsePoints.count(User) == 0 && "value is already a use-point");
