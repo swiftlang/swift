@@ -278,7 +278,7 @@ bool CaseLabelItem::isSyntacticallyExhaustive() const {
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
   for (auto clause : getCatches()) {
     for (auto &LabelItem : clause->getCaseLabelItems()) {
-      if (LabelItem.isSyntacticallyExhaustive())
+      if (LabelItem.getGuardExpr() == nullptr && !LabelItem.getPattern()->isRefutablePattern())
         return true;
     }
   }

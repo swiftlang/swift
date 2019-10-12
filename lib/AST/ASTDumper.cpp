@@ -1720,6 +1720,7 @@ public:
     Indent -= 2;
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
+
   void visitCatches(ArrayRef<CaseStmt *> clauses) {
     for (auto clause : clauses) {
       visitCaseStmt(clause);
