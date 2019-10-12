@@ -157,9 +157,7 @@ protected:
 
   /// \returns true is locator hasn't been simplified down to expression.
   bool hasComplexLocator() const {
-    bool isExplicitCoercion =
-        getLocator()->isLastElement<LocatorPathElt::ExplicitTypeCoercion>();
-    return HasComplexLocator && !isExplicitCoercion;
+    return HasComplexLocator;
   }
 
   /// \returns A parent expression if sub-expression is contained anywhere

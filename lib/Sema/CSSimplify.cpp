@@ -3534,28 +3534,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       if (result.isSuccess() || !shouldAttemptFixes())
         return result;
     }
-
-    auto last = locator.last();
-    if (last && last->is<LocatorPathElt::ExplicitTypeCoercion>()) {
-      bool hasDeepEqualityRestriction = llvm::any_of(
-          conversionsOrFixes, [](const RestrictionOrFix &entry) -> bool {
-            return entry.IsRestriction &&
-                   entry.getRestriction() ==
-                       ConversionRestrictionKind::DeepEquality;
-          });
-
-      // If there is a deep equality restriction already recorded
-      // or the toType of the coercion is a existential,
-      // let's skip this force downcast here because the actual correct
-      // fix is going to be added later.
-      if (!hasDeepEqualityRestriction && !type2->isExistentialType()) {
-        // At this point both desugared types are different,
-        // so this fix it to diagnose a failure conversion.
-        auto *fix = ForceDowncast::create(*this, type1, type2,
-                                          getConstraintLocator(locator));
-        conversionsOrFixes.push_back(fix);
-      }
-    }
   }
 
   if (kind >= ConstraintKind::Subtype) {
@@ -8119,20 +8097,11 @@ void ConstraintSystem::addExplicitConversionConstraint(
   SmallVector<Constraint *, 3> constraints;
 
   auto locatorPtr = getConstraintLocator(locator);
-  auto *coerceLocator = locatorPtr;
-
-  if (allowFixes && shouldAttemptFixes()) {
-    auto *anchor = locator.getAnchor();
-    if (isa<CoerceExpr>(anchor) && !anchor->isImplicit()) {
-      coerceLocator =
-          getConstraintLocator(anchor, LocatorPathElt::ExplicitTypeCoercion());
-    }
-  }
 
   // Coercion (the common case).
   Constraint *coerceConstraint =
     Constraint::create(*this, ConstraintKind::Conversion,
-                       fromType, toType, coerceLocator);
+                       fromType, toType, locatorPtr);
   coerceConstraint->setFavored();
   constraints.push_back(coerceConstraint);
 
@@ -8141,14 +8110,6 @@ void ConstraintSystem::addExplicitConversionConstraint(
   Constraint::create(*this, ConstraintKind::BridgingConversion,
                      fromType, toType, locatorPtr);
   constraints.push_back(bridgingConstraint);
-
-  if (allowFixes && shouldAttemptFixes()) {
-    Constraint *downcastConstraint =
-        Constraint::createFixed(*this, ConstraintKind::CheckedCast,
-                                CoerceToCheckedCast::create(*this, locatorPtr),
-                                fromType, toType, locatorPtr);
-    constraints.push_back(downcastConstraint);
-  }
 
   addDisjunctionConstraint(constraints, locator,
                            allowFixes ? RememberChoice

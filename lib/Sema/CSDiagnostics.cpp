@@ -1067,17 +1067,9 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
 
   bool useAs = TC.isExplicitlyConvertibleTo(fromType, toType, DC);
   bool useAsBang = !useAs && TC.checkedCastMaySucceed(fromType, toType, DC);
-  bool isNonContextualExplicitCoercion =
-      getLocator()->isLastElement<LocatorPathElt::ExplicitTypeCoercion>() &&
-      getContextualTypePurpose() == CTP_Unused;
-  if (!useAs && !useAsBang) {
-    if (isNonContextualExplicitCoercion) {
-      emitDiagnostic(getAnchor()->getLoc(), diag::cannot_convert_coerce,
-                     fromType, toType);
-      return true;
-    }
+  if (!useAs && !useAsBang)
     return false;
-  }
+  
 
   auto *expr = getParentExpr();
   // If we're performing pattern matching,
@@ -1088,27 +1080,6 @@ bool MissingExplicitConversionFailure::diagnoseAsError() {
       ValueDecl *decl0 = overloadedFn->getDecls()[0];
       if (decl0->getBaseName() == decl0->getASTContext().Id_MatchOperator)
         return false;
-    }
-  }
-
-  if (auto *coerceExpr = dyn_cast<CoerceExpr>(anchor)) {
-    auto subExpr = coerceExpr->getSubExpr();
-    auto castKind =
-        TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
-                                getDC(), coerceExpr->getLoc(), subExpr,
-                                coerceExpr->getCastTypeLoc().getSourceRange());
-    switch (castKind) {
-    case CheckedCastKind::ArrayDowncast:
-    case CheckedCastKind::DictionaryDowncast:
-    case CheckedCastKind::SetDowncast:
-    case CheckedCastKind::ValueCast:
-      emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                     fromType, toType)
-          .highlight(coerceExpr->getSourceRange())
-          .fixItReplace(coerceExpr->getLoc(), "as!");
-      return true;
-    default:
-      break;
     }
   }
 
