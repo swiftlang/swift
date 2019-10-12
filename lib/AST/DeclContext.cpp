@@ -1043,6 +1043,17 @@ bool DeclContext::hasValueSemantics() const {
   return false;
 }
 
+bool DeclContext::isClassConstrainedProtocolExtension() const {
+  if (auto ED = dyn_cast<ExtensionDecl>(this)) {
+    if (ED->getExtendedType()->isExistentialType()) {
+      return ED->getGenericSignature()->requiresClass(
+          ED->getSelfInterfaceType());
+    }
+  }
+
+  return false;
+}
+
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:

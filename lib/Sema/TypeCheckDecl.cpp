@@ -2091,6 +2091,8 @@ llvm::Expected<SelfAccessKind>
 SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
     if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
+      if (FD->getDeclContext()->isClassConstrainedProtocolExtension())
+        return SelfAccessKind::Mutating;
       return SelfAccessKind::NonMutating;
     }
     return SelfAccessKind::Mutating;
