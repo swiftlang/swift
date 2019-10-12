@@ -910,8 +910,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   // Parse all the partial modules first.
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
-    if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer),
+    if (!SML->loadAST(*MainModule, SourceLoc(), /*moduleInterfacePath*/"",
+                      std::move(PM.ModuleBuffer), std::move(PM.ModuleDocBuffer),
                       std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
                       /*treatAsPartialModule*/true))
       hadLoadError = true;

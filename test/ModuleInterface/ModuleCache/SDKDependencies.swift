@@ -1,5 +1,3 @@
-// XFAIL: *
-
 // RUN: %empty-directory(%t)
 
 // 1) Build a prebuilt cache for our SDK

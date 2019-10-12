@@ -639,7 +639,8 @@ public:
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static serialization::ValidationInfo
-  load(std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
+  load(StringRef moduleInterfacePath,
+       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework, std::unique_ptr<ModuleFile> &theModule,
@@ -649,6 +650,8 @@ public:
                                    std::move(moduleDocInputBuffer),
                                    std::move(moduleSourceInfoInputBuffer),
                                    isFramework, info, extInfo));
+    if (!moduleInterfacePath.empty())
+      theModule->ModuleInterfacePath = moduleInterfacePath;
     return info;
   }
 

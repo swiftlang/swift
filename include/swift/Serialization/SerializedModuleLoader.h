@@ -51,6 +51,7 @@ protected:
 
   using AccessPathElem = std::pair<Identifier, SourceLoc>;
   bool findModule(AccessPathElem moduleID,
+                  SmallVectorImpl<char> *moduleInterfacePath,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
                   std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
@@ -72,6 +73,7 @@ protected:
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
       StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) = 0;
@@ -125,6 +127,7 @@ public:
   /// If the AST cannot be loaded and \p diagLoc is present, a diagnostic is
   /// printed. (Note that \p diagLoc is allowed to be invalid.)
   FileUnit *loadAST(ModuleDecl &M, Optional<SourceLoc> diagLoc,
+                    StringRef moduleInterfacePath,
                     std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
                     std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
@@ -176,6 +179,7 @@ class SerializedModuleLoader : public SerializedModuleLoaderBase {
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
       StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
@@ -218,6 +222,7 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
       StringRef ModuleDocFilename,
       StringRef ModuleSourceInfoFilename,
+      SmallVectorImpl<char> *ModuleInterfacePath,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
       std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) override;
