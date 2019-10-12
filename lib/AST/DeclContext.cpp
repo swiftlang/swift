@@ -1036,21 +1036,18 @@ DeclContextKind DeclContext::getContextKind() const {
 }
 
 bool DeclContext::hasValueSemantics() const {
-  if (auto contextTy = getSelfTypeInContext()) {
-    return !contextTy->hasReferenceSemantics();
-  }
+  if (getExtendedProtocolDecl())
+    return !isClassConstrainedProtocolExtension();
+  return !getDeclaredInterfaceType()->hasReferenceSemantics();
 
   return false;
 }
 
 bool DeclContext::isClassConstrainedProtocolExtension() const {
-  if (auto ED = dyn_cast<ExtensionDecl>(this)) {
-    if (ED->getExtendedType()->isExistentialType()) {
-      return ED->getGenericSignature()->requiresClass(
-          ED->getSelfInterfaceType());
-    }
+  if (getExtendedProtocolDecl()) {
+    auto ED = cast<ExtensionDecl>(this);
+    return ED->getGenericSignature()->requiresClass(ED->getSelfInterfaceType());
   }
-
   return false;
 }
 
