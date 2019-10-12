@@ -914,7 +914,7 @@ ExtractCheckResult checkExtractConditions(ResolvedRangeInfo &RangeInfo,
     Stmt *S = RangeInfo.ContainedNodes[0].get<Stmt *>();
 
     // These aren't independent statement.
-    if (isa<BraceStmt>(S) || isa<CatchStmt>(S) || isa<CaseStmt>(S))
+    if (isa<BraceStmt>(S) || isa<CaseStmt>(S))
       return ExtractCheckResult();
   }
 

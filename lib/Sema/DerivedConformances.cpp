@@ -562,8 +562,8 @@ DeclRefExpr *DerivedConformance::convertEnumToIndex(SmallVectorImpl<ASTNode> &st
     assignExpr->setType(TupleType::getEmpty(C));
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(assignExpr),
                                   SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
-                                     SourceLoc(), body,
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(),
+                                     labelItem, SourceLoc(), SourceLoc(), body,
                                      /*case body vardecls*/ None));
   }
 

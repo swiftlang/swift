@@ -551,8 +551,10 @@ private:
     } else if (auto *DCS = dyn_cast<DoCatchStmt>(S)) {
       if (!handleBraceStmt(DCS->getBody(), DCS->getDoLoc()))
         return Stop;
-    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      if (!handleBraceStmt(CS->getBody(), CS->getCatchLoc()))
+    } else if (isa<CaseStmt>(S) &&
+               cast<CaseStmt>(S)->getParentKind() == CaseParentKind::DoCatch) {
+      auto CS = cast<CaseStmt>(S);
+      if (!handleBraceStmt(CS->getBody(), CS->getLoc()))
         return Stop;
     } else if (auto *RWS = dyn_cast<RepeatWhileStmt>(S)) {
       if (!handleBraceStmt(RWS->getBody(), RWS->getRepeatLoc()))
@@ -1805,7 +1807,8 @@ private:
       return IndentContext {ContextLoc, false};
     }
 
-    if (auto *CS = dyn_cast<CaseStmt>(S)) {
+    auto *CS = dyn_cast<CaseStmt>(S);
+    if (CS && CS->getParentKind() == CaseParentKind::Switch) {
       if (TrailingTarget && !TrailingTarget->isEmpty())
         return None;
 
@@ -1854,7 +1857,7 @@ private:
       return IndentContext {DS->getStartLoc(), false};
     }
 
-    if (auto *CS = dyn_cast<CatchStmt>(S)) {
+    if (CS && CS->getParentKind() == CaseParentKind::DoCatch) {
       if (auto *BS = dyn_cast<BraceStmt>(CS->getBody())) {
         if (auto Ctx = getIndentContextFrom(BS, CS->getStartLoc()))
           return Ctx;

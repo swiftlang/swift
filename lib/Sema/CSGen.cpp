@@ -2623,31 +2623,35 @@ namespace {
 
         bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
           for (auto catchClause : stmt->getCatches()) {
-            if (isSyntacticallyExhaustive(catchClause))
-              return true;
+            for (auto &LabelItem : catchClause->getMutableCaseLabelItems()) {
+              if (isSyntacticallyExhaustive(catchClause->getStartLoc(),
+                                            LabelItem))
+                return true;
+            }
           }
 
           return false;
         }
 
-        bool isSyntacticallyExhaustive(CatchStmt *clause) {
+        bool isSyntacticallyExhaustive(SourceLoc CatchLoc,
+                                       CaseLabelItem &LabelItem) {
           // If it's obviously non-exhaustive, great.
-          if (clause->getGuardExpr())
+          if (LabelItem.getGuardExpr())
             return false;
 
           // If we can show that it's exhaustive without full
           // type-checking, great.
-          if (clause->isSyntacticallyExhaustive())
+          if (LabelItem.isSyntacticallyExhaustive())
             return true;
 
           // Okay, resolve the pattern.
-          Pattern *pattern = clause->getErrorPattern();
+          Pattern *pattern = LabelItem.getPattern();
           pattern = TypeChecker::resolvePattern(pattern, CS.DC,
-                                                /*isStmtCondition*/false);
+                                         /*isStmtCondition*/false);
           if (!pattern) return false;
 
           // Save that aside while we explore the type.
-          clause->setErrorPattern(pattern);
+          LabelItem.setPattern(pattern);
 
           // Require the pattern to have a particular shape: a number
           // of is-patterns applied to an irrefutable pattern.
@@ -2673,8 +2677,9 @@ namespace {
 
           // Okay, now it should be safe to coerce the pattern.
           // Pull the top-level pattern back out.
-          pattern = clause->getErrorPattern();
+          pattern = LabelItem.getPattern();
           Type exnType = CS.getASTContext().getErrorDecl()->getDeclaredType();
+
           if (!exnType)
             return false;
           auto contextualPattern =
@@ -2684,10 +2689,10 @@ namespace {
           if (!pattern)
             return false;
 
-          clause->setErrorPattern(pattern);
-          return clause->isSyntacticallyExhaustive();
+          LabelItem.setPattern(pattern);
+          return LabelItem.isSyntacticallyExhaustive();
         }
-        
+
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
           // If we've found a 'throw', record it and terminate the traversal.
           if (isa<ThrowStmt>(stmt)) {
