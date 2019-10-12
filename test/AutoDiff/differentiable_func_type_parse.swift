@@ -38,6 +38,5 @@ struct B {
   let property: @differentiable(linear) (linear) -> linear // okay
   let property: @differentiable linear // okay
   let property: linear // okay
-  // FIXME(bartchr): TF-576 have this able to be parsed.
-  //let property: @differentiable(linear) linear // okay
+  let property: @differentiable(linear) linear // okay
 }
