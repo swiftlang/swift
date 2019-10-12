@@ -5439,9 +5439,11 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
 RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
     DifferentiableFunctionExtractOriginalExpr *E, SGFContext C) {
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
-  auto *origFunc = SGF.B.createDifferentiableFunctionExtractOriginal(
-      E, diffFunc.forward(SGF));
-  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(origFunc));
+  auto borrowedDiffFunc = diffFunc.borrow(SGF, E);
+  auto *borrowedOrigFunc = SGF.B.createDifferentiableFunctionExtractOriginal(
+      E, borrowedDiffFunc.getValue());
+  auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
 }
 // SWIFT_ENABLE_TENSORFLOW END
 
