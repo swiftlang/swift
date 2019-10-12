@@ -1245,7 +1245,8 @@ synthesizeLazyGetterBody(AccessorDecl *Get, VarDecl *VD, VarDecl *Storage,
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.
-  Get->getImplicitSelfDecl()->setDeclContext(Get);
+  if (auto Self = Get->getImplicitSelfDecl())
+    Self->setDeclContext(Get);
 
   InitValue->walk(RecontextualizeClosures(Get));
 
@@ -2105,12 +2106,31 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   auto *InitExpr = new (Context) NilLiteralExpr(SourceLoc(), /*Implicit=*/true);
   InitExpr->setType(Storage->getType());
 
-  auto *PBD = PatternBindingDecl::createImplicit(
-      Context, StaticSpellingKind::None, PBDPattern, InitExpr,
-      VD->getDeclContext(), /*VarLoc*/ VD->getLoc());
-  PBD->setInitializerChecked(0);
+  // Create and set up an implicit pattern binding using the given DC.
+  auto createImplicitPBD = [&](DeclContext *DC) {
+    auto *PBD = PatternBindingDecl::createImplicit(
+        Context, StaticSpellingKind::None, PBDPattern, InitExpr,
+        DC, /*VarLoc*/ VD->getLoc());
+    PBD->setInitializerChecked(0);
 
-  addMemberToContextIfNeeded(PBD, VD->getDeclContext(), Storage);
+    return PBD;
+  };
+
+  // If this is top-level code, wrap the pattern binding with
+  // a TopLevelCodeDecl.
+  const auto DC = VD->getDeclContext();
+  if (const auto SF = dyn_cast<SourceFile>(DC)) {
+    assert(SF->isScriptMode() && "lazy var cannot be global");
+
+    const auto TLDC = new (Context) TopLevelCodeDecl(SF);
+    const auto B = BraceStmt::create(Context, VD->getLoc(),
+                                     {createImplicitPBD(TLDC)},
+                                     VD->getLoc(), /*implicit*/ true);
+    TLDC->setImplicit();
+    TLDC->setBody(B);
+  } else {
+    addMemberToContextIfNeeded(createImplicitPBD(DC), DC, Storage);
+  }
 
   return Storage;
 }

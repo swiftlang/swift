@@ -657,7 +657,7 @@ void AttributeChecker::visitNonOverrideAttr(NonOverrideAttr *attr) {
 }
 
 void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
-  // lazy may only be used on properties.
+  // lazy may only be used on a VarDecl.
   auto *VD = cast<VarDecl>(D);
 
   auto attrs = VD->getAttrs();
@@ -669,13 +669,10 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
 
   // 'lazy' is not allowed on a global variable or on a static property (which
   // are already lazily initialized).
-  // TODO: we can't currently support lazy properties on non-type-contexts.
   if (VD->isStatic() ||
       (varDC->isModuleScopeContext() &&
        !varDC->getParentSourceFile()->isScriptMode())) {
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
-  } else if (!VD->getDeclContext()->isTypeContext()) {
-    diagnoseAndRemoveAttr(attr, diag::lazy_must_be_property);
   }
 }
 

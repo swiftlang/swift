@@ -1310,6 +1310,18 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
+  // If this is a top-level lazy var, visit its storage first.
+  if (vd->getAttrs().hasAttribute<LazyAttr>()) {
+    const auto lazyStorage = vd->getLazyStorageProperty();
+    const auto td = dyn_cast<TopLevelCodeDecl>(
+        lazyStorage->getParentPatternBinding()->getDeclContext());
+
+    assert(td && "PBD for top-level lazy var not wrapped in a TopLevelCodeDecl");
+
+    visitTopLevelCodeDecl(td);
+    visitVarDecl(lazyStorage);
+  }
+
   if (vd->hasStorage())
     addGlobalVariable(vd);
 

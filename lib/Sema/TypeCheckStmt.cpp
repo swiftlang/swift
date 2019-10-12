@@ -127,6 +127,12 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
+        // Lazy var synthesized accessors are contextualized in-place.
+        if (const auto AD = dyn_cast<AccessorDecl>(CE->getParent()))
+          if (const auto VD = dyn_cast<VarDecl>(AD->getStorage()))
+            if (VD->getAttrs().hasAttribute<LazyAttr>())
+              return { false, E };
+
         // In the repl, the parent top-level context may have been re-written.
         if (CE->getParent() != ParentDC) {
           if ((CE->getParent()->getContextKind() !=
