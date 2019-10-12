@@ -5358,14 +5358,16 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     return;
 #endif
   auto origFnType = originalFunction->getLoweredFunctionType();
+  CanGenericSignature derivativeCanGenSig;
+  if (auto *derivativeGenSig = getDerivativeGenericSignature())
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
   if (jvp) {
     // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
     // to accept result indices.
     auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
         getParameterIndices(), /*resultIndex*/ *resultIndices->begin(),
         AutoDiffDerivativeFunctionKind::JVP, M.Types,
-        LookUpConformanceInModule(M.getSwiftModule()),
-        getDerivativeGenericSignature()->getCanonicalSignature());
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
     SILVerifier(*jvp).requireSameType(
         SILType::getPrimitiveObjectType(jvp->getLoweredFunctionType()),
         SILType::getPrimitiveObjectType(expectedJVPType),
@@ -5377,8 +5379,7 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
     auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
         getParameterIndices(), /*resultIndex*/ *resultIndices->begin(),
         AutoDiffDerivativeFunctionKind::VJP, M.Types,
-        LookUpConformanceInModule(M.getSwiftModule()),
-        getDerivativeGenericSignature()->getCanonicalSignature());
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
     SILVerifier(*vjp).requireSameType(
         SILType::getPrimitiveObjectType(vjp->getLoweredFunctionType()),
         SILType::getPrimitiveObjectType(expectedVJPType),

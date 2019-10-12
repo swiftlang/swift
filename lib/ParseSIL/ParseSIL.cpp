@@ -6805,17 +6805,17 @@ static void convertRequirements(Parser &P, SILFunction *F,
 
 /// decl-sil-differentiability-witness ::=
 ///   'sil_differentiability_witness'
+///   '[' 'parameters' index-subset ']'
+///   '[' 'results' index-subset ']'
+///   ('[' 'where' derivatve-generic-signature-requirements ']')?
 ///   sil-function-name ':' sil-type
-///   'parameters' autodiff-index-subset
-///   'results' autodiff-index-subset
-///   ('where' generic-signature)?
 ///   '{'
 ///   ('jvp' sil-function-name ':' sil-type)?
 ///   ('vjp' sil-function-name ':' sil-type)?
 ///   '}'
 ///
-/// autodiff-index-subset ::=
-///   '(' [0-9]+ (',', [0-9]+)* ')'
+/// index-subset ::=
+///   [0-9]+ (' ' [0-9]+)*
 bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   P.consumeToken(tok::kw_sil_differentiability_witness);
   SILParser State(P);
@@ -6853,20 +6853,16 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     State.TUState.PotentialZombieFns.insert(fn);
     return false;
   };
-  // Parse original function name.
-  SILFunction *originalFn;
-  if (parseFunctionName(originalFn))
-    return true;
 
   SourceLoc lastLoc = P.getEndOfPreviousLoc();
   // Parse an index subset, prefaced with the given label.
   auto parseIndexSubset =
       [&](StringRef label, IndexSubset *& indexSubset) -> bool {
+    if (P.parseToken(tok::l_square, diag::sil_diff_witness_expected_keyword,
+                     "["))
+      return true;
     if (P.parseSpecificIdentifier(
           label, diag::sil_diff_witness_expected_keyword, label))
-      return true;
-    if (P.parseToken(tok::l_paren, diag::sil_diff_witness_expected_keyword,
-                     "("))
       return true;
     // Parse parameter index list.
     SmallVector<unsigned, 8> paramIndices;
@@ -6884,11 +6880,11 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     if (parseParam())
       return true;
     // Parse rest.
-    while (P.consumeIf(tok::comma))
+    while (P.Tok.isNot(tok::r_square))
       if (parseParam())
         return true;
-    if (P.parseToken(tok::r_paren, diag::sil_diff_witness_expected_keyword,
-                     "("))
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_keyword,
+                     "]"))
       return true;
     auto maxIndexRef =
         std::max_element(paramIndices.begin(), paramIndices.end());
@@ -6907,18 +6903,33 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   // Parse a trailing 'where' clause (optional).
   // This represents derivative generic signature requirements.
   GenericSignature *derivativeGenSig = nullptr;
-  if (P.Tok.is(tok::kw_where)) {
-    SourceLoc whereLoc;
-    SmallVector<RequirementRepr, 4> requirementReprs;
+  SourceLoc whereLoc;
+  SmallVector<RequirementRepr, 4> derivativeRequirementReprs;
+  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::kw_where)) {
+    P.consumeToken(tok::l_square);
     bool firstTypeInComplete;
-    P.parseGenericWhereClause(whereLoc, requirementReprs, firstTypeInComplete,
+    P.parseGenericWhereClause(whereLoc, derivativeRequirementReprs,
+                              firstTypeInComplete,
                               /*AllowLayoutConstraints*/ false);
-    auto *whereClause = TrailingWhereClause::create(
-        originalFn->getModule().getASTContext(), whereLoc, requirementReprs);
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_keyword,
+                     "]"))
+      return true;
+  }
+
+  // Parse original function name.
+  SILFunction *originalFn;
+  if (parseFunctionName(originalFn))
+    return true;
+
+  // Resolve derivative requirements.
+  if (!derivativeRequirementReprs.empty()) {
     SmallVector<Requirement, 4> requirements;
+    auto *whereClause = TrailingWhereClause::create(
+        originalFn->getModule().getASTContext(), whereLoc,
+        derivativeRequirementReprs);
     convertRequirements(P, originalFn, whereClause->getRequirements(),
                         requirements);
-    assert(requirements.size() == requirementReprs.size());
+    assert(requirements.size() == derivativeRequirementReprs.size());
     derivativeGenSig = evaluateOrDefault(
         P.Context.evaluator,
         AbstractGenericSignatureRequest{

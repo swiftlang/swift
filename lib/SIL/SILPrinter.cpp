@@ -3060,24 +3060,24 @@ void SILDefaultWitnessTable::dump() const {
 // SWIFT_ENABLE_TENSORFLOW
 void SILDifferentiabilityWitness::print(
     llvm::raw_ostream &OS, bool verbose) const {
+  OS << "// differentiability witness for "
+     << demangleSymbol(originalFunction->getName()) << "\n";
   // sil_differentiability_witness @original-function-name : $original-sil-type
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
   OS << "sil_differentiability_witness ";
   printLinkage(OS, linkage, ForDefinition);
-  OS << "@" << originalFunction->getName() << " : "
-     << originalFunction->getLoweredType();
-  // parameters (0, 1, ...)
-  OS << " parameters (";
+  // [parameters 0 1 ...]
+  OS << "[parameters ";
   interleave(parameterIndices->getIndices(),
              [&](unsigned index) { OS << index; },
-             [&] { OS << ", "; });
-  // results (0, 1, ...)
-  OS << ") results (";
+             [&] { OS << " "; });
+  // [results 0 1 ...]
+  OS << "] [results ";
   interleave(resultIndices->getIndices(),
              [&](unsigned index) { OS << index; },
-             [&] { OS << ", "; });
-  OS << ')';
-  // wrt 0, 1, ...
+             [&] { OS << " "; });
+  OS << ']';
+  // [where ...]
   if (derivativeGenericSignature) {
     // NOTE: This needs to be changed if there is no utility for parsing
     // generic signatures. Idea: we could instead print the type of the original
@@ -3096,7 +3096,7 @@ void SILDifferentiabilityWitness::print(
       }
     }
     if (!requirements.empty()) {
-      OS << " where ";
+      OS << " [where ";
       auto SubPrinter = PrintOptions::printSIL();
       interleave(requirements,
                  [&](Requirement req) {
@@ -3104,8 +3104,12 @@ void SILDifferentiabilityWitness::print(
                    return;
                  },
                  [&] { OS << ", "; });
+      OS << ']';
     }
   }
+  // original: @original-function-name : $original-sil-type
+  OS << " @" << originalFunction->getName() << " : "
+     << originalFunction->getLoweredType();
   // {
   //   jvp: @jvp-function-name : $jvp-sil-type
   //   vjp: @vjp-function-name : $vjp-sil-type
