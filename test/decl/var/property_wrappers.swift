@@ -1779,3 +1779,13 @@ struct SR_11477_W3 { // Okay
     get { return 0 }
   }
 }
+
+// rdar://problem/56213175 - backward compatibility issue with Swift 5.1,
+// which unconditionally skipped protocol members.
+protocol ProtocolWithWrapper {
+  associatedtype Wrapper = Float // expected-note{{associated type 'Wrapper' declared here}}
+}
+
+struct UsesProtocolWithWrapper: ProtocolWithWrapper {
+  @Wrapper var foo: Int // expected-warning{{ignoring associated type 'Wrapper' in favor of module-scoped property wrapper 'Wrapper'; please qualify the reference with 'property_wrappers'}}{{4-4=property_wrappers.}}
+}
