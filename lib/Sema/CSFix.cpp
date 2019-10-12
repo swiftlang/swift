@@ -134,6 +134,10 @@ bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   ConstraintLocator *locator) {
+  
+  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+    return nullptr;
+  
   auto &TC = cs.getTypeChecker();
 
   auto *expr = locator->getAnchor();

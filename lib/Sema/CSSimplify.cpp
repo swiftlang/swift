@@ -2405,6 +2405,16 @@ bool ConstraintSystem::repairFailures(
   SmallVector<LocatorPathElt, 4> path;
   auto *anchor = locator.getLocatorParts(path);
 
+  // If we have a coerce expr, attempt to repair with a `CoerceToCheckedCastFix`.
+  auto repairByCoerceToCheckedCast = [&](Type fromType, Type toYype) -> bool {
+    if (auto *coerceToCheckCastFix =
+        CoerceToCheckedCast::attempt(*this, lhs, rhs, getConstraintLocator(locator))) {
+      conversionsOrFixes.push_back(coerceToCheckCastFix);
+      return true;
+    }
+    return false;
+  };
+  
   // If there is a missing explicit call it could be:
   //
   // a). Contextual e.g. `let _: R = foo`
@@ -2520,12 +2530,10 @@ bool ConstraintSystem::repairFailures(
   if (path.empty()) {
     if (!anchor)
       return false;
-
-    if (auto *coerceToCheckCastFix =
-        CoerceToCheckedCast::attempt(*this, lhs, rhs, getConstraintLocator(locator))) {
-      conversionsOrFixes.push_back(coerceToCheckCastFix);
+    
+    // Repair a coercion ('as') with a forced checked cast ('as!').
+    if (repairByCoerceToCheckedCast(lhs, rhs))
       return true;
-    }
     
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.

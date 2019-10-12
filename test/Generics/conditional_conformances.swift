@@ -21,7 +21,9 @@ struct Free<T> {}
 // CHECK-LABEL: ExtensionDecl line={{.*}} base=Free
 // CHECK-NEXT: (normal_conformance type=Free<T> protocol=P2
 // CHECK-NEXT:   conforms_to: T P1)
-extension Free: P2 where T: P1 {} // expected-note {{requirement from conditional conformance of 'Free<U>' to 'P2'}}
+extension Free: P2 where T: P1 {} 
+// expected-note@-1 {{requirement from conditional conformance of 'Free<U>' to 'P2'}} 
+// expected-note@-2 {{requirement from conditional conformance of 'Free<T>' to 'P2'}}
 func free_good<U: P1>(_: U) {
     takes_P2(Free<U>())
 }
@@ -324,8 +326,7 @@ func existential_good<T: P1>(_: T.Type) {
 }
 
 func existential_bad<T>(_: T.Type) {
-  // FIXME: Poor diagnostic.
-  _ = Free<T>() as P2 // expected-error{{'Free<T>' is not convertible to 'P2'; did you mean to use 'as!' to force downcast?}}
+  _ = Free<T>() as P2 // expected-error{{protocol 'P2' requires that 'T' conform to 'P1'}}
 }
 
 // rdar://problem/35837054
