@@ -270,6 +270,7 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   BraceStmt *Body = builder.createBodyStmt(Loc, EndLoc);
   CE->setBody(Body, false);
   TC.typeCheckClosureBody(CE);
+  TC.ClosuresWithUncomputedCaptures.push_back(CE);
 
   auto *TheCall = CallExpr::createImplicit(Context, CE, { E }, { });
   TheCall->getArg()->setType(AnyFunctionType::composeInput(Context, args, false));
