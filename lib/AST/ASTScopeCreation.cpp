@@ -839,7 +839,6 @@ public:
   VISIT_AND_CREATE(DoCatchStmt, DoCatchStmtScope)
   VISIT_AND_CREATE(SwitchStmt, SwitchStmtScope)
   VISIT_AND_CREATE(ForEachStmt, ForEachStmtScope)
-  VISIT_AND_CREATE(CatchStmt, CatchStmtScope)
   VISIT_AND_CREATE(CaseStmt, CaseStmtScope)
   VISIT_AND_CREATE(AbstractFunctionDecl, AbstractFunctionDeclScope)
 
@@ -1166,7 +1165,6 @@ NO_NEW_INSERTION_POINT(EnumElementScope)
 
 NO_NEW_INSERTION_POINT(CaptureListScope)
 NO_NEW_INSERTION_POINT(CaseStmtScope)
-NO_NEW_INSERTION_POINT(CatchStmtScope)
 NO_NEW_INSERTION_POINT(ClosureBodyScope)
 NO_NEW_INSERTION_POINT(DefaultArgumentInitializerScope)
 NO_NEW_INSERTION_POINT(DoCatchStmtScope)
@@ -1465,12 +1463,6 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
 void ForEachPatternScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
     ScopeCreator &scopeCreator) {
   scopeCreator.addToScopeTree(stmt->getWhere(), this);
-  scopeCreator.addToScopeTree(stmt->getBody(), this);
-}
-
-void CatchStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
-    ScopeCreator &scopeCreator) {
-  scopeCreator.addToScopeTree(stmt->getGuardExpr(), this);
   scopeCreator.addToScopeTree(stmt->getBody(), this);
 }
 

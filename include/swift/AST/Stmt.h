@@ -1088,18 +1088,19 @@ public:
 };
 
 /// DoCatchStmt - do statement with trailing 'catch' clauses.
-class DoCatchStmt final : public LabeledStmt,
-    private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
+class DoCatchStmt final
+    : public LabeledStmt,
+      private llvm::TrailingObjects<DoCatchStmt, CaseStmt *> {
   friend TrailingObjects;
 
   SourceLoc DoLoc;
   Stmt *Body;
 
-  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc,
-              Stmt *body, ArrayRef<CaseStmt*> catches,
-              Optional<bool> implicit)
-    : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
-                  labelInfo), DoLoc(doLoc), Body(body) {
+  DoCatchStmt(LabeledStmtInfo labelInfo, SourceLoc doLoc, Stmt *body,
+              ArrayRef<CaseStmt *> catches, Optional<bool> implicit)
+      : LabeledStmt(StmtKind::DoCatch, getDefaultImplicitFlag(implicit, doLoc),
+                    labelInfo),
+        DoLoc(doLoc), Body(body) {
     Bits.DoCatchStmt.NumCatches = catches.size();
     std::uninitialized_copy(catches.begin(), catches.end(),
                             getTrailingObjects<CaseStmt *>());
@@ -1108,7 +1109,7 @@ class DoCatchStmt final : public LabeledStmt,
 public:
   static DoCatchStmt *create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                              SourceLoc doLoc, Stmt *body,
-                             ArrayRef<CaseStmt*> catches,
+                             ArrayRef<CaseStmt *> catches,
                              Optional<bool> implicit = None);
 
   SourceLoc getDoLoc() const { return DoLoc; }
@@ -1119,11 +1120,11 @@ public:
   Stmt *getBody() const { return Body; }
   void setBody(Stmt *s) { Body = s; }
 
-  ArrayRef<CaseStmt*> getCatches() const {
-    return {getTrailingObjects<CaseStmt*>(), Bits.DoCatchStmt.NumCatches};
+  ArrayRef<CaseStmt *> getCatches() const {
+    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
   }
-  MutableArrayRef<CaseStmt*> getMutableCatches() {
-    return {getTrailingObjects<CaseStmt*>(), Bits.DoCatchStmt.NumCatches};
+  MutableArrayRef<CaseStmt *> getMutableCatches() {
+    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
   }
 
   /// Does this statement contain a syntactically exhaustive catch

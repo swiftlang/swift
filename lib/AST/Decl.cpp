@@ -5494,9 +5494,6 @@ Pattern *VarDecl::getParentPattern() const {
   if (auto *stmt = getParentPatternStmt()) {
     if (auto *FES = dyn_cast<ForEachStmt>(stmt))
       return FES->getPattern();
-    
-    if (auto *CS = dyn_cast<CatchStmt>(stmt))
-      return CS->getErrorPattern();
 
     if (auto *cs = dyn_cast<CaseStmt>(stmt)) {
       // In a case statement, search for the pattern that contains it.  This is

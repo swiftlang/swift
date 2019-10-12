@@ -1720,21 +1720,10 @@ public:
     Indent -= 2;
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
-  void visitCatches(ArrayRef<CatchStmt*> clauses) {
+  void visitCatches(ArrayRef<CaseStmt*> clauses) {
     for (auto clause : clauses) {
-      visitCatchStmt(clause);
+      visitCaseStmt(clause);
     }
-  }
-  void visitCatchStmt(CatchStmt *clause) {
-    printCommon(clause, "catch") << '\n';
-    printRec(clause->getErrorPattern());
-    if (auto guard = clause->getGuardExpr()) {
-      OS << '\n';
-      printRec(guard);
-    }
-    OS << '\n';
-    printRec(clause->getBody());
-    PrintWithColorRAII(OS, ParenthesisColor) << ')';
   }
 };
 

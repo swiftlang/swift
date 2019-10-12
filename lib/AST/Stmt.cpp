@@ -262,25 +262,22 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-void CatchStmt::setErrorPattern(Pattern *pattern) {
-  ErrorPattern = pattern;
-  ErrorPattern->markOwnedByStatement(this);
-}
-
 
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
-                                 ArrayRef<CatchStmt*> catches,
+                                 ArrayRef<CaseStmt*> catches,
                                  Optional<bool> implicit) {
-  void *mem = ctx.Allocate(totalSizeToAlloc<CatchStmt*>(catches.size()),
+  void *mem = ctx.Allocate(totalSizeToAlloc<CaseStmt*>(catches.size()),
                            alignof(DoCatchStmt));
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
 
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
   for (auto clause : getCatches()) {
-    if (clause->isSyntacticallyExhaustive())
-      return true;
+    for (auto &LabelItem: clause->getCaseLabelItems()) {
+      if (LabelItem.getGuardExpr() == nullptr && !LabelItem.getPattern()->isRefutablePattern())
+        return true;
+    }
   }
   return false;
 }
@@ -295,13 +292,6 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
   
   Cond = e;
 }
-
-bool CatchStmt::isSyntacticallyExhaustive() const {
-  // It cannot have a guard expression and the pattern cannot be refutable.
-  return getGuardExpr() == nullptr &&
-         !getErrorPattern()->isRefutablePattern();
-}
-
 
 PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,

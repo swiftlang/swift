@@ -587,8 +587,6 @@ private:
   void visitCaseStmt(CaseStmt *S);
 
   void visitDoCatchStmt(DoCatchStmt *S);
-  void visitCatchClauses(ArrayRef<CatchStmt*> clauses);
-  void visitCatchStmt(CatchStmt *S);
   
 };
   
