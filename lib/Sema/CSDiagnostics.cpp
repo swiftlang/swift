@@ -794,8 +794,13 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 
   Optional<Diag<Type, Type>> diagnostic;
   if (path.empty()) {
-    assert(isa<AssignExpr>(anchor));
-    diagnostic = getDiagnosticFor(CTP_AssignSource);
+    if (isa<AssignExpr>(anchor)) {
+      diagnostic = getDiagnosticFor(CTP_AssignSource);
+    } else if (isa<CoerceExpr>(anchor)) {
+      diagnostic = getDiagnosticFor(CTP_CoerceOperand);
+    } else {
+      assert(false && "Unreachable code");
+    }
   } else {
     const auto &last = path.back();
     switch (last.getKind()) {

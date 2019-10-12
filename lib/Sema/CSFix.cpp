@@ -153,11 +153,9 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   switch (castKind) {
   // Invalid cast.
   case CheckedCastKind::Unresolved:
+      return nullptr;
   case CheckedCastKind::Coercion:
   case CheckedCastKind::BridgingCoercion:
-    // Fix didn't work, let it be diagnosed later by the correct fix.
-    return nullptr;
-  // Valid casts.
   case CheckedCastKind::ArrayDowncast:
   case CheckedCastKind::DictionaryDowncast:
   case CheckedCastKind::SetDowncast:

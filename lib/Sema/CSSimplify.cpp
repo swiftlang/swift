@@ -2520,14 +2520,11 @@ bool ConstraintSystem::repairFailures(
   if (path.empty()) {
     if (!anchor)
       return false;
-    
-    if (!hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality) &&
-        !hasConversionOrRestriction(ConversionRestrictionKind::Existential)) {
-      if (auto *coerceToCheckCastFix =
-          CoerceToCheckedCast::attempt(*this, lhs, rhs, getConstraintLocator(locator))) {
-        conversionsOrFixes.push_back(coerceToCheckCastFix);
-        return true;
-      }
+
+    if (auto *coerceToCheckCastFix =
+        CoerceToCheckedCast::attempt(*this, lhs, rhs, getConstraintLocator(locator))) {
+      conversionsOrFixes.push_back(coerceToCheckCastFix);
+      return true;
     }
     
     // This could be:
