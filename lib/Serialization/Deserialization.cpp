@@ -2295,7 +2295,6 @@ public:
 
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
-    alias->computeType();
     
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
@@ -2362,8 +2361,6 @@ public:
         DC, SourceLoc(), MF.getIdentifier(nameID), SourceLoc(), trailingWhere,
         &MF, defaultDefinitionID);
     declOrOffset = assocType;
-
-    assocType->computeType();
 
     assert(!assocType->getDeclaredInterfaceType()->hasError() &&
            "erroneous associated type");
@@ -2438,8 +2435,6 @@ public:
     if (isImplicit)
       theStruct->setImplicit();
     theStruct->setIsObjC(isObjC);
-
-    theStruct->computeType();
 
     handleInherited(theStruct,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
@@ -3222,8 +3217,6 @@ public:
       proto->setImplicit();
     proto->setIsObjC(isObjC);
 
-    proto->computeType();
-
     proto->setCircularityCheck(CircularityCheck::Checked);
 
     proto->setLazyRequirementSignature(&MF,
@@ -3426,8 +3419,6 @@ public:
     if (inheritsSuperclassInitializers)
       theClass->setInheritsSuperclassInitializers();
 
-    theClass->computeType();
-
     handleInherited(theClass,
                     rawInheritedAndDependencyIDs.slice(0, numInheritedTypes));
 
@@ -3501,8 +3492,6 @@ public:
     theEnum->setIsObjC(isObjC);
 
     theEnum->setRawType(MF.getType(rawTypeID));
-
-    theEnum->computeType();
 
     auto rawInheritedIDs = rawInheritedAndDependencyIDs.slice(0, numInherited);
     handleInherited(theEnum, rawInheritedIDs);
@@ -3588,8 +3577,6 @@ public:
       elem->setRawValueExpr(literal);
     }
     }
-
-    elem->computeType();
 
     if (isImplicit)
       elem->setImplicit();
@@ -3704,7 +3691,6 @@ public:
     auto elemInterfaceType = MF.getType(elemInterfaceTypeID);
     subscript->getElementTypeLoc().setType(elemInterfaceType);
     subscript->setImplicitlyUnwrappedOptional(isIUO);
-    subscript->computeType();
 
     if (isImplicit)
       subscript->setImplicit();

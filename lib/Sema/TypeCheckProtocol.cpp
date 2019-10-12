@@ -2469,9 +2469,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
                                                     DC);
-    aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
-    aliasDecl->computeType();
     
     aliasDecl->setImplicit();
     if (type->hasError())

@@ -258,7 +258,7 @@ swift::USRGenerationRequest::evaluate(Evaluator &evaluator,
 llvm::Expected<std::string>
 swift::MangleLocalTypeDeclRequest::evaluate(Evaluator &evaluator,
                                             const TypeDecl *D) const {
-  if (!D->hasInterfaceType())
+  if (!D->getInterfaceType())
     return std::string();
 
   if (isa<ModuleDecl>(D))

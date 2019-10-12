@@ -20,21 +20,31 @@
 #define SWIFT_SEMA_IDETYPECHECKING_H
 
 #include "llvm/ADT/MapVector.h"
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/SourceLoc.h"
 #include <memory>
 
 namespace swift {
   class AbstractFunctionDecl;
+  class ASTContext;
+  class ConcreteDeclRef;
   class Decl;
+  class DeclContext;
+  class DeclName;
+  enum class DeclRefKind;
   class Expr;
   class ExtensionDecl;
+  class FunctionType;
+  class NominalTypeDecl;
+  class PatternBindingDecl;
   class ProtocolDecl;
+  class SourceFile;
+  class SubscriptDecl;
+  class TopLevelCodeDecl;
   class Type;
   class TypeChecker;
-  class DeclContext;
-  class ConcreteDeclRef;
   class ValueDecl;
-  class DeclName;
+  struct PrintOptions;
 
   /// Typecheck binding initializer at \p bindingIndex.
   void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
@@ -126,12 +136,6 @@ namespace swift {
   ///
   /// \returns true on success, false on error.
   bool typeCheckTopLevelCodeDecl(TopLevelCodeDecl *TLCD);
-
-  /// Creates a type checker instance on the given AST context, if it
-  /// doesn't already have one.
-  ///
-  /// \returns a reference to the type checker instance.
-  TypeChecker &createTypeChecker(ASTContext &Ctx);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
