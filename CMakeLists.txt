@@ -11,6 +11,8 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+set(CMAKE_DISABLE_IN_SOURCE_BUILD YES)
+
 if(DEFINED CMAKE_JOB_POOLS)
   # CMake < 3.11 doesn't support CMAKE_JOB_POOLS. Manually set the property.
   set_property(GLOBAL PROPERTY JOB_POOLS "${CMAKE_JOB_POOLS}")
