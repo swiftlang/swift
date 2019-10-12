@@ -26,12 +26,12 @@ bb0(%0 : $Float, %1 : $Float):
   return %2 : $(Float, Float)
 }
 
-sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float) -> Float {
+sil @make_diff_func : $@convention(thin) () -> @differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float {
 bb0:
-  %orig = function_ref @foo : $@convention(thin) (Float) -> Float
-  %linear_orig = linear_function [wrt 0] %orig : $@convention(thin) (Float) -> Float
-  %trans = function_ref @foo_t : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-  %linear_orig_with_trans = linear_function [wrt 0] %orig : $@convention(thin) (Float) -> Float with_transpose %trans : $@convention(thin) (Float) -> Float
-  return %linear_orig_with_trans : $@differentiable(linear) @convention(thin) (Float) -> Float
+  %orig = function_ref @foo : $@convention(thin) (Float, Float, Float) -> Float
+  %linear_orig = linear_function [parameters 0] %orig : $@convention(thin) (Float, Float, Float) -> Float
+  %trans = function_ref @foo_t_wrt_0 : $@convention(thin) (Float, Float, Float) -> Float
+  %linear_orig_with_trans = linear_function [parameters 0] %orig : $@convention(thin) (Float, Float, Float) -> Float with_transpose %trans : $@convention(thin) (Float, Float, Float) -> Float
+  return %linear_orig_with_trans : $@differentiable(linear) @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
 }
 

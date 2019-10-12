@@ -698,8 +698,9 @@ LinearFunctionInst::LinearFunctionInst(
     bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
           OriginalFunction,
-          ArrayRef<SILValue>(TransposeFunction.getPointer(),
-                             TransposeFunction.hasValue() ? 1 : 0),
+          TransposeFunction.hasValue()
+              ? ArrayRef<SILValue>(TransposeFunction.getPointer(), 1)
+              : ArrayRef<SILValue>(),
           Loc, getLinearFunctionType(OriginalFunction, ParameterIndices),
           HasOwnership ? (
             TransposeFunction

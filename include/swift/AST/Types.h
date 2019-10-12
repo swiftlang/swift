@@ -4220,11 +4220,16 @@ public:
 
   CanSILFunctionType getWithoutDifferentiability();
 
-  /// Returns the type of a differentiation function that is associated with
-  /// a function of this type.
+  /// Returns the type of the derivative function.
   CanSILFunctionType getAutoDiffDerivativeFunctionType(
       IndexSubset *parameterIndices, unsigned resultIndex,
       AutoDiffDerivativeFunctionKind kind, Lowering::TypeConverter &TC,
+      LookupConformanceFn lookupConformance,
+      CanGenericSignature derivativeFunctionGenericSignature = nullptr);
+
+  /// Returns the type of the transpose function.
+  CanSILFunctionType getAutoDiffTransposeFunctionType(
+      IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
       LookupConformanceFn lookupConformance,
       CanGenericSignature derivativeFunctionGenericSignature = nullptr);
 
@@ -4284,6 +4289,10 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
+  }
+
   bool isDifferentiable() const {
     return getExtInfo().isDifferentiable();
   }

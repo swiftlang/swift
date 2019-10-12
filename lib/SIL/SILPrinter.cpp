@@ -1186,7 +1186,7 @@ public:
     *this << getIDAndType(lfi->getOriginalFunction());
     if (lfi->hasTransposeFunction()) {
       *this << " with_transpose ";
-      getIDAndType(lfi->getTransposeFunction());
+      *this << getIDAndType(lfi->getTransposeFunction());
     }
   }
 

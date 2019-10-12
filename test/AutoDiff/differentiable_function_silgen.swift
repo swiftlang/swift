@@ -14,14 +14,23 @@ func myfunction(_ f: @escaping @differentiable (Float) -> (Float)) -> (Float) ->
   return f
 }
 
+func myfunction2(_ f: @escaping @differentiable(linear) (Float) -> (Float)) -> (Float) -> Float {
+  // @differentiable(linear) functions should be callable.
+  _ = f(.zero)
+  return f
+}
+
 var global_f: @differentiable (Float) -> Float = {$0}
+var global_f_linear: @differentiable(linear) (Float) -> Float = {$0}
 
 func calls_global_f() {
   _ = global_f(10)
+  _ = global_f_linear(10)
 }
 
 func apply() {
   _ = myfunction(thin)
+  _ = myfunction2(thin)
 }
 
 // CHECK-AST-LABEL:  (func_decl {{.*}} "myfunction(_:)"

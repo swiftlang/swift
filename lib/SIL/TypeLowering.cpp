@@ -149,22 +149,38 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type) {
-      assert(type->isDifferentiable());
       auto &M = TC.M;
-      auto origTy = type->getWithoutDifferentiability();
-      auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-          AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M));
-      auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-          AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M));
-      RecursiveProperties props;
-      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
-      return props;
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal: {
+        auto origTy = type->getWithoutDifferentiability();
+        auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
+            type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+            AutoDiffDerivativeFunctionKind::JVP, TC,
+            LookUpConformanceInModule(&M));
+        auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
+            type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+            AutoDiffDerivativeFunctionKind::VJP, TC,
+            LookUpConformanceInModule(&M));
+        RecursiveProperties props;
+        props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
+        props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
+        props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
+        return props;
+      }
+      case DifferentiabilityKind::Linear: {
+        auto &M = TC.M;
+        auto origTy = type->getWithoutDifferentiability();
+        auto transTy = origTy->getAutoDiffTransposeFunctionType(
+            type->getDifferentiationParameterIndices(), TC,
+            LookUpConformanceInModule(&M));
+        RecursiveProperties props;
+        props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
+        props.addSubobject(classifyType(transTy, TC, Sig, Expansion));
+        return props;
+      }
+      case DifferentiabilityKind::NonDifferentiable:
+        llvm_unreachable("Must be differentiable");
+      }
     }
 
   public:
