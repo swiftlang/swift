@@ -5006,6 +5006,44 @@ RValue SILGenFunction::emitApplyMethod(SILLocation loc, ConcreteDeclRef declRef,
   return emission.apply(C);
 }
 
+RValue SILGenFunction::emitApplyOfPropertyWrapperBackingInitializer(
+    SILLocation loc,
+    VarDecl *var,
+    RValue &&originalValue,
+    SGFContext C) {
+  SILDeclRef constant(var, SILDeclRef::Kind::PropertyWrapperBackingInitializer);
+
+  SubstitutionMap subs;
+  auto varDC = var->getInnermostDeclContext();
+  if (auto genericSig = varDC->getGenericSignatureOfContext()) {
+    subs = SubstitutionMap::get(
+        genericSig,
+        [&](SubstitutableType *type) {
+          if (auto gp = type->getAs<GenericTypeParamType>()) {
+            return F.mapTypeIntoContext(gp);
+          }
+
+          return Type(type);
+        },
+        LookUpConformanceInModule(varDC->getParentModule()));
+  }
+
+  FormalEvaluationScope writebackScope(*this);
+
+  auto callee = Callee::forDirect(*this, constant, subs, loc);
+  auto substFnType = callee.getSubstFormalType();
+
+  CallEmission emission(*this, std::move(callee), std::move(writebackScope));
+
+  PreparedArguments args(substFnType->getAs<AnyFunctionType>()->getParams());
+  args.add(loc, std::move(originalValue));
+  emission.addCallSite(loc, std::move(args),
+                       substFnType->getResult()->getCanonicalType(),
+                       /*throws=*/false);
+  
+  return emission.apply(C);
+}
+
 /// Emit a literal that applies the various initializers.
 RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
   ConcreteDeclRef builtinInit;
