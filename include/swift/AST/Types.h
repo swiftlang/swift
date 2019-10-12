@@ -4216,7 +4216,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   CanSILFunctionType getWithDifferentiability(
-      IndexSubset *parameterIndices);
+      DifferentiabilityKind kind, IndexSubset *parameterIndices);
 
   CanSILFunctionType getWithoutDifferentiability();
 

@@ -114,7 +114,7 @@ SILFunctionType::getDifferentiationParameterIndices() {
 }
 
 CanSILFunctionType SILFunctionType::getWithDifferentiability(
-    IndexSubset *parameterIndices) {
+    DifferentiabilityKind kind, IndexSubset *parameterIndices) {
   SmallVector<SILParameterInfo, 8> newParameters;
   for (auto paramAndIndex : enumerate(getParameters())) {
     auto &param = paramAndIndex.value();
@@ -125,10 +125,7 @@ CanSILFunctionType SILFunctionType::getWithDifferentiability(
                 ? SILParameterDifferentiability::DifferentiableOrNotApplicable
                 : SILParameterDifferentiability::NotDifferentiable));
   }
-
-  auto newExtInfo = getExtInfo().withDifferentiabilityKind(
-      DifferentiabilityKind::Normal);
-
+  auto newExtInfo = getExtInfo().withDifferentiabilityKind(kind);
   return get(getGenericSignature(), newExtInfo, getCoroutineKind(),
              getCalleeConvention(), newParameters, getYields(), getResults(),
              getOptionalErrorResult(), getASTContext(),

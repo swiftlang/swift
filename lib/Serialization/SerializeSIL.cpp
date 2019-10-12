@@ -1004,6 +1004,24 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         trailingInfo);
     break;
   }
+  case SILInstructionKind::LinearFunctionInst: {
+    auto *lfi = cast<LinearFunctionInst>(&SI);
+    SmallVector<ValueID, 4> trailingInfo;
+    auto *paramIndices = lfi->getParameterIndices();
+    for (unsigned idx : paramIndices->getIndices())
+      trailingInfo.push_back(idx);
+    for (auto &op : lfi->getAllOperands()) {
+      auto val = op.get();
+      trailingInfo.push_back(S.addTypeRef(val->getType().getASTType()));
+      trailingInfo.push_back((unsigned)val->getType().getCategory());
+      trailingInfo.push_back(addValueRef(val));
+    }
+    SILInstLinearFunctionLayout::emitRecord(Out, ScratchRecord,
+        SILAbbrCodes[SILInstLinearFunctionLayout::Code],
+        paramIndices->getCapacity(), lfi->hasTransposeFunction(),
+        trailingInfo);
+    break;
+  }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     auto *dfei = cast<DifferentiableFunctionExtractInst>(&SI);
     auto operandRef = addValueRef(dfei->getFunctionOperand());

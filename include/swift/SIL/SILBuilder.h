@@ -518,6 +518,14 @@ public:
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, JVPAndVJPFunctions, hasOwnership()));
   }
+
+  LinearFunctionInst *createLinearFunction(
+      SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
+      Optional<SILValue> TransposeFunction) {
+    return insert(LinearFunctionInst::create(
+        getModule(), getSILDebugLocation(Loc), ParameterIndices,
+        OriginalFunction, TransposeFunction, hasOwnership()));
+  }
   
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
       SILLocation Loc, DifferentiableFunctionExtractee Extractee,

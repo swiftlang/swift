@@ -2919,10 +2919,10 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
-    // e.g. differentiable_function [wrt 0 1 2] [order 2] %0 : $T
+    // e.g. differentiable_function [wrt 0 1 2] %0 : $T
     //
-    // e.g. differentiable_function [wrt 0 1 2] [order 2] %0 : $T with
-    //      {%1 : $T, %2 : $T}, {%3 : $T, %4 : $T}
+    // e.g. differentiable_function [wrt 0 1 2] %0 : $T with
+    //      {%1 : $T, %2 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
     SmallVector<unsigned, 8> parameterIndices;
@@ -2963,30 +2963,75 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       // Parse derivative function values as an operand list.
       // FIXME(rxwei): Change this to *not* require a type signature once
       // we can infer derivative function types.
-      SILValue derivFn1, derivFn2;
+      derivativeFunctions = std::make_pair(SILValue(), SILValue());
       if (P.parseToken(tok::l_brace,
               diag::sil_inst_autodiff_operand_list_expected_lbrace) ||
-          parseTypedValueRef(derivFn1, B) ||
+          parseTypedValueRef(derivativeFunctions->first, B) ||
           P.parseToken(tok::comma,
               diag::sil_inst_autodiff_operand_list_expected_comma) ||
-          parseTypedValueRef(derivFn2, B) ||
+          parseTypedValueRef(derivativeFunctions->second, B) ||
           P.parseToken(tok::r_brace,
                        diag::sil_inst_autodiff_operand_list_expected_rbrace))
         return true;
-      derivativeFunctions = std::make_pair(derivFn1, derivFn2);
-      if (P.Tok.is(tok::l_brace)) {
-        P.diagnose(P.Tok,
-                   diag::sil_inst_autodiff_num_operand_list_order_mismatch);
-        return true;
-      }
     }
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    auto *parameterIndicesSubset =
-        IndexSubset::get(P.Context, fnType->getNumParameters(),
-                                 parameterIndices);
+    auto *parameterIndicesSubset = IndexSubset::get(
+        P.Context, fnType->getNumParameters(), parameterIndices);
     ResultVal = B.createDifferentiableFunction(
         InstLoc, parameterIndicesSubset, original, derivativeFunctions);
+    break;
+  }
+
+  case SILInstructionKind::LinearFunctionInst: {
+    // e.g. linear_function [parameters 0 1 2] %0 : $T
+    // e.g. linear_function [parameters 0 1 2] %0 : $T with_transpose %1 : $T
+    SourceLoc lastLoc;
+    SmallVector<unsigned, 8> parameterIndices;
+    // Parse optional `[parameters <integer_literal>...]`
+    if (P.Tok.is(tok::l_square) &&
+        P.peekToken().is(tok::identifier) &&
+        P.peekToken().getText() == "parameters") {
+      P.consumeToken(tok::l_square);
+      P.consumeToken(tok::identifier);
+      // Parse indices.
+      while (P.Tok.is(tok::integer_literal)) {
+        unsigned index;
+        if (P.parseUnsignedInteger(index, lastLoc,
+              diag::sil_inst_autodiff_expected_parameter_index))
+          return true;
+        parameterIndices.push_back(index);
+      }
+      if (P.parseToken(tok::r_square,
+                       diag::sil_inst_autodiff_attr_expected_rsquare,
+                       "parameter index list"))
+        return true;
+    }
+    // Parse the original function value.
+    SILValue original;
+    SourceLoc originalOperandLoc;
+    if (parseTypedValueRef(original, originalOperandLoc, B))
+      return true;
+    auto fnType = original->getType().getAs<SILFunctionType>();
+    if (!fnType) {
+      P.diagnose(originalOperandLoc,
+                 diag::sil_inst_autodiff_expected_function_type_operand);
+      return true;
+    }
+    // Parse an optional transpose function.
+    Optional<SILValue> transpose = None;
+    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_transpose") {
+      P.consumeToken(tok::identifier);
+      transpose = SILValue();
+      if (parseTypedValueRef(*transpose, B))
+        return true;
+    }
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+    auto *parameterIndicesSubset = IndexSubset::get(
+        P.Context, fnType->getNumParameters(), parameterIndices);
+    ResultVal = B.createLinearFunction(
+        InstLoc, parameterIndicesSubset, original, transpose);
     break;
   }
   

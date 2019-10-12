@@ -921,6 +921,7 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *i);
+  void visitLinearFunctionInst(LinearFunctionInst *i);
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *i);
   // SWIFT_ENABLE_TENSORFLOW END
@@ -1872,13 +1873,22 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
 // SWIFT_ENABLE_TENSORFLOW
 void IRGenSILFunction::
 visitDifferentiableFunctionInst(DifferentiableFunctionInst *i) {
-  // The original function and derivative functions can be thin or thick.
   auto origExp = getLoweredExplosion(i->getOriginalFunction());
   Explosion e;
   e.add(origExp.claimAll());
   assert(i->hasDerivativeFunctions());
   for (auto &derivFnOperand : i->getDerivativeFunctionArray())
     e.add(getLoweredExplosion(derivFnOperand.get()).claimAll());
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionInst(LinearFunctionInst *i) {
+  auto origExp = getLoweredExplosion(i->getOriginalFunction());
+  Explosion e;
+  e.add(origExp.claimAll());
+  assert(i->hasTransposeFunction());
+  e.add(getLoweredExplosion(i->getTransposeFunction()).claimAll());
   setLoweredExplosion(i, e);
 }
 

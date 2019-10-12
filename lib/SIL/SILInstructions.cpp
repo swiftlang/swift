@@ -579,26 +579,27 @@ TryApplyInst *TryApplyInst::create(
 
 // SWIFT_ENABLE_TENSORFLOW
 SILType DifferentiableFunctionInst::getDifferentiableFunctionType(
-    SILValue originalFunction, IndexSubset *parameterIndices) {
-  auto fnTy = originalFunction->getType().castTo<SILFunctionType>();
-  auto diffTy = fnTy->getWithDifferentiability(parameterIndices);
+    SILValue OriginalFunction, IndexSubset *ParameterIndices) {
+  auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
+  auto diffTy = fnTy->getWithDifferentiability(
+      DifferentiabilityKind::Normal, ParameterIndices);
   return SILType::getPrimitiveObjectType(diffTy);
 }
 
 ValueOwnershipKind DifferentiableFunctionInst::getMergedOwnershipKind(
-    SILValue original, ArrayRef<SILValue> derivativeFunctions) {
-  if (derivativeFunctions.empty())
-    return original.getOwnershipKind();
+    SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions) {
+  if (DerivativeFunctions.empty())
+    return OriginalFunction.getOwnershipKind();
   return *mergeSILValueOwnership(
-      {original, derivativeFunctions[0], derivativeFunctions[1]});
+      {OriginalFunction, DerivativeFunctions[0], DerivativeFunctions[1]});
 }
 
 DifferentiableFunctionInst::DifferentiableFunctionInst(
-    SILDebugLocation DebugLoc, IndexSubset *ParameterIndices,
+    SILDebugLocation Loc, IndexSubset *ParameterIndices,
     SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions,
     bool HasOwnership)
     : InstructionBaseWithTrailingOperands(
-          OriginalFunction, DerivativeFunctions, DebugLoc,
+          OriginalFunction, DerivativeFunctions, Loc,
           getDifferentiableFunctionType(OriginalFunction, ParameterIndices),
           HasOwnership
               ? getMergedOwnershipKind(OriginalFunction, DerivativeFunctions)
@@ -609,7 +610,7 @@ DifferentiableFunctionInst::DifferentiableFunctionInst(
 }
 
 DifferentiableFunctionInst *DifferentiableFunctionInst::create(
-    SILModule &Module, SILDebugLocation DebugLoc,
+    SILModule &Module, SILDebugLocation Loc,
     IndexSubset *ParameterIndices, SILValue OriginalFunction,
     Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
     bool HasOwnership) {
@@ -620,7 +621,7 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
   size_t size = totalSizeToAlloc<Operand>(1 + derivativeFunctions.size());
   void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
   return ::new (buffer) DifferentiableFunctionInst(
-      DebugLoc, ParameterIndices, OriginalFunction, derivativeFunctions,
+      Loc, ParameterIndices, OriginalFunction, derivativeFunctions,
       HasOwnership);
 }
 
@@ -682,6 +683,44 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
+
+SILType LinearFunctionInst::getLinearFunctionType(
+    SILValue OriginalFunction, IndexSubset *ParameterIndices) {
+  auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
+  auto diffTy = fnTy->getWithDifferentiability(
+      DifferentiabilityKind::Linear, ParameterIndices);
+  return SILType::getPrimitiveObjectType(diffTy);
+}
+
+LinearFunctionInst::LinearFunctionInst(
+    SILDebugLocation Loc, IndexSubset *ParameterIndices,
+    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
+    bool HasOwnership)
+    : InstructionBaseWithTrailingOperands(
+          OriginalFunction,
+          ArrayRef<SILValue>(TransposeFunction.getPointer(),
+                             TransposeFunction.hasValue() ? 1 : 0),
+          Loc, getLinearFunctionType(OriginalFunction, ParameterIndices),
+          HasOwnership ? (
+            TransposeFunction
+                ? *mergeSILValueOwnership(
+                       {OriginalFunction, *TransposeFunction})
+                : *mergeSILValueOwnership({OriginalFunction})
+          ) : ValueOwnershipKind(ValueOwnershipKind::Any)),
+      ParameterIndices(ParameterIndices),
+      HasTransposeFunction(TransposeFunction.hasValue()) {
+}
+
+LinearFunctionInst *LinearFunctionInst::create(
+    SILModule &Module, SILDebugLocation Loc, IndexSubset *ParameterIndices,
+    SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
+    bool HasOwnership) {
+  size_t size = totalSizeToAlloc<Operand>(TransposeFunction.hasValue() ? 2 : 1);
+  void *buffer = Module.allocateInst(size, alignof(DifferentiableFunctionInst));
+  return ::new (buffer) LinearFunctionInst(
+      Loc, ParameterIndices, OriginalFunction, TransposeFunction,
+      HasOwnership);
+}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

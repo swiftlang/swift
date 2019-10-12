@@ -1176,6 +1176,20 @@ public:
     }
   }
 
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    if (!lfi->getParameterIndices()->isEmpty()) {
+      *this << "[parameters";
+      for (auto i : lfi->getParameterIndices()->getIndices())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      getIDAndType(lfi->getTransposeFunction());
+    }
+  }
+
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     *this << '[';

@@ -1122,6 +1122,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         ListOfValues);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionInst;
     break;
+  case SIL_INST_LINEAR_FUNCTION:
+    SILInstLinearFunctionLayout::readRecord(
+        scratch, /*numParams*/ Attr, /*hasTransposeFunction*/ Attr2,
+        ListOfValues);
+    RawOpCode = (unsigned)SILInstructionKind::LinearFunctionInst;
+    break;
   case SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT:
     SILInstDifferentiableFunctionExtractLayout::readRecord(
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
@@ -1541,6 +1547,31 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
       derivativeFunctions = std::make_pair(operands[1], operands[2]);
     ResultVal = Builder.createDifferentiableFunction(
         Loc, paramIndices, operands[0], derivativeFunctions);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionInst: {
+    bool hasLinearFunction = (bool)Attr2;
+    unsigned numOperands = hasLinearFunction ? 2 : 1;
+    auto numParamIndices = ListOfValues.size() - numOperands * 3;
+    assert(ListOfValues.size() == numParamIndices + numOperands * 3);
+    auto rawParamIndices =
+       map<SmallVector<unsigned, 8>>(ListOfValues.take_front(numParamIndices),
+                                     [](uint64_t i) { return (unsigned)i; });
+    auto numParams = Attr;
+    auto *paramIndices =
+        IndexSubset::get(MF->getContext(), numParams, rawParamIndices);
+    SmallVector<SILValue, 3> operands;
+    for (auto i = numParamIndices;
+         i < numParamIndices + numOperands * 3; i += 3) {
+      auto astTy = MF->getType(ListOfValues[i]);
+      auto silTy = getSILType(astTy, (SILValueCategory)ListOfValues[i+1]);
+      operands.push_back(getLocalValue(ListOfValues[i+2], silTy));
+    }
+    Optional<SILValue> transposeFunction = None;
+    if (hasLinearFunction)
+      transposeFunction = operands[1];
+    ResultVal = Builder.createLinearFunction(
+        Loc, paramIndices, operands[0], transposeFunction);
     break;
   }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
