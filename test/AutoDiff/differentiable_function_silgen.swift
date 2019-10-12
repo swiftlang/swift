@@ -37,14 +37,17 @@ func apply() {
 // CHECK-AST:              (declref_expr type='(Float) -> Float'
 
 // CHECK-SILGEN-LABEL: @{{.*}}myfunction{{.*}}
-// CHECK-SILGEN: bb0([[DIFFED:%.*]] : @guaranteed $@differentiable @callee_guaranteed (Float) -> Float):
-// CHECK-SILGEN:   [[ORIG:%.*]] = copy_value [[DIFFED]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   [[BORROWED_ORIG:%.*]] = begin_borrow [[ORIG]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   apply [[BORROWED_ORIG]]({{%.*}}) : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   destroy_value [[ORIG]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   [[DIFFED_COPY:%.*]] = copy_value [[DIFFED]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   [[ORIG:%.*]] = differentiable_function_extract [original] [[DIFFED_COPY]] : $@differentiable @callee_guaranteed (Float) -> Float
-// CHECK-SILGEN:   return [[ORIG]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN: bb0([[DIFF:%.*]] : @guaranteed $@differentiable @callee_guaranteed (Float) -> Float):
+// CHECK-SILGEN:   [[COPIED_DIFF:%.*]] = copy_value [[DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[BORROWED_DIFF:%.*]] = begin_borrow [[COPIED_DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   apply [[BORROWED_DIFF]]({{%.*}}) : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   end_borrow [[BORROWED_DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   destroy_value [[COPIED_DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[COPIED_DIFF:%.*]] = copy_value [[DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[BORROWED_DIFF:%.*]] = begin_borrow [[COPIED_DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[BORROWED_ORIG:%.*]] = differentiable_function_extract [original] [[BORROWED_DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   [[COPIED_ORIG:%.*]] = copy_value [[BORROWED_ORIG]] : $@callee_guaranteed (Float) -> Float
+// CHECK-SILGEN:   return [[COPIED_ORIG]] : $@callee_guaranteed (Float) -> Float
 
 // CHECK-SILGEN-LABEL: @{{.*}}apply{{.*}}
 // CHECK-SILGEN:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
