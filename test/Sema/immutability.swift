@@ -681,3 +681,23 @@ struct SS {
     j = j // expected-error {{cannot assign to value: 'j' is a 'let' constant}}
   }
 }
+
+protocol JustAProtocol {
+  var name: String { get set }
+}
+
+extension JustAProtocol {
+  var foo: String {
+    get { return name }
+    nonmutating set { name = newValue } // expected-error {{cannot assign to property: 'self' is immutable}} 
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+  }
+
+  nonmutating func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    name = "Hello" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    name = "World" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+}
