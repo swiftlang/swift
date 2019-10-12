@@ -157,7 +157,7 @@ extension DoesNotImposeClassReq_1 where Self: JustAClass {
     wrappingProperty3 = "" // Okay
   }
   
-  func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{2-2=mutating }}
+  func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
     property = "" // Okay
     wrappingProperty1 = "" // Okay
     wrappingProperty2 = "" // Okay
@@ -178,6 +178,7 @@ instanceOfJustAClass1.wrappingProperty2 = "" // Okay
 instanceOfJustAClass1.wrappingProperty3 = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass1' is a 'let' constant}}
 instanceOfJustAClass1.foo() // expected-error {{cannot use mutating member on immutable value: 'instanceOfJustAClass1' is a 'let' constant}}
 instanceOfJustAClass1.bar() // Okay
+instanceOfJustAClass1.baz() // Okay
 
 var instanceOfJustAClass2 = JustAClass()
 instanceOfJustAClass2.foo() // Okay
@@ -204,22 +205,22 @@ extension DoesNotImposeClassReq_2 where Self : AnyObject {
   
   mutating func foo() {
     property = "" // Okay
-    wrappingProperty1 = "" // Okay
-    wrappingProperty2 = "" // Okay
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
     wrappingProperty3 = "" // Okay
   }
   
-  func bar() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{2-2=mutating }}
+  func bar() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
     property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
-    wrappingProperty1 = "" // Okay
-    wrappingProperty2 = "" // Okay
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
     wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
   
   nonmutating func baz() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}
     property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
-    wrappingProperty1 = "" // Okay
-    wrappingProperty2 = "" // Okay
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
     wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }
