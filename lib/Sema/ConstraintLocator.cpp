@@ -408,7 +408,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
     case KeyPathComponentResult:
       out << "key path component result";
       break;
-
     }
   }
   out << ']';

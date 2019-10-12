@@ -126,13 +126,47 @@ TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
 
 bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
   MissingForcedDowncastFailure failure(root, getConstraintSystem(),
+                                       getFromType(), getToType(),
                                        getLocator());
   return failure.diagnose(asNote);
 }
 
-CoerceToCheckedCast *CoerceToCheckedCast::create(ConstraintSystem &cs,
-                                                 ConstraintLocator *locator) {
-  return new (cs.getAllocator()) CoerceToCheckedCast(cs, locator);
+CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
+                                                  Type fromType, Type toType,
+                                                  ConstraintLocator *locator) {
+  auto &TC = cs.getTypeChecker();
+
+  auto *expr = locator->getAnchor();
+  if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
+    expr = assignExpr->getSrc();
+  auto *coerceExpr = dyn_cast<CoerceExpr>(expr);
+  if (!coerceExpr)
+    return nullptr;
+
+  auto *subExpr = coerceExpr->getSubExpr();
+
+  auto castKind =
+      TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
+                              cs.DC, coerceExpr->getLoc(), subExpr,
+                              coerceExpr->getCastTypeLoc().getSourceRange());
+
+  switch (castKind) {
+  // Invalid cast.
+  case CheckedCastKind::Unresolved:
+  case CheckedCastKind::Coercion:
+  case CheckedCastKind::BridgingCoercion:
+    // Fix didn't work, let it be diagnosed later by the correct fix.
+    return nullptr;
+  // Valid casts.
+  case CheckedCastKind::ArrayDowncast:
+  case CheckedCastKind::DictionaryDowncast:
+  case CheckedCastKind::SetDowncast:
+  case CheckedCastKind::ValueCast:
+      return new (cs.getAllocator()) CoerceToCheckedCast(cs, fromType, toType, locator);
+  }
+  
+  return nullptr;
+  
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {

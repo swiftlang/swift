@@ -156,9 +156,7 @@ protected:
   }
 
   /// \returns true is locator hasn't been simplified down to expression.
-  bool hasComplexLocator() const {
-    return HasComplexLocator;
-  }
+  bool hasComplexLocator() const { return HasComplexLocator; }
 
   /// \returns A parent expression if sub-expression is contained anywhere
   /// in the root expression or `nullptr` otherwise.
@@ -464,15 +462,6 @@ private:
   /// passing such parameter as an @escaping argument, or trying to
   /// assign it to a variable which expects @escaping function.
   bool diagnoseParameterUse() const;
-};
-
-class MissingForcedDowncastFailure final : public FailureDiagnostic {
-public:
-  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
-                               ConstraintLocator *locator)
-      : FailureDiagnostic(expr, cs, locator) {}
-
-  bool diagnoseAsError() override;
 };
 
 /// Diagnose failures related to attempting member access on optional base
@@ -1794,6 +1783,17 @@ public:
   ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
     return FnType->getParams()[idx].getParameterFlags();
   }
+};
+
+/// Replace a coercion ('as') with a forced checked cast ('as!').
+class MissingForcedDowncastFailure final : public ContextualFailure {
+public:
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
+                               Type fromType, Type toType,
+                               ConstraintLocator *locator)
+      : ContextualFailure(expr, cs, fromType, toType, locator) {}
+
+  bool diagnoseAsError() override;
 };
 
 } // end namespace constraints
