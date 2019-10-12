@@ -223,6 +223,7 @@ void State::initializeConsumingUse(BranchPropagatedUser consumingUser,
     } else {
       llvm::errs() << "Value: N/A\n";
     }
+    (*value)->getFunction()->dump();
     llvm::errs() << "User: " << *consumingUser << "Block: bb"
                  << userBlock->getDebugID() << "\n\n";
   });
@@ -325,6 +326,7 @@ void State::checkPredsForDoubleConsume(BranchPropagatedUser consumingUser,
     } else {
       llvm::errs() << "N/A. \n";
     }
+    (*value)->getFunction()->dump();
 
     llvm::errs() << "User: " << *consumingUser << "Block: bb"
                  << userBlock->getDebugID() << "\n\n";
@@ -355,6 +357,7 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
     } else {
       llvm::errs() << "N/A. \n";
     }
+    (*value)->getFunction()->dump();
 
     llvm::errs() << "Block: bb" << userBlock->getDebugID() << "\n\n";
   });
