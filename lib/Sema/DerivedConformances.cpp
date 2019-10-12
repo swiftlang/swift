@@ -309,7 +309,6 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
-  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
   getterDecl->copyFormalAccessFrom(property);

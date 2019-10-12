@@ -750,7 +750,6 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  encodeDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   encodeDecl->computeType(FunctionType::ExtInfo().withThrows());
 
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
@@ -1031,7 +1030,6 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  initDecl->setGenericSignature(conformanceDC->getGenericSignatureOfContext());
   initDecl->computeType(AnyFunctionType::ExtInfo().withThrows());
 
   initDecl->copyFormalAccessFrom(derived.Nominal,

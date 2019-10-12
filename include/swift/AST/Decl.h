@@ -2978,9 +2978,6 @@ public:
   /// Retrieve a sugared interface type containing the structure of the interface
   /// type before any semantic validation has occured.
   Type getStructuralType() const;
-
-  /// Set the interface type of this typealias declaration from the underlying type.
-  void computeType();
   
   bool isCompatibilityAlias() const {
     return Bits.TypeAliasDecl.IsCompatibilityAlias;
@@ -3168,10 +3165,6 @@ public:
   void setTrailingWhereClause(TrailingWhereClause *trailingWhereClause) {
     TrailingWhere = trailingWhereClause;
   }
-
-  /// Set the interface type of this associated type declaration to a dependent
-  /// member type of 'Self'.
-  void computeType();
 
   /// Retrieve the associated type "anchor", which is the associated type
   /// declaration that will be used to describe this associated type in the
@@ -3361,10 +3354,6 @@ public:
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
   }
-
-  /// Set the interface type of this nominal type to the metatype of the
-  /// declared interface type.
-  void computeType();
 
   /// getDeclaredType - Retrieve the type declared by this entity, without
   /// any generic parameters bound if this is a generic type.
@@ -5484,10 +5473,6 @@ public:
   TypeLoc &getElementTypeLoc() { return ElementTy; }
   const TypeLoc &getElementTypeLoc() const { return ElementTy; }
 
-  /// Compute the interface type of this subscript from the parameter and
-  /// element types.
-  void computeType();
-
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
@@ -6357,10 +6342,6 @@ public:
     assert(!getFullName().isSpecial() && "Cannot get string for special names");
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
-
-  /// Set the interface type of this enum element to the constructor function
-  /// type; (Self.Type) -> Self or (Self.Type) -> (Args...) -> Self.
-  void computeType();
 
   Type getArgumentInterfaceType() const;
 

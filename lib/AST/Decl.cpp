@@ -3368,16 +3368,6 @@ bool NominalTypeDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-void NominalTypeDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  Type declaredInterfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(declaredInterfaceTy, getASTContext()));
-
-  if (declaredInterfaceTy->hasError())
-    setInvalid();
-}
-
 enum class DeclTypeKind : unsigned {
   DeclaredType,
   DeclaredInterfaceType
@@ -3556,25 +3546,6 @@ SourceRange TypeAliasDecl::getSourceRange() const {
   return { TypeAliasLoc, getNameLoc() };
 }
 
-void TypeAliasDecl::computeType() {
-  assert(!hasInterfaceType());
-      
-  // Set the interface type of this declaration.
-  ASTContext &ctx = getASTContext();
-
-  auto genericSig = getGenericSignature();
-  SubstitutionMap subs;
-  if (genericSig)
-    subs = genericSig->getIdentitySubstitutionMap();
-
-  Type parent;
-  auto parentDC = getDeclContext();
-  if (parentDC->isTypeContext())
-    parent = parentDC->getSelfInterfaceType();
-  auto sugaredType = TypeAliasType::get(this, parent, subs, getUnderlyingType());
-  setInterfaceType(MetatypeType::get(sugaredType, ctx));
-}
-
 Type TypeAliasDecl::getUnderlyingType() const {
   auto &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -3682,14 +3653,6 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
       TrailingWhere(trailingWhere), Resolver(definitionResolver),
       ResolverContextData(resolverData) {
   assert(Resolver && "missing resolver");
-}
-
-void AssociatedTypeDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  auto &ctx = getASTContext();
-  auto interfaceTy = getDeclaredInterfaceType();
-  setInterfaceType(MetatypeType::get(interfaceTy, ctx));
 }
 
 Type AssociatedTypeDecl::getDefaultDefinitionType() const {
@@ -3875,9 +3838,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
 
   // Propagate access control and versioned-ness.
   DD->copyFormalAccessFrom(CD, /*sourceIsParentContext*/true);
-
-  // Wire up generic environment of DD.
-  DD->setGenericSignature(CD->getGenericSignatureOfContext());
 
   // Mark DD as ObjC, as all dtors are.
   DD->setIsObjC(ctx.LangOpts.EnableObjCInterop);
@@ -6168,30 +6128,11 @@ void SubscriptDecl::setIndices(ParameterList *p) {
 }
 
 Type SubscriptDecl::getElementInterfaceType() const {
-  auto elementTy = getInterfaceType();
-  if (elementTy->is<ErrorType>())
-    return elementTy;
-  return elementTy->castTo<AnyFunctionType>()->getResult();
-}
-
-void SubscriptDecl::computeType() {
-  auto elementTy = getElementTypeLoc().getType();
-
-  SmallVector<AnyFunctionType::Param, 2> argTy;
-  getIndices()->getParams(argTy);
-
-  Type funcTy;
-  if (auto sig = getGenericSignature())
-    funcTy = GenericFunctionType::get(sig, argTy, elementTy);
-  else
-    funcTy = FunctionType::get(argTy, elementTy);
-
-  // Record the interface type.
-  setInterfaceType(funcTy);
-      
-  // Make sure that there are no unresolved dependent types in the
-  // generic signature.
-  assert(!funcTy->findUnresolvedDependentMemberType());
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<SubscriptDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           ErrorType::get(ctx));
 }
 
 ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind() const {
@@ -6325,7 +6266,9 @@ BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
   }
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
-  return evaluateOrDefault(ctx.evaluator, ParseAbstractFunctionBodyRequest{mutableThis}, nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           ParseAbstractFunctionBodyRequest{mutableThis},
+                           nullptr);
 }
 
 SourceRange AbstractFunctionDecl::getBodySourceRange() const {
@@ -6606,34 +6549,18 @@ Identifier OpaqueTypeDecl::getOpaqueReturnTypeIdentifier() const {
 }
 
 void AbstractFunctionDecl::computeType(AnyFunctionType::ExtInfo info) {
-  auto &ctx = getASTContext();
   auto sig = getGenericSignature();
   bool hasSelf = hasImplicitSelfDecl();
 
   // Result
   Type resultTy;
   if (auto fn = dyn_cast<FuncDecl>(this)) {
-    resultTy = fn->getBodyResultTypeLoc().getType();
-    if (!resultTy) {
-      resultTy = TupleType::getEmpty(ctx);
-    }
-
+    resultTy = fn->getResultInterfaceType();
   } else if (auto ctor = dyn_cast<ConstructorDecl>(this)) {
-    auto *dc = ctor->getDeclContext();
-
-    if (hasSelf) {
-      if (!dc->isTypeContext())
-        resultTy = ErrorType::get(ctx);
-      else
-        resultTy = dc->getSelfInterfaceType();
-    }
-
-    // Adjust result type for failability.
-    if (ctor->isFailable())
-      resultTy = OptionalType::get(resultTy);
+    resultTy = ctor->getResultInterfaceType();
   } else {
     assert(isa<DestructorDecl>(this));
-    resultTy = TupleType::getEmpty(ctx);
+    resultTy = TupleType::getEmpty(getASTContext());
   }
 
   // (Args...) -> Result
@@ -6883,14 +6810,11 @@ StaticSpellingKind FuncDecl::getCorrectStaticSpelling() const {
 }
 
 Type FuncDecl::getResultInterfaceType() const {
-  Type resultTy = getInterfaceType();
-  if (resultTy.isNull() || resultTy->is<ErrorType>())
-    return resultTy;
-
-  if (hasImplicitSelfDecl())
-    resultTy = resultTy->castTo<AnyFunctionType>()->getResult();
-
-  return resultTy->castTo<AnyFunctionType>()->getResult();
+  auto &ctx = getASTContext();
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return evaluateOrDefault(ctx.evaluator,
+                           ResultTypeRequest{mutableThis},
+                           ErrorType::get(ctx));
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -7033,34 +6957,6 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
-void EnumElementDecl::computeType() {
-  assert(!hasInterfaceType());
-
-  auto &ctx = getASTContext();
-  auto *ED = getParentEnum();
-
-  // The type of the enum element is either (Self.Type) -> Self
-  // or (Self.Type) -> (Args...) -> Self.
-  auto resultTy = ED->getDeclaredInterfaceType();
-
-  AnyFunctionType::Param selfTy(MetatypeType::get(resultTy, ctx));
-
-  if (auto *PL = getParameterList()) {
-    SmallVector<AnyFunctionType::Param, 4> argTy;
-    PL->getParams(argTy);
-
-    resultTy = FunctionType::get(argTy, resultTy);
-  }
-
-  if (auto genericSig = ED->getGenericSignature())
-    resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy);
-  else
-    resultTy = FunctionType::get({selfTy}, resultTy);
-
-  // Record the interface type.
-  setInterfaceType(resultTy);
-}
-
 Type EnumElementDecl::getArgumentInterfaceType() const {
   if (!hasAssociatedValues())
     return nullptr;
@@ -7143,10 +7039,19 @@ SourceRange ConstructorDecl::getSourceRange() const {
 }
 
 Type ConstructorDecl::getResultInterfaceType() const {
-  Type ArgTy = getInterfaceType();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  ArgTy = ArgTy->castTo<AnyFunctionType>()->getResult();
-  return ArgTy;
+  Type resultTy;
+
+  auto *dc = getDeclContext();
+  if (!dc->isTypeContext())
+    resultTy = ErrorType::get(getASTContext());
+  else
+    resultTy = dc->getSelfInterfaceType();
+
+  // Adjust result type for failability.
+  if (isFailable())
+    return OptionalType::get(resultTy);
+
+  return resultTy;
 }
 
 Type ConstructorDecl::getInitializerInterfaceType() {

@@ -1481,7 +1481,6 @@ static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
   typealias->setUnderlyingType(underlyingType);
   typealias->setAccess(AccessLevel::Public);
   typealias->setImplicit();
-  typealias->computeType();
 
   nominal->addMember(typealias);
 }
@@ -1715,7 +1714,6 @@ buildSubscriptGetterDecl(ClangImporter::Implementation &Impl,
                      TypeLoc::withoutLoc(elementTy), dc,
                      getter->getClangNode());
 
-  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -1769,7 +1767,6 @@ buildSubscriptSetterDecl(ClangImporter::Implementation &Impl,
                      valueIndicesPL,
                      TypeLoc::withoutLoc(TupleType::getEmpty(C)), dc,
                      setter->getClangNode());
-  thunk->setGenericSignature(dc->getGenericSignatureOfContext());
   thunk->computeType();
 
   thunk->setAccess(getOverridableAccessLevel(dc));
@@ -2366,7 +2363,6 @@ namespace {
           decl, AccessLevel::Public, loc,
           importedName.getDeclName().getBaseIdentifier(),
           Impl.importSourceLoc(decl->getLocation()), None, nullptr, dc);
-      enumDecl->computeType();
       enumDecl->setMemberLoader(&Impl, 0);
       return enumDecl;
     }
@@ -2545,7 +2541,6 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                   underlying->getDeclaredInterfaceType());
-              typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2565,7 +2560,6 @@ namespace {
                             /*genericparams*/nullptr, DC);
               typealias->setUnderlyingType(
                 Impl.SwiftContext.getAnyObjectType());
-              typealias->computeType();
 
               Impl.SpecialTypedefNames[Decl->getCanonicalDecl()] =
                 MappedTypeNameKind::DefineAndUse;
@@ -2633,7 +2627,6 @@ namespace {
                                       Loc,
                                       /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftType);
-      Result->computeType();
       
       // Make Objective-C's 'id' unavailable.
       if (Impl.SwiftContext.LangOpts.EnableObjCInterop && isObjCId(Decl)) {
@@ -2735,7 +2728,6 @@ namespace {
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(decl,
           AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-        structDecl->computeType();
         structDecl->setAddedImplicitInitializers();
 
         auto options = getDefaultMakeStructRawValuedOptions();
@@ -2785,7 +2777,6 @@ namespace {
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
           // Create the wrapper struct.
           errorWrapper = new (C) StructDecl(loc, name, loc, None, nullptr, dc);
-          errorWrapper->computeType();
           errorWrapper->setAddedImplicitInitializers();
           errorWrapper->setAccess(AccessLevel::Public);
           errorWrapper->getAttrs().add(
@@ -2855,7 +2846,6 @@ namespace {
             decl, AccessLevel::Public, loc, enumName,
             Impl.importSourceLoc(decl->getLocation()), None, nullptr, enumDC);
         enumDecl->setHasFixedRawValues();
-        enumDecl->computeType();
 
         // Annotate as 'frozen' if appropriate.
         if (enumKind == EnumKind::FrozenEnum)
@@ -2926,7 +2916,6 @@ namespace {
                          C.Id_ErrorType, loc,
                          /*genericparams=*/nullptr, enumDecl);
           alias->setUnderlyingType(errorWrapper->getDeclaredInterfaceType());
-          alias->computeType();
           enumDecl->addMember(alias);
 
           // Add the 'Code' enum to the error wrapper.
@@ -3216,7 +3205,6 @@ namespace {
                                  name,
                                  Impl.importSourceLoc(decl->getLocation()),
                                  None, nullptr, dc);
-      result->computeType();
       result->setAddedImplicitInitializers();
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
@@ -3735,8 +3723,6 @@ namespace {
                                     nameLoc, bodyParams, resultTy,
                                     /*throws*/ false, dc, decl);
 
-      result->setGenericSignature(dc->getGenericSignatureOfContext());
-
       if (!dc->isModuleScopeContext()) {
         if (selfIsInOut)
           result->setSelfAccessKind(SelfAccessKind::Mutating);
@@ -4010,7 +3996,6 @@ namespace {
           Loc,
           /*genericparams*/nullptr, DC);
       Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
-      Result->computeType();
 
       return Result;
     }
@@ -4323,8 +4308,6 @@ namespace {
 
       // Record the return type.
       result->getBodyResultTypeLoc().setType(resultTy);
-
-      result->setGenericSignature(dc->getGenericSignatureOfContext());
 
       // Optional methods in protocols.
       if (decl->getImplementationControl() == clang::ObjCMethodDecl::Optional &&
@@ -4666,7 +4649,6 @@ namespace {
           Impl.importSourceLoc(decl->getBeginLoc()),
           Impl.importSourceLoc(decl->getLocation()), name, None,
           /*TrailingWhere=*/nullptr);
-      result->computeType();
 
       addObjCAttribute(result, Impl.importIdentifier(decl->getIdentifier()));
 
@@ -4711,7 +4693,6 @@ namespace {
                                                         SourceLoc(), name,
                                                         SourceLoc(), None,
                                                         nullptr, dc);
-        result->computeType();
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
         result->setCircularityCheck(CircularityCheck::Checked);
         result->setSuperclass(Type());
@@ -4815,8 +4796,6 @@ namespace {
       } else {
         return nullptr;
       }
-
-      result->computeType();
 
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
@@ -5143,7 +5122,6 @@ namespace {
       }
 
       typealias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-      typealias->computeType();
       return typealias;
     }
 
@@ -5297,7 +5275,6 @@ SwiftDeclConverter::importCFClassType(const clang::TypedefNameDecl *decl,
   auto theClass = Impl.createDeclWithClangNode<ClassDecl>(
       decl, AccessLevel::Public, SourceLoc(), className, SourceLoc(), None,
       nullptr, dc);
-  theClass->computeType();
   theClass->setCircularityCheck(CircularityCheck::Checked);
   theClass->setSuperclass(superclass);
   theClass->setAddedImplicitInitializers(); // suppress all initializers
@@ -5379,7 +5356,6 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
   }
 
   alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
-  alias->computeType();
   
   // Record that this is the official version of this declaration.
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = alias;
@@ -5464,7 +5440,6 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-  structDecl->computeType();
   structDecl->setAddedImplicitInitializers();
 
   // Import the type of the underlying storage
@@ -5648,9 +5623,6 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
       decl, AccessLevel::Public, SourceLoc(), name, nullptr,
       SourceLoc(), rawValueExpr, theEnum);
 
-  // Give the enum element the appropriate type.
-  element->computeType();
-
   Impl.importAttributes(decl, element);
 
   return element;
@@ -5744,7 +5716,6 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
       decl, AccessLevel::Public, Loc, name, Loc, None, nullptr, dc);
-  structDecl->computeType();
   structDecl->setAddedImplicitInitializers();
 
   makeStructRawValued(Impl, structDecl, underlyingType,
@@ -6331,7 +6302,6 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   addObjCAttribute(result, selector);
 
   // Calculate the function type of the result.
-  result->setGenericSignature(dc->getGenericSignatureOfContext());
   result->computeType();
 
   Impl.recordImplicitUnwrapForDecl(result,
@@ -6762,11 +6732,8 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   if (setterObjCMethod)
     Impl.importAttributes(setterObjCMethod, setterThunk);
 
-  subscript->setGenericSignature(dc->getGenericSignatureOfContext());
-
   subscript->setIsSetterMutating(false);
   makeComputed(subscript, getterThunk, setterThunk);
-  subscript->computeType();
 
   Impl.recordImplicitUnwrapForDecl(subscript, isIUO);
 
