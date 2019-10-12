@@ -508,6 +508,17 @@ open class TestMyWrapper {
   @MyWrapper open var useMyWrapper: Int? = nil
 }
 
+// rdar://problem/54352235 - crash due to reference to private backing var
+extension UsesMyPublished {
+  // CHECK-LABEL: sil hidden [ossa] @$s21property_wrapper_defs15UsesMyPublishedC0A9_wrappersE6setFooyySiF : $@convention(method) (Int, @guaranteed UsesMyPublished) -> ()
+  // CHECK: class_method %1 : $UsesMyPublished, #UsesMyPublished.foo!setter.1
+  // CHECK-NOT: assign_by_wrapper
+  // CHECK: return
+  func setFoo(_ x: Int) {
+    foo = x
+  }
+}
+
 // CHECK-LABEL: sil_vtable ClassUsingWrapper {
 // CHECK-NEXT:  #ClassUsingWrapper.x!getter.1: (ClassUsingWrapper) -> () -> Int : @$s17property_wrappers17ClassUsingWrapperC1xSivg   // ClassUsingWrapper.x.getter
 // CHECK-NEXT:  #ClassUsingWrapper.x!setter.1: (ClassUsingWrapper) -> (Int) -> () : @$s17property_wrappers17ClassUsingWrapperC1xSivs // ClassUsingWrapper.x.setter

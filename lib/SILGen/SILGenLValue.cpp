@@ -1366,19 +1366,30 @@ namespace {
                                  std::move(value), isSelfParameter);
     }
 
+    /// Determine whether the backing variable for the given
+    /// property (that has a wrapper) is visible from the
+    /// current context.
+    static bool isBackingVarVisible(VarDecl *field,
+                                    DeclContext *fromDC){
+      VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
+      return backingVar->isAccessibleFrom(fromDC);
+    }
+
     void set(SILGenFunction &SGF, SILLocation loc,
              ArgumentSource &&value, ManagedValue base) && override {
       assert(getAccessorDecl()->isSetter());
       SILDeclRef setter = Accessor;
 
-      if (hasPropertyWrapper() && IsOnSelfParameter) {
+      if (hasPropertyWrapper() && IsOnSelfParameter &&
+          isBackingVarVisible(cast<VarDecl>(Storage),
+                              SGF.FunctionDC)) {
         // This is wrapped property. Instead of emitting a setter, emit an
         // assign_by_wrapper with the allocating initializer function and the
         // setter function as arguments. DefiniteInitializtion will then decide
         // between the two functions, depending if it's an initialization or a
         // re-assignment.
         //
-        VarDecl *field = dyn_cast<VarDecl>(Storage);
+        VarDecl *field = cast<VarDecl>(Storage);
         VarDecl *backingVar = field->getPropertyWrapperBackingProperty();
         assert(backingVar);
         CanType ValType =
