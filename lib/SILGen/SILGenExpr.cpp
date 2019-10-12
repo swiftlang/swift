@@ -5441,7 +5441,7 @@ RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto borrowedDiffFunc = diffFunc.borrow(SGF, E);
   auto *borrowedOrigFunc = SGF.B.createDifferentiableFunctionExtractOriginal(
-      E, borrowedDiffFunc.forward(SGF));
+      E, borrowedDiffFunc.getValue());
   auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
 }
