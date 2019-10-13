@@ -388,16 +388,14 @@ template<typename T> struct DenseMapInfo;
 template<> struct DenseMapInfo<AutoDiffConfig> {
   static AutoDiffConfig getEmptyKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
-    return {static_cast<IndexSubset *>(ptr),
-            static_cast<IndexSubset *>(ptr),
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
             static_cast<GenericSignature *>(ptr)};
   }
 
   static AutoDiffConfig getTombstoneKey() {
     auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
-    return {static_cast<IndexSubset *>(ptr),
-        static_cast<IndexSubset *>(ptr),
-        static_cast<GenericSignature *>(ptr)};
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            static_cast<GenericSignature *>(ptr)};
   }
 
   static unsigned getHashValue(const AutoDiffConfig &Val) {

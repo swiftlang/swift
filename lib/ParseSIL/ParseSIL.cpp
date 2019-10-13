@@ -6869,9 +6869,9 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     // Function that parses an index into `paramIndices`. Returns true on error.
     auto parseParam = [&]() -> bool {
       unsigned index;
-      // TODO: Reject non-ascending parameter index lists.
+      // TODO: Reject non-ascending index lists.
       if (P.parseUnsignedInteger(index, lastLoc,
-              diag::sil_diff_witness_expected_parameter_list))
+              diag::sil_diff_witness_expected_index_list))
         return true;
       paramIndices.push_back(index);
       return false;
