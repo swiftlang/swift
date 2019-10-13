@@ -1537,8 +1537,8 @@ class DifferentiableAttr final
                                     ParsedAutoDiffParameter> {
   friend TrailingObjects;
 
-  /// Whether this function is linear (optional).
-  bool linear;
+  /// Whether this function is linear.
+  bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The JVP function.
@@ -1621,7 +1621,7 @@ public:
     return NumParsedParameters;
   }
                                       
-  bool isLinear() const { return linear; }
+  bool isLinear() const { return Linear; }
 
   TrailingWhereClause *getWhereClause() const { return WhereClause; }
 
@@ -1676,8 +1676,8 @@ class DifferentiatingAttr final
   DeclNameWithLoc Original;
   /// The original function, resolved by the type checker.
   FuncDecl *OriginalFunction = nullptr;
-  /// Whether this function is linear (optional).
-  bool linear;
+  /// Whether this function is linear.
+  bool Linear;
   /// The number of parsed parameters specified in 'wrt:'.
   unsigned NumParsedParameters = 0;
   /// The differentiation parameters' indices, resolved by the type checker.
@@ -1706,7 +1706,7 @@ public:
 
   DeclNameWithLoc getOriginal() const { return Original; }
                                       
-  bool isLinear() const { return linear; }
+  bool isLinear() const { return Linear; }
 
   FuncDecl *getOriginalFunction() const { return OriginalFunction; }
   void setOriginalFunction(FuncDecl *decl) { OriginalFunction = decl; }
