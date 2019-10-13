@@ -5361,6 +5361,22 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
   CanGenericSignature derivativeCanGenSig;
   if (auto *derivativeGenSig = getDerivativeGenericSignature())
     derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto requireSameType =
+      [&](CanSILFunctionType type1, CanSILFunctionType type2,
+          const Twine &complaint) {
+    if (type1 == type2)
+      return;
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    llvm::dbgs() << "  " << type1 << "\n  " << type2 << "\n\n";
+    llvm::dbgs() << "In differentiability witness:\n";
+    print(llvm::dbgs());
+    // We abort by default because we want to always crash in
+    // the debugger.
+    if (AbortOnFailure)
+      abort();
+    else
+      exit(1);
+  };
   if (jvp) {
     // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
     // to accept result indices.
@@ -5368,10 +5384,8 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
         getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
         AutoDiffDerivativeFunctionKind::JVP, M.Types,
         LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
-    SILVerifier(*jvp).requireSameType(
-        SILType::getPrimitiveObjectType(jvp->getLoweredFunctionType()),
-        SILType::getPrimitiveObjectType(expectedJVPType),
-        "JVP type does not match expected JVP type");
+    requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
+                    "JVP type does not match expected JVP type");
   }
   if (vjp) {
     // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
@@ -5380,10 +5394,8 @@ void SILDifferentiabilityWitness::verify(const SILModule &M) const {
         getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
         AutoDiffDerivativeFunctionKind::VJP, M.Types,
         LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
-    SILVerifier(*vjp).requireSameType(
-        SILType::getPrimitiveObjectType(vjp->getLoweredFunctionType()),
-        SILType::getPrimitiveObjectType(expectedVJPType),
-        "VJP type does not match expected VJP type");
+    requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
+                    "VJP type does not match expected VJP type");
   }
 }
 // SWIFT_ENABLE_TENSORFLOW END
