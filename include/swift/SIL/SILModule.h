@@ -205,9 +205,10 @@ private:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Lookup table for SIL differentiability witnesses from original functions.
-  /// Indexed by key type: original function, parameter indices, result indices,
-  /// and derivative generic signature.
-  llvm::DenseMap<SILDifferentiabilityWitnessKey, SILDifferentiabilityWitness *>
+  /// Indexed by the original function, then by the autodiff config: parameter
+  /// indices, result indices, and derivative generic signature.
+  llvm::DenseMap<StringRef,
+                 llvm::DenseMap<AutoDiffConfig, SILDifferentiabilityWitness *>>
       DifferentiabilityWitnessMap;
 
   /// The list of SILDifferentiabilityWitnesses in the module.
@@ -614,6 +615,19 @@ public:
   SILDifferentiabilityWitness *
   lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key,
                                  bool deserializeLazily=true);
+
+  /// Returns true if there exists at least one differentiability witness for
+  /// the given original function.
+  bool hasDifferentiabilityWitnesses(StringRef originalFunctionName);
+
+  /// Look up the differentiability witnesses corresponding to the given
+  /// original function name.
+  llvm::DenseMap<AutoDiffConfig, SILDifferentiabilityWitness *> &
+  lookUpDifferentiabilityWitnesses(StringRef originalFunctionName,
+                                   bool deserializeLazily=true);
+
+  /// Deletes a differentiability witness.
+  void deleteDifferentiabilityWitness(SILDifferentiabilityWitness *witness);
   // SWIFT_ENABLE_TENSORFLOW END
 
   // Given a protocol, attempt to create a default witness table declaration
