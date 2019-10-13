@@ -1447,7 +1447,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        Optional<DeclNameWithLoc> vjp,
                                        TrailingWhereClause *clause)
   : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-    linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
+    Linear(linear), NumParsedParameters(params.size()), JVP(std::move(jvp)),
     VJP(std::move(vjp)), WhereClause(clause) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
@@ -1461,7 +1461,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature *derivativeGenSig)
     : DeclAttribute(DAK_Differentiable, atLoc, baseRange, implicit),
-      linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
+      Linear(linear), JVP(std::move(jvp)), VJP(std::move(vjp)),
       ParameterIndices(indices) {
   setDerivativeGenericSignature(context, derivativeGenSig);
 }
@@ -1530,7 +1530,7 @@ DifferentiatingAttr::DifferentiatingAttr(
     DeclNameWithLoc original, bool linear,
     ArrayRef<ParsedAutoDiffParameter> params)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-      Original(std::move(original)), linear(linear),
+      Original(std::move(original)), Linear(linear),
       NumParsedParameters(params.size()) {
   std::copy(params.begin(), params.end(),
             getTrailingObjects<ParsedAutoDiffParameter>());
@@ -1540,7 +1540,7 @@ DifferentiatingAttr::DifferentiatingAttr(
     ASTContext &context, bool implicit, SourceLoc atLoc, SourceRange baseRange,
     DeclNameWithLoc original, bool linear, IndexSubset *indices)
     : DeclAttribute(DAK_Differentiating, atLoc, baseRange, implicit),
-      Original(std::move(original)), linear(linear), ParameterIndices(indices) {
+      Original(std::move(original)), Linear(linear), ParameterIndices(indices) {
 }
 
 DifferentiatingAttr *

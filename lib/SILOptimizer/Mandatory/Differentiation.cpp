@@ -353,8 +353,8 @@ private:
   Kind kind;
   union Value {
     /// The instruction associated with the `DifferentiableFunctionInst` case.
-    DifferentiableFunctionInst *adFuncInst;
-    Value(DifferentiableFunctionInst *inst) : adFuncInst(inst) {}
+    DifferentiableFunctionInst *diffFuncInst;
+    Value(DifferentiableFunctionInst *inst) : diffFuncInst(inst) {}
 
     /// The parent `apply` instruction and `[differentiable]` attribute
     /// associated with the `IndirectDifferentiation` case.
@@ -385,7 +385,7 @@ public:
 
   DifferentiableFunctionInst *getDifferentiableFunctionInst() const {
     assert(kind == Kind::DifferentiableFunctionInst);
-    return value.adFuncInst;
+    return value.diffFuncInst;
   }
 
   std::pair<ApplyInst *, SILDifferentiableAttr *>
