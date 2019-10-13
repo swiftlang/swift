@@ -5010,10 +5010,6 @@ Type VarDecl::getType() const {
   return getDeclContext()->mapTypeIntoContext(getInterfaceType());
 }
 
-void VarDecl::markInvalid() {
-  setInterfaceType(ErrorType::get(getASTContext()));
-}
-
 /// Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.

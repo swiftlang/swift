@@ -1064,7 +1064,10 @@ public:
 
       // If that failed, mark any variables binding pieces of the pattern
       // as invalid to silence follow-on errors.
-      pattern->forEachVariable([&](VarDecl *VD) { VD->markInvalid(); });
+      pattern->forEachVariable([&](VarDecl *VD) {
+        VD->setInterfaceType(ErrorType::get(TC.Context));
+        VD->setInvalid();
+      });
     }
     labelItem.setPattern(pattern);
 
@@ -1140,8 +1143,11 @@ public:
             !vd->getType()->isEqual(initialCaseVarDecl->getType())) {
           TC.diagnose(vd->getLoc(), diag::type_mismatch_multiple_pattern_list,
                       vd->getType(), initialCaseVarDecl->getType());
-          vd->markInvalid();
-          initialCaseVarDecl->markInvalid();
+          vd->setInterfaceType(ErrorType::get(TC.Context));
+          vd->setInvalid();
+
+          initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
+          initialCaseVarDecl->setInvalid();
         }
 
         if (initialCaseVarDecl->isLet() == vd->isLet()) {
@@ -1161,8 +1167,11 @@ public:
         if (foundVP)
           diag.fixItReplace(foundVP->getLoc(),
                             initialCaseVarDecl->isLet() ? "let" : "var");
-        vd->markInvalid();
-        initialCaseVarDecl->markInvalid();
+        vd->setInterfaceType(ErrorType::get(TC.Context));
+        vd->setInvalid();
+
+        initialCaseVarDecl->setInterfaceType(ErrorType::get(TC.Context));
+        initialCaseVarDecl->setInvalid();
       }
     });
 
@@ -1229,8 +1238,11 @@ public:
           TC.diagnose(previous->getLoc(),
                       diag::type_mismatch_fallthrough_pattern_list,
                       previous->getType(), expected->getType());
-          previous->markInvalid();
-          expected->markInvalid();
+          previous->setInterfaceType(ErrorType::get(TC.Context));
+          previous->setInvalid();
+
+          expected->setInterfaceType(ErrorType::get(TC.Context));
+          expected->setInvalid();
         }
 
         // Ok, we found our match. Make the previous fallthrough statement var
@@ -1465,7 +1477,8 @@ bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
       // before we type-check the guard.  (This will probably kill
       // most of the type-checking, but maybe not.)
       pattern->forEachVariable([&](VarDecl *var) {
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
+        var->setInvalid();
       });
     }
 

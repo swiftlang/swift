@@ -42,7 +42,8 @@ void swift::setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
     if (var->hasInterfaceType() && !var->getType()->hasError())
       return;
 
-    var->markInvalid();
+    var->setInterfaceType(ErrorType::get(var->getASTContext()));
+    var->setInvalid();
   });
 }
 

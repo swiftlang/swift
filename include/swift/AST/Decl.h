@@ -4809,8 +4809,6 @@ public:
   /// this will use archetypes.
   Type getType() const;
 
-  void markInvalid();
-
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.
   ///

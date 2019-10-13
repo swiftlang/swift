@@ -2824,7 +2824,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
           !var->getType()->hasError())
         return;
 
-      var->markInvalid();
+      var->setInterfaceType(ErrorType::get(Context));
     });
   }
 
@@ -3033,7 +3033,7 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
         // compute a type for.
         if (var->hasInterfaceType() && !var->getType()->hasError())
           return;
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
       });
     };
 

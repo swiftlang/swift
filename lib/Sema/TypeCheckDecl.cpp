@@ -2459,7 +2459,7 @@ public:
         auto markVarAndPBDInvalid = [PBD, var] {
           PBD->setInvalid();
           var->setInvalid();
-          var->markInvalid();
+          var->setInterfaceType(ErrorType::get(var->getASTContext()));
         };
         
         // Properties with an opaque return type need an initializer to
@@ -4244,12 +4244,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       if (!PBD->isBeingValidated()) {
         validatePatternBindingEntries(*this, PBD);
       } else if (!VD->getNamingPattern()) {
-        // FIXME: This acts as a circularity breaker for overload resolution
-        // during pattern binding validation, which is allowed to lookup and
-        // find the very VarDecl attached to the binding it's trying to check.
-        // In order to tell it to back off, we surface an error type but don't
-        // set the interface type so a different caller can come along and
-        // do the right thing.
+        // FIXME: This acts as a circularity breaker.
         return;
       }
 
@@ -4260,7 +4255,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
       }
     } else if (!VD->getParentPatternStmt() && !VD->getParentVarDecl()) {
       // No parent?  That's an error.
-      VD->markInvalid();
+      VD->setInterfaceType(ErrorType::get(Context));
       break;
     }
 
@@ -4283,7 +4278,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
         VD->getParentPattern()->setType(ErrorType::get(Context));
         setBoundVarsTypeError(VD->getParentPattern(), Context);
-        VD->markInvalid();
+        VD->setInterfaceType(ErrorType::get(Context));
         break;
       }
     }
