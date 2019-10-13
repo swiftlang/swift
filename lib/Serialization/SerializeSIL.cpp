@@ -2227,7 +2227,13 @@ static void writeIndexTable(Serializer &S,
           kind == sil_index_block::SIL_VTABLE_NAMES ||
           kind == sil_index_block::SIL_GLOBALVAR_NAMES ||
           kind == sil_index_block::SIL_WITNESS_TABLE_NAMES ||
-          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES) &&
+          kind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_NAMES ||
+          // SWIFT_ENABLE_TENSORFLOW
+          // TODO(TF-893): Update surrounding comment/assertion text when
+          // upstreaming code to master. Comments/assertions have not been
+          // updated to keep the code diff small.
+          kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) &&
+          // SWIFT_ENABLE_TENSORFLOW END
          "SIL function table, global, vtable and (default) witness table "
          "are supported");
   llvm::SmallString<4096> hashTableBlob;
@@ -2523,9 +2529,13 @@ writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
                                    dw.getResultIndices()->end());
   auto originalFnType = original->getLoweredFunctionType();
   assert(originalFnType->getNumParameters() ==
-         dw.getParameterIndices()->getCapacity());
+         dw.getParameterIndices()->getCapacity() &&
+         "Original function parameter count should match differentiability "
+         "witness parameter indices capacity");
   assert(originalFnType->getNumResults() ==
-         dw.getResultIndices()->getCapacity());
+         dw.getResultIndices()->getCapacity() &&
+         "Original function result count should match differentiability "
+         "witness result indices capacity");
 
   DifferentiabilityWitnessLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[DifferentiabilityWitnessLayout::Code],

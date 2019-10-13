@@ -3299,8 +3299,12 @@ SILDeserializer::lookupDefaultWitnessTable(SILDefaultWitnessTable *existingWt) {
 // SWIFT_ENABLE_TENSORFLOW
 SILDifferentiabilityWitness *
 SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
-  auto &diffWitnessOrOffset = DifferentiabilityWitnesses[DId-1];
+  if (DId == 0)
+    return nullptr;
+  assert(DId <= DifferentiabilityWitnesses.size() &&
+         "Invalid SILDifferentiabilityWitness ID");
 
+  auto &diffWitnessOrOffset = DifferentiabilityWitnesses[DId-1];
   if (diffWitnessOrOffset.isFullyDeserialized())
     return diffWitnessOrOffset.get();
 
@@ -3332,12 +3336,17 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
 
   auto linkage = fromStableSILLinkage(rawLinkage);
   assert(linkage && "Expected value linkage for sil_differentiability_witness");
-  auto originalName = MF->getIdentifier(originalNameId).str();
-  auto jvpName = MF->getIdentifier(jvpNameId).str();
-  auto vjpName = MF->getIdentifier(vjpNameId).str();
+  auto originalName = MF->getIdentifierText(originalNameId);
+  auto jvpName = MF->getIdentifierText(jvpNameId);
+  auto vjpName = MF->getIdentifierText(vjpNameId);
   auto *original = getFuncForReference(originalName);
+  assert(original && "Original function must be found");
   auto *jvp = getFuncForReference(jvpName);
+  if (!jvpName.empty())
+    assert(jvp && "JVP function must be found if JVP name is not empty");
   auto *vjp = getFuncForReference(vjpName);
+  if (!vjpName.empty())
+    assert(vjp && "VJP function must be found if VJP name is not empty");
   auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
   SmallVector<unsigned, 8> parameterAndResultIndices(
@@ -3373,6 +3382,8 @@ SILDifferentiabilityWitness *SILDeserializer::lookupDifferentiabilityWitness(
 }
 
 void SILDeserializer::getAllDifferentiabilityWitnesses() {
+  if (!DifferentiabilityWitnessList)
+    return;
   for (unsigned I = 0, E = DifferentiabilityWitnesses.size(); I < E; ++I)
     readDifferentiabilityWitness(I+1);
 }
