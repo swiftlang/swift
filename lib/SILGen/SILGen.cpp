@@ -1310,18 +1310,6 @@ void SILGenModule::visitPatternBindingDecl(PatternBindingDecl *pd) {
 }
 
 void SILGenModule::visitVarDecl(VarDecl *vd) {
-  // If this is a top-level lazy var, visit its storage first.
-  if (vd->getAttrs().hasAttribute<LazyAttr>()) {
-    const auto lazyStorage = vd->getLazyStorageProperty();
-    const auto td = dyn_cast<TopLevelCodeDecl>(
-        lazyStorage->getParentPatternBinding()->getDeclContext());
-
-    assert(td && "PBD for top-level lazy var not wrapped in a TopLevelCodeDecl");
-
-    visitTopLevelCodeDecl(td);
-    visitVarDecl(lazyStorage);
-  }
-
   if (vd->hasStorage())
     addGlobalVariable(vd);
 
@@ -1674,9 +1662,26 @@ public:
 void SILGenModule::emitSourceFile(SourceFile *sf) {
   SourceFileScope scope(*this, sf);
   FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-file", sf);
-  for (Decl *D : sf->Decls) {
+  
+  const auto visitDecl = [this](Decl *D) {
     FrontendStatsTracer StatsTracer(getASTContext().Stats, "SILgen-decl", D);
     visit(D);
+  };
+  for (Decl *D : sf->Decls) {
+    // If this is a wrapped PBD for a lazy var, visit its storage
+    // first.
+    if (const auto TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      const ASTNode N = TLCD->getBody()->getElements()[0];
+      if (const auto SomeDecl = N.dyn_cast<Decl *>())
+        if (const auto PBD = dyn_cast<PatternBindingDecl>(SomeDecl))
+          if (const auto VD = PBD->getSingleVar())
+            if (VD->getAttrs().hasAttribute<LazyAttr>())
+              VD->visitLazyStorageIfCreated([visitDecl](Decl *D) {
+                visitDecl(D);
+              });
+    }
+
+    visitDecl(D);
   }
 
   for (TypeDecl *TD : sf->LocalTypeDecls) {

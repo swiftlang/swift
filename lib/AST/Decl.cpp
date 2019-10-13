@@ -5636,6 +5636,34 @@ VarDecl *VarDecl::getLazyStorageProperty() const {
       {});
 }
 
+void VarDecl::visitLazyStorageIfCreated(
+            llvm::function_ref<void (Decl *)> visit) const {
+  assert(getAttrs().hasAttribute<LazyAttr>() && "Not a lazy var");
+  if (getDeclContext()->isTypeContext())
+    return;
+
+  // This method is not responsible for creating storage;
+  // bail out if the request hasn't been evaluated yet.
+  auto mutableThis = const_cast<VarDecl *>(this);
+  if (!getASTContext().evaluator.hasBeenCached(
+          LazyStoragePropertyRequest{mutableThis})) {
+    return;
+  }
+
+  const auto lazyStorage = getLazyStorageProperty();
+  if (getDeclContext()->isLocalContext()) {
+    visit(lazyStorage->getParentPatternBinding());
+  } else {
+    const auto topLevelCode = dyn_cast<TopLevelCodeDecl>(
+        lazyStorage->getParentPatternBinding()->getDeclContext());
+
+    assert(topLevelCode &&
+           "PBD for top-level lazy var not wrapped in TopLevelCodeDecl");
+    visit(topLevelCode);
+  }
+  visit(lazyStorage);
+}
+
 static bool propertyWrapperInitializedViaInitialValue(
    const VarDecl *var, bool checkDefaultInit) {
   auto customAttrs = var->getAttachedPropertyWrappers();

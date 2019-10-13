@@ -1192,14 +1192,6 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
 void SILGenFunction::visitVarDecl(VarDecl *D) {
   // We handle emitting the variable storage when we see the pattern binding.
 
-  // If this is a local lazy var, visit its storage first.
-  if (D->getAttrs().hasAttribute<LazyAttr>() &&
-      D->getDeclContext()->isLocalContext()) {
-    const auto lazyStorage = D->getLazyStorageProperty();
-    visitPatternBindingDecl(lazyStorage->getParentPatternBinding());
-    visitVarDecl(lazyStorage);
-  }
-
   // Emit the variable's accessors.
   D->visitEmittedAccessors([&](AccessorDecl *accessor) {
     SGM.emitFunction(accessor);

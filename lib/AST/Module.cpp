@@ -1460,14 +1460,31 @@ void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
 void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   std::set<DeclKind> MajorDeclKinds = {DeclKind::Class, DeclKind::Enum,
     DeclKind::Extension, DeclKind::Protocol, DeclKind::Struct};
-  for (auto decl : Decls) {
+  const auto visitDecl = [&](Decl *decl) {
     if (!decl->shouldPrintInContext(PO))
-      continue;
+      return;
     // For a major decl, we print an empty line before it.
     if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end())
       Printer << "\n";
     if (decl->print(Printer, PO))
       Printer << "\n";
+  };
+
+  for (auto decl : Decls) {
+    // If this is a wrapped PBD for a lazy var, visit its storage
+    // first.
+    if (const auto topLevel = dyn_cast<TopLevelCodeDecl>(decl)) {
+      const ASTNode n = topLevel->getBody()->getElements()[0];
+      if (const auto someDecl = n.dyn_cast<Decl *>())
+        if (const auto pbd = dyn_cast<PatternBindingDecl>(someDecl))
+          if (const auto var = pbd->getSingleVar())
+            if (var->getAttrs().hasAttribute<LazyAttr>())
+              var->visitLazyStorageIfCreated([visitDecl](Decl *decl) {
+                visitDecl(decl);
+              });
+    }
+
+    visitDecl(decl);
   }
 }
 
@@ -1708,7 +1725,7 @@ bool FileUnit::walk(ASTWalker &walker) {
   getTopLevelDecls(Decls);
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : Decls) {
+  const auto visitDecl = [&](Decl *D) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif
@@ -1728,15 +1745,33 @@ bool FileUnit::walk(ASTWalker &walker) {
         }
       }
     }
-  }
+    return false;
+  };
 
+  for (Decl *D : Decls) {
+    // If this is a wrapped PBD for a lazy var, visit its storage
+    // first.
+    if (const auto TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      const ASTNode N = TLCD->getBody()->getElements()[0];
+      if (const auto SomeDecl = N.dyn_cast<Decl *>())
+        if (const auto PBD = dyn_cast<PatternBindingDecl>(SomeDecl))
+          if (const auto VD = PBD->getSingleVar())
+            if (VD->getAttrs().hasAttribute<LazyAttr>())
+              VD->visitLazyStorageIfCreated([visitDecl](Decl *D) {
+                visitDecl(D);
+              });
+    }
+
+    if (visitDecl(D))
+      return true;
+  }
   return false;
 }
 
 bool SourceFile::walk(ASTWalker &walker) {
   llvm::SaveAndRestore<ASTWalker::ParentTy> SAR(walker.Parent,
                                                 getParentModule());
-  for (Decl *D : Decls) {
+  const auto visitDecl = [&](Decl *D) {
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into decl", D);
 #endif
@@ -1756,6 +1791,25 @@ bool SourceFile::walk(ASTWalker &walker) {
         }
       }
     }
+    return false;
+  };
+
+  for (Decl *D : Decls) {
+    // If this is a wrapped PBD for a lazy var, visit its storage
+    // first.
+    if (const auto TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
+      const ASTNode N = TLCD->getBody()->getElements()[0];
+      if (const auto SomeDecl = N.dyn_cast<Decl *>())
+        if (const auto PBD = dyn_cast<PatternBindingDecl>(SomeDecl))
+          if (const auto VD = PBD->getSingleVar())
+            if (VD->getAttrs().hasAttribute<LazyAttr>())
+              VD->visitLazyStorageIfCreated([visitDecl](Decl *D) {
+                visitDecl(D);
+              });
+    }
+
+    if (visitDecl(D))
+      return true;
   }
   return false;
 }

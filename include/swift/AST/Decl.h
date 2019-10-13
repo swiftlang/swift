@@ -5107,6 +5107,14 @@ public:
   /// Retrieve the backing storage property for a lazy property.
   VarDecl *getLazyStorageProperty() const;
 
+  /// Visit the backing storage of this lazy variable, provided that
+  /// the storage had already been created.
+  ///
+  /// This is a convenience method for local and top-level lazy variables,
+  /// the implicit storage for which is not directly added to the AST and
+  /// should therefore be visited explicity where necessary.
+  void visitLazyStorageIfCreated(llvm::function_ref<void (Decl *)>) const;
+
   /// Whether this is a property with a property wrapper that was initialized
   /// via a value of the original type, e.g.,
   ///

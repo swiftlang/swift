@@ -1402,7 +1402,17 @@ Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
       continue;
     }
 
+    // Backing storage for local and top-level lazy variables
+    // is not added to the AST and should be visited explicitly.
     auto *D = Elem.get<Decl*>();
+    if (const auto PBD = dyn_cast<PatternBindingDecl>(D))
+      if (const auto VD = PBD->getSingleVar())
+        if (VD->getAttrs().hasAttribute<LazyAttr>() &&
+            !isa<TopLevelCodeDecl>(PBD->getDeclContext()))
+          VD->visitLazyStorageIfCreated([this](Decl *D) {
+            doIt(D);
+          });
+
     if (doIt(D))
       return nullptr;
 

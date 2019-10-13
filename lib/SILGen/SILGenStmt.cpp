@@ -280,19 +280,18 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   const unsigned UnknownStmtType  = 4;
   unsigned StmtType = UnknownStmtType;
   
-  for (auto &ESD : S->getElements()) {
-    
+  const auto visitElement = [&](const ASTNode &ESD) {
     if (auto D = ESD.dyn_cast<Decl*>())
       if (isa<IfConfigDecl>(D))
-        continue;
-    
+        return;
+
     // If we ever reach an unreachable point, stop emitting statements and issue
     // an unreachable code diagnostic.
     if (!SGF.B.hasValidInsertionPoint()) {
       // If this is an implicit statement or expression, just skip over it,
       // don't emit a diagnostic here.
       if (auto *S = ESD.dyn_cast<Stmt*>()) {
-        if (S->isImplicit()) continue;
+        if (S->isImplicit()) return;
       } else if (auto *E = ESD.dyn_cast<Expr*>()) {
         // Optional chaining expressions are wrapped in a structure like.
         //
@@ -303,15 +302,15 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
         // Walk through it to find out if the statement is actually implicit.
         if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(E)) {
           if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
-            if (IIO->getSubExpr()->isImplicit()) continue;
+            if (IIO->getSubExpr()->isImplicit()) return;
           if (auto *C = dyn_cast<CallExpr>(OEE->getSubExpr()))
-            if (C->isImplicit()) continue;
+            if (C->isImplicit()) return;
         } else if (E->isImplicit()) {
           // Ignore all other implicit expressions.
-          continue;
+          return;
         }
       }
-      
+
       if (StmtType != UnknownStmtType) {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code_after_stmt, StmtType);
@@ -348,6 +347,20 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     } else {
       SGF.visit(ESD.get<Decl*>());
     }
+  };
+
+  for (const auto &ESD : S->getElements()) {
+    // If we hit a PBD for a local lazy var, visit its backing storage first.
+    if (const auto D = ESD.dyn_cast<Decl *>())
+      if (const auto PBD = dyn_cast<PatternBindingDecl>(D))
+        if (const auto VD = PBD->getSingleVar())
+          if (VD->getAttrs().hasAttribute<LazyAttr>() &&
+              !isa<TopLevelCodeDecl>(PBD->getDeclContext()))
+            VD->visitLazyStorageIfCreated([visitElement](Decl *D) {
+              visitElement(D);
+            });
+
+    visitElement(ESD);
   }
 }
 

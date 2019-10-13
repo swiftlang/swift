@@ -1518,7 +1518,7 @@ public:
   }
 
   void printASTNodes(const ArrayRef<ASTNode> &Elements) {
-    for (auto Elt : Elements) {
+    const auto printNode = [this](const ASTNode &Elt) {
       OS << '\n';
       if (auto *SubExpr = Elt.dyn_cast<Expr*>())
         printRec(SubExpr);
@@ -1526,6 +1526,19 @@ public:
         printRec(SubStmt);
       else
         printRec(Elt.get<Decl*>());
+    };
+    for (const auto &Elt : Elements) {
+      // If we hit a PBD for a local lazy var, dump its storage first.
+      if (const auto D = Elt.dyn_cast<Decl *>())
+        if (const auto PBD = dyn_cast<PatternBindingDecl>(D))
+          if (const auto VD = PBD->getSingleVar())
+            if (VD->getAttrs().hasAttribute<LazyAttr>() &&
+                !isa<TopLevelCodeDecl>(PBD->getDeclContext()))
+              VD->visitLazyStorageIfCreated([printNode](Decl *D) {
+                printNode(D);
+              });
+
+      printNode(Elt);
     }
   }
 

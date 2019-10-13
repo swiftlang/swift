@@ -303,6 +303,16 @@ public:
     cache.insert({getCanonicalRequest(request), std::move(output)});
   }
 
+  /// Consults the general cache for whether the output for the given request
+  /// had already been cached.
+  template<typename Request,
+           typename std::enable_if<!Request::hasExternalCache>::type* = nullptr>
+  bool hasBeenCached(const Request &request) {
+    assert(request.isCached() && "Request output should not be cached");
+
+    return cache.find_as(request) != cache.end();
+  }
+
   /// Clear the cache stored within this evaluator.
   ///
   /// Note that this does not clear the caches of requests that use external

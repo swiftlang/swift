@@ -2696,9 +2696,7 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
                              bool NeedIndent) {
   IndentRAII IndentMore(*this, NeedIndent);
-  bool PrintedSomething = false;
-  for (auto element : Elements) {
-    PrintedSomething = true;
+  const auto printNode = [this](const ASTNode &element) {
     Printer.printNewline();
     indent();
     if (auto decl = element.dyn_cast<Decl*>()) {
@@ -2710,6 +2708,22 @@ bool PrintAST::printASTNodes(const ArrayRef<ASTNode> &Elements,
       // FIXME: print expression
       // visit(element.get<Expr*>());
     }
+  };
+  bool PrintedSomething = false;
+  for (const auto &element : Elements) {
+    PrintedSomething = true;
+
+    // If we hit a PBD for a local lazy var, print its storage first.
+    if (const auto decl = element.dyn_cast<Decl *>())
+      if (const auto pbd = dyn_cast<PatternBindingDecl>(decl))
+        if (const auto var = pbd->getSingleVar())
+          if (var->getAttrs().hasAttribute<LazyAttr>() &&
+              !isa<TopLevelCodeDecl>(pbd->getDeclContext()))
+            var->visitLazyStorageIfCreated([printNode](Decl *decl) {
+              printNode(decl);
+            });
+
+    printNode(element);
   }
   return PrintedSomething;
 }
