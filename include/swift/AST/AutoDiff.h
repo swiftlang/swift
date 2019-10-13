@@ -40,9 +40,9 @@ typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
 enum class DifferentiabilityKind: uint8_t {
-  NonDifferentiable = 0b00,
-  Normal = 0b01,
-  Linear = 0b11
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
 };
 
 class ParsedAutoDiffParameter {

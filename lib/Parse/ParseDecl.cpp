@@ -2554,8 +2554,7 @@ bool Parser::parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // Handling '@differentiable(wrong) (...'.
           if (!justChecking)
-            diagnose(t, diag::unexpected_argument_differentiable,
-                     possibleArg);
+            diagnose(t, diag::unexpected_argument_differentiable, possibleArg);
           consumeToken(tok::r_paren);
           backtrack.cancelBacktrack();
           return false;
