@@ -782,8 +782,12 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 }
 
 void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
-  Type formalExnType =
-    S->getCatches().front()->getErrorPattern()->getType();
+  Type formalExnType = S->getCatches()
+                           .front()
+                           ->getCaseLabelItems()
+                           .front()
+                           .getPattern()
+                           ->getType();
   auto &exnTL = SGF.getTypeLowering(formalExnType);
 
   // Create the throw destination at the end of the function.
@@ -855,10 +859,6 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // emitOrDeleteBlock ever learns to just continue in the
   // predecessor, we'll need to suppress that here.
   emitOrDeleteBlock(SGF, endDest, CleanupLocation(S->getBody()));
-}
-
-void StmtEmitter::visitCatchStmt(CatchStmt *S) {
-  llvm_unreachable("catch statement outside of context?");
 }
 
 void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {

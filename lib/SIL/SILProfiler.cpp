@@ -240,8 +240,6 @@ struct MapRegionCounters : public ASTWalker {
       mapRegion(SS);
     } else if (auto *CS = dyn_cast<CaseStmt>(S)) {
       mapRegion(CS);
-    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      mapRegion(CS->getBody());
     }
     return {true, S};
   }
@@ -600,11 +598,6 @@ struct PGOMapping : public ASTWalker {
       CounterMap[CS] = NextCounter++;
       auto csCount = loadExecutionCount(CS);
       LoadedCounterMap[CS] = csCount;
-    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      auto csBody = CS->getBody();
-      CounterMap[csBody] = NextCounter++;
-      auto csBodyCount = loadExecutionCount(csBody);
-      LoadedCounterMap[csBody] = csBodyCount;
     }
     return {true, S};
   }
@@ -757,7 +750,7 @@ private:
     Stmt *ParentStmt = Parent.getAsStmt();
     if (ParentStmt) {
       if (isa<DoStmt>(ParentStmt) || isa<DoCatchStmt>(ParentStmt) ||
-          isa<CatchStmt>(ParentStmt))
+          isa<CaseStmt>(ParentStmt))
         return;
       if (auto *LS = dyn_cast<LabeledStmt>(ParentStmt))
         JumpsToLabel = &getCounter(LS);
@@ -969,9 +962,6 @@ public:
       assignCounter(DCS, CounterExpr::Ref(getCurrentCounter()));
       DoCatchStack.push_back(DCS);
 
-    } else if (auto *CS = dyn_cast<CatchStmt>(S)) {
-      assert(DoCatchStack.size() && "catch stmt with no parent");
-      assignCounter(CS->getBody());
     }
     return {true, S};
   }
@@ -1036,9 +1026,6 @@ public:
       assert(DoCatchStack.back() == DCS && "Malformed do-catch stack");
       DoCatchStack.pop_back();
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
-
-    } else if (isa<CatchStmt>(S)) {
-      assert(DoCatchStack.size() && "catch stmt with no parent");
 
     } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
       // When we return, adjust loop condition counts and do-catch exit counts

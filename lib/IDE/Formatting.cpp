@@ -412,7 +412,7 @@ public:
         // } <-- No indent here, close brace should be at same level as do.
         // catch {
         // }
-        if (isa<CatchStmt>(AtStmtEnd))
+        if (isa<CaseStmt>(AtStmtEnd))
           return false;
       }
     }
@@ -447,8 +447,8 @@ public:
 
     // If we're in a DoCatchStmt and at a 'catch', don't add an indent.
     if (auto *DoCatchS = dyn_cast_or_null<DoCatchStmt>(Cursor->getAsStmt())) {
-      for (CatchStmt *CatchS : DoCatchS->getCatches()) {
-        SourceLoc Loc = CatchS->getCatchLoc();
+      for (CaseStmt *CatchS : DoCatchS->getCatches()) {
+        SourceLoc Loc = CatchS->getStartLoc();
         if (Loc.isValid() && SM.getLineAndColumn(Loc).first == Line)
           return false;
       }

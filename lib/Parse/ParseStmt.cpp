@@ -1898,6 +1898,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       ParserResult<CaseStmt> clause =
           parseStmtCase(false, CaseParentKind::DoCatch);
       status |= clause;
+      consumeToken(tok::r_brace);
       if (status.hasCodeCompletion() && clause.isNull())
         return makeParserResult<Stmt>(status, nullptr);
 
