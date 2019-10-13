@@ -6808,6 +6808,7 @@ static void convertRequirements(Parser &P, SILFunction *F,
 
 /// decl-sil-differentiability-witness ::=
 ///   'sil_differentiability_witness'
+///   ('[' 'serialized' ']')?
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
 ///   ('[' 'where' derivatve-generic-signature-requirements ']')?
@@ -6829,6 +6830,17 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     return true;
   if (!linkage)
     linkage = SILLinkage::PublicExternal;
+
+  // Parse '[serialized]' flag (optional).
+  bool isSerialized = false;
+  if (P.Tok.is(tok::l_square) && P.peekToken().is(tok::identifier) &&
+      P.peekToken().getText() == "serialized") {
+    isSerialized = true;
+    P.consumeToken(tok::l_square);
+    P.consumeToken(tok::identifier);
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
+      return true;
+  }
 
   Scope scope(&P, ScopeKind::TopLevel);
   Scope body(&P, ScopeKind::FunctionBody);
@@ -6970,8 +6982,6 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
       return true;
   }
 
-  // TODO(TF-893): Parse `isSerialized` flag.
-  bool isSerialized = false;
   SILDifferentiabilityWitness::create(
       M, *linkage, originalFn, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized);

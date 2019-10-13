@@ -3066,6 +3066,9 @@ void SILDifferentiabilityWitness::print(
   // sil_differentiability_witness (linkage)?
   OS << "sil_differentiability_witness ";
   printLinkage(OS, linkage, ForDefinition);
+  // ([serialized])?
+  if (isSerialized())
+    OS << "[serialized] ";
   // [parameters ...]
   OS << "[parameters ";
   interleave(getParameterIndices()->getIndices(),
