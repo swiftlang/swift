@@ -435,6 +435,27 @@ template<> struct DenseMapInfo<AutoDiffConfig> {
   }
 };
 
+template<> struct DenseMapInfo<AutoDiffDerivativeFunctionKind> {
+  static AutoDiffDerivativeFunctionKind getEmptyKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getEmptyKey());
+  }
+
+  static AutoDiffDerivativeFunctionKind getTombstoneKey() {
+    return static_cast<AutoDiffDerivativeFunctionKind::innerty>(
+        DenseMapInfo<unsigned>::getTombstoneKey());
+  }
+
+  static unsigned getHashValue(const AutoDiffDerivativeFunctionKind &Val) {
+    return DenseMapInfo<unsigned>::getHashValue(Val);
+  }
+
+  static bool isEqual(const AutoDiffDerivativeFunctionKind &LHS,
+                      const AutoDiffDerivativeFunctionKind &RHS) {
+    return LHS == RHS;
+  }
+};
+
 template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {
     return { DenseMapInfo<unsigned>::getEmptyKey(), nullptr };

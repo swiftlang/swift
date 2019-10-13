@@ -3610,6 +3610,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     attr->setInvalid();
     return;
   }
+  attr->setDerivativeKind(kind);
   // `value: R` result tuple element must conform to `Differentiable`.
   auto diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   auto valueResultType = valueResultElt.getType();

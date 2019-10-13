@@ -251,6 +251,18 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
   return found->second;
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+SILDifferentiabilityWitness *
+SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key,
+                                          bool deserializeLazily) {
+  auto found = DifferentiabilityWitnessMap.find(key);
+  if (found != DifferentiabilityWitnessMap.end())
+    return found->second;
+  if (deserializeLazily)
+    return getSILLoader()->lookupDifferentiabilityWitness(key);
+  return nullptr;
+}
+
 SILDefaultWitnessTable *
 SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,
                                                 SILLinkage Linkage) {

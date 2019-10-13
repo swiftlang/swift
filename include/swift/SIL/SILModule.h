@@ -609,6 +609,13 @@ public:
   /// hierarchy of \p Class.
   SILFunction *lookUpFunctionInVTable(ClassDecl *Class, SILDeclRef Member);
 
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Look up the differentiability witness corresponding to the given key.
+  SILDifferentiabilityWitness *
+  lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key,
+                                 bool deserializeLazily=true);
+  // SWIFT_ENABLE_TENSORFLOW END
+
   // Given a protocol, attempt to create a default witness table declaration
   // for it.
   SILDefaultWitnessTable *
