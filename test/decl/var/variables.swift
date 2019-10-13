@@ -66,8 +66,7 @@ class SomeClass {}
 weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
 
 let a = b ; let b = a
-// expected-note@-1 {{'a' declared here}}
-// expected-error@-2 {{ambiguous use of 'a'}}
+// expected-error@-1 {{let 'a' references itself}}
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
 let uselessValue : String?

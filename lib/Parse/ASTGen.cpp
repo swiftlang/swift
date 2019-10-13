@@ -63,7 +63,7 @@ ASTGen::generateDeclAttributes(const Syntax &D, SourceLoc Loc,
   if (auto firstTok = D.getFirstToken()) {
     auto declLoc = advanceLocBegin(Loc, *firstTok);
     if (hasDeclAttributes(declLoc))
-      return getDeclAttributes(declLoc);
+      return takeDeclAttributes(declLoc);
   }
   return DeclAttributes();
 }
@@ -229,6 +229,442 @@ TrailingWhereClause *ASTGen::generate(const GenericWhereClauseSyntax &syntax,
   return TrailingWhereClause::create(Context, whereLoc, requirements);
 }
 
+Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
+  Expr *result = nullptr;
+
+  auto exprLoc = advanceLocBegin(Loc, E);
+  if (hasExpr(exprLoc))
+    return takeExpr(exprLoc);
+
+  if (auto identifierExpr = E.getAs<IdentifierExprSyntax>())
+    result = generate(*identifierExpr, Loc);
+  else if (auto superRefExpr = E.getAs<SuperRefExprSyntax>())
+    result = generate(*superRefExpr, Loc);
+  else if (auto specializeExpr = E.getAs<SpecializeExprSyntax>())
+    result = generate(*specializeExpr, Loc);
+  else if (auto editorPlaceHolderExpr = E.getAs<EditorPlaceholderExprSyntax>())
+    result = generate(*editorPlaceHolderExpr, Loc);
+  else if (auto arrayExpr = E.getAs<ArrayExprSyntax>())
+    result = generate(*arrayExpr, Loc);
+  else if (auto dictionaryExpr = E.getAs<DictionaryExprSyntax>())
+    result = generate(*dictionaryExpr, Loc);
+  else if (auto tupleExpr = E.getAs<TupleExprSyntax>())
+    result = generate(*tupleExpr, Loc);
+  else if (auto callExpr  = E.getAs<FunctionCallExprSyntax>())
+    result = generate(*callExpr, Loc);
+  else if (auto memberExpr  = E.getAs<MemberAccessExprSyntax>())
+    result = generate(*memberExpr, Loc);
+  else if (auto integerLiteralExpr = E.getAs<IntegerLiteralExprSyntax>())
+    result = generate(*integerLiteralExpr, Loc);
+  else if (auto floatLiteralExpr = E.getAs<FloatLiteralExprSyntax>())
+    result = generate(*floatLiteralExpr, Loc);
+  else if (auto nilLiteral = E.getAs<NilLiteralExprSyntax>())
+    result = generate(*nilLiteral, Loc);
+  else if (auto boolLiteral = E.getAs<BooleanLiteralExprSyntax>())
+    result = generate(*boolLiteral, Loc);
+  else if (auto poundFileExpr = E.getAs<PoundFileExprSyntax>())
+    result = generate(*poundFileExpr, Loc);
+  else if (auto poundLineExpr = E.getAs<PoundLineExprSyntax>())
+    result = generate(*poundLineExpr, Loc);
+  else if (auto poundColumnExpr = E.getAs<PoundColumnExprSyntax>())
+    result = generate(*poundColumnExpr, Loc);
+  else if (auto poundFunctionExpr = E.getAs<PoundFunctionExprSyntax>())
+    result = generate(*poundFunctionExpr, Loc);
+  else if (auto poundDsohandleExpr = E.getAs<PoundDsohandleExprSyntax>())
+    result = generate(*poundDsohandleExpr, Loc);
+  else if (auto objcKeyPathExpr = E.getAs<ObjcKeyPathExprSyntax>())
+    result = generate(*objcKeyPathExpr, Loc);
+  else if (auto objectLiteralExpr = E.getAs<ObjectLiteralExprSyntax>())
+    result = generate(*objectLiteralExpr, Loc);
+  else if (auto completionExpr = E.getAs<CodeCompletionExprSyntax>())
+    result = generate(*completionExpr, Loc);
+  else if (auto unknownExpr = E.getAs<UnknownExprSyntax>())
+    result = generate(*unknownExpr, Loc);
+  else {
+#ifndef NDEBUG
+    E.dump();
+    llvm_unreachable("unsupported expression");
+#endif
+  }
+
+  return result;
+}
+
+std::pair<DeclName, DeclNameLoc> ASTGen::generateUnqualifiedDeclName(
+    const TokenSyntax &idTok, const Optional<DeclNameArgumentsSyntax> &args,
+    const SourceLoc Loc) {
+  SourceLoc baseNameLoc = advanceLocBegin(Loc, idTok);
+
+  DeclBaseName baseName;
+  if (idTok.getTokenKind() == tok::kw_init)
+    baseName = DeclBaseName::createConstructor();
+  else if (idTok.getTokenKind() == tok::kw_deinit)
+    baseName = DeclBaseName::createDestructor();
+  else if (idTok.getTokenKind() == tok::kw_subscript)
+    baseName = DeclBaseName::createSubscript();
+  else
+    baseName = Context.getIdentifier(idTok.getIdentifierText());
+
+  if (!args)
+    return {DeclName(baseName), DeclNameLoc(baseNameLoc)};
+
+  // FIXME: Remove this block and use 'Loc'.
+  // This is needed for the case 'idTok' and 'args' are not in the same tree.
+  // i.e. Call from parseUnqualifiedDeclName().
+  SourceLoc argsLeadingLoc = Loc;
+  if (!args->getParent()) {
+    argsLeadingLoc = Loc.getAdvancedLoc(idTok.getTextLength());
+  } else {
+    assert(idTok.getData().getParent() == args->getData().getParent() &&
+           idTok.getIndexInParent() + 1 == args->getIndexInParent() &&
+           "'idTok' must be immediately followed by 'args'");
+  }
+
+  SmallVector<Identifier, 2> argumentLabels;
+  SmallVector<SourceLoc, 2> argumentLabelLocs;
+  for (auto arg : args->getArguments()) {
+    Identifier label;
+    if (!arg.getName().isMissing() &&
+        arg.getName().getTokenKind() != tok::kw__) {
+      label = Context.getIdentifier(arg.getName().getIdentifierText());
+    }
+    argumentLabels.push_back(label);
+    argumentLabelLocs.push_back(advanceLocBegin(argsLeadingLoc,
+                                                *arg.getFirstToken()));
+  }
+  SourceLoc lParenLoc = advanceLocBegin(argsLeadingLoc, args->getLeftParen());
+  SourceLoc rParenLoc = advanceLocBegin(argsLeadingLoc, args->getRightParen());
+
+  DeclName name(Context, baseName, argumentLabels);
+  DeclNameLoc nameLoc;
+  if (argumentLabelLocs.empty())
+    nameLoc = DeclNameLoc(baseNameLoc);
+  else
+    nameLoc = DeclNameLoc(Context, baseNameLoc, lParenLoc, argumentLabelLocs,
+                          rParenLoc);
+  return {name, nameLoc};
+}
+
+Expr *ASTGen::generate(const IdentifierExprSyntax &E, const SourceLoc Loc) {
+  auto idTok = E.getIdentifier();
+  DeclName name;
+  DeclNameLoc nameLoc;
+  std::tie(name, nameLoc) = generateUnqualifiedDeclName(
+      E.getIdentifier(), E.getDeclNameArguments(), Loc);
+
+  ValueDecl *D = nullptr;
+  if (!P.InPoundIfEnvironment) {
+    D = lookupInScope(name);
+    // FIXME: We want this to work: "var x = { x() }", but for now it's better
+    // to disallow it than to crash.
+    if (D) {
+      for (auto activeVar : P.DisabledVars) {
+        if (activeVar != D)
+          continue;
+        P.diagnose(nameLoc.getBaseNameLoc(), P.DisabledVarReason);
+        return new (Context) ErrorExpr(nameLoc.getSourceRange());
+      }
+    } else {
+      for (auto activeVar : P.DisabledVars) {
+        if (activeVar->getFullName() != name)
+          continue;
+        P.diagnose(nameLoc.getBaseNameLoc(), P.DisabledVarReason);
+        return new (Context) ErrorExpr(nameLoc.getSourceRange());
+      }
+    }
+  }
+
+  if (!D) {
+    return new (Context)
+        UnresolvedDeclRefExpr(name, DeclRefKind::Ordinary, nameLoc);
+  }
+
+  if (auto TD = dyn_cast<TypeDecl>(D)) {
+    // When parsing default argument expressions for generic functions,
+    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
+    // to the FuncDecl yet. Other than that, we should only ever find
+    // global or local declarations here.
+    assert(!TD->getDeclContext()->isTypeContext() ||
+           isa<GenericTypeParamDecl>(TD));
+    return TypeExpr::createForDecl(nameLoc.getBaseNameLoc(), TD,
+                                   /*DeclContext=*/nullptr,
+                                   /*inplicit=*/false);
+  }
+
+  return new (Context) DeclRefExpr(D, nameLoc, /*implicit=*/false);
+}
+
+static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
+                                                   DeclContext *DC,
+                                                   SourceLoc Loc) {
+  auto *methodContext = DC->getInnermostMethodContext();
+  if (!methodContext) {
+    P.diagnose(Loc, diag::super_not_in_class_method);
+    return nullptr;
+  }
+
+  // Do an actual lookup for 'self' in case it shows up in a capture list.
+  auto *methodSelf = methodContext->getImplicitSelfDecl();
+  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
+  if (lookupSelf && lookupSelf != methodSelf) {
+    // FIXME: This is the wrong diagnostic for if someone manually declares a
+    // variable named 'self' using backticks.
+    P.diagnose(Loc, diag::super_in_closure_with_capture);
+    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
+    return nullptr;
+  }
+
+  return methodSelf;
+}
+
+Expr *ASTGen::generate(const SuperRefExprSyntax &E, const SourceLoc Loc) {
+  auto superLoc = advanceLocBegin(Loc, E.getSuperKeyword());
+  VarDecl *selfDecl =
+      getImplicitSelfDeclForSuperContext(P, P.CurDeclContext, superLoc);
+  if (!selfDecl)
+    return new (Context) ErrorExpr(superLoc);
+
+  return new (Context) SuperRefExpr(selfDecl, superLoc, /*Implicit=*/false);
+}
+
+Expr *ASTGen::generate(const EditorPlaceholderExprSyntax &E, const SourceLoc Loc) {
+  assert(!E.getIdentifier().isMissing());
+
+  auto text = E.getIdentifier().getText();
+  auto tokLoc = advanceLocBegin(Loc, E.getIdentifier());
+  return P.parseExprEditorPlaceholder(tokLoc, text);
+}
+
+Expr *ASTGen::generate(const SpecializeExprSyntax &E, const SourceLoc Loc) {
+  auto base = generate(E.getExpression(), Loc);
+
+  SourceLoc lAngleLoc, rAngleLoc;
+  SmallVector<TypeRepr *, 4> argTyRs;
+  generate(E.getGenericArgumentClause(), Loc, lAngleLoc, rAngleLoc, argTyRs);
+  if (argTyRs.empty())
+    return base;
+
+  SmallVector<TypeLoc, 4> args;
+  args.assign(argTyRs.begin(), argTyRs.end());
+  return UnresolvedSpecializeExpr::create(Context, base, lAngleLoc, args,
+                                          rAngleLoc);
+}
+
+/// validateCollectionElement - Check if a given collection element is valid.
+///
+/// At the moment, this checks whether a given collection element is a subscript
+/// expression and whether we're subscripting into an array. If we are, then it
+/// we emit a diagnostic in case it was not something that the user was
+/// expecting.
+///
+/// For example: `let array [ [0, 1] [42] ]`
+void ASTGen::validateCollectionElement(Expr *elementExpr) {
+  if (!elementExpr)
+    return;
+
+  if (!isa<SubscriptExpr>(elementExpr))
+    return;
+
+  auto subscriptExpr = cast<SubscriptExpr>(elementExpr);
+  if (!isa<ArrayExpr>(subscriptExpr->getBase()))
+    return;
+
+  auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
+
+  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
+  auto endLocOfArray = arrayExpr->getEndLoc();
+
+  auto locForEndOfTokenArray =
+      Lexer::getLocForEndOfToken(Context.SourceMgr, endLocOfArray);
+
+  if (locForEndOfTokenArray != startLocOfSubscript) {
+    auto subscriptLoc = subscriptExpr->getLoc();
+    P.diagnose(subscriptLoc, diag::subscript_array_element)
+        .highlight(subscriptExpr->getSourceRange());
+    P.diagnose(subscriptLoc, diag::subscript_array_element_fix_it_add_comma)
+        .fixItInsertAfter(endLocOfArray, ",");
+    P.diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
+        .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
+  }
+}
+
+Expr *ASTGen::generate(const ArrayExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<Expr *, 8> elements;
+  SmallVector<SourceLoc, 8> commaLocs;
+  elements.reserve(E.getElements().size());
+  for (auto elemSyntax : E.getElements()) {
+    if (auto elemAST = generate(elemSyntax.getExpression(), Loc)) {
+      validateCollectionElement(elemAST);
+      elements.push_back(elemAST);
+    }
+    if (auto comma = elemSyntax.getTrailingComma())
+      commaLocs.push_back(advanceLocBegin(Loc, *comma));
+  }
+
+  // Don't bother to create expression if any expressions aren't parsed.
+  if (elements.empty() && !E.getElements().empty())
+    return nullptr;
+
+  auto LSquareLoc = advanceLocBegin(Loc, E);
+  auto RSquareLoc = advanceLocEnd(Loc, E);
+  return ArrayExpr::create(Context, LSquareLoc, elements, commaLocs,
+                           RSquareLoc);
+}
+
+Expr *ASTGen::generate(const DictionaryExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<Expr *, 8> elements;
+  SmallVector<SourceLoc, 8> commaLocs;
+  if (auto contents = E.getContent().getAs<DictionaryElementListSyntax>()) {
+    elements.reserve(contents->size());
+    for (auto elemSyntax : *contents) {
+      if (auto key = generate(elemSyntax.getKeyExpression(), Loc)) {
+        auto val = generate(elemSyntax.getValueExpression(), Loc);
+        if (!val)
+          val = new (Context) ErrorExpr(advanceLocEnd(Loc, elemSyntax));
+        auto elemAST = TupleExpr::createImplicit(Context, {key, val}, {});
+        elements.push_back(elemAST);
+      }
+      if (auto comma = elemSyntax.getTrailingComma())
+        commaLocs.push_back(advanceLocBegin(Loc, *comma));
+    }
+    // Don't bother to create expression if any expressions aren't parsed.
+    if (elements.empty() && !contents->empty())
+      return nullptr;
+  }
+
+  auto LSquareLoc = advanceLocBegin(Loc, E);
+  auto RSquareLoc = advanceLocEnd(Loc, E);
+  return DictionaryExpr::create(Context, LSquareLoc, elements, commaLocs,
+                                RSquareLoc);
+}
+
+Expr *ASTGen::generate(const TupleExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<Expr *, 2> exprs;
+  SmallVector<Identifier, 2> exprLabels;
+  SmallVector<SourceLoc, 2> exprLabelLocs;
+  generateExprTupleElementList(E.getElementList(), Loc,
+  /*isForCallArguments=*/false, exprs, exprLabels,
+                               exprLabelLocs);
+
+  SourceLoc leftLoc = advanceLocBegin(Loc, E.getLeftParen());
+  SourceLoc rightLoc = advanceLocEnd(Loc, E);
+
+  // A tuple with a single, unlabeled element is just parentheses.
+  if (exprs.size() == 1 && exprLabels.empty()) {
+    return new (Context) ParenExpr(leftLoc, exprs[0], rightLoc,
+                                   /*hasTrailingClosure=*/false);
+  }
+
+  return TupleExpr::create(Context, leftLoc, exprs, exprLabels, exprLabelLocs,
+                           rightLoc, /*HasTrailingClosure=*/false,
+                           /*Implicit=*/false);
+}
+
+void ASTGen::generateExprTupleElementList(const TupleExprElementListSyntax &elements,
+                                          const SourceLoc Loc, bool isForCallArguments,
+                                          SmallVectorImpl<Expr *> &exprs,
+                                  SmallVectorImpl<Identifier> &exprLabels,
+                                  SmallVectorImpl<SourceLoc> &exprLabelLocs) {
+  auto isFirst = true;
+  for (auto elem : elements) {
+    auto *subExpr = generate(elem.getExpression(), Loc);
+    if (!subExpr)
+      continue;
+
+    // Handle call arguments specially because it may need argument labels.
+    if (P.CodeCompletion && isForCallArguments && !elem.getLabel())
+      if (auto CCExpr = elem.getExpression().getAs<CodeCompletionExprSyntax>())
+        if (!CCExpr->getBase() && !CCExpr->getPeriodOrParen())
+          P.CodeCompletion->completeCallArg(cast<CodeCompletionExpr>(subExpr),
+                                              isFirst);
+    isFirst = false;
+
+    Identifier fieldName;
+    SourceLoc fieldNameLoc;
+    if (auto label = elem.getLabel()) {
+      fieldNameLoc = advanceLocBegin(Loc, *label);
+      if (label->getTokenKind() == tok::identifier)
+        fieldName = Context.getIdentifier(label->getIdentifierText());
+    }
+
+    // Don't populate label vectors unless we see at least one label.
+    if (!exprLabels.empty()) {
+      exprLabels.push_back(fieldName);
+      exprLabelLocs.push_back(fieldNameLoc);
+    } else if (fieldNameLoc.isValid()) {
+      exprLabels.resize(exprs.size());
+      exprLabelLocs.resize(exprs.size());
+      exprLabels.push_back(fieldName);
+      exprLabelLocs.push_back(fieldNameLoc);
+    }
+    exprs.push_back(subExpr);
+  }
+  assert((exprLabels.size() == 0 || exprs.size() == exprLabels.size()) &&
+         exprLabels.size() == exprLabelLocs.size());
+}
+
+Expr *ASTGen::generate(const FunctionCallExprSyntax &E, const SourceLoc Loc) {
+  auto callee = E.getCalledExpression();
+
+  SourceLoc LParenLoc, RParenLoc;
+  SmallVector<Expr *, 2> args;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  generateExprTupleElementList(E.getArgumentList(), Loc,
+                               /*isForCallArguments=*/true, args, argLabels,
+                               argLabelLocs);
+  Expr *trailingClosure = nullptr;
+  if (auto CE = E.getTrailingClosure())
+    trailingClosure = generate(*CE, Loc);
+  if (auto LParen = E.getLeftParen()) {
+    LParenLoc = advanceLocBegin(Loc, *LParen);
+    if (auto RParen = E.getRightParen())
+      RParenLoc = advanceLocBegin(Loc, *RParen);
+    else
+      RParenLoc = advanceLocEnd(Loc, E.getArgumentList());
+  }
+
+  if (auto memberAccess = callee.getAs<MemberAccessExprSyntax>()) {
+    if (!memberAccess->getBase()) {
+      // This is UnresolvedMemberExpr with call arguments.
+      if (memberAccess->getName().isMissing())
+        return nullptr;
+
+      SourceLoc dotLoc = advanceLocBegin(Loc, memberAccess->getDot());
+      DeclName name;
+      DeclNameLoc nameLoc;
+      std::tie(name, nameLoc) = generateUnqualifiedDeclName(
+          memberAccess->getName(), memberAccess->getDeclNameArguments(), Loc);
+
+      return UnresolvedMemberExpr::create(
+          Context, dotLoc, nameLoc, name, LParenLoc, args, argLabels,
+          argLabelLocs, RParenLoc, trailingClosure,
+          /*implicit=*/false);
+    }
+  }
+  llvm_unreachable("call expression not implemented");
+  return nullptr;
+}
+
+Expr *ASTGen::generate(const MemberAccessExprSyntax &E, const SourceLoc Loc) {
+  if (!E.getBase()) {
+    // This is an UnresolvedMemberExpr.
+    if (E.getName().isMissing())
+      return nullptr;
+
+    DeclName name;
+    DeclNameLoc nameLoc;
+    std::tie(name, nameLoc) =
+        generateUnqualifiedDeclName(E.getName(), E.getDeclNameArguments(), Loc);
+    SourceLoc dotLoc = advanceLocBegin(Loc, E.getDot());
+
+    return UnresolvedMemberExpr::create(Context, dotLoc, nameLoc, name,
+                                        /*implicit=*/false);
+  }
+  llvm_unreachable("member access expression not implemented");
+  return nullptr;
+}
+
 Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,
                        const SourceLoc Loc) {
   auto Digits = Expr.getDigits();
@@ -280,6 +716,109 @@ Expr *ASTGen::generate(const PoundDsohandleExprSyntax &Expr,
                        const SourceLoc Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundDsohandle(),
                                                   Loc);
+}
+
+Expr *ASTGen::generate(const ObjcKeyPathExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<KeyPathExpr::Component, 4> components;
+  if (E.getLeftParen().isMissing())
+    return nullptr;
+
+  for (auto piece : E.getName()) {
+    DeclName name;
+    DeclNameLoc nameLoc;
+    std::tie(name, nameLoc) =
+        generateUnqualifiedDeclName(piece.getName(),
+                                    piece.getDeclNameArguments(), Loc);
+    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
+                                                      nameLoc.getBaseNameLoc());
+    components.push_back(component);
+  }
+  auto keywordLoc = advanceLocBegin(Loc, E.getKeyPath());
+  auto LParenLoc = advanceLocBegin(Loc, E.getLeftParen());
+  auto RParenLoc = advanceLocEnd(Loc, E);
+
+  if (components.empty())
+    return new (Context) ErrorExpr(SourceRange(keywordLoc, RParenLoc));
+
+  return new (Context) KeyPathExpr(
+      Context, keywordLoc, LParenLoc, components, RParenLoc);
+}
+
+Expr *ASTGen::generate(const ObjectLiteralExprSyntax &E, const SourceLoc Loc) {
+  ObjectLiteralExpr::LiteralKind kind;
+  switch (E.getIdentifier().getTokenKind()) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  case tok::pound_##Name:                                                      \
+    kind = ObjectLiteralExpr::Name;                                            \
+    break;
+#include "swift/Syntax/TokenKinds.def"
+  default:
+    llvm_unreachable("unknown token kind for object literal expression");
+  }
+
+  SmallVector<Expr *, 2> args;
+  SmallVector<Identifier, 2> argLabels;
+  SmallVector<SourceLoc, 2> argLabelLocs;
+  generateExprTupleElementList(E.getArguments(), Loc, true, args, argLabels,
+                               argLabelLocs);
+
+  ClosureExpr *trailingClosure = nullptr;
+  if (auto CE = E.getTrailingClosure())
+    trailingClosure = dyn_cast_or_null<ClosureExpr>(generate(*CE, Loc));
+
+  if (E.getLeftParen().isMissing() || E.getRightParen().isMissing())
+    return nullptr;
+
+  SourceLoc poundLoc = advanceLocBegin(Loc, E.getIdentifier());
+  SourceLoc LParenLoc = advanceLocBegin(Loc, E.getLeftParen());
+  SourceLoc RParenLoc = advanceLocBegin(Loc, E.getRightParen());
+
+  return ObjectLiteralExpr::create(Context, poundLoc, kind, LParenLoc, args,
+                                   argLabels, argLabelLocs, RParenLoc,
+                                   trailingClosure, /*implicit=*/false);
+}
+
+Expr *ASTGen::generate(const CodeCompletionExprSyntax &E, const SourceLoc Loc) {
+  if (!E.getBase()) {
+    if (auto punctuator = E.getPeriodOrParen()) {
+      // '.' <cc-token>
+      if (punctuator->getTokenKind() == tok::period ||
+          punctuator->getTokenKind() == tok::period_prefix) {
+        auto ccLoc = advanceLocBegin(Loc, E.getCodeCompletionToken());
+        auto dotLoc = advanceLocBegin(Loc, *punctuator);
+        
+        auto CCE = new (Context) CodeCompletionExpr(ccLoc);
+        if (P.CodeCompletion)
+          P.CodeCompletion->completeUnresolvedMember(CCE, dotLoc);
+        return CCE;
+      }
+    } else {
+      llvm_unreachable("'(' <cc-token> is not suppported");
+    }
+  } else {
+    if (auto objcKeyPathExpr = E.getBase()->getAs<ObjcKeyPathExprSyntax>()) {
+      // #keyPath(<cc-token>
+      // #keyPath(some <cc-token>
+      // #keyPath(some.<cc-token>
+      auto expr = generate(*objcKeyPathExpr, Loc);
+      if (P.CodeCompletion) {
+        SourceLoc dotLoc;
+        if (!expr || isa<ErrorExpr>(expr)) {
+          P.CodeCompletion->completeExprKeyPath(nullptr, SourceLoc());
+        } else {
+          auto namePieces = objcKeyPathExpr->getName();
+          if (!namePieces.empty())
+            if (auto dot = namePieces[namePieces.getNumChildren() - 1].getDot())
+              dotLoc = advanceLocBegin(Loc, *dot);
+          P.CodeCompletion->completeExprKeyPath(cast<KeyPathExpr>(expr), dotLoc);
+        }
+      }
+      return expr;
+    }
+    // TODO: implement
+  }
+  llvm_unreachable("code completion expression not implemented");
+  return nullptr;
 }
 
 Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc Loc) {
@@ -387,17 +926,21 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
                                      const TupleTypeElementListSyntax &Elements,
                                      const TokenSyntax &RParen,
                                      const SourceLoc Loc, bool IsFunction) {
-  auto LPLoc = generate(LParen, Loc);
-  auto RPLoc = generate(RParen, Loc);
+  auto LPLoc = advanceLocBegin(Loc, LParen);
+  auto RPLoc = advanceLocEnd(Loc, RParen);
 
   SmallVector<TupleTypeReprElement, 4> TupleElements;
 
   SourceLoc EllipsisLoc;
-  unsigned EllipsisIdx = Elements.size();
+  unsigned EllipsisIdx;
 
-  for (unsigned i = 0; i < Elements.getNumChildren(); i++) {
-    auto Element = Elements.getChild(i)->castTo<TupleTypeElementSyntax>();
+  for (unsigned i = 0; i < Elements.size(); i++) {
+    auto Element = Elements[i];
     TupleTypeReprElement ElementAST;
+    ElementAST.Type = generate(Element.getType(), Loc);
+    if (!ElementAST.Type)
+      continue;
+
     if (auto Name = Element.getName()) {
       ElementAST.NameLoc = generate(*Name, Loc);
       ElementAST.Name = Name->getText() == "_"
@@ -419,7 +962,7 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
         ElementAST.NameLoc = ElementAST.SecondNameLoc;
       }
     }
-    ElementAST.Type = generate(Element.getType(), Loc);
+
     if (auto InOut = Element.getInOut()) {
       // don't apply multiple inout specifiers to a type: that's invalid and was
       // already reported in the parser, handle gracefully
@@ -431,13 +974,17 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
     }
     if (auto Comma = Element.getTrailingComma())
       ElementAST.TrailingCommaLoc = generate(*Comma, Loc);
+
     if (auto Ellipsis = Element.getEllipsis()) {
-      EllipsisLoc = generate(*Ellipsis, Loc);
-      if (EllipsisIdx == Elements.size())
+      if (EllipsisLoc.isInvalid()) {
+        EllipsisLoc = generate(*Ellipsis, Loc);
         EllipsisIdx = i;
+      }
     }
     TupleElements.push_back(ElementAST);
   }
+  if (EllipsisLoc.isInvalid())
+    EllipsisIdx = TupleElements.size();
 
   return TupleTypeRepr::create(Context, TupleElements, {LPLoc, RPLoc},
                                EllipsisLoc, EllipsisIdx);
@@ -661,15 +1208,12 @@ ComponentIdentTypeRepr *ASTGen::generateIdentifier(const T &Type,
   auto IdentifierLoc = advanceLocBegin(Loc, Type.getName());
   auto Identifier = Context.getIdentifier(Type.getName().getIdentifierText());
   if (auto Clause = Type.getGenericArgumentClause()) {
-    auto Args = Clause->getArguments();
-    if (!Args.empty()) {
-      auto LAngleLoc = advanceLocBegin(Loc, Clause->getLeftAngleBracket());
-      auto RAngleLoc = advanceLocBegin(Loc, Clause->getRightAngleBracket());
-      SourceRange Range{LAngleLoc, RAngleLoc};
-      auto ArgsAST = generate(Args, Loc);
+    SourceLoc lAngleLoc, rAngleLoc;
+    SmallVector<TypeRepr *, 4> args;
+    generate(*Clause, Loc, lAngleLoc, rAngleLoc, args);
+    if (!args.empty())
       return GenericIdentTypeRepr::create(Context, IdentifierLoc, Identifier,
-                                          ArgsAST, Range);
-    }
+                                          args, {lAngleLoc, rAngleLoc});
   }
   return new (Context) SimpleIdentTypeRepr(IdentifierLoc, Identifier);
 }
@@ -698,14 +1242,8 @@ TypeRepr *ASTGen::generate(const DictionaryTypeSyntax &Type,
   auto ColonLoc = advanceLocBegin(Loc, Type.getColon());
 
   SourceLoc LBracketLoc, RBracketLoc;
-  if (Type.getLeftSquareBracket().isPresent())
-    LBracketLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
-  else
-    LBracketLoc = advanceLocBegin(Loc, *Type.getFirstToken());
-  if (Type.getRightSquareBracket().isPresent())
-    RBracketLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  else
-    RBracketLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  LBracketLoc = advanceLocBegin(Loc, Type);
+  RBracketLoc = advanceLocEnd(Loc, Type);
   SourceRange Range{LBracketLoc, RBracketLoc};
   return new (Context) DictionaryTypeRepr(KeyType, ValueType, ColonLoc, Range);
 }
@@ -715,14 +1253,8 @@ TypeRepr *ASTGen::generate(const ArrayTypeSyntax &Type, SourceLoc Loc) {
   if (!ElementType)
     return nullptr;
   SourceLoc LBracketLoc, RBracketLoc;
-  if (Type.getLeftSquareBracket().isPresent())
-    LBracketLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
-  else
-    LBracketLoc = advanceLocBegin(Loc, *Type.getFirstToken());
-  if (Type.getRightSquareBracket().isPresent())
-    RBracketLoc = advanceLocBegin(Loc, Type.getRightSquareBracket());
-  else
-    RBracketLoc = advanceLocBegin(Loc, *Type.getLastToken());
+  LBracketLoc = advanceLocBegin(Loc, Type);
+  RBracketLoc = advanceLocEnd(Loc, Type);
   return new (Context) ArrayTypeRepr(ElementType, {LBracketLoc, RBracketLoc});
 }
 
@@ -798,13 +1330,11 @@ TypeRepr *ASTGen::generate(const SILBoxTypeSyntax &Type, const SourceLoc Loc,
   auto RBraceLoc = advanceLocBegin(Loc, Type.getRightBrace());
 
   SourceLoc LAngleLoc, RAngleLoc;
-  SmallVector<TypeRepr*, 4> Args;
+  SmallVector<TypeRepr *, 4> Args;
   if (auto genericArgs = Type.getGenericArgumentClause()) {
     if (genericArgs->getRightAngleBracket().isMissing())
       return nullptr;
-    LAngleLoc = advanceLocBegin(Loc, genericArgs->getLeftAngleBracket());
-    RAngleLoc = advanceLocBegin(Loc, genericArgs->getRightAngleBracket());
-    Args = generate(genericArgs->getArguments(), Loc);
+    generate(*genericArgs, Loc, LAngleLoc, RAngleLoc, Args);
   }
 
   auto SILType = SILBoxTypeRepr::create(Context, generics, LBraceLoc, Fields,
@@ -890,24 +1420,6 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
     }
   }
 
-  // Create empty TupleTypeRepr for types starting with `(`.
-  if (ChildrenCount >= 1) {
-    auto LParen = Type.getChild(0)->getAs<TokenSyntax>();
-    if (LParen && LParen->getTokenKind() == tok::l_paren) {
-      // generate child 'TypeSyntax' anyway to trigger the side effects e.g.
-      // code-completion.
-      for (size_t i = 1; i != ChildrenCount; ++i) {
-        auto elem = *Type.getChild(i);
-        if (auto ty = elem.getAs<TypeSyntax>())
-          (void)generate(*ty, Loc);
-      }
-      auto LParenLoc = advanceLocBegin(Loc, *LParen);
-      auto EndLoc =
-          advanceLocBegin(Loc, *Type.getChild(Type.getNumChildren() - 1));
-      return TupleTypeRepr::createEmpty(Context, {LParenLoc, EndLoc});
-    }
-  }
-
   // generate child 'TypeSyntax' anyway to trigger the side effects e.g.
   // code-completion.
   for (size_t i = 0; i != ChildrenCount; ++i) {
@@ -920,22 +1432,20 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
   return nullptr;
 }
 
-SmallVector<TypeRepr *, 4>
-ASTGen::generate(const GenericArgumentListSyntax &Args, const SourceLoc Loc) {
-  SmallVector<TypeRepr *, 4> Types;
-  for (auto Arg : Args) {
-    auto tyR = generate(Arg, Loc);
+void
+ASTGen::generate(const GenericArgumentClauseSyntax &clause, const SourceLoc Loc,
+                 SourceLoc &lAngleLoc, SourceLoc &rAngleLoc,
+                 SmallVectorImpl<TypeRepr *> &args) {
+  lAngleLoc = advanceLocBegin(Loc, clause);
+  rAngleLoc = advanceLocEnd(Loc, clause);
+
+  assert(args.empty());
+  for (auto Arg : clause.getArguments()) {
+    auto tyR = generate(Arg.getArgumentType(), Loc);
     if (!tyR)
       tyR = new (Context) ErrorTypeRepr(advanceLocBegin(Loc, Arg));
-    Types.push_back(tyR);
+    args.push_back(tyR);
   }
-
-  return Types;
-}
-
-TypeRepr *ASTGen::generate(const GenericArgumentSyntax &Arg,
-                           const SourceLoc Loc) {
-  return generate(Arg.getArgumentType(), Loc);
 }
 
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
@@ -976,6 +1486,9 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
   params.reserve(clause.getGenericParameterList().getNumChildren());
 
   for (auto elem : clause.getGenericParameterList()) {
+    auto nameTok = elem.getName();
+    if (nameTok.isMissing())
+      break;
 
     DeclAttributes attrs = generateDeclAttributes(elem, Loc, false);
     Identifier name = Context.getIdentifier(elem.getName().getIdentifierText());
@@ -1020,8 +1533,8 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
       whereLoc = advanceLocBegin(Loc, whereClause->getWhereKeyword());
   }
 
-  auto lAngleLoc = advanceLocBegin(Loc, clause.getLeftAngleBracket());
-  auto rAngleLoc = advanceLocBegin(Loc, clause.getRightAngleBracket());
+  auto lAngleLoc = advanceLocBegin(Loc, clause);
+  auto rAngleLoc = advanceLocEnd(Loc, clause);
   return GenericParamList::create(Context, lAngleLoc, params, whereLoc,
                                   requirements, rAngleLoc);
 }
@@ -1111,6 +1624,22 @@ SourceLoc ASTGen::advanceLocBegin(const SourceLoc &Loc, const Syntax &Node) {
   return Loc.getAdvancedLoc(Node.getAbsolutePosition().getOffset());
 }
 
+SourceLoc ASTGen::advanceLocEnd(const SourceLoc &Loc, const Syntax &Node) {
+  if (!Node.isMissing()) {
+    // NOTE: We cannot use 'getLastToken()' because it doesn't take string
+    // literal expressions into account.
+    if (Node.isToken() || Node.is<StringLiteralExprSyntax>())
+      return advanceLocBegin(Loc, Node);
+    for (size_t I = Node.getNumChildren(); I != 0; --I)
+      if (auto Child = Node.getChild(I - 1))
+        return advanceLocEnd(Loc, *Child);
+  }
+  if (auto Prev = Node.getPreviousNode())
+    return advanceLocEnd(Loc, *Prev);
+  assert(false && "No tokens in tree?");
+  return Loc;
+}
+
 StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);
 }
@@ -1164,14 +1693,36 @@ TypeRepr *ASTGen::lookupType(TypeSyntax Type) {
   return Found != TypeCache.end() ? Found->second : nullptr;
 }
 
+void ASTGen::addExpr(Expr *E, const SourceLoc Loc) {
+  assert(!hasExpr(Loc));
+  Exprs[Loc] = E;
+}
+
+bool ASTGen::hasExpr(const SourceLoc Loc) const {
+  return Exprs.find(Loc) != Exprs.end();
+}
+
+Expr *ASTGen::takeExpr(const SourceLoc Loc) {
+  auto I = Exprs.find(Loc);
+  assert(I != Exprs.end());
+  auto expr = I->second;
+  Exprs.erase(I);
+  return expr;
+}
+
 void ASTGen::addDeclAttributes(DeclAttributes attrs, SourceLoc Loc) {
-  ParsedDeclAttrs.insert({Loc, attrs});
+  assert(!hasDeclAttributes(Loc));
+  ParsedDeclAttrs[Loc] = attrs;
 }
 
 bool ASTGen::hasDeclAttributes(SourceLoc Loc) const {
   return ParsedDeclAttrs.find(Loc) != ParsedDeclAttrs.end();
 }
 
-DeclAttributes ASTGen::getDeclAttributes(SourceLoc Loc) const {
-  return ParsedDeclAttrs.find(Loc)->second;
+DeclAttributes ASTGen::takeDeclAttributes(SourceLoc Loc) {
+  auto I = ParsedDeclAttrs.find(Loc);
+  assert(I != ParsedDeclAttrs.end());
+  auto attrs = I->second;
+  ParsedDeclAttrs.erase(I);
+  return attrs;
 }

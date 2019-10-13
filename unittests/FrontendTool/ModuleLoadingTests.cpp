@@ -108,11 +108,12 @@ protected:
 
     std::unique_ptr<llvm::MemoryBuffer> moduleBuffer;
     std::unique_ptr<llvm::MemoryBuffer> moduleDocBuffer;
+    std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoBuffer;
 
     auto error =
       loader->findModuleFilesInDirectory({moduleName, SourceLoc()}, tempDir,
-        "Library.swiftmodule", "Library.swiftdoc",
-        &moduleBuffer, &moduleDocBuffer);
+        "Library.swiftmodule", "Library.swiftdoc", "Library.swiftsourceinfo",
+        &moduleBuffer, &moduleDocBuffer, &moduleSourceInfoBuffer);
     ASSERT_FALSE(error);
     ASSERT_FALSE(diags.hadAnyError());
 

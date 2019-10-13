@@ -440,12 +440,6 @@ static bool findNonMembers(TypeChecker &TC,
     if (!isValid(D))
       return false;
 
-    // FIXME: Circularity hack.
-    if (!D->getInterfaceType()) {
-      AllDeclRefs = false;
-      continue;
-    }
-
     if (matchesDeclRefKind(D, refKind))
       ResultValues.push_back(D);
   }
@@ -1237,7 +1231,7 @@ namespace {
           Expr *target = nullptr;
           bool foundApply = false;
           bool foundRebind = false;
-          for (auto ancestor : reversed(ExprStack)) {
+          for (auto ancestor : llvm::reverse(ExprStack)) {
             if (isa<RebindSelfInConstructorExpr>(ancestor)) {
               // If we already have a rebind, then we're re-typechecking an
               // expression and are done.
@@ -1351,24 +1345,24 @@ bool PreCheckExpression::walkToClosureExprPre(ClosureExpr *closure) {
   auto *PL = closure->getParameters();
 
   // Validate the parameters.
-  TypeResolutionOptions options(TypeResolverContext::ClosureExpr);
-  options |= TypeResolutionFlags::AllowUnspecifiedTypes;
-  options |= TypeResolutionFlags::AllowUnboundGenerics;
   bool hadParameterError = false;
 
-  auto resolution = TypeResolution::forContextual(closure);
-  if (TC.typeCheckParameterList(PL, resolution, options)) {
-    // If we encounter an error validating the parameter list, don't bail.
-    // Instead, go on to validate any potential result type, and bail
-    // afterwards.  This allows for better diagnostics, and keeps the
-    // closure expression type well-formed.
-    hadParameterError = true;
+  // If we encounter an error validating the parameter list, don't bail.
+  // Instead, go on to validate any potential result type, and bail
+  // afterwards.  This allows for better diagnostics, and keeps the
+  // closure expression type well-formed.
+  for (auto param : *PL) {
+    // FIXME: Forces computation of isInvalid().
+    (void) param->getInterfaceType();
+
+    hadParameterError |= param->isInvalid();
   }
 
   // Validate the result type, if present.
   if (closure->hasExplicitResultType() &&
-      TypeChecker::validateType(TC.Context, closure->getExplicitResultTypeLoc(),
-                                resolution,
+      TypeChecker::validateType(TC.Context,
+                                closure->getExplicitResultTypeLoc(),
+                                TypeResolution::forContextual(closure),
                                 TypeResolverContext::InExpression)) {
     return false;
   }
@@ -2041,7 +2035,7 @@ void ExprTypeCheckListener::applySolutionFailed(Solution &solution,
 void ParentConditionalConformance::diagnoseConformanceStack(
     DiagnosticEngine &diags, SourceLoc loc,
     ArrayRef<ParentConditionalConformance> conformances) {
-  for (auto history : reversed(conformances)) {
+  for (auto history : llvm::reverse(conformances)) {
     diags.diagnose(loc, diag::requirement_implied_by_conditional_conformance,
                    history.ConformingType, history.Protocol);
   }

@@ -261,10 +261,7 @@ public:
 
   /// Returns the kind of context this is.
   DeclContextKind getContextKind() const;
-
-  /// Returns whether this context has value semantics.
-  bool hasValueSemantics() const;
-
+  
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.
@@ -667,7 +664,7 @@ public:
 
 /// The range of declarations stored within an iterable declaration
 /// context.
-typedef IteratorRange<DeclIterator> DeclRange;
+using DeclRange = iterator_range<DeclIterator>;
 
 /// The kind of an \c IterableDeclContext.
 enum class IterableDeclContextKind : uint8_t {  

@@ -895,9 +895,9 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  llvm::Optional<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
-                           SourceLoc OtherLoc);
+  ParsedSyntaxResult<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                           bool silenceDiag = false);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
@@ -917,13 +917,12 @@ public:
                          bool AllowSepAfterLast, Diag<> ErrorDiag,
                          syntax::SyntaxKind Kind,
                          llvm::function_ref<ParserStatus()> callback);
-  ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
-                               llvm::Optional<ParsedTokenSyntax> &LastComma,
-                               SourceLoc &RightLoc,
-                               llvm::Optional<ParsedTokenSyntax> &Right,
-                               llvm::SmallVectorImpl<ParsedSyntax>& Junk,
-                               bool AllowSepAfterLast, Diag<> ErrorDiag,
-                               llvm::function_ref<ParserStatus()> callback);
+  template <typename ParsedNode>
+  ParserStatus parseListSyntax(
+      SmallVectorImpl<ParsedNode> &elements, bool AllowEmpty,
+      bool AllowSepAfterLast, llvm::function_ref<bool()> isAtCloseTok,
+      llvm::function_ref<ParserStatus(typename ParsedNode::Builder &)>
+          callback);
 
   void consumeTopLevelDecl(ParserPosition BeginParserPosition,
                            TopLevelCodeDecl *TLCD);
@@ -1429,6 +1428,7 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Expression Parsing
+  ParsedSyntaxResult<ParsedExprSyntax> parseExpressionSyntax(Diag<> ID);
   ParserResult<Expr> parseExpr(Diag<> ID) {
     return parseExprImpl(ID, /*isExprBasic=*/false);
   }
@@ -1452,9 +1452,14 @@ public:
   ParserResult<Expr> parseExprPrimary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprUnary(Diag<> ID, bool isExprBasic);
   ParserResult<Expr> parseExprKeyPathObjC();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprObjcKeyPathSyntax();
   ParserResult<Expr> parseExprKeyPath();
   ParserResult<Expr> parseExprSelector();
   ParserResult<Expr> parseExprSuper();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprSuperSyntax();
+  ParserResult<Expr> parseExprUnresolvedMember(bool isExprBasic);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprUnresolvedMemberSyntax(bool isExprBasic);
   ParserResult<Expr> parseExprStringLiteral();
 
   // todo [gsoc]: create new result type for ParsedSyntax
@@ -1481,6 +1486,8 @@ public:
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  bool parseOptionalArgumentLabelSyntax(Optional<ParsedTokenSyntax> &name,
+                                        Optional<ParsedTokenSyntax> &colon);
 
   /// Parse an unqualified-decl-name.
   ///
@@ -1499,10 +1506,20 @@ public:
                                     bool allowOperators=false,
                                     bool allowZeroArgCompoundNames=false,
                                     bool allowDeinitAndSubscript=false);
+  ParserStatus
+  parseUnqualifiedDeclNameSyntax(Optional<ParsedTokenSyntax> &identTok,
+                                 Optional<ParsedDeclNameArgumentsSyntax> &declNameArg,
+                                 bool afterDot, const Diagnostic &diag,
+                                 bool allowOperators=false,
+                                 bool allowZeroArgCompoundNames=false,
+                                 bool allowDeinitAndSubscript=false);
+
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprIdentifierSyntax();
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprSpecializeSyntax(ParsedExprSyntax &&);
 
   Expr *parseExprIdentifier();
-  Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
-                                   Identifier PlaceholderId);
+  Expr *parseExprEditorPlaceholder(SourceLoc loc, StringRef text);
 
   /// Parse a closure expression after the opening brace.
   ///
@@ -1545,8 +1562,11 @@ public:
                                       SourceLoc &inLoc);
 
   Expr *parseExprAnonClosureArg();
-  ParserResult<Expr> parseExprList(tok LeftTok, tok RightTok,
-                                   syntax::SyntaxKind Kind);
+  ParserResult<Expr> parseExprParenOrTuple();
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprTupleSyntax();
+  ParserStatus parseExprTupleElementListSyntax(
+      SmallVectorImpl<ParsedTupleExprElementSyntax> &elements,
+      llvm::function_ref<bool()> isAtCloseTok);
 
   /// Parse an expression list, keeping all of the pieces separated.
   ParserStatus parseExprList(tok leftTok, tok rightTok,
@@ -1557,27 +1577,39 @@ public:
                              SmallVectorImpl<Identifier> &exprLabels,
                              SmallVectorImpl<SourceLoc> &exprLabelLocs,
                              SourceLoc &rightLoc,
-                             Expr *&trailingClosure,
-                             syntax::SyntaxKind Kind);
-
+                             Expr *&trailingClosure);
+  ParserStatus parseExprListSyntax(
+  tok leftK, tok rightK, bool isPostfix, bool isExprBasic,
+  llvm::function_ref<void(
+      ParsedTokenSyntax &&, ParsedTupleExprElementListSyntax &&,
+      Optional<ParsedTokenSyntax> &&, Optional<ParsedClosureExprSyntax> &&)>
+                      callback);
   ParserResult<Expr> parseTrailingClosure(SourceRange calleeRange);
+  ParsedSyntaxResult<ParsedClosureExprSyntax>
+  parseTrailingClosureSyntax(SourceRange calleeRange);
 
-  /// Parse an object literal.
-  ///
-  /// \param LK The literal kind as determined by the first token.
-  ParserResult<Expr> parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LK,
-                                            bool isExprBasic);
+  ParserResult<Expr> parseExprObjectLiteral(bool isExprBasic);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprObjectLiteralSyntax(bool isExprBasic);
   ParserResult<Expr> parseExprCallSuffix(ParserResult<Expr> fn,
                                          bool isExprBasic);
   ParserResult<Expr> parseExprCollection();
-  ParserResult<Expr> parseExprCollectionElement(Optional<bool> &isDictionary);
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprCollectionSyntax();
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprArraySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                       ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprDictionarySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                            ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr);
+
   ParserResult<Expr> parseExprPoundUnknown(SourceLoc LSquareLoc);
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprPoundUnknownSyntax(Optional<ParsedTokenSyntax> &&LSquare,
+                              SourceLoc LSquareLoc);
   ParserResult<Expr>
   parseExprPoundCodeCompletion(Optional<StmtKind> ParentKind);
 
   UnresolvedDeclRefExpr *parseExprOperator();
-
-  void validateCollectionElement(ParserResult<Expr> element);
 
   //===--------------------------------------------------------------------===//
   // Statement Parsing

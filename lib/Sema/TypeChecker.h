@@ -1353,10 +1353,6 @@ public:
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
 
-  /// Type check a parameter list.
-  bool typeCheckParameterList(ParameterList *PL, TypeResolution resolution,
-                              TypeResolutionOptions options);
-
   /// Coerce a pattern to the given type.
   ///
   /// \param P The pattern, which may be modified by this coercion.
@@ -1760,6 +1756,7 @@ private:
                                            const DeclContext *DC,
                                            FragileFunctionKind fragileKind);
 
+public:
   /// Given that a type is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if its
   /// generic arguments require the use of conformances that cannot reasonably
@@ -1767,10 +1764,9 @@ private:
   ///
   /// This method \e only checks how generic arguments are used; it is assumed
   /// that the declarations involved have already been checked elsewhere.
-  static void diagnoseGenericTypeExportability(const TypeLoc &TL,
+  static void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
                                                const DeclContext *DC);
 
-public:
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///
@@ -1974,10 +1970,6 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-  
-  Type getOrCreateOpaqueResultType(TypeResolution resolution,
-                                   ValueDecl *originatingDecl,
-                                   OpaqueReturnTypeRepr *repr);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

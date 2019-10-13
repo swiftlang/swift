@@ -64,8 +64,7 @@ static CanType getNamedSwiftType(ModuleDecl *stdlib, StringRef name) {
   // that's a real thing.
   if (results.size() == 1) {
     if (auto typeDecl = dyn_cast<TypeDecl>(results[0]))
-      if (typeDecl->hasInterfaceType())
-        return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
+      return typeDecl->getDeclaredInterfaceType()->getCanonicalType();
   }
   return CanType();
 }

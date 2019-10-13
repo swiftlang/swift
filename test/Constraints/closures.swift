@@ -349,8 +349,8 @@ takeVoidVoidFn { () -> Void in
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
-func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' at position #0}}
-func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' at position #0}}
+func f19997471(_ x: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1}}
+func f19997471(_ x: Int) {}    // expected-note {{candidate expects value of type 'Int' for parameter #1}}
 
 func someGeneric19997471<T>(_ x: T) {
   takeVoidVoidFn {
@@ -870,7 +870,7 @@ struct rdar30347997 {
 struct rdar43866352<Options> {
   func foo() {
     let callback: (inout Options) -> Void
-    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(inout Options) -> ()' to type '(inout _) -> Void'}}
+    callback = { (options: Options) in } // expected-error {{cannot assign value of type '(Options) -> ()' to type '(inout Options) -> Void'}}
   }
 }
 

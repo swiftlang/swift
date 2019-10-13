@@ -817,7 +817,7 @@ ArrayRef<StringRef> copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator,
     if (auto *OVD = OD.dyn_cast<const ValueDecl*>()) {
       if (shouldCopyAssociatedUSRForDecl(OVD)) {
         llvm::raw_svector_ostream OS(SS);
-        Ignored = printDeclUSR(OVD, OS);
+        Ignored = printValueDeclUSR(OVD, OS);
       }
     } else if (auto *OND = OD.dyn_cast<const clang::NamedDecl*>()) {
       Ignored = clang::index::generateUSRForDecl(OND, SS);
@@ -868,7 +868,7 @@ calculateTypeRelationForDecl(const Decl *D, Type ExpectedType,
                              bool UseFuncResultType = true) {
   auto VD = dyn_cast<ValueDecl>(D);
   auto DC = D->getDeclContext();
-  if (!VD || !VD->getInterfaceType())
+  if (!VD)
     return CodeCompletionResult::ExpectedTypeRelation::Unrelated;
 
   if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {

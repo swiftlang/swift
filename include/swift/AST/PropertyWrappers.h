@@ -43,9 +43,12 @@ struct PropertyWrapperTypeInfo {
     HasInitialValueInit
   } wrappedValueInit = NoWrappedValueInit;
 
-  /// The initializer `init()` that will be called to default-initialize a
+  /// The initializer that will be called to default-initialize a
   /// value with an attached property wrapper.
-  ConstructorDecl *defaultInit = nullptr;
+  enum {
+    NoDefaultValueInit = 0,
+    HasDefaultValueInit
+  } defaultInit = NoDefaultValueInit;
 
   /// The property through which the projection value ($foo) will be accessed.
   ///

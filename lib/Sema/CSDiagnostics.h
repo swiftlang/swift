@@ -195,6 +195,101 @@ private:
   std::pair<Expr *, bool> computeAnchor() const;
 };
 
+/// Provides information about the application of a function argument to a
+/// parameter.
+class FunctionArgApplyInfo {
+  Expr *ArgExpr;
+  unsigned ArgIdx;
+  Type ArgType;
+
+  unsigned ParamIdx;
+
+  Type FnInterfaceType;
+  FunctionType *FnType;
+  const ValueDecl *Callee;
+
+public:
+  FunctionArgApplyInfo(Expr *argExpr, unsigned argIdx, Type argType,
+                       unsigned paramIdx, Type fnInterfaceType,
+                       FunctionType *fnType, const ValueDecl *callee)
+      : ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType), ParamIdx(paramIdx),
+        FnInterfaceType(fnInterfaceType), FnType(fnType), Callee(callee) {}
+
+  /// \returns The argument being applied.
+  Expr *getArgExpr() const { return ArgExpr; }
+
+  /// \returns The position of the argument, starting at 1.
+  unsigned getArgPosition() const { return ArgIdx + 1; }
+
+  /// \returns The position of the parameter, starting at 1.
+  unsigned getParamPosition() const { return ParamIdx + 1; }
+
+  /// \returns The type of the argument being applied, including any generic
+  /// substitutions.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  Type getArgType(bool withSpecifier = false) const {
+    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
+  }
+
+  /// \returns The interface type for the function being applied. Note that this
+  /// may not a function type, for example it could be a generic parameter.
+  Type getFnInterfaceType() const { return FnInterfaceType; }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return FnType; }
+
+  /// \returns The callee for the application.
+  const ValueDecl *getCallee() const { return Callee; }
+
+private:
+  Type getParamTypeImpl(AnyFunctionType *fnTy,
+                        bool lookThroughAutoclosure) const {
+    auto param = fnTy->getParams()[ParamIdx];
+    auto paramTy = param.getPlainType();
+    if (lookThroughAutoclosure && param.isAutoClosure())
+      paramTy = paramTy->castTo<FunctionType>()->getResult();
+    return paramTy;
+  }
+
+public:
+  /// \returns The type of the parameter which the argument is being applied to,
+  /// including any generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return getParamTypeImpl(FnType, lookThroughAutoclosure);
+  }
+
+  /// \returns The interface type of the parameter which the argument is being
+  /// applied to.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
+    if (!interfaceFnTy) {
+      // If the interface type isn't a function, then just return the resolved
+      // parameter type.
+      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
+    }
+    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter which the argument is being applied
+  /// to.
+  ParameterTypeFlags getParameterFlags() const {
+    return FnType->getParams()[ParamIdx].getParameterFlags();
+  }
+
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return FnType->getParams()[idx].getParameterFlags();
+  }
+};
+
 /// Base class for all of the diagnostics related to generic requirement
 /// failures, provides common information like failed requirement,
 /// declaration where such requirement comes from, etc.
@@ -1648,10 +1743,17 @@ public:
 /// func bar(_ v: Int) { foo(v) } // `Int` is not convertible to `String`
 /// ```
 class ArgumentMismatchFailure : public ContextualFailure {
+  // FIXME: Currently ArgumentMismatchFailure can be used from CSDiag, in which
+  // case it's possible we're not able to resolve the arg apply info. Once
+  // the CSDiag logic has been removed, we should be able to store Info
+  // unwrapped.
+  Optional<FunctionArgApplyInfo> Info;
+
 public:
   ArgumentMismatchFailure(Expr *root, ConstraintSystem &cs, Type argType,
                           Type paramType, ConstraintLocator *locator)
-      : ContextualFailure(root, cs, argType, paramType, locator) {}
+      : ContextualFailure(root, cs, argType, paramType, locator),
+        Info(getFunctionArgApplyInfo(getLocator())) {}
 
   bool diagnoseAsError() override;
   bool diagnoseAsNote() override;
@@ -1668,6 +1770,84 @@ public:
   bool diagnoseUseOfReferenceEqualityOperator() const;
 
 protected:
+  /// \returns The position of the argument being diagnosed, starting at 1.
+  unsigned getArgPosition() const { return Info->getArgPosition(); }
+
+  /// \returns The position of the parameter being diagnosed, starting at 1.
+  unsigned getParamPosition() const { return Info->getParamPosition(); }
+
+  /// Returns the argument expression being diagnosed.
+  ///
+  /// Note this may differ from \c getAnchor(), which will return a smaller
+  /// sub-expression if the failed constraint is for a sub-expression within
+  /// an argument. For example, in an argument conversion from (T, U) to (U, U),
+  /// the conversion from T to U may fail. In this case, \c getArgExpr() will
+  /// return the (T, U) expression, whereas \c getAnchor() will return the T
+  /// expression.
+  Expr *getArgExpr() const { return Info->getArgExpr(); }
+
+  /// Returns the argument type for the conversion being diagnosed.
+  ///
+  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
+  /// the argument, if any.
+  ///
+  /// Note this may differ from \c getFromType(), which will give the source
+  /// type of a failed constraint for the argument conversion. For example in
+  /// an argument conversion from T? to U?, the conversion from T to U may fail.
+  /// In this case, \c getArgType() will return T?, whereas \c getFromType()
+  /// will return T.
+  Type getArgType(bool withSpecifier = false) const {
+    return Info->getArgType(withSpecifier);
+  }
+
+  /// \returns The interface type for the function being applied.
+  Type getFnInterfaceType() const { return Info->getFnInterfaceType(); }
+
+  /// \returns The function type being applied, including any generic
+  /// substitutions.
+  FunctionType *getFnType() const { return Info->getFnType(); }
+
+  /// \returns The callee for the argument conversion, if any.
+  const ValueDecl *getCallee() const {
+    return Info ? Info->getCallee() : nullptr;
+  }
+
+  /// \returns The full name of the callee, or a null decl name if there is no
+  /// callee.
+  DeclName getCalleeFullName() const {
+    return getCallee() ? getCallee()->getFullName() : DeclName();
+  }
+
+  /// Returns the type of the parameter involved in the mismatch, including any
+  /// generic substitutions.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  ///
+  /// Note this may differ from \c getToType(), see the note on \c getArgType().
+  Type getParamType(bool lookThroughAutoclosure = true) const {
+    return Info->getParamType(lookThroughAutoclosure);
+  }
+
+  /// Returns the type of the parameter involved in the mismatch.
+  ///
+  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
+  /// should be treated as being of type T.
+  ///
+  /// Note this may differ from \c getToType(), see the note on \c getArgType().
+  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
+    return Info->getParamInterfaceType(lookThroughAutoclosure);
+  }
+
+  /// \returns The flags of the parameter involved in the mismatch.
+  ParameterTypeFlags getParameterFlags() const {
+    return Info->getParameterFlags();
+  }
+
+  /// \returns The flags of a parameter at a given index.
+  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
+    return Info->getParameterFlagsAtIndex(idx);
+  }
 
   /// Situations like this:
   ///
@@ -1679,110 +1859,6 @@ protected:
   bool diagnoseMisplacedMissingArgument() const;
 
   SourceLoc getLoc() const { return getAnchor()->getLoc(); }
-
-  ValueDecl *getDecl() const {
-    auto selectedOverload = getChoiceFor(getLocator());
-    if (!selectedOverload)
-      return nullptr;
-
-    auto choice = selectedOverload->choice;
-    return choice.getDeclOrNull();
-  }
-};
-
-/// Provides information about the application of a function argument to a
-/// parameter.
-class FunctionArgApplyInfo {
-  Expr *ArgExpr;
-  unsigned ArgIdx;
-  Type ArgType;
-
-  unsigned ParamIdx;
-
-  Type FnInterfaceType;
-  FunctionType *FnType;
-  const ValueDecl *Callee;
-
-public:
-  FunctionArgApplyInfo(Expr *argExpr, unsigned argIdx, Type argType,
-                       unsigned paramIdx, Type fnInterfaceType,
-                       FunctionType *fnType, const ValueDecl *callee)
-      : ArgExpr(argExpr), ArgIdx(argIdx), ArgType(argType), ParamIdx(paramIdx),
-        FnInterfaceType(fnInterfaceType), FnType(fnType), Callee(callee) {}
-
-  /// \returns The argument being applied.
-  Expr *getArgExpr() const { return ArgExpr; }
-
-  /// \returns The position of the argument, starting at 1.
-  unsigned getArgPosition() const { return ArgIdx + 1; }
-
-  /// \returns The position of the parameter, starting at 1.
-  unsigned getParamPosition() const { return ParamIdx + 1; }
-
-  /// \returns The type of the argument being applied, including any generic
-  /// substitutions.
-  ///
-  /// \param withSpecifier Whether to keep the inout or @lvalue specifier of
-  /// the argument, if any.
-  Type getArgType(bool withSpecifier = false) const {
-    return withSpecifier ? ArgType : ArgType->getWithoutSpecifierType();
-  }
-
-  /// \returns The interface type for the function being applied. Note that this
-  /// may not a function type, for example it could be a generic parameter.
-  Type getFnInterfaceType() const { return FnInterfaceType; }
-
-  /// \returns The function type being applied, including any generic
-  /// substitutions.
-  FunctionType *getFnType() const { return FnType; }
-
-  /// \returns The callee for the application.
-  const ValueDecl *getCallee() const { return Callee; }
-
-private:
-  Type getParamTypeImpl(AnyFunctionType *fnTy,
-                        bool lookThroughAutoclosure) const {
-    auto param = fnTy->getParams()[ParamIdx];
-    auto paramTy = param.getPlainType();
-    if (lookThroughAutoclosure && param.isAutoClosure())
-      paramTy = paramTy->castTo<FunctionType>()->getResult();
-    return paramTy;
-  }
-
-public:
-  /// \returns The type of the parameter which the argument is being applied to,
-  /// including any generic substitutions.
-  ///
-  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
-  /// should be treated as being of type T.
-  Type getParamType(bool lookThroughAutoclosure = true) const {
-    return getParamTypeImpl(FnType, lookThroughAutoclosure);
-  }
-
-  /// \returns The interface type of the parameter which the argument is being
-  /// applied to.
-  ///
-  /// \param lookThroughAutoclosure Whether an @autoclosure () -> T parameter
-  /// should be treated as being of type T.
-  Type getParamInterfaceType(bool lookThroughAutoclosure = true) const {
-    auto interfaceFnTy = FnInterfaceType->getAs<AnyFunctionType>();
-    if (!interfaceFnTy) {
-      // If the interface type isn't a function, then just return the resolved
-      // parameter type.
-      return getParamType(lookThroughAutoclosure)->mapTypeOutOfContext();
-    }
-    return getParamTypeImpl(interfaceFnTy, lookThroughAutoclosure);
-  }
-
-  /// \returns The flags of the parameter which the argument is being applied
-  /// to.
-  ParameterTypeFlags getParameterFlags() const {
-    return FnType->getParams()[ParamIdx].getParameterFlags();
-  }
-
-  ParameterTypeFlags getParameterFlagsAtIndex(unsigned idx) const {
-    return FnType->getParams()[idx].getParameterFlags();
-  }
 };
 
 /// Replace a coercion ('as') with a forced checked cast ('as!').

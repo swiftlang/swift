@@ -4,11 +4,11 @@
 
 // RUN: %target-swiftc_driver %s -emit-ir -debug-info-store-invocation -g -o - | %FileCheck %s
 // RUN: %target-swiftc_driver %s -emit-ir -debug-info-store-invocation -sdk "/Weird Location/SDK" -g -o - | %FileCheck --check-prefix CHECK-EXPLICIT %s
-// CHECK:          !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
+// CHECK:          !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-SAME:                    flags: "
 // CHECK-NOT:                     "
 // CHECK-SAME:                    -resource-dir 
-// CHECK-EXPLICIT: !DICompileUnit({{.*}}producer: "{{(Apple )?Swift version [^"]+}}"
+// CHECK-EXPLICIT: !DICompileUnit({{.*}}producer: "{{[^"]*Swift version [^"]+}}"
 // CHECK-EXPLICIT-SAME:           flags: "
 // CHECK-EXPLICIT-NOT:            "
 // CHECK-EXPLICIT-SAME:           -sdk \22/Weird Location/SDK\22

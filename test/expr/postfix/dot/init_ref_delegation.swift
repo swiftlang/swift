@@ -549,10 +549,9 @@ struct MultipleMemberAccesses {
 
 func sr10670() {
   struct S {
-    init(_ x: inout String) {}
-    init(_ x: inout [Int]) {}
+    init(_ x: inout String) {} // expected-note {{candidate expects in-out value of type 'String' for parameter #1}}
+    init(_ x: inout [Int]) {}  // expected-note {{candidate expects in-out value of type '[Int]' for parameter #1}}
   }
   var a = 0
-  S.init(&a) // expected-error {{cannot invoke 'S.Type.init' with an argument list of type '(inout Int)'}}
-  // expected-note@-1 {{overloads for 'S.Type.init' exist with these partially matching parameter lists: (inout String), (inout [Int])}}
+  S.init(&a) // expected-error {{no exact matches in call to initializer}}
 }

@@ -90,7 +90,9 @@ func f1() {
 func f1() {
   bar(a : {}}, <#T##d: () -> ()##() -> ()#>)
 }
-// CHECK: bar(a : {}}, <#T##d: () -> ()##() -> ()#>)
+// CHECK: bar(a : {}) {
+// CHECK-NEXT: <#code#>
+// CHECK-NEXT: }
 
 foo(withDuration: 1, animations: <#T##() -> Void#>)
 

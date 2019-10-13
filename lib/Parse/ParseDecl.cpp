@@ -1632,6 +1632,9 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
       }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
+    } else {
+      // Synthesize an r_brace syntax node if the token is absent
+      SyntaxContext->synthesize(tok::identifier, AtLoc.getAdvancedLoc(1));
     }
 
     diagnose(Tok, diag::expected_attribute_name);
@@ -1781,8 +1784,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
         status |= parseExprList(tok::l_paren, tok::r_paren,
                                 /*isPostfix=*/false, /*isExprBasic=*/true,
                                 lParenLoc, args, argLabels, argLabelLocs,
-                                rParenLoc, trailingClosure,
-                                SyntaxKind::FunctionCallArgumentList);
+                                rParenLoc, trailingClosure);
         assert(!trailingClosure && "Cannot parse a trailing closure here");
         hasInitializer = true;
       }
@@ -1999,13 +2001,11 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       }
 
       // Parse ')'.
-      SourceLoc RParenLoc;
       auto RParen = parseMatchingTokenSyntax(
-          tok::r_paren, RParenLoc, diag::convention_attribute_expected_rparen,
-          LParenLoc);
-      if (!RParen)
+          tok::r_paren, diag::convention_attribute_expected_rparen, LParenLoc);
+      if (RParen.isError())
         return makeParserError();
-      builder.useRightParen(std::move(*RParen));
+      builder.useRightParen(RParen.get());
 
       return makeParserSuccess();
     }();
@@ -2033,13 +2033,11 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       builder.useArgument(consumeTokenSyntax(tok::string_literal));
 
       // Parse ')'.
-      SourceLoc RParenLoc;
       auto RParen = parseMatchingTokenSyntax(
-          tok::r_paren, RParenLoc, diag::opened_attribute_expected_rparen,
-          LParenLoc);
-      if (!RParen)
+          tok::r_paren, diag::opened_attribute_expected_rparen, LParenLoc);
+      if (RParen.isError())
         return makeParserError();
-      builder.useRightParen(std::move(*RParen));
+      builder.useRightParen(RParen.get());
 
       return makeParserSuccess();
     }();
@@ -2085,12 +2083,11 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       builder.useArgument(argBuilder.build());
 
       // Parse ')'.
-      SourceLoc RParenLoc;
       auto RParen = parseMatchingTokenSyntax(
-          tok::r_paren, RParenLoc, diag::expected_rparen_expr_list, LParenLoc);
-      if (!RParen)
+          tok::r_paren, diag::expected_rparen_expr_list, LParenLoc);
+      if (RParen.isError())
         return makeParserError();
-      builder.useRightParen(std::move(*RParen));
+      builder.useRightParen(RParen.get());
 
       return makeParserSuccess();
     }();
@@ -4245,8 +4242,7 @@ static AccessorDecl *createAccessorFunc(SourceLoc DeclLoc,
         // Clone the parameter.  Do not clone the parameter type;
         // this will be filled in by the type-checker.
         auto accessorParam =
-          new (P->Context) ParamDecl(storageParam->getSpecifier(),
-                                     storageParam->getSpecifierLoc(),
+          new (P->Context) ParamDecl(storageParam->getSpecifierLoc(),
                                      storageParam->getArgumentNameLoc(),
                                      storageParam->getArgumentName(),
                                      storageParam->getNameLoc(),
@@ -4308,13 +4304,11 @@ static ParamDecl *createSetterAccessorArgument(SourceLoc nameLoc,
   }
 
   auto result = new (P.Context)
-      ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), SourceLoc(),
+      ParamDecl(SourceLoc(), SourceLoc(),
                 Identifier(), nameLoc, name, P.CurDeclContext);
+
   if (isNameImplicit)
     result->setImplicit();
-
-  // AST Walker shouldn't go into the type recursively.
-  result->setIsTypeLocImplicit(true);
 
   return result;
 }

@@ -208,6 +208,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   if (setUpModuleLoaders())
     return true;
 
+  createTypeChecker(*Context);
   return false;
 }
 
@@ -468,38 +469,35 @@ Optional<unsigned> CompilerInstance::getRecordedBufferID(const InputFile &input,
       return existingBufferID;
     }
   }
-  std::pair<std::unique_ptr<llvm::MemoryBuffer>,
-            std::unique_ptr<llvm::MemoryBuffer>>
-      buffers = getInputBufferAndModuleDocBufferIfPresent(input);
+  auto buffers = getInputBuffersIfPresent(input);
 
-  if (!buffers.first) {
+  if (!buffers.hasValue()) {
     failed = true;
     return None;
   }
 
   // FIXME: The fact that this test happens twice, for some cases,
   // suggests that setupInputs could use another round of refactoring.
-  if (serialization::isSerializedAST(buffers.first->getBuffer())) {
+  if (serialization::isSerializedAST(buffers->ModuleBuffer->getBuffer())) {
     PartialModules.push_back(
-        {std::move(buffers.first), std::move(buffers.second)});
+        {std::move(buffers->ModuleBuffer), std::move(buffers->ModuleDocBuffer),
+         std::move(buffers->ModuleSourceInfoBuffer)});
     return None;
   }
-  assert(buffers.second.get() == nullptr);
+  assert(buffers->ModuleDocBuffer.get() == nullptr);
+  assert(buffers->ModuleSourceInfoBuffer.get() == nullptr);
   // Transfer ownership of the MemoryBuffer to the SourceMgr.
-  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers.first));
+  unsigned bufferID = SourceMgr.addNewSourceBuffer(std::move(buffers->ModuleBuffer));
 
   InputSourceCodeBufferIDs.push_back(bufferID);
   return bufferID;
 }
 
-std::pair<std::unique_ptr<llvm::MemoryBuffer>,
-          std::unique_ptr<llvm::MemoryBuffer>>
-CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
+Optional<CompilerInstance::ModuleBuffers> CompilerInstance::getInputBuffersIfPresent(
     const InputFile &input) {
   if (auto b = input.buffer()) {
-    return std::make_pair(llvm::MemoryBuffer::getMemBufferCopy(
-                              b->getBuffer(), b->getBufferIdentifier()),
-                          nullptr);
+    return ModuleBuffers(llvm::MemoryBuffer::getMemBufferCopy(b->getBuffer(),
+                                                              b->getBufferIdentifier()));
   }
   // FIXME: Working with filenames is fragile, maybe use the real path
   // or have some kind of FileManager.
@@ -509,17 +507,35 @@ CompilerInstance::getInputBufferAndModuleDocBufferIfPresent(
   if (!inputFileOrErr) {
     Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file, input.file(),
                          inputFileOrErr.getError().message());
-    return std::make_pair(nullptr, nullptr);
+    return None;
   }
   if (!serialization::isSerializedAST((*inputFileOrErr)->getBuffer()))
-    return std::make_pair(std::move(*inputFileOrErr), nullptr);
+    return ModuleBuffers(std::move(*inputFileOrErr));
 
-  if (Optional<std::unique_ptr<llvm::MemoryBuffer>> moduleDocBuffer =
-          openModuleDoc(input)) {
-    return std::make_pair(std::move(*inputFileOrErr),
-                          std::move(*moduleDocBuffer));
-  }
-  return std::make_pair(nullptr, nullptr);
+  auto swiftdoc = openModuleDoc(input);
+  auto sourceinfo = openModuleSourceInfo(input);
+  return ModuleBuffers(std::move(*inputFileOrErr),
+                       swiftdoc.hasValue() ? std::move(swiftdoc.getValue()) : nullptr,
+                       sourceinfo.hasValue() ? std::move(sourceinfo.getValue()) : nullptr);
+}
+
+Optional<std::unique_ptr<llvm::MemoryBuffer>>
+CompilerInstance::openModuleSourceInfo(const InputFile &input) {
+  llvm::SmallString<128> pathWithoutProjectDir(input.file());
+  llvm::sys::path::replace_extension(pathWithoutProjectDir,
+                  file_types::getExtension(file_types::TY_SwiftSourceInfoFile));
+  llvm::SmallString<128> pathWithProjectDir = pathWithoutProjectDir.str();
+  StringRef fileName = llvm::sys::path::filename(pathWithoutProjectDir);
+  llvm::sys::path::remove_filename(pathWithProjectDir);
+  llvm::sys::path::append(pathWithProjectDir, "Project");
+  llvm::sys::path::append(pathWithProjectDir, fileName);
+  if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                            pathWithProjectDir))
+    return std::move(*sourceInfoFileOrErr);
+  if (auto sourceInfoFileOrErr = swift::vfs::getFileOrSTDIN(getFileSystem(),
+                                                            pathWithoutProjectDir))
+    return std::move(*sourceInfoFileOrErr);
+  return None;
 }
 
 Optional<std::unique_ptr<llvm::MemoryBuffer>>
@@ -896,7 +912,8 @@ bool CompilerInstance::parsePartialModulesAndLibraryFiles(
   for (auto &PM : PartialModules) {
     assert(PM.ModuleBuffer);
     if (!SML->loadAST(*MainModule, SourceLoc(), std::move(PM.ModuleBuffer),
-                      std::move(PM.ModuleDocBuffer), /*isFramework*/false,
+                      std::move(PM.ModuleDocBuffer),
+                      std::move(PM.ModuleSourceInfoBuffer), /*isFramework*/false,
                       /*treatAsPartialModule*/true))
       hadLoadError = true;
   }
