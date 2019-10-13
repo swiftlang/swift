@@ -99,8 +99,7 @@ mklink "%VCToolsInstallDir%\include\visualc.apinotes" S:\swift\stdlib\public\Pla
 Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
 
 ## 6. Build LLVM/Clang
-- This must be done from within a developer command prompt. LLVM and Clang are
-  large projects, so building might take a few hours. Make sure that the build
+- This must be done from within a developer command prompt. Make sure that the build
   type for LLVM/Clang is compatible with the build type for Swift. That is,
   either build everything `Debug` or some variant of `Release` (e.g. `Release`,
   `RelWithDebInfo`).
@@ -126,8 +125,8 @@ ninja
 path S:\b\llvm\bin;%PATH%
 ```
 ## 7. Build CMark
-- This must be done from within a developer command prompt. CMark is a fairly
-  small project and should only take a few minutes to build.
+- This must be done from within a developer command prompt.
+
 ```cmd
 md "S:\b\cmark"
 cd "S:\b\cmark"
@@ -180,8 +179,8 @@ cmake -G "Visual Studio 2017" -A x64 -T "host=x64"^ ...
 ```
 
 ## 9. Build lldb
-- This must be done from within a developer command prompt and could take hours
-  depending on your system.
+- This must be done from within a developer command prompt.
+
 ```cmd
 md "S:\b\lldb"
 cd "S:\b\lldb"
