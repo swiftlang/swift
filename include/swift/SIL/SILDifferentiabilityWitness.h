@@ -47,9 +47,12 @@ private:
   SILLinkage linkage;
   /// The original function.
   SILFunction *originalFunction;
-  /// The autodiff configuration: parameter indices, result indices, and
-  /// derivative generic signature (optional).
-  AutoDiffConfig *autoDiffConfig;
+  /// The parameter indices.
+  IndexSubset *parameterIndices;
+  /// The result indices.
+  IndexSubset *resultIndices;
+  /// The derivative generic signature (optional).
+  GenericSignature *derivativeGenericSignature;
   /// The JVP (Jacobian-vector products) derivative function.
   SILFunction *jvp;
   /// The VJP (vector-Jacobian products) derivative function.
@@ -71,9 +74,9 @@ private:
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized)
     : module(module), linkage(linkage), originalFunction(originalFunction),
-      autoDiffConfig(getAutoDiffConfig(
-          module, parameterIndices, resultIndices, derivativeGenSig)),
-      jvp(jvp), vjp(vjp), serialized(isSerialized) {}
+      parameterIndices(parameterIndices), resultIndices(resultIndices),
+      derivativeGenericSignature(derivativeGenSig), jvp(jvp), vjp(vjp),
+      serialized(isSerialized) {}
 
 public:
   static SILDifferentiabilityWitness *create(
@@ -87,13 +90,13 @@ public:
   SILLinkage getLinkage() const { return linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }
   IndexSubset *getParameterIndices() const {
-    return autoDiffConfig->getParameterIndices();
+    return parameterIndices;
   }
   IndexSubset *getResultIndices() const {
-    return autoDiffConfig->getResultIndices();
+    return resultIndices;
   }
   GenericSignature *getDerivativeGenericSignature() const {
-    return autoDiffConfig->getDerivativeGenericSignature();
+    return derivativeGenericSignature;
   }
   SILFunction *getJVP() const { return jvp; }
   SILFunction *getVJP() const { return vjp; }

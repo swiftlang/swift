@@ -449,9 +449,6 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// For uniquifying `IndexSubset` allocations.
   llvm::FoldingSet<IndexSubset> IndexSubsets;
 
-  /// For uniquifying `AutoDiffConfig` allocations.
-  llvm::FoldingSet<AutoDiffConfig> AutoDiffConfigs;
-
   /// For uniquifying `AutoDiffDerivativeFunctionIdentifier` allocations.
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
@@ -4828,27 +4825,6 @@ IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
   auto *buf = reinterpret_cast<IndexSubset *>(
       ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
   auto *newNode = new (buf) IndexSubset(indices);
-  foldingSet.InsertNode(newNode, insertPos);
-  return newNode;
-}
-
-AutoDiffConfig *AutoDiffConfig::get(
-    IndexSubset *parameterIndices, IndexSubset *resultIndices,
-    GenericSignature *derivativeGenericSignature, ASTContext &C) {
-  assert(parameterIndices);
-  assert(resultIndices);
-  auto &foldingSet = C.getImpl().AutoDiffConfigs;
-  llvm::FoldingSetNodeID id;
-  id.AddPointer(parameterIndices);
-  id.AddPointer(resultIndices);
-  id.AddPointer(derivativeGenericSignature);
-  void *insertPos;
-  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
-  if (existing)
-    return existing;
-  void *buf = C.Allocate(sizeof(AutoDiffConfig), alignof(AutoDiffConfig));
-  auto *newNode = new (buf) AutoDiffConfig(
-      parameterIndices, resultIndices, derivativeGenericSignature);
   foldingSet.InsertNode(newNode, insertPos);
   return newNode;
 }

@@ -35,13 +35,8 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
   return diffWitness;
 }
 
-AutoDiffConfig *SILDifferentiabilityWitness::getAutoDiffConfig(
-    SILModule &module, IndexSubset *parameterIndices,
-    IndexSubset *resultIndices, GenericSignature *derivativeGenSig) {
-  return AutoDiffConfig::get(parameterIndices, resultIndices, derivativeGenSig,
-                             module.getASTContext());
-}
-
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
-  return std::make_pair(originalFunction->getName(), autoDiffConfig);
+  AutoDiffConfig config{parameterIndices, resultIndices,
+                        derivativeGenericSignature};
+  return std::make_pair(originalFunction->getName(), config);
 }
