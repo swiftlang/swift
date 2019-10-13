@@ -2300,6 +2300,7 @@ void SILSerializer::writeIndexTables() {
     Offset.emit(ScratchRecord, sil_index_block::SIL_PROPERTY_OFFSETS,
                 PropertyOffset);
   }
+
 }
 
 void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
@@ -2517,7 +2518,7 @@ writeSILDifferentiabilityWitness(const SILDifferentiabilityWitness &dw) {
     vjpID = S.addUniquedStringRef(vjp->getName());
   }
   SmallVector<unsigned, 8> parameterAndResultIndices(
-       dw.getParameterIndices()->begin(), dw.getParameterIndices()->end());
+      dw.getParameterIndices()->begin(), dw.getParameterIndices()->end());
   parameterAndResultIndices.append(dw.getResultIndices()->begin(),
                                    dw.getResultIndices()->end());
   auto originalFnType = original->getLoweredFunctionType();

@@ -67,11 +67,6 @@ private:
   /// deserialized.
   DeclAttribute *attribute = nullptr;
 
-  static AutoDiffConfig *
-  getAutoDiffConfig(SILModule &module, IndexSubset *parameterIndices,
-                    IndexSubset *resultIndices,
-                    GenericSignature *derivativeGenSig);
-
   SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
                               SILFunction *originalFunction,
                               IndexSubset *parameterIndices,
@@ -112,6 +107,8 @@ public:
     case AutoDiffDerivativeFunctionKind::VJP: return vjp;
     }
   }
+  void setJVP(SILFunction *jvp) { this->jvp = jvp; }
+  void setVJP(SILFunction *vjp) { this->vjp = vjp; }
   void setDerivative(AutoDiffDerivativeFunctionKind kind,
                      SILFunction *derivative) {
     switch (kind) {
@@ -123,9 +120,9 @@ public:
   DeclAttribute *getAttribute() const { return attribute; }
 
   /// Verify that the differentiability witness is well-formed.
-  void verify(const SILModule &M) const;
+  void verify(const SILModule &module) const;
 
-  void print(llvm::raw_ostream &OS, bool verbose = false) const;
+  void print(llvm::raw_ostream &os, bool verbose = false) const;
   void dump() const;
 };
 

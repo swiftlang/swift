@@ -22,9 +22,7 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
     GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
     bool isSerialized, DeclAttribute *attribute) {
-  void *buf = module.allocate(sizeof(SILDifferentiabilityWitness),
-                              alignof(SILDifferentiabilityWitness));
-  auto *diffWitness = ::new (buf) SILDifferentiabilityWitness(
+  auto *diffWitness = new (module) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized, attribute);
   // Register the differentiability witness in the module.

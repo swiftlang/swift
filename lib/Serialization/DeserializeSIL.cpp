@@ -3369,9 +3369,7 @@ SILDifferentiabilityWitness *SILDeserializer::lookupDifferentiabilityWitness(
   auto iter = DifferentiabilityWitnessList->find(mangledDiffWitnessKey);
   if (iter == DifferentiabilityWitnessList->end())
     return nullptr;
-
-  auto *diffWitness = readDifferentiabilityWitness(*iter);
-  return diffWitness;
+  return readDifferentiabilityWitness(*iter);
 }
 
 void SILDeserializer::getAllDifferentiabilityWitnesses() {

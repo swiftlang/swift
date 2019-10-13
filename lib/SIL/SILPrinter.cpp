@@ -3061,23 +3061,23 @@ void SILDefaultWitnessTable::dump() const {
 void SILDifferentiabilityWitness::print(
     llvm::raw_ostream &OS, bool verbose) const {
   OS << "// differentiability witness for "
-     << demangleSymbol(originalFunction->getName()) << "\n";
-  // sil_differentiability_witness @original-function-name : $original-sil-type
+     << demangleSymbol(originalFunction->getName()) << '\n';
   PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  // sil_differentiability_witness (linkage)?
   OS << "sil_differentiability_witness ";
   printLinkage(OS, linkage, ForDefinition);
-  // [parameters 0 1 ...]
+  // [parameters ...]
   OS << "[parameters ";
   interleave(getParameterIndices()->getIndices(),
              [&](unsigned index) { OS << index; },
-             [&] { OS << " "; });
-  // [results 0 1 ...]
+             [&] { OS << ' '; });
+  // [results ...]
   OS << "] [results ";
   interleave(getResultIndices()->getIndices(),
              [&](unsigned index) { OS << index; },
-             [&] { OS << " "; });
+             [&] { OS << ' '; });
   OS << ']';
-  // [where ...]
+  // ([where ...])?
   if (auto *derivativeGenSig = getDerivativeGenericSignature()) {
     ArrayRef<Requirement> requirements;
     SmallVector<Requirement, 4> requirementsScratch;
@@ -3093,17 +3093,17 @@ void SILDifferentiabilityWitness::print(
     }
     if (!requirements.empty()) {
       OS << " [where ";
-      auto SubPrinter = PrintOptions::printSIL();
+      auto subPrinter = PrintOptions::printSIL();
       interleave(requirements,
                  [&](Requirement req) {
-                   req.print(OS, SubPrinter);
+                   req.print(OS, subPrinter);
                    return;
                  },
                  [&] { OS << ", "; });
       OS << ']';
     }
   }
-  // original: @original-function-name : $original-sil-type
+  // @original-function-name : $original-sil-type
   OS << " @" << originalFunction->getName() << " : "
      << originalFunction->getLoweredType();
   // {
@@ -3112,9 +3112,9 @@ void SILDifferentiabilityWitness::print(
   // }
   OS << " {\n";
   if (jvp)
-    OS << "  jvp: @" << jvp->getName() << " : " << jvp->getLoweredType() << "\n";
+    OS << "  jvp: @" << jvp->getName() << " : " << jvp->getLoweredType() << '\n';
   if (vjp)
-    OS << "  vjp: @" << vjp->getName() << " : " << vjp->getLoweredType() << "\n";
+    OS << "  vjp: @" << vjp->getName() << " : " << vjp->getLoweredType() << '\n';
   OS << "}\n\n";
 }
 

@@ -6747,7 +6747,10 @@ bool SILParserTUState::parseSILDefaultWitnessTable(Parser &P) {
 
 // SWIFT_ENABLE_TENSORFLOW
 // TODO(TF-893): Dedupe with `SILParser::convertRequirements` upstream.
-// Consider defining this as `Parser::convertRequirements`.
+// Currently, this utility is defined on `SILParser`, but SIL differentiability
+// witness is defined on `SILParserTUState` and only has access to `Parser`.
+// Consider redefining `SILParser::convertRequirements`as
+// `Parser::convertRequirements`.
 static void convertRequirements(Parser &P, SILFunction *F,
                                 ArrayRef<RequirementRepr> From,
                                 SmallVectorImpl<Requirement> &To) {
@@ -6827,8 +6830,8 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   if (!linkage)
     linkage = SILLinkage::PublicExternal;
 
-  Scope S(&P, ScopeKind::TopLevel);
-  Scope Body(&P, ScopeKind::FunctionBody);
+  Scope scope(&P, ScopeKind::TopLevel);
+  Scope body(&P, ScopeKind::FunctionBody);
 
   // Parse a SIL function name.
   auto parseFunctionName = [&](SILFunction *&fn) -> bool {
@@ -6858,11 +6861,10 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   // Parse an index subset, prefaced with the given label.
   auto parseIndexSubset =
       [&](StringRef label, IndexSubset *& indexSubset) -> bool {
-    if (P.parseToken(tok::l_square, diag::sil_diff_witness_expected_keyword,
-                     "["))
+    if (P.parseToken(tok::l_square, diag::sil_diff_witness_expected_token, "["))
       return true;
     if (P.parseSpecificIdentifier(
-          label, diag::sil_diff_witness_expected_keyword, label))
+          label, diag::sil_diff_witness_expected_token, label))
       return true;
     // Parse parameter index list.
     SmallVector<unsigned, 8> paramIndices;
@@ -6883,8 +6885,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     while (P.Tok.isNot(tok::r_square))
       if (parseParam())
         return true;
-    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_keyword,
-                     "]"))
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
       return true;
     auto maxIndexRef =
         std::max_element(paramIndices.begin(), paramIndices.end());
@@ -6911,8 +6912,7 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
     P.parseGenericWhereClause(whereLoc, derivativeRequirementReprs,
                               firstTypeInComplete,
                               /*AllowLayoutConstraints*/ false);
-    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_keyword,
-                     "]"))
+    if (P.parseToken(tok::r_square, diag::sil_diff_witness_expected_token, "]"))
       return true;
   }
 
@@ -6944,25 +6944,23 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   SILFunction *vjp = nullptr;
   if (P.Tok.is(tok::l_brace)) {
     // Parse '{'.
-    SourceLoc lBraceLoc = P.Tok.getLoc();
-    P.consumeToken(tok::l_brace);
+    SourceLoc lBraceLoc;
+    P.consumeIf(tok::l_brace, lBraceLoc);
     // Parse JVP (optional).
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "jvp") {
       P.consumeToken(tok::identifier);
-      if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_keyword,
-                       ":"))
+      if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
-      Scope Body(&P, ScopeKind::FunctionBody);
+      Scope body(&P, ScopeKind::FunctionBody);
       if (parseFunctionName(jvp))
         return true;
     }
     // Parse VJP (optional).
     if (P.Tok.is(tok::identifier) && P.Tok.getText() == "vjp") {
       P.consumeToken(tok::identifier);
-      if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_keyword,
-                       ":"))
+      if (P.parseToken(tok::colon, diag::sil_diff_witness_expected_token, ":"))
         return true;
-      Scope Body(&P, ScopeKind::FunctionBody);
+      Scope body(&P, ScopeKind::FunctionBody);
       if (parseFunctionName(vjp))
         return true;
     }
