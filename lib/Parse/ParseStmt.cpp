@@ -2456,7 +2456,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
   SourceLoc StartOfBody = Tok.getLoc();
   if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
     Status |= parseBraceItems(BodyItems, braceItemListKind);
-  } else if (Status.isSuccess()) {
+  } else if (Status.isSuccess() && ParentKind == CaseParentKind::Switch) {
     diagnose(IntroducerLoc, diag::case_stmt_without_body,
              CaseLabelItems.back().isDefault())
         .highlight(SourceRange(IntroducerLoc, TerminatorLoc))

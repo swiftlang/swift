@@ -235,8 +235,6 @@ public:
       recurse = asImpl().checkDoCatch(doCatch);
     } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
       recurse = asImpl().checkThrow(thr);
-    } else {
-      assert(!isa<CaseStmt>(S));
     }
     return {bool(recurse), S};
   }
