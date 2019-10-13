@@ -431,10 +431,11 @@ std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
   // TODO(TF-20): Make the mangling scheme robust.
   beginManglingWithoutPrefix();
 
-  auto originalName = std::get<0>(key);
-  auto *parameterIndices = std::get<1>(key);
-  auto *resultIndices = std::get<2>(key);
-  auto *derivativeGenericSignature = std::get<3>(key);
+  auto originalName = key.first;
+  auto *autoDiffConfig = key.second;
+  auto *parameterIndices = autoDiffConfig->getParameterIndices();
+  auto *resultIndices = autoDiffConfig->getResultIndices();
+  auto *derivativeGenericSignature = autoDiffConfig->getDerivativeGenericSignature();
 
   Buffer << "AD__" << originalName << '_';
   Buffer << "P" << parameterIndices->getString();

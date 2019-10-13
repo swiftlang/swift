@@ -208,6 +208,41 @@ struct AutoDiffDerivativeFunctionKind {
   }
 };
 
+/// Identifies an autodiff derivative function configuration:
+/// - Parameter indices.
+/// - Result indices.
+/// - Derivative generic signature (optional).
+// TODO(TF-893): Use `AutoDiffConfig` in `AutoDiffDerivativeFunctionIdentifier`
+// to avoid duplication.
+class AutoDiffConfig : public llvm::FoldingSetNode {
+  IndexSubset *const parameterIndices;
+  IndexSubset *const resultIndices;
+  GenericSignature *derivativeGenericSignature;
+
+  AutoDiffConfig(IndexSubset *parameterIndices, IndexSubset *resultIndices,
+                 GenericSignature *derivativeGenericSignature)
+      : parameterIndices(parameterIndices), resultIndices(resultIndices),
+        derivativeGenericSignature(derivativeGenericSignature) {}
+
+public:
+  IndexSubset *getParameterIndices() const { return parameterIndices; }
+  IndexSubset *getResultIndices() const { return resultIndices; }
+  GenericSignature *getDerivativeGenericSignature() const {
+    return derivativeGenericSignature;
+  }
+
+  static AutoDiffConfig *get(IndexSubset *parameterIndices,
+                             IndexSubset *resultIndices,
+                             GenericSignature *derivativeGenericSignature,
+                             ASTContext &C);
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    ID.AddPointer(parameterIndices);
+    ID.AddPointer(resultIndices);
+    ID.AddPointer(derivativeGenericSignature);
+  }
+};
+
 /// In conjunction with the original function declaration, identifies an
 /// autodiff derivative function.
 ///
@@ -241,9 +276,7 @@ public:
 /// The key type used for uniquing `SILDifferentiabilityWitness` in
 /// `SILModule`: original function name, parameter indices, result indices, and
 /// derivative generic signature.
-// TODO(TF-893): Unify with `AutoDiffDerivativeFunctionIdentifier`.
-using SILDifferentiabilityWitnessKey =
-    std::tuple<StringRef, IndexSubset *, IndexSubset *, GenericSignature *>;
+using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig *>;
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {

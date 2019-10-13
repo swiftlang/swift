@@ -3068,31 +3068,27 @@ void SILDifferentiabilityWitness::print(
   printLinkage(OS, linkage, ForDefinition);
   // [parameters 0 1 ...]
   OS << "[parameters ";
-  interleave(parameterIndices->getIndices(),
+  interleave(getParameterIndices()->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << " "; });
   // [results 0 1 ...]
   OS << "] [results ";
-  interleave(resultIndices->getIndices(),
+  interleave(getResultIndices()->getIndices(),
              [&](unsigned index) { OS << index; },
              [&] { OS << " "; });
   OS << ']';
   // [where ...]
-  if (derivativeGenericSignature) {
-    // NOTE: This needs to be changed if there is no utility for parsing
-    // generic signatures. Idea: we could instead print the type of the original
-    // function substituted into this generic signature.
+  if (auto *derivativeGenSig = getDerivativeGenericSignature()) {
     ArrayRef<Requirement> requirements;
     SmallVector<Requirement, 4> requirementsScratch;
     auto *origGenEnv = originalFunction->getGenericEnvironment();
-    if (derivativeGenericSignature) {
+    if (derivativeGenSig) {
       if (origGenEnv) {
-        requirementsScratch =
-            derivativeGenericSignature->requirementsNotSatisfiedBy(
-                origGenEnv->getGenericSignature());
+        requirementsScratch = derivativeGenSig->requirementsNotSatisfiedBy(
+            origGenEnv->getGenericSignature());
         requirements = requirementsScratch;
       } else {
-        requirements = derivativeGenericSignature->getRequirements();
+        requirements = derivativeGenSig->getRequirements();
       }
     }
     if (!requirements.empty()) {

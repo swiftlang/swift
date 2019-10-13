@@ -29,7 +29,6 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/SIL/SILAllocated.h"
-#include "swift/SIL/SILInstruction.h"
 #include "llvm/ADT/ilist_node.h"
 #include "llvm/ADT/ilist.h"
 
@@ -48,12 +47,9 @@ private:
   SILLinkage linkage;
   /// The original function.
   SILFunction *originalFunction;
-  /// The parameter indices.
-  IndexSubset *parameterIndices;
-  /// The result indices.
-  IndexSubset *resultIndices;
-  /// The derivative generic signature (optional).
-  GenericSignature *derivativeGenericSignature;
+  /// The autodiff configuration: parameter indices, result indices, and
+  /// derivative generic signature (optional).
+  AutoDiffConfig *autoDiffConfig;
   /// The JVP (Jacobian-vector products) derivative function.
   SILFunction *jvp;
   /// The VJP (vector-Jacobian products) derivative function.
@@ -61,6 +57,11 @@ private:
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
   bool serialized;
+
+  static AutoDiffConfig *
+  getAutoDiffConfig(SILModule &module, IndexSubset *parameterIndices,
+                    IndexSubset *resultIndices,
+                    GenericSignature *derivativeGenSig);
 
   SILDifferentiabilityWitness(SILModule &module, SILLinkage linkage,
                               SILFunction *originalFunction,
@@ -70,9 +71,9 @@ private:
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized)
     : module(module), linkage(linkage), originalFunction(originalFunction),
-      parameterIndices(parameterIndices), resultIndices(resultIndices),
-      derivativeGenericSignature(derivativeGenSig), jvp(jvp), vjp(vjp),
-      serialized(isSerialized) {}
+      autoDiffConfig(getAutoDiffConfig(
+          module, parameterIndices, resultIndices, derivativeGenSig)),
+      jvp(jvp), vjp(vjp), serialized(isSerialized) {}
 
 public:
   static SILDifferentiabilityWitness *create(
@@ -86,16 +87,29 @@ public:
   SILLinkage getLinkage() const { return linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }
   IndexSubset *getParameterIndices() const {
-    return parameterIndices;
+    return autoDiffConfig->getParameterIndices();
   }
   IndexSubset *getResultIndices() const {
-    return resultIndices;
+    return autoDiffConfig->getResultIndices();
   }
   GenericSignature *getDerivativeGenericSignature() const {
-    return derivativeGenericSignature;
+    return autoDiffConfig->getDerivativeGenericSignature();
   }
   SILFunction *getJVP() const { return jvp; }
   SILFunction *getVJP() const { return vjp; }
+  SILFunction *getDerivative(AutoDiffDerivativeFunctionKind kind) const {
+    switch (kind) {
+    case AutoDiffDerivativeFunctionKind::JVP: return jvp;
+    case AutoDiffDerivativeFunctionKind::VJP: return vjp;
+    }
+  }
+  void setDerivative(AutoDiffDerivativeFunctionKind kind,
+                     SILFunction *derivative) {
+    switch (kind) {
+    case AutoDiffDerivativeFunctionKind::JVP: jvp = derivative; break;
+    case AutoDiffDerivativeFunctionKind::VJP: vjp = derivative; break;
+    }
+  }
   bool isSerialized() const { return serialized; }
 
   /// Verify that the differentiability witness is well-formed.
