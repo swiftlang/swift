@@ -625,65 +625,6 @@ DifferentiableFunctionInst *DifferentiableFunctionInst::create(
       HasOwnership);
 }
 
-DifferentiableFunctionExtractInst::Extractee::Extractee(
-    AutoDiffDerivativeFunctionKind kind) {
-  switch (kind) {
-  case AutoDiffDerivativeFunctionKind::JVP:
-    rawValue = JVP;
-    return;
-  case AutoDiffDerivativeFunctionKind::VJP:
-    rawValue = VJP;
-    return;
-  }
-}
-
-DifferentiableFunctionExtractInst::Extractee::Extractee(StringRef string) {
-  Optional<innerty> result =
-      llvm::StringSwitch<Optional<innerty>>(string)
-          .Case("original", Original)
-          .Case("jvp", JVP)
-          .Case("vjp", VJP);
-  assert(result && "Invalid string");
-  rawValue = *result;
-}
-
-Optional<AutoDiffDerivativeFunctionKind>
-DifferentiableFunctionExtractInst::Extractee::getExtracteeAsDerivativeFunction()
-    const {
-  switch (rawValue) {
-  case Original:
-    return None;
-  case JVP:
-    return {AutoDiffDerivativeFunctionKind::JVP};
-  case VJP:
-    return {AutoDiffDerivativeFunctionKind::VJP};
-  }
-}
-
-SILType DifferentiableFunctionExtractInst::
-getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
-  auto fnTy = function->getType().castTo<SILFunctionType>();
-  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
-  auto originalFnTy = fnTy->getWithoutDifferentiability();
-  auto kindOpt = extractee.getExtracteeAsDerivativeFunction();
-  if (!kindOpt) {
-    assert(extractee == Extractee::Original);
-    return SILType::getPrimitiveObjectType(originalFnTy);
-  }
-  auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
-        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-        *kindOpt, module.Types,
-        LookUpConformanceInModule(module.getSwiftModule()));
-  return SILType::getPrimitiveObjectType(resultFnTy);
-}
-
-DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
-    SILValue theFunction)
-    : InstructionBase(debugLoc,
-                      getExtracteeType(theFunction, extractee, module)),
-      extractee(extractee), operands(this, theFunction) {}
-
 SILType LinearFunctionInst::getLinearFunctionType(
     SILValue OriginalFunction, IndexSubset *ParameterIndices) {
   auto fnTy = OriginalFunction->getType().castTo<SILFunctionType>();
@@ -731,6 +672,61 @@ LinearFunctionInst *LinearFunctionInst::create(
       Loc, ParameterIndices, OriginalFunction, TransposeFunction,
       HasOwnership);
 }
+
+DifferentiableFunctionExtractInst::Extractee::Extractee(
+    AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffDerivativeFunctionKind::JVP:
+    rawValue = JVP;
+    return;
+  case AutoDiffDerivativeFunctionKind::VJP:
+    rawValue = VJP;
+    return;
+  }
+}
+
+DifferentiableFunctionExtractInst::Extractee::Extractee(StringRef string) {
+  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
+      .Case("original", Original)
+      .Case("jvp", JVP)
+      .Case("vjp", VJP);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
+Optional<AutoDiffDerivativeFunctionKind>
+DifferentiableFunctionExtractInst::Extractee::
+getExtracteeAsDerivativeFunction() const {
+  switch (rawValue) {
+  case Original: return None;
+  case JVP: return {AutoDiffDerivativeFunctionKind::JVP};
+  case VJP: return {AutoDiffDerivativeFunctionKind::VJP};
+  }
+}
+
+SILType DifferentiableFunctionExtractInst::
+getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
+  auto originalFnTy = fnTy->getWithoutDifferentiability();
+  auto kindOpt = extractee.getExtracteeAsDerivativeFunction();
+  if (!kindOpt) {
+    assert(extractee == Extractee::Original);
+    return SILType::getPrimitiveObjectType(originalFnTy);
+  }
+  auto resultFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
+        fnTy->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+        *kindOpt, module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()));
+  return SILType::getPrimitiveObjectType(resultFnTy);
+}
+
+DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+    SILValue theFunction)
+    : InstructionBase(debugLoc,
+                      getExtracteeType(theFunction, extractee, module)),
+      extractee(extractee), operands(this, theFunction) {}
 
 SILType LinearFunctionExtractInst::
 getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
