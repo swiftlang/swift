@@ -150,6 +150,8 @@ class SILCombiner :
 
   /// Cast optimizer
   CastOptimizer CastOpt;
+  
+  SILOptFunctionBuilder &FuncBuilder;
 
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
@@ -157,7 +159,7 @@ public:
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
       : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
-        RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
+        RemoveCondFails(removeCondFails), Iteration(0), Builder(B), FuncBuilder(FuncBuilder),
         CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
                 /* ReplaceValueUsesAction */
                 [&](SILValue Original, SILValue Replacement) {

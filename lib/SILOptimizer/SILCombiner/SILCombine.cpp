@@ -29,11 +29,14 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeInstruction.h"
 #include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
+#include <iostream>
 
 using namespace swift;
 
@@ -170,9 +173,50 @@ public:
   }
 };
 
+static Optional<StructInst*>
+getStructIfLiteral (StoreInst *store) {
+  if (auto *structLiteral = dyn_cast<StructInst>(store->getSrc())) {
+    std::cout << "found struct" << std::endl;
+    auto literal = structLiteral->getElementOperands()[0].get();
+    if (!dyn_cast<LiteralInst>(literal)) {
+      return NoneType{};
+    } else {
+      return structLiteral;
+    }
+  }
+  return NoneType{};
+}
+
+static Optional<SmallVector<std::pair<SILValue, SILValue>, 3>>
+getArrayLiteralElements(PointerToAddressInst *ptr) {
+  SmallVector<std::pair<SILValue, SILValue>, 3> out;
+  
+  for (auto *useInst : ptr->getUses()) {
+    if (auto *store = dyn_cast<StoreInst>(useInst->getUser())) {
+      if (auto structLiteral = getStructIfLiteral(store))
+      	out.push_back(std::make_pair(structLiteral.getValue(), store->getDest()));
+    }
+    
+    if (auto *indexAddr = dyn_cast<IndexAddrInst>(useInst->getUser())) {
+      for (auto *indexUse : indexAddr->getUses()) {
+        if (auto *store = dyn_cast<StoreInst>(indexUse->getUser())) {
+          if (auto structLiteral = getStructIfLiteral(store))
+            out.push_back(std::make_pair(structLiteral.getValue(), store->getDest()));
+        }
+      }
+    }
+  }
+  
+  if (out.size() == 0) { return NoneType{}; }
+  return out;
+}
+
+static bool hasRunOnce = false;
+
 bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   MadeChange = false;
-
+  bool shouldDebugDump = false;
+  
   LLVM_DEBUG(llvm::dbgs() << "\n\nSILCOMBINE ITERATION #" << Iteration << " on "
                           << F.getName() << "\n");
 
@@ -180,6 +224,129 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
   addReachableCodeToWorklist(&*F.begin());
 
   SILCombineCanonicalize scCanonicalize(Worklist);
+  
+//  std::cout << "NEW FUNCTION" << std::endl;
+  for (auto& block : F) {
+    if (hasRunOnce) continue;
+    
+    bool foundCreateArr = false;
+    SmallVector<std::pair<SILValue, SILValue>, 3> foundElements;
+    ReturnInst *oldReturn;
+    ApplyInst *oldApplyInst;
+    StrongReleaseInst *oldRlease;
+    FunctionRefInst *closureToApply;
+    SubstitutionMap substitutions;
+
+//    std::cout << "NEW BLOCK" << std::endl;
+    for (auto first = block.begin(); first != block.end(); (void)++first) {
+      if (auto *release = dyn_cast<StrongReleaseInst>(first)) {
+        oldRlease = release;
+      }
+      
+      if (auto *returnInst = dyn_cast<ReturnInst>(first)) {
+        oldReturn = returnInst;
+      }
+      
+      if (auto *closure = dyn_cast<FunctionRefInst>(first)) {
+        if (auto *fn = closure->getReferencedFunctionOrNull()) {
+          if (fn->getName().contains("test1")) {
+            closureToApply = closure;
+            substitutions = fn->getForwardingSubstitutionMap();
+          }
+        }
+      }
+      
+      if (auto *arrayLiteralCreate = dyn_cast<ApplyInst>(first)) {
+        if (auto *func = arrayLiteralCreate->getReferencedFunctionOrNull()) {
+          if (func->getName().contains("mapy")) {
+            oldApplyInst = arrayLiteralCreate;
+          }
+          if (func->getName().contains("allocateUninitializedArray")) {
+            std::cout << "found literal: " << std::endl;
+            foundCreateArr = true;
+          }
+        }
+      }
+      
+      if (!foundCreateArr) continue;
+      if (auto *ptr = dyn_cast<PointerToAddressInst>(first)) {
+        if (auto elements = getArrayLiteralElements(ptr)) {
+          std::cout << "found elements: " << elements.getValue().size() << std::endl;
+          foundElements = elements.getValue();
+        }
+      }
+    }
+    
+    if (!closureToApply || !foundCreateArr || foundElements.size() < 1) continue;
+    
+    Builder.setInsertionPoint(oldApplyInst);
+		for (auto& argPair : foundElements) {
+      auto arg = argPair.first;
+      auto dest = argPair.second;
+      auto *apply = Builder.createApply(closureToApply->getLoc(), closureToApply, SubstitutionMap(), {arg});
+      auto *store = Builder.createStore(apply->getLoc(), apply, dest, StoreOwnershipQualifier::Unqualified);
+      apply->dump();
+      store->dump();
+		}
+    
+    SILValue array;
+    if (auto *arrayPtr = dyn_cast<AllocStackInst>(oldApplyInst->getArgument(1))) {
+      std::cout << "found arr ptr" << std::endl;
+      for (auto *useInst : arrayPtr->getUses()) {
+        std::cout << "found use" << std::endl;
+        if (auto *store = dyn_cast<StoreInst>(useInst->getUser())) {
+          std::cout << "updating array" << std::endl;
+          array = store->getSrc();
+        }
+      }
+    }
+
+    Builder.setInsertionPoint(oldReturn);
+//    auto * load = Builder.createLoadBorrow(oldReturn->getLoc(), array);
+    auto * newReturn = Builder.createReturn(oldReturn->getLoc(), array);
+//    oldReturn->dropAllReferences();
+//    oldReturn->eraseFromParent();
+    
+    eraseInstFromFunction(*oldReturn);
+    eraseInstFromFunction(*oldApplyInst);
+    
+//    auto *oldApplyFuncRefInst = dyn_cast<FunctionRefInst>(oldApplyInst->getCalleeOrigin());
+//    oldApplyFuncRefInst->dropAllReferences();
+//    oldApplyInst->dropAllReferences();
+//    oldApplyFuncRefInst->eraseFromParent();
+//    oldApplyInst->eraseFromParent();
+//
+//    oldRlease->dropAllReferences();
+//    oldRlease->eraseFromParent();
+    
+//    for (auto inst = block.begin(); inst != block.end(); (void)++inst) {
+//      if (auto *partialApply = dyn_cast<PartialApplyInst>(inst)) {
+//        size_t useCount = 0;
+//        DeallocStackInst *localDealloc;
+//        for (auto *useInst : partialApply->getUses()) {
+//          useCount++;
+//          if (auto deallocStackInst = dyn_cast<DeallocStackInst>(useInst->getUser())) {
+//            localDealloc = deallocStackInst;
+//          }
+//        }
+//
+//        if (useCount == 1 && localDealloc) {
+//          localDealloc->eraseFromParent();
+//          inst->dropAllReferences();
+//          inst->eraseFromParent();
+//        }
+//      }
+//    }
+    
+    std::cout << "\n" << std::endl;
+    for (auto& inst : block) { inst.dump(); }
+    std::cout << "\n" << std::endl;
+//    assert(false);
+    
+    shouldDebugDump = true;
+    hasRunOnce = true;
+    MadeChange = true;
+  }
 
   // Process until we run out of items in our worklist.
   while (!Worklist.isEmpty()) {
@@ -190,9 +357,27 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // instead of shifting all members of the worklist towards the front. This
     // check makes sure that if we run into any such residual null pointers, we
     // skip them.
-    if (I == nullptr)
+    if (I == nullptr || !dyn_cast<SILInstruction>(I) ||  unsigned(I->getKind()) == 0)
       continue;
 
+    if (shouldDebugDump) {
+      std::cout << unsigned(I->getKind()) << std::endl;
+      assert(I->getFunction());
+      I->dump();
+      std::cout << "checking" << std::endl;
+    }
+    
+//    if (auto *funcRef = dyn_cast<FunctionRefInst>(I)) {
+//      std::cout << "is_used: " << std::boolalpha << funcRef->use_empty() << std::endl;
+//      if (funcRef->use_empty()) {
+//        funcRef->dropAllReferences();
+//        funcRef->eraseFromParent();
+//        ++NumDeadInst;
+//        MadeChange = true;
+//        continue;
+//      }
+//    }
+    
     // Check to see if we can DCE the instruction.
     if (isInstructionTriviallyDead(I)) {
       LLVM_DEBUG(llvm::dbgs() << "SC: DCE: " << *I << '\n');
