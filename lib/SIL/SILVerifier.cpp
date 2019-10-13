@@ -5350,6 +5350,56 @@ void SILGlobalVariable::verify() const {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Verify that a differentiability witness follows invariants.
+void SILDifferentiabilityWitness::verify(const SILModule &M) const {
+#ifdef NDEBUG
+  if (!M.getOptions().VerifyAll)
+    return;
+#endif
+  auto origFnType = originalFunction->getLoweredFunctionType();
+  CanGenericSignature derivativeCanGenSig;
+  if (auto *derivativeGenSig = getDerivativeGenericSignature())
+    derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+  auto requireSameType =
+      [&](CanSILFunctionType type1, CanSILFunctionType type2,
+          const Twine &complaint) {
+    if (type1 == type2)
+      return;
+    llvm::dbgs() << "SIL verification failed: " << complaint << "\n";
+    llvm::dbgs() << "  " << type1 << "\n  " << type2 << "\n\n";
+    llvm::dbgs() << "In differentiability witness:\n";
+    print(llvm::dbgs());
+    // We abort by default because we want to always crash in
+    // the debugger.
+    if (AbortOnFailure)
+      abort();
+    else
+      exit(1);
+  };
+  if (jvp) {
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to accept result indices.
+    auto expectedJVPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
+        AutoDiffDerivativeFunctionKind::JVP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+    requireSameType(jvp->getLoweredFunctionType(), expectedJVPType,
+                    "JVP type does not match expected JVP type");
+  }
+  if (vjp) {
+    // TODO(TF-893): Change `SILFunctionType::getAutoDiffDerivativeFunctionType`
+    // to result indices.
+    auto expectedVJPType = origFnType->getAutoDiffDerivativeFunctionType(
+        getParameterIndices(), /*resultIndex*/ *getResultIndices()->begin(),
+        AutoDiffDerivativeFunctionKind::VJP, M.Types,
+        LookUpConformanceInModule(M.getSwiftModule()), derivativeCanGenSig);
+    requireSameType(vjp->getLoweredFunctionType(), expectedVJPType,
+                    "VJP type does not match expected VJP type");
+  }
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Verify the module.
 void SILModule::verify() const {
 #ifdef NDEBUG
@@ -5433,6 +5483,22 @@ void SILModule::verify() const {
     }
     wt.verify(*this);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Check all differentiability witnesses.
+  LLVM_DEBUG(llvm::dbgs() <<
+             "*** Checking differentiability witnesses for duplicates ***\n");
+  llvm::DenseSet<SILDifferentiabilityWitnessKey> diffWitnesses;
+  for (auto &dw : getDifferentiabilityWitnesses()) {
+    LLVM_DEBUG(llvm::dbgs() << "Differentiability Witness:\n"; dw.dump());
+    if (!diffWitnesses.insert(dw.getKey()).second) {
+      llvm::errs() << "Differentiability witness redefined: ";
+      dw.dump();
+      assert(false && "triggering standard assertion failure routine");
+    }
+    dw.verify(*this);
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   
   // Check property descriptors.
   LLVM_DEBUG(llvm::dbgs() << "*** Checking property descriptors ***\n");

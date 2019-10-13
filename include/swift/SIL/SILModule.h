@@ -28,6 +28,8 @@
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILDefaultWitnessTable.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILDifferentiabilityWitness.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILPrintContext.h"
@@ -113,6 +115,10 @@ public:
   using PropertyListType = llvm::ilist<SILProperty>;
   using WitnessTableListType = llvm::ilist<SILWitnessTable>;
   using DefaultWitnessTableListType = llvm::ilist<SILDefaultWitnessTable>;
+  // SWIFT_ENABLE_TENSORFLOW
+  using DifferentiabilityWitnessListType =
+      llvm::ilist<SILDifferentiabilityWitness>;
+  // SWIFT_ENABLE_TENSORFLOW END
   using CoverageMapCollectionType =
       llvm::MapVector<StringRef, SILCoverageMap *>;
 
@@ -139,6 +145,9 @@ private:
   friend SILProperty;
   friend SILUndef;
   friend SILWitnessTable;
+  // SWIFT_ENABLE_TENSORFLOW
+  friend SILDifferentiabilityWitness;
+  // SWIFT_ENABLE_TENSORFLOW END
   friend Lowering::SILGenModule;
   friend Lowering::TypeConverter;
   class SerializationCallback;
@@ -193,6 +202,17 @@ private:
 
   /// The list of SILDefaultWitnessTables in the module.
   DefaultWitnessTableListType defaultWitnessTables;
+
+  // SWIFT_ENABLE_TENSORFLOW
+  /// Lookup table for SIL differentiability witnesses from original functions.
+  /// Indexed by key type: original function, parameter indices, result indices,
+  /// and derivative generic signature.
+  llvm::DenseMap<SILDifferentiabilityWitnessKey, SILDifferentiabilityWitness *>
+      DifferentiabilityWitnessMap;
+
+  /// The list of SILDifferentiabilityWitnesses in the module.
+  DifferentiabilityWitnessListType differentiabilityWitnesses;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// Lookup table for SIL Global Variables.
   llvm::StringMap<SILGlobalVariable *> GlobalVariableMap;
@@ -445,6 +465,27 @@ public:
   iterator_range<default_witness_table_const_iterator> getDefaultWitnessTables() const {
     return {defaultWitnessTables.begin(), defaultWitnessTables.end()};
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  using differentiability_witness_iterator = DifferentiabilityWitnessListType::iterator;
+  using differentiability_witness_const_iterator = DifferentiabilityWitnessListType::const_iterator;
+  DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() { return differentiabilityWitnesses; }
+  const DifferentiabilityWitnessListType &getDifferentiabilityWitnessList() const { return differentiabilityWitnesses; }
+  differentiability_witness_iterator differentiability_witness_begin() { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_iterator differentiability_witness_end() { return differentiabilityWitnesses.end(); }
+  differentiability_witness_const_iterator differentiability_witness_begin() const { return differentiabilityWitnesses.begin(); }
+  differentiability_witness_const_iterator differentiability_witness_end() const { return differentiabilityWitnesses.end(); }
+  iterator_range<differentiability_witness_iterator>
+  getDifferentiabilityWitnesses() {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+  iterator_range<differentiability_witness_const_iterator>
+  getDifferentiabilityWitnesses() const {
+    return {differentiabilityWitnesses.begin(),
+            differentiabilityWitnesses.end()};
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   using sil_global_iterator = GlobalListType::iterator;
   using sil_global_const_iterator = GlobalListType::const_iterator;

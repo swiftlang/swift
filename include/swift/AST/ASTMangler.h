@@ -155,22 +155,30 @@ public:
                                              ModuleDecl *Module);
 
   // SWIFT_ENABLE_TENSORFLOW
-  // Mangle the derivative function (JVP/VJP) with the given:
-  // - Mangled original function name.
-  // - Derivative function kind.
-  // - Parameter/result indices.
+  /// Mangle the derivative function (JVP/VJP) with the given:
+  /// - Mangled original function name.
+  /// - Derivative function kind.
+  /// - Parameter/result indices.
   std::string mangleAutoDiffDerivativeFunctionHelper(
       StringRef name, AutoDiffDerivativeFunctionKind kind,
       const SILAutoDiffIndices &indices);
 
-  // SWIFT_ENABLE_TENSORFLOW
-  // Mangle the autodiff linear map (differential/pullback) with the given:
-  // - Mangled original function name.
-  // - Linear map kind.
-  // - Parameter/result indices.
+  /// Mangle the autodiff linear map (differential/pullback) with the given:
+  /// - Mangled original function name.
+  /// - Linear map kind.
+  /// - Parameter/result indices.
   std::string mangleAutoDiffLinearMapHelper(
       StringRef name, AutoDiffLinearMapKind kind,
       const SILAutoDiffIndices &indices);
+
+  /// Mangle a SIL differentiability witness key.
+  /// - Mangled original function name.
+  /// - Parameter indices.
+  /// - Result indices.
+  /// - Derivative generic signature (optional).
+  std::string mangleSILDifferentiabilityWitnessKey(
+      SILDifferentiabilityWitnessKey key);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   std::string mangleKeyPathGetterThunkHelper(const AbstractStorageDecl *property,
                                              GenericSignature *signature,

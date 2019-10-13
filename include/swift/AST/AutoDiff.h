@@ -208,6 +208,16 @@ struct AutoDiffDerivativeFunctionKind {
   }
 };
 
+/// Identifies an autodiff derivative function configuration:
+/// - Parameter indices.
+/// - Result indices.
+/// - Derivative generic signature (optional).
+struct AutoDiffConfig {
+  IndexSubset *parameterIndices;
+  IndexSubset *resultIndices;
+  GenericSignature *derivativeGenericSignature;
+};
+
 /// In conjunction with the original function declaration, identifies an
 /// autodiff derivative function.
 ///
@@ -218,8 +228,7 @@ class AutoDiffDerivativeFunctionIdentifier : public llvm::FoldingSetNode {
   IndexSubset *const parameterIndices;
 
   AutoDiffDerivativeFunctionIdentifier(
-      AutoDiffDerivativeFunctionKind kind,
-      IndexSubset *parameterIndices) :
+      AutoDiffDerivativeFunctionKind kind, IndexSubset *parameterIndices) :
     kind(kind), parameterIndices(parameterIndices) {}
 
 public:
@@ -237,6 +246,11 @@ public:
     ID.AddPointer(parameterIndices);
   }
 };
+
+/// The key type used for uniquing `SILDifferentiabilityWitness` in
+/// `SILModule`: original function name, parameter indices, result indices, and
+/// derivative generic signature.
+using SILDifferentiabilityWitnessKey = std::pair<StringRef, AutoDiffConfig>;
 
 /// Automatic differentiation utility namespace.
 namespace autodiff {
@@ -363,9 +377,41 @@ public:
 
 namespace llvm {
 
+using swift::AutoDiffConfig;
+using swift::AutoDiffDerivativeFunctionKind;
+using swift::GenericSignature;
+using swift::IndexSubset;
 using swift::SILAutoDiffIndices;
 
 template<typename T> struct DenseMapInfo;
+
+template<> struct DenseMapInfo<AutoDiffConfig> {
+  static AutoDiffConfig getEmptyKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getEmptyKey();
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            static_cast<GenericSignature *>(ptr)};
+  }
+
+  static AutoDiffConfig getTombstoneKey() {
+    auto *ptr = llvm::DenseMapInfo<void *>::getTombstoneKey();
+    return {static_cast<IndexSubset *>(ptr), static_cast<IndexSubset *>(ptr),
+            static_cast<GenericSignature *>(ptr)};
+  }
+
+  static unsigned getHashValue(const AutoDiffConfig &Val) {
+    unsigned combinedHash = hash_combine(
+        ~1U, DenseMapInfo<void *>::getHashValue(Val.parameterIndices),
+        DenseMapInfo<void *>::getHashValue(Val.resultIndices),
+        DenseMapInfo<void *>::getHashValue(Val.derivativeGenericSignature));
+    return combinedHash;
+  }
+
+  static bool isEqual(const AutoDiffConfig &LHS, const AutoDiffConfig &RHS) {
+    return LHS.parameterIndices == RHS.parameterIndices &&
+        LHS.resultIndices == RHS.resultIndices &&
+        LHS.derivativeGenericSignature == RHS.derivativeGenericSignature;
+  }
+};
 
 template<> struct DenseMapInfo<SILAutoDiffIndices> {
   static SILAutoDiffIndices getEmptyKey() {

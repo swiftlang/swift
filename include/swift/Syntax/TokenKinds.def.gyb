@@ -165,6 +165,9 @@ SIL_KEYWORD(sil_vtable)
 SIL_KEYWORD(sil_global)
 SIL_KEYWORD(sil_witness_table)
 SIL_KEYWORD(sil_default_witness_table)
+// SWIFT_ENABLE_TENSORFLOW
+SIL_KEYWORD(sil_differentiability_witness)
+// SWIFT_ENABLE_TENSORFLOW END
 SIL_KEYWORD(sil_coverage_map)
 SIL_KEYWORD(sil_scope)
 

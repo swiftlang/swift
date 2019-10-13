@@ -26,6 +26,8 @@ add_swift_host_library(swiftSIL STATIC
   SILDebugScope.cpp
   SILDeclRef.cpp
   SILDefaultWitnessTable.cpp
+  # SWIFT_ENABLE_TENSORFLOW
+  SILDifferentiabilityWitness.cpp
   SILFunction.cpp
   SILFunctionType.cpp
   SILGlobalVariable.cpp

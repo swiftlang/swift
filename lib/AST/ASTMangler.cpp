@@ -379,11 +379,12 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 std::string ASTMangler::mangleAutoDiffDerivativeFunctionHelper(
     StringRef name, AutoDiffDerivativeFunctionKind kind,
     const SILAutoDiffIndices &indices) {
   // TODO(TF-20): Make the mangling scheme robust.
-  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  // TODO(TF-680): Mangle derivative generic signature as well.
   beginManglingWithoutPrefix();
 
   Buffer << "AD__" << name << '_';
@@ -406,7 +407,7 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
     StringRef name, AutoDiffLinearMapKind kind,
     const SILAutoDiffIndices &indices) {
   // TODO(TF-20): Make the mangling scheme robust.
-  // TODO(TF-680): Mangle `@differentiable` atttribute requirements as well.
+  // TODO(TF-680): Mangle derivative generic signature as well.
   beginManglingWithoutPrefix();
 
   Buffer << "AD__" << name << '_';
@@ -424,6 +425,28 @@ std::string ASTMangler::mangleAutoDiffLinearMapHelper(
   Storage.clear();
   return result;
 }
+
+std::string ASTMangler::mangleSILDifferentiabilityWitnessKey(
+    SILDifferentiabilityWitnessKey key) {
+  // TODO(TF-20): Make the mangling scheme robust.
+  beginManglingWithoutPrefix();
+
+  auto originalName = key.first;
+  auto *parameterIndices = key.second.parameterIndices;
+  auto *resultIndices = key.second.resultIndices;
+  auto *derivativeGenericSignature = key.second.derivativeGenericSignature;
+
+  Buffer << "AD__" << originalName << '_';
+  Buffer << "P" << parameterIndices->getString();
+  Buffer << "R" << resultIndices->getString();
+  if (derivativeGenericSignature)
+    appendGenericSignature(derivativeGenericSignature);
+
+  auto result = Storage.str().str();
+  Storage.clear();
+  return result;
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 std::string ASTMangler::mangleTypeForDebugger(Type Ty, const DeclContext *DC) {
   PrettyStackTraceType prettyStackTrace(Ty->getASTContext(),
