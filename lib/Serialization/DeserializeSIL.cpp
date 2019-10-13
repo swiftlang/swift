@@ -148,9 +148,7 @@ SILDeserializer::SILDeserializer(
   // SIL_DEFAULT_WITNESS_TABLE_NAMES. But each one can be
   // omitted if no entries exist in the module file.
   unsigned kind = 0;
-// SWIFT_ENABLE_TENSORFLOW
   while (kind != sil_index_block::SIL_PROPERTY_OFFSETS) {
-// SWIFT_ENABLE_TENSORFLOW END
     auto next = cursor.advance();
     if (next.Kind == llvm::BitstreamEntry::EndBlock)
       return;
@@ -225,12 +223,14 @@ SILDeserializer::SILDeserializer(
               offKind == sil_index_block::SIL_DEFAULT_WITNESS_TABLE_OFFSETS) &&
              "Expect a SIL_DEFAULT_WITNESS_TABLE_OFFSETS record.");
       MF->allocateBuffer(DefaultWitnessTables, scratch);
+    // SWIFT_ENABLE_TENSORFLOW
     } else if (kind == sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_NAMES) {
       assert((next.Kind == llvm::BitstreamEntry::Record &&
               offKind ==
                   sil_index_block::SIL_DIFFERENTIABILITY_WITNESS_OFFSETS) &&
              "Expect a SIL_DIFFERENTIABILITY_WITNESS_OFFSETS record.");
       MF->allocateBuffer(DifferentiabilityWitnesses, scratch);
+    // SWIFT_ENABLE_TENSORFLOW END
     }
   }
 }

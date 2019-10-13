@@ -2666,7 +2666,7 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // SWIFT_ENABLE_TENSORFLOW
   // Write out differentiability witnesses.
   for (const auto &diffWitness : SILMod->getDifferentiabilityWitnessList()) {
-    // TODO: Consider checking
+    // TODO(TF-893): Consider checking
     // `SILMod->shouldSerializeEntitiesAssociatedWithDeclContext` on the JVP/VJP
     // functions.
     if ((ShouldSerializeAll || diffWitness.isSerialized()))
