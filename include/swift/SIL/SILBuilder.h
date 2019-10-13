@@ -534,6 +534,13 @@ public:
         getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
   }
 
+  LinearFunctionExtractInst *createLinearFunctionExtract(
+      SILLocation Loc, LinearFunctionExtractee Extractee,
+      SILValue TheFunction) {
+    return insert(new (getModule()) LinearFunctionExtractInst(
+        getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
+  }
+
   DifferentiableFunctionExtractInst *
   createDifferentiableFunctionExtractOriginal(SILLocation Loc,
                                               SILValue TheFunction) {

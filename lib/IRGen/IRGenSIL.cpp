@@ -924,6 +924,7 @@ public:
   void visitLinearFunctionInst(LinearFunctionInst *i);
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *i);
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
   // SWIFT_ENABLE_TENSORFLOW END
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
@@ -1903,6 +1904,23 @@ visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *i) {
   }
   auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
   assert(diffFnExp.size() == fieldSize * 3);
+  Explosion e;
+  e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
+  (void)diffFnExp.claimAll();
+  setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::
+visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
+  unsigned structFieldOffset = i->getExtractee().rawValue;
+  unsigned fieldSize = 1;
+  auto fnRepr = i->getFunctionOperand()->getType().getFunctionRepresentation();
+  if (fnRepr == SILFunctionTypeRepresentation::Thick) {
+    structFieldOffset *= 2;
+    fieldSize = 2;
+  }
+  auto diffFnExp = getLoweredExplosion(i->getFunctionOperand());
+  assert(diffFnExp.size() == fieldSize * 2);
   Explosion e;
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)diffFnExp.claimAll();

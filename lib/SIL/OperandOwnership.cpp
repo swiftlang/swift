@@ -363,6 +363,8 @@ FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
 // SWIFT_ENABLE_TENSORFLOW
 FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
                                            DifferentiableFunctionExtract)
+FORWARD_CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, MustBeLive,
+                                           LinearFunctionExtract)
 #undef CONSTANT_OR_TRIVIAL_OWNERSHIP_INST
 
 OperandOwnershipKindMap

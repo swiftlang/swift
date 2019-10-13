@@ -1001,6 +1001,16 @@ visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *Inst) 
                 getOpLocation(Inst->getLoc()), Inst->getExtractee(),
                 getOpValue(Inst->getFunctionOperand())));
 }
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::
+visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createLinearFunctionExtract(
+                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
+                getOpValue(Inst->getFunctionOperand())));
+}
 // SWIFT_ENABLE_TENSORFLOW END
 
 template<typename ImplClass>

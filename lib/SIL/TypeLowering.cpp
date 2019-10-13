@@ -932,6 +932,48 @@ namespace {
     }
   };
 
+  class LinearSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<LinearSILFunctionTypeLowering,
+                                       LinearFunctionExtractee> {
+  public:
+    using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
+                               SILValue tupleValue,
+                               LinearFunctionExtractee extractee,
+                               const TypeLowering &eltLowering) const {
+      return B.createLinearFunctionExtract(loc, extractee, tupleValue);
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      assert(values.size() == 3);
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      return B.createLinearFunction(loc, paramIndices, values[0], values[1]);
+    }
+
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      children.reserve(2);
+      auto origFnTy = fnTy->getWithoutDifferentiability();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      children.push_back(Child{
+        LinearFunctionExtractee::Original,
+        TC.getTypeLowering(origFnTy, getResilienceExpansion())
+      });
+      auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
+          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+      auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
+      children.push_back(Child{
+        LinearFunctionExtractee::Transpose,
+        TC.getTypeLowering(transposeSILFnTy, getResilienceExpansion())
+      });
+      assert(children.size() == 2);
+    }
+  };
+
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {

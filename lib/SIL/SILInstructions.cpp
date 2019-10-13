@@ -663,7 +663,7 @@ DifferentiableFunctionExtractInst::Extractee::getExtracteeAsDerivativeFunction()
 SILType DifferentiableFunctionExtractInst::
 getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
-  assert(fnTy->getExtInfo().isDifferentiable());
+  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal);
   auto originalFnTy = fnTy->getWithoutDifferentiability();
   auto kindOpt = extractee.getExtracteeAsDerivativeFunction();
   if (!kindOpt) {
@@ -690,6 +690,15 @@ SILType LinearFunctionInst::getLinearFunctionType(
   auto diffTy = fnTy->getWithDifferentiability(
       DifferentiabilityKind::Linear, ParameterIndices);
   return SILType::getPrimitiveObjectType(diffTy);
+}
+
+LinearFunctionExtractInst::Extractee::Extractee(StringRef string) {
+  Optional<innerty> result =
+      llvm::StringSwitch<Optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("transpose", Transpose);
+  assert(result && "Invalid string");
+  rawValue = *result;
 }
 
 LinearFunctionInst::LinearFunctionInst(
@@ -722,6 +731,29 @@ LinearFunctionInst *LinearFunctionInst::create(
       Loc, ParameterIndices, OriginalFunction, TransposeFunction,
       HasOwnership);
 }
+
+SILType LinearFunctionExtractInst::
+getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
+  auto fnTy = function->getType().castTo<SILFunctionType>();
+  assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear);
+  auto originalFnTy = fnTy->getWithoutDifferentiability();
+  switch (extractee) {
+  case Extractee::Original:
+    return SILType::getPrimitiveObjectType(originalFnTy);
+  case Extractee::Transpose:
+    auto transposeFnTy = originalFnTy->getAutoDiffTransposeFunctionType(
+        fnTy->getDifferentiationParameterIndices(), module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()));
+    return SILType::getPrimitiveObjectType(transposeFnTy);
+  }
+}
+
+LinearFunctionExtractInst::LinearFunctionExtractInst(
+    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+    SILValue theFunction)
+    : InstructionBase(debugLoc,
+                      getExtracteeType(theFunction, extractee, module)),
+      extractee(extractee), operands(this, theFunction) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,

@@ -177,6 +177,7 @@ namespace sil_block {
     SIL_INST_DIFFERENTIABLE_FUNCTION,
     SIL_INST_LINEAR_FUNCTION,
     SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT,
+    SIL_INST_LINEAR_FUNCTION_EXTRACT,
 
     // We also share these layouts from the decls block. Their enumerators must
     // not overlap with ours.
@@ -433,6 +434,14 @@ namespace sil_block {
     SILTypeCategoryField,
     ValueIDField,
     BCFixed<2> // extractee
+  >;
+
+  using SILInstLinearFunctionExtractLayout = BCRecordLayout<
+    SIL_INST_LINEAR_FUNCTION_EXTRACT,
+    TypeIDField,
+    SILTypeCategoryField,
+    ValueIDField,
+    BCFixed<1> // extractee
   >;
   // SWIFT_ENABLE_TENSORFLOW END
 

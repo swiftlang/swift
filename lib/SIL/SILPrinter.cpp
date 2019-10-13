@@ -1208,6 +1208,20 @@ public:
     *this << getIDAndType(dfei->getFunctionOperand());
   }
 
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    *this << '[';
+    switch (lfei->getExtractee()) {
+    case LinearFunctionExtractee::Original:
+      *this << "original";
+      break;
+    case LinearFunctionExtractee::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(lfei->getFunctionOperand());
+  }
+
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();

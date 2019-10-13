@@ -1133,6 +1133,11 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::DifferentiableFunctionExtractInst;
     break;
+  case SIL_INST_LINEAR_FUNCTION_EXTRACT:
+    SILInstLinearFunctionExtractLayout::readRecord(
+        scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
+    RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
+    break;
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
     break;
@@ -1581,6 +1586,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     DifferentiableFunctionExtractee extractee(Attr);
     ResultVal =
         Builder.createDifferentiableFunctionExtract(Loc, extractee, val);
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto astTy = MF->getType(TyID);
+    auto silTy = getSILType(astTy, SILValueCategory::Object);
+    auto val = getLocalValue(ValID, silTy);
+    LinearFunctionExtractee extractee(Attr);
+    ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END

@@ -2755,6 +2755,12 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
         instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
     break;
   }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto instr = cast<LinearFunctionExtractInst>(convInstr);
+    newInstr = convBuilder.createLinearFunctionExtract(
+        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
+    break;
+  }
   // SWIFT_ENABLE_TENSORFLOW END
   default:
     llvm_unreachable("Unexpected conversion instruction");
@@ -2848,6 +2854,7 @@ void LoadableByAddress::run() {
               // SWIFT_ENABLE_TENSORFLOW
               case SILInstructionKind::DifferentiableFunctionInst:
               case SILInstructionKind::LinearFunctionInst:
+              case SILInstructionKind::LinearFunctionExtractInst:
               case SILInstructionKind::DifferentiableFunctionExtractInst: {
               // SWIFT_ENABLE_TENSORFLOW END
                 conversionInstrs.insert(
@@ -2918,7 +2925,8 @@ void LoadableByAddress::run() {
           }
         } else if (isa<DifferentiableFunctionInst>(&I) ||
                    isa<LinearFunctionInst>(&I) ||
-                   isa<DifferentiableFunctionExtractInst>(&I)) {
+                   isa<DifferentiableFunctionExtractInst>(&I) ||
+                   isa<LinearFunctionExtractInst>(&I)) {
           conversionInstrs.insert(cast<SingleValueInstruction>(&I));
         }
       }

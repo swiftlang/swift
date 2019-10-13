@@ -788,6 +788,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_INST_LINEAR_FUNCTION);
   BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION);
   BLOCK_RECORD(sil_block, SIL_INST_DIFFERENTIABLE_FUNCTION_EXTRACT);
+  BLOCK_RECORD(sil_block, SIL_INST_LINEAR_FUNCTION_EXTRACT);
   // SWIFT_ENABLE_TENSORFLOW END
 
   // These layouts can exist in both decl blocks and sil blocks.

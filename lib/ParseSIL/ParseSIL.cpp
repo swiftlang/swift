@@ -3043,17 +3043,40 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
     SILValue functionOperand;
     SourceLoc lastLoc;
     if (P.parseToken(tok::l_square,
-            diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
+            diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
         parseSILIdentifierSwitch(extractee, extracteeNames,
-            diag::sil_inst_autodiff_expected_associated_function_kind_attr) ||
+            diag::sil_inst_autodiff_expected_differentiable_extractee_kind) ||
         P.parseToken(tok::r_square,
                      diag::sil_inst_autodiff_attr_expected_rsquare,
-                     "derivative function kind"))
+                     "extractee kind"))
       return true;
     if (parseTypedValueRef(functionOperand, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     ResultVal = B.createDifferentiableFunctionExtract(
+        InstLoc, extractee, functionOperand);
+    break;
+  }
+
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    // Parse the rest of the instruction: an extractee, a linear function
+    // operand, and a debug location.
+    LinearFunctionExtractee extractee;
+    StringRef extracteeNames[2] = {"original", "transpose"};
+    SILValue functionOperand;
+    SourceLoc lastLoc;
+    if (P.parseToken(tok::l_square,
+            diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+        parseSILIdentifierSwitch(extractee, extracteeNames,
+            diag::sil_inst_autodiff_expected_linear_extractee_kind) ||
+        P.parseToken(tok::r_square,
+                     diag::sil_inst_autodiff_attr_expected_rsquare,
+                     "extractee kind"))
+      return true;
+    if (parseTypedValueRef(functionOperand, B) ||
+        parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createLinearFunctionExtract(
         InstLoc, extractee, functionOperand);
     break;
   }
