@@ -21,12 +21,12 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
     SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
     IndexSubset *parameterIndices, IndexSubset *resultIndices,
     GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-    bool isSerialized) {
+    bool isSerialized, DeclAttribute *attribute) {
   void *buf = module.allocate(sizeof(SILDifferentiabilityWitness),
                               alignof(SILDifferentiabilityWitness));
   auto *diffWitness = ::new (buf) SILDifferentiabilityWitness(
       module, linkage, originalFunction, parameterIndices, resultIndices,
-      derivativeGenSig, jvp, vjp, isSerialized);
+      derivativeGenSig, jvp, vjp, isSerialized, attribute);
   // Register the differentiability witness in the module.
   assert(!module.DifferentiabilityWitnessMap.count(diffWitness->getKey()) &&
          "Cannot create duplicate differentiability witness in a module");

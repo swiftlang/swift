@@ -26,6 +26,7 @@
 #ifndef SWIFT_SIL_SILDIFFERENTIABILITYWITNESS_H
 #define SWIFT_SIL_SILDIFFERENTIABILITYWITNESS_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/SIL/SILAllocated.h"
@@ -60,6 +61,11 @@ private:
   /// Whether or not this differentiability witness is serialized, which allows
   /// devirtualization from another module.
   bool serialized;
+  /// The AST `@differentiable` or `@differentiating` attribute from which the
+  /// differentiability witness is generated. Used for diagnostics.
+  /// Null if the differentiability witness is parsed from SIL or if it is
+  /// deserialized.
+  DeclAttribute *attribute = nullptr;
 
   static AutoDiffConfig *
   getAutoDiffConfig(SILModule &module, IndexSubset *parameterIndices,
@@ -72,18 +78,18 @@ private:
                               IndexSubset *resultIndices,
                               GenericSignature *derivativeGenSig,
                               SILFunction *jvp, SILFunction *vjp,
-                              bool isSerialized)
+                              bool isSerialized, DeclAttribute *attribute)
     : module(module), linkage(linkage), originalFunction(originalFunction),
       parameterIndices(parameterIndices), resultIndices(resultIndices),
       derivativeGenericSignature(derivativeGenSig), jvp(jvp), vjp(vjp),
-      serialized(isSerialized) {}
+      serialized(isSerialized), attribute(attribute) {}
 
 public:
   static SILDifferentiabilityWitness *create(
       SILModule &module, SILLinkage linkage, SILFunction *originalFunction,
       IndexSubset *parameterIndices, IndexSubset *resultIndices,
       GenericSignature *derivativeGenSig, SILFunction *jvp, SILFunction *vjp,
-      bool isSerialized);
+      bool isSerialized, DeclAttribute *attribute = nullptr);
 
   SILDifferentiabilityWitnessKey getKey() const;
   SILModule &getModule() const { return module; }
@@ -114,6 +120,7 @@ public:
     }
   }
   bool isSerialized() const { return serialized; }
+  DeclAttribute *getAttribute() const { return attribute; }
 
   /// Verify that the differentiability witness is well-formed.
   void verify(const SILModule &M) const;
