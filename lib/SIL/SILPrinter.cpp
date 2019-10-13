@@ -3100,7 +3100,6 @@ void SILDifferentiabilityWitness::print(
       interleave(requirements,
                  [&](Requirement req) {
                    req.print(OS, subPrinter);
-                   return;
                  },
                  [&] { OS << ", "; });
       OS << ']';

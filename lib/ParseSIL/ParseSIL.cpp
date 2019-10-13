@@ -6809,6 +6809,7 @@ static void convertRequirements(Parser &P, SILFunction *F,
 /// decl-sil-differentiability-witness ::=
 ///   'sil_differentiability_witness'
 ///   ('[' 'serialized' ']')?
+///   sil-linkage?
 ///   '[' 'parameters' index-subset ']'
 ///   '[' 'results' index-subset ']'
 ///   ('[' 'where' derivatve-generic-signature-requirements ']')?
@@ -6828,8 +6829,9 @@ bool SILParserTUState::parseSILDifferentiabilityWitness(Parser &P) {
   Optional<SILLinkage> linkage;
   if (parseSILLinkage(linkage, P))
     return true;
+  // Default to public linkage.
   if (!linkage)
-    linkage = SILLinkage::PublicExternal;
+    linkage = SILLinkage::Public;
 
   // Parse '[serialized]' flag (optional).
   bool isSerialized = false;
