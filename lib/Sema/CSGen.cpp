@@ -2291,8 +2291,9 @@ namespace {
 
         bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
           for (auto catchClause : stmt->getCatches()) {
-            for (auto &LabelItem: catchClause->getMutableCaseLabelItems()) {
-              if (isSyntacticallyExhaustive(catchClause->getStartLoc(), LabelItem))
+            for (auto &LabelItem : catchClause->getMutableCaseLabelItems()) {
+              if (isSyntacticallyExhaustive(catchClause->getStartLoc(),
+                                            LabelItem))
                 return true;
             }
           }
@@ -2300,7 +2301,8 @@ namespace {
           return false;
         }
 
-        bool isSyntacticallyExhaustive(SourceLoc CatchLoc, CaseLabelItem &LabelItem) {
+        bool isSyntacticallyExhaustive(SourceLoc CatchLoc,
+                                       CaseLabelItem &LabelItem) {
           // If it's obviously non-exhaustive, great.
           if (LabelItem.getGuardExpr())
             return false;
@@ -2357,7 +2359,7 @@ namespace {
           LabelItem.setPattern(pattern);
           return LabelItem.isSyntacticallyExhaustive();
         }
-        
+
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
           // If we've found a 'throw', record it and terminate the traversal.
           if (isa<ThrowStmt>(stmt)) {

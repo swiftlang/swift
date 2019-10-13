@@ -1422,7 +1422,7 @@ private:
   }
 
   void checkCatch(CaseStmt *S, ThrowingKind doThrowingKind) {
-    for (auto &LabelItem: S->getMutableCaseLabelItems()) {
+    for (auto &LabelItem : S->getMutableCaseLabelItems()) {
       // The pattern and guard aren't allowed to throw.
       {
         ContextScope scope(*this, Context::forCatchPattern(S));

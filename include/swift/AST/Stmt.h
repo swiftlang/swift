@@ -836,7 +836,7 @@ public:
   bool isDefault() const {
     return GuardExprAndKind.getInt() == Kind::Default;
   }
-  
+
   bool isSyntacticallyExhaustive() const;
 };
 
