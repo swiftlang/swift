@@ -877,6 +877,11 @@ public:
   }
 };
 
+enum CaseParentKind {
+  Switch,
+  DoCatch
+};
+
 /// A 'case' or 'default' block of a switch statement.  Only valid as the
 /// substatement of a SwitchStmt.  A case block begins either with one or more
 /// CaseLabelItems or a single 'default' label.
@@ -899,12 +904,13 @@ class CaseStmt final
   SourceLoc UnknownAttrLoc;
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;
+  CaseParentKind ParentKind;
 
   llvm::PointerIntPair<Stmt *, 1, bool> BodyAndHasFallthrough;
 
   Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
-  CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
+  CaseStmt(CaseParentKind ParentKind, SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
            SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
            Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
            Optional<bool> Implicit,
@@ -912,12 +918,14 @@ class CaseStmt final
 
 public:
   static CaseStmt *
-  create(ASTContext &C, SourceLoc CaseLoc,
+  create(ASTContext &C, CaseParentKind ParentKind, SourceLoc CaseLoc,
          ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
          SourceLoc ColonLoc, Stmt *Body,
          Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
+                                      
+                                      CaseParentKind getParentKind() const { return ParentKind; }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};

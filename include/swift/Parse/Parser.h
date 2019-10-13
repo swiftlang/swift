@@ -1603,11 +1603,10 @@ public:
   ParserResult<Stmt> parseStmtWhile(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtRepeat(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtDo(LabeledStmtInfo LabelInfo);
-  ParserResult<CatchStmt> parseStmtCatch();
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
-  ParserResult<CaseStmt> parseStmtCase(bool IsActive);
+  ParserResult<CaseStmt> parseStmtCase(bool IsActive, CaseParentKind ParentKind);
   ParserResult<Stmt> parseStmtPoundAssert();
 
   //===--------------------------------------------------------------------===//
