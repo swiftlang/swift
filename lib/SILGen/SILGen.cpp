@@ -751,7 +751,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
 void SILGenModule::
 emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                             const CaptureInfo &captureInfo) {
+                                             CaptureInfo captureInfo) {
   assert(TopLevelSGF && TopLevelSGF->B.hasValidInsertionPoint()
          && "no valid code generator for top-level function?!");
 
@@ -1100,7 +1100,7 @@ emitStoredPropertyInitialization(PatternBindingDecl *pbd, unsigned i) {
   auto *var = pbdEntry.getAnchoringVarDecl();
   auto *init = pbdEntry.getInit();
   auto *initDC = pbdEntry.getInitContext();
-  auto &captureInfo = pbdEntry.getCaptureInfo();
+  auto captureInfo = pbdEntry.getCaptureInfo();
   assert(!pbdEntry.isInitializerSubsumed());
 
   // If this is the backing storage for a property with an attached wrapper
