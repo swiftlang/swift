@@ -150,8 +150,6 @@ class SILCombiner :
 
   /// Cast optimizer
   CastOptimizer CastOpt;
-  
-  SILOptFunctionBuilder &FuncBuilder;
 
 public:
   SILCombiner(SILOptFunctionBuilder &FuncBuilder, SILBuilder &B,
@@ -159,7 +157,7 @@ public:
               ProtocolConformanceAnalysis *PCA, ClassHierarchyAnalysis *CHA,
               bool removeCondFails)
       : AA(AA), DA(DA), PCA(PCA), CHA(CHA), Worklist(), MadeChange(false),
-        RemoveCondFails(removeCondFails), Iteration(0), Builder(B), FuncBuilder(FuncBuilder),
+        RemoveCondFails(removeCondFails), Iteration(0), Builder(B),
         CastOpt(FuncBuilder, nullptr /*SILBuilderContext*/,
                 /* ReplaceValueUsesAction */
                 [&](SILValue Original, SILValue Replacement) {
@@ -277,7 +275,7 @@ public:
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
   SILInstruction *visitEnumInst(EnumInst *EI);
-      
+
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
@@ -380,6 +378,10 @@ private:
   /// Returns true if the results of a try_apply are not used.
   static bool isTryApplyResultNotUsed(UserListTy &AcceptedUses,
                                       TryApplyInst *TAI);
+
+  /// If an array literal is found and map is called on it, creates calls to map's closure with all elements.
+  /// These will later be inlined and optimized out (because they are literal instructions).
+  bool constantFoldArrayMap(SILFunction &F);
 };
 
 } // end namespace swift
