@@ -312,7 +312,6 @@ ConcreteDeclRef Expr::getReferencedDecl() const {
 
   NO_REFERENCE(OpaqueValue);
   NO_REFERENCE(DefaultArgument);
-  NO_REFERENCE(CallerDefaultArgument);
 
   PASS_THROUGH_REFERENCE(BindOptional, getSubExpr);
   PASS_THROUGH_REFERENCE(OptionalEvaluation, getSubExpr);
@@ -621,7 +620,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::RebindSelfInConstructor:
   case ExprKind::OpaqueValue:
   case ExprKind::DefaultArgument:
-  case ExprKind::CallerDefaultArgument:
   case ExprKind::BindOptional:
   case ExprKind::OptionalEvaluation:
     return false;

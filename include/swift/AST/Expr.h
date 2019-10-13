@@ -3916,44 +3916,6 @@ public:
   }
 };
 
-/// An expression referring to a caller-side default argument left unspecified
-/// at the call site.
-///
-/// A CallerDefaultArgumentExpr must only appear as a direct child of a
-/// ParenExpr or a TupleExpr that is itself a call argument.
-///
-/// FIXME: This only exists to distinguish caller default arguments from arguments
-/// that were specified at the call site. Once we remove SanitizeExpr, we can remove
-/// this hack too.
-class CallerDefaultArgumentExpr final : public Expr {
-  /// The expression that is evaluated to produce the default argument value.
-  Expr *SubExpr;
-
-  /// The source location of the argument list.
-  SourceLoc Loc;
-
-public:
-  explicit CallerDefaultArgumentExpr(Expr *subExpr, SourceLoc loc, Type Ty)
-    : Expr(ExprKind::CallerDefaultArgument, /*Implicit=*/true, Ty),
-      SubExpr(subExpr), Loc(loc) { }
-
-  SourceRange getSourceRange() const {
-    return Loc;
-  }
-
-  Expr *getSubExpr() const {
-    return SubExpr;
-  }
-
-  void setSubExpr(Expr *subExpr) {
-    SubExpr = subExpr;
-  }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::CallerDefaultArgument;
-  }
-};
-
 /// ApplyExpr - Superclass of various function calls, which apply an argument to
 /// a function to get a result.
 class ApplyExpr : public Expr {

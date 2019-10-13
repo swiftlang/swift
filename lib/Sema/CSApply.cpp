@@ -3014,10 +3014,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    Expr *visitCallerDefaultArgumentExpr(CallerDefaultArgumentExpr *expr) {
-      llvm_unreachable("Already type-checked");
-    }
-
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto *calleeLoc = CalleeLocators[expr];
       assert(calleeLoc);
