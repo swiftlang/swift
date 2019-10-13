@@ -2553,16 +2553,20 @@ for host in "${ALL_HOSTS[@]}"; do
             llbuild)
                 cmake_options=(
                     "${cmake_options[@]}"
+
+                    -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
+                    -DCMAKE_Swift_COMPILER:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
+
+                    -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
+                    -DLLBUILD_SUPPORT_BINDINGS:=Swift
+
                     -DLIT_EXECUTABLE:PATH="${LLVM_SOURCE_DIR}/utils/lit/lit.py"
                     -DFILECHECK_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} llvm)/FileCheck"
-                    -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
-                    -DLLBUILD_ENABLE_ASSERTIONS:BOOL=$(true_false "${LLBUILD_ENABLE_ASSERTIONS}")
                     -DSWIFTC_EXECUTABLE:PATH="$(build_directory_bin ${LOCAL_HOST} swift)/swiftc"
                     -DFOUNDATION_BUILD_DIR:PATH="$(build_directory ${host} foundation)"
                     -DLIBDISPATCH_BUILD_DIR:PATH="$(build_directory ${host} libdispatch)"
                     -DLIBDISPATCH_SOURCE_DIR:PATH="${LIBDISPATCH_SOURCE_DIR}"
-                    -DLLBUILD_SUPPORT_BINDINGS:=Swift
                 )
                 ;;
             swiftpm)
