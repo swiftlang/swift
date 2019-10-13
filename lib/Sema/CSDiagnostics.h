@@ -1788,9 +1788,8 @@ public:
 /// Replace a coercion ('as') with a forced checked cast ('as!').
 class MissingForcedDowncastFailure final : public ContextualFailure {
 public:
-  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs,
-                               Type fromType, Type toType,
-                               ConstraintLocator *locator)
+  MissingForcedDowncastFailure(Expr *expr, ConstraintSystem &cs, Type fromType,
+                               Type toType, ConstraintLocator *locator)
       : ContextualFailure(expr, cs, fromType, toType, locator) {}
 
   bool diagnoseAsError() override;

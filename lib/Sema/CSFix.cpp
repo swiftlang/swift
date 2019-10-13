@@ -134,10 +134,9 @@ bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   ConstraintLocator *locator) {
-  
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
     return nullptr;
-  
+
   auto &TC = cs.getTypeChecker();
 
   auto *expr = locator->getAnchor();
@@ -147,8 +146,7 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   if (!coerceExpr)
     return nullptr;
 
-  auto *subExpr = coerceExpr->getSubExpr();
-
+  auto subExpr = coerceExpr->getSubExpr();
   auto castKind =
       TC.typeCheckCheckedCast(fromType, toType, CheckedCastContextKind::None,
                               cs.DC, coerceExpr->getLoc(), subExpr,
@@ -157,18 +155,18 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
   switch (castKind) {
   // Invalid cast.
   case CheckedCastKind::Unresolved:
-      return nullptr;
+    return nullptr;
   case CheckedCastKind::Coercion:
   case CheckedCastKind::BridgingCoercion:
   case CheckedCastKind::ArrayDowncast:
   case CheckedCastKind::DictionaryDowncast:
   case CheckedCastKind::SetDowncast:
   case CheckedCastKind::ValueCast:
-      return new (cs.getAllocator()) CoerceToCheckedCast(cs, fromType, toType, locator);
+    return new (cs.getAllocator())
+        CoerceToCheckedCast(cs, fromType, toType, locator);
   }
-  
+
   return nullptr;
-  
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {

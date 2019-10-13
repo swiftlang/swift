@@ -994,18 +994,17 @@ bool MissingForcedDowncastFailure::diagnoseAsError() {
   auto *expr = getAnchor();
   if (auto *assignExpr = dyn_cast<AssignExpr>(expr))
     expr = assignExpr->getSrc();
-  
+
   auto *coerceExpr = cast<CoerceExpr>(expr);
 
   auto fromType = getFromType();
   auto toType = getToType();
 
-  emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast,
-                 fromType, toType)
+  emitDiagnostic(coerceExpr->getLoc(), diag::missing_forced_downcast, fromType,
+                 toType)
       .highlight(coerceExpr->getSourceRange())
       .fixItReplace(coerceExpr->getLoc(), "as!");
   return true;
- 
 }
 
 bool MissingAddressOfFailure::diagnoseAsError() {

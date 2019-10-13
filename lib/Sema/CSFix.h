@@ -1402,18 +1402,17 @@ public:
 /// Replace a coercion ('as') with a forced checked cast ('as!').
 class CoerceToCheckedCast final : public ContextualMismatch {
   CoerceToCheckedCast(ConstraintSystem &cs, Type fromType, Type toType,
-            ConstraintLocator *locator)
-  : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
-                       locator) {}
+                      ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::CoerceToCheckedCast, fromType, toType,
+                           locator) {}
 
 public:
   std::string getName() const { return "as to as!"; }
 
   bool diagnose(Expr *root, bool asNote = false) const;
 
-  static CoerceToCheckedCast *attempt(ConstraintSystem &cs,
-                                      Type fromType, Type toType,
-                                      ConstraintLocator *locator);
+  static CoerceToCheckedCast *attempt(ConstraintSystem &cs, Type fromType,
+                                      Type toType, ConstraintLocator *locator);
 };
 
 } // end namespace constraints
