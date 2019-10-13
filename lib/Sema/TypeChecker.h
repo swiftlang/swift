@@ -1005,8 +1005,6 @@ public:
   /// unbound generic types.
   static Type typeCheckPattern(ContextualPattern pattern);
 
-  static bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
-
   /// Coerce a pattern to the given type.
   ///
   /// \param pattern The contextual pattern.

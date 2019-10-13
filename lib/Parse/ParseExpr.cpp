@@ -429,7 +429,7 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
             break;
         }*/
         // TODO(owen) fix recovery
-        
+
         return makeParserResult(new (Context) ErrorExpr(tryLoc));
       }
         

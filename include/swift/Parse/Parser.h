@@ -1606,7 +1606,8 @@ public:
   ParserResult<Stmt> parseStmtForEach(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtSwitch(LabeledStmtInfo LabelInfo);
   ParserStatus parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive);
-  ParserResult<CaseStmt> parseStmtCase(bool IsActive, CaseParentKind ParentKind);
+  ParserResult<CaseStmt> parseStmtCase(bool IsActive,
+                                       CaseParentKind ParentKind);
   ParserResult<Stmt> parseStmtPoundAssert();
 
   //===--------------------------------------------------------------------===//

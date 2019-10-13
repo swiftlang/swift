@@ -836,6 +836,8 @@ public:
   bool isDefault() const {
     return GuardExprAndKind.getInt() == Kind::Default;
   }
+  
+  bool isSyntacticallyExhaustive() const;
 };
 
 /// FallthroughStmt - The keyword "fallthrough".
@@ -877,10 +879,7 @@ public:
   }
 };
 
-enum CaseParentKind {
-  Switch,
-  DoCatch
-};
+enum CaseParentKind { Switch, DoCatch };
 
 /// A 'case' or 'default' block of a switch statement.  Only valid as the
 /// substatement of a SwitchStmt.  A case block begins either with one or more
@@ -910,8 +909,9 @@ class CaseStmt final
 
   Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables;
 
-  CaseStmt(CaseParentKind ParentKind, SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
-           SourceLoc UnknownAttrLoc, SourceLoc ColonLoc, Stmt *Body,
+  CaseStmt(CaseParentKind ParentKind, SourceLoc CaseLoc,
+           ArrayRef<CaseLabelItem> CaseLabelItems, SourceLoc UnknownAttrLoc,
+           SourceLoc ColonLoc, Stmt *Body,
            Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
            Optional<bool> Implicit,
            NullablePtr<FallthroughStmt> fallthroughStmt);
@@ -924,8 +924,8 @@ public:
          Optional<MutableArrayRef<VarDecl *>> CaseBodyVariables,
          Optional<bool> Implicit = None,
          NullablePtr<FallthroughStmt> fallthroughStmt = nullptr);
-                                      
-                                      CaseParentKind getParentKind() const { return ParentKind; }
+
+  CaseParentKind getParentKind() const { return ParentKind; }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
     return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};

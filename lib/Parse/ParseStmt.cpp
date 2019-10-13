@@ -1892,10 +1892,11 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   if (Tok.is(tok::kw_catch)) {
     SyntaxParsingContext CatchListCtxt(SyntaxContext,
                                        SyntaxKind::CatchClauseList);
-    // Parse 'catch' clauses 
-    SmallVector<CaseStmt*, 4> allClauses;
+    // Parse 'catch' clauses
+    SmallVector<CaseStmt *, 4> allClauses;
     do {
-      ParserResult<CaseStmt> clause = parseStmtCase(false, CaseParentKind::DoCatch);
+      ParserResult<CaseStmt> clause =
+          parseStmtCase(false, CaseParentKind::DoCatch);
       status |= clause;
       if (status.hasCodeCompletion() && clause.isNull())
         return makeParserResult<Stmt>(status, nullptr);
@@ -2170,7 +2171,8 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
     if (isAtStartOfSwitchCase(*this)) {
-      ParserResult<CaseStmt> Case = parseStmtCase(IsActive, CaseParentKind::Switch);
+      ParserResult<CaseStmt> Case =
+          parseStmtCase(IsActive, CaseParentKind::Switch);
       Status |= Case;
       if (Case.isNonNull())
         cases.emplace_back(Case.get());
@@ -2232,15 +2234,15 @@ parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
   tok terminatorToken;
   GuardedPatternContext patternContext;
   switch (ParentKind) {
-    case CaseParentKind::Switch:
-      introducerToken = tok::kw_case;
-      terminatorToken = tok::colon;
-      patternContext = GuardedPatternContext::Case;
-      break;
-    case CaseParentKind::DoCatch:
-      introducerToken = tok::kw_catch;
-      terminatorToken = tok::l_brace;
-      patternContext = GuardedPatternContext::Catch;
+  case CaseParentKind::Switch:
+    introducerToken = tok::kw_case;
+    terminatorToken = tok::colon;
+    patternContext = GuardedPatternContext::Case;
+    break;
+  case CaseParentKind::DoCatch:
+    introducerToken = tok::kw_catch;
+    terminatorToken = tok::l_brace;
+    patternContext = GuardedPatternContext::Catch;
   }
   SyntaxParsingContext CaseContext(P.SyntaxContext,
                                    SyntaxKind::SwitchCaseLabel);
@@ -2255,8 +2257,8 @@ parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
     while (true) {
       SyntaxParsingContext ItemContext(P.SyntaxContext, SyntaxKind::CaseItem);
       GuardedPattern PatternResult;
-      parseGuardedPattern(P, PatternResult, Status, BoundDecls,
-                          patternContext, isFirst);
+      parseGuardedPattern(P, PatternResult, Status, BoundDecls, patternContext,
+                          isFirst);
       LabelItems.emplace_back(PatternResult.ThePattern, PatternResult.WhereLoc,
                               PatternResult.Guard);
       isFirst = false;
@@ -2364,20 +2366,21 @@ struct FallthroughFinder : ASTWalker {
 
 } // end anonymous namespace
 
-ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive, CaseParentKind ParentKind) {
+ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
+                                             CaseParentKind ParentKind) {
   SyntaxKind syntaxKind;
   tok introducerToken;
   BraceItemListKind braceItemListKind;
   switch (ParentKind) {
-    case CaseParentKind::Switch:
-      syntaxKind = SyntaxKind::SwitchCase;
-      introducerToken = tok::kw_case;
-      braceItemListKind = BraceItemListKind::Case;
-      break;
-    case CaseParentKind::DoCatch:
-      syntaxKind = SyntaxKind::CatchClause;
-      introducerToken = tok::kw_catch;
-      braceItemListKind = BraceItemListKind::Brace;
+  case CaseParentKind::Switch:
+    syntaxKind = SyntaxKind::SwitchCase;
+    introducerToken = tok::kw_case;
+    braceItemListKind = BraceItemListKind::Case;
+    break;
+  case CaseParentKind::DoCatch:
+    syntaxKind = SyntaxKind::CatchClause;
+    introducerToken = tok::kw_catch;
+    braceItemListKind = BraceItemListKind::Brace;
   }
   SyntaxParsingContext CaseContext(SyntaxContext, syntaxKind);
   // A case block has its own scope for variables bound out of the pattern.
@@ -2422,13 +2425,14 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive, CaseParentKind Paren
   SourceLoc TerminatorLoc;
   Optional<MutableArrayRef<VarDecl *>> CaseBodyDecls;
   if (Tok.is(introducerToken)) {
-    Status |= ::parseStmtCase(*this, ParentKind, IntroducerLoc, CaseLabelItems, BoundDecls,
-                              TerminatorLoc, CaseBodyDecls);
+    Status |= ::parseStmtCase(*this, ParentKind, IntroducerLoc, CaseLabelItems,
+                              BoundDecls, TerminatorLoc, CaseBodyDecls);
   } else if (Tok.is(tok::kw_default)) {
-    Status |= parseStmtCaseDefault(*this, IntroducerLoc, CaseLabelItems, TerminatorLoc);
+    Status |= parseStmtCaseDefault(*this, IntroducerLoc, CaseLabelItems,
+                                   TerminatorLoc);
   } else {
     llvm_unreachable("isAtStartOfSwitchCase() lied.");
-  } //TODO(owen) better recovery
+  } // TODO(owen) better recovery
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
 
@@ -2467,9 +2471,10 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive, CaseParentKind Paren
   }
 
   return makeParserResult(
-      Status, CaseStmt::create(Context, ParentKind, IntroducerLoc, CaseLabelItems, UnknownAttrLoc,
-                               TerminatorLoc, Body, CaseBodyDecls, None,
-                               FallthroughFinder::findFallthrough(Body)));
+      Status,
+      CaseStmt::create(Context, ParentKind, IntroducerLoc, CaseLabelItems,
+                       UnknownAttrLoc, TerminatorLoc, Body, CaseBodyDecls, None,
+                       FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:

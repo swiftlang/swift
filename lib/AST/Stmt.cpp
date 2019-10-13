@@ -271,11 +271,14 @@ DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
   return ::new (mem) DoCatchStmt(labelInfo, doLoc, body, catches, implicit);
 }
 
+bool CaseLabelItem::isSyntacticallyExhaustive() const {
+  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+}
+
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
   for (auto clause : getCatches()) {
     for (auto &LabelItem : clause->getCaseLabelItems()) {
-      if (LabelItem.getGuardExpr() == nullptr &&
-          !LabelItem.getPattern()->isRefutablePattern())
+      if (LabelItem.isSyntacticallyExhaustive())
         return true;
     }
   }
@@ -397,13 +400,15 @@ SourceLoc CaseLabelItem::getEndLoc() const {
   return CasePattern->getEndLoc();
 }
 
-CaseStmt::CaseStmt(CaseParentKind ParentKind, SourceLoc caseLoc, ArrayRef<CaseLabelItem> caseLabelItems,
+CaseStmt::CaseStmt(CaseParentKind ParentKind, SourceLoc caseLoc,
+                   ArrayRef<CaseLabelItem> caseLabelItems,
                    SourceLoc unknownAttrLoc, SourceLoc colonLoc, Stmt *body,
                    Optional<MutableArrayRef<VarDecl *>> caseBodyVariables,
                    Optional<bool> implicit,
                    NullablePtr<FallthroughStmt> fallthroughStmt)
     : Stmt(StmtKind::Case, getDefaultImplicitFlag(implicit, caseLoc)),
-      ParentKind(ParentKind), UnknownAttrLoc(unknownAttrLoc), CaseLoc(caseLoc), ColonLoc(colonLoc),
+      ParentKind(ParentKind), UnknownAttrLoc(unknownAttrLoc), CaseLoc(caseLoc),
+      ColonLoc(colonLoc),
       BodyAndHasFallthrough(body, fallthroughStmt.isNonNull()),
       CaseBodyVariables(caseBodyVariables) {
   Bits.CaseStmt.NumPatterns = caseLabelItems.size();
@@ -429,7 +434,8 @@ CaseStmt::CaseStmt(CaseParentKind ParentKind, SourceLoc caseLoc, ArrayRef<CaseLa
   }
 }
 
-CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc caseLoc,
+CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind,
+                           SourceLoc caseLoc,
                            ArrayRef<CaseLabelItem> caseLabelItems,
                            SourceLoc unknownAttrLoc, SourceLoc colonLoc,
                            Stmt *body,
@@ -440,8 +446,9 @@ CaseStmt *CaseStmt::create(ASTContext &ctx, CaseParentKind ParentKind, SourceLoc
       ctx.Allocate(totalSizeToAlloc<FallthroughStmt *, CaseLabelItem>(
                        fallthroughStmt.isNonNull(), caseLabelItems.size()),
                    alignof(CaseStmt));
-  return ::new (mem) CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
-                              body, caseVarDecls, implicit, fallthroughStmt);
+  return ::new (mem)
+      CaseStmt(ParentKind, caseLoc, caseLabelItems, unknownAttrLoc, colonLoc,
+               body, caseVarDecls, implicit, fallthroughStmt);
 }
 
 SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,

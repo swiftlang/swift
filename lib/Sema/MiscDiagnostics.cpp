@@ -3254,7 +3254,8 @@ static void checkStmtConditionTrailingClosure(ASTContext &ctx, const Stmt *S) {
     checkStmtConditionTrailingClosure(ctx, FES->getWhere());
   } else if (auto DCS = dyn_cast<DoCatchStmt>(S)) {
     for (auto CS : DCS->getCatches())
-      checkStmtConditionTrailingClosure(ctx, CS->getGuardExpr());
+      for (auto &LabelItem: CS->getCaseLabelItems())
+        checkStmtConditionTrailingClosure(ctx, LabelItem.getGuardExpr());
   }
 }
 

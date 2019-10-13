@@ -225,7 +225,7 @@ deriveBodyCodingKey_enum_stringValue(AbstractFunctionDecl *strValDecl, void *) {
       auto *returnStmt = new (C) ReturnStmt(SourceLoc(), caseValue);
       auto *caseBody = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                          SourceLoc());
-      cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+      cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem, SourceLoc(),
                                        SourceLoc(), caseBody,
                                        /*case body var decls*/ None));
     }
@@ -292,7 +292,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
 
     auto *body = BraceStmt::create(C, SourceLoc(), ASTNode(assignment),
                                    SourceLoc());
-    cases.push_back(CaseStmt::create(C, SourceLoc(), labelItem, SourceLoc(),
+    cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), labelItem, SourceLoc(),
                                      SourceLoc(), body,
                                      /*case body var decls*/ None));
   }
@@ -304,7 +304,7 @@ deriveBodyCodingKey_init_stringValue(AbstractFunctionDecl *initDecl, void *) {
   auto *dfltReturnStmt = new (C) FailStmt(SourceLoc(), SourceLoc());
   auto *dfltBody = BraceStmt::create(C, SourceLoc(), ASTNode(dfltReturnStmt),
                                      SourceLoc());
-  cases.push_back(CaseStmt::create(C, SourceLoc(), dfltLabelItem, SourceLoc(),
+  cases.push_back(CaseStmt::create(C, CaseParentKind::Switch, SourceLoc(), dfltLabelItem, SourceLoc(),
                                    SourceLoc(), dfltBody,
                                    /*case body var decls*/ None));
 
