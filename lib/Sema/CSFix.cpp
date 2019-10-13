@@ -134,6 +134,7 @@ bool CoerceToCheckedCast::diagnose(Expr *root, bool asNote) const {
 CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   ConstraintLocator *locator) {
+  // If any of the types has a type variable, don't add the fix. 
   if (fromType->hasTypeVariable() || toType->hasTypeVariable())
     return nullptr;
 

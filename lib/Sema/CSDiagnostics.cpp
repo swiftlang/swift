@@ -799,7 +799,7 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
     } else if (isa<CoerceExpr>(anchor)) {
       diagnostic = getDiagnosticFor(CTP_CoerceOperand);
     } else {
-      assert(false && "Unreachable code");
+      assert(false && "unhandled expression type");
     }
   } else {
     const auto &last = path.back();
