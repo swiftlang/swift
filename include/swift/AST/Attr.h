@@ -89,8 +89,12 @@ public:
   bool isValid() const { return AtLoc.isValid(); }
   
   // SWIFT_ENABLE_TENSORFLOW
-  bool isLinear() const { return linear; }
-  
+  bool isLinear() const {
+    assert(!linear || (linear && has(TAK_differentiable)) &&
+           "Linear shouldn't have been true if there's no `@differentiable`");
+    return linear;
+  }
+
   void clearAttribute(TypeAttrKind A) {
     AttrLocs[A] = SourceLoc();
   }

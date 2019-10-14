@@ -240,6 +240,13 @@ TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
         TypeAttrs.convention = Convention.str();
       }
 
+      // SWIFT_ENABLE_TENSORFLOW
+      if (AttrKind == TAK_differentiable) {
+        auto Argument = Attr.getArgument()->castTo<TokenSyntax>();
+        auto Linear = Context.getIdentifier(Argument.getIdentifierText());
+        TypeAttrs.linear = Linear.is("linear");
+      }
+
       if (AttrKind == TAK_opened) {
         auto AttrText = Attr.getArgument()->castTo<TokenSyntax>().getText();
         auto LiteralText = AttrText.slice(1, AttrText.size() - 1);
