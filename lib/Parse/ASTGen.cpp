@@ -241,7 +241,7 @@ TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
       }
 
       // SWIFT_ENABLE_TENSORFLOW
-      if (AttrKind == TAK_differentiable) {
+      if (AttrKind == TAK_differentiable && Attr.getArgument()) {
         auto Argument = Attr.getArgument()->castTo<TokenSyntax>();
         auto Linear = Context.getIdentifier(Argument.getIdentifierText());
         TypeAttrs.linear = Linear.is("linear");
