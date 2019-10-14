@@ -1009,6 +1009,14 @@ def create_argument_parser():
                 '%(default)s is the default.')
 
     # -------------------------------------------------------------------------
+    in_group('Experimental language features')
+
+    option('--enable-experimental-differentiable-programming', toggle_true,
+           default=True,
+           help='Enable experimental Swift differentiable programming language'
+                ' features.')
+
+    # -------------------------------------------------------------------------
     in_group('Unsupported options')
 
     option('--build-jobs', unsupported)
