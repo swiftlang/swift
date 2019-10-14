@@ -7241,10 +7241,8 @@ ConstraintSystem::simplifyDynamicCallableApplicableFnConstraint(
 }
 
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {
-  if (Type unwrapped = type->getOptionalObjectType())
-    type = unwrapped.getPointer();
-
-  auto pointeeTy = type->getAnyPointerElementType();
+  auto pointeeTy = type->lookThroughSingleOptionalType()
+                       ->getAnyPointerElementType();
   assert(pointeeTy);
   return pointeeTy;
 }

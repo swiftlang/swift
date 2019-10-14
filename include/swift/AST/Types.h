@@ -1067,6 +1067,9 @@ public:
   // otherwise, return the null type.
   Type getSwiftNewtypeUnderlyingType();
 
+  /// Return the type T after looking through at most one optional type.
+  Type lookThroughSingleOptionalType();
+
   /// Return the type T after looking through all of the optional
   /// types.
   Type lookThroughAllOptionalTypes();

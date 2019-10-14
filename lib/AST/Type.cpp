@@ -670,6 +670,13 @@ Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
   return Type();
 }
 
+Type TypeBase::lookThroughSingleOptionalType() {
+  Type type(this);
+  if (auto objType = type->getOptionalObjectType())
+    type = objType;
+  return type;
+}
+
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
   while (auto objType = type->getOptionalObjectType())
