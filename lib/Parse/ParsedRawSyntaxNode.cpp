@@ -56,34 +56,37 @@ void ParsedRawSyntaxNode::dump() const {
 }
 
 void ParsedRawSyntaxNode::dump(llvm::raw_ostream &OS, unsigned Indent) const {
-  for (decltype(Indent) i = 0; i < Indent; ++i)
-    OS << ' ';
+  auto indent = [&](unsigned Amount) {
+    for (decltype(Amount) i = 0; i < Amount; ++i) {
+      OS << ' ';
+    }
+  };
+
+  indent(Indent);
+
+  if (isNull()) {
+    OS << "(<NULL>)";
+    return;
+  }
+
   OS << '(';
   dumpSyntaxKind(OS, getKind());
 
-  switch (DK) {
-    case DataKind::Null:
-      OS << "<NULL>";
-      break;
-    case DataKind::Recorded:
-      OS << " [recorded] ";
-      if (isToken()) {
-        dumpTokenKind(OS, getTokenKind());
-      } else {
-        OS << "<layout>";
-      }
-      break;
-    case DataKind::DeferredLayout:
-      OS << " [deferred]";
+  if (isToken()) {
+    dumpTokenKind(OS, getTokenKind());
+
+  } else {
+    if (isRecorded()) {
+      OS << " [recorded]";
+    } else if (isDeferredLayout()) {
       for (const auto &child : getDeferredChildren()) {
         OS << "\n";
-        child.dump(OS, Indent + 2);
+        child.dump(OS, Indent + 1);
       }
-      break;
-    case DataKind::DeferredToken:
-      OS << " [deferred] ";
-      dumpTokenKind(OS, getTokenKind());
-      break;
+    } else {
+      assert(isDeferredToken());
+      OS << " [deferred token]";
+    }
   }
   OS << ')';
 }

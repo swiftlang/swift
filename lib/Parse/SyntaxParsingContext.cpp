@@ -305,7 +305,7 @@ void SyntaxParsingContext::synthesize(tok Kind, SourceLoc Loc) {
 void SyntaxParsingContext::dumpStorage() const  {
   llvm::errs() << "======================\n";
   for (auto Node : getStorage()) {
-    Node.dump(llvm::errs());
+    Node.dump();
     llvm::errs() << "\n--------------\n";
   }
 }
