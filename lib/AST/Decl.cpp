@@ -5643,11 +5643,16 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;
       }
-                   
+
       auto &d = getASTContext().Diags;
-      d.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
-                 isa<AccessorDecl>(FD))
-       .fixItInsert(FD->getFuncLoc(), "mutating ");
+      auto diags = d.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
+                              isa<AccessorDecl>(FD));
+      if (auto nonmutatingAttr =
+              FD->getAttrs().getAttribute<NonMutatingAttr>()) {
+        diags.fixItReplace(nonmutatingAttr->getLocation(), "mutating");
+      } else {
+        diags.fixItInsert(FD->getFuncLoc(), "mutating ");
+      }
       return;
     }
   }
