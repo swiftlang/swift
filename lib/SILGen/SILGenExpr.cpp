@@ -506,8 +506,13 @@ namespace {
     // SWIFT_ENABLE_TENSORFLOW
     RValue visitDifferentiableFunctionExpr(DifferentiableFunctionExpr *E,
                                            SGFContext C);
+    RValue visitLinearFunctionExpr(LinearFunctionExpr *E, SGFContext C);
     RValue visitDifferentiableFunctionExtractOriginalExpr(
         DifferentiableFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitLinearFunctionExtractOriginalExpr(
+        LinearFunctionExtractOriginalExpr *E, SGFContext C);
+    RValue visitLinearToDifferentiableFunctionExpr(
+        LinearToDifferentiableFunctionExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -5436,6 +5441,15 @@ RValue RValueEmitter::visitDifferentiableFunctionExpr(
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
 }
 
+RValue RValueEmitter::visitLinearFunctionExpr(
+    LinearFunctionExpr *E, SGFContext C) {
+  auto origFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto destTy = SGF.getLoweredType(E->getType()).castTo<SILFunctionType>();
+  auto *diffFunc = SGF.B.createLinearFunction(
+      E, destTy->getDifferentiationParameterIndices(), origFunc.forward(SGF));
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(diffFunc));
+}
+
 RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
     DifferentiableFunctionExtractOriginalExpr *E, SGFContext C) {
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
@@ -5444,6 +5458,22 @@ RValue RValueEmitter::visitDifferentiableFunctionExtractOriginalExpr(
       E, borrowedDiffFunc.getValue());
   auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
+}
+
+RValue RValueEmitter::visitLinearFunctionExtractOriginalExpr(
+    LinearFunctionExtractOriginalExpr *E, SGFContext C) {
+  auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  auto borrowedDiffFunc = diffFunc.borrow(SGF, E);
+  auto *borrowedOrigFunc = SGF.B.createLinearFunctionExtract(
+      E, LinearFunctionExtractee::Original, borrowedDiffFunc.getValue());
+  auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
+  return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
+}
+
+RValue RValueEmitter::visitLinearToDifferentiableFunctionExpr(
+    LinearToDifferentiableFunctionExpr *E, SGFContext C) {
+  // TODO: Implement this.
+  llvm_unreachable("Unsupported!");
 }
 // SWIFT_ENABLE_TENSORFLOW END
 

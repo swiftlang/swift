@@ -8773,6 +8773,8 @@ void Differentiation::run() {
   // A global differentiation context.
   ADContext context(*this);
 
+  bool errorOccurred = false;
+
   // Register all `@differentiable` attributes and `differentiable_function`
   // instructions in the module that trigger differentiation.
   for (SILFunction &f : module) {
@@ -8783,10 +8785,18 @@ void Differentiation::run() {
       context.getInvokers().insert({diffAttr, invoker});
       continue;
     }
-    for (SILBasicBlock &bb : f)
-      for (SILInstruction &i : bb)
+    for (SILBasicBlock &bb : f) {
+      for (SILInstruction &i : bb) {
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
           context.getDifferentiableFunctionInsts().push_back(dfi);
+        else if (auto *lfi = dyn_cast<LinearFunctionInst>(&i)) {
+          astCtx.Diags.diagnose(
+              lfi->getLoc().getSourceLoc(),
+              diag::autodiff_conversion_to_linear_function_not_supported);
+          errorOccurred = true;
+        }
+      }
+    }
   }
 
   // If nothing has triggered differentiation, there's nothing to do.
@@ -8801,8 +8811,6 @@ void Differentiation::run() {
                           diag::autodiff_internal_swift_not_imported);
     return;
   }
-
-  bool errorOccurred = false;
 
   // Process all `[differentiable]` attributes.
   for (auto invokerPair : context.getInvokers()) {

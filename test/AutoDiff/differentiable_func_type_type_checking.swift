@@ -50,6 +50,17 @@ extension Float {
 _ = gradient(of: Float.addOne) // okay
 _ = gradient(of: Float(1.0).addOne) // okay
 
+// TODO(TF-908): Remove this test once linear-to-differentiable conversion is supported.
+func linearToDifferentiable(_ f: @escaping @differentiable(linear) (Float) -> Float) {
+  // expected-error @+1 {{conversion from '@differentiable(linear)' to '@differentiable' is not yet supported}}
+  _ = f as @differentiable (Float) -> Float
+}
+
+func differentiableToLinear(_ f: @escaping @differentiable (Float) -> Float) {
+  // expected-error @+1 {{a '@differentiable(linear)' function can only be formed from a reference to a 'func' or a literal closure}}
+  _ = f as @differentiable(linear) (Float) -> Float
+}
+
 //===----------------------------------------------------------------------===//
 // Parameter selection (@nondiff)
 //===----------------------------------------------------------------------===//
