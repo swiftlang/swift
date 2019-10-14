@@ -27,4 +27,5 @@ f(<#T##Int#>) // expected-error{{editor placeholder in source file}}
 f(<#T##String#>) // expected-error{{editor placeholder in source file}} expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 
 for x in <#T#> { // expected-error{{editor placeholder in source file}} expected-error{{type '()' does not conform to protocol 'Sequence'}}
+  // expected-error@-1{{variable 'x' is not bound by any pattern}}
 }

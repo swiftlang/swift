@@ -584,7 +584,7 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedEncodingContainerDecl(),
-                                             codingKeysType,
+                                             codingKeysEnum->getDeclaredInterfaceType(),
                                              VarDecl::Introducer::Var);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),
@@ -806,7 +806,7 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
   auto codingKeysType = codingKeysEnum->getDeclaredType();
   auto *containerDecl = createKeyedContainer(C, funcDC,
                                              C.getKeyedDecodingContainerDecl(),
-                                             codingKeysType,
+                                             codingKeysEnum->getDeclaredInterfaceType(),
                                              VarDecl::Introducer::Let);
 
   auto *containerExpr = new (C) DeclRefExpr(ConcreteDeclRef(containerDecl),

@@ -2595,7 +2595,7 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
         }
       }
     } else {
-      returnRepr = VD->getTypeRepr();
+      returnRepr = VD->getTypeReprOrParentPatternTypeRepr();
     }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
     returnRepr = FD->getBodyResultTypeLoc().getTypeRepr();
@@ -5007,24 +5007,7 @@ VarDecl::VarDecl(DeclKind kind, bool isStatic, VarDecl::Introducer introducer,
 }
 
 Type VarDecl::getType() const {
-  if (!typeInContext) {
-    const_cast<VarDecl *>(this)->typeInContext =
-      getDeclContext()->mapTypeIntoContext(
-        getInterfaceType());
-  }
-
-  return typeInContext;
-}
-
-void VarDecl::setType(Type t) {
-  assert(t.isNull() || !t->is<InOutType>());
-  typeInContext = t;
-}
-
-void VarDecl::markInvalid() {
-  auto &Ctx = getASTContext();
-  setType(ErrorType::get(Ctx));
-  setInterfaceType(ErrorType::get(Ctx));
+  return getDeclContext()->mapTypeIntoContext(getInterfaceType());
 }
 
 /// Returns whether the var is settable in the specified context: this
@@ -5269,9 +5252,6 @@ Pattern *VarDecl::getParentPattern() const {
           if (pat->containsVarDecl(this))
             return pat;
     }
-
-    //stmt->dump();
-    assert(0 && "Unknown parent pattern statement?");
   }
 
   // Otherwise, check if we have to walk our case stmt's var decl list to find
@@ -5282,6 +5262,16 @@ Pattern *VarDecl::getParentPattern() const {
 
   // Otherwise, this is a case we do not know or understand. Return nullptr to
   // signal we do not have any information.
+  return nullptr;
+}
+
+TypeRepr *VarDecl::getTypeReprOrParentPatternTypeRepr() const {
+  if (auto *param = dyn_cast<ParamDecl>(this))
+    return param->getTypeRepr();
+
+  if (auto *parentPattern = dyn_cast_or_null<TypedPattern>(getParentPattern()))
+    return parentPattern->getTypeRepr();
+
   return nullptr;
 }
 
