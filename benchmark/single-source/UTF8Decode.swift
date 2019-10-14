@@ -145,7 +145,7 @@ public func run_UTF8Decode_InitFromBytes_ascii(_ N: Int) {
 public func run_UTF8Decode_InitFromData_ascii_as_ascii(_ N: Int) {
   let input = asciiData
   for _ in 0..<1_000*N {
-    blackHole(String(data: input, encoding: Unicode.ASCII.self))
+    blackHole(String(data: input, encoding: .ascii))
   }
 }
 @inline(never)
@@ -159,7 +159,7 @@ public func run_UTF8Decode_InitDecoding_ascii_as_ascii(_ N: Int) {
 public func run_UTF8Decode_InitFromBytes_ascii_as_ascii(_ N: Int) {
   let input = asciiBytes
   for _ in 0..<1_000*N {
-    blackHole(String(bytes: input, encoding: Unicode.ASCII.self))
+    blackHole(String(bytes: input, encoding: .ascii))
   }
 }
 
