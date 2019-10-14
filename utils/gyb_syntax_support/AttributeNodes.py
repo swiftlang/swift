@@ -222,16 +222,9 @@ ATTRIBUTE_NODES = [
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
     #     differentiation-params-clause? ','?
-    #     differentiable-attr-func-specifier? # primal
-    #     differentiable-attr-func-specifier? # adjoint
     #     differentiable-attr-func-specifier? # jvp
     #     differentiable-attr-func-specifier? # vjp
     #     generic-where-clause?
-    # FIXME: There is currently no guarantee that 'MaybePrimal' is in fact
-    # the primal specifier, it could be any specifier. The current syntax
-    # definitions only ensure that there are between 0 and 4 function
-    # specifiers. A more robust definition would enforce that specific function
-    # specifiers appear only once, in order.
     Node('DifferentiableAttributeArguments', kind='Syntax',
          description='''
          The arguments for the `@differentiable` attribute: an optional \
