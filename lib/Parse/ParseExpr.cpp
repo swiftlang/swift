@@ -1498,8 +1498,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
           ParsedSyntaxRecorder::makeIdentifierPattern(
                                   SyntaxContext->popToken(), *SyntaxContext);
       ParsedExprSyntax ExprNode =
-          ParsedSyntaxRecorder::makeUnresolvedPatternExpr(std::move(PatternNode),
-                                                          *SyntaxContext);
+          ParsedSyntaxRecorder::deferUnresolvedPatternExpr(std::move(PatternNode),
+                                                           *SyntaxContext);
       SyntaxContext->addSyntax(std::move(ExprNode));
       return makeParserResult(new (Context) UnresolvedPatternExpr(pattern));
     }
