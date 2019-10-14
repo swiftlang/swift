@@ -895,9 +895,9 @@ public:
   bool parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
                           SourceLoc OtherLoc);
 
-  ParsedSyntaxResult<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
-                           bool silenceDiag = false);
+  llvm::Optional<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
+                           SourceLoc OtherLoc);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
@@ -919,6 +919,7 @@ public:
                          llvm::function_ref<ParserStatus()> callback);
   ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
                                llvm::Optional<ParsedTokenSyntax> &LastComma,
+                               SourceLoc &RightLoc,
                                llvm::Optional<ParsedTokenSyntax> &Right,
                                llvm::SmallVectorImpl<ParsedSyntax>& Junk,
                                bool AllowSepAfterLast, Diag<> ErrorDiag,

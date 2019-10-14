@@ -130,15 +130,18 @@ Parser::parseLayoutConstraintSyntax() {
     return false;
   };
 
-  auto hasError = parseTrivialConstraintBody();
-  if (hasError)
+  if (parseTrivialConstraintBody()) {
     ignoreUntil(tok::r_paren);
-  auto rParen = parseMatchingTokenSyntax(
-      tok::r_paren, diag::expected_rparen_layout_constraint, lParenLoc,
-      /*silenceDiag=*/hasError);
-  if (!rParen.isNull())
-    builder.useRightParen(rParen.get());
-
+    if (Tok.is(tok::r_paren))
+      builder.useRightParen(consumeTokenSyntax(tok::r_paren));
+  } else {
+    SourceLoc rParenLoc;
+    auto rParen = parseMatchingTokenSyntax(tok::r_paren, rParenLoc,
+                             diag::expected_rparen_layout_constraint,
+                             lParenLoc);
+    if (rParen)
+      builder.useRightParen(std::move(*rParen));
+  }
   return makeParsedResult(builder.build());
 }
 
@@ -973,10 +976,11 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeTupleBody() {
 
   Optional<ParsedTokenSyntax> Comma;
 
+  SourceLoc RParenLoc;
   Optional<ParsedTokenSyntax> RParen;
 
   ParserStatus Status =
-      parseListSyntax(tok::r_paren, LParenLoc, Comma, RParen, Junk,
+      parseListSyntax(tok::r_paren, LParenLoc, Comma, RParenLoc, RParen, Junk,
                       false, diag::expected_rparen_tuple_type_list, [&]() {
     Optional<BacktrackingScope> Backtracking;
     SmallVector<ParsedSyntax, 0> LocalJunk;
@@ -1224,11 +1228,11 @@ Parser::parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc) {
   // Ignore integer literal between '[' and ']'
   ignoreIf(tok::integer_literal);
 
-  auto RSquareLoc = Tok.getLoc();
+  SourceLoc RSquareLoc;
   auto RSquare = parseMatchingTokenSyntax(
-      tok::r_square, diag::expected_rbracket_array_type, LSquareLoc);
+      tok::r_square, RSquareLoc, diag::expected_rbracket_array_type, LSquareLoc);
 
-  if (!RSquare.isNull()) {
+  if (RSquare) {
     // If we parsed something valid, diagnose it with a fixit to rewrite it to
     // Swift syntax.
     diagnose(LSquareLoc, diag::new_array_syntax)
@@ -1240,9 +1244,11 @@ Parser::parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc) {
   ParserStatus status;
 
   builder.useElementType(std::move(Base));
-  if (!RSquare.isNull())
-    builder.useRightSquareBracket(RSquare.get());
-  status |= RSquare.getStatus();
+  if (RSquare) {
+    builder.useRightSquareBracket(std::move(*RSquare));
+  } else {
+    status.setIsParseError();
+  }
 
   return makeParsedResult(builder.build(), status);
 }
@@ -1280,8 +1286,11 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollection() {
   auto Diag = Colon ? diag::expected_rbracket_dictionary_type
                     : diag::expected_rbracket_array_type;
 
-  auto RSquare = parseMatchingTokenSyntax(tok::r_square, Diag, LSquareLoc);
-  Status |= RSquare.getStatus();
+  SourceLoc RSquareLoc;
+  auto RSquare =
+      parseMatchingTokenSyntax(tok::r_square, RSquareLoc, Diag, LSquareLoc);
+  if (!RSquare)
+    Status.setIsParseError();
 
   if (Colon) {
     ParsedDictionaryTypeSyntaxBuilder builder(*SyntaxContext);
@@ -1289,15 +1298,15 @@ ParsedSyntaxResult<ParsedTypeSyntax> Parser::parseTypeCollection() {
     builder.useKeyType(std::move(*ElementType));
     builder.useColon(std::move(*Colon));
     builder.useValueType(std::move(*ValueType));
-    if (!RSquare.isNull())
-      builder.useRightSquareBracket(RSquare.get());
+    if (RSquare)
+      builder.useRightSquareBracket(std::move(*RSquare));
     return makeParsedResult(builder.build(), Status);
   } else {
     ParsedArrayTypeSyntaxBuilder builder(*SyntaxContext);
     builder.useLeftSquareBracket(std::move(LSquare));
     builder.useElementType(std::move(*ElementType));
-    if (!RSquare.isNull())
-      builder.useRightSquareBracket(RSquare.get());
+    if (RSquare)
+      builder.useRightSquareBracket(std::move(*RSquare));
     return makeParsedResult(builder.build(), Status);
   }
 }

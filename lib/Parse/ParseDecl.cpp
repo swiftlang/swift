@@ -1999,11 +1999,13 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       }
 
       // Parse ')'.
+      SourceLoc RParenLoc;
       auto RParen = parseMatchingTokenSyntax(
-          tok::r_paren, diag::convention_attribute_expected_rparen, LParenLoc);
-      if (RParen.isError())
+          tok::r_paren, RParenLoc, diag::convention_attribute_expected_rparen,
+          LParenLoc);
+      if (!RParen)
         return makeParserError();
-      builder.useRightParen(RParen.get());
+      builder.useRightParen(std::move(*RParen));
 
       return makeParserSuccess();
     }();
@@ -2031,11 +2033,13 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       builder.useArgument(consumeTokenSyntax(tok::string_literal));
 
       // Parse ')'.
+      SourceLoc RParenLoc;
       auto RParen = parseMatchingTokenSyntax(
-          tok::r_paren, diag::opened_attribute_expected_rparen, LParenLoc);
-      if (RParen.isError())
+          tok::r_paren, RParenLoc, diag::opened_attribute_expected_rparen,
+          LParenLoc);
+      if (!RParen)
         return makeParserError();
-      builder.useRightParen(RParen.get());
+      builder.useRightParen(std::move(*RParen));
 
       return makeParserSuccess();
     }();
@@ -2081,11 +2085,12 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
       builder.useArgument(argBuilder.build());
 
       // Parse ')'.
+      SourceLoc RParenLoc;
       auto RParen = parseMatchingTokenSyntax(
-          tok::r_paren, diag::expected_rparen_expr_list, LParenLoc);
-      if (RParen.isError())
+          tok::r_paren, RParenLoc, diag::expected_rparen_expr_list, LParenLoc);
+      if (!RParen)
         return makeParserError();
-      builder.useRightParen(RParen.get());
+      builder.useRightParen(std::move(*RParen));
 
       return makeParserSuccess();
     }();
