@@ -62,61 +62,81 @@ TypeRepr *Parser::applyAttributeToType(TypeRepr *ty,
   return ty;
 }
 
-/// Parse layout constraint for 'where' clause in '@_specialize' attribute
-/// and in SIL.
-///
-///   layout-constraint:
-///     identifier
-///     identifier '(' integer-literal ')'
-///     identifier '(' integer-literal ',' integer-literal ')'
-ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
-Parser::parseLayoutConstraintSyntax() {
-  assert(Tok.is(tok::identifier));
-  ParsedLayoutConstraintSyntaxBuilder builder(*SyntaxContext);
+LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
+  LayoutConstraint layoutConstraint =
+      getLayoutConstraint(LayoutConstraintID, Context);
+  assert(layoutConstraint->isKnownLayout() &&
+         "Expected layout constraint definition");
 
-  builder.useName(consumeTokenSyntax(tok::identifier));
+  if (!layoutConstraint->isTrivial())
+    return layoutConstraint;
 
-  if (!Tok.isFollowingLParen())
-    return makeParsedResult(builder.build());
+  SourceLoc LParenLoc;
+  if (!consumeIf(tok::l_paren, LParenLoc)) {
+    // It is a trivial without any size constraints.
+    return LayoutConstraint::getLayoutConstraint(LayoutConstraintKind::Trivial,
+                                                 Context);
+  }
 
-  auto lParenLoc = Tok.getLoc();
-  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
+  int size = 0;
+  int alignment = 0;
 
-  auto parseTrivialConstraintBody = [&]() -> bool {
-    int value;
-
-    if (!Tok.is(tok::integer_literal) ||
-        Tok.getText().getAsInteger(10, value) || value < 0) {
-      diagnose(Tok, diag::layout_size_should_be_positive);
-      return true;
-    }
-    builder.useSize(consumeTokenSyntax(tok::integer_literal));
-
-    if (Tok.is(tok::comma)) {
-      builder.useComma(consumeTokenSyntax(tok::comma));
-
-      if (!Tok.is(tok::integer_literal) ||
-          Tok.getText().getAsInteger(10, value) || value < 0) {
-        diagnose(Tok, diag::layout_alignment_should_be_positive);
+  auto ParseTrivialLayoutConstraintBody = [&] () -> bool {
+    // Parse the size and alignment.
+    if (Tok.is(tok::integer_literal)) {
+      if (Tok.getText().getAsInteger(10, size)) {
+        diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
         return true;
       }
-      builder.useAlignment(consumeTokenSyntax(tok::integer_literal));
+      consumeToken();
+      if (consumeIf(tok::comma)) {
+        // parse alignment.
+        if (Tok.is(tok::integer_literal)) {
+          if (Tok.getText().getAsInteger(10, alignment)) {
+            diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
+            return true;
+          }
+          consumeToken();
+        } else {
+          diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
+          return true;
+        }
+      }
+    } else {
+      diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
+      return true;
     }
     return false;
   };
 
-  if (parseTrivialConstraintBody()) {
-    ignoreUntil(tok::r_paren);
-    if (Tok.is(tok::r_paren))
-      builder.useRightParen(consumeTokenSyntax(tok::r_paren));
-  } else {
-    auto rParen = parseMatchingTokenSyntax(tok::r_paren,
-                             diag::expected_rparen_layout_constraint,
-                             lParenLoc);
-    if (rParen)
-      builder.useRightParen(std::move(*rParen));
+  if (ParseTrivialLayoutConstraintBody()) {
+    // There was an error during parsing.
+    skipUntil(tok::r_paren);
+    consumeIf(tok::r_paren);
+    return LayoutConstraint::getUnknownLayout();
   }
-  return makeParsedResult(builder.build());
+
+  if (!consumeIf(tok::r_paren)) {
+    // Expected a closing r_paren.
+    diagnose(Tok.getLoc(), diag::expected_rparen_layout_constraint);
+    consumeToken();
+    return LayoutConstraint::getUnknownLayout();
+  }
+
+  if (size < 0) {
+    diagnose(Tok.getLoc(), diag::layout_size_should_be_positive);
+    return LayoutConstraint::getUnknownLayout();
+  }
+
+  if (alignment < 0) {
+    diagnose(Tok.getLoc(), diag::layout_alignment_should_be_positive);
+    return LayoutConstraint::getUnknownLayout();
+  }
+
+  // Otherwise it is a trivial layout constraint with
+  // provided size and alignment.
+  return LayoutConstraint::getLayoutConstraint(layoutConstraint->getKind(), size,
+                                               alignment, Context);
 }
 
 /// parseTypeSimple
@@ -350,7 +370,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     // the function body; otherwise, they are visible when parsing the type.
     if (!IsSILFuncDecl)
       GenericsScope.emplace(this, ScopeKind::Generics);
-    generics = parseSILGenericParams().getPtrOrNull();
+    generics = maybeParseGenericParams().getPtrOrNull();
   }
 
   // In SIL mode, parse box types { ... }.
