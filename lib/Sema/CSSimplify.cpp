@@ -20,6 +20,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -4864,7 +4865,19 @@ performMemberLookup(ConstraintKind constraintKind, DeclName memberName,
   // reasonable choice.
   auto addChoice = [&](OverloadChoice candidate) {
     auto decl = candidate.getDecl();
-    
+
+    // In a pattern binding initializer, immediately reject all of its bound
+    // variables. These would otherwise allow circular references.
+    if (auto *PBI = dyn_cast<PatternBindingInitializer>(DC)) {
+      if (auto *VD = dyn_cast<VarDecl>(decl)) {
+        if (PBI->getBinding() == VD->getParentPatternBinding()) {
+          result.addUnviable(candidate,
+                             MemberLookupResult::UR_InstanceMemberOnType);
+          return;
+        }
+      }
+    }
+
     // If the result is invalid, skip it.
     // FIXME(InterfaceTypeRequest): isInvalid() should be based on the interface type.
     (void)decl->getInterfaceType();
