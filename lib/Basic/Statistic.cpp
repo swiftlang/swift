@@ -416,21 +416,21 @@ void
 UnifiedStatsReporter::publishAlwaysOnStatsToLLVM() {
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
-#define FRONTEND_STATISTIC(TY, NAME)                            \
-    do {                                                        \
-      static Statistic Stat = {#TY, #NAME, #NAME, {0}, {false}};  \
-      Stat += (C).NAME;                                         \
-    } while (0);
+#define FRONTEND_STATISTIC(TY, NAME)                                           \
+  do {                                                                         \
+    static Statistic Stat = {#TY, #NAME, #NAME};                               \
+    Stat += (C).NAME;                                                          \
+  } while (0);
 #include "swift/Basic/Statistics.def"
 #undef FRONTEND_STATISTIC
   }
   if (DriverCounters) {
     auto &C = getDriverCounters();
-#define DRIVER_STATISTIC(NAME)                                       \
-    do {                                                             \
-      static Statistic Stat = {"Driver", #NAME, #NAME, {0}, {false}};  \
-      Stat += (C).NAME;                                              \
-    } while (0);
+#define DRIVER_STATISTIC(NAME)                                                 \
+  do {                                                                         \
+    static Statistic Stat = {"Driver", #NAME, #NAME};                          \
+    Stat += (C).NAME;                                                          \
+  } while (0);
 #include "swift/Basic/Statistics.def"
 #undef DRIVER_STATISTIC
   }
