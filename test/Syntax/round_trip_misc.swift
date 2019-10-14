@@ -19,6 +19,9 @@ do {
 do {
   typealias Alias3 = (a b C, 
 }
+do {
+  typealias Alias3 = () -> @objc func
+}
 
 // Orphan '}' at top level
 }

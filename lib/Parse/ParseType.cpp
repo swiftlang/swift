@@ -387,6 +387,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
   }
 
   if (Tok.is(tok::arrow)) {
+    auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     // Handle type-function if we have an arrow.
     auto ArrowLoc = Tok.getLoc();
     auto Arrow = consumeTokenSyntax();
@@ -399,10 +400,14 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     }
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
+    auto SecondTy = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (SecondHalf.isParseError()) {
+      SyntaxContext->addSyntax(InputNode);
       if (Throws)
         SyntaxContext->addSyntax(*Throws);
       SyntaxContext->addSyntax(Arrow);
+      if (SecondTy)
+        SyntaxContext->addSyntax(*SecondTy);
       if (SecondHalf.hasCodeCompletion())
         return makeParserCodeCompletionResult<TypeRepr>();
       if (SecondHalf.isNull())
@@ -410,12 +415,6 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
     }
 
     ParsedFunctionTypeSyntaxBuilder Builder(*SyntaxContext);
-    Builder.useReturnType(SyntaxContext->popIf<ParsedTypeSyntax>().getValue());
-    Builder.useArrow(Arrow);
-    if (Throws)
-      Builder.useThrowsOrRethrowsKeyword(*Throws);
-
-    auto InputNode = SyntaxContext->popIf<ParsedTypeSyntax>().getValue();
     bool isVoid = false;
     if (auto TupleTypeNode = InputNode.getAs<ParsedTupleTypeSyntax>()) {
       // Decompose TupleTypeSyntax and repack into FunctionType.
@@ -443,6 +442,13 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       Builder.addArgumentsMember(ParsedSyntaxRecorder::makeTupleTypeElement(
           InputNode, /*TrailingComma=*/None, *SyntaxContext));
     }
+
+    Builder.useReturnType(*SecondTy);
+    if (Throws)
+      Builder.useThrowsOrRethrowsKeyword(*Throws);
+    Builder.useArrow(Arrow);
+    Builder.useReturnType(*SecondTy);
+
     SyntaxContext->addSyntax(Builder.build());
 
     auto FunctionType = SyntaxContext->topNode<FunctionTypeSyntax>();
@@ -1103,21 +1109,20 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
     // Parse the type annotation.
     auto TypeLoc = Tok.getLoc();
     auto TypeASTResult = parseType(diag::expected_type);
+    auto Type = SyntaxContext->popIf<ParsedTypeSyntax>();
     if (TypeASTResult.hasCodeCompletion() || TypeASTResult.isNull()) {
       Junk.append(LocalJunk.begin(), LocalJunk.end());
-      if (auto parsedT = SyntaxContext->popIf<ParsedTypeSyntax>())
-        Junk.push_back(*parsedT);
+      if (Type)
+        Junk.push_back(*Type);
       skipListUntilDeclRBraceSyntax(Junk, LParenLoc, tok::r_paren, tok::comma);
       return TypeASTResult.hasCodeCompletion()
                  ? makeParserCodeCompletionStatus()
                  : makeParserError();
     }
 
-    auto Type = *SyntaxContext->popIf<ParsedTypeSyntax>();
-
     if (IsInOutObsoleted) {
       bool IsTypeAlreadyAttributed = false;
-      if (auto AttributedType = Type.getAs<ParsedAttributedTypeSyntax>())
+      if (auto AttributedType = Type->getAs<ParsedAttributedTypeSyntax>())
         IsTypeAlreadyAttributed = AttributedType->getDeferredSpecifier().hasValue();
 
       if (IsTypeAlreadyAttributed) {
@@ -1163,7 +1168,7 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
     Comma = consumeTokenSyntaxIf(tok::comma);
 
     auto Element = ParsedSyntaxRecorder::makeTupleTypeElement(
-        InOut, Name, SecondName, Colon, Type, ElementEllipsis, Initializer,
+        InOut, Name, SecondName, Colon, *Type, ElementEllipsis, Initializer,
         Comma, *SyntaxContext);
 
     Junk.push_back(Element);
