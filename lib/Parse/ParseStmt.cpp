@@ -1898,7 +1898,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       ParserResult<CaseStmt> clause =
           parseStmtCase(false, CaseParentKind::DoCatch);
       status |= clause;
-      consumeToken(tok::r_brace);
+      // consumeToken(tok::r_brace);
       if (status.hasCodeCompletion() && clause.isNull())
         return makeParserResult<Stmt>(status, nullptr);
 
@@ -2247,6 +2247,8 @@ parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
   }
   SyntaxParsingContext CaseContext(P.SyntaxContext,
                                    SyntaxKind::SwitchCaseLabel);
+  if (ParentKind == CaseParentKind::DoCatch)
+    CaseContext.setDiscard();
   ParserStatus Status;
   bool isFirst = true;
   // TODO(owen) diags
@@ -2288,7 +2290,7 @@ parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
   if (!P.Tok.is(terminatorToken)) {
     P.diagnose(P.Tok, diag::expected_case_colon, "case");
     Status.setIsParseError();
-  } else
+  } else if (ParentKind == CaseParentKind::Switch)
     P.consumeToken(terminatorToken);
 
   return Status;
@@ -2454,21 +2456,30 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
   SmallVector<ASTNode, 8> BodyItems;
 
   SourceLoc StartOfBody = Tok.getLoc();
-  if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
-    Status |= parseBraceItems(BodyItems, braceItemListKind);
-  } else if (Status.isSuccess() && ParentKind == CaseParentKind::Switch) {
-    diagnose(IntroducerLoc, diag::case_stmt_without_body,
-             CaseLabelItems.back().isDefault())
-        .highlight(SourceRange(IntroducerLoc, TerminatorLoc))
-        .fixItInsertAfter(TerminatorLoc, " break");
-  }
   BraceStmt *Body;
-  if (BodyItems.empty()) {
-    Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
-                             PreviousLoc, /*implicit=*/true);
-  } else {
-    Body = BraceStmt::create(Context, StartOfBody, BodyItems,
-                             PreviousLoc, /*implicit=*/true);
+
+  switch (ParentKind) {
+  case CaseParentKind::Switch: {
+    if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
+      Status |= parseBraceItems(BodyItems, braceItemListKind);
+    } else if (Status.isSuccess() && ParentKind == CaseParentKind::Switch) {
+      diagnose(IntroducerLoc, diag::case_stmt_without_body,
+               CaseLabelItems.back().isDefault())
+          .highlight(SourceRange(IntroducerLoc, TerminatorLoc))
+          .fixItInsertAfter(TerminatorLoc, " break");
+    }
+    if (BodyItems.empty()) {
+      Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
+                               PreviousLoc, /*implicit=*/true);
+    } else {
+      Body = BraceStmt::create(Context, StartOfBody, BodyItems, PreviousLoc,
+                               /*implicit=*/true);
+    }
+    break;
+  }
+  case CaseParentKind::DoCatch:
+    Body = parseBraceItemList(diag::docatch_not_trycatch).get();
+    break;
   }
 
   return makeParserResult(

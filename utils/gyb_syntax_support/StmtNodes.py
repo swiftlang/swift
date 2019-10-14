@@ -328,10 +328,8 @@ STMT_NODES = [
     Node('CatchClause', kind='Syntax',
          children=[
              Child('CatchKeyword', kind='CatchToken'),
-             Child('Pattern', kind='Pattern',
-                   is_optional=True),
-             Child('WhereClause', kind='WhereClause',
-                   is_optional=True),
+             Child('CaseItems', kind='CaseItemList',
+             collection_element_name='CaseItem', is_optional=True),
              Child('Body', kind='CodeBlock'),
          ]),
 
