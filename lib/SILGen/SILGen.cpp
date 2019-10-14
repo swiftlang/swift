@@ -1145,10 +1145,11 @@ emitPropertyWrapperBackingInitializer(VarDecl *var) {
     preEmitFunction(constant, var, f, var);
     PrettyStackTraceSILFunction X(
         "silgen emitPropertyWrapperBackingInitializer", f);
-    f->createProfiler(var, constant, ForDefinition);
-    auto varDC = var->getInnermostDeclContext();
     auto wrapperInfo = var->getPropertyWrapperBackingPropertyInfo();
     assert(wrapperInfo.initializeFromOriginal);
+    f->createProfiler(wrapperInfo.initializeFromOriginal, constant,
+                      ForDefinition);
+    auto varDC = var->getInnermostDeclContext();
     SILGenFunction SGF(*this, *f, varDC);
     SGF.emitGeneratorFunction(constant, wrapperInfo.initializeFromOriginal);
     postEmitFunction(constant, f);
