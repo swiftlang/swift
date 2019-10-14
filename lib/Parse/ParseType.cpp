@@ -110,8 +110,7 @@ Parser::parseLayoutConstraintSyntax() {
     if (Tok.is(tok::r_paren))
       builder.useRightParen(consumeTokenSyntax(tok::r_paren));
   } else {
-    SourceLoc rParenLoc;
-    auto rParen = parseMatchingTokenSyntax(tok::r_paren, rParenLoc,
+    auto rParen = parseMatchingTokenSyntax(tok::r_paren,
                              diag::expected_rparen_layout_constraint,
                              lParenLoc);
     if (rParen)
@@ -1168,8 +1167,6 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
   });
 
   if (!Status.isSuccess()) {
-    if (RParen)
-      Junk.push_back(std::move(*RParen));
     auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
     return makeParsedResult(std::move(ty), Status);
   }
@@ -1257,9 +1254,9 @@ Parser::TypeResult Parser::parseTypeArray(ParsedTypeSyntax Base,
   // Ignore integer literal between '[' and ']'
   ignoreIf(tok::integer_literal);
 
-  SourceLoc RSquareLoc;
+  auto RSquareLoc = Tok.getLoc();
   auto RSquare = parseMatchingTokenSyntax(
-      tok::r_square, RSquareLoc, diag::expected_rbracket_array_type, LSquareLoc);
+      tok::r_square, diag::expected_rbracket_array_type, LSquareLoc);
 
   if (RSquare) {
     // If we parsed something valid, diagnose it with a fixit to rewrite it to
@@ -1305,9 +1302,7 @@ Parser::TypeResult Parser::parseTypeCollection() {
   auto Diag = Colon ? diag::expected_rbracket_dictionary_type
                     : diag::expected_rbracket_array_type;
 
-  SourceLoc RSquareLoc;
-  auto RSquare = parseMatchingTokenSyntax(tok::r_square, RSquareLoc, Diag,
-                                          LSquareLoc);
+  auto RSquare = parseMatchingTokenSyntax(tok::r_square, Diag, LSquareLoc);
   if (!RSquare)
     Status.setIsParseError();
 

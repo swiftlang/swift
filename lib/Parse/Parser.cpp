@@ -1242,10 +1242,8 @@ bool Parser::parseMatchingToken(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
   return false;
 }
 
-Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
-                                                     const Diagnostic &D) {
+Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, const Diagnostic &D) {
   if (Tok.is(K)) {
-    TokLoc = Tok.getLoc();
     return consumeTokenSyntax();
   }
 
@@ -1255,7 +1253,7 @@ Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
 }
 
 Optional<ParsedTokenSyntax>
-Parser::parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag, SourceLoc OtherLoc) {
+Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc) {
   Diag<> OtherNote;
   switch (K) {
   case tok::r_paren:  OtherNote = diag::opening_paren; break;
@@ -1264,11 +1262,9 @@ Parser::parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag, Sou
   default: llvm_unreachable("unknown matching token!");
   }
 
-  auto Token = parseTokenSyntax(K, TokLoc, ErrorDiag);
-  if (!Token) {
-    TokLoc = getLocForMissingMatchingToken();
+  auto Token = parseTokenSyntax(K, ErrorDiag);
+  if (!Token)
     diagnose(OtherLoc, OtherNote);
-  }
   return Token;
 }
 
@@ -1393,14 +1389,9 @@ Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
 
   if (Status.isError()) {
     // If we've already got errors, don't emit missing RightK diagnostics.
-    if (Tok.is(RightK)) {
-      RightLoc = Tok.getLoc();
-      Right = consumeTokenSyntax(RightK);
-    } else {
-      RightLoc = getLocForMissingMatchingToken();
-    }
+    RightLoc = Tok.is(RightK) ? consumeToken() : PreviousLoc;
   } else {
-    Right = parseMatchingTokenSyntax(RightK, RightLoc, ErrorDiag, LeftLoc);
+    Right = parseMatchingTokenSyntax(RightK, ErrorDiag, LeftLoc);
     if (!Right)
       Status.setIsParseError();
   }
