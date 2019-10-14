@@ -4187,20 +4187,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     auto nominal = cast<NominalTypeDecl>(D);
     Type declaredInterfaceTy = nominal->getDeclaredInterfaceType();
     nominal->setInterfaceType(MetatypeType::get(declaredInterfaceTy, Context));
-
-    if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
-      // @objc enums use their raw values as the value representation, so we
-      // need to force the values to be checked even in non-primaries.
-      //
-      // FIXME: This check can be removed once IRGen can be made tolerant of
-      // semantic failures post-Sema.
-      if (ED->isObjC()) {
-        (void)evaluateOrDefault(
-            Context.evaluator,
-            EnumRawValuesRequest{ED, TypeResolutionStage::Interface}, true);
-      }
-    }
-
     break;
   }
 
