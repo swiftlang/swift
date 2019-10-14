@@ -323,6 +323,81 @@ CanSILFunctionType SILFunctionType::getAutoDiffDerivativeFunctionType(
                               getWitnessMethodConformanceOrNone());
 }
 
+CanSILFunctionType SILFunctionType::getAutoDiffTransposeFunctionType(
+    IndexSubset *parameterIndices, Lowering::TypeConverter &TC,
+    LookupConformanceFn lookupConformance, CanGenericSignature genSig) {
+  // Get the canonical derivative function generic signature.
+  if (!genSig)
+    genSig = getGenericSignature();
+  genSig = getAutoDiffDerivativeFunctionGenericSignature(
+      genSig, getParameters(), parameterIndices, &TC.M);
+  Lowering::GenericContextScope genericContextScope(TC, genSig);
+
+  // Given a type, returns its formal SIL parameter info.
+  auto getParameterInfoForOriginalResult = [&](
+      const SILResultInfo &result) -> SILParameterInfo {
+    auto &tl = TC.getTypeLowering(
+        result.getType(), ResilienceExpansion::Minimal);
+    ParameterConvention newConv;
+    switch (result.getConvention()) {
+    case ResultConvention::Owned:
+    case ResultConvention::Autoreleased:
+      newConv = tl.isTrivial()
+          ? ParameterConvention::Direct_Unowned
+          : ParameterConvention::Direct_Guaranteed;
+      break;
+    case ResultConvention::Unowned:
+    case ResultConvention::UnownedInnerPointer:
+      newConv = ParameterConvention::Direct_Unowned;
+      break;
+    case ResultConvention::Indirect:
+      newConv = ParameterConvention::Indirect_In_Guaranteed;
+      break;
+    }
+    return {result.getType()->getCanonicalType(genSig), newConv};
+  };
+
+  // Given a type, returns its formal SIL result info.
+  auto getResultInfoForOriginalParameter = [&](
+      const SILParameterInfo &param) -> SILResultInfo {
+    auto &tl = TC.getTypeLowering(
+        param.getType(), ResilienceExpansion::Minimal);
+    ResultConvention newConv;
+    switch (param.getConvention()) {
+    case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Direct_Guaranteed:
+    case ParameterConvention::Direct_Unowned:
+      newConv = tl.isTrivial()
+          ? ResultConvention::Unowned
+          : ResultConvention::Owned;
+      break;
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Constant:
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_InoutAliasable:
+      newConv = ResultConvention::Indirect;
+      break;
+    }
+    return {param.getType()->getCanonicalType(genSig), newConv};
+  };
+
+  SmallVector<SILParameterInfo, 4> newParameters;
+  SmallVector<SILResultInfo, 4> newResults;
+  for (auto param : llvm::enumerate(getParameters())) {
+    if (parameterIndices->contains(param.index()))
+      newResults.push_back(getResultInfoForOriginalParameter(param.value()));
+    else
+      newParameters.push_back(param.value());
+  }
+  for (auto &res : getResults())
+    newParameters.push_back(getParameterInfoForOriginalResult(res));
+  return SILFunctionType::get(
+      genSig, getExtInfo(), getCoroutineKind(),
+      getCalleeConvention(), newParameters, getYields(), newResults,
+      getOptionalErrorResult(), getASTContext());
+}
+
 ClassDecl *
 SILFunctionType::getWitnessMethodClass() const {
   auto selfTy = getSelfInstanceType();

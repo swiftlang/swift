@@ -146,27 +146,6 @@ namespace {
                        ResilienceExpansion Expansion)
       : TC(TC), Sig(Sig), Expansion(Expansion) {}
 
-    // SWIFT_ENABLE_TENSORFLOW
-    RecursiveProperties getDifferentiableSILFunctionTypeRecursiveProperties(
-        CanSILFunctionType type) {
-      assert(type->isDifferentiable());
-      auto &M = TC.M;
-      auto origTy = type->getWithoutDifferentiability();
-      auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-          AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M));
-      auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
-          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
-          AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M));
-      RecursiveProperties props;
-      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
-      props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
-      return props;
-    }
-
   public:
     // The subclass should implement:
     //   // Trivial, fixed-layout, and non-address-only.
@@ -248,8 +227,18 @@ namespace {
     
     RetTy visitSILFunctionType(CanSILFunctionType type) {
       // SWIFT_ENABLE_TENSORFLOW
-      if (type->isDifferentiable())
-        return asImpl().visitDifferentiableSILFunctionType(type);
+      switch (type->getDifferentiabilityKind()) {
+      case DifferentiabilityKind::Normal:
+        return asImpl().visitNormalDifferentiableSILFunctionType(
+            type,
+            getNormalDifferentiableSILFunctionTypeRecursiveProperties(type));
+      case DifferentiabilityKind::Linear:
+        return asImpl().visitLinearDifferentiableSILFunctionType(
+            type,
+            getLinearDifferentiableSILFunctionTypeRecursiveProperties(type));
+      case DifferentiabilityKind::NonDifferentiable:
+        break;
+      }
 
       // Only escaping closures are references.
       bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
@@ -262,10 +251,48 @@ namespace {
     }
 
     // SWIFT_ENABLE_TENSORFLOW
-    RetTy visitDifferentiableSILFunctionType(CanSILFunctionType type) {
-      assert(type->isDifferentiable());
-      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
-      return asImpl().handleAggregateByProperties(type, props);
+    RecursiveProperties
+    getNormalDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type) {
+      auto &M = TC.M;
+      auto origTy = type->getWithoutDifferentiability();
+      auto jvpTy = origTy->getAutoDiffDerivativeFunctionType(
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::JVP, TC,
+          LookUpConformanceInModule(&M));
+      auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
+          type->getDifferentiationParameterIndices(), /*resultIndex*/ 0,
+          AutoDiffDerivativeFunctionKind::VJP, TC,
+          LookUpConformanceInModule(&M));
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
+      props.addSubobject(classifyType(jvpTy, TC, Sig, Expansion));
+      props.addSubobject(classifyType(vjpTy, TC, Sig, Expansion));
+      return props;
+    }
+
+    RecursiveProperties
+    getLinearDifferentiableSILFunctionTypeRecursiveProperties(
+        CanSILFunctionType type) {
+      auto &M = TC.M;
+      auto origTy = type->getWithoutDifferentiability();
+      auto transTy = origTy->getAutoDiffTransposeFunctionType(
+          type->getDifferentiationParameterIndices(), TC,
+          LookUpConformanceInModule(&M));
+      RecursiveProperties props;
+      props.addSubobject(classifyType(origTy, TC, Sig, Expansion));
+      props.addSubobject(classifyType(transTy, TC, Sig, Expansion));
+      return props;
+    }
+
+    RetTy visitNormalDifferentiableSILFunctionType(
+        CanSILFunctionType type, RecursiveProperties props) {
+      return handleAggregateByProperties(type, props);
+    }
+
+    RetTy visitLinearDifferentiableSILFunctionType(
+        CanSILFunctionType type, RecursiveProperties props) {
+      return handleAggregateByProperties(type, props);
     }
 
     RetTy visitLValueType(CanLValueType type) {
@@ -862,9 +889,10 @@ namespace {
   };
 
   // SWIFT_ENABLE_TENSORFLOW
-  class DifferentiableSILFunctionTypeLowering final
-      : public LoadableAggTypeLowering<DifferentiableSILFunctionTypeLowering,
-                                       DifferentiableFunctionExtractee> {
+  class NormalDifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<
+                   NormalDifferentiableSILFunctionTypeLowering,
+                   DifferentiableFunctionExtractee> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
 
@@ -913,6 +941,48 @@ namespace {
             extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
       }
       assert(children.size() == 3);
+    }
+  };
+
+  class LinearDifferentiableSILFunctionTypeLowering final
+      : public LoadableAggTypeLowering<
+                   LinearDifferentiableSILFunctionTypeLowering,
+                   LinearDifferentiableFunctionTypeComponent> {
+  public:
+    using LoadableAggTypeLowering::LoadableAggTypeLowering;
+
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        LinearDifferentiableFunctionTypeComponent component,
+        const TypeLowering &eltLowering) const {
+      // TODO: Handle this once `linear_function_extract` instruction exists.
+      llvm_unreachable("Unhandled");
+    }
+
+    SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
+                              ArrayRef<SILValue> values) const override {
+      // TODO: Handle this once `linear_function` instruction exists.
+      llvm_unreachable("Unhandled");
+    }
+
+    void lowerChildren(TypeConverter &TC,
+                       SmallVectorImpl<Child> &children) const override {
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      children.reserve(2);
+      auto origFnTy = fnTy->getWithoutDifferentiability();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      children.push_back(Child{
+        LinearDifferentiableFunctionTypeComponent::Original,
+        TC.getTypeLowering(origFnTy, getResilienceExpansion())
+      });
+      auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
+          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+      auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
+      children.push_back(Child{
+        LinearDifferentiableFunctionTypeComponent::Transpose,
+        TC.getTypeLowering(transposeSILFnTy, getResilienceExpansion())
+      });
+      assert(children.size() == 2);
     }
   };
 
@@ -1412,11 +1482,17 @@ namespace {
 
     // SWIFT_ENABLE_TENSORFLOW
     TypeLowering *
-    visitDifferentiableSILFunctionType(CanSILFunctionType type) {
-      assert(type->isDifferentiable());
-      auto props = getDifferentiableSILFunctionTypeRecursiveProperties(type);
-      return handleAggregateByProperties<DifferentiableSILFunctionTypeLowering>(
-          type, props);
+    visitNormalDifferentiableSILFunctionType(CanSILFunctionType type,
+                                             RecursiveProperties props) {
+      return handleAggregateByProperties
+          <NormalDifferentiableSILFunctionTypeLowering>(type, props);
+    }
+
+    TypeLowering *
+    visitLinearDifferentiableSILFunctionType(CanSILFunctionType type,
+                                             RecursiveProperties props) {
+      return handleAggregateByProperties
+          <LinearDifferentiableSILFunctionTypeLowering>(type, props);
     }
 
     template <class LoadableLoweringClass>
