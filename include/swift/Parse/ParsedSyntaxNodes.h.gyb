@@ -32,9 +32,6 @@ namespace swift {
 %   if not node.is_syntax_collection():
 class Parsed${node.name};
 %   end
-%   if node.is_buildable():
-class Parsed${node.name}Builder;
-%   end
 % end
 
 % for node in SYNTAX_NODES + PARSEONLY_NODES:
@@ -82,10 +79,6 @@ public:
   static bool classof(const ParsedSyntax *S) {
     return kindof(S->getKind());
   }
-
-%     if node.is_buildable():
-  using Builder = Parsed${node.name}Builder;
-%     end
 };
 
 %   end

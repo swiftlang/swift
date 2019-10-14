@@ -21,31 +21,18 @@ ParsedRawSyntaxNode
 ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
                                   MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
                                   SyntaxParsingContext &ctx) {
-  CharSourceRange range;
   if (deferredNodes.empty()) {
-    return ParsedRawSyntaxNode(k, range, {});
+    return ParsedRawSyntaxNode(k, {});
   }
   ParsedRawSyntaxNode *newPtr =
     ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
 
+  // uninitialized move;
   auto ptr = newPtr;
-  for (auto &node : deferredNodes) {
-    // Cached range.
-    if (!node.isNull() && !node.isMissing()) {
-      auto nodeRange = node.getDeferredRange();
-      if (nodeRange.isValid()) {
-        if (range.isInvalid())
-          range = nodeRange;
-        else
-          range.widen(nodeRange);
-      }
-    }
-
-    // uninitialized move;
+  for (auto &node : deferredNodes)
     :: new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
-  }
-  return ParsedRawSyntaxNode(k, range,
-                             makeMutableArrayRef(newPtr, deferredNodes.size()));
+
+  return ParsedRawSyntaxNode(k, makeMutableArrayRef(newPtr, deferredNodes.size()));
 }
 
 ParsedRawSyntaxNode

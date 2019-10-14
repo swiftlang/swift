@@ -653,7 +653,7 @@ struct TupleTypeReprElement {
   TypeRepr *Type;
   SourceLoc TrailingCommaLoc;
 
-  TupleTypeReprElement(): Type(nullptr) {}
+  TupleTypeReprElement() {}
   TupleTypeReprElement(TypeRepr *Type): Type(Type) {}
 };
 
