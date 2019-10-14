@@ -1039,8 +1039,6 @@ bool DeclContext::hasValueSemantics() const {
   if (getExtendedProtocolDecl())
     return !isClassConstrainedProtocolExtension();
   return !getDeclaredInterfaceType()->hasReferenceSemantics();
-
-  return false;
 }
 
 bool DeclContext::isClassConstrainedProtocolExtension() const {
