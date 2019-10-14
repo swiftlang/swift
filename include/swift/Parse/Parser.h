@@ -1082,13 +1082,24 @@ public:
   /// an error parsing.
   bool parseVersionTuple(llvm::VersionTuple &Version, SourceRange &Range,
                          const Diagnostic &D);
+
   bool parseTypeAttributeList(ParamDecl::Specifier &Specifier,
                               SourceLoc &SpecifierLoc,
-                              TypeAttributes &Attributes);
-  ParserStatus parseTypeAttributeListSyntax(Optional<ParsedTokenSyntax> &specifier,
-                                            Optional<ParsedAttributeListSyntax> &attrs);
-  ParsedSyntaxResult<ParsedAttributeSyntax> parseTypeAttributeSyntax();
-
+                              TypeAttributes &Attributes) {
+    if (Tok.isAny(tok::at_sign, tok::kw_inout) ||
+        (Tok.is(tok::identifier) &&
+         (Tok.getRawText().equals("__shared") ||
+          Tok.getRawText().equals("__owned"))))
+      return parseTypeAttributeListPresent(Specifier, SpecifierLoc, Attributes);
+    return false;
+  }
+  bool parseTypeAttributeListPresent(ParamDecl::Specifier &Specifier,
+                                     SourceLoc &SpecifierLoc,
+                                     TypeAttributes &Attributes);
+  bool parseTypeAttribute(TypeAttributes &Attributes, SourceLoc AtLoc,
+                          bool justChecking = false);
+  
+  
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
   ParserStatus parseInheritance(MutableArrayRef<TypeLoc> &Inherited,
@@ -1179,47 +1190,44 @@ public:
   //===--------------------------------------------------------------------===//
   // Type Parsing
 
-  ParserResult<TypeRepr> parseType();
-  ParserResult<TypeRepr> parseType(Diag<> MessageID,
-                                   bool HandleCodeCompletion = true,
-                                   bool IsSILFuncDecl = false);
-  ParserStatus parseGenericArguments(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
-                                     SourceLoc &LAngleLoc,
-                                     SourceLoc &RAngleLoc);
-  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
-                                 ParamDecl::Specifier Specifier,
-                                 SourceLoc SpecifierLoc);
-  ParserResult<TypeRepr> parseAnyTypeAST();
+  using TypeASTResult = ParserResult<TypeRepr>;
+  using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
 
   ParsedSyntaxResult<ParsedLayoutConstraintSyntax>
   parseLayoutConstraintSyntax();
 
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeSyntax();
-  ParsedSyntaxResult<ParsedTypeSyntax>
-  parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
-                  bool IsSILFuncDecl = false);
+  TypeResult parseTypeSyntax();
+  TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
+                             bool IsSILFuncDecl = false);
+
+  TypeASTResult parseType();
+  TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
+                          bool IsSILFuncDecl = false);
+  ParserStatus
+  parseGenericArgumentsAST(llvm::SmallVectorImpl<TypeRepr *> &ArgsAST,
+                           SourceLoc &LAngleLoc, SourceLoc &RAngleLoc);
+  TypeASTResult parseSILBoxType(GenericParamList *generics,
+                                const TypeAttributes &attrs,
+                                Optional<Scope> &GenericsScope);
+  TypeASTResult parseTypeSimpleOrCompositionAST(Diag<> MessageID,
+                                                bool HandleCodeCompletion);
+  TypeASTResult parseAnyTypeAST();
 
   ParsedSyntaxResult<ParsedGenericArgumentClauseSyntax>
   parseGenericArgumentClauseSyntax();
 
-  ParsedSyntaxResult<ParsedTypeSyntax>
-  parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
-  ParsedSyntaxResult<ParsedTypeSyntax>
-  parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeIdentifier();
-  ParsedSyntaxResult<ParsedTypeSyntax> parseAnyType();
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeTupleBody();
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeCollection();
-  ParsedSyntaxResult<ParsedTypeSyntax> parseMetatypeType(ParsedTypeSyntax Base);
-  ParsedSyntaxResult<ParsedTypeSyntax> parseOptionalType(ParsedTypeSyntax Base);
-  ParsedSyntaxResult<ParsedTypeSyntax>
-  parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
-  ParsedSyntaxResult<ParsedTypeSyntax> parseSILBoxTypeSyntax(
-      Optional<ParsedGenericParameterClauseListSyntax> genericParams);
+  TypeResult parseTypeSimple(Diag<> MessageID, bool HandleCodeCompletion);
+  TypeResult parseTypeSimpleOrComposition(Diag<> MessageID, bool HandleCodeCompletion);
+  TypeResult parseTypeIdentifier();
+  TypeResult parseAnyType();
+  TypeResult parseTypeTupleBody();
+  TypeResult parseTypeCollection();
+  TypeResult parseMetatypeType(ParsedTypeSyntax Base);
+  TypeResult parseOptionalType(ParsedTypeSyntax Base);
+  TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
 
-  ParsedSyntaxResult<ParsedTypeSyntax> parseTypeArray(ParsedTypeSyntax Base,
-                                                      SourceLoc BaseLoc);
-  ParsedSyntaxResult<ParsedTypeSyntax> parseOldStyleProtocolComposition();
+  TypeResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
+  TypeResult parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
   ParsedTokenSyntax consumeOptionalTokenSyntax();
@@ -1229,10 +1237,9 @@ public:
   ParsedTokenSyntax consumeImplicitlyUnwrappedOptionalTokenSyntax();
   SourceLoc consumeImplicitlyUnwrappedOptionalToken();
 
-  ParsedSyntaxResult<ParsedTypeSyntax>
-  applyAttributeToTypeSyntax(ParsedSyntaxResult<ParsedTypeSyntax> &&ty,
-                             Optional<ParsedTokenSyntax> specifier,
-                             Optional<ParsedAttributeListSyntax> attrs);
+  TypeRepr *applyAttributeToType(TypeRepr *Ty, const TypeAttributes &Attr,
+                                 ParamDecl::Specifier Specifier,
+                                 SourceLoc SpecifierLoc);
 
   //===--------------------------------------------------------------------===//
   // Pattern Parsing
