@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name main
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name main
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name main | %FileCheck %s
+
+// Round-trip parsing/printing and serialization/deserialization test.
+// NOTE: deserialization currently fails if public function bodies are removed
+// so that they are only declarations. This may require investigation.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+// Test public non-generic function.
+// SIL differentiability witness:
+// - Has public linkage (implicit).
+// - Has no `where` clause.
+
+sil [ossa] @foo : $@convention(thin) (Float) -> Float {
+bb0(%0 : $Float):
+  return %0 : $Float
+}
+
+sil @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  return undef : $(Float, @callee_guaranteed (Float) -> Float)
+}
+
+sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
+  jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+}
+
+// CHECK-LABEL: // differentiability witness for foo
+// CHECK: sil_differentiability_witness [parameters 0] [results 0] @foo : $@convention(thin) (Float) -> Float {
+// CHECK:   jvp: @AD__foo__jvp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK:   vjp: @AD__foo__vjp_src_0_wrt_0 : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+// CHECK: }
+
+// Test internal generic function.
+// SIL differentiability witness:
+// - Has hidden linkage.
+// - Has `where` clause.
+
+sil hidden [ossa] @generic : $@convention(thin) <T> (@in_guaranteed T, Float) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $Float):
+  copy_addr %1 to [initialization] %0 : $*T
+  %void = tuple ()
+  return %void : $()
+}
+
+sil hidden @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector) {
+bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $Float):
+  return undef : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector
+}
+
+sil hidden @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float)) {
+bb0(%0 : $*τ_0_0, %1 : $*τ_0_0, %2 : $Float):
+  return undef : $@callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float)
+}
+
+sil_differentiability_witness hidden [parameters 0 1] [results 0] [where τ_0_0 : _Differentiable] @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0 {
+  jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+  vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+}
+
+// CHECK-LABEL: // differentiability witness for generic
+// CHECK: sil_differentiability_witness hidden [parameters 0 1] [results 0] [where τ_0_0 : _Differentiable] @generic : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0, Float) -> @out τ_0_0 {
+// CHECK:   jvp: @AD__generic__jvp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector, Float) -> @out τ_0_0.TangentVector)
+// CHECK:   vjp: @AD__generic__vjp_src_0_wrt_0_1 : $@convention(thin) <τ_0_0 where τ_0_0 : _Differentiable> (@in_guaranteed τ_0_0, Float) -> (@out τ_0_0, @owned @callee_guaranteed (@in_guaranteed τ_0_0.TangentVector) -> (@out τ_0_0.TangentVector, Float))
+// CHECK: }

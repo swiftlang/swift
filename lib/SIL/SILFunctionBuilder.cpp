@@ -86,10 +86,7 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
     for (auto *A : Attrs.getAttributes<DifferentiableAttr>()) {
       // Get lowered argument indices.
       auto *paramIndices = A->getParameterIndices();
-      // NOTE: If `A->getParameterIndices()` is `nullptr`, continue. This is a
-      // necessary hack regarding deserialization.
-      if (!paramIndices)
-        continue;
+      assert(paramIndices && "Parameter indices should have been resolved");
       auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
           paramIndices, decl->getInterfaceType()->castTo<AnyFunctionType>());
       SILAutoDiffIndices indices(/*source*/ 0, loweredParamIndices);

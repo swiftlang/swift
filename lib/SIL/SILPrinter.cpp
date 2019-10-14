@@ -2723,6 +2723,33 @@ printSILDefaultWitnessTables(SILPrintContext &Ctx,
     wt->print(Ctx.OS(), Ctx.printVerbose());
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+static void printSILDifferentiabilityWitnesses(
+    SILPrintContext &Ctx,
+    const SILModule::DifferentiabilityWitnessListType &diffWitnesses) {
+  if (!Ctx.sortSIL()) {
+    for (auto &dw : diffWitnesses)
+      dw.print(Ctx.OS(), Ctx.printVerbose());
+    return;
+  }
+
+  std::vector<const SILDifferentiabilityWitness *> sortedDiffWitnesses;
+  sortedDiffWitnesses.reserve(diffWitnesses.size());
+  for (auto &dw : diffWitnesses)
+    sortedDiffWitnesses.push_back(&dw);
+  std::sort(sortedDiffWitnesses.begin(), sortedDiffWitnesses.end(),
+    [] (const SILDifferentiabilityWitness *w1,
+        const SILDifferentiabilityWitness *w2) -> bool {
+      // TODO(TF-893): Sort based on more criteria for deterministic ordering.
+      return w1->getOriginalFunction()->getName()
+          .compare(w2->getOriginalFunction()->getName());
+    }
+  );
+  for (auto *dw : sortedDiffWitnesses)
+    dw->print(Ctx.OS(), Ctx.printVerbose());
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 static void
 printSILCoverageMaps(SILPrintContext &Ctx,
                      const SILModule::CoverageMapCollectionType &CoverageMaps) {
@@ -2840,6 +2867,10 @@ void SILModule::print(SILPrintContext &PrintCtx, ModuleDecl *M,
   printSILVTables(PrintCtx, getVTableList());
   printSILWitnessTables(PrintCtx, getWitnessTableList());
   printSILDefaultWitnessTables(PrintCtx, getDefaultWitnessTableList());
+  // SWIFT_ENABLE_TENSORFLOW
+  printSILDifferentiabilityWitnesses(PrintCtx,
+                                     getDifferentiabilityWitnessList());
+  // SWIFT_ENABLE_TENSORFLOW END
   printSILCoverageMaps(PrintCtx, getCoverageMaps());
   printSILProperties(PrintCtx, getPropertyList());
   
@@ -3053,6 +3084,74 @@ void SILDefaultWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
 void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
+
+// SWIFT_ENABLE_TENSORFLOW
+void SILDifferentiabilityWitness::print(
+    llvm::raw_ostream &OS, bool verbose) const {
+  OS << "// differentiability witness for "
+     << demangleSymbol(originalFunction->getName()) << '\n';
+  PrintOptions qualifiedSILTypeOptions = PrintOptions::printQualifiedSILType();
+  // sil_differentiability_witness (linkage)?
+  OS << "sil_differentiability_witness ";
+  printLinkage(OS, linkage, ForDefinition);
+  // ([serialized])?
+  if (isSerialized())
+    OS << "[serialized] ";
+  // [parameters ...]
+  OS << "[parameters ";
+  interleave(getParameterIndices()->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ' '; });
+  // [results ...]
+  OS << "] [results ";
+  interleave(getResultIndices()->getIndices(),
+             [&](unsigned index) { OS << index; },
+             [&] { OS << ' '; });
+  OS << ']';
+  // ([where ...])?
+  if (auto *derivativeGenSig = getDerivativeGenericSignature()) {
+    ArrayRef<Requirement> requirements;
+    SmallVector<Requirement, 4> requirementsScratch;
+    auto *origGenEnv = originalFunction->getGenericEnvironment();
+    if (derivativeGenSig) {
+      if (origGenEnv) {
+        requirementsScratch = derivativeGenSig->requirementsNotSatisfiedBy(
+            origGenEnv->getGenericSignature());
+        requirements = requirementsScratch;
+      } else {
+        requirements = derivativeGenSig->getRequirements();
+      }
+    }
+    if (!requirements.empty()) {
+      OS << " [where ";
+      auto subPrinter = PrintOptions::printSIL();
+      interleave(requirements,
+                 [&](Requirement req) {
+                   req.print(OS, subPrinter);
+                 },
+                 [&] { OS << ", "; });
+      OS << ']';
+    }
+  }
+  // @original-function-name : $original-sil-type
+  OS << " @" << originalFunction->getName() << " : "
+     << originalFunction->getLoweredType();
+  // {
+  //   jvp: @jvp-function-name : $jvp-sil-type
+  //   vjp: @vjp-function-name : $vjp-sil-type
+  // }
+  OS << " {\n";
+  if (jvp)
+    OS << "  jvp: @" << jvp->getName() << " : " << jvp->getLoweredType() << '\n';
+  if (vjp)
+    OS << "  vjp: @" << vjp->getName() << " : " << vjp->getLoweredType() << '\n';
+  OS << "}\n\n";
+}
+
+void SILDifferentiabilityWitness::dump() const {
+  print(llvm::errs());
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 void SILCoverageMap::print(SILPrintContext &PrintCtx) const {
   llvm::raw_ostream &OS = PrintCtx.OS();

@@ -39,4 +39,5 @@ struct B {
   let property: @differentiable linear // okay
   let property: linear // okay
   let property: @differentiable(linear) linear // okay
+  let property: @differentiable(linear) @convention(c) linear // okay
 }

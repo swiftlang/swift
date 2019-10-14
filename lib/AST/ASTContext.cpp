@@ -452,6 +452,7 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   /// For uniquifying `AutoDiffDerivativeFunctionIdentifier` allocations.
   llvm::FoldingSet<AutoDiffDerivativeFunctionIdentifier>
       AutoDiffDerivativeFunctionIdentifiers;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.

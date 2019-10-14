@@ -919,7 +919,7 @@ public struct AnyDerivative : EuclideanDifferentiable & AdditiveArithmetic {
   @differentiating(+)
   @usableFromInline internal static func _jvpAdd(
     lhs: AnyDerivative, rhs: AnyDerivative
-    ) -> (value: AnyDerivative,
+  ) -> (value: AnyDerivative,
     differential: (AnyDerivative, AnyDerivative) -> (AnyDerivative)) {
       return (lhs + rhs, { (dlhs, drhs) in dlhs + drhs })
   }
