@@ -1129,9 +1129,6 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
   params.reserve(clause.getGenericParameterList().getNumChildren());
 
   for (auto elem : clause.getGenericParameterList()) {
-    auto nameTok = elem.getName();
-    if (nameTok.isMissing())
-      break;
 
     DeclAttributes attrs = generateDeclAttributes(elem, Loc, false);
     Identifier name = Context.getIdentifier(elem.getName().getIdentifierText());

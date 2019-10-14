@@ -1632,9 +1632,6 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc At
       }
       consumeToken(tok::code_complete);
       return makeParserCodeCompletionStatus();
-    } else {
-      // Synthesize an r_brace syntax node if the token is absent
-      SyntaxContext->synthesize(tok::identifier, AtLoc.getAdvancedLoc(1));
     }
 
     diagnose(Tok, diag::expected_attribute_name);

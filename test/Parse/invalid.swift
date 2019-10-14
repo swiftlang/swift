@@ -145,6 +145,3 @@ enum sr8202_enum<@indirect T> {} // expected-error {{'indirect' is a declaration
 protocol P {
   @available(swift, introduced: 4.2) associatedtype Assoc // expected-error {{'@availability' attribute cannot be applied to this declaration}}
 }
-
-struct genericParamIncomplete1<@> {} // expected-error {{expected an attribute name}} expected-error {{expected an identifier to name generic parameter}}
-struct genericParamIncomplete2<@objc> {} // expected-error {{expected an identifier to name generic parameter}}
