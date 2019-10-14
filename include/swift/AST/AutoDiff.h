@@ -45,6 +45,18 @@ enum class DifferentiabilityKind: uint8_t {
   Linear = 2
 };
 
+// TODO(TF-904): Replace `DifferentiableFunctionExtractInst::Extractee`.
+enum class NormalDifferentiableFunctionTypeComponent : uint8_t {
+  Original = 0,
+  JVP = 1,
+  VJP = 2
+};
+
+enum class LinearDifferentiableFunctionTypeComponent : uint8_t {
+  Original = 0,
+  Transpose = 1
+};
+
 class ParsedAutoDiffParameter {
 public:
   enum class Kind { Named, Ordered, Self };

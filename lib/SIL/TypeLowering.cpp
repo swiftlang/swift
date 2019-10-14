@@ -239,6 +239,7 @@ namespace {
       case DifferentiabilityKind::NonDifferentiable:
         break;
       }
+
       // Only escaping closures are references.
       bool isSwiftEscaping = type->getExtInfo().isNoEscape() &&
                              type->getExtInfo().getRepresentation() ==
@@ -249,6 +250,7 @@ namespace {
       return asImpl().handleTrivial(type);
     }
 
+    // SWIFT_ENABLE_TENSORFLOW
     RecursiveProperties
     getNormalDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type) {
@@ -945,15 +947,15 @@ namespace {
   class LinearDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
                    LinearDifferentiableSILFunctionTypeLowering,
-                   LinearFunctionExtractee> {
+                   LinearDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
 
-    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
-                               SILValue tupleValue,
-                               LinearFunctionExtractee extractee,
-                               const TypeLowering &eltLowering) const {
-      return B.createLinearFunctionExtract(loc, extractee, tupleValue);
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        LinearDifferentiableFunctionTypeComponent component,
+        const TypeLowering &eltLowering) const {
+      return B.createLinearFunctionExtract(loc, component, tupleValue);
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
@@ -971,14 +973,14 @@ namespace {
       auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
-        LinearFunctionExtractee::Original,
+        LinearDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
       auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
           paramIndices, TC, LookUpConformanceInModule(&TC.M));
       auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
       children.push_back(Child{
-        LinearFunctionExtractee::Transpose,
+        LinearDifferentiableFunctionTypeComponent::Transpose,
         TC.getTypeLowering(transposeSILFnTy, getResilienceExpansion())
       });
       assert(children.size() == 2);
