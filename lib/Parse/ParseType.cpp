@@ -399,7 +399,7 @@ Parser::TypeASTResult Parser::parseType(Diag<> MessageID,
       diagnose(Tok.getLoc(), DiagID)
           .fixItInsert(ArrowLoc, "throws ")
           .fixItRemove(Tok.getLoc());
-      Throws = consumeTokenSyntax();
+      ignoreToken();
     }
     ParserResult<TypeRepr> SecondHalf =
         parseType(diag::expected_type_function_result);
@@ -946,7 +946,8 @@ Parser::TypeResult Parser::parseOldStyleProtocolComposition() {
       replacement = "Any";
     } else {
       auto extractText = [&](ParsedTypeSyntax &Type) -> StringRef {
-        auto SourceRange = Type.getRaw().getDeferredRange();
+        auto SourceRange = Type.getRaw()
+          .getDeferredRange(/*includeTrivia=*/false);
         return SourceMgr.extractText(SourceRange);
       };
       auto Begin = Protocols.begin();
@@ -1063,18 +1064,15 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       // Consume a name.
       NameLoc = Tok.getLoc();
       Name = consumeArgumentLabelSyntax();
-      LocalJunk.push_back(Name->copyDeferred());
 
       // If there is a second name, consume it as well.
       if (Tok.canBeArgumentLabel()) {
         SecondNameLoc = Tok.getLoc();
         SecondName = consumeArgumentLabelSyntax();
-        LocalJunk.push_back(SecondName->copyDeferred());
       }
 
       // Consume the ':'.
       if ((Colon = consumeTokenSyntaxIf(tok::colon))) {
-        LocalJunk.push_back(Colon->copyDeferred());
         // If we succeed, then we successfully parsed a label.
         if (Backtracking)
           Backtracking->cancelBacktrack();
@@ -1091,6 +1089,18 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       IsInOutObsoleted = false;
     }
 
+    if (!Backtracking || !Backtracking->willBacktrack()) {
+      if (Name)
+        LocalJunk.push_back(Name->copyDeferred());
+      if (SecondName)
+        LocalJunk.push_back(SecondName->copyDeferred());
+      if (Colon)
+        LocalJunk.push_back(Colon->copyDeferred());
+    } else if (Backtracking && Backtracking->willBacktrack()) {
+      Name.reset();
+      SecondName.reset();
+      assert(!Colon.hasValue());
+    }
     Backtracking.reset();
 
     // Parse the type annotation.

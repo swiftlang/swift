@@ -120,6 +120,10 @@ void Parsed${node.name}Builder::finishLayout(bool deferred) {
   }
 %     end
 %   end
+
+#ifndef NDEBUG
+  ParsedRawSyntaxRecorder::verifyElementRanges(Layout);
+#endif
 % end
 }
 
