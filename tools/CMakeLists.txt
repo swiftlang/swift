@@ -11,7 +11,6 @@ endif()
 
 # Add generated libSyntax headers to global dependencies.
 list(APPEND LLVM_COMMON_DEPENDS swift-syntax-generated-headers)
-list(APPEND LLVM_COMMON_DEPENDS swift-parse-syntax-generated-headers)
 if(SWIFT_BUILD_SOURCEKIT)
   list(APPEND LLVM_COMMON_DEPENDS generated_sourcekit_uids)
 endif()
