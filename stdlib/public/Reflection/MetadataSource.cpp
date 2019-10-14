@@ -22,18 +22,18 @@ class PrintMetadataSource
   FILE *file;
   unsigned Indent;
 
-  FILE * &indent(unsigned Amount) {
+  FILE * indent(unsigned Amount) {
     for (unsigned i = 0; i < Amount; ++i)
       fprintf(file, " ");
     return file;
   }
 
-  FILE * &printHeader(std::string Name) {
+  FILE * printHeader(std::string Name) {
     fprintf(indent(Indent), "(%s", Name.c_str());
     return file;
   }
 
-  FILE * &printField(std::string name, std::string value) {
+  FILE * printField(std::string name, std::string value) {
     if (!name.empty())
       fprintf(file, " %s=%s", name.c_str(), value.c_str());
     else

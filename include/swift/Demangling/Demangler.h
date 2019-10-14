@@ -133,7 +133,7 @@ public:
     size_t ObjectSize = NumObjects * sizeof(T);
     CurPtr = align(CurPtr, alignof(T));
 #ifdef NODE_FACTORY_DEBUGGING
-    fprintf(stderr, "%salloc%zu, CurPtr = %p\n", indent().c_str(), ObjectSize, (void *)CurPtr)
+    fprintf(stderr, "%salloc %zu, CurPtr = %p\n", indent().c_str(), ObjectSize, (void *)CurPtr)
     allocatedMemory += ObjectSize;
 #endif
 

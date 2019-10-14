@@ -402,10 +402,10 @@ void TypeRefBuilder::dumpBuiltinTypeSection(FILE *file) {
       auto typeName = nodeToString(typeNode);
       
       fprintf(file, "\n- %s:\n", typeName.c_str());
-      fprintf(file, "Size: %s\n", std::to_string(descriptor->Size).c_str());
-      fprintf(file, "Alignment: %s:\n", std::to_string(descriptor->getAlignment()).c_str());
-      fprintf(file, "Stride: %s:\n", std::to_string(descriptor->Stride).c_str());
-      fprintf(file, "NumExtraInhabitants: %s:\n", std::to_string(descriptor->NumExtraInhabitants).c_str());
+      fprintf(file, "Size: %u\n", descriptor->Size);
+      fprintf(file, "Alignment: %u:\n", descriptor->getAlignment());
+      fprintf(file, "Stride: %u:\n", descriptor->Stride);
+      fprintf(file, "NumExtraInhabitants: %u:\n", descriptor->NumExtraInhabitants);
       fprintf(file, "BitwiseTakable: %d:\n", descriptor->isBitwiseTakable());
     }
   }
