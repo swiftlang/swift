@@ -5689,7 +5689,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
                               isa<AccessorDecl>(FD));
       if (auto nonmutatingAttr =
               FD->getAttrs().getAttribute<NonMutatingAttr>()) {
-        diags.fixItReplace(nonmutatingAttr->getLocation(), "mutating ");
+        diags.fixItReplace(nonmutatingAttr->getLocation(), "mutating");
       } else {
         diags.fixItInsert(FD->getFuncLoc(), "mutating ");
       }
