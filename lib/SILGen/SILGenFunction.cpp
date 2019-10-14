@@ -666,6 +666,31 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
   }
 }
 
+#ifndef NDEBUG
+/// If \c false, \c function is either a declaration that inherently cannot
+/// capture variables, or it is in a context it cannot capture variables from.
+/// In either case, it is expected that Sema may not have computed its
+/// \c CaptureInfo.
+///
+/// This call exists for use in assertions; do not use it to skip capture
+/// processing.
+static bool canCaptureFromParent(SILDeclRef function) {
+  switch (function.kind) {
+  case SILDeclRef::Kind::StoredPropertyInitializer:
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+    return false;
+
+  default:
+    if (function.hasDecl()) {
+      if (auto dc = dyn_cast<DeclContext>(function.getDecl())) {
+        return TypeConverter::canCaptureFromParent(dc);
+      }
+    }
+    return false;
+  }
+}
+#endif
+
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
                                            bool EmitProfilerIncrement) {
   auto *dc = function.getDecl()->getInnermostDeclContext();
@@ -707,10 +732,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   if (function.getAnyFunctionRef())
     captureInfo = SGM.M.Types.getLoweredLocalCaptures(function);
   else {
-    // The expressions for these cannot capture.
-    assert(function.kind == SILDeclRef::Kind::StoredPropertyInitializer ||
-           function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer ||
-           (function.getDecl() && !function.getDecl()->getDeclContext()->isLocalContext()));
+    assert(!canCaptureFromParent(function));
     captureInfo = CaptureInfo::empty();
   }
 
