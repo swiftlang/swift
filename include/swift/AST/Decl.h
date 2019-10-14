@@ -667,6 +667,13 @@ private:
   void operator=(const Decl&) = delete;
   SourceLoc getLocFromSource() const;
 
+  struct CachedExternalSourceLocs {
+    SourceLoc Loc;
+    SourceLoc StartLoc;
+    SourceLoc EndLoc;
+  };
+  mutable CachedExternalSourceLocs *CachedLocs = nullptr;
+  CachedExternalSourceLocs *calculateSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)

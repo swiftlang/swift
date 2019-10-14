@@ -248,7 +248,7 @@ public:
   SourceLoc getLocFromExternalSource(StringRef Path, unsigned Line, unsigned Col);
 private:
   const VirtualFile *getVirtualFile(SourceLoc Loc) const;
-  Optional<unsigned> getExternalSourceBufferId(StringRef Path);
+  unsigned getExternalSourceBufferId(StringRef Path);
   int getLineOffset(SourceLoc Loc) const {
     if (auto VFile = getVirtualFile(Loc))
       return VFile->LineOffset;

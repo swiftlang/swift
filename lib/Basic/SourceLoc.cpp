@@ -357,16 +357,16 @@ llvm::Optional<unsigned> SourceManager::resolveFromLineCol(unsigned BufferId,
   return None;
 }
 
-Optional<unsigned> SourceManager::getExternalSourceBufferId(StringRef Path) {
+unsigned SourceManager::getExternalSourceBufferId(StringRef Path) {
   auto It = ExternalBufferId.find(Path.data());
   if (It != ExternalBufferId.end()) {
     return It->second;
   }
+  unsigned Id = 0u;
   auto InputFileOrErr = swift::vfs::getFileOrSTDIN(*getFileSystem(), Path);
-  if (!InputFileOrErr) {
-    return None;
+  if (InputFileOrErr) {
+    Id = addNewSourceBuffer(std::move(InputFileOrErr.get()));
   }
-  auto Id = addNewSourceBuffer(std::move(InputFileOrErr.get()));
   ExternalBufferId.insert({Path.data(), Id});
   return Id;
 }
@@ -375,10 +375,10 @@ SourceLoc
 SourceManager::getLocFromExternalSource(StringRef Path, unsigned Line,
                                         unsigned Col) {
   auto BufferId = getExternalSourceBufferId(Path);
-  if (!BufferId.hasValue())
+  if (BufferId == 0u)
     return SourceLoc();
-  auto Offset = resolveFromLineCol(*BufferId, Line, Col);
+  auto Offset = resolveFromLineCol(BufferId, Line, Col);
   if (!Offset.hasValue())
     return SourceLoc();
-  return getLocForOffset(*BufferId, *Offset);
+  return getLocForOffset(BufferId, *Offset);
 }
