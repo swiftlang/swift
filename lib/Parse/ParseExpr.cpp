@@ -19,6 +19,7 @@
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/ParsedSyntaxBuilders.h"
 #include "swift/Parse/ParsedSyntaxRecorder.h"
 #include "swift/Parse/SyntaxParsingContext.h"
 #include "swift/Syntax/SyntaxKind.h"
@@ -2041,6 +2042,32 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       AppendingExpr));
 }
 
+/// Parse an optional argument label and ':'. Returns \c true if it's parsed.
+/// Returns \c false it it's not found.
+bool Parser::parseOptionalArgumentLabelSyntax(
+    Optional<ParsedTokenSyntax> &name, Optional<ParsedTokenSyntax> &colon) {
+  if (!Tok.canBeArgumentLabel() || !peekToken().is(tok::colon))
+    return false;
+
+  // If this was an escaped identifier that need not have been escaped, say
+  // so. Only _ needs escaping, because we take foo(_: 3) to be equivalent
+  // to foo(3), to be more uniform with _ in function declaration as well as
+  // the syntax for referring to the function pointer (foo(_:)),
+  auto text = Tok.getText();
+  auto escaped = Tok.isEscapedIdentifier();
+  auto underscore = Tok.is(tok::kw__) || (escaped && text == "_");
+  if (escaped && !underscore && canBeArgumentLabel(text)) {
+    SourceLoc start = Tok.getLoc();
+    SourceLoc end = start.getAdvancedLoc(Tok.getLength());
+    diagnose(Tok, diag::escaped_parameter_name, text)
+        .fixItRemoveChars(start, start.getAdvancedLoc(1))
+        .fixItRemoveChars(end.getAdvancedLoc(-1), end);
+  }
+  name = consumeArgumentLabelSyntax();
+  colon = consumeTokenSyntax(tok::colon);
+  return true;
+}
+
 void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   // Check to see if there is an argument label.
   if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
@@ -2065,220 +2092,197 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
   }
 }
 
-DeclName Parser::parseUnqualifiedDeclName(bool afterDot,
-                                          DeclNameLoc &loc,
-                                          const Diagnostic &diag,
-                                          bool allowOperators,
-                                          bool allowZeroArgCompoundNames,
-                                          bool allowDeinitAndSubscript) {
-  // Consume the base name.
-  DeclBaseName baseName;
-  SourceLoc baseNameLoc;
+/// Parse unqualified decl name.
+///
+///   decl-name:
+///     identifier decl-name-arguments?
+///   decl-name-arguments:
+///     '(' decl-name-argument* ')'
+///   decl-name-argument:
+///     (identifier | '_') ':'
+ParserStatus Parser::parseUnqualifiedDeclNameSyntax(
+    Optional<ParsedTokenSyntax> &identTok,
+    Optional<ParsedDeclNameArgumentsSyntax> &declNameArg, bool afterDot,
+    const Diagnostic &diag, bool allowOperators, bool allowZeroArgCompoundNames,
+    bool allowDeinitAndSubscript) {
+
   if (Tok.isAny(tok::identifier, tok::kw_Self, tok::kw_self)) {
-    Identifier baseNameId;
-    baseNameLoc = consumeIdentifier(
-        &baseNameId, /*allowDollarIdentifier=*/true);
-    baseName = baseNameId;
+    identTok = consumeTokenSyntax();
   } else if (allowOperators && Tok.isAnyOperator()) {
-    baseName = Context.getIdentifier(Tok.getText());
-    baseNameLoc = consumeToken();
+    identTok = consumeTokenSyntax();
   } else if (afterDot && Tok.isKeyword()) {
-    // Syntax highlighting should treat this token as an identifier and
-    // not as a keyword.
-    if (Tok.is(tok::kw_init))
-      baseName = DeclBaseName::createConstructor();
-    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_deinit))
-      baseName = DeclBaseName::createDestructor();
-    else if (allowDeinitAndSubscript &&Tok.is(tok::kw_subscript))
-      baseName = DeclBaseName::createSubscript();
-    else
-      baseName = Context.getIdentifier(Tok.getText());
-    Tok.setKind(tok::identifier);
-    baseNameLoc = consumeToken();
+    if (Tok.is(tok::kw_init) ||
+        (allowDeinitAndSubscript &&
+         Tok.isAny(tok::kw_deinit, tok::kw_subscript))) {
+      // Parse 'init', 'deinit' and 'subscript' as a keyword.
+    } else {
+      Tok.setKind(tok::identifier);
+    }
+    identTok = consumeTokenSyntax();
   } else {
-    baseName = Context.getIdentifier(Tok.getText());
     checkForInputIncomplete();
     diagnose(Tok, diag);
-    return DeclName();
+    return makeParserError();
   }
 
   // If the next token isn't a following '(', we don't have a compound name.
-  if (!Tok.isFollowingLParen()) {
-    loc = DeclNameLoc(baseNameLoc);
-    return baseName;
-  }
-
+  if (!Tok.isFollowingLParen())
+    return makeParserSuccess();
 
   // If the next token is a ')' then we have a 0-arg compound name. This is
   // explicitly differentiated from "simple" (non-compound) name in DeclName.
   // Unfortunately only some places in the grammar are ok with accepting this
   // kind of name; in other places it's ambiguous with trailing calls.
   if (allowZeroArgCompoundNames && peekToken().is(tok::r_paren)) {
-    SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
-    consumeToken(tok::l_paren);
-    SyntaxContext->addSyntax(
-        ParsedSyntaxRecorder::makeBlankDeclNameArgumentList(
-          Tok.getLoc(), *SyntaxContext));
-    consumeToken(tok::r_paren);
-    loc = DeclNameLoc(baseNameLoc);
-    SmallVector<Identifier, 2> argumentLabels;
-    return DeclName(Context, baseName, argumentLabels);
+    ParsedDeclNameArgumentsSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
+    builder.useRightParen(consumeTokenSyntax(tok::r_paren));
+    declNameArg = builder.build();
+    return makeParserSuccess();
   }
 
   // If the token after that isn't an argument label or ':', we don't have a
   // compound name.
   if ((!peekToken().canBeArgumentLabel() && !peekToken().is(tok::colon)) ||
-      Identifier::isEditorPlaceholder(peekToken().getText())) {
-    loc = DeclNameLoc(baseNameLoc);
-    return baseName;
-  }
+      Identifier::isEditorPlaceholder(peekToken().getText()))
+    return makeParserSuccess();
+
+  ParsedDeclNameArgumentsSyntaxBuilder builder(*SyntaxContext);
 
   // Try to parse a compound name.
-  SyntaxParsingContext ArgsCtxt(SyntaxContext, SyntaxKind::DeclNameArguments);
   BacktrackingScope backtrack(*this);
 
-  SmallVector<Identifier, 2> argumentLabels;
-  SmallVector<SourceLoc, 2> argumentLabelLocs;
-  SourceLoc lparenLoc = consumeToken(tok::l_paren);
-  SourceLoc rparenLoc;
+  // Parse '('.
+  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
   while (Tok.isNot(tok::r_paren)) {
-    SyntaxParsingContext ArgCtxt(SyntaxContext, SyntaxKind::DeclNameArgument);
+    ParsedDeclNameArgumentSyntaxBuilder argBuilder(*SyntaxContext);
 
     // If we see a ':', the user forgot the '_';
     if (Tok.is(tok::colon)) {
       diagnose(Tok, diag::empty_arg_label_underscore)
           .fixItInsert(Tok.getLoc(), "_");
-      argumentLabels.push_back(Identifier());
-      argumentLabelLocs.push_back(consumeToken(tok::colon));
+      argBuilder.useColon(consumeTokenSyntax(tok::colon));
+      builder.addArgumentsMember(argBuilder.build());
+      continue;
     }
 
-    Identifier argName;
-    SourceLoc argLoc;
-    parseOptionalArgumentLabel(argName, argLoc);
-    if (argLoc.isValid()) {
-      argumentLabels.push_back(argName);
-      argumentLabelLocs.push_back(argLoc);
+    Optional<ParsedTokenSyntax> name;
+    Optional<ParsedTokenSyntax> colon;
+    if (parseOptionalArgumentLabelSyntax(name, colon)) {
+      argBuilder.useName(std::move(*name));
+      argBuilder.useColon(std::move(*colon));
+      builder.addArgumentsMember(argBuilder.build());
       continue;
     }
 
     // This is not a compound name.
     // FIXME: Could recover better if we "know" it's a compound name.
-    loc = DeclNameLoc(baseNameLoc);
-    ArgCtxt.setBackTracking();
-    ArgsCtxt.setBackTracking();
-    return baseName;
+    return makeParserSuccess();
   }
+
   // We have a compound name. Cancel backtracking and build that name.
   backtrack.cancelBacktrack();
 
-  ArgsCtxt.collectNodesInPlace(SyntaxKind::DeclNameArgumentList);
-  rparenLoc = consumeToken(tok::r_paren);
+  // Parse ')'.
+  builder.useRightParen(consumeTokenSyntax(tok::r_paren));
+  declNameArg = builder.build();
 
-  assert(!argumentLabels.empty() && "Logic above should prevent this");
-  assert(argumentLabels.size() == argumentLabelLocs.size());
+  return makeParserSuccess();
+}
 
-  loc = DeclNameLoc(Context, baseNameLoc, lparenLoc, argumentLabelLocs,
-                    rparenLoc);
-  return DeclName(Context, baseName, argumentLabels);
+DeclName Parser::parseUnqualifiedDeclName(bool afterDot, DeclNameLoc &loc,
+                                          const Diagnostic &diag,
+                                          bool allowOperators,
+                                          bool allowZeroArgCompoundNames,
+                                          bool allowDeinitAndSubscript) {
+  auto leadingLoc = leadingTriviaLoc();
+  Optional<ParsedTokenSyntax> parsedIdentTok;
+  Optional<ParsedDeclNameArgumentsSyntax> parsedDeclNameArgs;
+  auto status = parseUnqualifiedDeclNameSyntax(
+      parsedIdentTok, parsedDeclNameArgs, afterDot, diag, allowOperators,
+      allowZeroArgCompoundNames, allowDeinitAndSubscript);
+  if (status.isError())
+    return DeclName();
+
+  SyntaxContext->addSyntax(std::move(*parsedIdentTok));
+  auto identTok = SyntaxContext->topNode<TokenSyntax>();
+
+  Optional<DeclNameArgumentsSyntax> declNameArgs;
+  if (parsedDeclNameArgs) {
+    SyntaxContext->addSyntax(std::move(*parsedDeclNameArgs));
+    declNameArgs.emplace(SyntaxContext->topNode<DeclNameArgumentsSyntax>());
+  }
+
+  DeclName name;
+  std::tie(name, loc) =
+      Generator.generateUnqualifiedDeclName(identTok, declNameArgs, leadingLoc);
+  return name;
 }
 
 ///   expr-identifier:
-///     unqualified-decl-name generic-args?
-Expr *Parser::parseExprIdentifier() {
+///     unqualified-decl-name generic-argument-clause?
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprIdentifierSyntax() {
   assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
-  SyntaxParsingContext IDSyntaxContext(SyntaxContext,
-                                       SyntaxKind::IdentifierExpr);
-  Token IdentTok = Tok;
 
-  // Parse the unqualified-decl-name.
-  DeclNameLoc loc;
-  DeclName name = parseUnqualifiedDeclName(/*afterDot=*/false, loc,
-                                           diag::expected_expr);
+  if (swift::isEditorPlaceholder(Tok.getRawText())) {
+    return makeParsedResult(ParsedSyntaxRecorder::makeEditorPlaceholderExpr(
+        consumeTokenSyntax(), *SyntaxContext));
+  }
 
-  SmallVector<TypeRepr*, 8> args;
-  SourceLoc LAngleLoc, RAngleLoc;
-  bool hasGenericArgumentList = false;
-  
-  ///   The generic-args case is ambiguous with an expression involving '<'
-  ///   and '>' operators. The operator expression is favored unless a generic
-  ///   argument list can be successfully parsed, and the closing bracket is
-  ///   followed by one of these tokens:
-  ///     lparen_following rparen lsquare_following rsquare lbrace rbrace
-  ///     period_following comma semicolon
-  ///
-  if (canParseAsGenericArgumentList()) {
-    SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
-    SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
-    auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
-    if (argStat.isError())
-      diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
-    
-    // The result can be empty in error cases.
-    hasGenericArgumentList = !args.empty();
-  }
-  
-  ValueDecl *D = nullptr;
-  if (!InPoundIfEnvironment) {
-    D = lookupInScope(name);
-    // FIXME: We want this to work: "var x = { x() }", but for now it's better
-    // to disallow it than to crash.
-    if (D) {
-      for (auto activeVar : DisabledVars) {
-        if (activeVar == D) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-          return new (Context) ErrorExpr(loc.getSourceRange());
-        }
-      }
-    } else {
-      for (auto activeVar : DisabledVars) {
-        if (activeVar->getFullName() == name) {
-          diagnose(loc.getBaseNameLoc(), DisabledVarReason);
-          return new (Context) ErrorExpr(loc.getSourceRange());
-        }
-      }
-    }
-  }
-  
-  Expr *E;
-  if (D == nullptr) {
-    if (name.getBaseName().isEditorPlaceholder()) {
-      IDSyntaxContext.setCreateSyntax(SyntaxKind::EditorPlaceholderExpr);
-      return parseExprEditorPlaceholder(IdentTok, name.getBaseIdentifier());
-    }
+  Optional<ParsedTokenSyntax> idTok;
+  Optional<ParsedDeclNameArgumentsSyntax> declNameArgs;
+  auto status = parseUnqualifiedDeclNameSyntax(idTok, declNameArgs,
+                                               /*afterDot=*/false,
+                                               diag::expected_expr);
+  assert(status.isSuccess() && idTok.hasValue());
+  (void)status;
 
-    auto refKind = DeclRefKind::Ordinary;
-    E = new (Context) UnresolvedDeclRefExpr(name, refKind, loc);
-  } else if (auto TD = dyn_cast<TypeDecl>(D)) {
-    // When parsing default argument expressions for generic functions,
-    // we haven't built a FuncDecl or re-parented the GenericTypeParamDecls
-    // to the FuncDecl yet. Other than that, we should only ever find
-    // global or local declarations here.
-    assert(!TD->getDeclContext()->isTypeContext() ||
-           isa<GenericTypeParamDecl>(TD));
-    E = TypeExpr::createForDecl(loc.getBaseNameLoc(), TD, /*DC*/nullptr,
-                                /*implicit*/false);
-  } else {
-    E = new (Context) DeclRefExpr(D, loc, /*Implicit=*/false);
-  }
-  
-  if (hasGenericArgumentList) {
-    SmallVector<TypeLoc, 8> locArgs;
-    for (auto ty : args)
-      locArgs.push_back(ty);
-    E = UnresolvedSpecializeExpr::create(Context, E, LAngleLoc, locArgs,
-                                         RAngleLoc);
-  }
-  return E;
+  ParsedIdentifierExprSyntaxBuilder builder(*SyntaxContext);
+  builder.useIdentifier(std::move(*idTok));
+  if (declNameArgs)
+    builder.useDeclNameArguments(std::move(*declNameArgs));
+
+  if (canParseAsGenericArgumentList())
+    return parseExprSpecializeSyntax(builder.build());
+
+  return makeParsedResult(builder.build());
 }
 
-Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
-                                         Identifier PlaceholderId) {
-  assert(PlaceholderTok.is(tok::identifier));
-  assert(PlaceholderId.isEditorPlaceholder());
+/// Parse generic argument suffix for the base expression.
+///
+///   expr-specialize:
+///     expr generic-argument-clause
+ParsedSyntaxResult<ParsedExprSyntax>
+Parser::parseExprSpecializeSyntax(ParsedExprSyntax &&base) {
+  assert(startsWithLess(Tok));
 
+  auto LAngleLoc = Tok.getLoc();
+  auto genericArgs = parseGenericArgumentClauseSyntax();
+  auto status = genericArgs.getStatus();
+
+  if (status.isError())
+    diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
+  assert(!genericArgs.isNull());
+
+  auto specializeExpr = ParsedSyntaxRecorder::makeSpecializeExpr(
+      std::move(base), genericArgs.get(), *SyntaxContext);
+  return makeParsedResult(std::move(specializeExpr), status);
+}
+
+Expr *Parser::parseExprIdentifier() {
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseExprIdentifierSyntax();
+  assert(!parsed.isNull());
+  SyntaxContext->addSyntax(parsed.get());
+
+  auto syntax = SyntaxContext->topNode<ExprSyntax>();
+  return Generator.generate(syntax, leadingLoc);
+}
+
+Expr *Parser::parseExprEditorPlaceholder(SourceLoc loc, StringRef text) {
   auto parseTypeForPlaceholder = [&](TypeLoc &TyLoc, TypeRepr *&ExpansionTyR) {
     Optional<EditorPlaceholderData> DataOpt =
-      swift::parseEditorPlaceholder(PlaceholderTok.getText());
+        swift::parseEditorPlaceholder(text);
     if (!DataOpt)
       return;
     StringRef TypeStr = DataOpt->Type;
@@ -2289,8 +2293,8 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
     ParserPositionRAII PPR(*this);
 
     auto parseTypeString = [&](StringRef TyStr) -> TypeRepr* {
-      unsigned Offset = TyStr.data() - PlaceholderTok.getText().data();
-      SourceLoc TypeStartLoc = PlaceholderTok.getLoc().getAdvancedLoc(Offset);
+      unsigned Offset = TyStr.data() - text.data();
+      SourceLoc TypeStartLoc = loc.getAdvancedLoc(Offset);
       SourceLoc TypeEndLoc = TypeStartLoc.getAdvancedLoc(TyStr.size());
 
       LexerState StartState = L->getStateForBeginningOfTokenLoc(TypeStartLoc);
@@ -2325,9 +2329,8 @@ Expr *Parser::parseExprEditorPlaceholder(Token PlaceholderTok,
   TypeLoc TyLoc;
   TypeRepr *ExpansionTyR = nullptr;
   parseTypeForPlaceholder(TyLoc, ExpansionTyR);
-  return new (Context) EditorPlaceholderExpr(PlaceholderId,
-                                             PlaceholderTok.getLoc(),
-                                             TyLoc, ExpansionTyR);
+  return new (Context) EditorPlaceholderExpr(Context.getIdentifier(text),
+                                             loc, TyLoc, ExpansionTyR);
 }
 
 // Extract names of the tuple elements and preserve the structure

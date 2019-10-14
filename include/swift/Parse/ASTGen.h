@@ -81,6 +81,11 @@ public:
   //===--------------------------------------------------------------------===//
   // Expressions.
 
+  Expr *generate(const syntax::ExprSyntax &Expr, const SourceLoc Loc);
+  Expr *generate(const syntax::IdentifierExprSyntax &Expr, const SourceLoc Loc);
+  Expr *generate(const syntax::EditorPlaceholderExprSyntax &Expr,
+                 const SourceLoc Loc);
+  Expr *generate(const syntax::SpecializeExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::IntegerLiteralExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::FloatLiteralExprSyntax &Expr,
@@ -98,7 +103,13 @@ public:
                  const SourceLoc Loc);
   Expr *generate(const syntax::UnknownExprSyntax &Expr, const SourceLoc Loc);
 
+  std::pair<DeclName, DeclNameLoc> generateUnqualifiedDeclName(
+      const syntax::TokenSyntax &idTok,
+      const Optional<syntax::DeclNameArgumentsSyntax> &args,
+      const SourceLoc Loc);
+
 private:
+
   Expr *generateMagicIdentifierLiteralExpression(
       const syntax::TokenSyntax &PoundToken, const SourceLoc Loc);
 
@@ -170,10 +181,9 @@ public:
   //===--------------------------------------------------------------------===//
   // Generics.
 
-  TypeRepr *generate(const syntax::GenericArgumentSyntax &Arg,
-                     const SourceLoc Loc);
-  llvm::SmallVector<TypeRepr *, 4>
-  generate(const syntax::GenericArgumentListSyntax &Args, const SourceLoc Loc);
+  void generate(const syntax::GenericArgumentClauseSyntax &Arg,
+                const SourceLoc Loc, SourceLoc &lAngleLoc, SourceLoc &rAngleLoc,
+                SmallVectorImpl<TypeRepr *> &args);
 
   GenericParamList *
   generate(const syntax::GenericParameterClauseListSyntax &clause,
