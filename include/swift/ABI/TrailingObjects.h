@@ -175,7 +175,7 @@ protected:
 
     if (requiresRealignment())
       return reinterpret_cast<const NextTy *>(
-          llvm::alignAddr(Ptr, alignof(NextTy)));
+          llvm::alignAddr(Ptr, llvm::Align::Of<NextTy>()));
     else
       return reinterpret_cast<const NextTy *>(Ptr);
   }
@@ -189,7 +189,8 @@ protected:
                     Obj, TrailingObjectsBase::OverloadToken<PrevTy>());
 
     if (requiresRealignment())
-      return reinterpret_cast<NextTy *>(llvm::alignAddr(Ptr, alignof(NextTy)));
+      return reinterpret_cast<NextTy *>(
+          llvm::alignAddr(Ptr, llvm::Align::Of<NextTy>()));
     else
       return reinterpret_cast<NextTy *>(Ptr);
   }
