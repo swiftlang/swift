@@ -200,7 +200,10 @@ set(SWIFTLIB_ESSENTIAL_GYB_SOURCES
 # Compile differentiable programming sources only if enabled.
 set(SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES)
 if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-  # TODO: Add `_Differentiable` protocol.
+  list(APPEND SWIFTLIB_DIFFERENTIABLE_PROGRAMMING_SOURCES
+    Differentiable.swift
+    # SWIFT_ENABLE_TENSORFLOW
+    DifferentiationSupport.swift)
   message(STATUS "Differentiable programming standard library additions enabled.")
 endif()
 
@@ -213,9 +216,6 @@ set(SWIFTLIB_SOURCES
   CollectionDifference.swift
   CollectionOfOne.swift
   Diffing.swift
-  Differentiable.swift
-  # SWIFT_ENABLE_TENSORFLOW
-  DifferentiationSupport.swift
   Mirror.swift
   PlaygroundDisplay.swift
   CommandLine.swift
