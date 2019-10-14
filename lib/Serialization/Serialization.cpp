@@ -3661,6 +3661,19 @@ static uint8_t getRawStableSILCoroutineKind(
   llvm_unreachable("bad kind");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+/// Translate from the AST differentiability kind enum to the Serialization enum
+/// values, which are guaranteed to be stable.
+static uint8_t getRawStableDifferentiabilityKind(
+    swift::DifferentiabilityKind kind) {
+  switch (kind) {
+  SIMPLE_CASE(DifferentiabilityKind, NonDifferentiable)
+  SIMPLE_CASE(DifferentiabilityKind, Normal)
+  SIMPLE_CASE(DifferentiabilityKind, Linear)
+  }
+  llvm_unreachable("bad differentiability kind");
+}
+
 /// Translate from the AST ownership enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t
@@ -4015,8 +4028,11 @@ public:
     using namespace decls_block;
 
     auto representation = fnTy->getRepresentation();
+    // SWIFT_ENABLE_TENSORFLOW
     auto stableRepresentation =
-      getRawStableSILFunctionTypeRepresentation(representation);
+        getRawStableSILFunctionTypeRepresentation(representation);
+    auto stableDifferentiabilityKind =
+        getRawStableDifferentiabilityKind(fnTy->getDifferentiabilityKind());
 
     SmallVector<TypeID, 8> variableData;
     for (auto param : fnTy->getParameters()) {
@@ -4059,7 +4075,7 @@ public:
         stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
         // SWIFT_ENABLE_TENSORFLOW
-        fnTy->isDifferentiable(), fnTy->hasErrorResult(),
+        stableDifferentiabilityKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(), fnTy->getNumYields(),
         fnTy->getNumResults(), S.addGenericSignatureRef(sig), variableData);
 

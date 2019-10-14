@@ -10,6 +10,35 @@ sil_stage raw
 import Swift
 import Builtin
 
+sil @examplefunc : $@convention(thin) (Float, Float, Float) -> Float
+sil @examplemethod : $@convention(method) (Float, Float, Float) -> Float
+
+// CHECK-LABEL: sil @test
+sil @test : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @examplefunc : $@convention(thin) (Float, Float, Float) -> Float
+  %1 = differentiable_function [wrt 0 1 2] %0 : $@convention(thin) (Float, Float, Float) -> Float
+
+  // CHECK: %2 = differentiable_function_extract [vjp] %1 : $@differentiable @convention(thin) (Float, Float, Float) -> Float
+  %2 = differentiable_function_extract [vjp] %1 : $@differentiable @convention(thin) (Float, Float, Float) -> Float
+  %3 = differentiable_function [wrt 0] %0 : $@convention(thin) (Float, Float, Float) -> Float
+
+  // CHECK: %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+  %4 = differentiable_function_extract [vjp] %3 : $@differentiable @convention(thin) (Float, @nondiff Float, @nondiff Float) -> Float
+  %5 = function_ref @examplemethod : $@convention(method) (Float, Float, Float) -> Float
+  %6 = differentiable_function [wrt 0 1 2] %5 : $@convention(method) (Float, Float, Float) -> Float
+
+  // CHECK: %7 = differentiable_function_extract [vjp] %6 : $@differentiable @convention(method) (Float, Float, Float) -> Float
+  %7 = differentiable_function_extract [vjp] %6 : $@differentiable @convention(method) (Float, Float, Float) -> Float
+  %8 = differentiable_function [wrt 0] %5 : $@convention(method) (Float, Float, Float) -> Float
+
+  // CHECK: %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @nondiff Float, @nondiff Float) -> Float
+  %9 = differentiable_function_extract [vjp] %8 : $@differentiable @convention(method) (Float, @nondiff Float, @nondiff Float) -> Float
+
+  %ret = tuple ()
+  return %ret : $()
+}
+
 // The adjoint function emitted by the compiler. Parameter are a vector, as in
 // vector-Jacobian products, and pullback values. The function is partially
 // applied to a pullback struct to form a pullback, which takes a vector and
