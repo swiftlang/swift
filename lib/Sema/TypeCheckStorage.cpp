@@ -2538,7 +2538,16 @@ static void finishNSManagedImplInfo(VarDecl *var,
   if (var->isLet())
     diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_let_property);
 
+  SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
+
   auto diagnoseNotStored = [&](unsigned kind) {
+    // Skip diagnosing @NSManaged declarations in module interfaces. They are
+    // properties that are stored, but have specially synthesized observers
+    // and we should allow them to have getters and setters in a module
+    // interface.
+    if (parentFile && parentFile->Kind == SourceFileKind::Interface)
+      return;
+
     diagnoseAndRemoveAttr(var, attr, diag::attr_NSManaged_not_stored, kind);
   };
 
