@@ -20,6 +20,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/LinkLibrary.h"
@@ -2291,8 +2292,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto paramIndices = attr->getParameterIndices();
       assert(paramIndices && "Checked parameter indices must be resolved");
       SmallVector<bool, 4> indices;
-      for (unsigned i : swift::indices(paramIndices->parameters))
-        indices.push_back(paramIndices->parameters[i]);
+      for (unsigned i : range(paramIndices->getCapacity()))
+        indices.push_back(paramIndices->contains(i));
 
       DifferentiableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
