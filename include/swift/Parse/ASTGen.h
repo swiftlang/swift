@@ -87,6 +87,7 @@ public:
   Expr *generate(const syntax::SuperRefExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::ArrayExprSyntax &Expr, const SourceLoc Loc);
   Expr *generate(const syntax::DictionaryExprSyntax &Expr, const SourceLoc Loc);
+  Expr *generate(const syntax::TupleExprSyntax &E, const SourceLoc Loc);
   Expr *generate(const syntax::EditorPlaceholderExprSyntax &Expr,
                  const SourceLoc Loc);
   Expr *generate(const syntax::SpecializeExprSyntax &Expr, const SourceLoc Loc);
@@ -111,6 +112,12 @@ public:
       const syntax::TokenSyntax &idTok,
       const Optional<syntax::DeclNameArgumentsSyntax> &args,
       const SourceLoc Loc);
+
+  void generateExprTupleElementList(const syntax::TupleExprElementListSyntax &elements,
+                                    const SourceLoc Loc, bool isForCallArguments,
+                                    SmallVectorImpl<Expr *> &exprs,
+                                    SmallVectorImpl<Identifier> &exprLabels,
+                                    SmallVectorImpl<SourceLoc> &exprLabelLocs);
 
 private:
   void validateCollectionElement(Expr *elementExpr);

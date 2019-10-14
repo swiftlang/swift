@@ -900,8 +900,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                             /*isExprBasic=*/false,
                                             lParenLoc, args, argLabels,
                                             argLabelLocs, rParenLoc,
-                                            trailingClosure,
-                                            SyntaxKind::Unknown);
+                                            trailingClosure);
         if (status.isSuccess()) {
           backtrack.cancelBacktrack();
           
