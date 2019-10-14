@@ -575,7 +575,7 @@ Parser::parseGenericArgumentClauseSyntax() {
 ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &ArgsAST,
                                            SourceLoc &LAngleLoc,
                                            SourceLoc &RAngleLoc) {
-  auto leadingLoc = leadingTriviaLoc();
+  auto StartLoc = leadingTriviaLoc();
   auto ParsedClauseResult = parseGenericArgumentClauseSyntax();
   if (ParsedClauseResult.isNull())
     return ParsedClauseResult.getStatus();
@@ -585,7 +585,10 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &ArgsAST,
     return ParsedClauseResult.getStatus();
 
   auto Clause = SyntaxContext->topNode<GenericArgumentClauseSyntax>();
-  Generator.generate(Clause, leadingLoc, LAngleLoc, RAngleLoc, ArgsAST);
+  LAngleLoc = Generator.generate(Clause.getLeftAngleBracket(), StartLoc);
+  for (auto &&ArgAST : Generator.generate(Clause.getArguments(), StartLoc))
+    ArgsAST.push_back(ArgAST);
+  RAngleLoc = Generator.generate(Clause.getRightAngleBracket(), StartLoc);
   return makeParserSuccess();
 }
 
@@ -1435,10 +1438,6 @@ bool Parser::canParseAsGenericArgumentList() {
   BacktrackingScope backtrack(*this);
 
   if (canParseGenericArguments())
-    // The generic-args case is ambiguous with an expression involving '<'
-    // and '>' operators. The operator expression is favored unless a generic
-    // argument list can be successfully parsed, and the closing bracket is
-    // followed by one of dis-ambiguating tokens.
     return isGenericTypeDisambiguatingToken(*this);
 
   return false;
