@@ -272,6 +272,8 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*poundFunctionExpr, Loc);
   else if (auto poundDsohandleExpr = E.getAs<PoundDsohandleExprSyntax>())
     result = generate(*poundDsohandleExpr, Loc);
+  else if (auto objcKeyPathExpr = E.getAs<ObjcKeyPathExprSyntax>())
+    result = generate(*objcKeyPathExpr, Loc);
   else if (auto objectLiteralExpr = E.getAs<ObjectLiteralExprSyntax>())
     result = generate(*objectLiteralExpr, Loc);
   else if (auto completionExpr = E.getAs<CodeCompletionExprSyntax>())
@@ -716,6 +718,32 @@ Expr *ASTGen::generate(const PoundDsohandleExprSyntax &Expr,
                                                   Loc);
 }
 
+Expr *ASTGen::generate(const ObjcKeyPathExprSyntax &E, const SourceLoc Loc) {
+  SmallVector<KeyPathExpr::Component, 4> components;
+  if (E.getLeftParen().isMissing())
+    return nullptr;
+
+  for (auto piece : E.getName()) {
+    DeclName name;
+    DeclNameLoc nameLoc;
+    std::tie(name, nameLoc) =
+        generateUnqualifiedDeclName(piece.getName(),
+                                    piece.getDeclNameArguments(), Loc);
+    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
+                                                      nameLoc.getBaseNameLoc());
+    components.push_back(component);
+  }
+  auto keywordLoc = advanceLocBegin(Loc, E.getKeyPath());
+  auto LParenLoc = advanceLocBegin(Loc, E.getLeftParen());
+  auto RParenLoc = advanceLocEnd(Loc, E);
+
+  if (components.empty())
+    return new (Context) ErrorExpr(SourceRange(keywordLoc, RParenLoc));
+
+  return new (Context) KeyPathExpr(
+      Context, keywordLoc, LParenLoc, components, RParenLoc);
+}
+
 Expr *ASTGen::generate(const ObjectLiteralExprSyntax &E, const SourceLoc Loc) {
   ObjectLiteralExpr::LiteralKind kind;
   switch (E.getIdentifier().getTokenKind()) {
@@ -768,6 +796,25 @@ Expr *ASTGen::generate(const CodeCompletionExprSyntax &E, const SourceLoc Loc) {
       llvm_unreachable("'(' <cc-token> is not suppported");
     }
   } else {
+    if (auto objcKeyPathExpr = E.getBase()->getAs<ObjcKeyPathExprSyntax>()) {
+      // #keyPath(<cc-token>
+      // #keyPath(some <cc-token>
+      // #keyPath(some.<cc-token>
+      auto expr = generate(*objcKeyPathExpr, Loc);
+      if (P.CodeCompletion) {
+        SourceLoc dotLoc;
+        if (!expr || isa<ErrorExpr>(expr)) {
+          P.CodeCompletion->completeExprKeyPath(nullptr, SourceLoc());
+        } else {
+          auto namePieces = objcKeyPathExpr->getName();
+          if (!namePieces.empty())
+            if (auto dot = namePieces[namePieces.getNumChildren() - 1].getDot())
+              dotLoc = advanceLocBegin(Loc, *dot);
+          P.CodeCompletion->completeExprKeyPath(cast<KeyPathExpr>(expr), dotLoc);
+        }
+      }
+      return expr;
+    }
     // TODO: implement
   }
   llvm_unreachable("code completion expression not implemented");
