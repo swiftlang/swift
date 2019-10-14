@@ -4285,7 +4285,28 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
     }
   }
 
-  return false;
+  if (ExtraArgs.size() < 2)
+    return false;
+
+  llvm::SmallString<64> positions;
+  llvm::raw_svector_ostream OS(positions);
+
+  interleave(
+      ExtraArgs,
+      [&](const std::pair<unsigned, AnyFunctionType::Param> &arg) {
+        OS << "#" << (arg.first + 1);
+      },
+      [&] { OS << ", "; });
+
+  emitDiagnostic(anchor->getLoc(), diag::extra_arguments_in_call, OS.str());
+
+  if (auto overload = getChoiceFor(getLocator())) {
+    if (auto *decl = overload->choice.getDeclOrNull()) {
+      emitDiagnostic(decl, diag::decl_declared_here, decl->getFullName());
+    }
+  }
+
+  return true;
 }
 
 bool ExtraneousArgumentsFailure::diagnoseAsNote() {
