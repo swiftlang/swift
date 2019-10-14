@@ -4424,7 +4424,49 @@ namespace {
         updateCSWithResolvedComponent();
       }
       E->resolveComponents(cs.getASTContext(), resolvedComponents);
-      
+
+      // If we're passing this KeyPath to the KVO `observe` method and this
+      // KeyPath refers to a property which is not marked @objc dynamic then
+      // emit a warning, because it could lead to the observer not being
+      // called or worse, a runtime crash.
+      auto maybeDiagnoseCallToObserveFnWithKeyPath = [&]() {
+        auto lastComponent = E->getComponents().back();
+        if (!lastComponent.isValid() || !lastComponent.isResolved())
+          return;
+        // The KeyPath must refer to a property
+        if (lastComponent.getKind() != KeyPathExpr::Component::Kind::Property)
+          return;
+        auto tuple = cs.getParentExpr(E);
+        if (!tuple || !isa<TupleExpr>(tuple))
+          return;
+        auto call = cs.getParentExpr(tuple);
+        if (!call || !isa<CallExpr>(call))
+          return;
+        auto fn = cast<ApplyExpr>(call)->getCalledValue();
+        if (!fn)
+          return;
+        // The observe(keyPath:options:changeHandler) method exists in
+        // Foundation
+        if (fn->getModuleContext()->getName() !=
+            cs.getASTContext().Id_Foundation)
+          return;
+        if (!fn->getFullName().isCompoundName("observe",
+                                              {"", "options", "changeHandler"}))
+          return;
+        auto decl = lastComponent.getDeclRef().getDecl();
+        if (!decl)
+          return;
+        // No need to diagnose if it's already @objc dynamic
+        if (decl->isObjCDynamic())
+          return;
+        cs.TC.diagnose(call->getLoc(),
+                      diag::observe_keypath_property_not_objc_dynamic,
+                      decl->getFullName(), fn->getFullName())
+             .highlight(lastComponent.getLoc());
+      };
+
+      maybeDiagnoseCallToObserveFnWithKeyPath();
+
       // See whether there's an equivalent ObjC key path string we can produce
       // for interop purposes.
       if (cs.getASTContext().LangOpts.EnableObjCInterop) {
