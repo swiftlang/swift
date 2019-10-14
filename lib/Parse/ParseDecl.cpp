@@ -2544,7 +2544,7 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
         return makeParserSuccess();
 
       Parser::BacktrackingScope backtrack(*this);
-      SourceLoc LParenLoc = Tok.getLoc();
+      SourceLoc lParenLoc = Tok.getLoc();
       auto lParen = consumeTokenSyntax(tok::l_paren);
 
       // Determine if we have '@differentiable(linear) (T) -> U'
@@ -2557,10 +2557,10 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
           backtrack.cancelBacktrack();
           builder.useLeftParen(std::move(lParen));
           builder.useArgument(std::move(linearIdentifier));
-          SourceLoc RParenLoc;
+          SourceLoc rParenLoc;
           auto rParen = parseMatchingTokenSyntax(
-              tok::r_paren, RParenLoc, diag::differentiable_attribute_expected_rparen,
-              LParenLoc);
+              tok::r_paren, rParenLoc, diag::differentiable_attribute_expected_rparen,
+              lParenLoc);
           if (!rParen)
             return makeParserError();
           builder.useRightParen(std::move(*rParen));
