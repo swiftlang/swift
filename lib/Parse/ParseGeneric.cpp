@@ -110,8 +110,9 @@ Parser::parseGenericParameterClauseSyntax() {
           diagnose(Tok, diag::unexpected_class_constraint);
           diagnose(Tok, diag::suggest_anyobject)
               .fixItReplace(Tok.getLoc(), "AnyObject");
-          auto ty = ParsedSyntaxRecorder::makeClassRestrictionType(
-              consumeTokenSyntax(tok::kw_class), *SyntaxContext);
+          Tok.setKind(tok::identifier);
+          auto ty = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
+              consumeTokenSyntax(), None, *SyntaxContext);
           paramBuilder.useInheritedType(std::move(ty));
         } else {
           diagnose(Tok, diag::expected_generics_type_restriction, ident);

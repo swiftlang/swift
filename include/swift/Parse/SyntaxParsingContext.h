@@ -279,9 +279,17 @@ public:
   }
 
   /// Returns the topmost Syntax node.
-  template <typename SyntaxNode> SyntaxNode topNode();
+  template <typename SyntaxNode> SyntaxNode topNode() {
+    ParsedRawSyntaxNode &TopNode = getStorage().back();
+    if (TopNode.isRecorded()) {
+      OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
+      return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
+    }
+    return getSyntaxCreator().createNode<SyntaxNode>(TopNode.copyDeferred());
+  }
 
-  template <typename SyntaxNode> llvm::Optional<SyntaxNode> popIf() {
+  template <typename SyntaxNode>
+  llvm::Optional<SyntaxNode> popIf() {
     auto &Storage = getStorage();
     if (Storage.size() <= Offset)
       return llvm::None;
@@ -367,25 +375,6 @@ public:
   LLVM_ATTRIBUTE_DEPRECATED(void dumpStorage() const LLVM_ATTRIBUTE_USED,
                             "Only meant for use in the debugger");
 };
-
-template <typename SyntaxNode>
-inline SyntaxNode SyntaxParsingContext::topNode() {
-  ParsedRawSyntaxNode &TopNode = getStorage().back();
-  if (TopNode.isRecorded()) {
-    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-    return getSyntaxCreator().getLibSyntaxNodeFor<SyntaxNode>(OpaqueNode);
-  }
-  return getSyntaxCreator().createNode<SyntaxNode>(TopNode.copyDeferred());
-}
-
-template <> inline TokenSyntax SyntaxParsingContext::topNode<TokenSyntax>() {
-  ParsedRawSyntaxNode &TopNode = getStorage().back();
-  if (TopNode.isRecorded()) {
-    OpaqueSyntaxNode OpaqueNode = TopNode.getOpaqueNode();
-    return getSyntaxCreator().getLibSyntaxNodeFor<TokenSyntax>(OpaqueNode);
-  }
-  return getSyntaxCreator().createToken(TopNode.copyDeferred());
-}
 
 } // namespace swift
 #endif // SWIFT_SYNTAX_PARSING_CONTEXT_H

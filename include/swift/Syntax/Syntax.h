@@ -83,7 +83,7 @@ public:
   SyntaxKind getKind() const;
 
   /// Get the shared raw syntax.
-  const RC<RawSyntax> &getRaw() const;
+  RC<RawSyntax> getRaw() const;
 
   /// Get an ID for this node that is stable across incremental parses
   SyntaxNodeId getId() const { return getRaw()->getId(); }

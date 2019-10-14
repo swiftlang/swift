@@ -38,14 +38,13 @@ public:
     assert(Node.isDeferredToken());
 
     auto Kind = Node.getTokenKind();
-    auto Range = Node.getDeferredTokenRange();
+    auto Range = Node.getDeferredTokenRangeWithTrivia();
     auto LeadingTriviaPieces = Node.getDeferredLeadingTriviaPieces();
     auto TrailingTriviaPieces = Node.getDeferredTrailingTriviaPieces();
 
     auto Recorded = Recorder.recordToken(Kind, Range, LeadingTriviaPieces,
                                          TrailingTriviaPieces);
-    RC<RawSyntax> Raw{static_cast<RawSyntax *>(Recorded.takeOpaqueNode())};
-    Raw->Release(); // -1 since it's transfer of ownership.
+    auto Raw = static_cast<RawSyntax *>(Recorded.takeOpaqueNode());
     return make<TokenSyntax>(Raw);
   }
 
@@ -56,7 +55,7 @@ public:
     auto Children = Node.getDeferredChildren();
 
     auto Recorded = Recorder.recordRawSyntax(Kind, Children);
-    RC<RawSyntax> Raw{static_cast<RawSyntax *>(Recorded.takeOpaqueNode())};
+    RC<RawSyntax> Raw {static_cast<RawSyntax *>(Recorded.takeOpaqueNode()) };
     Raw->Release(); // -1 since it's transfer of ownership.
     return make<SyntaxNode>(Raw);
   }

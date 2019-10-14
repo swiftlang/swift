@@ -28,9 +28,6 @@ do {
 do {
   typealias Alias = A & B & C.D<>
 }
-do {
-  typealias boo bar = Int
-}
 
 // Orphan '}' at top level
 }
