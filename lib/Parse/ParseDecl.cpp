@@ -2546,28 +2546,32 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
 
       Parser::BacktrackingScope backtrack(*this);
       SourceLoc LParenLoc = Tok.getLoc();
-      builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
+      auto lParen = consumeTokenSyntax(tok::l_paren);
 
       // Determine if we have '@differentiable(linear) (T) -> U'
       // or '@differentiable (linear) -> U'.
       if (Tok.getText() == "linear") {
-        builder.useArgument(consumeTokenSyntax(tok::identifier));
+        auto linearIdentifier = consumeTokenSyntax(tok::identifier);
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
           linear = true;
           backtrack.cancelBacktrack();
+          builder.useLeftParen(std::move(lParen));
+          builder.useArgument(std::move(linearIdentifier));
           SourceLoc RParenLoc;
-          auto RParen = parseMatchingTokenSyntax(
+          auto rParen = parseMatchingTokenSyntax(
               tok::r_paren, RParenLoc, diag::differentiable_attribute_expected_rparen,
               LParenLoc);
-          if (!RParen)
+          if (!rParen)
             return makeParserError();
-          builder.useRightParen(std::move(*RParen));
+          builder.useRightParen(std::move(*rParen));
         } else if (Tok.is(tok::l_paren)) {
           // Handle invalid '@differentiable(linear (T) -> U'
           diagnose(Tok, diag::differentiable_attribute_expected_rparen);
           backtrack.cancelBacktrack();
+          builder.useLeftParen(std::move(lParen));
+          builder.useArgument(std::move(linearIdentifier));
           return makeParserError();
         }
       } else if (Tok.is(tok::identifier)) {
@@ -2575,14 +2579,17 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
         // passed in as an invalid argument to '@differentiable'.
         auto possibleArg = Tok.getText();
         auto t = Tok; // get ref to the argument for clearer diagnostics.
-        consumeToken(tok::identifier);
+        auto argIdentifier = consumeTokenSyntax(tok::identifier);
         // Check if there is an invalid argument getting passed into
         // '@differentiable'.
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // Handling '@differentiable(wrong) (...'.
           diagnose(t, diag::unexpected_argument_differentiable, possibleArg);
-          consumeToken(tok::r_paren);
+          auto rParen = consumeTokenSyntax(tok::r_paren);
           backtrack.cancelBacktrack();
+          builder.useLeftParen(std::move(lParen));
+          builder.useArgument(std::move(argIdentifier));
+          builder.useRightParen(std::move(rParen));
           return makeParserError();
         }
       }

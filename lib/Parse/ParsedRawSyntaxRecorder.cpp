@@ -140,17 +140,6 @@ void ParsedRawSyntaxRecorder::verifyElementRanges(ArrayRef<ParsedRawSyntaxNode> 
       ? elem.getRecordedRange()
       : elem.getDeferredRange(/*includeTrivia=*/true);
     if (range.isValid()) {
-      if (!(prevEndLoc.isInvalid() || range.getStart() == prevEndLoc)) {
-        // NOTE: Debugging utilities, delete before merging!
-        llvm::errs() << "ParsedRawSyntaxRecorder::verifyElementRanges ERROR!\n";
-        llvm::errs() << "ParsedRawSyntaxNode ELEMENT!\n";
-        elem.dump(llvm::errs());llvm::errs() << "\n";
-        llvm::errs() << "ALL ParsedRawSyntaxNode ELEMENTS:\n";
-        for (const auto &e: elements) {
-          e.dump();
-          llvm::errs() << "\n";
-        }
-      }
       assert((prevEndLoc.isInvalid() || range.getStart() == prevEndLoc)
              && "Non-contiguous child ranges?");
       prevEndLoc = range.getEnd();
