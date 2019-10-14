@@ -665,19 +665,19 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
       if (startsWithLess(Tok)) {
         SmallVector<TypeRepr *, 4> GenericArgsAST;
         SourceLoc LAngleLoc, RAngleLoc;
-        auto GenericArgsResult = parseGenericArgumentClauseSyntax();
+        auto GenericArgsResult =
+            parseGenericArgumentsAST(GenericArgsAST, LAngleLoc, RAngleLoc);
         if (!GenericArgsResult.isSuccess()) {
           if (Base)
             Junk.push_back(*Base);
           if (Period)
             Junk.push_back(*Period);
           Junk.push_back(*Identifier);
-          auto genericJunks = GenericArgsResult.getUnknownNodes();
-          Junk.append(genericJunks.begin(), genericJunks.end());
-          return makeParsedResult<ParsedTypeSyntax>(
-              Junk, GenericArgsResult.getStatus());
+          if (auto GenericJunk = SyntaxContext->popIf<ParsedSyntax>())
+            Junk.push_back(*GenericJunk);
+          return makeParsedResult<ParsedTypeSyntax>(Junk, GenericArgsResult);
         }
-        GenericArgs = GenericArgsResult.getResult();
+        GenericArgs = SyntaxContext->popIf<ParsedGenericArgumentClauseSyntax>();
       }
 
       if (!Base)
@@ -1070,18 +1070,15 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       // Consume a name.
       NameLoc = Tok.getLoc();
       Name = consumeArgumentLabelSyntax();
-      LocalJunk.push_back(*Name);
 
       // If there is a second name, consume it as well.
       if (Tok.canBeArgumentLabel()) {
         SecondNameLoc = Tok.getLoc();
         SecondName = consumeArgumentLabelSyntax();
-        LocalJunk.push_back(*SecondName);
       }
 
       // Consume the ':'.
       if ((Colon = consumeTokenSyntaxIf(tok::colon))) {
-        LocalJunk.push_back(*Colon);
         // If we succeed, then we successfully parsed a label.
         if (Backtracking)
           Backtracking->cancelBacktrack();
@@ -1090,6 +1087,8 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
       } else {
         if (!Backtracking)
           diagnose(Tok, diag::expected_parameter_colon);
+        Name = None;
+        SecondName = None;
         NameLoc = SourceLoc();
         SecondNameLoc = SourceLoc();
       }
@@ -1100,14 +1099,20 @@ Parser::TypeResult Parser::parseTypeTupleBody() {
 
     Backtracking.reset();
 
+    if (Name)
+      LocalJunk.push_back(*Name);
+    if (SecondName)
+      LocalJunk.push_back(*SecondName);
+    if (Colon)
+      LocalJunk.push_back(*Colon);
+
     // Parse the type annotation.
     auto TypeLoc = Tok.getLoc();
     auto TypeASTResult = parseType(diag::expected_type);
     if (TypeASTResult.hasCodeCompletion() || TypeASTResult.isNull()) {
-      Junk.append(LocalJunk.begin(), LocalJunk.end());
-      if (auto parsedT = SyntaxContext->popIf<ParsedTypeSyntax>())
-        Junk.push_back(*parsedT);
       skipListUntilDeclRBraceSyntax(Junk, LParenLoc, tok::r_paren, tok::comma);
+      for (auto &&Item : LocalJunk)
+        Junk.push_back(Item);
       return TypeASTResult.hasCodeCompletion()
                  ? makeParserCodeCompletionStatus()
                  : makeParserError();
