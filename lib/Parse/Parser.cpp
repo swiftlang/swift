@@ -763,6 +763,7 @@ void Parser::ignoreToken() {
   std::move(TrailingTrivia.begin(), TrailingTrivia.end(),
             std::back_inserter(Skipped));
 
+  TokReceiver->receive(Tok);
   consumeTokenWithoutFeedingReceiver();
 
   std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
