@@ -80,40 +80,6 @@ Swift 5.2
     }
   }
   ```
-  
-  As a result, this could lead to code that currently compiles today to throw an error.
-  
-  ```swift
-  protocol Foo {
-    var someProperty: Int { get set }
-  }
-  
-  class Bar: Foo {
-    var someProperty = 0
-  }
-  
-  extension Foo where Self: Bar {
-    var anotherProperty1: Int {
-      get { return someProperty }
-      // This will now error, because the protocol requirement
-      // is implicitly mutating and the setter is implicitly 
-      // nonmutating.
-      set { someProperty = newValue } // Error
-    }
-  }
-  ```
-
-  **Workaround**: Define a new mutable variable inside the setter that has a reference to `self`:
-  
-  ```swift
-  var anotherProperty1: Int {
-    get { return someProperty }
-    set {
-      var mutableSelf = self
-      mutableSelf.someProperty = newValue // Okay
-    }
-  }
-  ```
 
 * [SE-0253][]:
 
