@@ -37,7 +37,8 @@ using namespace irgen;
 // `@differentiable` (non-linear) function type info
 //----------------------------------------------------------------------------//
 namespace {
-class DifferentiableFuncFieldInfo final : public RecordField<DifferentiableFuncFieldInfo> {
+class DifferentiableFuncFieldInfo final
+    : public RecordField<DifferentiableFuncFieldInfo> {
 public:
   DifferentiableFuncFieldInfo(
       DifferentiableFunctionExtractee component, const TypeInfo &type,
