@@ -155,6 +155,7 @@ private:
     node.present = true;
   }
 
+public:
   OpaqueSyntaxNode recordToken(tok tokenKind,
                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
                                ArrayRef<ParsedTriviaPiece> trailingTrivia,
@@ -200,6 +201,10 @@ private:
     assert(ckind == numValue && "syntax kind value is too large");
     auto result = NodeLookup(lexerOffset, ckind);
     return {result.length, result.node};
+  }
+
+  OpaqueSyntaxNodeKind getOpaqueKind() override {
+    return OpaqueSyntaxNodeKind::SwiftSyntax;
   }
 };
 

@@ -43,7 +43,7 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
   // diagnostic engine here.
   Parser parser(bufferID, sf, /*No Lexer Diags*/nullptr, nullptr, nullptr);
   // Disable libSyntax creation in the delayed parsing.
-  parser.SyntaxContext->disable();
+  parser.SyntaxContext->setDiscard();
   ASTContext &ctx = idc->getDecl()->getASTContext();
   return ctx.AllocateCopy(
       llvm::makeArrayRef(parser.parseDeclListDelayed(idc)));
@@ -82,7 +82,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
     unsigned bufferID = sourceMgr.findBufferContainingLoc(afd->getLoc());
     Parser parser(bufferID, sf, static_cast<SILParserTUStateBase *>(nullptr),
                   nullptr, nullptr);
-    parser.SyntaxContext->disable();
+    parser.SyntaxContext->setDiscard();
     auto body = parser.parseAbstractFunctionBodyDelayed(afd);
     afd->setBodyKind(BodyKind::Parsed);
     return body;
