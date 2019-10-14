@@ -2092,8 +2092,8 @@ SelfAccessKindRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   if (FD->getAttrs().getAttribute<MutatingAttr>(true)) {
     if (!FD->isInstanceMember() || !FD->getDeclContext()->hasValueSemantics()) {
       // If this decl is on a class-constrained protocol extension, then
-      // the respect the explicit mutatingness. Otherwise, we would throw an
-      // error and break source compatibility.
+      // respect the explicit mutatingness. Otherwise, we would throw an
+      // error.
       if (FD->getDeclContext()->isClassConstrainedProtocolExtension())
         return SelfAccessKind::Mutating;
       return SelfAccessKind::NonMutating;
