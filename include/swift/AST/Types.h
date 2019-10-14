@@ -4284,6 +4284,10 @@ public:
   }
 
   // SWIFT_ENABLE_TENSORFLOW
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return getExtInfo().getDifferentiabilityKind();
+  }
+
   bool isDifferentiable() const {
     return getExtInfo().isDifferentiable();
   }
