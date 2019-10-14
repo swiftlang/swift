@@ -24,7 +24,7 @@
 using namespace swift;
 using namespace swift::syntax;
 
-% for node in SYNTAX_NODES + SILONLY_NODES:
+% for node in SYNTAX_NODES + PARSEONLY_NODES:
 %   if node.requires_validation():
 void ${node.name}::validate() const {
 #ifndef NDEBUG

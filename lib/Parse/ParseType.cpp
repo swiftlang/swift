@@ -624,8 +624,8 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
         CodeCompletion->completeTypeSimpleBeginning();
 
       auto CCTok = consumeTokenSyntax(tok::code_complete);
-      auto ty = ParsedSyntaxRecorder::makeUnknownType(
-          {&CCTok, 1}, *SyntaxContext);
+      auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+          None, None, std::move(CCTok), *SyntaxContext);
       return makeParsedCodeCompletion(std::move(ty));
     }
 
@@ -635,8 +635,8 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
     // skip it as a recovery but rather keep it.
     if (Tok.isKeyword() && !Tok.isAtStartOfLine()) {
       auto kwTok = consumeTokenSyntax();
-      ParsedTypeSyntax ty = ParsedSyntaxRecorder::makeUnknownType(
-          {&kwTok, 1}, *SyntaxContext);
+      ParsedTypeSyntax ty =
+          ParsedSyntaxRecorder::makeUnknownType({&kwTok, 1}, *SyntaxContext);
       return makeParsedError(std::move(ty));
     }
 
@@ -645,110 +645,108 @@ Parser::TypeResult Parser::parseTypeIdentifier() {
 
   SmallVector<ParsedSyntax, 0> Junk;
 
-  auto BaseLoc = leadingTriviaLoc();
-  ParserStatus Status;
-  Optional<ParsedTypeSyntax> Base;
-  Optional<ParsedTokenSyntax> Period;
-  while (true) {
-    Optional<ParsedTokenSyntax> Identifier;
-    if (Tok.is(tok::kw_Self)) {
-      Identifier = consumeIdentifierSyntax();
-    } else {
-      // FIXME: specialize diagnostic for 'Type': type cannot start with
-      // 'metatype'
-      // FIXME: offer a fixit: 'self' -> 'Self'
-      Identifier =
-          parseIdentifierSyntax(diag::expected_identifier_in_dotted_type);
-    }
+  auto parseComponent =
+      [&](Optional<ParsedTokenSyntax> &Identifier,
+          Optional<ParsedGenericArgumentClauseSyntax> &GenericArgs) {
+        if (Tok.is(tok::kw_Self)) {
+          Identifier = consumeIdentifierSyntax();
+        } else {
+          // FIXME: specialize diagnostic for 'Type': type cannot start with
+          // 'metatype'
+          // FIXME: offer a fixit: 'self' -> 'Self'
+          Identifier =
+              parseIdentifierSyntax(diag::expected_identifier_in_dotted_type);
+        }
 
-    if (Identifier) {
-      Optional<ParsedGenericArgumentClauseSyntax> GenericArgs;
+        if (!Identifier)
+          return makeParserError();
 
-      if (startsWithLess(Tok)) {
+        if (!startsWithLess(Tok))
+          return makeParserSuccess();
+
         SmallVector<TypeRepr *, 4> GenericArgsAST;
         SourceLoc LAngleLoc, RAngleLoc;
         auto GenericArgsResult = parseGenericArgumentClauseSyntax();
-        if (GenericArgsResult.isError()) {
-          if (Base)
-            Junk.push_back(std::move(*Base));
-          if (Period)
-            Junk.push_back(std::move(*Period));
-          Junk.push_back(std::move(*Identifier));
-          if (!GenericArgsResult.isNull())
-            Junk.push_back(GenericArgsResult.get());
-          auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
-          return makeParsedResult(std::move(ty), GenericArgsResult.getStatus());
-        }
-        GenericArgs = GenericArgsResult.get();
-      }
+        if (!GenericArgsResult.isNull())
+          GenericArgs = GenericArgsResult.get();
+        return GenericArgsResult.getStatus();
+      };
 
-      if (!Base)
-        Base = ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
-            std::move(*Identifier), std::move(GenericArgs), *SyntaxContext);
-      else
-        Base = ParsedSyntaxRecorder::makeMemberTypeIdentifier(
-            std::move(*Base), std::move(*Period), std::move(*Identifier),
-            std::move(GenericArgs), *SyntaxContext);
-    } else {
-      Status.setIsParseError();
-      if (Base)
-        Junk.push_back(std::move(*Base));
-      if (Period)
-        Junk.push_back(std::move(*Period));
-    }
+  ParsedSyntaxResult<ParsedTypeSyntax> result;
 
-    // Treat 'Foo.<anything>' as an attempt to write a dotted type
-    // unless <anything> is 'Type'.
-    if ((Tok.is(tok::period) || Tok.is(tok::period_prefix))) {
-      if (peekToken().is(tok::code_complete)) {
-        Status.setHasCodeCompletion();
-        break;
-      }
-      if (!peekToken().isContextualKeyword("Type") &&
-          !peekToken().isContextualKeyword("Protocol")) {
-        Period = consumeTokenSyntax();
-        continue;
-      }
-    } else if (Tok.is(tok::code_complete)) {
-      if (!Tok.isAtStartOfLine())
-        Status.setHasCodeCompletion();
+  // Parse the base identifier.
+  result = [&]() {
+    Optional<ParsedTokenSyntax> identifier;
+    Optional<ParsedGenericArgumentClauseSyntax> genericArgs;
+    auto status = parseComponent(identifier, genericArgs);
+    assert(identifier);
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeSimpleTypeIdentifier(
+            std::move(*identifier), std::move(genericArgs), *SyntaxContext),
+        status);
+  }();
+
+  // Parse member identifiers.
+  while (result.isSuccess() && Tok.isAny(tok::period, tok::period_prefix)) {
+    if (peekToken().isContextualKeyword("Type") ||
+        peekToken().isContextualKeyword("Protocol"))
       break;
+
+    // Parse '.'.
+    auto period = consumeTokenSyntax();
+
+    // Parse component;
+    Optional<ParsedTokenSyntax> identifier;
+    Optional<ParsedGenericArgumentClauseSyntax> genericArgs;
+    auto status = parseComponent(identifier, genericArgs);
+    if (identifier) {
+      ParsedMemberTypeIdentifierSyntaxBuilder builder(*SyntaxContext);
+      builder.useBaseType(result.get());
+      builder.usePeriod(std::move(period));
+      builder.useName(std::move(*identifier));
+      if (genericArgs)
+        builder.useGenericArgumentClause(std::move(*genericArgs));
+      result = makeParsedResult(builder.build(), status);
+      continue;
     }
-    break;
+
+    assert(!genericArgs);
+
+    if (Tok.is(tok::code_complete)) {
+      if (CodeCompletion)
+        CodeCompletion->completeTypeIdentifierWithDot();
+
+      auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+          result.get(), std::move(period), consumeTokenSyntax(),
+          *SyntaxContext);
+      return makeParsedCodeCompletion(std::move(ty));
+    }
+
+    ParsedSyntax parts[] = {result.get(), std::move(period)};
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeUnknownType({parts, 2}, *SyntaxContext),
+        status);
   }
 
-  if (Status.hasCodeCompletion()) {
-    IdentTypeRepr *ITR = nullptr;
+  if (result.isSuccess() && Tok.is(tok::code_complete) &&
+      !Tok.isAtStartOfLine()) {
+    if (CodeCompletion)
+      CodeCompletion->completeTypeIdentifierWithoutDot();
 
-    if (Base) {
-      SyntaxContext->addSyntax(std::move(*Base));
-      auto T = SyntaxContext->topNode<TypeSyntax>();
-      Junk.push_back(std::move(*SyntaxContext->popIf<ParsedTypeSyntax>()));
-      ITR = dyn_cast<IdentTypeRepr>(Generator.generate(T, BaseLoc));
-    }
-
-    if (Tok.isNot(tok::code_complete)) {
-      // We have a dot.
-      auto Dot = consumeTokenSyntax();
-      Junk.push_back(std::move(Dot));
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithDot(ITR);
-    } else {
-      if (CodeCompletion)
-        CodeCompletion->completeTypeIdentifierWithoutDot(ITR);
-    }
-    // Eat the code completion token because we handled it.
-    Junk.push_back(consumeTokenSyntax(tok::code_complete));
-    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
+    auto ty = ParsedSyntaxRecorder::makeCodeCompletionType(
+        result.get(), None, consumeTokenSyntax(), *SyntaxContext);
     return makeParsedCodeCompletion(std::move(ty));
   }
 
-  if (Status.isError()) {
-    auto ty = ParsedSyntaxRecorder::makeUnknownType(Junk, *SyntaxContext);
-    return makeParsedError(std::move(ty));
+  // Don't propagate malformed type as valid type.
+  if (!result.isSuccess()) {
+    auto ty = result.get();
+    return makeParsedResult(
+        ParsedSyntaxRecorder::makeUnknownType({&ty, 1}, *SyntaxContext),
+        result.getStatus());
   }
 
-  return makeParsedResult(std::move(*Base));
+  return result;
 }
 
 Parser::TypeASTResult
@@ -908,7 +906,7 @@ Parser::TypeResult Parser::parseOldStyleProtocolComposition() {
       bool IsAny = Tok.getKind() == tok::kw_Any;
       auto TypeResult = parseTypeIdentifier();
       Status |= TypeResult.getStatus();
-      if (TypeResult.isSuccess()) {
+      if (!TypeResult.isNull()) {
         auto Type = TypeResult.get();
         Junk.push_back(Type.copyDeferred());
         if (!IsAny)

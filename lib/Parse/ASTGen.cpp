@@ -15,6 +15,7 @@
 #include "swift/Basic/SourceManager.h"
 
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/CodeCompletionCallbacks.h"
 #include "swift/Parse/Parser.h"
 
 using namespace swift;
@@ -125,6 +126,8 @@ TypeRepr *ASTGen::generate(const TypeSyntax &Type, const SourceLoc Loc) {
     TypeAST = generate(*Unwrapped, Loc);
   else if (auto Attributed = Type.getAs<AttributedTypeSyntax>())
     TypeAST = generate(*Attributed, Loc);
+  else if (auto CompletionTy = Type.getAs<CodeCompletionTypeSyntax>())
+    TypeAST = generate(*CompletionTy, Loc);
   else if (auto Unknown = Type.getAs<UnknownTypeSyntax>())
     TypeAST = generate(*Unknown, Loc);
 
@@ -447,34 +450,44 @@ TypeRepr *ASTGen::generate(const ImplicitlyUnwrappedOptionalTypeSyntax &Type,
       ImplicitlyUnwrappedOptionalTypeRepr(WrappedType, ExclamationLoc);
 }
 
+TypeRepr *ASTGen::generate(const CodeCompletionTypeSyntax &Type,
+                           const SourceLoc Loc) {
+  auto base = Type.getBase();
+  if (!base)
+    return nullptr;
+
+  TypeRepr *parsedTyR = generate(*base, Loc);
+  if (parsedTyR) {
+    if (P.CodeCompletion)
+      P.CodeCompletion->setParsedTypeLoc(parsedTyR);
+  }
+  return parsedTyR;
+}
+
 TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
   auto ChildrenCount = Type.getNumChildren();
 
   // Recover from old-style protocol composition:
   //   `protocol` `<` protocols `>`
   if (ChildrenCount >= 2) {
-    auto Protocol = Type.getChild(0)->getAs<TokenSyntax>();
+    auto keyword = Type.getChild(0)->getAs<TokenSyntax>();
 
-    if (Protocol && Protocol->getText() == "protocol") {
+    if (keyword && keyword->getText() == "protocol") {
+      auto keywordLoc = advanceLocBegin(Loc, *keyword);
       auto LAngle = Type.getChild(1);
-
-      SmallVector<TypeSyntax, 4> Protocols;
-      for (unsigned i = 2; i < Type.getNumChildren(); i++)
-        if (auto PType = Type.getChild(i)->getAs<TypeSyntax>())
-          Protocols.push_back(*PType);
-
       auto RAngle = Type.getChild(ChildrenCount - 1);
 
-      auto ProtocolLoc = advanceLocBegin(Loc, *Protocol);
       auto LAngleLoc = advanceLocBegin(Loc, *LAngle);
       auto RAngleLoc = advanceLocBegin(Loc, *RAngle);
 
-      SmallVector<TypeRepr *, 4> ProtocolTypes;
-      for (auto &&P : llvm::reverse(Protocols))
-        ProtocolTypes.push_back(generate(P, Loc));
-      std::reverse(std::begin(ProtocolTypes), std::end(ProtocolTypes));
+      SmallVector<TypeRepr *, 4> protocols;
+      for (unsigned i = 2; i < Type.getNumChildren(); i++) {
+        if (auto elem = Type.getChild(i)->getAs<TypeSyntax>())
+          if (auto proto = generate(*elem, Loc))
+            protocols.push_back(proto);
+      }
 
-      return CompositionTypeRepr::create(Context, ProtocolTypes, ProtocolLoc,
+      return CompositionTypeRepr::create(Context, protocols, keywordLoc,
                                          {LAngleLoc, RAngleLoc});
     }
   }
