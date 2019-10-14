@@ -843,7 +843,8 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID,
         Status |= NextTypeResult.getStatus();
         break;
       }
-      SmallVector<ParsedSyntax, 0> nodes = {FirstElement};
+      SmallVector<ParsedSyntax, 0> nodes;
+      nodes.append(Elements.begin(), Elements.end());
       nodes.append(following.begin(), following.end());
       return makeParsedResult<ParsedTypeSyntax>(nodes, NextTypeResult.getStatus());
     }
