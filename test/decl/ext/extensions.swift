@@ -227,6 +227,30 @@ extension DoesNotImposeClassReq_2 where Self : AnyObject {
   }
 }
 
+protocol DoesNotImposeClassReq_3 {
+  var someProperty: Int { get set }
+}
+
+class JustAClass1: DoesNotImposeClassReq_3 {
+  var someProperty = 0
+}
+
+extension DoesNotImposeClassReq_3 where Self: JustAClass1 {
+  var anotherProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue } // Okay
+  }
+
+  var anotherProperty2: Int {
+    get { return someProperty }
+    set { someProperty = newValue } // Okay
+  }
+}
+
+let justAClass1 = JustAClass1() // expected-note {{change 'let' to 'var' to make it mutable}}
+justAClass1.anotherProperty1 = 1234 // Okay
+justAClass1.anotherProperty2 = 4321 // expected-error {{cannot assign to property: 'justAClass1' is a 'let' constant}}
+
 // Reject extension of nominal type via parameterized typealias
 
 struct Nest<Egg> { typealias Contents = Egg }
