@@ -20,64 +20,58 @@
 using namespace swift;
 using namespace swift::syntax;
 
-SourceLoc ASTGen::generate(const TokenSyntax &Tok, const SourceLoc Loc) {
+SourceLoc ASTGen::generate(TokenSyntax Tok, SourceLoc &Loc) {
   return advanceLocBegin(Loc, Tok);
 }
 
-Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,
-                       const SourceLoc Loc) {
+Expr *ASTGen::generate(IntegerLiteralExprSyntax &Expr, SourceLoc &Loc) {
   auto Digits = Expr.getDigits();
   auto Text = copyAndStripUnderscores(Digits.getText());
   auto DigitsLoc = advanceLocBegin(Loc, Digits);
   return new (Context) IntegerLiteralExpr(Text, DigitsLoc);
 }
 
-Expr *ASTGen::generate(const FloatLiteralExprSyntax &Expr,
-                       const SourceLoc Loc) {
+Expr *ASTGen::generate(FloatLiteralExprSyntax &Expr, SourceLoc &Loc) {
   auto Digits = Expr.getFloatingDigits();
   auto Text = copyAndStripUnderscores(Digits.getText());
   auto DigitsLoc = advanceLocBegin(Loc, Digits);
   return new (Context) FloatLiteralExpr(Text, DigitsLoc);
 }
 
-Expr *ASTGen::generate(const NilLiteralExprSyntax &Expr, const SourceLoc Loc) {
+Expr *ASTGen::generate(NilLiteralExprSyntax &Expr, SourceLoc &Loc) {
   auto Nil = Expr.getNilKeyword();
   auto NilLoc = advanceLocBegin(Loc, Nil);
   return new (Context) NilLiteralExpr(NilLoc);
 }
 
-Expr *ASTGen::generate(const BooleanLiteralExprSyntax &Expr,
-                       const SourceLoc Loc) {
+Expr *ASTGen::generate(BooleanLiteralExprSyntax &Expr, SourceLoc &Loc) {
   auto Boolean = Expr.getBooleanLiteral();
   auto Value = Boolean.getTokenKind() == tok::kw_true;
   auto BooleanLoc = advanceLocBegin(Loc, Boolean);
   return new (Context) BooleanLiteralExpr(Value, BooleanLoc);
 }
 
-Expr *ASTGen::generate(const PoundFileExprSyntax &Expr, const SourceLoc Loc) {
+Expr *ASTGen::generate(PoundFileExprSyntax &Expr, SourceLoc &Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundFile(), Loc);
 }
 
-Expr *ASTGen::generate(const PoundLineExprSyntax &Expr, const SourceLoc Loc) {
+Expr *ASTGen::generate(PoundLineExprSyntax &Expr, SourceLoc &Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundLine(), Loc);
 }
 
-Expr *ASTGen::generate(const PoundColumnExprSyntax &Expr, const SourceLoc Loc) {
+Expr *ASTGen::generate(PoundColumnExprSyntax &Expr, SourceLoc &Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundColumn(), Loc);
 }
 
-Expr *ASTGen::generate(const PoundFunctionExprSyntax &Expr,
-                       const SourceLoc Loc) {
+Expr *ASTGen::generate(PoundFunctionExprSyntax &Expr, SourceLoc &Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundFunction(), Loc);
 }
 
-Expr *ASTGen::generate(const PoundDsohandleExprSyntax &Expr,
-                       const SourceLoc Loc) {
-  return generateMagicIdentifierLiteralExpression(Expr.getPoundDsohandle(),
-                                                  Loc);
+Expr *ASTGen::generate(PoundDsohandleExprSyntax &Expr, SourceLoc &Loc) {
+  return generateMagicIdentifierLiteralExpression(Expr.getPoundDsohandle(), Loc);
 }
 
-Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc Loc) {
+Expr *ASTGen::generate(UnknownExprSyntax &Expr, SourceLoc &Loc) {
   if (Expr.getNumChildren() == 1 && Expr.getChild(0)->isToken()) {
     Syntax Token = *Expr.getChild(0);
     tok Kind = Token.getRaw()->getTokenKind();
@@ -98,7 +92,7 @@ Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc Loc) {
   return nullptr;
 }
 
-TypeRepr *ASTGen::generate(const TypeSyntax &Type, const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(TypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *TypeAST = nullptr;
 
   if (auto SimpleIdentifier = Type.getAs<SimpleTypeIdentifierSyntax>())
@@ -136,8 +130,7 @@ TypeRepr *ASTGen::generate(const TypeSyntax &Type, const SourceLoc Loc) {
   return cacheType(Type, TypeAST);
 }
 
-TypeRepr *ASTGen::generate(const FunctionTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(FunctionTypeSyntax Type, SourceLoc &Loc) {
   auto ArgumentTypes = generateTuple(Type.getLeftParen(), Type.getArguments(),
                                      Type.getRightParen(), Loc,
                                      /*IsFunction=*/true);
@@ -153,10 +146,10 @@ TypeRepr *ASTGen::generate(const FunctionTypeSyntax &Type,
       FunctionTypeRepr(nullptr, ArgumentTypes, ThrowsLoc, ArrowLoc, ReturnType);
 }
 
-TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
-                                     const TupleTypeElementListSyntax &Elements,
-                                     const TokenSyntax &RParen,
-                                     const SourceLoc Loc, bool IsFunction) {
+TupleTypeRepr *ASTGen::generateTuple(TokenSyntax LParen,
+                                     TupleTypeElementListSyntax Elements,
+                                     TokenSyntax RParen, SourceLoc &Loc,
+                                     bool IsFunction) {
   auto LPLoc = generate(LParen, Loc);
   auto RPLoc = generate(RParen, Loc);
 
@@ -213,8 +206,7 @@ TupleTypeRepr *ASTGen::generateTuple(const TokenSyntax &LParen,
                                EllipsisLoc, EllipsisIdx);
 }
 
-TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(AttributedTypeSyntax Type, SourceLoc &Loc) {
   // todo [gsoc]: improve this after refactoring attribute parsing
 
   auto TypeAST = generate(Type.getBaseType(), Loc);
@@ -270,20 +262,19 @@ TypeRepr *ASTGen::generate(const AttributedTypeSyntax &Type,
   return TypeAST;
 }
 
-TypeRepr *ASTGen::generate(const TupleTypeSyntax &Type, const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(TupleTypeSyntax Type, SourceLoc &Loc) {
   return generateTuple(Type.getLeftParen(), Type.getElements(),
                        Type.getRightParen(), Loc);
 }
 
-TypeRepr *ASTGen::generate(const SomeTypeSyntax &Type, const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(SomeTypeSyntax Type, SourceLoc &Loc) {
   auto Some = Type.getSomeSpecifier();
   auto SomeLoc = generate(Some, Loc);
   auto BaseType = generate(Type.getBaseType(), Loc);
   return new (Context) OpaqueReturnTypeRepr(SomeLoc, BaseType);
 }
 
-TypeRepr *ASTGen::generate(const CompositionTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(CompositionTypeSyntax Type, SourceLoc &Loc) {
   auto Elements = Type.getElements();
   auto FirstElem = Elements[0];
   auto LastElem = Elements[Elements.size() - 1];
@@ -320,7 +311,7 @@ TypeRepr *ASTGen::generate(const CompositionTypeSyntax &Type,
 }
 
 void ASTGen::gatherTypeIdentifierComponents(
-    const TypeSyntax &Component, const SourceLoc Loc,
+    TypeSyntax Component, SourceLoc &Loc,
     SmallVectorImpl<ComponentIdentTypeRepr *> &Components) {
   if (auto SimpleIdentifier = Component.getAs<SimpleTypeIdentifierSyntax>()) {
     auto ComponentType = generateIdentifier(*SimpleIdentifier, Loc);
@@ -340,8 +331,7 @@ void ASTGen::gatherTypeIdentifierComponents(
 }
 
 template <typename T>
-TypeRepr *ASTGen::generateSimpleOrMemberIdentifier(const T &Type,
-                                                   const SourceLoc Loc) {
+TypeRepr *ASTGen::generateSimpleOrMemberIdentifier(T Type, SourceLoc &Loc) {
   SmallVector<ComponentIdentTypeRepr *, 4> Components;
   gatherTypeIdentifierComponents(Type, Loc, Components);
   std::reverse(Components.begin(), Components.end());
@@ -359,8 +349,7 @@ TypeRepr *ASTGen::generateSimpleOrMemberIdentifier(const T &Type,
 }
 
 template <typename T>
-ComponentIdentTypeRepr *ASTGen::generateIdentifier(const T &Type,
-                                                   const SourceLoc Loc) {
+ComponentIdentTypeRepr *ASTGen::generateIdentifier(T Type, SourceLoc &Loc) {
   auto IdentifierLoc = advanceLocBegin(Loc, Type.getName());
   auto Identifier = Context.getIdentifier(Type.getName().getIdentifierText());
   if (auto Clause = Type.getGenericArgumentClause()) {
@@ -377,28 +366,25 @@ ComponentIdentTypeRepr *ASTGen::generateIdentifier(const T &Type,
   return new (Context) SimpleIdentTypeRepr(IdentifierLoc, Identifier);
 }
 
-TypeRepr *ASTGen::generate(const SimpleTypeIdentifierSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(SimpleTypeIdentifierSyntax Type, SourceLoc &Loc) {
   if (Type.getName().getTokenKind() == tok::kw_Any) {
     auto AnyLoc = advanceLocBegin(Loc, Type.getName());
     return CompositionTypeRepr::createEmptyComposition(Context, AnyLoc);
   }
   if (Type.getName().getText() == "class") {
     auto classLoc = advanceLocBegin(Loc, Type.getName());
-    return new (Context)
-        SimpleIdentTypeRepr(classLoc, Context.getIdentifier("AnyObject"));
+    return new (Context) SimpleIdentTypeRepr(classLoc,
+                                             Context.getIdentifier("AnyObject"));
   }
 
   return generateSimpleOrMemberIdentifier(Type, Loc);
 }
 
-TypeRepr *ASTGen::generate(const MemberTypeIdentifierSyntax &Type,
-                           SourceLoc Loc) {
+TypeRepr *ASTGen::generate(MemberTypeIdentifierSyntax Type, SourceLoc &Loc) {
   return generateSimpleOrMemberIdentifier(Type, Loc);
 }
 
-TypeRepr *ASTGen::generate(const DictionaryTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(DictionaryTypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *ValueType = generate(Type.getValueType(), Loc);
   TypeRepr *KeyType = generate(Type.getKeyType(), Loc);
   auto LBraceLoc = advanceLocBegin(Loc, Type.getLeftSquareBracket());
@@ -408,7 +394,7 @@ TypeRepr *ASTGen::generate(const DictionaryTypeSyntax &Type,
   return new (Context) DictionaryTypeRepr(KeyType, ValueType, ColonLoc, Range);
 }
 
-TypeRepr *ASTGen::generate(const ArrayTypeSyntax &Type, SourceLoc Loc) {
+TypeRepr *ASTGen::generate(ArrayTypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *ElementType = generate(Type.getElementType(), Loc);
   SourceLoc LBraceLoc, RBraceLoc;
   if (Type.getLeftSquareBracket().isPresent())
@@ -422,8 +408,7 @@ TypeRepr *ASTGen::generate(const ArrayTypeSyntax &Type, SourceLoc Loc) {
   return new (Context) ArrayTypeRepr(ElementType, {LBraceLoc, RBraceLoc});
 }
 
-TypeRepr *ASTGen::generate(const MetatypeTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(MetatypeTypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *BaseType = generate(Type.getBaseType(), Loc);
   auto TypeOrProtocol = Type.getTypeOrProtocol();
   auto TypeOrProtocolLoc = advanceLocBegin(Loc, TypeOrProtocol);
@@ -432,22 +417,21 @@ TypeRepr *ASTGen::generate(const MetatypeTypeSyntax &Type,
   return new (Context) ProtocolTypeRepr(BaseType, TypeOrProtocolLoc);
 }
 
-TypeRepr *ASTGen::generate(const OptionalTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(OptionalTypeSyntax Type, SourceLoc &Loc) {
   TypeRepr *WrappedType = generate(Type.getWrappedType(), Loc);
   auto QuestionLoc = advanceLocBegin(Loc, Type.getQuestionMark());
   return new (Context) OptionalTypeRepr(WrappedType, QuestionLoc);
 }
 
-TypeRepr *ASTGen::generate(const ImplicitlyUnwrappedOptionalTypeSyntax &Type,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(ImplicitlyUnwrappedOptionalTypeSyntax Type,
+                           SourceLoc &Loc) {
   TypeRepr *WrappedType = generate(Type.getWrappedType(), Loc);
   auto ExclamationLoc = advanceLocBegin(Loc, Type.getExclamationMark());
   return new (Context)
       ImplicitlyUnwrappedOptionalTypeRepr(WrappedType, ExclamationLoc);
 }
 
-TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(UnknownTypeSyntax Type, SourceLoc &Loc) {
   auto ChildrenCount = Type.getNumChildren();
 
   // Recover from old-style protocol composition:
@@ -493,8 +477,7 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
     auto LParen = Type.getChild(0)->getAs<TokenSyntax>();
     if (LParen && LParen->getTokenKind() == tok::l_paren) {
       auto LParenLoc = advanceLocBegin(Loc, *LParen);
-      auto EndLoc =
-          advanceLocBegin(Loc, *Type.getChild(Type.getNumChildren() - 1));
+      auto EndLoc = advanceLocBegin(Loc, *Type.getChild(Type.getNumChildren() - 1));
       return TupleTypeRepr::createEmpty(Context, {LParenLoc, EndLoc});
     }
   }
@@ -503,8 +486,8 @@ TypeRepr *ASTGen::generate(const UnknownTypeSyntax &Type, const SourceLoc Loc) {
   return nullptr;
 }
 
-SmallVector<TypeRepr *, 4>
-ASTGen::generate(const GenericArgumentListSyntax &Args, const SourceLoc Loc) {
+SmallVector<TypeRepr *, 4> ASTGen::generate(GenericArgumentListSyntax Args,
+                                            SourceLoc &Loc) {
   SmallVector<TypeRepr *, 4> Types;
   Types.resize(Args.size());
 
@@ -517,8 +500,7 @@ ASTGen::generate(const GenericArgumentListSyntax &Args, const SourceLoc Loc) {
   return Types;
 }
 
-TypeRepr *ASTGen::generate(const GenericArgumentSyntax &Arg,
-                           const SourceLoc Loc) {
+TypeRepr *ASTGen::generate(GenericArgumentSyntax Arg, SourceLoc &Loc) {
   return generate(Arg.getArgumentType(), Loc);
 }
 
@@ -537,9 +519,8 @@ StringRef ASTGen::copyAndStripUnderscores(StringRef Orig, ASTContext &Context) {
   return StringRef(start, p - start);
 }
 
-GenericParamList *
-ASTGen::generate(const GenericParameterClauseListSyntax &clauses,
-                 const SourceLoc Loc) {
+GenericParamList *ASTGen::generate(GenericParameterClauseListSyntax clauses,
+                                   SourceLoc &Loc) {
   GenericParamList *curr = nullptr;
 
   // The first one is the outmost generic parameter list.
@@ -554,8 +535,8 @@ ASTGen::generate(const GenericParameterClauseListSyntax &clauses,
   return curr;
 }
 
-GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
-                                   const SourceLoc Loc) {
+GenericParamList *ASTGen::generate(GenericParameterClauseSyntax clause,
+                                   SourceLoc &Loc) {
   SmallVector<GenericTypeParamDecl *, 4> params;
   params.reserve(clause.getGenericParameterList().getNumChildren());
 
@@ -614,9 +595,8 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
                                   requirements, rAngleLoc);
 }
 
-Optional<RequirementRepr>
-ASTGen::generate(const syntax::GenericRequirementSyntax &req,
-                 const SourceLoc Loc) {
+Optional<RequirementRepr> ASTGen::generate(syntax::GenericRequirementSyntax req,
+                                           SourceLoc &Loc) {
   if (auto sameTypeReq = req.getBody().getAs<SameTypeRequirementSyntax>()) {
     auto firstType = generate(sameTypeReq->getLeftTypeIdentifier(), Loc);
     auto secondType = generate(sameTypeReq->getRightTypeIdentifier(), Loc);
@@ -665,8 +645,8 @@ static LayoutConstraintKind getLayoutConstraintKind(Identifier &id,
   return LayoutConstraintKind::UnknownLayout;
 }
 
-LayoutConstraint ASTGen::generate(const LayoutConstraintSyntax &constraint,
-                                  const SourceLoc Loc) {
+LayoutConstraint ASTGen::generate(LayoutConstraintSyntax constraint,
+                                  SourceLoc &Loc) {
   auto name = Context.getIdentifier(constraint.getName().getIdentifierText());
   auto constraintKind = getLayoutConstraintKind(name, Context);
   assert(constraintKind != LayoutConstraintKind::UnknownLayout);
@@ -703,16 +683,14 @@ StringRef ASTGen::copyAndStripUnderscores(StringRef Orig) {
   return copyAndStripUnderscores(Orig, Context);
 }
 
-Expr *
-ASTGen::generateMagicIdentifierLiteralExpression(const TokenSyntax &PoundToken,
-                                                 const SourceLoc Loc) {
+Expr *ASTGen::generateMagicIdentifierLiteralExpression(TokenSyntax PoundToken,
+                                                       SourceLoc &Loc) {
   auto Kind = getMagicIdentifierLiteralKind(PoundToken.getTokenKind());
   auto KindLoc = advanceLocBegin(Loc, PoundToken);
   return new (Context) MagicIdentifierLiteralExpr(Kind, KindLoc);
 }
 
-MagicIdentifierLiteralExpr::Kind
-ASTGen::getMagicIdentifierLiteralKind(tok Kind) {
+MagicIdentifierLiteralExpr::Kind ASTGen::getMagicIdentifierLiteralKind(tok Kind) {
   switch (Kind) {
   case tok::kw___COLUMN__:
   case tok::pound_column:
@@ -752,15 +730,15 @@ TypeRepr *ASTGen::lookupType(TypeSyntax Type) {
   return Found != TypeCache.end() ? Found->second : nullptr;
 }
 
-void ASTGen::addType(TypeRepr *Type, const SourceLoc Loc) {
-  Types.insert({Loc, Type});
+TypeRepr *ASTGen::addType(TypeRepr *Type, const SourceLoc &Loc) {
+  return Types.insert({Loc, Type}).first->second;
 }
 
-bool ASTGen::hasType(const SourceLoc Loc) const {
+bool ASTGen::hasType(const SourceLoc &Loc) const {
   return Types.find(Loc) != Types.end();
 }
 
-TypeRepr *ASTGen::getType(const SourceLoc Loc) const {
+TypeRepr *ASTGen::getType(const SourceLoc &Loc) const {
   return Types.find(Loc)->second;
 }
 

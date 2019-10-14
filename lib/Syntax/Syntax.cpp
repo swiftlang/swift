@@ -98,13 +98,13 @@ llvm::Optional<Syntax> Syntax::getChild(const size_t N) const {
   return Syntax {Root, ChildData.get()};
 }
 
-Optional<TokenSyntax> Syntax::getFirstToken() const {
+Optional<TokenSyntax> Syntax::getFirstToken() {
   if (auto tok = getData().getFirstToken())
     return TokenSyntax(Root, tok.get());
   return None;
 }
 
-Optional<TokenSyntax> Syntax::getLastToken() const {
+Optional<TokenSyntax> Syntax::getLastToken() {
   if (auto tok = getData().getLastToken())
     return TokenSyntax(Root, tok.get());
   return None;
