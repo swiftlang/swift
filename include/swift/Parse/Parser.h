@@ -695,25 +695,6 @@ public:
   /// plain Tok.is(T1) check).
   bool skipUntilTokenOrEndOfLine(tok T1);
 
-  void ignoreToken();
-  void ignoreToken(tok Kind) {
-    assert(Tok.is(Kind));
-    ignoreToken();
-  }
-  bool ignoreIf(tok Kind) {
-    if (!Tok.is(Kind))
-      return false;
-    ignoreToken();
-    return true;
-  }
-  void ignoreSingle();
-  void ignoreUntil(tok Kind);
-
-  /// Ignore tokens until a token that starts with '>', and return true it if
-  /// found. Applies heuristics that are suitable when trying to find the end
-  /// of a list of generic parameters, generic arguments.
-  bool ignoreUntilGreaterInTypeList();
-
   /// If the parser is generating only a syntax tree, try loading the current
   /// node from a previously generated syntax tree.
   /// Returns \c true if the node has been loaded and inserted into the current
@@ -1172,12 +1153,9 @@ public:
 
   using TypeASTResult = ParserResult<TypeRepr>;
   using TypeResult = ParsedSyntaxResult<ParsedTypeSyntax>;
+  using TypeErrorResult = ParsedSyntaxResult<ParsedUnknownTypeSyntax>;
 
   LayoutConstraint parseLayoutConstraint(Identifier LayoutConstraintID);
-
-  TypeResult parseTypeSyntax();
-  TypeResult parseTypeSyntax(Diag<> MessageID, bool HandleCodeCompletion = true,
-                             bool IsSILFuncDecl = false);
 
   TypeASTResult parseType();
   TypeASTResult parseType(Diag<> MessageID, bool HandleCodeCompletion = true,
@@ -1205,8 +1183,8 @@ public:
   TypeResult parseOptionalType(ParsedTypeSyntax Base);
   TypeResult parseImplicitlyUnwrappedOptionalType(ParsedTypeSyntax Base);
 
-  TypeResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
-  TypeResult parseOldStyleProtocolComposition();
+  TypeErrorResult parseTypeArray(ParsedTypeSyntax Base, SourceLoc BaseLoc);
+  TypeErrorResult parseOldStyleProtocolComposition();
 
   bool isOptionalToken(const Token &T) const;
   ParsedTokenSyntax consumeOptionalTokenSyntax();

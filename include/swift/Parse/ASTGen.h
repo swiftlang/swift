@@ -100,6 +100,10 @@ private:
 
   static SourceLoc advanceLocBegin(const SourceLoc &Loc,
                                    const syntax::Syntax &Node);
+  static SourceLoc advanceLocEnd(const SourceLoc &Loc,
+                                 const syntax::TokenSyntax &Token);
+  static SourceLoc advanceLocAfter(const SourceLoc &Loc,
+                                   const syntax::Syntax &Node);
 
   static MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind);
 
