@@ -78,11 +78,10 @@ Parser::parseGenericParameterClauseSyntax() {
       SyntaxParsingContext TmpCtxt(SyntaxContext);
       TmpCtxt.setTransparent();
 
-      auto AttrsLoc = Tok.getLoc();
       DeclAttributes attrsAST;
       parseDeclAttributeList(attrsAST);
       if (!attrsAST.isEmpty())
-        Generator.addDeclAttributes(attrsAST, AttrsLoc);
+        Generator.addDeclAttributes(attrsAST, attrsAST.getStartLoc());
       auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
       if (attrs)
         paramBuilder.useAttributes(std::move(*attrs));

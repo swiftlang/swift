@@ -2714,7 +2714,6 @@ Parser::parseDecl(ParseDeclOptions Flags,
                                   StructureMarkerKind::Declaration);
 
   // Parse attributes.
-  SourceLoc AttrsLoc = Tok.getLoc();
   DeclAttributes Attributes;
   if (Tok.hasComment())
     Attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
@@ -2726,8 +2725,12 @@ Parser::parseDecl(ParseDeclOptions Flags,
   StaticSpellingKind StaticSpelling = StaticSpellingKind::None;
   parseDeclModifierList(Attributes, StaticLoc, StaticSpelling);
 
-  if (!Attributes.isEmpty())
-    Generator.addDeclAttributes(Attributes, AttrsLoc);
+  if (!Attributes.isEmpty()) {
+    auto startLoc = Attributes.getStartLoc();
+    if (startLoc.isInvalid())
+      startLoc = Tok.getLoc();
+    Generator.addDeclAttributes(Attributes, startLoc);
+  }
 
   // We emit diagnostics for 'try let ...' in parseDeclVar().
   SourceLoc tryLoc;
