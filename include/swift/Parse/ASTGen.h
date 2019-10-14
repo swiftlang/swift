@@ -56,8 +56,6 @@ public:
   Decl *generate(const syntax::DeclSyntax &Decl, const SourceLoc Loc);
   TypeDecl *generate(const syntax::AssociatedtypeDeclSyntax &Decl,
                      const SourceLoc Loc);
-  TypeDecl *generate(const syntax::TypealiasDeclSyntax &Decl,
-                     const SourceLoc Loc);
 
   TrailingWhereClause *generate(const syntax::GenericWhereClauseSyntax &syntax,
                                 const SourceLoc Loc);
@@ -71,11 +69,6 @@ private:
                          const Optional<syntax::AttributeListSyntax> &attrs,
                          const Optional<syntax::ModifierListSyntax> &modifiers,
                          SourceLoc Loc, bool includeComments);
-
-  void generateFreeStandingGenericWhereClause(
-                                const syntax::GenericWhereClauseSyntax &syntax,
-                                const SourceLoc Loc,
-                                GenericParamList *genericParams);
 
 public:
   //===--------------------------------------------------------------------===//

@@ -1,23 +1,23 @@
 {
-  "id": 23,
+  "id": 38,
   "kind": "SourceFile",
   "layout": [
     {
-      "id": 22,
+      "id": 37,
       "kind": "CodeBlockItemList",
       "layout": [
         {
-          "id": 20,
+          "id": 35,
           "kind": "CodeBlockItem",
           "layout": [
             {
-              "id": 19,
+              "id": 34,
               "kind": "TypealiasDecl",
               "layout": [
                 null,
                 null,
                 {
-                  "id": 17,
+                  "id": 32,
                   "tokenKind": {
                     "kind": "kw_typealias"
                   },
@@ -48,7 +48,7 @@
                   "presence": "Present"
                 },
                 {
-                  "id": 18,
+                  "id": 33,
                   "tokenKind": {
                     "kind": "identifier",
                     "text": "x"
@@ -64,11 +64,11 @@
                 },
                 null,
                 {
-                  "id": 16,
+                  "id": 31,
                   "kind": "TypeInitializerClause",
                   "layout": [
                     {
-                      "id": 1,
+                      "id": 2,
                       "tokenKind": {
                         "kind": "equal"
                       },
@@ -82,11 +82,11 @@
                       "presence": "Present"
                     },
                     {
-                      "id": 15,
+                      "id": 30,
                       "kind": "TupleType",
                       "layout": [
                         {
-                          "id": 2,
+                          "id": 17,
                           "tokenKind": {
                             "kind": "l_paren"
                           },
@@ -95,16 +95,16 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 13,
+                          "id": 28,
                           "kind": "TupleTypeElementList",
                           "layout": [
                             {
-                              "id": 8,
+                              "id": 23,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 3,
+                                  "id": 18,
                                   "tokenKind": {
                                     "kind": "identifier",
                                     "text": "b"
@@ -115,7 +115,7 @@
                                 },
                                 null,
                                 {
-                                  "id": 4,
+                                  "id": 19,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -129,11 +129,11 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 6,
+                                  "id": 21,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 5,
+                                      "id": 20,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "Int"
@@ -149,7 +149,7 @@
                                 null,
                                 null,
                                 {
-                                  "id": 7,
+                                  "id": 22,
                                   "tokenKind": {
                                     "kind": "comma"
                                   },
@@ -166,12 +166,12 @@
                               "presence": "Present"
                             },
                             {
-                              "id": 12,
+                              "id": 27,
                               "kind": "TupleTypeElement",
                               "layout": [
                                 null,
                                 {
-                                  "id": 9,
+                                  "id": 24,
                                   "tokenKind": {
                                     "kind": "kw__"
                                   },
@@ -181,7 +181,7 @@
                                 },
                                 null,
                                 {
-                                  "id": 4,
+                                  "id": 19,
                                   "tokenKind": {
                                     "kind": "colon"
                                   },
@@ -195,11 +195,11 @@
                                   "presence": "Present"
                                 },
                                 {
-                                  "id": 11,
+                                  "id": 26,
                                   "kind": "SimpleTypeIdentifier",
                                   "layout": [
                                     {
-                                      "id": 10,
+                                      "id": 25,
                                       "tokenKind": {
                                         "kind": "identifier",
                                         "text": "String"
@@ -222,7 +222,7 @@
                           "presence": "Present"
                         },
                         {
-                          "id": 14,
+                          "id": 29,
                           "tokenKind": {
                             "kind": "r_paren"
                           },
@@ -249,7 +249,7 @@
       "presence": "Present"
     },
     {
-      "id": 21,
+      "id": 36,
       "tokenKind": {
         "kind": "eof",
         "text": ""
