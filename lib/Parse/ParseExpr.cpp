@@ -1081,7 +1081,7 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (canParseAsGenericArgumentList()) {
         SmallVector<TypeRepr *, 8> args;
         SourceLoc LAngleLoc, RAngleLoc;
-        auto argStat = parseGenericArgumentsAST(args, LAngleLoc, RAngleLoc);
+        auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
         if (argStat.isError())
           diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
 
@@ -1390,17 +1390,16 @@ ParsedExprSyntax Parser::parseExprSyntax<PoundDsohandleExprSyntax>() {
 
 template <typename SyntaxNode>
 ParserResult<Expr> Parser::parseExprAST() {
-  auto Loc = leadingTriviaLoc();
   auto ParsedExpr = parseExprSyntax<SyntaxNode>();
   SyntaxContext->addSyntax(ParsedExpr);
   // todo [gsoc]: improve this somehow
-  if (SyntaxContext->isTopNode<UnknownExprSyntax>()) {
+  if (SyntaxContext->isTopNode<SyntaxKind::UnknownExpr>()) {
     auto Expr = SyntaxContext->topNode<UnknownExprSyntax>();
-    auto ExprAST = Generator.generate(Expr, Loc);
+    auto ExprAST = Generator.generate(Expr);
     return makeParserResult(ExprAST);
   }
   auto Expr = SyntaxContext->topNode<SyntaxNode>();
-  auto ExprAST = Generator.generate(Expr, Loc);
+  auto ExprAST = Generator.generate(Expr);
   return makeParserResult(ExprAST);
 }
 
@@ -1510,7 +1509,7 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
 
   case tok::kw_Any: { // Any
     ExprContext.setCreateSyntax(SyntaxKind::TypeExpr);
-    auto TyR = parseAnyTypeAST();
+    auto TyR = parseAnyType();
     return makeParserResult(new (Context) TypeExpr(TypeLoc(TyR.get())));
   }
 
@@ -2209,7 +2208,7 @@ Expr *Parser::parseExprIdentifier() {
   if (canParseAsGenericArgumentList()) {
     SyntaxContext->createNodeInPlace(SyntaxKind::IdentifierExpr);
     SyntaxContext->setCreateSyntax(SyntaxKind::SpecializeExpr);
-    auto argStat = parseGenericArgumentsAST(args, LAngleLoc, RAngleLoc);
+    auto argStat = parseGenericArguments(args, LAngleLoc, RAngleLoc);
     if (argStat.isError())
       diagnose(LAngleLoc, diag::while_parsing_as_left_angle_bracket);
     

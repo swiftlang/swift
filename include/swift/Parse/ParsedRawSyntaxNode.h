@@ -136,20 +136,9 @@ public:
   /// Primary used for a deferred missing token.
   bool isMissing() const { return IsMissing; }
 
-  CharSourceRange getDeferredRange() const {
-    switch (DK) { 
-    case DataKind::DeferredLayout:
-      return getDeferredLayoutRange();
-    case DataKind::DeferredToken:
-      return getDeferredTokenRange();
-    default:
-      llvm_unreachable("node not deferred");
-    }
-  }
-  
   // Recorded Data ===========================================================//
 
-  CharSourceRange getRecordedRange() const {
+  CharSourceRange getRange() const {
     assert(isRecorded());
     return RecordedData.Range;
   }
@@ -160,20 +149,6 @@ public:
 
   // Deferred Layout Data ====================================================//
 
-  CharSourceRange getDeferredLayoutRange() const {
-    assert(DK == DataKind::DeferredLayout);
-    assert(!DeferredLayout.Children.empty());
-    auto getLastNonNullChild = [this]() {
-      for (auto &&Child : llvm::reverse(getDeferredChildren()))
-        if (!Child.isNull())
-          return Child;
-      llvm_unreachable("layout node without non-null children");
-    };
-    auto firstRange = DeferredLayout.Children.front().getDeferredRange();
-    auto lastRange = getLastNonNullChild().getDeferredRange();
-    firstRange.widen(lastRange);
-    return firstRange;
-  }
   ArrayRef<ParsedRawSyntaxNode> getDeferredChildren() const {
     assert(DK == DataKind::DeferredLayout);
     return DeferredLayout.Children;
