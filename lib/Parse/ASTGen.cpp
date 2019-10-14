@@ -250,10 +250,6 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*dictionaryExpr, Loc);
   else if (auto tupleExpr = E.getAs<TupleExprSyntax>())
     result = generate(*tupleExpr, Loc);
-  else if (auto callExpr  = E.getAs<FunctionCallExprSyntax>())
-    result = generate(*callExpr, Loc);
-  else if (auto memberExpr  = E.getAs<MemberAccessExprSyntax>())
-    result = generate(*memberExpr, Loc);
   else if (auto integerLiteralExpr = E.getAs<IntegerLiteralExprSyntax>())
     result = generate(*integerLiteralExpr, Loc);
   else if (auto floatLiteralExpr = E.getAs<FloatLiteralExprSyntax>())
@@ -272,10 +268,6 @@ Expr *ASTGen::generate(const ExprSyntax &E, const SourceLoc Loc) {
     result = generate(*poundFunctionExpr, Loc);
   else if (auto poundDsohandleExpr = E.getAs<PoundDsohandleExprSyntax>())
     result = generate(*poundDsohandleExpr, Loc);
-  else if (auto objectLiteralExpr = E.getAs<ObjectLiteralExprSyntax>())
-    result = generate(*objectLiteralExpr, Loc);
-  else if (auto completionExpr = E.getAs<CodeCompletionExprSyntax>())
-    result = generate(*completionExpr, Loc);
   else if (auto unknownExpr = E.getAs<UnknownExprSyntax>())
     result = generate(*unknownExpr, Loc);
   else {
@@ -601,67 +593,6 @@ void ASTGen::generateExprTupleElementList(const TupleExprElementListSyntax &elem
          exprLabels.size() == exprLabelLocs.size());
 }
 
-Expr *ASTGen::generate(const FunctionCallExprSyntax &E, const SourceLoc Loc) {
-  auto callee = E.getCalledExpression();
-
-  SourceLoc LParenLoc, RParenLoc;
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  generateExprTupleElementList(E.getArgumentList(), Loc,
-                               /*isForCallArguments=*/true, args, argLabels,
-                               argLabelLocs);
-  Expr *trailingClosure = nullptr;
-  if (auto CE = E.getTrailingClosure())
-    trailingClosure = generate(*CE, Loc);
-  if (auto LParen = E.getLeftParen()) {
-    LParenLoc = advanceLocBegin(Loc, *LParen);
-    if (auto RParen = E.getRightParen())
-      RParenLoc = advanceLocBegin(Loc, *RParen);
-    else
-      RParenLoc = advanceLocEnd(Loc, E.getArgumentList());
-  }
-
-  if (auto memberAccess = callee.getAs<MemberAccessExprSyntax>()) {
-    if (!memberAccess->getBase()) {
-      // This is UnresolvedMemberExpr with call arguments.
-      if (memberAccess->getName().isMissing())
-        return nullptr;
-
-      SourceLoc dotLoc = advanceLocBegin(Loc, memberAccess->getDot());
-      DeclName name;
-      DeclNameLoc nameLoc;
-      std::tie(name, nameLoc) = generateUnqualifiedDeclName(
-          memberAccess->getName(), memberAccess->getDeclNameArguments(), Loc);
-
-      return UnresolvedMemberExpr::create(
-          Context, dotLoc, nameLoc, name, LParenLoc, args, argLabels,
-          argLabelLocs, RParenLoc, trailingClosure,
-          /*implicit=*/false);
-    }
-  }
-  llvm_unreachable("call expression not implemented");
-  return nullptr;
-}
-
-Expr *ASTGen::generate(const MemberAccessExprSyntax &E, const SourceLoc Loc) {
-  if (!E.getBase()) {
-    // This is an UnresolvedMemberExpr.
-    if (E.getName().isMissing())
-      return nullptr;
-
-    DeclName name;
-    DeclNameLoc nameLoc;
-    std::tie(name, nameLoc) =
-        generateUnqualifiedDeclName(E.getName(), E.getDeclNameArguments(), Loc);
-    SourceLoc dotLoc = advanceLocBegin(Loc, E.getDot());
-
-    return UnresolvedMemberExpr::create(Context, dotLoc, nameLoc, name,
-                                        /*implicit=*/false);
-  }
-  llvm_unreachable("member access expression not implemented");
-  return nullptr;
-}
 
 Expr *ASTGen::generate(const IntegerLiteralExprSyntax &Expr,
                        const SourceLoc Loc) {
@@ -714,64 +645,6 @@ Expr *ASTGen::generate(const PoundDsohandleExprSyntax &Expr,
                        const SourceLoc Loc) {
   return generateMagicIdentifierLiteralExpression(Expr.getPoundDsohandle(),
                                                   Loc);
-}
-
-Expr *ASTGen::generate(const ObjectLiteralExprSyntax &E, const SourceLoc Loc) {
-  ObjectLiteralExpr::LiteralKind kind;
-  switch (E.getIdentifier().getTokenKind()) {
-#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
-  case tok::pound_##Name:                                                      \
-    kind = ObjectLiteralExpr::Name;                                            \
-    break;
-#include "swift/Syntax/TokenKinds.def"
-  default:
-    llvm_unreachable("unknown token kind for object literal expression");
-  }
-
-  SmallVector<Expr *, 2> args;
-  SmallVector<Identifier, 2> argLabels;
-  SmallVector<SourceLoc, 2> argLabelLocs;
-  generateExprTupleElementList(E.getArguments(), Loc, true, args, argLabels,
-                               argLabelLocs);
-
-  ClosureExpr *trailingClosure = nullptr;
-  if (auto CE = E.getTrailingClosure())
-    trailingClosure = dyn_cast_or_null<ClosureExpr>(generate(*CE, Loc));
-
-  if (E.getLeftParen().isMissing() || E.getRightParen().isMissing())
-    return nullptr;
-
-  SourceLoc poundLoc = advanceLocBegin(Loc, E.getIdentifier());
-  SourceLoc LParenLoc = advanceLocBegin(Loc, E.getLeftParen());
-  SourceLoc RParenLoc = advanceLocBegin(Loc, E.getRightParen());
-
-  return ObjectLiteralExpr::create(Context, poundLoc, kind, LParenLoc, args,
-                                   argLabels, argLabelLocs, RParenLoc,
-                                   trailingClosure, /*implicit=*/false);
-}
-
-Expr *ASTGen::generate(const CodeCompletionExprSyntax &E, const SourceLoc Loc) {
-  if (!E.getBase()) {
-    if (auto punctuator = E.getPeriodOrParen()) {
-      // '.' <cc-token>
-      if (punctuator->getTokenKind() == tok::period ||
-          punctuator->getTokenKind() == tok::period_prefix) {
-        auto ccLoc = advanceLocBegin(Loc, E.getCodeCompletionToken());
-        auto dotLoc = advanceLocBegin(Loc, *punctuator);
-        
-        auto CCE = new (Context) CodeCompletionExpr(ccLoc);
-        if (P.CodeCompletion)
-          P.CodeCompletion->completeUnresolvedMember(CCE, dotLoc);
-        return CCE;
-      }
-    } else {
-      llvm_unreachable("'(' <cc-token> is not suppported");
-    }
-  } else {
-    // TODO: implement
-  }
-  llvm_unreachable("code completion expression not implemented");
-  return nullptr;
 }
 
 Expr *ASTGen::generate(const UnknownExprSyntax &Expr, const SourceLoc Loc) {
