@@ -507,8 +507,6 @@ EXPR_NODES = [
     Node('ObjcNamePiece', kind='Syntax',
          children=[
              Child('Name', kind='IdentifierToken'),
-             Child('DeclNameArguments', kind='DeclNameArguments',
-                   is_optional=True),
              Child('Dot', kind='PeriodToken', is_optional=True),
          ]),
 

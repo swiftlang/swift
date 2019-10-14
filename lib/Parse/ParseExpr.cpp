@@ -627,79 +627,97 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
 ///   expr-keypath-objc:
 ///     '#keyPath' '(' unqualified-name ('.' unqualified-name) * ')'
 ///
-ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprObjcKeyPathSyntax() {
-  ParsedObjcKeyPathExprSyntaxBuilder builder(*SyntaxContext);
-  ParserStatus status;
-
+ParserResult<Expr> Parser::parseExprKeyPathObjC() {
+  SyntaxParsingContext ObjcKPCtx(SyntaxContext, SyntaxKind::ObjcKeyPathExpr);
   // Consume '#keyPath'.
-  builder.useKeyPath(consumeTokenSyntax(tok::pound_keyPath));
+  SourceLoc keywordLoc = consumeToken(tok::pound_keyPath);
 
   // Parse the leading '('.
   if (!Tok.is(tok::l_paren)) {
     diagnose(Tok, diag::expr_keypath_expected_lparen);
-    return makeParsedError(builder.build());
+    return makeParserError();
   }
-  auto LParenLoc = Tok.getLoc();
-  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
+  SourceLoc lParenLoc = consumeToken(tok::l_paren);
+
+  SmallVector<KeyPathExpr::Component, 4> components;
+  /// Handler for code completion.
+  auto handleCodeCompletion = [&](SourceLoc DotLoc) -> ParserResult<Expr> {
+    KeyPathExpr *expr = nullptr;
+    if (!components.empty()) {
+      expr = new (Context)
+          KeyPathExpr(Context, keywordLoc, lParenLoc, components, Tok.getLoc());
+    }
+
+    if (CodeCompletion)
+      CodeCompletion->completeExprKeyPath(expr, DotLoc);
+
+    // Eat the code completion token because we handled it.
+    consumeToken(tok::code_complete);
+    return makeParserCodeCompletionResult(expr);
+  };
 
   // Parse the sequence of unqualified-names.
-  bool isFirst = true;
-  bool hasNext = true;
-  do {
-    // Parse the next name
-    Optional<ParsedTokenSyntax> identTok;
-    Optional<ParsedDeclNameArgumentsSyntax> declNameArgs;
-    status |= parseUnqualifiedDeclNameSyntax(
-        identTok, declNameArgs, /*afterDot=*/!isFirst,
-        diag::expr_keypath_expected_property_or_type);
-    isFirst = false;
-    if (status.isError())
+  ParserStatus status;
+  SourceLoc LastDotLoc;
+  while (true) {
+    SyntaxParsingContext NamePieceCtx(SyntaxContext, SyntaxKind::ObjcNamePiece);
+    // Handle code completion.
+    if (Tok.is(tok::code_complete))
+      return handleCodeCompletion(LastDotLoc);
+
+    // Parse the next name.
+    DeclNameLoc nameLoc;
+    bool afterDot = !components.empty();
+    auto name = parseUnqualifiedDeclName(
+                  afterDot, nameLoc, 
+                  diag::expr_keypath_expected_property_or_type);
+    if (!name) {
+      status.setIsParseError();
       break;
+    }
 
-    ParsedObjcNamePieceSyntaxBuilder elemBuilder(*SyntaxContext);
+    // Record the name we parsed.
+    auto component = KeyPathExpr::Component::forUnresolvedProperty(name,
+                                                      nameLoc.getBaseNameLoc());
+    components.push_back(component);
 
-    elemBuilder.useName(std::move(*identTok));
-    if (declNameArgs)
-      elemBuilder.useDeclNameArguments(std::move(*declNameArgs));
+    // Handle code completion.
+    if (Tok.is(tok::code_complete))
+      return handleCodeCompletion(SourceLoc());
 
-    hasNext = Tok.is(tok::period);
-    if (hasNext)
-      elemBuilder.useDot(consumeTokenSyntax(tok::period));
-    builder.addNameMember(elemBuilder.build());
-  } while (hasNext);
+    // Parse the next period to continue the path.
+    if (consumeIf(tok::period, LastDotLoc))
+      continue;
 
-  if (Tok.is(tok::code_complete)) {
-    return makeParsedCodeCompletion(
-        ParsedSyntaxRecorder::makeCodeCompletionExpr(
-            builder.build(), None, consumeTokenSyntax(tok::code_complete),
-            *SyntaxContext));
+    break;
   }
 
-  if (status.isError()) {
-    while (!Tok.isAny(tok::r_paren, tok::eof, tok::r_brace, tok::pound_endif,
-                      tok::pound_else, tok::pound_elseif) &&
-           !isStartOfDecl() && !isStartOfStmt())
-      ignoreSingle();
-  }
+  // Collect all name pieces to an objc name.
+  SyntaxContext->collectNodesInPlace(SyntaxKind::ObjcName);
 
   // Parse the closing ')'.
-  auto RParen =
-      parseMatchingTokenSyntax(tok::r_paren, diag::expr_keypath_expected_rparen,
-                               LParenLoc, /*silenceDiag=*/status.isError());
-  status |= RParen.getStatus();
-  if (!RParen.isNull())
-    builder.useRightParen(RParen.get());
+  SourceLoc rParenLoc;
+  if (status.isError()) {
+    skipUntilDeclStmtRBrace(tok::r_paren);
+    if (Tok.is(tok::r_paren))
+      rParenLoc = consumeToken();
+    else
+      rParenLoc = PreviousLoc;
+  } else {
+    parseMatchingToken(tok::r_paren, rParenLoc,
+                       diag::expr_keypath_expected_rparen, lParenLoc);
+  }
 
-  return makeParsedResult(builder.build(), status);
-}
+  // If we cannot build a useful expression, just return an error
+  // expression.
+  if (components.empty() || status.isError()) {
+    return makeParserResult<Expr>(
+             new (Context) ErrorExpr(SourceRange(keywordLoc, rParenLoc)));
+  }
 
-ParserResult<Expr> Parser::parseExprKeyPathObjC() {
-  auto leadingLoc = leadingTriviaLoc();
-  auto parsed = parseExprObjcKeyPathSyntax();
-  SyntaxContext->addSyntax(parsed.get());
-  auto syntax = SyntaxContext->topNode<ExprSyntax>();
-  auto expr = Generator.generate(syntax, leadingLoc);
-  return makeParserResult(parsed.getStatus(), expr);
+  // We're done: create the key-path expression.
+  return makeParserResult<Expr>(new (Context) KeyPathExpr(
+      Context, keywordLoc, lParenLoc, components, rParenLoc));
 }
 
 /// parseExprSelector
