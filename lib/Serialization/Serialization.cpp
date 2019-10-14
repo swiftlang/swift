@@ -3663,6 +3663,7 @@ static uint8_t getRawStableSILCoroutineKind(
   llvm_unreachable("bad kind");
 }
 
+// SWIFT_ENABLE_TENSORFLOW
 /// Translate from the AST differentiability kind enum to the Serialization enum
 /// values, which are guaranteed to be stable.
 static uint8_t getRawStableDifferentiabilityKind(
