@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -353,13 +354,13 @@ static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
 }
 
 static std::string getDifferentiationParametersClauseString(
-    const AbstractFunctionDecl *function, AutoDiffIndexSubset *indices,
+    const AbstractFunctionDecl *function, IndexSubset *indices,
     ArrayRef<ParsedAutoDiffParameter> parsedParams) {
   bool isInstanceMethod = function && function->isInstanceMember();
   std::string result;
   llvm::raw_string_ostream printer(result);
 
-  // Use parameter indices from `AutoDiffIndexSubset`, if specified.
+  // Use parameter indices from `IndexSubset`, if specified.
   if (indices) {
     auto parameters = indices->getBitVector();
     auto parameterCount = parameters.count();
@@ -1340,7 +1341,7 @@ DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
 DifferentiableAttr::DifferentiableAttr(ASTContext &context, bool implicit,
                                        SourceLoc atLoc, SourceRange baseRange,
                                        bool linear,
-                                       AutoDiffIndexSubset *indices,
+                                       IndexSubset *indices,
                                        Optional<DeclNameWithLoc> jvp,
                                        Optional<DeclNameWithLoc> vjp,
                                        GenericSignature derivativeGenSig)
@@ -1368,7 +1369,7 @@ DifferentiableAttr::create(ASTContext &context, bool implicit,
 DifferentiableAttr *
 DifferentiableAttr::create(ASTContext &context, bool implicit,
                            SourceLoc atLoc, SourceRange baseRange,
-                           bool linear, AutoDiffIndexSubset *indices,
+                           bool linear, IndexSubset *indices,
                            Optional<DeclNameWithLoc> jvp,
                            Optional<DeclNameWithLoc> vjp,
                            GenericSignature derivativeGenSig) {

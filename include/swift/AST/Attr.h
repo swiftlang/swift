@@ -1758,7 +1758,7 @@ class DifferentiableAttr final
   /// specified.
   FuncDecl *VJPFunction = nullptr;
   /// The differentiation parameters' indices, resolved by the type checker.
-  AutoDiffIndexSubset *ParameterIndices = nullptr;
+  IndexSubset *ParameterIndices = nullptr;
   /// The trailing where clause (optional).
   TrailingWhereClause *WhereClause = nullptr;
   /// The generic signature for autodiff associated functions. Resolved by the
@@ -1777,7 +1777,7 @@ class DifferentiableAttr final
 
   explicit DifferentiableAttr(ASTContext &context, bool implicit,
                               SourceLoc atLoc, SourceRange baseRange,
-                              bool linear, AutoDiffIndexSubset *indices,
+                              bool linear, IndexSubset *indices,
                               Optional<DeclNameWithLoc> jvp,
                               Optional<DeclNameWithLoc> vjp,
                               GenericSignature derivativeGenericSignature);
@@ -1793,7 +1793,7 @@ public:
 
   static DifferentiableAttr *create(ASTContext &context, bool implicit,
                                     SourceLoc atLoc, SourceRange baseRange,
-                                    bool linear, AutoDiffIndexSubset *indices,
+                                    bool linear, IndexSubset *indices,
                                     Optional<DeclNameWithLoc> jvp,
                                     Optional<DeclNameWithLoc> vjp,
                                     GenericSignature derivativeGenSig);
@@ -1808,10 +1808,10 @@ public:
   /// registered VJP.
   Optional<DeclNameWithLoc> getVJP() const { return VJP; }
 
-  AutoDiffIndexSubset *getParameterIndices() const {
+  IndexSubset *getParameterIndices() const {
     return ParameterIndices;
   }
-  void setParameterIndices(AutoDiffIndexSubset *pi) {
+  void setParameterIndices(IndexSubset *pi) {
     ParameterIndices = pi;
   }
 
