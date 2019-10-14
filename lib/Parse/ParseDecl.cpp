@@ -2538,7 +2538,6 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
   // SWIFT_ENABLE_TENSORFLOW
   case TAK_differentiable:
     status |= [&]() -> ParserStatus {
-      bool linear = false;
       // Check if there is a 'linear' argument.
       // If next tokens are not `'(' identifier`, break early.
       if (!Tok.is(tok::l_paren) || !peekToken().is(tok::identifier))
@@ -2555,7 +2554,6 @@ ParsedSyntaxResult<ParsedAttributeSyntax> Parser::parseTypeAttributeSyntax() {
         if (Tok.is(tok::r_paren) && peekToken().is(tok::l_paren)) {
           // It is being used as an attribute argument, so cancel backtrack
           // as function is linear differentiable.
-          linear = true;
           backtrack.cancelBacktrack();
           builder.useLeftParen(std::move(lParen));
           builder.useArgument(std::move(linearIdentifier));
