@@ -542,26 +542,11 @@ void RequirementFailure::emitRequirementNote(const Decl *anchor, Type lhs,
 
 bool MissingConformanceFailure::diagnoseAsError() {
   auto *anchor = getAnchor();
-  auto ownerType = getOwnerType();
   auto nonConformingType = getLHS();
   auto protocolType = getRHS();
 
-  auto getArgumentAt = [](const ApplyExpr *AE, unsigned index) -> Expr * {
-    assert(AE);
-
-    auto *arg = AE->getArg();
-    if (auto *TE = dyn_cast<TupleExpr>(arg))
-      return TE->getElement(index);
-
-    assert(index == 0);
-    if (auto *PE = dyn_cast<ParenExpr>(arg))
-      return PE->getSubExpr();
-
-    return arg;
-  };
-
   // If this is a requirement of a pattern-matching operator,
-  // let's see whether argument is already has a fix associated
+  // let's see whether argument already has a fix associated
   // with it and if so skip conformance error, otherwise we'd
   // produce an unrelated `<type> doesn't conform to Equatable protocol`
   // diagnostic.
@@ -588,43 +573,14 @@ bool MissingConformanceFailure::diagnoseAsError() {
   if (diagnoseAsAmbiguousOperatorRef())
     return true;
 
-  Optional<unsigned> atParameterPos;
-  // Sometimes fix is recorded by type-checking sub-expression
-  // during normal diagnostics, in such case call expression
-  // is unavailable.
-  if (Apply) {
-    if (auto *fnType = ownerType->getAs<AnyFunctionType>()) {
-      auto parameters = fnType->getParams();
-      for (auto index : indices(parameters)) {
-        if (parameters[index].getOldType()->isEqual(nonConformingType)) {
-          atParameterPos = index;
-          break;
-        }
-      }
-    }
-  }
-
   if (nonConformingType->isObjCExistentialType()) {
     emitDiagnostic(anchor->getLoc(), diag::protocol_does_not_conform_static,
                    nonConformingType, protocolType);
     return true;
   }
 
-  if (diagnoseTypeCannotConform((atParameterPos ?
-                                getArgumentAt(Apply, *atParameterPos) : anchor),
-                                nonConformingType, protocolType)) {
-      return true;
-  }
-
-  if (atParameterPos) {
-    // Requirement comes from one of the parameter types,
-    // let's try to point diagnostic to the argument expression.
-    auto *argExpr = getArgumentAt(Apply, *atParameterPos);
-    emitDiagnostic(argExpr->getLoc(),
-                   diag::cannot_convert_argument_value_protocol,
-                   nonConformingType, protocolType);
+  if (diagnoseTypeCannotConform(anchor, nonConformingType, protocolType))
     return true;
-  }
 
   // If none of the special cases could be diagnosed,
   // let's fallback to the most general diagnostic.
