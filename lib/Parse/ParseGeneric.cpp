@@ -74,17 +74,12 @@ Parser::parseGenericParameterClauseSyntax() {
 
     // Parse attributes.
     // TODO: Implement syntax attribute parsing.
-    if (Tok.is(tok::at_sign)) {
-      SyntaxParsingContext TmpCtxt(SyntaxContext);
-      TmpCtxt.setTransparent();
-
-      DeclAttributes attrsAST;
-      parseDeclAttributeList(attrsAST);
-      if (!attrsAST.isEmpty())
-        Generator.addDeclAttributes(attrsAST, attrsAST.getStartLoc());
-      auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
-      if (attrs)
-        paramBuilder.useAttributes(std::move(*attrs));
+    DeclAttributes attrsAST;
+    parseDeclAttributeList(attrsAST);
+    auto attrs = SyntaxContext->popIf<ParsedAttributeListSyntax>();
+    if (attrs) {
+      paramBuilder.useAttributes(std::move(*attrs));
+      Generator.addDeclAttributes(attrsAST, attrsAST.getStartLoc());
     }
 
     // Parse the name of the parameter.
