@@ -380,31 +380,36 @@ class ModuleInterfaceLoaderImpl {
   /// with dead entries -- when other factors change, such as the contents of
   /// the .swiftinterface input or its dependencies.
   std::string getCacheHash(const CompilerInvocation &SubInvocation) {
-    // Start with the compiler version (which will be either tag names or revs).
-    // Explicitly don't pass in the "effective" language version -- this would
-    // mean modules built in different -swift-version modes would rebuild their
-    // dependencies.
-    llvm::hash_code H = hash_value(swift::version::getSwiftFullVersion());
+    auto normalizedTargetTriple =
+        getTargetSpecificModuleTriple(SubInvocation.getLangOptions().Target);
 
-    // Simplest representation of input "identity" (not content) is just a
-    // pathname, and probably all we can get from the VFS in this regard
-    // anyways.
-    H = hash_combine(H, interfacePath);
+    llvm::hash_code H = hash_combine(
+        // Start with the compiler version (which will be either tag names or
+        // revs). Explicitly don't pass in the "effective" language version --
+        // this would mean modules built in different -swift-version modes would
+        // rebuild their dependencies.
+        swift::version::getSwiftFullVersion(),
 
-    // Include the target CPU architecture. In practice, .swiftinterface files
-    // will be in architecture-specific subdirectories and would have
-    // architecture-specific pieces #if'd out. However, it doesn't hurt to
-    // include it, and it guards against mistakenly reusing cached modules
-    // across architectures.
-    H = hash_combine(H, SubInvocation.getLangOptions().Target.getArchName());
+        // Simplest representation of input "identity" (not content) is just a
+        // pathname, and probably all we can get from the VFS in this regard
+        // anyways.
+        interfacePath,
 
-    // The SDK path is going to affect how this module is imported, so include
-    // it.
-    H = hash_combine(H, SubInvocation.getSDKPath());
+        // Include the normalized target triple. In practice, .swiftinterface
+        // files will be in target-specific subdirectories and would have
+        // target-specific pieces #if'd out. However, it doesn't hurt to include
+        // it, and it guards against mistakenly reusing cached modules across
+        // targets. Note that this normalization explicitly doesn't include the
+        // minimum deployment target (e.g. the '12.0' in 'ios12.0').
+        normalizedTargetTriple.str(),
 
-    // Whether or not we're tracking system dependencies affects the
-    // invalidation behavior of this cache item.
-    H = hash_combine(H, SubInvocation.getFrontendOptions().TrackSystemDeps);
+        // The SDK path is going to affect how this module is imported, so
+        // include it.
+        SubInvocation.getSDKPath(),
+
+        // Whether or not we're tracking system dependencies affects the
+        // invalidation behavior of this cache item.
+        SubInvocation.getFrontendOptions().TrackSystemDeps);
 
     return llvm::APInt(64, H).toString(36, /*Signed=*/false);
   }
@@ -983,8 +988,10 @@ bool ModuleInterfaceLoader::isCached(StringRef DepPath) {
 std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
   StringRef ModuleDocFilename,
+  StringRef ModuleSourceInfoFilename,
   std::unique_ptr<llvm::MemoryBuffer> *ModuleBuffer,
-  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer) {
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleDocBuffer,
+  std::unique_ptr<llvm::MemoryBuffer> *ModuleSourceInfoBuffer) {
 
   // If running in OnlySerialized mode, ModuleInterfaceLoader
   // should not have been constructed at all.
@@ -1029,7 +1036,11 @@ std::error_code ModuleInterfaceLoader::findModuleFilesInDirectory(
   if (ModuleBuffer) {
     *ModuleBuffer = std::move(*ModuleBufferOrErr);
   }
-
+  // Open .swiftsourceinfo file if it's present.
+  SerializedModuleLoaderBase::openModuleSourceInfoFileIfPresent(ModuleID,
+                                                                ModPath,
+                                                       ModuleSourceInfoFilename,
+                                                       ModuleSourceInfoBuffer);
   // Delegate back to the serialized module loader to load the module doc.
   llvm::SmallString<256> DocPath{DirPath};
   path::append(DocPath, ModuleDocFilename);

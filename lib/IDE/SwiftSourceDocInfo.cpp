@@ -139,8 +139,10 @@ static std::vector<CharSourceRange> getEnumParamListInfo(SourceManager &SM,
   for (ParamDecl *Param: *PL) {
     if (Param->isImplicit())
       continue;
-    
-    SourceLoc LabelStart(Param->getTypeLoc().getLoc());
+
+    SourceLoc LabelStart;
+    if (auto *repr = Param->getTypeRepr())
+      LabelStart = repr->getLoc();
     SourceLoc LabelEnd(LabelStart);
     
     if (Param->getNameLoc().isValid()) {

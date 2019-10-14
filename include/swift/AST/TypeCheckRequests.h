@@ -380,8 +380,7 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return hash_combine(hash_value(owner.dc),
-                        hash_value(owner.source.getOpaqueValue()));
+    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
@@ -1189,7 +1188,7 @@ public:
   void cacheResult(GenericSignature value) const;
 };
 
-/// Compute the interface type of the underlying definition type of a typealias declaration.
+/// Compute the underlying interface type of a typealias.
 class UnderlyingTypeRequest :
     public SimpleRequest<UnderlyingTypeRequest,
                          Type(TypeAliasDecl *),
@@ -1209,8 +1208,10 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
+/// Looks up the precedence group of an operator declaration.
 class OperatorPrecedenceGroupRequest
     : public SimpleRequest<OperatorPrecedenceGroupRequest,
                            PrecedenceGroupDecl *(InfixOperatorDecl *),
@@ -1228,6 +1229,160 @@ private:
 public:
   // Separate caching.
   bool isCached() const { return true; }
+};
+
+/// Computes the raw values for an enum type.
+class EnumRawValuesRequest :
+    public SimpleRequest<EnumRawValuesRequest,
+                         bool (EnumDecl *, TypeResolutionStage),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
+  
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+                           
+  // Separate caching.
+  bool isCached() const;
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determines if an override is ABI compatible with its base method.
+class IsABICompatibleOverrideRequest
+    : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Builds an opaque result type for a declaration.
+class OpaqueResultTypeRequest
+    : public SimpleRequest<OpaqueResultTypeRequest,
+                           OpaqueTypeDecl *(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<OpaqueTypeDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Determines if a function declaration is 'static'.
+class IsStaticRequest :
+    public SimpleRequest<IsStaticRequest,
+                         bool(FuncDecl *),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, FuncDecl *value) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determines if a method override should introduce a new vtable entry,
+/// because the override is not ABI compatible, or the base method is
+/// less visible than the override.
+class NeedsNewVTableEntryRequest
+    : public SimpleRequest<NeedsNewVTableEntryRequest,
+                           bool(AbstractFunctionDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator,
+                                AbstractFunctionDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
+/// Determines the specifier for a parameter (inout, __owned, etc).
+class ParamSpecifierRequest
+    : public SimpleRequest<ParamSpecifierRequest,
+                           ParamSpecifier(ParamDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<ParamSpecifier>
+  evaluate(Evaluator &evaluator, ParamDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<ParamSpecifier> getCachedResult() const;
+  void cacheResult(ParamSpecifier value) const;
+};
+
+/// Determines the result type of a function or element type of a subscript.
+class ResultTypeRequest
+    : public SimpleRequest<ResultTypeRequest,
+                           Type(ValueDecl *),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  TypeLoc &getResultTypeLoc() const;
+
+  // Evaluation.
+  llvm::Expected<Type> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

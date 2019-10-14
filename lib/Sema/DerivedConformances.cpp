@@ -292,8 +292,6 @@ addGetterToReadOnlyDerivedProperty(VarDecl *property,
 AccessorDecl *
 DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
                                                  Type propertyContextType) {
-  bool isStatic = property->isStatic();
-
   auto &C = property->getASTContext();
   auto parentDC = property->getDeclContext();
   ParameterList *params = ParameterList::createEmpty(C);
@@ -308,15 +306,12 @@ DerivedConformance::declareDerivedPropertyGetter(VarDecl *property,
     /*GenericParams=*/nullptr, params,
     TypeLoc::withoutLoc(propertyInterfaceType), parentDC);
   getterDecl->setImplicit();
-  getterDecl->setStatic(isStatic);
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of the getter.
-  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
   getterDecl->copyFormalAccessFrom(property);
-  getterDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(getterDecl);
 
@@ -337,7 +332,6 @@ DerivedConformance::declareDerivedProperty(Identifier name,
   propDecl->setImplicit();
   propDecl->copyFormalAccessFrom(Nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyInterfaceType);
-  propDecl->setValidationToChecked();
 
   Pattern *propPat = new (C) NamedPattern(propDecl, /*implicit*/ true);
   propPat->setType(propertyContextType);

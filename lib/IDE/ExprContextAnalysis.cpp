@@ -52,6 +52,8 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::TopLevelCodeDecl:
   case DeclContextKind::EnumElementDecl:
+  case DeclContextKind::GenericTypeDecl:
+  case DeclContextKind::SubscriptDecl:
     // Nothing to do for these.
     break;
 
@@ -61,7 +63,7 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
         auto i = patternInit->getBindingIndex();
         if (PBD->getInit(i)) {
           PBD->getPattern(i)->forEachVariable([](VarDecl *VD) {
-            typeCheckCompletionDecl(VD);
+            (void) VD->getInterfaceType();
           });
           if (!PBD->isInitializerChecked(i))
             typeCheckPatternBinding(PBD, i);
@@ -72,29 +74,18 @@ void typeCheckContextImpl(DeclContext *DC, SourceLoc Loc) {
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(DC);
-
-    // FIXME: This shouldn't be necessary, but we crash otherwise.
-    if (auto *AD = dyn_cast<AccessorDecl>(AFD))
-      typeCheckCompletionDecl(AD->getStorage());
-
     typeCheckAbstractFunctionBodyUntil(AFD, Loc);
     break;
   }
 
   case DeclContextKind::ExtensionDecl:
-    typeCheckCompletionDecl(cast<ExtensionDecl>(DC));
-    break;
-
-  case DeclContextKind::GenericTypeDecl:
-    typeCheckCompletionDecl(cast<GenericTypeDecl>(DC));
+    // Make sure the extension has been bound, in case it is in an
+    // inactive #if or something weird like that.
+    cast<ExtensionDecl>(DC)->computeExtendedNominal();
     break;
 
   case DeclContextKind::FileUnit:
     llvm_unreachable("module scope context handled above");
-
-  case DeclContextKind::SubscriptDecl:
-    typeCheckCompletionDecl(cast<SubscriptDecl>(DC));
-    break;
   }
 }
 } // anonymous namespace
@@ -895,9 +886,6 @@ bool swift::ide::isReferenceableByImplicitMemberExpr(
         ModuleDecl *CurrModule, DeclContext *DC, Type T, ValueDecl *VD) {
 
   if (VD->isOperator())
-    return false;
-
-  if (!VD->getInterfaceType())
     return false;
 
   if (T->getOptionalObjectType() &&

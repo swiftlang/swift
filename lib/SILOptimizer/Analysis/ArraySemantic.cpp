@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/StringSwitch.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
-#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
+#include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
 

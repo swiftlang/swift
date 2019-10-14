@@ -24,12 +24,13 @@
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/CFG.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
-#include "swift/SILOptimizer/Utils/Local.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -200,125 +201,6 @@ namespace {
   };
 
 } // end anonymous namespace
-
-/// Return true if there are any users of V outside the specified block.
-static bool isUsedOutsideOfBlock(SILValue V, SILBasicBlock *BB) {
-  for (auto UI : V->getUses())
-    if (UI->getUser()->getParent() != BB)
-      return true;
-  return false;
-}
-
-// Populate 'projections' with the chain of address projections leading
-// to and including 'inst'.
-//
-// Populate 'inBlockDefs' with all the non-address value definitions in
-// the block that will be used outside this block after projection sinking.
-//
-// Return true on success, even if projections is empty.
-bool SinkAddressProjections::analyzeAddressProjections(SILInstruction *inst) {
-  projections.clear();
-  inBlockDefs.clear();
-
-  SILBasicBlock *bb = inst->getParent();
-  auto pushOperandVal = [&](SILValue def) {
-    if (def->getParentBlock() != bb)
-      return true;
-
-    if (!def->getType().isAddress()) {
-      inBlockDefs.insert(def);
-      return true;
-    }
-    if (auto *addressProj = dyn_cast<SingleValueInstruction>(def)) {
-      if (addressProj->isTriviallyDuplicatable()) {
-        projections.push_back(addressProj);
-        return true;
-      }
-    }
-    // Can't handle a multi-value or unclonable address producer.
-    return false;
-  };
-  // Check the given instruction for any address-type results.
-  for (auto result : inst->getResults()) {
-    if (!isUsedOutsideOfBlock(result, bb))
-      continue;
-    if (!pushOperandVal(result))
-      return false;
-  }
-  // Recurse upward through address projections.
-  for (unsigned idx = 0; idx < projections.size(); ++idx) {
-    // Only one address result/operand can be handled per instruction.
-    if (projections.size() != idx + 1)
-      return false;
-
-    for (SILValue operandVal : projections[idx]->getOperandValues())
-      pushOperandVal(operandVal);
-  }
-  return true;
-}
-
-// Clone the projections gathered by 'analyzeAddressProjections' at
-// their use site outside this block.
-bool SinkAddressProjections::cloneProjections() {
-  if (projections.empty())
-    return false;
-
-  SILBasicBlock *bb = projections.front()->getParent();
-  SmallVector<Operand *, 4> usesToReplace;
-  // Clone projections in last-to-first order.
-  for (unsigned idx = 0; idx < projections.size(); ++idx) {
-    auto *oldProj = projections[idx];
-    assert(oldProj->getParent() == bb);
-    usesToReplace.clear();
-    for (Operand *use : oldProj->getUses()) {
-      if (use->getUser()->getParent() != bb)
-        usesToReplace.push_back(use);
-    }
-    for (Operand *use : usesToReplace) {
-      auto *newProj = oldProj->clone(use->getUser());
-      use->set(cast<SingleValueInstruction>(newProj));
-    }
-  }
-  return true;
-}
-
-/// Helper function to perform SSA updates in case of jump threading.
-void swift::updateSSAAfterCloning(BasicBlockCloner &Cloner,
-                                  SILBasicBlock *SrcBB, SILBasicBlock *DestBB) {
-  SILSSAUpdater SSAUp;
-  for (auto AvailValPair : Cloner.AvailVals) {
-    ValueBase *Inst = AvailValPair.first;
-    if (Inst->use_empty())
-      continue;
-
-    SILValue NewRes(AvailValPair.second);
-
-    SmallVector<UseWrapper, 16> UseList;
-    // Collect the uses of the value.
-    for (auto Use : Inst->getUses())
-      UseList.push_back(UseWrapper(Use));
-
-    SSAUp.Initialize(Inst->getType());
-    SSAUp.AddAvailableValue(DestBB, Inst);
-    SSAUp.AddAvailableValue(SrcBB, NewRes);
-
-    if (UseList.empty())
-      continue;
-
-    // Update all the uses.
-    for (auto U : UseList) {
-      Operand *Use = U;
-      SILInstruction *User = Use->getUser();
-      assert(User && "Missing user");
-
-      // Ignore uses in the same basic block.
-      if (User->getParent() == DestBB)
-        continue;
-
-      SSAUp.RewriteUse(*Use);
-    }
-  }
-}
 
 static SILValue getTerminatorCondition(TermInst *Term) {
   if (auto *CondBr = dyn_cast<CondBranchInst>(Term))
@@ -1044,7 +926,7 @@ bool SimplifyCFG::tryJumpThreading(BranchInst *BI) {
 
   // Are the arguments to this block used outside of the block.
   for (auto Arg : DestBB->getArguments())
-    if ((NeedToUpdateSSA |= isUsedOutsideOfBlock(Arg, DestBB))) {
+    if ((NeedToUpdateSSA |= isUsedOutsideOfBlock(Arg))) {
       break;
     }
 
@@ -2910,7 +2792,7 @@ void ArgumentSplitter::replaceIncomingArgs(
     llvm::SmallVectorImpl<SILValue> &NewIncomingValues) {
   unsigned ArgIndex = Arg->getIndex();
 
-  for (unsigned i : reversed(indices(BI->getAllOperands()))) {
+  for (unsigned i : llvm::reverse(indices(BI->getAllOperands()))) {
     // Skip this argument.
     if (i == ArgIndex)
       continue;
@@ -2929,7 +2811,7 @@ void ArgumentSplitter::replaceIncomingArgs(
   unsigned ArgIndex = Arg->getIndex();
   if (Arg->getParent() == CBI->getTrueBB()) {
     ArrayRef<Operand> TrueArgs = CBI->getTrueOperands();
-    for (unsigned i : reversed(indices(TrueArgs))) {
+    for (unsigned i : llvm::reverse(indices(TrueArgs))) {
       // Skip this argument.
       if (i == ArgIndex)
         continue;
@@ -2942,7 +2824,7 @@ void ArgumentSplitter::replaceIncomingArgs(
     NewFalseValues = OldIncomingValues;
   } else {
     ArrayRef<Operand> FalseArgs = CBI->getFalseOperands();
-    for (unsigned i : reversed(indices(FalseArgs))) {
+    for (unsigned i : llvm::reverse(indices(FalseArgs))) {
       // Skip this argument.
       if (i == ArgIndex)
         continue;
@@ -3065,7 +2947,7 @@ bool ArgumentSplitter::split() {
 
     auto Loc = RegularLocation::getAutoGeneratedLocation();
     assert(NewIncomingValues.empty() && "NewIncomingValues was not cleared?");
-    for (auto &P : reversed(Projections)) {
+    for (auto &P : llvm::reverse(Projections)) {
       auto *ProjInst = P.createProjection(B, Loc, Base).get();
       NewIncomingValues.push_back(ProjInst);
     }

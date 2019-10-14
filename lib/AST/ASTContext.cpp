@@ -28,6 +28,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/GenericSignatureBuilder.h"
 #include "swift/AST/ImportCache.h"
+#include "swift/AST/IndexSubset.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/ModuleLoader.h"
@@ -165,7 +166,8 @@ struct ASTContext::Implementation {
 
   // FIXME: This is a StringMap rather than a StringSet because StringSet
   // doesn't allow passing in a pre-existing allocator.
-  llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
+  llvm::StringMap<Identifier::Aligner, llvm::BumpPtrAllocator&>
+  IdentifierTable;
 
   /// The declaration of Swift.AssignmentPrecedence.
   PrecedenceGroupDecl *AssignmentPrecedence = nullptr;
@@ -426,6 +428,9 @@ FOR_KNOWN_FOUNDATION_TYPES(CACHE_FOUNDATION_DECL)
   llvm::FoldingSet<DeclName::CompoundDeclName> CompoundNames;
   llvm::DenseMap<UUID, OpenedArchetypeType *> OpenedExistentialArchetypes;
 
+  /// For uniquifying `IndexSubset` allocations.
+  llvm::FoldingSet<IndexSubset> IndexSubsets;
+
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
   llvm::DenseMap<NominalTypeDecl *, ForeignRepresentationInfo>
@@ -642,7 +647,8 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   if (Str.data() == nullptr)
     return Identifier(nullptr);
 
-  auto I = getImpl().IdentifierTable.insert(std::make_pair(Str, char())).first;
+  auto pair = std::make_pair(Str, Identifier::Aligner());
+  auto I = getImpl().IdentifierTable.insert(pair).first;
   return Identifier(I->getKeyData());
 }
 
@@ -3405,8 +3411,6 @@ ProtocolType::ProtocolType(ProtocolDecl *TheDecl, Type Parent,
   : NominalType(TypeKind::Protocol, &Ctx, TheDecl, Parent, properties) { }
 
 LValueType *LValueType::get(Type objectTy) {
-  assert(!objectTy->hasError() &&
-         "cannot have ErrorType wrapped inside LValueType");
   assert(!objectTy->is<LValueType>() && !objectTy->is<InOutType>() &&
          "cannot have 'inout' or @lvalue wrapped inside an @lvalue");
 
@@ -4615,4 +4619,25 @@ void VarDecl::setOriginalWrappedProperty(VarDecl *originalProperty) {
   ASTContext &ctx = getASTContext();
   assert(ctx.getImpl().OriginalWrappedProperties.count(this) == 0);
   ctx.getImpl().OriginalWrappedProperties[this] = originalProperty;
+}
+
+IndexSubset *
+IndexSubset::get(ASTContext &ctx, const SmallBitVector &indices) {
+  auto &foldingSet = ctx.getImpl().IndexSubsets;
+  llvm::FoldingSetNodeID id;
+  unsigned capacity = indices.size();
+  id.AddInteger(capacity);
+  for (unsigned index : indices.set_bits())
+    id.AddInteger(index);
+  void *insertPos = nullptr;
+  auto *existing = foldingSet.FindNodeOrInsertPos(id, insertPos);
+  if (existing)
+    return existing;
+  auto sizeToAlloc = sizeof(IndexSubset) +
+      getNumBitWordsNeededForCapacity(capacity);
+  auto *buf = reinterpret_cast<IndexSubset *>(
+      ctx.Allocate(sizeToAlloc, alignof(IndexSubset)));
+  auto *newNode = new (buf) IndexSubset(indices);
+  foldingSet.InsertNode(newNode, insertPos);
+  return newNode;
 }

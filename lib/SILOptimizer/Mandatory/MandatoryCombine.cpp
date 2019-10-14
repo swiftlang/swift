@@ -31,7 +31,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/raw_ostream.h"
@@ -127,20 +127,18 @@ public:
 //===----------------------------------------------------------------------===//
 
 void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
-  SmallBlotSetVector<SILBasicBlock *, 32> blockWorklist;
-  SmallBlotSetVector<SILBasicBlock *, 32> blocksVisited;
-  SmallVector<SILInstruction *, 128> instructions;
+  SmallVector<SILBasicBlock *, 32> blockWorklist;
+  SmallPtrSet<SILBasicBlock *, 32> blockAlreadyAddedToWorklist;
+  SmallVector<SILInstruction *, 128> initialInstructionWorklist;
 
-  blockWorklist.insert(&*function.begin());
+  {
+    auto *firstBlock = &*function.begin();
+    blockWorklist.push_back(firstBlock);
+    blockAlreadyAddedToWorklist.insert(firstBlock);
+  }
+
   while (!blockWorklist.empty()) {
-    auto *block = blockWorklist.pop_back_val().getValueOr(nullptr);
-    if (block == nullptr) {
-      continue;
-    }
-
-    if (!blocksVisited.insert(block).second) {
-      continue;
-    }
+    auto *block = blockWorklist.pop_back_val();
 
     for (auto iterator = block->begin(), end = block->end(); iterator != end;) {
       auto *instruction = &*iterator;
@@ -150,14 +148,17 @@ void MandatoryCombiner::addReachableCodeToWorklist(SILFunction &function) {
         continue;
       }
 
-      instructions.push_back(instruction);
+      initialInstructionWorklist.push_back(instruction);
     }
 
-    for_each(block->getSuccessorBlocks(),
-             [&](SILBasicBlock *block) { blockWorklist.insert(block); });
+    llvm::copy_if(block->getSuccessorBlocks(),
+                  std::back_inserter(blockWorklist),
+                  [&](SILBasicBlock *block) -> bool {
+                    return blockAlreadyAddedToWorklist.insert(block).second;
+                  });
   }
 
-  worklist.addInitialGroup(instructions);
+  worklist.addInitialGroup(initialInstructionWorklist);
 }
 
 bool MandatoryCombiner::doOneIteration(SILFunction &function,
@@ -281,6 +282,12 @@ class MandatoryCombine final : public SILFunctionTransform {
 
   void run() override {
     auto *function = getFunction();
+
+    // If this function is an external declaration, bail. We only want to visit
+    // functions with bodies.
+    if (function->isExternalDeclaration()) {
+      return;
+    }
 
     MandatoryCombiner combiner(createdInstructions);
     bool madeChange = combiner.runOnFunction(*function);

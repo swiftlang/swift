@@ -59,7 +59,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 
 using namespace swift;
 

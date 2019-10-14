@@ -319,8 +319,7 @@ public:
     return { false, DRE };
   }
 
-  void propagateCaptures(const CaptureInfo &captureInfo,
-                         SourceLoc loc) {
+  void propagateCaptures(CaptureInfo captureInfo, SourceLoc loc) {
     for (auto capture : captureInfo.getCaptures()) {
       // If the decl was captured from us, it isn't captured *by* us.
       if (capture.getDecl()->getDeclContext() == CurDC)
@@ -364,6 +363,11 @@ public:
       propagateCaptures(AFD->getCaptureInfo(), AFD->getLoc());
       return false;
     }
+
+    // Don't walk into local types; we'll walk their initializers when we check
+    // the local type itself.
+    if (isa<NominalTypeDecl>(D))
+      return false;
 
     return true;
   }

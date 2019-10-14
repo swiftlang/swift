@@ -12,6 +12,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
@@ -167,15 +168,15 @@ bool EnumRawTypeRequest::isCached() const {
 
 Optional<Type> EnumRawTypeRequest::getCachedResult() const {
   auto enumDecl = std::get<0>(getStorage());
-  if (enumDecl->LazySemanticInfo.RawType.getInt())
-    return enumDecl->LazySemanticInfo.RawType.getPointer();
+  if (enumDecl->LazySemanticInfo.hasRawType())
+    return enumDecl->LazySemanticInfo.RawTypeAndFlags.getPointer();
 
   return None;
 }
 
 void EnumRawTypeRequest::cacheResult(Type value) const {
   auto enumDecl = std::get<0>(getStorage());
-  enumDecl->LazySemanticInfo.RawType.setPointerAndInt(value, true);
+  enumDecl->LazySemanticInfo.cacheRawType(value);
 }
 
 //----------------------------------------------------------------------------//
@@ -839,7 +840,7 @@ void InferredGenericSignatureRequest::noteCycleStep(DiagnosticEngine &d) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsImplicitlyUnwrappedOptionalRequest computation.
+// UnderlyingTypeRequest computation.
 //----------------------------------------------------------------------------//
 
 Optional<Type>
@@ -853,4 +854,112 @@ UnderlyingTypeRequest::getCachedResult() const {
 void UnderlyingTypeRequest::cacheResult(Type value) const {
   auto *typeAlias = std::get<0>(getStorage());
   typeAlias->UnderlyingTy.setType(value);
+}
+
+void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  auto aliasDecl = std::get<0>(getStorage());
+  diags.diagnose(aliasDecl, diag::recursive_decl_reference,
+                 aliasDecl->getDescriptiveKind(),
+                 aliasDecl->getName());
+}
+
+//----------------------------------------------------------------------------//
+// EnumRawValuesRequest computation.
+//----------------------------------------------------------------------------//
+
+bool EnumRawValuesRequest::isCached() const {
+  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
+}
+
+Optional<bool> EnumRawValuesRequest::getCachedResult() const {
+  auto *ED = std::get<0>(getStorage());
+  if (ED->LazySemanticInfo.hasCheckedRawValues())
+    return true;
+  return None;
+}
+
+void EnumRawValuesRequest::cacheResult(bool) const {
+  auto *ED = std::get<0>(getStorage());
+  auto flags = ED->LazySemanticInfo.RawTypeAndFlags.getInt() |
+      EnumDecl::HasFixedRawValues |
+      EnumDecl::HasFixedRawValuesAndTypes;
+  ED->LazySemanticInfo.RawTypeAndFlags.setInt(flags);
+}
+
+void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
+  // This request computes the raw type, and so participates in cycles involving
+  // it. For now, the raw type provides a rich enough circularity diagnostic
+  // that we can silence ourselves.
+}
+
+void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
+
+}
+
+//----------------------------------------------------------------------------//
+// IsStaticRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> IsStaticRequest::getCachedResult() const {
+  auto *FD = std::get<0>(getStorage());
+  return FD->getCachedIsStatic();
+}
+
+void IsStaticRequest::cacheResult(bool result) const {
+  auto *FD = std::get<0>(getStorage());
+  FD->setStatic(result);
+}
+
+//----------------------------------------------------------------------------//
+// NeedsNewVTableEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<bool> NeedsNewVTableEntryRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (decl->LazySemanticInfo.NeedsNewVTableEntryComputed)
+    return decl->LazySemanticInfo.NeedsNewVTableEntry;
+  return None;
+}
+
+void NeedsNewVTableEntryRequest::cacheResult(bool value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->LazySemanticInfo.NeedsNewVTableEntryComputed = true;
+  decl->LazySemanticInfo.NeedsNewVTableEntry = value;
+}
+
+//----------------------------------------------------------------------------//
+// ParamSpecifierRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<ParamSpecifier> ParamSpecifierRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  return decl->getCachedSpecifier();
+}
+
+void ParamSpecifierRequest::cacheResult(ParamSpecifier specifier) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->setSpecifier(specifier);
+}
+
+//----------------------------------------------------------------------------//
+// ResultTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+TypeLoc &ResultTypeRequest::getResultTypeLoc() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto *funcDecl = dyn_cast<FuncDecl>(decl))
+    return funcDecl->getBodyResultTypeLoc();
+  auto *subscriptDecl = cast<SubscriptDecl>(decl);
+  return subscriptDecl->getElementTypeLoc();
+}
+
+Optional<Type> ResultTypeRequest::getCachedResult() const {
+  if (auto type = getResultTypeLoc().getType())
+    return type;
+
+  return None;
+}
+
+void ResultTypeRequest::cacheResult(Type type) const {
+  getResultTypeLoc().setType(type);
 }

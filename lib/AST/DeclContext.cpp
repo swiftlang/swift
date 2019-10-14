@@ -1035,14 +1035,6 @@ DeclContextKind DeclContext::getContextKind() const {
   llvm_unreachable("Unhandled DeclContext ASTHierarchy");
 }
 
-bool DeclContext::hasValueSemantics() const {
-  if (auto contextTy = getSelfTypeInContext()) {
-    return !contextTy->hasReferenceSemantics();
-  }
-
-  return false;
-}
-
 SourceLoc swift::extractNearestSourceLoc(const DeclContext *dc) {
   switch (dc->getContextKind()) {
   case DeclContextKind::AbstractFunctionDecl:

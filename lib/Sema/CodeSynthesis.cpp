@@ -236,8 +236,9 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
 
       // Create the parameter.
       auto *arg = new (ctx)
-          ParamDecl(ParamDecl::Specifier::Default, SourceLoc(), Loc,
+          ParamDecl(SourceLoc(), Loc,
                     var->getName(), Loc, var->getName(), decl);
+      arg->setSpecifier(ParamSpecifier::Default);
       arg->setInterfaceType(varInterfaceType);
       arg->setImplicit();
       
@@ -651,8 +652,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   // Create the initializer parameter patterns.
   OptionSet<ParameterList::CloneFlags> options
     = (ParameterList::Implicit |
-       ParameterList::Inherited |
-       ParameterList::WithoutTypes);
+       ParameterList::Inherited);
   auto *superclassParams = superclassCtor->getParameters();
   auto *bodyParams = superclassParams->clone(ctx, options);
 
@@ -669,7 +669,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     auto substTy = paramTy.subst(subMap);
 
     bodyParam->setInterfaceType(substTy);
-    bodyParam->getTypeLoc() = TypeLoc::withoutLoc(substTy);
   }
 
   // Create the initializer declaration, inheriting the name,
@@ -692,8 +691,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
 
-  ctor->setValidationToChecked();
-
   configureInheritedDesignatedInitAttributes(classDecl, ctor,
                                              superclassCtor, ctx);
 
@@ -704,8 +701,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // Note that this is a stub implementation.
     ctor->setStubImplementation(true);
 
-    // Stub constructors don't appear in the vtable.
-    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 
@@ -845,18 +840,6 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
   assert(!decl->hasUnreferenceableStorage() &&
          "User-defined structs cannot have unreferenceable storage");
 
-  // Bail out if we're validating one of our stored properties already;
-  // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
-
-      if (!var->getInterfaceType())
-        return;
-    }
-  }
-
   decl->setAddedImplicitInitializers();
 
   // Check whether there is a user-declared constructor or an instance
@@ -917,7 +900,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->getInterfaceType())
+        if (ctor->isRecursiveValidation())
           return;
       }
     }

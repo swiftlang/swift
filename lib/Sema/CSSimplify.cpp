@@ -728,21 +728,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   return listener.relabelArguments(actualArgNames);
 }
 
-static bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice) {
-  auto *decl = choice.getDeclOrNull();
-  if (!decl)
-    return false;
-
-  auto baseType = choice.getBaseType();
-  if (baseType)
-    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
-
-  // In most cases where we reference a declaration with a curried self
-  // parameter, it gets dropped from the type of the reference.
-  return decl->hasCurriedSelf() &&
-         doesMemberRefApplyCurriedSelf(baseType, decl);
-}
-
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
@@ -902,7 +887,7 @@ public:
       }
     }
 
-    auto *locator = CS.getConstraintLocator(anchor);
+    auto *locator = CS.getConstraintLocator(Locator);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
     CS.recordFix(fix);
     // Re-labeling fixes with extraneous labels should take
@@ -2669,11 +2654,23 @@ bool ConstraintSystem::repairFailures(
       auto result = matchTypes(lhs, rhs, ConstraintKind::Conversion,
                                TMF_ApplyingFix, locator);
 
-      if (!result.isFailure()) {
-        conversionsOrFixes.push_back(
-            AllowInOutConversion::create(*this, lhs, rhs, loc));
-        break;
+      ConstraintFix *fix = nullptr;
+      if (result.isFailure()) {
+        // If this is a "destination" argument to a mutating operator
+        // like `+=`, let's consider it contextual and only attempt
+        // to fix type mismatch on the "source" right-hand side of
+        // such operators.
+        if (isOperatorArgument(loc) &&
+            loc->findLast<LocatorPathElt::ApplyArgToParam>()->getArgIdx() == 0)
+          break;
+
+        fix = AllowArgumentMismatch::create(*this, lhs, rhs, loc);
+      } else {
+        fix = AllowInOutConversion::create(*this, lhs, rhs, loc);
       }
+
+      conversionsOrFixes.push_back(fix);
+      break;
     }
 
     if (elt.getKind() != ConstraintLocator::ApplyArgToParam)
@@ -3022,13 +3019,38 @@ bool ConstraintSystem::repairFailures(
     if (repairByInsertingExplicitCall(lhs, rhs))
       return true;
 
-    auto result = matchTypes(lhs, rhs, ConstraintKind::ArgumentConversion,
-        TypeMatchFlags::TMF_ApplyingFix,
-        locator.withPathElement(ConstraintLocator::FunctionArgument));
+    auto isPointerType = [](Type type) -> bool {
+      return bool(
+          type->lookThroughAllOptionalTypes()->getAnyPointerElementType());
+    };
 
-    if (result.isSuccess())
-      conversionsOrFixes.push_back(AllowAutoClosurePointerConversion::create(
-          *this, lhs, rhs, getConstraintLocator(locator)));
+    // Let's see whether this is an implicit conversion to a pointer type
+    // which is invalid in @autoclosure context e.g. from `inout`, Array
+    // or String.
+    if (!isPointerType(lhs) && isPointerType(rhs)) {
+      auto result = matchTypes(
+          lhs, rhs, ConstraintKind::ArgumentConversion,
+          TypeMatchFlags::TMF_ApplyingFix,
+          locator.withPathElement(ConstraintLocator::FunctionArgument));
+
+      if (result.isSuccess())
+        conversionsOrFixes.push_back(AllowAutoClosurePointerConversion::create(
+            *this, lhs, rhs, getConstraintLocator(locator)));
+    }
+
+    // In situations like this:
+    //
+    // struct S<T> {}
+    // func foo(_: @autoclosure () -> S<Int>) {}
+    // foo(S<String>())
+    //
+    // Generic type conversion mismatch is a better fix which is going to
+    // point to the generic arguments that did not align properly.
+    if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
+      break;
+
+    conversionsOrFixes.push_back(AllowArgumentMismatch::create(
+        *this, lhs, rhs, getConstraintLocator(locator)));
     break;
   }
 
@@ -6412,6 +6434,7 @@ done:
 
   auto loc = locator.getBaseLocator();
   if (definitelyFunctionType) {
+    increaseScore(SK_FunctionConversion);
     return SolutionKind::Solved;
   } else if (!anyComponentsUnresolved ||
              (definitelyKeyPathType && capability == ReadOnly)) {
@@ -8088,6 +8111,35 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   case SolutionKind::Solved:
     return;
   }
+}
+
+Type ConstraintSystem::addJoinConstraint(
+    ConstraintLocator *locator,
+    ArrayRef<std::pair<Type, ConstraintLocator *>> inputs) {
+  switch (inputs.size()) {
+  case 0:
+    return Type();
+
+  case 1:
+    return inputs.front().first;
+
+  default:
+    // Produce the join below.
+    break;
+  }
+
+  // Create a type variable to capture the result of the join.
+  Type resultTy = createTypeVariable(locator,
+                                     (TVO_PrefersSubtypeBinding |
+                                      TVO_CanBindToNoEscape));
+
+  // Introduce conversions from each input type to the type variable.
+  for (const auto &input : inputs) {
+    addConstraint(
+      ConstraintKind::Conversion, input.first, resultTy, input.second);
+  }
+
+  return resultTy;
 }
 
 void ConstraintSystem::addExplicitConversionConstraint(

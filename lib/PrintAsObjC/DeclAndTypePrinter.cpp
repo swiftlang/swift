@@ -393,12 +393,12 @@ private:
         os << " SWIFT_COMPILE_NAME(\"" << Elt->getName() << "\")";
       }
 
-      if (auto ILE = cast_or_null<IntegerLiteralExpr>(Elt->getRawValueExpr())) {
-        os << " = ";
-        if (ILE->isNegative())
-          os << "-";
-        os << ILE->getDigitsText();
-      }
+      // Print the raw values, even the ones that we synthesize.
+      auto *ILE = cast<IntegerLiteralExpr>(Elt->getStructuralRawValueExpr());
+      os << " = ";
+      if (ILE->isNegative())
+        os << "-";
+      os << ILE->getDigitsText();
       os << ",\n";
     }
     os << "};\n";
@@ -2034,7 +2034,7 @@ void DeclAndTypePrinter::print(Type ty) {
 }
 
 void DeclAndTypePrinter::printAdHocCategory(
-    llvm::iterator_range<const ValueDecl * const *> members) {
+    iterator_range<const ValueDecl * const *> members) {
   getImpl().printAdHocCategory(members);
 }
 

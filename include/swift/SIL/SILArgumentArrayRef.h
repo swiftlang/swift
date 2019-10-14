@@ -22,7 +22,6 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/TransformArrayRef.h"
 
 namespace swift {
 
@@ -31,10 +30,11 @@ class SILPhiArgument;
 class SILFunctionArgument;
 
 using PhiArgumentArrayRef =
-    TransformArrayRef<function_ref<SILPhiArgument *(SILArgument *)>>;
+    TransformRange<ArrayRef<SILArgument *>, SILPhiArgument *(*)(SILArgument *)>;
 
 using FunctionArgumentArrayRef =
-    TransformArrayRef<function_ref<SILFunctionArgument *(SILArgument *)>>;
+    TransformRange<ArrayRef<SILArgument *>,
+                   SILFunctionArgument *(*)(SILArgument *)>;
 
 } // namespace swift
 

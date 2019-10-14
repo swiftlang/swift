@@ -193,10 +193,9 @@ public:
     if (silConv.loweredAddresses)
       return funcTy->getIndirectFormalResults();
 
-    auto filter = llvm::make_filter_range(
-        makeIteratorRange((const SILResultInfo *)0, (const SILResultInfo *)0),
+    return llvm::make_filter_range(
+        llvm::make_range((const SILResultInfo *)0, (const SILResultInfo *)0),
         SILFunctionType::IndirectFormalResultFilter());
-    return makeIteratorRange(filter.begin(), filter.end());
   }
 
   struct SILResultTypeFunc {
@@ -210,16 +209,12 @@ public:
 
   using IndirectSILResultTypeIter =
       llvm::mapped_iterator<IndirectSILResultIter, SILResultTypeFunc>;
-  using IndirectSILResultTypeRange = IteratorRange<IndirectSILResultTypeIter>;
+  using IndirectSILResultTypeRange = iterator_range<IndirectSILResultTypeIter>;
 
   /// Return a range of SILTypes for each result passed as an address-typed SIL
   /// argument.
   IndirectSILResultTypeRange getIndirectSILResultTypes() const {
-    return makeIteratorRange(
-        IndirectSILResultTypeIter(getIndirectSILResults().begin(),
-                                  SILResultTypeFunc(silConv)),
-        IndirectSILResultTypeIter(getIndirectSILResults().end(),
-                                  SILResultTypeFunc(silConv)));
+    return llvm::map_range(getIndirectSILResults(), SILResultTypeFunc(silConv));
   }
 
   /// Get the number of SIL results directly returned by SIL value.
@@ -238,28 +233,23 @@ public:
   };
   using DirectSILResultIter =
       llvm::filter_iterator<const SILResultInfo *, DirectSILResultFilter>;
-  using DirectSILResultRange = IteratorRange<DirectSILResultIter>;
+  using DirectSILResultRange = iterator_range<DirectSILResultIter>;
 
   /// Return a range of direct result information for results directly returned
   /// by SIL value.
   DirectSILResultRange getDirectSILResults() const {
-    auto filter = llvm::make_filter_range(
+    return llvm::make_filter_range(
         funcTy->getResults(), DirectSILResultFilter(silConv.loweredAddresses));
-    return makeIteratorRange(filter.begin(), filter.end());
   }
 
   using DirectSILResultTypeIter =
       llvm::mapped_iterator<DirectSILResultIter, SILResultTypeFunc>;
-  using DirectSILResultTypeRange = IteratorRange<DirectSILResultTypeIter>;
+  using DirectSILResultTypeRange = iterator_range<DirectSILResultTypeIter>;
 
   /// Return a range of SILTypes for each result directly returned
   /// by SIL value.
   DirectSILResultTypeRange getDirectSILResultTypes() const {
-    return makeIteratorRange(
-        DirectSILResultTypeIter(getDirectSILResults().begin(),
-                                SILResultTypeFunc(silConv)),
-        DirectSILResultTypeIter(getDirectSILResults().end(),
-                                SILResultTypeFunc(silConv)));
+    return llvm::map_range(getDirectSILResults(), SILResultTypeFunc(silConv));
   }
 
   //===--------------------------------------------------------------------===//
@@ -288,16 +278,13 @@ public:
 
   using SILParameterTypeIter =
       llvm::mapped_iterator<const SILParameterInfo *, SILParameterTypeFunc>;
-  using SILParameterTypeRange = IteratorRange<SILParameterTypeIter>;
+  using SILParameterTypeRange = iterator_range<SILParameterTypeIter>;
 
   /// Return a range of SILTypes for each function parameter, not including
   /// indirect results.
   SILParameterTypeRange getParameterSILTypes() const {
-    return makeIteratorRange(
-        SILParameterTypeIter(funcTy->getParameters().begin(),
-                             SILParameterTypeFunc(silConv)),
-        SILParameterTypeIter(funcTy->getParameters().end(),
-                             SILParameterTypeFunc(silConv)));
+    return llvm::map_range(funcTy->getParameters(),
+                           SILParameterTypeFunc(silConv));
   }
 
   //===--------------------------------------------------------------------===//
@@ -312,14 +299,10 @@ public:
 
   using SILYieldTypeIter =
       llvm::mapped_iterator<const SILYieldInfo *, SILParameterTypeFunc>;
-  using SILYieldTypeRange = IteratorRange<SILYieldTypeIter>;
+  using SILYieldTypeRange = iterator_range<SILYieldTypeIter>;
 
   SILYieldTypeRange getYieldSILTypes() const {
-    return makeIteratorRange(
-        SILYieldTypeIter(funcTy->getYields().begin(),
-                         SILParameterTypeFunc(silConv)),
-        SILYieldTypeIter(funcTy->getYields().end(),
-                         SILParameterTypeFunc(silConv)));
+    return llvm::map_range(funcTy->getYields(), SILParameterTypeFunc(silConv));
   }
 
   SILYieldInfo getYieldInfoForOperandIndex(unsigned opIndex) const {

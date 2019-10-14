@@ -259,8 +259,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     if (!parentModule)
       return Type();
 
-    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName,
-                                                           Resolver);
+    auto opaqueDecl = parentModule->lookupOpaqueResultType(mangledName);
     if (!opaqueDecl)
       return Type();
     // TODO: multiple opaque types

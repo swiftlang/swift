@@ -36,6 +36,9 @@ SWIFT_REQUEST(TypeChecker, DefaultTypeRequest,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EmittedMembersRequest, DeclRange(ClassDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
+              bool (EnumDecl *, TypeResolutionStage), SeparatelyCached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawTypeRequest,
               Type(EnumDecl *, TypeResolutionStage), SeparatelyCached,
               NoLocationInfo)
@@ -85,6 +88,9 @@ SWIFT_REQUEST(TypeChecker, MangleLocalTypeDeclRequest,
 SWIFT_REQUEST(TypeChecker, OpaqueReadOwnershipRequest,
               OpaqueReadOwnership(AbstractStorageDecl *), SeparatelyCached,
               NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, OpaqueResultTypeRequest,
+              OpaqueTypeDecl *(ValueDecl *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, OperatorPrecedenceGroupRequest,
               PrecedenceGroupDecl *(PrecedenceGroupDecl *),
               Cached, NoLocationInfo)
@@ -139,3 +145,13 @@ SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, USRGenerationRequest, std::string(const ValueDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsABICompatibleOverrideRequest,
+              bool(ValueDecl *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, IsStaticRequest,
+              bool(FuncDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, NeedsNewVTableEntryRequest,
+              bool(AbstractFunctionDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ParamSpecifierRequest,
+              ParamDecl::Specifier(ParamDecl *), SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResultTypeRequest,
+              Type(ValueDecl *), SeparatelyCached, NoLocationInfo)

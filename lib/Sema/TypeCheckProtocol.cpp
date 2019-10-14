@@ -334,7 +334,7 @@ swift::matchWitness(
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->getInterfaceType())
+  if (witness->isRecursiveValidation())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.
@@ -1889,8 +1889,7 @@ SourceLoc OptionalAdjustment::getOptionalityLoc(ValueDecl *witness) const {
     return SourceLoc();
   }
 
-  return getOptionalityLoc(params->get(getParameterIndex())->getTypeLoc()
-                           .getTypeRepr());
+  return getOptionalityLoc(params->get(getParameterIndex())->getTypeRepr());
 }
 
 SourceLoc OptionalAdjustment::getOptionalityLoc(TypeRepr *tyR) const {
@@ -2470,10 +2469,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     SourceLoc(),
                                                     /*genericparams*/nullptr, 
                                                     DC);
-    aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
-    aliasDecl->setValidationToChecked();
-    aliasDecl->computeType();
     
     aliasDecl->setImplicit();
     if (type->hasError())

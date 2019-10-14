@@ -4,27 +4,27 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Contents               |
-| :--------------------- |
-| [Swift Next](#swift-next) |
-| [Swift 5.1](#swift-51) |
-| [Swift 5.0](#swift-50) |
-| [Swift 4.2](#swift-42) |
-| [Swift 4.1](#swift-41) |
-| [Swift 4.0](#swift-40) |
-| [Swift 3.1](#swift-31) |
-| [Swift 3.0](#swift-30) |
-| [Swift 2.2](#swift-22) |
-| [Swift 2.1](#swift-21) |
-| [Swift 2.0](#swift-20) |
-| [Swift 1.2](#swift-12) |
-| [Swift 1.1](#swift-11) |
-| [Swift 1.0](#swift-10) |
+| Version                | Released   | Toolchain   |
+| :--------------------- | :--------- | :---------- |
+| [Swift 5.2](#swift-52) |            |             |
+| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
+| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
+| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
+| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
+| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
+| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
+| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
+| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
+| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
+| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
+| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
+| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
+| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
 
 </details>
 
-Swift Next
-----------
+Swift 5.2
+---------
 
 * [SR-11429][]:
 
@@ -58,63 +58,6 @@ Swift Next
   (foo as Magic)(5)
   ```
 
-* [SR-11298][]:
-
-  A class-constrained protocol extension, where the extended protocol does
-  not impose a class constraint, will now infer the constraint implicitly.
-
-  ```swift
-  protocol Foo {}
-  class Bar: Foo {
-    var someProperty: Int = 0
-  }
-
-  // Even though 'Foo' does not impose a class constraint, it is automatically
-  // inferred due to the Self: Bar constraint.
-  extension Foo where Self: Bar {
-    var anotherProperty: Int {
-      get { return someProperty }
-      // As a result, the setter is now implicitly nonmutating, just like it would
-      // be if 'Foo' had a class constraint.
-      set { someProperty = newValue }
-    }
-  }
-  ```
-  
-  As a result, this could lead to code that currently compiles today to throw an error.
-  
-  ```swift
-  protocol Foo {
-    var someProperty: Int { get set }
-  }
-  
-  class Bar: Foo {
-    var someProperty = 0
-  }
-  
-  extension Foo where Self: Bar {
-    var anotherProperty1: Int {
-      get { return someProperty }
-      // This will now error, because the protocol requirement
-      // is implicitly mutating and the setter is implicitly 
-      // nonmutating.
-      set { someProperty = newValue } // Error
-    }
-  }
-  ```
-
-  **Workaround**: Define a new mutable variable inside the setter that has a reference to `self`:
-  
-  ```swift
-  var anotherProperty1: Int {
-    get { return someProperty }
-    set {
-      var mutableSelf = self
-      mutableSelf.someProperty = newValue // Okay
-    }
-  }
-  ```
-
 * [SE-0253][]:
 
   Values of types that declare `func callAsFunction` methods can be called
@@ -140,7 +83,7 @@ Swift Next
 
 * [SR-4206][]:
 
-  A method override is no longer allowed to have a generic signature with
+  A method override is no longer allowed to have a generic signature with 
   requirements not imposed by the base method. For example:
 
   ```
@@ -7856,5 +7799,4 @@ Swift 1.0
 [SR-8974]: <https://bugs.swift.org/browse/SR-8974>
 [SR-9043]: <https://bugs.swift.org/browse/SR-9043>
 [SR-9827]: <https://bugs.swift.org/browse/SR-9827>
-[SR-11298]: <https://bugs.swift.org/browse/SR-11298>
 [SR-11429]: <https://bugs.swift.org/browse/SR-11429>

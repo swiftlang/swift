@@ -420,7 +420,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
+void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 ParameterList *paramList,
                                 ParamDecl *selfParam,
                                 DeclContext *DC,
@@ -501,11 +501,11 @@ static void emitIndirectResultParameters(SILGenFunction &SGF, Type resultType,
     return;
   }
   auto &ctx = SGF.getASTContext();
-  auto var = new (ctx) ParamDecl(ParamDecl::Specifier::InOut,
-                                 SourceLoc(), SourceLoc(),
+  auto var = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                  ctx.getIdentifier("$return_value"), SourceLoc(),
                                  ctx.getIdentifier("$return_value"),
                                  DC);
+  var->setSpecifier(ParamSpecifier::InOut);
   var->setInterfaceType(resultType);
 
   auto *arg =

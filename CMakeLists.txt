@@ -11,6 +11,8 @@ endif()
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
+set(CMAKE_DISABLE_IN_SOURCE_BUILD YES)
+
 if(DEFINED CMAKE_JOB_POOLS)
   # CMake < 3.11 doesn't support CMAKE_JOB_POOLS. Manually set the property.
   set_property(GLOBAL PROPERTY JOB_POOLS "${CMAKE_JOB_POOLS}")
@@ -125,7 +127,7 @@ set(SWIFT_ANALYZE_CODE_COVERAGE FALSE CACHE STRING
 # SWIFT_VERSION is deliberately /not/ cached so that an existing build directory
 # can be reused when a new version of Swift comes out (assuming the user hasn't
 # manually set it as part of their own CMake configuration).
-set(SWIFT_VERSION "5.1")
+set(SWIFT_VERSION "5.1.1")
 
 set(SWIFT_VENDOR "" CACHE STRING
     "The vendor name of the Swift compiler")

@@ -1777,7 +1777,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(vd)) {
     auto *param = getParameterAt(afd, c.defaultArgIndex);
     if (param->getDefaultValue()) {
-      auto &captureInfo = param->getDefaultArgumentCaptureInfo();
+      auto captureInfo = param->getDefaultArgumentCaptureInfo();
       sig = getEffectiveGenericSignature(afd, captureInfo);
     }
   }
@@ -2137,11 +2137,11 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
 
-  std::function<void (const CaptureInfo &captureInfo, DeclContext *dc)> collectCaptures;
+  std::function<void (CaptureInfo captureInfo, DeclContext *dc)> collectCaptures;
   std::function<void (AnyFunctionRef)> collectFunctionCaptures;
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
-  collectCaptures = [&](const CaptureInfo &captureInfo, DeclContext *dc) {
+  collectCaptures = [&](CaptureInfo captureInfo, DeclContext *dc) {
     assert(captureInfo.hasBeenComputed() ||
            !TypeConverter::canCaptureFromParent(dc));
 

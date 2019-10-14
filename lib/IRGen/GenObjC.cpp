@@ -364,6 +364,11 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolLabel->setSection(GetObjCSectionName("__objc_protolist",
                                                "coalesced,no_dead_strip"));
 
+  // Mark used to prevent DCE of public unreferenced protocols to ensure
+  // that they are available for external use when a used module is used
+  // as a library.
+  addUsedGlobal(protocolLabel);
+
   // Introduce a variable to reference the protocol.
   auto *protocolRef =
       new llvm::GlobalVariable(Module, Int8PtrTy, /*constant*/ false,
@@ -374,6 +379,11 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   protocolRef->setVisibility(llvm::GlobalValue::HiddenVisibility);
   protocolRef->setSection(GetObjCSectionName("__objc_protorefs",
                                              "coalesced,no_dead_strip"));
+
+  // Mark used to prevent DCE of public unreferenced protocols to ensure
+  // that they are available for external use when a used module is used
+  // as a library.
+  addUsedGlobal(protocolRef);
 
   ObjCProtocolPair pair{protocolRecord, protocolRef};
   ObjCProtocols.insert({proto, pair});

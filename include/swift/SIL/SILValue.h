@@ -281,7 +281,7 @@ public:
   template <typename Subclass>
   using DowncastUserFilterRange =
       DowncastFilterRange<Subclass,
-                          llvm::iterator_range<llvm::mapped_iterator<
+                          iterator_range<llvm::mapped_iterator<
                               use_iterator, UseToUser, SILInstruction *>>>;
 
   /// Iterate over the use list of this ValueBase visiting all users that are of
@@ -386,6 +386,18 @@ public:
     llvm::PointerLikeTypeTraits<ValueBase *>::
           NumLowBitsAvailable
   };
+
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  SILInstruction *getDefiningInstruction() {
+    return Value->getDefiningInstruction();
+  }
+
+  /// If this SILValue is a result of an instruction, return its
+  /// defining instruction. Returns nullptr otherwise.
+  const SILInstruction *getDefiningInstruction() const {
+    return Value->getDefiningInstruction();
+  }
 
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value

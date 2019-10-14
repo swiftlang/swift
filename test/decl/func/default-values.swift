@@ -132,8 +132,14 @@ func inoutFuncWithDefaultArg1(x: inout Int = 1) {} // expected-error {{cannot pr
 func inoutFuncWithDefaultArg2(x: inout Int = bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 func inoutFuncWithDefaultArg3(x: inout Int = aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
 func inoutFuncWithDefaultArg4(x: inout Int = &aLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+// expected-error@-1 {{use of extraneous '&'}}
+
 func inoutFuncWithDefaultArg5(x: inout Int = &bLiteral) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+// expected-error@-1 {{use of extraneous '&'}}
+
 func inoutFuncWithDefaultArg6(x: inout Int = #file) {} // expected-error {{cannot provide default value to inout parameter 'x'}}
+// expected-error@-1 {{default argument value of type 'String' cannot be converted to type 'Int'}}
+
 func inoutFuncWithDefaultArg7(_: inout Int = 1) {} // expected-error {{cannot provide default value to inout parameter '_'}}
 
 // SE-0242 - Test that memberwise constructor generates default values

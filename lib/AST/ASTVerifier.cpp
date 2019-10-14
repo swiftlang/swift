@@ -3190,12 +3190,6 @@ public:
     void verifyParsed(AccessorDecl *FD) {
       PrettyStackTraceDecl debugStack("verifying AccessorDecl", FD);
 
-      auto storage = FD->getStorage();
-      if (storage->isStatic() != FD->isStatic()) {
-        Out << "accessor static-ness must match static-ness of storage\n";
-        abort();
-      }
-
       verifyParsedBase(FD);
     }
 

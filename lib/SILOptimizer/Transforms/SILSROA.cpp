@@ -26,7 +26,7 @@
 #include "swift/SIL/SILUndef.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Debug.h"
@@ -286,7 +286,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     if (auto *DSI = dyn_cast<DeallocStackInst>(User)) {
       LLVM_DEBUG(llvm::dbgs() << "        Found DeallocStackInst!\n");
       // Create the allocations in reverse order.
-      for (auto *NewAI : swift::reversed(NewAllocations))
+      for (auto *NewAI : llvm::reverse(NewAllocations))
         B.createDeallocStack(DSI->getLoc(), SILValue(NewAI));
       ToRemove.push_back(DSI);
     }

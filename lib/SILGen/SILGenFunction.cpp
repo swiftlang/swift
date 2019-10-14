@@ -692,12 +692,12 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   ParameterList *params = nullptr;
   if (function.kind == SILDeclRef::Kind::PropertyWrapperBackingInitializer) {
     auto &ctx = getASTContext();
-    auto param = new (ctx) ParamDecl(ParamDecl::Specifier::Owned,
-                                     SourceLoc(), SourceLoc(),
+    auto param = new (ctx) ParamDecl(SourceLoc(), SourceLoc(),
                                      ctx.getIdentifier("$input_value"),
                                      SourceLoc(),
                                      ctx.getIdentifier("$input_value"),
                                      dc);
+    param->setSpecifier(ParamSpecifier::Owned);
     param->setInterfaceType(function.getDecl()->getInterfaceType());
 
     params = ParameterList::create(ctx, SourceLoc(), {param}, SourceLoc());

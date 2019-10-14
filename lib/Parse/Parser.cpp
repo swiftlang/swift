@@ -755,6 +755,7 @@ void Parser::skipSingle() {
 }
 
 void Parser::ignoreToken() {
+  assert(!Tok.is(tok::eof) && "Lexing eof token");
   ParsedTriviaList Skipped;
   Skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
   std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
@@ -764,7 +765,7 @@ void Parser::ignoreToken() {
             std::back_inserter(Skipped));
 
   TokReceiver->receive(Tok);
-  consumeTokenWithoutFeedingReceiver();
+  L->lex(Tok, LeadingTrivia, TrailingTrivia);
 
   std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
             std::back_inserter(Skipped));
@@ -1254,22 +1255,26 @@ Optional<ParsedTokenSyntax> Parser::parseTokenSyntax(tok K, SourceLoc &TokLoc,
   return None;
 }
 
-Optional<ParsedTokenSyntax>
-Parser::parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag, SourceLoc OtherLoc) {
-  Diag<> OtherNote;
-  switch (K) {
-  case tok::r_paren:  OtherNote = diag::opening_paren; break;
-  case tok::r_square: OtherNote = diag::opening_bracket; break;
-  case tok::r_brace:  OtherNote = diag::opening_brace; break;
-  default: llvm_unreachable("unknown matching token!");
-  }
+ParsedSyntaxResult<ParsedTokenSyntax>
+Parser::parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                                 bool silenceDiag) {
+  if (Tok.is(K))
+    return makeParsedResult(consumeTokenSyntax(K));
+  checkForInputIncomplete();
 
-  auto Token = parseTokenSyntax(K, TokLoc, ErrorDiag);
-  if (!Token) {
-    TokLoc = getLocForMissingMatchingToken();
+  if (!silenceDiag) {
+    diagnose(Tok, ErrorDiag);
+
+    Diag<> OtherNote;
+    switch (K) {
+    case tok::r_paren:  OtherNote = diag::opening_paren; break;
+    case tok::r_square: OtherNote = diag::opening_bracket; break;
+    case tok::r_brace:  OtherNote = diag::opening_brace; break;
+    default: llvm_unreachable("unknown matching token!");
+    }
     diagnose(OtherLoc, OtherNote);
   }
-  return Token;
+  return makeParserError();
 }
 
 SourceLoc Parser::getLocForMissingMatchingToken() const {
@@ -1295,14 +1300,12 @@ SourceLoc Parser::getErrorOrMissingLoc() const {
 
 static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   switch (ListKind) {
-  case SyntaxKind::FunctionCallArgumentList:
-    return SyntaxKind::FunctionCallArgument;
+  case SyntaxKind::TupleExprElementList:
+    return SyntaxKind::TupleExprElement;
   case SyntaxKind::ArrayElementList:
     return SyntaxKind::ArrayElement;
   case SyntaxKind::DictionaryElementList:
     return SyntaxKind::DictionaryElement;
-  case SyntaxKind::TupleElementList:
-    return SyntaxKind::TupleElement;
   case SyntaxKind::FunctionParameterList:
     return SyntaxKind::FunctionParameter;
   case SyntaxKind::TupleTypeElementList:
@@ -1312,102 +1315,6 @@ static SyntaxKind getListElementKind(SyntaxKind ListKind) {
   default:
     return SyntaxKind::Unknown;
   }
-}
-
-ParserStatus
-Parser::parseListSyntax(tok RightK, SourceLoc LeftLoc,
-                        Optional<ParsedTokenSyntax> &LastComma,
-                        SourceLoc &RightLoc,
-                        Optional<ParsedTokenSyntax> &Right,
-                        SmallVectorImpl<ParsedSyntax>& Junk,
-                        bool AllowSepAfterLast, Diag<> ErrorDiag,
-                        llvm::function_ref<ParserStatus()> callback) {
-  auto TokIsStringInterpolationEOF = [&]() -> bool {
-    return Tok.is(tok::eof) && Tok.getText() == ")" && RightK == tok::r_paren;
-  };
-
-  if (Tok.is(RightK)) {
-    RightLoc = Tok.getLoc();
-    Right = consumeTokenSyntax(RightK);
-    return makeParserSuccess();
-  }
-  if (TokIsStringInterpolationEOF()) {
-    Tok.setKind(RightK);
-    RightLoc = Tok.getLoc();
-    Right = consumeTokenSyntax();
-    return makeParserSuccess();
-  }
-
-  ParserStatus Status;
-  while (true) {
-    while (Tok.is(tok::comma)) {
-      diagnose(Tok, diag::unexpected_separator, ",")
-          .fixItRemove(SourceRange(Tok.getLoc()));
-      auto Comma = consumeTokenSyntax();
-      Junk.push_back(std::move(Comma));
-    }
-    SourceLoc StartLoc = Tok.getLoc();
-
-    Status |= callback();
-    if (Tok.is(RightK))
-      break;
-    // If the lexer stopped with an EOF token whose spelling is ")", then this
-    // is actually the tuple that is a string literal interpolation context.
-    // Just accept the ")" and build the tuple as we usually do.
-    if (TokIsStringInterpolationEOF()) {
-      Tok.setKind(RightK);
-      RightLoc = Tok.getLoc();
-      Right = consumeTokenSyntax();
-      return Status;
-    }
-    // If we haven't made progress, or seeing any error, skip ahead.
-    if (Tok.getLoc() == StartLoc || Status.isError()) {
-      assert(Status.isError() && "no progress without error");
-      skipListUntilDeclRBraceSyntax(Junk, LeftLoc, RightK, tok::comma);
-      if (Tok.is(RightK) || Tok.isNot(tok::comma))
-        break;
-    }
-    if (LastComma) {
-      if (Tok.isNot(RightK))
-        continue;
-      if (!AllowSepAfterLast) {
-        diagnose(Tok, diag::unexpected_separator, ",")
-            .fixItRemove(SourceRange(PreviousLoc));
-      }
-      break;
-    }
-    // If we're in a comma-separated list, the next token is at the
-    // beginning of a new line and can never start an element, break.
-    if (Tok.isAtStartOfLine() &&
-        (Tok.is(tok::r_brace) || isStartOfDecl() || isStartOfStmt())) {
-      break;
-    }
-    // If we found EOF or such, bailout.
-    if (Tok.isAny(tok::eof, tok::pound_endif)) {
-      IsInputIncomplete = true;
-      break;
-    }
-
-    diagnose(Tok, diag::expected_separator, ",")
-        .fixItInsertAfter(PreviousLoc, ",");
-    Status.setIsParseError();
-  }
-
-  if (Status.isError()) {
-    // If we've already got errors, don't emit missing RightK diagnostics.
-    if (Tok.is(RightK)) {
-      RightLoc = Tok.getLoc();
-      Right = consumeTokenSyntax(RightK);
-    } else {
-      RightLoc = getLocForMissingMatchingToken();
-    }
-  } else {
-    Right = parseMatchingTokenSyntax(RightK, RightLoc, ErrorDiag, LeftLoc);
-    if (!Right)
-      Status.setIsParseError();
-  }
-
-  return Status;
 }
 
 ParserStatus

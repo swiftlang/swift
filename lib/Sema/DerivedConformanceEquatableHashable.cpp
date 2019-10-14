@@ -47,9 +47,6 @@ associatedValuesNotConformingToProtocol(DeclContext *DC, EnumDecl *theEnum,
                                         ProtocolDecl *protocol) {
   SmallVector<ParamDecl *, 3> nonconformingAssociatedValues;
   for (auto elt : theEnum->getAllElements()) {
-    if (!elt->getInterfaceType())
-      continue;
-    
     auto PL = elt->getParameterList();
     if (!PL)
       continue;
@@ -143,8 +140,11 @@ void diagnoseFailedDerivation(DeclContext *DC, NominalTypeDecl *nominal,
     auto nonconformingAssociatedTypes =
         associatedValuesNotConformingToProtocol(DC, enumDecl, protocol);
     for (auto *typeToDiagnose : nonconformingAssociatedTypes) {
+      SourceLoc reprLoc;
+      if (auto *repr = typeToDiagnose->getTypeRepr())
+        reprLoc = repr->getStartLoc();
       ctx.Diags.diagnose(
-          typeToDiagnose->getTypeLoc().getLoc(),
+          reprLoc,
           diag::missing_member_type_conformance_prevents_synthesis,
           NonconformingMemberKind::AssociatedValue,
           typeToDiagnose->getInterfaceType(), protocol->getDeclaredType(),
@@ -706,9 +706,10 @@ deriveEquatable_eq(
   auto selfIfaceTy = parentDC->getDeclaredInterfaceType();
 
   auto getParamDecl = [&](StringRef s) -> ParamDecl * {
-    auto *param = new (C) ParamDecl(ParamDecl::Specifier::Default, SourceLoc(),
+    auto *param = new (C) ParamDecl(SourceLoc(),
                                     SourceLoc(), Identifier(), SourceLoc(),
                                     C.getIdentifier(s), parentDC);
+    param->setSpecifier(ParamSpecifier::Default);
     param->setInterfaceType(selfIfaceTy);
     return param;
   };
@@ -767,11 +768,9 @@ deriveEquatable_eq(
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
   // Compute the interface type.
-  eqDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   eqDecl->computeType();
 
   eqDecl->copyFormalAccessFrom(derived.Nominal, /*sourceIsParentContext*/ true);
-  eqDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(eqDecl);
 
@@ -870,10 +869,10 @@ deriveHashable_hashInto(
   Type hasherType = hasherDecl->getDeclaredType();
 
   // Params: self (implicit), hasher
-  auto *hasherParamDecl = new (C) ParamDecl(ParamDecl::Specifier::InOut,
-                                            SourceLoc(),
+  auto *hasherParamDecl = new (C) ParamDecl(SourceLoc(),
                                             SourceLoc(), C.Id_into, SourceLoc(),
                                             C.Id_hasher, parentDC);
+  hasherParamDecl->setSpecifier(ParamSpecifier::InOut);
   hasherParamDecl->setInterfaceType(hasherType);
 
   ParameterList *params = ParameterList::createWithoutLoc(hasherParamDecl);
@@ -893,10 +892,8 @@ deriveHashable_hashInto(
   hashDecl->setImplicit();
   hashDecl->setBodySynthesizer(bodySynthesizer);
 
-  hashDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   hashDecl->computeType();
   hashDecl->copyFormalAccessFrom(derived.Nominal);
-  hashDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(hashDecl);
 
@@ -1244,17 +1241,14 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   getterDecl->setIsTransparent(false);
 
   // Compute the interface type of hashValue().
-  getterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   getterDecl->computeType();
 
-  getterDecl->setValidationToChecked();
   getterDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
 
   // Finish creating the property.
   hashValueDecl->setImplicit();
   hashValueDecl->setInterfaceType(intType);
-  hashValueDecl->setValidationToChecked();
   hashValueDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
   hashValueDecl->copyFormalAccessFrom(derived.Nominal,

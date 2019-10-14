@@ -46,6 +46,12 @@
 // RUN: not %target-swift-frontend -typecheck %s -import-objc-header %S/Inputs/sdk-bridging-header.h -pch-output-dir %t/no-pch -pch-disable-validation 2>&1 | %FileCheck %s -check-prefix=NO-VALIDATION
 // NO-VALIDATION: PCH file {{.*}} not found
 
+// Test that -Xcc options are considered in the PCH hash.
+// RUN: %target-swift-frontend -emit-pch -pch-output-dir %t/pch-Xcc %S/Inputs/sdk-bridging-header.h
+// RUN: %target-swift-frontend -emit-pch -pch-output-dir %t/pch-Xcc %S/Inputs/sdk-bridging-header.h -Xcc -Ifoo
+// RUN: %target-swift-frontend -emit-pch -pch-output-dir %t/pch-Xcc %S/Inputs/sdk-bridging-header.h -Xcc -Ibar
+// RUN: ls %t/pch-Xcc/*swift*clang*.pch | count 3
+
 import Foundation
 
 let not = MyPredicate.not()

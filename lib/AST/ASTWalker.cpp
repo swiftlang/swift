@@ -403,7 +403,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visit(PL);
     }
 
-    if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
+    if (auto *rawLiteralExpr = ED->getRawValueUnchecked()) {
       Expr *newRawExpr = doIt(rawLiteralExpr);
       if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
         ED->setRawValueExpr(newRawLiteralExpr);
@@ -1158,9 +1158,13 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 
       // Don't walk into the type if the decl is implicit, or if the type is
       // implicit.
-      if (!P->isImplicit() && !P->isTypeLocImplicit() &&
-          doIt(P->getTypeLoc()))
-        return true;
+      if (!P->isImplicit()) {
+        if (auto *repr = P->getTypeRepr()) {
+          if (doIt(repr)) {
+            return true;
+          }
+        }
+      }
 
       if (auto *E = P->getDefaultValue()) {
         auto res = doIt(E);

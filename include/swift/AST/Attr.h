@@ -1672,7 +1672,7 @@ private:
 public:
   template <typename ATTR, bool AllowInvalid>
   using AttributeKindRange =
-      OptionalTransformRange<llvm::iterator_range<const_iterator>,
+      OptionalTransformRange<iterator_range<const_iterator>,
                              ToAttributeKind<ATTR, AllowInvalid>,
                              const_iterator>;
 

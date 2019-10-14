@@ -732,6 +732,13 @@ public:
     return Diags.diagnose(std::forward<ArgTypes>(Args)...);
   }
 
+  void diagnoseWithNotes(InFlightDiagnostic parentDiag,
+                         llvm::function_ref<void(void)> builder) {
+    CompoundDiagnosticTransaction transaction(Diags);
+    parentDiag.flush();
+    builder();
+  }
+
   static Type getArraySliceType(SourceLoc loc, Type elementType);
   static Type getDictionaryType(SourceLoc loc, Type keyType, Type valueType);
   static Type getOptionalType(SourceLoc loc, Type elementType);
@@ -1016,9 +1023,6 @@ public:
   Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                    ReferenceOwnershipAttr *attr);
 
-  /// Check the raw value expression in this enum element.
-  void checkRawValueExpr(EnumDecl *parent, EnumElementDecl *Elt);
-  
   virtual void resolveDeclSignature(ValueDecl *VD) override {
     validateDecl(VD);
   }
@@ -1348,10 +1352,6 @@ public:
                         TypeResolutionOptions options);
 
   bool typeCheckCatchPattern(CatchStmt *S, DeclContext *dc);
-
-  /// Type check a parameter list.
-  bool typeCheckParameterList(ParameterList *PL, TypeResolution resolution,
-                              TypeResolutionOptions options);
 
   /// Coerce a pattern to the given type.
   ///
@@ -1756,6 +1756,7 @@ private:
                                            const DeclContext *DC,
                                            FragileFunctionKind fragileKind);
 
+public:
   /// Given that a type is used from a particular context which
   /// exposes it in the interface of the current module, diagnose if its
   /// generic arguments require the use of conformances that cannot reasonably
@@ -1763,10 +1764,9 @@ private:
   ///
   /// This method \e only checks how generic arguments are used; it is assumed
   /// that the declarations involved have already been checked elsewhere.
-  static void diagnoseGenericTypeExportability(const TypeLoc &TL,
+  static void diagnoseGenericTypeExportability(SourceLoc loc, Type type,
                                                const DeclContext *DC);
 
-public:
   /// Given that \p DC is within a fragile context for some reason, describe
   /// why.
   ///
@@ -1898,7 +1898,7 @@ public:
   void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
   void checkFunctionErrorHandling(AbstractFunctionDecl *D);
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
-  void checkEnumElementErrorHandling(EnumElementDecl *D);
+  void checkEnumElementErrorHandling(EnumElementDecl *D, Expr *expr);
   void checkPropertyWrapperErrorHandling(PatternBindingDecl *binding,
                                           Expr *expr);
 
@@ -1970,10 +1970,6 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-  
-  Type getOrCreateOpaqueResultType(TypeResolution resolution,
-                                   ValueDecl *originatingDecl,
-                                   OpaqueReturnTypeRepr *repr);
 };
 
 /// Temporary on-stack storage and unescaping for encoded diagnostic

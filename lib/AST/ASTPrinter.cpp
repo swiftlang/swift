@@ -2523,8 +2523,10 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     });
   if (decl->hasInterfaceType()) {
     Printer << ": ";
-    auto tyLoc = decl->getTypeLoc();
-    if (!tyLoc.getTypeRepr())
+    TypeLoc tyLoc;
+    if (auto *repr = decl->getTypeRepr())
+      tyLoc = TypeLoc(repr, decl->getInterfaceType());
+    else
       tyLoc = TypeLoc::withoutLoc(decl->getInterfaceType());
 
     Printer.printDeclResultTypePre(decl, tyLoc);
@@ -2592,13 +2594,15 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << ": ";
   };
 
-  auto TheTypeLoc = param->getTypeLoc();
-
   printAttributes(param);
   printArgName();
 
-  if (!TheTypeLoc.getTypeRepr() && param->hasInterfaceType())
+  TypeLoc TheTypeLoc;
+  if (auto *repr = param->getTypeRepr()) {
+    TheTypeLoc = TypeLoc(repr, param->getInterfaceType());
+  } else {
     TheTypeLoc = TypeLoc::withoutLoc(param->getInterfaceType());
+  }
 
   // If the parameter is variadic, we will print the "..." after it, but we have
   // to strip off the added array type.
@@ -2893,7 +2897,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
     break;
   }
 
-  auto *raw = elt->getRawValueExpr();
+  auto *raw = elt->getStructuralRawValueExpr();
   if (!raw || raw->isImplicit())
     return;
 

@@ -3043,6 +3043,22 @@ bool constraints::isAutoClosureArgument(Expr *argExpr) {
   return false;
 }
 
+bool constraints::hasAppliedSelf(ConstraintSystem &cs,
+                                 const OverloadChoice &choice) {
+  auto *decl = choice.getDeclOrNull();
+  if (!decl)
+    return false;
+
+  auto baseType = choice.getBaseType();
+  if (baseType)
+    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
+
+  // In most cases where we reference a declaration with a curried self
+  // parameter, it gets dropped from the type of the reference.
+  return decl->hasCurriedSelf() &&
+         doesMemberRefApplyCurriedSelf(baseType, decl);
+}
+
 bool constraints::conformsToKnownProtocol(ConstraintSystem &cs, Type type,
                                           KnownProtocolKind protocol) {
   if (auto *proto = cs.TC.getProtocol(SourceLoc(), protocol))
@@ -3187,6 +3203,21 @@ bool constraints::isPatternMatchingOperator(Expr *expr) {
   return isOperator(expr, "~=");
 }
 
+bool constraints::isOperatorArgument(ConstraintLocator *locator,
+                                     StringRef expectedOperator) {
+  if (!locator->findLast<LocatorPathElt::ApplyArgToParam>())
+    return false;
+
+  if (auto *AE = dyn_cast_or_null<ApplyExpr>(locator->getAnchor())) {
+    if (isa<PrefixUnaryExpr>(AE) || isa<BinaryExpr>(AE) ||
+        isa<PostfixUnaryExpr>(AE))
+      return expectedOperator.empty() ||
+             isOperator(AE->getFn(), expectedOperator);
+  }
+
+  return false;
+}
+
 bool constraints::isArgumentOfPatternMatchingOperator(
     ConstraintLocator *locator) {
   auto *binaryOp = dyn_cast_or_null<BinaryExpr>(locator->getAnchor());
@@ -3197,13 +3228,6 @@ bool constraints::isArgumentOfPatternMatchingOperator(
 
 bool constraints::isArgumentOfReferenceEqualityOperator(
     ConstraintLocator *locator) {
-  if (!locator->findLast<LocatorPathElt::ApplyArgToParam>())
-    return false;
-
-  if (auto *binaryOp = dyn_cast_or_null<BinaryExpr>(locator->getAnchor())) {
-    auto *fnExpr = binaryOp->getFn();
-    return isOperator(fnExpr, "===") || isOperator(fnExpr, "!==");
-  }
-
-  return false;
+  return isOperatorArgument(locator, "===") ||
+         isOperatorArgument(locator, "!==");
 }
