@@ -451,6 +451,15 @@ TypeAttributes ASTGen::generateTypeAttributes(const AttributeListSyntax &syntax,
       if (indexTok.getText().getAsInteger(10, index))
         continue;
       attrs.setOpaqueReturnTypeOf(mangling.str(), index);
+      // SWIFT_ENABLE_TENSORFLOW
+    } else if (attr == TAK_differentiable) {
+      if (arg) {
+        auto argSyntax = arg->getAs<TokenSyntax>();
+        attrs.linear = argSyntax->getTokenKind() == tok::identifier &&
+                       argSyntax->getIdentifierText() == "linear";
+      } else {
+        attrs.linear = false;
+      }
     }
 
     attrs.setAttr(attr, atLoc);
