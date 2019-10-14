@@ -236,6 +236,7 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'GenericRequirement': 232,
     'LayoutRequirement': 233,
     'LayoutConstraint': 234,
+    'OpaqueReturnTypeOfAttributeArguments': 235,
 }
 
 
