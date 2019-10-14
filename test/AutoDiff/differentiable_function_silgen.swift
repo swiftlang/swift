@@ -14,23 +14,27 @@ func myfunction(_ f: @escaping @differentiable (Float) -> (Float)) -> (Float) ->
   return f
 }
 
-func myfunction2(_ f: @escaping @differentiable(linear) (Float) -> (Float)) -> (Float) -> Float {
+func myfunction2(_ f: @escaping @differentiable(linear) (Float) -> (Float)) /*-> (Float) -> Float*/ {
   // @differentiable(linear) functions should be callable.
   _ = f(.zero)
-  return f
+  // TODO(TF-900): Uncomment the following line to test conversion to non-differentiable function type.
+  // return f
 }
 
 var global_f: @differentiable (Float) -> Float = {$0}
-var global_f_linear: @differentiable(linear) (Float) -> Float = {$0}
+// TODO(TF-902): Uncomment the following line to test linear function storage.
+// var global_f_linear: @differentiable(linear) (Float) -> Float = {$0}
 
 func calls_global_f() {
   _ = global_f(10)
-  _ = global_f_linear(10)
+  // TODO(TF-900, TF-902): Uncomment the following line to test loading a linear function from memory and direct calls to a linear function.
+  // _ = global_f_linear(10)
 }
 
 func apply() {
   _ = myfunction(thin)
-  _ = myfunction2(thin)
+  // TODO(TF-900): Uncomment the following line to test direct calls to a linear function.
+  // _ = myfunction2(thin)
 }
 
 // CHECK-AST-LABEL:  (func_decl {{.*}} "myfunction(_:)"
@@ -57,6 +61,18 @@ func apply() {
 // CHECK-SILGEN:   [[BORROWED_ORIG:%.*]] = differentiable_function_extract [original] [[BORROWED_DIFF]] : $@differentiable @callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   [[COPIED_ORIG:%.*]] = copy_value [[BORROWED_ORIG]] : $@callee_guaranteed (Float) -> Float
 // CHECK-SILGEN:   return [[COPIED_ORIG]] : $@callee_guaranteed (Float) -> Float
+
+// CHEK-SILGEN-LABEL: @{{.*}}myfunction2{{.*}} : $@convention(thin) (@guaranteed @differentiable(linear) @callee_guaranteed (Float) -> Float) -> () {
+// CHEK-SILGEN: bb0([[LIN:%.*]] : @guaranteed $@differentiable(linear) @callee_guaranteed (Float) -> Float):
+// CHEK-SILGEN:   [[COPIED_LIN:%.*]] = copy_value [[LIN]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float
+// CHEK-SILGEN:   apply [[COPIED_LIN]]<Float>({{%.*}}, {{%.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral> (@thick τ_0_0.Type) -> @out τ_0_0
+// CHEK-SILGEN:   [[BORROWED_LIN:%.*]] = begin_borrow [[COPIED_LIN]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float
+// CHEK-SILGEN:   apply [[BORROWED_LIN]]({{%.*}}) : $@differentiable(linear) @callee_guaranteed (Float) -> Float
+// CHEK-SILGEN:   end_borrow [[BORROWED_LIN]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float
+// CHEK-SILGEN:   destroy_value [[COPIED_LIN]] : $@differentiable(linear) @callee_guaranteed (Float) -> Float // id: %13
+// TODO(TF-900): Change this to returning the extracted original function.
+// CHEK-SILGEN:   %14 = tuple ()
+// CHEK-SILGEN:   return %14 : $()
 
 // CHECK-SILGEN-LABEL: @{{.*}}apply{{.*}}
 // CHECK-SILGEN:       [[ORIG:%.*]] = function_ref @{{.*}}thin{{.*}} : $@convention(thin) (Float) -> Float
