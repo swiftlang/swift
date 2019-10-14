@@ -198,11 +198,7 @@ public:
 
   /// True if the token is any keyword.
   bool isKeyword() const {
-    switch (Kind) {
-#define KEYWORD(X) case tok::kw_##X: return true;
-#include "swift/Syntax/TokenKinds.def"
-    default: return false;
-    }
+    return isTokenKeyword(Kind);
   }
 
   /// True if the token is any literal.
