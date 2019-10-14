@@ -1116,7 +1116,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       ParserStatus status = parseExprList(
           tok::l_square, tok::r_square,
           /*isPostfix=*/true, isExprBasic, lSquareLoc, indexArgs,
-          indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure);
+          indexArgLabels, indexArgLabelLocs, rSquareLoc, trailingClosure,
+          SyntaxKind::TupleExprElementList);
       Result = makeParserResult(
           status | Result,
           SubscriptExpr::create(Context, Result.get(), lSquareLoc, indexArgs,
@@ -1588,7 +1589,8 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
                                           lParenLoc, args, argLabels,
                                           argLabelLocs,
                                           rParenLoc,
-                                          trailingClosure);
+                                          trailingClosure,
+                                          SyntaxKind::TupleExprElementList);
       SyntaxContext->createNodeInPlace(SyntaxKind::FunctionCallExpr);
       return makeParserResult(
                  status,
@@ -1635,7 +1637,9 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
     // only one element without label. However, libSyntax tree doesn't have this
     // differentiation. A tuple expression node in libSyntax can have a single
     // element without label.
-    return parseExprParenOrTuple();
+    ExprContext.setCreateSyntax(SyntaxKind::TupleExpr);
+    return parseExprList(tok::l_paren, tok::r_paren,
+                         SyntaxKind::TupleExprElementList);
 
   case tok::l_square:
     return parseExprCollection();
@@ -1672,7 +1676,6 @@ ParserResult<Expr> Parser::parseExprPrimary(Diag<> ID, bool isExprBasic) {
             cast<CodeCompletionExpr>(Result.get()));
       }
     }
-    ExprContext.setCreateSyntax(SyntaxKind::CodeCompletionExpr);
     consumeToken(tok::code_complete);
     return Result;
   }
@@ -2911,101 +2914,59 @@ Expr *Parser::parseExprAnonClosureArg() {
 }
 
 
-/// Parse a tuple expression or a paren expression.
+/// parseExprList - Parse a list of expressions.
 ///
-///   expr-tuple:
-///     '(' ')'
-///     '(' expr-tuple-element-list ')'
-ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprTupleSyntax() {
-  ParsedTupleExprSyntaxBuilder builder(*SyntaxContext);
-  ParserStatus status;
+///   expr-paren:
+///     lparen-any ')'
+///     lparen-any binary-op ')'
+///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
+///
+///   expr-paren-element:
+///     (identifier ':')? expr
+///
+ParserResult<Expr>
+Parser::parseExprList(tok leftTok, tok rightTok, SyntaxKind Kind) {
+  SmallVector<Expr*, 8> subExprs;
+  SmallVector<Identifier, 8> subExprNames;
+  SmallVector<SourceLoc, 8> subExprNameLocs;
+  Expr *trailingClosure = nullptr;
 
-  StructureMarkerRAII ParsingExprList(*this, Tok);
-  if (ParsingExprList.isFailed())
-    return makeParserError();
+  SourceLoc leftLoc, rightLoc;
+  ParserStatus status = parseExprList(leftTok, rightTok, /*isPostfix=*/false,
+                                      /*isExprBasic=*/true,
+                                      leftLoc,
+                                      subExprs,
+                                      subExprNames,
+                                      subExprNameLocs,
+                                      rightLoc,
+                                      trailingClosure,
+                                      Kind);
 
-  // Parse '('.
-  auto LParenLoc = Tok.getLoc();
-  builder.useLeftParen(consumeTokenSyntax(tok::l_paren));
-
-  // Parse the elements.
-  SmallVector<ParsedTupleExprElementSyntax, 4> elements;
-  status |= parseExprTupleElementListSyntax(
-      elements, [&]() { return Tok.is(tok::r_paren); });
-  for (auto &elem : elements)
-    builder.addElementListMember(std::move(elem));
-
-  // Parse ')'.
-  auto RParen =
-      parseMatchingTokenSyntax(tok::r_paren, diag::expected_rparen_expr_list,
-                               LParenLoc, /*silenceDiag=*/status.isError());
-  status |= RParen.getStatus();
-  if (!RParen.isNull())
-    builder.useRightParen(RParen.get());
-
-  return makeParsedResult(builder.build(), status);
-}
-
-ParserResult<Expr> Parser::parseExprParenOrTuple() {
-  auto leadingLoc = leadingTriviaLoc();
-  auto parsed = parseExprTupleSyntax();
-  // NOTE: 'parsed' can be null if the nesting structure is too deep.
-  if (!parsed.isNull()) {
-    SyntaxContext->addSyntax(parsed.get());
-    auto syntax = SyntaxContext->topNode<ExprSyntax>();
-    return makeParserResult(parsed.getStatus(),
-                            Generator.generate(syntax, leadingLoc));
+  // A tuple with a single, unlabeled element is just parentheses.
+  if (subExprs.size() == 1 &&
+      (subExprNames.empty() || subExprNames[0].empty())) {
+    return makeParserResult(
+        status, new (Context) ParenExpr(leftLoc, subExprs[0], rightLoc,
+                                        /*hasTrailingClosure=*/false));
   }
-  return parsed.getStatus();
+
+  return makeParserResult(
+      status,
+      TupleExpr::create(Context, leftLoc, subExprs, subExprNames,
+                        subExprNameLocs, rightLoc, /*HasTrailingClosure=*/false,
+                        /*Implicit=*/false));
 }
 
 /// parseExprList - Parse a list of expressions.
 ///
-///   expr-tuple-element-list:
-///     expr-tuple-element (',' expr-tuple-element)*
-///   expr-tuple-element:
-///     (identifier ':')? (expr | binary-operator)
+///   expr-paren:
+///     lparen-any ')'
+///     lparen-any binary-op ')'
+///     lparen-any expr-paren-element (',' expr-paren-element)* ')'
 ///
-ParserStatus Parser::parseExprTupleElementListSyntax(
-    SmallVectorImpl<ParsedTupleExprElementSyntax> &elements,
-    llvm::function_ref<bool()> isAtCloseTok) {
-  return parseListSyntax(
-      elements, /*AllowEmpty=*/true, /*AllowSepAfterLast=*/false, isAtCloseTok,
-      [&](ParsedTupleExprElementSyntaxBuilder &elemBuilder) {
-        Optional<ParsedTokenSyntax> label;
-        Optional<ParsedTokenSyntax> colon;
-        if (parseOptionalArgumentLabelSyntax(label, colon)) {
-          elemBuilder.useLabel(std::move(*label));
-          elemBuilder.useColon(std::move(*colon));
-        }
-
-        // See if we have an operator decl ref '(<op>)'. The operator token in
-        // this case lexes as a binary operator because it neither leads nor
-        // follows a proper subexpression.
-        if (Tok.isBinaryOperator() &&
-            peekToken().isAny(tok::r_paren, tok::r_square, tok::eof,
-                              tok::comma)) {
-          elemBuilder.useExpression(ParsedSyntaxRecorder::makeIdentifierExpr(
-              consumeTokenSyntax(), None, *SyntaxContext));
-          return makeParserSuccess();
-        }
-
-        auto subExpr = parseExpressionSyntax(diag::expected_expr_in_expr_list);
-        if (!subExpr.isNull())
-          elemBuilder.useExpression(subExpr.get());
-        else
-          elemBuilder.useExpression(
-              ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
-        return subExpr.getStatus();
-      });
-}
-
-/// Parse a parenthesized expression list for a call-like expressions including
-/// subscripts.
+///   expr-paren-element:
+///     (identifier ':')? expr
 ///
-///   expr-list(left, right):
-///     left right expr-closure?
-///     left expr-tuple-element-list right expr-closure?
 ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    bool isPostfix,
                                    bool isExprBasic,
@@ -3014,53 +2975,82 @@ ParserStatus Parser::parseExprList(tok leftTok, tok rightTok,
                                    SmallVectorImpl<Identifier> &exprLabels,
                                    SmallVectorImpl<SourceLoc> &exprLabelLocs,
                                    SourceLoc &rightLoc,
-                                   Expr *&trailingClosure) {
+                                   Expr *&trailingClosure,
+                                   SyntaxKind Kind) {
   trailingClosure = nullptr;
 
   StructureMarkerRAII ParsingExprList(*this, Tok);
-  if (ParsingExprList.isFailed())
+  
+  if (ParsingExprList.isFailed()) {
     return makeParserError();
-
-  auto TokIsStringInterpolationEOF = [&]() -> bool {
-    return Tok.is(tok::eof) && Tok.getText() == ")" && rightTok == tok::r_paren;
-  };
+  }
 
   leftLoc = consumeToken(leftTok);
-
-  ParserStatus status;
-  // Parse the parenthesized expression list.
-  {
-    auto leadingLoc = leadingTriviaLoc();
-    SmallVector<ParsedTupleExprElementSyntax, 4> parsedElements;
-    status |= parseExprTupleElementListSyntax(parsedElements, [&] {
-      return Tok.is(rightTok) || TokIsStringInterpolationEOF();
-    });
-
-    // Elements.
-    SyntaxContext->addSyntax(ParsedSyntaxRecorder::makeTupleExprElementList(
-        parsedElements, *SyntaxContext));
-    auto elements = SyntaxContext->topNode<TupleExprElementListSyntax>();
-    Generator.generateExprTupleElementList(elements, leadingLoc,
-                                           /*isForCallArguments=*/true, exprs,
-                                           exprLabels, exprLabelLocs);
-  }
-
-  if (TokIsStringInterpolationEOF()) {
-    rightLoc = Tok.getLoc();
-    return status;
-  }
-
-  if (status.isError()) {
-    // If we've already got errors, don't emit missing RightK diagnostics.
-    rightLoc =
-        Tok.is(rightTok) ? consumeToken() : getLocForMissingMatchingToken();
-  } else if (parseMatchingToken(rightTok, rightLoc,
-                                rightTok == tok::r_paren
+  ParserStatus status = parseList(rightTok, leftLoc, rightLoc,
+                                  /*AllowSepAfterLast=*/false,
+                                  rightTok == tok::r_paren
                                     ? diag::expected_rparen_expr_list
                                     : diag::expected_rsquare_expr_list,
-                                leftLoc)) {
-    status.setIsParseError();
-  }
+                                  Kind,
+                                  [&] () -> ParserStatus {
+    Identifier FieldName;
+    SourceLoc FieldNameLoc;
+    if (Kind != SyntaxKind::YieldStmt)
+      parseOptionalArgumentLabel(FieldName, FieldNameLoc);
+
+    // See if we have an operator decl ref '(<op>)'. The operator token in
+    // this case lexes as a binary operator because it neither leads nor
+    // follows a proper subexpression.
+    ParserStatus Status;
+    Expr *SubExpr = nullptr;
+    if (Tok.isBinaryOperator() && peekToken().isAny(rightTok, tok::comma)) {
+      SyntaxParsingContext operatorContext(SyntaxContext,
+                                           SyntaxKind::IdentifierExpr);
+      SourceLoc Loc;
+      Identifier OperName;
+      if (parseAnyIdentifier(OperName, Loc, diag::expected_operator_ref)) {
+        return makeParserError();
+      }
+      // Bypass local lookup. Use an 'Ordinary' reference kind so that the
+      // reference may resolve to any unary or binary operator based on
+      // context.
+      SubExpr = new(Context) UnresolvedDeclRefExpr(OperName,
+                                                   DeclRefKind::Ordinary,
+                                                   DeclNameLoc(Loc));
+    } else if (isPostfix && Tok.is(tok::code_complete)) {
+      // Handle call arguments specially because it may need argument labels.
+      auto CCExpr = new (Context) CodeCompletionExpr(Tok.getLoc());
+      if (CodeCompletion)
+        CodeCompletion->completeCallArg(CCExpr, PreviousLoc == leftLoc);
+      consumeIf(tok::code_complete);
+      SubExpr = CCExpr;
+      Status.setHasCodeCompletion();
+    } else {
+      auto ParsedSubExpr = parseExpr(diag::expected_expr_in_expr_list);
+      SubExpr = ParsedSubExpr.getPtrOrNull();
+      Status = ParsedSubExpr;
+    }
+
+    // If we got a subexpression, add it.
+    if (SubExpr) {
+      // Update names and locations.
+      if (!exprLabels.empty()) {
+        exprLabels.push_back(FieldName);
+        exprLabelLocs.push_back(FieldNameLoc);
+      } else if (FieldNameLoc.isValid()) {
+        exprLabels.resize(exprs.size());
+        exprLabels.push_back(FieldName);
+
+        exprLabelLocs.resize(exprs.size());
+        exprLabelLocs.push_back(FieldNameLoc);
+      }
+
+      // Add the subexpression.
+      exprs.push_back(SubExpr);
+    }
+
+    return Status;
+  });
 
   // If we aren't interested in trailing closures, or there isn't a valid one,
   // we're done.
@@ -3141,7 +3131,8 @@ Parser::parseExprObjectLiteral(ObjectLiteralExpr::LiteralKind LitKind,
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingClosure);
+                                      trailingClosure,
+                                      SyntaxKind::TupleExprElementList);
   if (status.hasCodeCompletion())
     return makeParserCodeCompletionResult<Expr>();
   if (status.isError())
@@ -3181,7 +3172,8 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
     ParserStatus status =
         parseExprList(tok::l_paren, tok::r_paren,
                       /*isPostfix=*/true, /*isExprBasic*/ true, LParenLoc,
-                      args, argLabels, argLabelLocs, RParenLoc, trailingClosure);
+                      args, argLabels, argLabelLocs, RParenLoc, trailingClosure,
+                      SyntaxKind::TupleExprElementList);
     if (status.hasCodeCompletion())
       return makeParserCodeCompletionResult<Expr>();
     if (status.isError())
@@ -3316,7 +3308,8 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
                                       lParenLoc, args, argLabels,
                                       argLabelLocs,
                                       rParenLoc,
-                                      trailingClosure);
+                                      trailingClosure,
+                                      SyntaxKind::TupleExprElementList);
 
   // Form the call.
   return makeParserResult(

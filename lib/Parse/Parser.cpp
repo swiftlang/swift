@@ -755,7 +755,6 @@ void Parser::skipSingle() {
 }
 
 void Parser::ignoreToken() {
-  assert(!Tok.is(tok::eof) && "Lexing eof token");
   ParsedTriviaList Skipped;
   Skipped.reserve(LeadingTrivia.size() + TrailingTrivia.size() + 1 + 2);
   std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
@@ -765,7 +764,7 @@ void Parser::ignoreToken() {
             std::back_inserter(Skipped));
 
   TokReceiver->receive(Tok);
-  L->lex(Tok, LeadingTrivia, TrailingTrivia);
+  consumeTokenWithoutFeedingReceiver();
 
   std::move(LeadingTrivia.begin(), LeadingTrivia.end(),
             std::back_inserter(Skipped));
