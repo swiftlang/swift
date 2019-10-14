@@ -243,13 +243,87 @@ extension DoesNotImposeClassReq_3 where Self: JustAClass1 {
 
   var anotherProperty2: Int {
     get { return someProperty }
-    set { someProperty = newValue } // Okay
+    mutating set { someProperty = newValue } // Okay
   }
 }
 
 let justAClass1 = JustAClass1() // expected-note {{change 'let' to 'var' to make it mutable}}
 justAClass1.anotherProperty1 = 1234 // Okay
 justAClass1.anotherProperty2 = 4321 // expected-error {{cannot assign to property: 'justAClass1' is a 'let' constant}}
+
+protocol ImposeClassReq1: AnyObject {
+  var someProperty: Int { get set }
+}
+
+class JustAClass2: ImposeClassReq1 {
+  var someProperty = 0
+}
+
+extension ImposeClassReq1 where Self: AnyObject {
+  var wrappingProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+
+  var wrappingProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+  }
+
+  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 1
+  }
+
+  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 2
+  }
+
+  func baz() { // Okay
+    someProperty = 3
+  }
+}
+
+extension ImposeClassReq1 {
+  var wrappingProperty3: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+}
+
+let justAClass2 = JustAClass2() // expected-note {{change 'let' to 'var' to make it mutable}}
+justAClass2.wrappingProperty1 = 9876 // Okay
+justAClass2.wrappingProperty3 = 0987 // Okay
+justAClass2.foo() // expected-error {{cannot use mutating member on immutable value: 'justAClass2' is a 'let' constant}}
+justAClass2.bar() // Okay as well (complains about explicit nonmutating on decl)
+justAClass2.baz() // Okay
+
+protocol ImposeClassReq2: AnyObject {
+  var someProperty: Int { get set }
+}
+
+extension ImposeClassReq2 {
+  var wrappingProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+
+  var wrappingProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+  }
+
+  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 1
+  }
+
+  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 2
+  }
+
+  func baz() { // Okay
+    someProperty = 3
+  }
+}
 
 // Reject extension of nominal type via parameterized typealias
 
