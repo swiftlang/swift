@@ -5,7 +5,6 @@ from .AttributeNodes import ATTRIBUTE_NODES
 from .AvailabilityNodes import AVAILABILITY_NODES
 from .Classification import SYNTAX_CLASSIFICATIONS
 from .CommonNodes import COMMON_NODES
-from .CompletionOnlyNodes import COMPLETIONONLY_NODES
 from .DeclNodes import DECL_NODES
 from .ExprNodes import EXPR_NODES
 from .GenericNodes import GENERIC_NODES
@@ -29,7 +28,7 @@ __all__ = [
     'GENERIC_NODES',
     'SYNTAX_NODE_SERIALIZATION_CODES',
     'PATTERN_NODES',
-    'PARSEONLY_NODES',
+    'SILONLY_NODES',
     'STMT_NODES',
     'SYNTAX_TOKENS',
     'SYNTAX_TOKEN_MAP',
@@ -50,8 +49,6 @@ __all__ = [
 SYNTAX_NODES = COMMON_NODES + EXPR_NODES + DECL_NODES + ATTRIBUTE_NODES + \
     STMT_NODES + GENERIC_NODES + TYPE_NODES + PATTERN_NODES + \
     AVAILABILITY_NODES
-
-PARSEONLY_NODES = SILONLY_NODES + COMPLETIONONLY_NODES
 
 verify_syntax_node_serialization_codes(SYNTAX_NODES,
                                        SYNTAX_NODE_SERIALIZATION_CODES)
