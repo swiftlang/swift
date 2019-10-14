@@ -52,7 +52,7 @@ bool isTokenKeyword(tok kind) {
 
 bool parserShallOmitWhenNoChildren(syntax::SyntaxKind Kind) {
   switch(Kind) {
-%   for node in SYNTAX_NODES:
+%   for node in SYNTAX_NODES + SILONLY_NODES:
 %     if node.shall_be_omitted_when_empty():
   case syntax::SyntaxKind::${node.syntax_kind}:
 %     end
@@ -73,7 +73,7 @@ void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
   case SyntaxKind::Unknown:
     os << "Unknown";
     break;
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
   case SyntaxKind::${node.syntax_kind}:
     os << "${node.syntax_kind}";
     break;
@@ -83,7 +83,7 @@ void dumpSyntaxKind(llvm::raw_ostream &os, const SyntaxKind kind) {
 
 bool isCollectionKind(SyntaxKind Kind) {
   switch(Kind) {
-%   for node in SYNTAX_NODES:
+%   for node in SYNTAX_NODES + SILONLY_NODES:
 %     if node.is_syntax_collection():
   case SyntaxKind::${node.syntax_kind}:
 %     end
@@ -147,7 +147,7 @@ SyntaxKind getUnknownKind(SyntaxKind Kind) {
 llvm::raw_ostream &llvm::operator<<(llvm::raw_ostream &OS,
                                     swift::syntax::SyntaxKind Kind) {
   switch (Kind) {
-% for node in SYNTAX_NODES:
+% for node in SYNTAX_NODES + SILONLY_NODES:
     case swift::syntax::SyntaxKind::${node.syntax_kind}:
     OS << "${node.syntax_kind}";
     break;
