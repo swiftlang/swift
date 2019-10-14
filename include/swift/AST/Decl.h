@@ -2021,8 +2021,8 @@ public:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2126,11 +2126,11 @@ public:
     return getPatternList()[i].getInitContext();
   }
 
-  const CaptureInfo &getCaptureInfo(unsigned i) const {
+  CaptureInfo getCaptureInfo(unsigned i) const {
     return getPatternList()[i].getCaptureInfo();
   }
 
-  void setCaptureInfo(unsigned i, const CaptureInfo &captures) {
+  void setCaptureInfo(unsigned i, CaptureInfo captures) {
     getMutablePatternList()[i].setCaptureInfo(captures);
   }
 
@@ -5237,12 +5237,12 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  const CaptureInfo &getDefaultArgumentCaptureInfo() const {
+  CaptureInfo getDefaultArgumentCaptureInfo() const {
     assert(DefaultValueAndFlags.getPointer());
     return DefaultValueAndFlags.getPointer()->Captures;
   }
 
-  void setDefaultArgumentCaptureInfo(const CaptureInfo &captures);
+  void setDefaultArgumentCaptureInfo(CaptureInfo captures);
 
   /// Extracts the text of the default argument attached to the provided
   /// ParamDecl, removing all inactive #if clauses and providing only the
@@ -5814,8 +5814,8 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),
