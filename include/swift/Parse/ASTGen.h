@@ -67,10 +67,8 @@ public:
 
 private:
   DeclAttributes
-  generateDeclAttributes(const syntax::DeclSyntax &D,
-                         const Optional<syntax::AttributeListSyntax> &attrs,
-                         const Optional<syntax::ModifierListSyntax> &modifiers,
-                         SourceLoc Loc, bool includeComments);
+  generateDeclAttributes(const syntax::Syntax &D, SourceLoc Loc,
+                         bool includeComments);
 
   void generateFreeStandingGenericWhereClause(
                                 const syntax::GenericWhereClauseSyntax &syntax,

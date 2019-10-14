@@ -57,21 +57,14 @@ Decl *ASTGen::generate(const DeclSyntax &D, const SourceLoc Loc) {
 }
 
 DeclAttributes
-ASTGen::generateDeclAttributes(const DeclSyntax &D,
-                               const Optional<AttributeListSyntax> &attrs,
-                               const Optional<ModifierListSyntax> &modifiers,
-                               SourceLoc Loc, bool includeComments) {
-  SourceLoc attrsLoc;
-  if (attrs) {
-    attrsLoc = advanceLocBegin(Loc, *attrs->getFirstToken());
-  } else if (modifiers) {
-    attrsLoc = advanceLocBegin(Loc, *modifiers->getFirstToken());
-  } else {
-    // We might have comment attributes.
-    attrsLoc = advanceLocBegin(Loc, *D.getFirstToken());
+ASTGen::generateDeclAttributes(const Syntax &D, SourceLoc Loc,
+                               bool includeComments) {
+  // Find the AST attribute-list from the lookup table.
+  if (auto firstTok = D.getFirstToken()) {
+    auto declLoc = advanceLocBegin(Loc, *firstTok);
+    if (hasDeclAttributes(declLoc))
+      return getDeclAttributes(declLoc);
   }
-  if (hasDeclAttributes(attrsLoc))
-    return getDeclAttributes(attrsLoc);
   return DeclAttributes();
 }
 
@@ -111,8 +104,7 @@ TypeDecl *ASTGen::generate(const AssociatedtypeDeclSyntax &D,
   Identifier name;
   SourceLoc nameLoc = generateIdentifierDeclName(idToken, Loc, name);
 
-  DeclAttributes attrs =
-      generateDeclAttributes(D, D.getAttributes(), D.getModifiers(), Loc, true);
+  DeclAttributes attrs = generateDeclAttributes(D, Loc, true);
 
   DebuggerContextChange DCC(P, name, DeclKind::AssociatedType);
 
@@ -147,8 +139,7 @@ TypeDecl *ASTGen::generate(const TypealiasDeclSyntax &D, const SourceLoc Loc) {
   auto keywordLoc = advanceLocBegin(Loc, D.getTypealiasKeyword());
   Identifier name;
   SourceLoc nameLoc = generateIdentifierDeclName(idToken, Loc, name);
-  auto attrs =
-      generateDeclAttributes(D, D.getAttributes(), D.getModifiers(), Loc, true);
+  auto attrs = generateDeclAttributes(D, Loc, true);
   SourceLoc equalLoc;
 
   DebuggerContextChange DCC(P, name, DeclKind::TypeAlias);
@@ -1139,14 +1130,7 @@ GenericParamList *ASTGen::generate(const GenericParameterClauseSyntax &clause,
 
   for (auto elem : clause.getGenericParameterList()) {
 
-    DeclAttributes attrs;
-    if (auto attrsSyntax = elem.getAttributes()) {
-      if (auto firstTok = attrsSyntax->getFirstToken()) {
-        auto attrsLoc = advanceLocBegin(Loc, *firstTok);
-        if (hasDeclAttributes(attrsLoc))
-          attrs = getDeclAttributes(attrsLoc);
-      }
-    }
+    DeclAttributes attrs = generateDeclAttributes(elem, Loc, false);
     Identifier name = Context.getIdentifier(elem.getName().getIdentifierText());
     SourceLoc nameLoc = advanceLocBegin(Loc, elem.getName());
 
