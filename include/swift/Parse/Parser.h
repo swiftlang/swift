@@ -547,10 +547,11 @@ public:
   ParsedTokenSyntax consumeIdentifierSyntax(bool allowDollarIdentifier = false) {
     assert(Tok.isAny(tok::identifier, tok::kw_self, tok::kw_Self));
 
+    Context.getIdentifier(Tok.getText());
+
     if (Tok.getText()[0] == '$' && !allowDollarIdentifier)
       diagnoseDollarIdentifier(Tok);
 
-    Tok.setKind(tok::identifier);
     return consumeTokenSyntax();
   }
 
