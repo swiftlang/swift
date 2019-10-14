@@ -34,3 +34,13 @@ bb0:
   %ret = tuple ()
   return %ret : $()
 }
+
+sil @takeAndReturnLinear : $@convention(thin) (@differentiable(linear) (Float) -> Float) -> @differentiable(linear) (Float) -> Float {
+bb0(%0 : $@differentiable(linear) (Float) -> Float):
+  return %0 : $@differentiable(linear) (Float) -> Float
+}
+
+// CHECK-LABEL: sil @takeAndReturnLinear : $@convention(thin) (@differentiable(linear) (Float) -> Float) -> @differentiable(linear) (Float) -> Float {
+// CHECK: bb0([[ARG:%.*]] : $@differentiable(linear) (Float) -> Float):
+// CHECK:   return [[ARG]] : $@differentiable(linear) (Float) -> Float
+// CHECK: }
