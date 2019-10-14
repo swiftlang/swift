@@ -3064,7 +3064,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::LinearFunctionExtractInst: {
     // Parse the rest of the instruction: an extractee, a linear function
     // operand, and a debug location.
-    LinearFunctionExtractee extractee;
+    LinearDifferentiableFunctionTypeComponent extractee;
     StringRef extracteeNames[2] = {"original", "transpose"};
     SILValue functionOperand;
     SourceLoc lastLoc;

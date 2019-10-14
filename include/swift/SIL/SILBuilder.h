@@ -535,7 +535,7 @@ public:
   }
 
   LinearFunctionExtractInst *createLinearFunctionExtract(
-      SILLocation Loc, LinearFunctionExtractee Extractee,
+      SILLocation Loc, LinearDifferentiableFunctionTypeComponent Extractee,
       SILValue TheFunction) {
     return insert(new (getModule()) LinearFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));

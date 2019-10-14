@@ -52,9 +52,19 @@ enum class NormalDifferentiableFunctionTypeComponent : uint8_t {
   VJP = 2
 };
 
-enum class LinearDifferentiableFunctionTypeComponent : uint8_t {
-  Original = 0,
-  Transpose = 1
+struct LinearDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    Transpose = 1,
+  } rawValue;
+
+  LinearDifferentiableFunctionTypeComponent() = default;
+  LinearDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue) :
+      LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
 };
 
 class ParsedAutoDiffParameter {

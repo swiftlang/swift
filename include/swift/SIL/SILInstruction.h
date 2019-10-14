@@ -8022,42 +8022,33 @@ class LinearFunctionExtractInst
     : public InstructionBase<
           SILInstructionKind::LinearFunctionExtractInst,
           SingleValueInstruction> {
-public:
-  struct Extractee {
-    enum innerty : unsigned {
-      Original = 0,
-      Transpose = 1
-    } rawValue;
-    Extractee() = default;
-    Extractee(innerty rawValue) : rawValue(rawValue) {}
-    explicit Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
-    explicit Extractee(StringRef name);
-    operator innerty() const { return rawValue; }
-  };
-
 private:
   /// The extractee.
-  Extractee extractee;
+  LinearDifferentiableFunctionTypeComponent extractee;
   /// The list containing the `@differentiable(linear)` function operand.
   FixedOperandList<1> operands;
 
   static SILType
-  getExtracteeType(SILValue function, Extractee extractee, SILModule &module);
+  getExtracteeType(SILValue function,
+                   LinearDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
 
 public:
   explicit LinearFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+      SILModule &module, SILDebugLocation debugLoc,
+      LinearDifferentiableFunctionTypeComponent extractee,
       SILValue theFunction);
 
-  Extractee getExtractee() const { return extractee; }
+  LinearDifferentiableFunctionTypeComponent getExtractee() const {
+    return extractee;
+  }
 
   SILValue getFunctionOperand() const { return operands[0].get(); }
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
 
-typedef LinearFunctionExtractInst::Extractee
-    LinearFunctionExtractee;
+typedef LinearDifferentiableFunctionTypeComponent LinearFunctionExtractee;
 // SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on

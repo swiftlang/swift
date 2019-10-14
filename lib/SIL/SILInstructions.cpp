@@ -633,15 +633,6 @@ SILType LinearFunctionInst::getLinearFunctionType(
   return SILType::getPrimitiveObjectType(diffTy);
 }
 
-LinearFunctionExtractInst::Extractee::Extractee(StringRef string) {
-  Optional<innerty> result =
-      llvm::StringSwitch<Optional<innerty>>(string)
-          .Case("original", Original)
-          .Case("transpose", Transpose);
-  assert(result && "Invalid string");
-  rawValue = *result;
-}
-
 LinearFunctionInst::LinearFunctionInst(
     SILDebugLocation Loc, IndexSubset *ParameterIndices,
     SILValue OriginalFunction, Optional<SILValue> TransposeFunction,
@@ -729,14 +720,16 @@ DifferentiableFunctionExtractInst::DifferentiableFunctionExtractInst(
       extractee(extractee), operands(this, theFunction) {}
 
 SILType LinearFunctionExtractInst::
-getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
+getExtracteeType(
+    SILValue function, LinearDifferentiableFunctionTypeComponent extractee,
+    SILModule &module) {
   auto fnTy = function->getType().castTo<SILFunctionType>();
   assert(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear);
   auto originalFnTy = fnTy->getWithoutDifferentiability();
   switch (extractee) {
-  case Extractee::Original:
+  case LinearDifferentiableFunctionTypeComponent::Original:
     return SILType::getPrimitiveObjectType(originalFnTy);
-  case Extractee::Transpose:
+  case LinearDifferentiableFunctionTypeComponent::Transpose:
     auto transposeFnTy = originalFnTy->getAutoDiffTransposeFunctionType(
         fnTy->getDifferentiationParameterIndices(), module.Types,
         LookUpConformanceInModule(module.getSwiftModule()));
@@ -745,8 +738,8 @@ getExtracteeType(SILValue function, Extractee extractee, SILModule &module) {
 }
 
 LinearFunctionExtractInst::LinearFunctionExtractInst(
-    SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
-    SILValue theFunction)
+    SILModule &module, SILDebugLocation debugLoc,
+    LinearDifferentiableFunctionTypeComponent extractee, SILValue theFunction)
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
