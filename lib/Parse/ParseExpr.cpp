@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "ParseList.h"
 #include "swift/Parse/Parser.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
@@ -34,6 +35,19 @@
 
 using namespace swift;
 using namespace swift::syntax;
+
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExpressionSyntax(Diag<> ID) {
+  SourceLoc ExprLoc = Tok.getLoc();
+  SyntaxParsingContext ExprParsingContext(SyntaxContext,
+                                          SyntaxContextKind::Expr);
+  ExprParsingContext.setTransparent();
+  ParserResult<Expr> Result = parseExpr(ID);
+  if (auto ParsedExpr = ExprParsingContext.popIf<ParsedExprSyntax>()) {
+    Generator.addExpr(Result.getPtrOrNull(), ExprLoc);
+    return makeParsedResult(std::move(*ParsedExpr), Result.getStatus());
+  }
+  return Result.getStatus();
+}
 
 /// parseExpr
 ///
@@ -813,29 +827,6 @@ UnresolvedDeclRefExpr *Parser::parseExprOperator() {
   return new (Context) UnresolvedDeclRefExpr(name, refKind, DeclNameLoc(loc));
 }
 
-static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
-                                                   DeclContext *DC,
-                                                   SourceLoc Loc) {
-  auto *methodContext = DC->getInnermostMethodContext();
-  if (!methodContext) {
-    P.diagnose(Loc, diag::super_not_in_class_method);
-    return nullptr;
-  }
-
-  // Do an actual lookup for 'self' in case it shows up in a capture list.
-  auto *methodSelf = methodContext->getImplicitSelfDecl();
-  auto *lookupSelf = P.lookupInScope(P.Context.Id_self);
-  if (lookupSelf && lookupSelf != methodSelf) {
-    // FIXME: This is the wrong diagnostic for if someone manually declares a
-    // variable named 'self' using backticks.
-    P.diagnose(Loc, diag::super_in_closure_with_capture);
-    P.diagnose(lookupSelf->getLoc(), diag::super_in_closure_with_capture_here);
-    return nullptr;
-  }
-
-  return methodSelf;
-}
-
 /// parseExprSuper
 ///
 ///   expr-super:
@@ -848,28 +839,36 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///     'super' '.' 'init'
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
-ParserResult<Expr> Parser::parseExprSuper() {
-  SyntaxParsingContext SuperCtxt(SyntaxContext, SyntaxContextKind::Expr);
-  // Parse the 'super' reference.
-  SourceLoc superLoc = consumeToken(tok::kw_super);
-  SyntaxContext->createNodeInPlace(SyntaxKind::SuperRefExpr);
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprSuperSyntax() {
+  auto superTok = consumeTokenSyntax(tok::kw_super);
 
   // 'super.' must be followed by a member ref, explicit initializer ref, or
   // subscript call.
   if (!Tok.isAny(tok::period, tok::period_prefix, tok::code_complete) &&
       !Tok.isFollowingLSquare()) {
-    if (!consumeIf(tok::unknown))
+    SmallVector<ParsedSyntax, 2> junk;
+    junk.emplace_back(std::move(superTok));
+    if (auto unknown = consumeTokenSyntaxIf(tok::unknown)) {
+      junk.emplace_back(std::move(*unknown));
+    } else {
       diagnose(Tok, diag::expected_dot_or_subscript_after_super);
-    return nullptr;
+    }
+
+    return makeParsedError(
+        ParsedSyntaxRecorder::makeUnknownExpr(junk, *SyntaxContext));
   }
 
-  VarDecl *selfDecl =
-      getImplicitSelfDeclForSuperContext(*this, CurDeclContext, superLoc);
-  if (!selfDecl)
-    return makeParserResult(new (Context) ErrorExpr(superLoc));
+  return makeParsedResult(ParsedSyntaxRecorder::makeSuperRefExpr(
+      std::move(superTok), *SyntaxContext));
+}
 
-  return makeParserResult(new (Context) SuperRefExpr(selfDecl, superLoc,
-                                                     /*Implicit=*/false));
+ParserResult<Expr> Parser::parseExprSuper() {
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseExprSuperSyntax();
+  SyntaxContext->addSyntax(parsed.get());
+  auto syntax = SyntaxContext->topNode<ExprSyntax>();
+  auto expr = Generator.generate(syntax, leadingLoc);
+  return makeParserResult(parsed.getStatus(), expr);
 }
 
 StringRef Parser::copyAndStripUnderscores(StringRef orig) {
@@ -3227,6 +3226,26 @@ ParserResult<Expr> Parser::parseExprPoundUnknown(SourceLoc LSquareLoc) {
   return makeParserError();
 }
 
+ParsedSyntaxResult<ParsedExprSyntax>
+Parser::parseExprPoundUnknownSyntax(Optional<ParsedTokenSyntax> &&LSquare,
+                                    SourceLoc LSquareLoc) {
+  SourceLoc ExprLoc = Tok.getLoc();
+  if (LSquareLoc.isValid())
+    ExprLoc = LSquareLoc;
+  ParserStatus status;
+  {
+    SyntaxParsingContext ExprParsingContext(SyntaxContext,
+                                            SyntaxContextKind::Expr);
+    if (LSquare)
+      ExprParsingContext.addSyntax(std::move(*LSquare));
+    ParserResult<Expr> result = parseExprPoundUnknown(LSquareLoc);
+    status = result;
+    Generator.addExpr(result.getPtrOrNull(), ExprLoc);
+  }
+  auto parsed = SyntaxContext->popIf<ParsedExprSyntax>();
+  return makeParsedResult(std::move(*parsed), status);
+}
+
 /// Handle code completion after pound in expression position.
 ///
 /// In case it's in a stmt condition position, specify \p ParentKind to
@@ -3310,205 +3329,163 @@ Parser::parseExprCallSuffix(ParserResult<Expr> fn, bool isExprBasic) {
 ///   expr-dictionary:
 ///     '[' expr ':' expr (',' expr ':' expr)* ','? ']'
 ///     '[' ':' ']'
-ParserResult<Expr> Parser::parseExprCollection() {
-  SyntaxParsingContext ArrayOrDictContext(SyntaxContext,
-                                          SyntaxContextKind::Expr);
-  SourceLoc LSquareLoc = consumeToken(tok::l_square);
-  SourceLoc RSquareLoc;
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprCollectionSyntax() {
+  auto LSquareLoc = Tok.getLoc();
+  auto LSquare = consumeTokenSyntax(tok::l_square);
 
   Parser::StructureMarkerRAII ParsingCollection(
-                                *this, LSquareLoc,
-                                StructureMarkerKind::OpenSquare);
+      *this, LSquareLoc, StructureMarkerKind::OpenSquare);
 
   // [] is always an array.
   if (Tok.is(tok::r_square)) {
-    SyntaxContext->addSyntax(
-        ParsedSyntaxRecorder::makeBlankArrayElementList(
-                              Tok.getLoc(), *SyntaxContext));
-    RSquareLoc = consumeToken(tok::r_square);
-    ArrayOrDictContext.setCreateSyntax(SyntaxKind::ArrayExpr);
-    return makeParserResult(
-                    ArrayExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
+    ParsedArrayExprSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftSquare(std::move(LSquare));
+    builder.useRightSquare(consumeTokenSyntax(tok::r_square));
+    return makeParsedResult(builder.build());
   }
 
   // [:] is always an empty dictionary.
   if (Tok.is(tok::colon) && peekToken().is(tok::r_square)) {
-    consumeToken(tok::colon);
-    RSquareLoc = consumeToken(tok::r_square);
-    ArrayOrDictContext.setCreateSyntax(SyntaxKind::DictionaryExpr);
-    return makeParserResult(
-               DictionaryExpr::create(Context, LSquareLoc, {}, {}, RSquareLoc));
+    ParsedDictionaryExprSyntaxBuilder builder(*SyntaxContext);
+    builder.useLeftSquare(std::move(LSquare));
+    builder.useContent(consumeTokenSyntax(tok::colon));
+    builder.useRightSquare(consumeTokenSyntax(tok::r_square));
+    return makeParsedResult(builder.build());
   }
 
-  // [#identifier is likely to be a legacy object literal.
+  // '[#identifier' is likely to be a legacy object literal.
   if (Tok.is(tok::pound) && peekToken().is(tok::identifier) &&
       !peekToken().isEscapedIdentifier() &&
       LSquareLoc.getAdvancedLoc(1) == Tok.getLoc() &&
       Tok.getLoc().getAdvancedLoc(1) == peekToken().getLoc()) {
-    ArrayOrDictContext.setCoerceKind(SyntaxContextKind::Expr);
-    return parseExprPoundUnknown(LSquareLoc);
+     return parseExprPoundUnknownSyntax(std::move(LSquare), LSquareLoc);
   }
 
-  ParserStatus Status;
-  Optional<bool> isDictionary;
-  SmallVector<Expr *, 8> ElementExprs;
-  SmallVector<SourceLoc, 8> CommaLocs;
+  auto firstExpr =
+      parseExpressionSyntax(diag::expected_expr_in_collection_literal);
 
-  {
-    SyntaxParsingContext ListCtx(SyntaxContext, SyntaxContextKind::Expr);
-
-    while (true) {
-      SyntaxParsingContext ElementCtx(SyntaxContext);
-
-      auto Element = parseExprCollectionElement(isDictionary);
-      Status |= Element;
-      ElementCtx.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryElement
-                                               : SyntaxKind::ArrayElement);
-      if (Element.isNonNull())
-        ElementExprs.push_back(Element.get());
-
-      // Skip to ']' or ',' in case of error.
-      // NOTE: This checks 'Status' instead of 'Element' to silence excessive
-      // diagnostics.
-      if (Status.isError()) {
-        skipUntilDeclRBrace(tok::r_square, tok::comma);
-        if (Tok.isNot(tok::comma))
-          break;
-      }
-
-      // Parse the ',' if exists.
-      if (Tok.is(tok::comma)) {
-        CommaLocs.push_back(consumeToken());
-        if (!Tok.is(tok::r_square))
-          continue;
-      }
-
-      // Close square.
-      if (Tok.is(tok::r_square))
-        break;
-
-      // If we found EOF or such, bailout.
-      if (Tok.is(tok::eof)) {
-        IsInputIncomplete = true;
-        break;
-      }
-
-      // If The next token is at the beginning of a new line and can never start
-      // an element, break.
-      if (Tok.isAtStartOfLine() && (Tok.isAny(tok::r_brace, tok::pound_endif) ||
-                                    isStartOfDecl() || isStartOfStmt()))
-        break;
-
-      diagnose(Tok, diag::expected_separator, ",")
-          .fixItInsertAfter(PreviousLoc, ",");
-      Status.setIsParseError();
-    }
-
-    ListCtx.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryElementList
-                                          : SyntaxKind::ArrayElementList);
+  if (!Tok.is(tok::colon)) {
+    // Array.
+    return parseExprArraySyntax(std::move(LSquare), LSquareLoc,
+                                std::move(firstExpr));
+  } else {
+    // Dictionary.
+    return parseExprDictionarySyntax(std::move(LSquare), LSquareLoc,
+                                     std::move(firstExpr));
   }
-  ArrayOrDictContext.setCreateSyntax(*isDictionary ? SyntaxKind::DictionaryExpr
-                                                   : SyntaxKind::ArrayExpr);
-
-  if (Status.isError()) {
-    // If we've already got errors, don't emit missing RightK diagnostics.
-    RSquareLoc = Tok.is(tok::r_square) ? consumeToken()
-                                       : getLocForMissingMatchingToken();
-  } else if (parseMatchingToken(tok::r_square, RSquareLoc,
-                                diag::expected_rsquare_array_expr,
-                                LSquareLoc)) {
-    Status.setIsParseError();
-  }
-
-  // Don't bother to create expression if any expressions aren't parsed.
-  if (ElementExprs.empty())
-    return Status;
-
-  Expr *expr;
-  if (*isDictionary)
-    expr = DictionaryExpr::create(Context, LSquareLoc, ElementExprs, CommaLocs,
-                                  RSquareLoc);
-  else
-    expr = ArrayExpr::create(Context, LSquareLoc, ElementExprs, CommaLocs,
-                             RSquareLoc);
-
-  return makeParserResult(Status, expr);
 }
 
-/// parseExprCollectionElement - Parse an element for collection expr.
-///
-/// If \p isDictionary is \c None, it's set to \c true if the element is for
-/// dictionary literal, or \c false otherwise.
-ParserResult<Expr>
-Parser::parseExprCollectionElement(Optional<bool> &isDictionary) {
-  auto Element = parseExpr(isDictionary.hasValue() && *isDictionary
-                               ? diag::expected_key_in_dictionary_literal
-                               : diag::expected_expr_in_collection_literal);
+ParsedSyntaxResult<ParsedExprSyntax>
+Parser::parseExprArraySyntax(ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+                             ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr) {
+  ParserStatus status;
 
-  if (!isDictionary.hasValue())
-    isDictionary = Tok.is(tok::colon);
+  ParsedArrayExprSyntaxBuilder builder(*SyntaxContext);
+  builder.useLeftSquare(std::move(LSquare));
 
-  if (!*isDictionary) {
-    validateCollectionElement(Element);
-    return Element;
-  }
+  SmallVector<ParsedArrayElementSyntax, 8> elements;
 
-  if (Element.isNull())
-    return Element;
+  // Parse elements.
+  // NOTE: 'AllowEmpty=false' because we already have 'firstExpr'.
+  bool isFirst = true;
+  status |= parseListSyntax(
+      elements, /*AllowEmpty=*/false, /*AllowSepAfterLast=*/true,
+      [&]() { return Tok.is(tok::r_square); },
+      [&](ParsedArrayElementSyntaxBuilder &elemBuilder) {
+        auto expr = isFirst ? std::move(firstExpr)
+                            : parseExpressionSyntax(
+                                  diag::expected_expr_in_collection_literal);
+        isFirst = false;
+        elemBuilder.useExpression(
+            !expr.isNull()
+                ? expr.get()
+                : ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
+        return expr.getStatus();
+      });
+  for (auto &elem : elements)
+    builder.addElementsMember(std::move(elem));
 
-  // Parse the ':'.
-  if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::expected_colon_in_dictionary_literal);
-    return ParserStatus(Element) | makeParserError();
-  }
+  // Parse ']'.
+  auto RSquare =
+      parseMatchingTokenSyntax(tok::r_square, diag::expected_rsquare_array_expr,
+                               LSquareLoc, status.isError());
+  status |= RSquare.getStatus();
+  if (!RSquare.isNull())
+    builder.useRightSquare(RSquare.get());
 
-  // Parse the value.
-  auto Value = parseExpr(diag::expected_value_in_dictionary_literal);
-
-  if (Value.isNull())
-    Value = makeParserResult(Value, new (Context) ErrorExpr(PreviousLoc));
-
-  // Make a tuple of Key Value pair.
-  return makeParserResult(
-      ParserStatus(Element) | ParserStatus(Value),
-      TupleExpr::createImplicit(Context, {Element.get(), Value.get()}, {}));
+  return makeParsedResult(builder.build(), status);
 }
 
-/// validateCollectionElement - Check if a given collection element is valid.
-///
-/// At the moment, this checks whether a given collection element is a subscript
-/// expression and whether we're subscripting into an array. If we are, then it
-/// we emit a diagnostic in case it was not something that the user was
-/// expecting.
-///
-/// For example: `let array [ [0, 1] [42] ]`
-void Parser::validateCollectionElement(ParserResult<Expr> element) {
-  if (element.isNull())
-    return;
+ParsedSyntaxResult<ParsedExprSyntax> Parser::parseExprDictionarySyntax(
+    ParsedTokenSyntax &&LSquare, SourceLoc LSquareLoc,
+    ParsedSyntaxResult<ParsedExprSyntax> &&firstExpr) {
+  ParserStatus status = firstExpr.getStatus();
 
-  auto elementExpr = element.get();
-  if (!isa<SubscriptExpr>(elementExpr))
-    return;
+  ParsedDictionaryExprSyntaxBuilder builder(*SyntaxContext);
+  builder.useLeftSquare(std::move(LSquare));
 
-  auto subscriptExpr = cast<SubscriptExpr>(elementExpr);
-  if (!isa<ArrayExpr>(subscriptExpr->getBase()))
-    return;
+  SmallVector<ParsedDictionaryElementSyntax, 8> elements;
 
-  auto arrayExpr = cast<ArrayExpr>(subscriptExpr->getBase());
+  // Parse other elements.
+  bool isFirst = true;
+  status |= parseListSyntax(
+      elements, /*AllowEmpty=*/false, /*AllowSepAfterLast=*/true,
+      [&]() { return Tok.is(tok::r_square); },
+      [&](ParsedDictionaryElementSyntaxBuilder &elemBuilder) {
+        // Parse the key expression.
+        auto key = isFirst ? std::move(firstExpr)
+                           : parseExpressionSyntax(
+                                 diag::expected_key_in_dictionary_literal);
+        isFirst = false;
+        elemBuilder.useKeyExpression(
+            !key.isNull()
+                ? key.get()
+                : ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
 
-  auto startLocOfSubscript = subscriptExpr->getIndex()->getStartLoc();
-  auto endLocOfArray = arrayExpr->getEndLoc();
-  auto locForEndOfTokenArray = L->getLocForEndOfToken(SourceMgr, endLocOfArray);
+        // Parse ':'.
+        if (Tok.is(tok::colon)) {
+          elemBuilder.useColon(consumeTokenSyntax(tok::colon));
+        } else {
+          if (key.getStatus().isSuccess())
+            diagnose(Tok, diag::expected_colon_in_dictionary_literal);
+          elemBuilder.useValueExpression(
+               ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
+          return key.getStatus() | makeParserError();
+        }
 
-  if (locForEndOfTokenArray != startLocOfSubscript) {
-    auto subscriptLoc = subscriptExpr->getLoc();
-    diagnose(subscriptLoc, diag::subscript_array_element)
-        .highlight(subscriptExpr->getSourceRange());
-    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_add_comma)
-        .fixItInsertAfter(endLocOfArray, ",");
-    diagnose(subscriptLoc, diag::subscript_array_element_fix_it_remove_space)
-        .fixItRemoveChars(locForEndOfTokenArray, startLocOfSubscript);
-  }
+        // Parse the value expression.
+        auto value =
+            parseExpressionSyntax(diag::expected_value_in_dictionary_literal);
+        elemBuilder.useValueExpression(
+            !value.isNull()
+                ? value.get()
+                : ParsedSyntaxRecorder::makeUnknownExpr({}, *SyntaxContext));
+
+        return key.getStatus() | value.getStatus();
+      });
+  builder.useContent(ParsedSyntaxRecorder::makeDictionaryElementList(
+      elements, *SyntaxContext));
+
+  // Parse ']'.
+  auto RSquare =
+      parseMatchingTokenSyntax(tok::r_square, diag::expected_rsquare_array_expr,
+                               LSquareLoc, status.isError());
+  status |= RSquare.getStatus();
+  if (!RSquare.isNull())
+    builder.useRightSquare(RSquare.get());
+
+  return makeParsedResult(builder.build(), status);
+}
+
+ParserResult<Expr> Parser::parseExprCollection() {
+  auto leadingLoc = leadingTriviaLoc();
+  auto parsed = parseExprCollectionSyntax();
+  assert(!parsed.isNull());
+  SyntaxContext->addSyntax(parsed.get());
+
+  auto syntax = SyntaxContext->topNode<ExprSyntax>();
+  return makeParserResult(parsed.getStatus(),
+                          Generator.generate(syntax, leadingLoc));
 }
 
 void Parser::addPatternVariablesToScope(ArrayRef<Pattern *> Patterns) {

@@ -714,6 +714,7 @@ func testImplicitMemberInArrayLiteral() {
     .create2(1, #^IMPLICIT_MEMBER_ARRAY_1_SECOND^#
     // Same as IMPLICIT_MEMBER_SECOND.
   ])
+  func sync() {}
   Receiver(arg1: 12, arg2: [
     .create2(1, arg3: 2, #^IMPLICIT_MEMBER_ARRAY_1_SKIPPED^#
     // Same as IMPLICIT_MEMBER_SKIPPED.
