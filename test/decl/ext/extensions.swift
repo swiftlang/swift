@@ -164,7 +164,7 @@ extension DoesNotImposeClassReq_1 where Self: JustAClass {
     wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
   
-  nonmutating func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}
+  nonmutating func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
     property = "" // Okay
     wrappingProperty1 = "" // Okay
     wrappingProperty2 = "" // Okay
@@ -191,11 +191,13 @@ extension DoesNotImposeClassReq_2 where Self : AnyObject {
   var wrappingProperty1: String {
     get { property }
     set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-5=mutating }}
   }
   
   var wrappingProperty2: String {
     get { property }
     nonmutating set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
   }
   
   var wrappingProperty3: String {
@@ -217,7 +219,7 @@ extension DoesNotImposeClassReq_2 where Self : AnyObject {
     wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
   
-  nonmutating func baz() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}
+  nonmutating func baz() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
     property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
     wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
     wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
