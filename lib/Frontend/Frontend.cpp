@@ -318,6 +318,23 @@ void CompilerInstance::setUpDiagnosticOptions() {
   }
 }
 
+// The ordering of ModuleLoaders is important!
+//
+// 1. SourceLoader: This is a hack and only the compiler's tests are using it,
+//    to avoid writing repetitive code involving generating modules/interfaces.
+//    Ideally, we'd get rid of it.
+// 2. MemoryBufferSerializedModuleLoader: This is used by LLDB, because it might
+//    already have the module available in memory.
+// 3. ModuleInterfaceLoader: Tries to find an up-to-date swiftmodule. If it
+//    succeeds, it issues a particular "error" (see
+//    [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]), which
+//    is interpreted by the overarching loader as a command to use the
+//    SerializedModuleLoader. If we failed to find a .swiftmodule, this falls
+//    back to using an interface. Actual errors lead to diagnostics.
+// 4. SerializedModuleLoader: Loads a serialized module if it can.
+// 5. ClangImporter: This must come after all the Swift module loaders because
+//    in the presence of overlays and mixed-source frameworks, we want to prefer
+//    the overlay or framework module over the underlying Clang module.
 bool CompilerInstance::setUpModuleLoaders() {
   if (hasSourceImport()) {
     bool enableLibraryEvolution =
@@ -354,10 +371,6 @@ bool CompilerInstance::setUpModuleLoaders() {
     Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
 
-  std::unique_ptr<SerializedModuleLoader> SML =
-    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
-  this->SML = SML.get();
-
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
@@ -380,7 +393,12 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.RemarkOnRebuildFromModuleInterface);
     Context->addModuleLoader(std::move(PIML));
   }
+
+  std::unique_ptr<SerializedModuleLoader> SML =
+    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
+  this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
+
   Context->addModuleLoader(std::move(clangImporter), /*isClang*/ true);
 
   return false;
