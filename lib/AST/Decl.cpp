@@ -1371,7 +1371,6 @@ ParamDecl *PatternBindingInitializer::getImplicitSelfDecl() {
                                     C.Id_self, this);
       SelfParam->setImplicit();
       SelfParam->setInterfaceType(DC->getSelfInterfaceType());
-      SelfParam->setValidationToChecked();
     }
   }
 
@@ -2152,32 +2151,15 @@ bool AbstractStorageDecl::isResilient(ModuleDecl *M,
   llvm_unreachable("bad resilience expansion");
 }
 
-static bool isValidKeyPathComponent(AbstractStorageDecl *decl) {
-  // If this property or subscript is not an override, we can reference it
-  // from a keypath component.
-  auto base = decl->getOverriddenDecl();
-  if (!base)
-    return true;
-
-  // Otherwise, we can only reference it if the type is not ABI-compatible
-  // with the type of the base.
-  //
-  // If the type is ABI compatible with the type of the base, we have to
-  // reference the base instead.
-  auto baseInterfaceTy = base->getInterfaceType();
-  auto derivedInterfaceTy = decl->getInterfaceType();
-
-  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
-
-  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
-      base, decl, baseInterfaceTy);
-
-  return !derivedInterfaceTy->matches(overrideInterfaceTy,
-                                      TypeMatchFlags::AllowABICompatible);
-}
-
-void AbstractStorageDecl::computeIsValidKeyPathComponent() {
-  setIsValidKeyPathComponent(::isValidKeyPathComponent(this));
+bool AbstractStorageDecl::isValidKeyPathComponent() const {
+  // Check whether we're an ABI compatible override of another property. If we
+  // are, then the key path should refer to the base decl instead.
+  auto &ctx = getASTContext();
+  auto isABICompatibleOverride = evaluateOrDefault(
+      ctx.evaluator,
+      IsABICompatibleOverrideRequest{const_cast<AbstractStorageDecl *>(this)},
+      false);
+  return !isABICompatibleOverride;
 }
 
 bool AbstractStorageDecl::isGetterMutating() const {
@@ -2608,7 +2590,22 @@ void ValueDecl::setOverriddenDecls(ArrayRef<ValueDecl *> overridden) {
 OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
   TypeLoc returnLoc;
   if (auto *VD = dyn_cast<VarDecl>(this)) {
-    returnLoc = VD->getTypeLoc();
+    if (auto *P = VD->getParentPattern()) {
+      while (auto *PP = dyn_cast<ParenPattern>(P))
+        P = PP->getSubPattern();
+
+      if (auto *TP = dyn_cast<TypedPattern>(P)) {
+        P = P->getSemanticsProvidingPattern();
+        if (auto *NP = dyn_cast<NamedPattern>(P)) {
+          assert(NP->getDecl() == VD);
+          (void) NP;
+
+          returnLoc = TP->getTypeLoc();
+        }
+      }
+    } else {
+      returnLoc = VD->getTypeLoc();
+    }
   } else if (auto *FD = dyn_cast<FuncDecl>(this)) {
     returnLoc = FD->getBodyResultTypeLoc();
   } else if (auto *SD = dyn_cast<SubscriptDecl>(this)) {
@@ -2619,23 +2616,12 @@ OpaqueReturnTypeRepr *ValueDecl::getOpaqueResultTypeRepr() const {
 }
 
 OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    return func->getOpaqueResultTypeDecl();
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)) {
-    return storage->getOpaqueResultTypeDecl();
-  } else {
+  if (getOpaqueResultTypeRepr() == nullptr)
     return nullptr;
-  }
-}
 
-void ValueDecl::setOpaqueResultTypeDecl(OpaqueTypeDecl *D) {
-  if (auto func = dyn_cast<FuncDecl>(this)) {
-    func->setOpaqueResultTypeDecl(D);
-  } else if (auto storage = dyn_cast<AbstractStorageDecl>(this)){
-    storage->setOpaqueResultTypeDecl(D);
-  } else {
-    llvm_unreachable("decl does not support opaque result types");
-  }
+  return evaluateOrDefault(getASTContext().evaluator,
+    OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
+    nullptr);
 }
 
 bool ValueDecl::isObjC() const {
@@ -3947,7 +3933,6 @@ GetDestructorRequest::evaluate(Evaluator &evaluator, ClassDecl *CD) const {
   auto *DD = new (ctx) DestructorDecl(CD->getLoc(), CD);
 
   DD->setImplicit();
-  DD->setValidationToChecked();
 
   // Synthesize an empty body for the destructor as needed.
   DD->setBodySynthesizer(synthesizeEmptyFunctionBody);
@@ -6675,26 +6660,22 @@ static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
   if (decl->isEffectiveLinkageMoreVisibleThan(base))
     return true;
 
-  // If the method overrides something, we only need a new entry if the
-  // override has a more general AST type. However an abstraction
-  // change is OK; we don't want to add a whole new vtable entry just
-  // because an @in parameter because @owned, or whatever.
-  auto baseInterfaceTy = base->getInterfaceType();
-  auto derivedInterfaceTy = decl->getInterfaceType();
-
   using Direction = ASTContext::OverrideGenericSignatureReqCheck;
   if (!ctx.overrideGenericSignatureReqsSatisfied(
           base, decl, Direction::BaseReqSatisfiedByDerived)) {
     return true;
   }
 
-  auto selfInterfaceTy = decl->getDeclContext()->getDeclaredInterfaceType();
-
-  auto overrideInterfaceTy = selfInterfaceTy->adjustSuperclassMemberDeclType(
-      base, decl, baseInterfaceTy);
-
-  return !derivedInterfaceTy->matches(overrideInterfaceTy,
-                                      TypeMatchFlags::AllowABICompatible);
+  // If this method is an ABI compatible override, then we don't need a new
+  // vtable entry. Otherwise, if it's not ABI compatible, for example if the
+  // base has a more general AST type, then we need a new entry. Note that an
+  // abstraction change is OK; we don't want to add a whole new vtable entry
+  // just because an @in parameter becomes @owned, or whatever.
+  auto isABICompatibleOverride = evaluateOrDefault(
+      ctx.evaluator,
+      IsABICompatibleOverrideRequest{const_cast<AbstractFunctionDecl *>(decl)},
+      false);
+  return !isABICompatibleOverride;
 }
 
 void AbstractFunctionDecl::computeNeedsNewVTableEntry() {
@@ -6751,8 +6732,6 @@ void AbstractFunctionDecl::computeSelfDeclType() {
                        ? ParamDecl::Specifier::InOut
                        : ParamDecl::Specifier::Default;
   selfDecl->setSpecifier(specifier);
-
-  selfDecl->setValidationToChecked();
 }
 
 void AbstractFunctionDecl::setParameters(ParameterList *BodyParams) {

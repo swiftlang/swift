@@ -340,12 +340,7 @@ protected:
     IsUserAccessible : 1
   );
 
-  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1+1+1,
-    /// Whether a keypath component can directly reference this storage,
-    /// or if it must use the overridden declaration instead.
-    HasComputedValidKeyPathComponent : 1,
-    ValidKeyPathComponent : 1,
-    
+  SWIFT_INLINE_BITFIELD(AbstractStorageDecl, ValueDecl, 1,
     /// Whether this property is a type property (currently unfortunately
     /// called 'static').
     IsStatic : 1
@@ -2769,12 +2764,6 @@ public:
   /// Get the representative for this value's opaque result type, if it has one.
   OpaqueReturnTypeRepr *getOpaqueResultTypeRepr() const;
 
-  /// Set the opaque return type decl for this decl.
-  ///
-  /// `this` must be of a decl type that supports opaque return types, and
-  /// must not have previously had an opaque result type set.
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *D);
-
   /// Retrieve the attribute associating this declaration with a
   /// function builder, if there is one.
   CustomAttr *getAttachedFunctionBuilder() const;
@@ -4559,10 +4548,6 @@ protected:
     Bits.AbstractStorageDecl.IsStatic = IsStatic;
   }
 
-  void computeIsValidKeyPathComponent();
-  
-  OpaqueTypeDecl *OpaqueReturn = nullptr;
-
 public:
 
   /// Should this declaration be treated as if annotated with transparent
@@ -4803,18 +4788,9 @@ public:
   /// property from the given module?
   bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
 
-  void setIsValidKeyPathComponent(bool value) {
-    Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent = true;
-    Bits.AbstractStorageDecl.ValidKeyPathComponent = value;
-  }
-
   /// True if the storage can be referenced by a keypath directly.
   /// Otherwise, its override must be referenced.
-  bool isValidKeyPathComponent() const {
-    if (!Bits.AbstractStorageDecl.HasComputedValidKeyPathComponent)
-      const_cast<AbstractStorageDecl *>(this)->computeIsValidKeyPathComponent();
-    return Bits.AbstractStorageDecl.ValidKeyPathComponent;
-  }
+  bool isValidKeyPathComponent() const;
 
   /// True if the storage exports a property descriptor for key paths in
   /// other modules.
@@ -4828,14 +4804,6 @@ public:
   bool hasAnyNativeDynamicAccessors() const;
 
   bool hasAnyDynamicReplacementAccessors() const;
-
-  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
-    return OpaqueReturn;
-  }
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    assert(!OpaqueReturn && "already has opaque type decl");
-    OpaqueReturn = decl;
-  }
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) {
@@ -6022,8 +5990,6 @@ class FuncDecl : public AbstractFunctionDecl {
 
   TypeLoc FnRetType;
 
-  OpaqueTypeDecl *OpaqueReturn = nullptr;
-
 protected:
   FuncDecl(DeclKind Kind,
            SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
@@ -6172,15 +6138,7 @@ public:
   }
 
   OperatorDecl *getOperatorDecl() const;
-  
-  OpaqueTypeDecl *getOpaqueResultTypeDecl() const {
-    return OpaqueReturn;
-  }
-  void setOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
-    assert(!OpaqueReturn && "already has opaque type decl");
-    OpaqueReturn = decl;
-  }
-  
+
   /// Returns true if the function is forced to be statically dispatched.
   bool hasForcedStaticDispatch() const {
     return Bits.FuncDecl.ForcedStaticDispatch;

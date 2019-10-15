@@ -387,8 +387,7 @@ struct WhereClauseOwner {
   SourceLoc getLoc() const;
 
   friend hash_code hash_value(const WhereClauseOwner &owner) {
-    return hash_combine(hash_value(owner.dc),
-                        hash_value(owner.source.getOpaqueValue()));
+    return llvm::hash_combine(owner.dc, owner.source.getOpaqueValue());
   }
 
   friend bool operator==(const WhereClauseOwner &lhs,
@@ -1196,7 +1195,7 @@ public:
   void cacheResult(GenericSignature value) const;
 };
 
-/// Compute the interface type of the underlying definition type of a typealias declaration.
+/// Compute the underlying interface type of a typealias.
 class UnderlyingTypeRequest :
     public SimpleRequest<UnderlyingTypeRequest,
                          Type(TypeAliasDecl *),
@@ -1216,8 +1215,10 @@ public:
   bool isCached() const { return true; }
   Optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
+/// Looks up the precedence group of an operator declaration.
 class OperatorPrecedenceGroupRequest
     : public SimpleRequest<OperatorPrecedenceGroupRequest,
                            PrecedenceGroupDecl *(InfixOperatorDecl *),
@@ -1260,6 +1261,42 @@ public:
   bool isCached() const;
   Optional<bool> getCachedResult() const;
   void cacheResult(bool value) const;
+};
+
+class IsABICompatibleOverrideRequest
+    : public SimpleRequest<IsABICompatibleOverrideRequest, bool(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<bool> evaluate(Evaluator &evaluator, ValueDecl *decl) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+/// Builds an opaque result type for a declaration.
+class OpaqueResultTypeRequest
+    : public SimpleRequest<OpaqueResultTypeRequest,
+                           OpaqueTypeDecl *(ValueDecl *),
+                           CacheKind::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  llvm::Expected<OpaqueTypeDecl *>
+  evaluate(Evaluator &evaluator, ValueDecl *VD) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
 };
 
 // Allow AnyValue to compare two Type values, even though Type doesn't

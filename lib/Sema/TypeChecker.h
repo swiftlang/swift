@@ -2051,10 +2051,6 @@ public:
   /// Check if the given decl has a @_semantics attribute that gives it
   /// special case type-checking behavior.
   DeclTypeCheckingSemantics getDeclTypeCheckingSemantics(ValueDecl *decl);
-  
-  Type getOrCreateOpaqueResultType(TypeResolution resolution,
-                                   ValueDecl *originatingDecl,
-                                   OpaqueReturnTypeRepr *repr);
 
   /// SWIFT_ENABLE_TENSORFLOW
   // Returns the function declaration corresponding to the given function name

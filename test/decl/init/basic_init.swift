@@ -11,7 +11,6 @@ class C {
 }
 
 typealias t = t // expected-error {{type alias 't' references itself}}
-// expected-note@-1{{type declared here}}
 
 extension Foo {
   convenience init() {} // expected-error{{invalid redeclaration of synthesized 'init()'}}

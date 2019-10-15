@@ -3793,22 +3793,24 @@ static Type buildAddressorResultType(TypeChecker &TC,
 }
 
 
-static void validateResultType(TypeChecker &TC,
-                               ValueDecl *decl, ParameterList *params,
-                               TypeLoc &resultTyLoc,
-                               TypeResolution resolution) {
+static void validateResultType(ValueDecl *decl,
+                               TypeLoc &resultTyLoc) {
   // Nothing to do if there's no result type loc to set into.
   if (resultTyLoc.isNull())
     return;
 
   // Check the result type. It is allowed to be opaque.
-  if (auto opaqueTy =
-          dyn_cast_or_null<OpaqueReturnTypeRepr>(resultTyLoc.getTypeRepr())) {
-    // Create the decl and type for it.
+  if (decl->getOpaqueResultTypeRepr()) {
+    auto *opaqueDecl = decl->getOpaqueResultTypeDecl();
     resultTyLoc.setType(
-        TC.getOrCreateOpaqueResultType(resolution, decl, opaqueTy));
+        opaqueDecl
+        ? opaqueDecl->getDeclaredInterfaceType()
+        : ErrorType::get(decl->getASTContext()));
   } else {
-    TypeChecker::validateType(TC.Context, resultTyLoc, resolution,
+    auto *dc = decl->getInnermostDeclContext();
+    auto resolution = TypeResolution::forInterface(dc);
+    TypeChecker::validateType(dc->getASTContext(),
+                              resultTyLoc, resolution,
                               TypeResolverContext::FunctionResult);
   }
 }
@@ -3821,12 +3823,8 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   // Handling validation failure due to re-entrancy is left
   // up to the caller, who must call hasInterfaceType() to
   // check that validateDecl() returned a fully-formed decl.
-  if (D->hasValidationStarted()) {
-    // If this isn't reentrant (i.e. D has already been validated), the
-    // signature better be valid.
-    assert(D->isBeingValidated() || D->hasInterfaceType());
+  if (D->hasValidationStarted() || D->hasInterfaceType())
     return;
-  }
 
   // FIXME: It would be nicer if Sema would always synthesize fully-typechecked
   // declarations, but for now, you can make an imported type conform to a
@@ -3840,8 +3838,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   PrettyStackTraceDecl StackTrace("validating", D);
   FrontendStatsTracer StatsTracer(Context.Stats, "validate-decl", D);
 
-  if (hasEnabledForbiddenTypecheckPrefix())
-    checkForForbiddenPrefix(D);
+  checkForForbiddenPrefix(D);
 
   // Validate the context.
   auto dc = D->getDeclContext();
@@ -3869,7 +3866,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   // Validating the parent may have triggered validation of this declaration,
   // so just return if that was the case.
-  if (D->hasValidationStarted()) {
+  if (D->hasValidationStarted() || D->hasInterfaceType()) {
     assert(D->hasInterfaceType());
     return;
   }
@@ -3900,40 +3897,25 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
   case DeclKind::AssociatedType: {
     auto assocType = cast<AssociatedTypeDecl>(D);
-
-    DeclValidationRAII IBV(assocType);
-
-    // Finally, set the interface type.
-    if (!assocType->hasInterfaceType())
-      assocType->computeType();
-
+    assocType->computeType();
     break;
   }
 
   case DeclKind::TypeAlias: {
     auto typeAlias = cast<TypeAliasDecl>(D);
-
-    DeclValidationRAII IBV(typeAlias);
-
-    // Finally, set the interface type.
-    if (!typeAlias->hasInterfaceType())
-      typeAlias->computeType();
-    
+    typeAlias->computeType();
     break;
   }
       
-  case DeclKind::OpaqueType: {
-    auto opaque = cast<OpaqueTypeDecl>(D);
-    opaque->setValidationToChecked();
+  case DeclKind::OpaqueType:
     break;
-  }
 
   case DeclKind::Enum:
   case DeclKind::Struct:
-  case DeclKind::Class: {
+  case DeclKind::Class:
+  case DeclKind::Protocol: {
     auto nominal = cast<NominalTypeDecl>(D);
     nominal->computeType();
-    nominal->setValidationToChecked();
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
@@ -3951,28 +3933,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     break;
   }
 
-  case DeclKind::Protocol: {
-    auto proto = cast<ProtocolDecl>(D);
-    if (!proto->hasInterfaceType())
-      proto->computeType();
-    proto->setValidationToChecked();
-
-    break;
-  }
-
-  case DeclKind::Param: {
-    auto *PD = cast<ParamDecl>(D);
-    if (!PD->hasInterfaceType()) {
-      // Can't fallthough because parameter without a type doesn't have
-      // valid signature, but that shouldn't matter anyway.
-      return;
-    }
-
-    auto type = PD->getInterfaceType();
-    if (type->hasError())
-      PD->markInvalid();
-    break;
-  }
+  case DeclKind::Param:
+    // Can't fallthough because parameter without a type doesn't have
+    // valid signature, but that shouldn't matter anyway.
+    return;
 
   case DeclKind::Var: {
     auto *VD = cast<VarDecl>(D);
@@ -3982,11 +3946,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // have a PatternBindingDecl, for example the iterator in a
     // 'for ... in ...' loop.
     if (PBD == nullptr) {
-      if (!VD->hasInterfaceType()) {
-        VD->setValidationToChecked();
-        VD->markInvalid();
-      }
-
+      VD->markInvalid();
       break;
     }
 
@@ -3996,29 +3956,13 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     if (PBD->isBeingValidated())
       return;
 
-    if (!VD->hasInterfaceType()) {
-      // Attempt to infer the type using initializer expressions.
-      validatePatternBindingEntries(*this, PBD);
+    // Attempt to infer the type using initializer expressions.
+    validatePatternBindingEntries(*this, PBD);
 
-      auto parentPattern = VD->getParentPattern();
-      if (PBD->isInvalid() || !parentPattern->hasType()) {
-        parentPattern->setType(ErrorType::get(Context));
-        setBoundVarsTypeError(parentPattern, Context);
-      }
-
-      // Should have set a type above.
-      assert(VD->hasInterfaceType());
-    }
-
-    // We're not really done with processing the signature yet, but
-    // @objc checking requires the declaration to call itself validated
-    // so that it can be considered as a witness.
-    D->setValidationToChecked();
-
-    if (VD->getOpaqueResultTypeDecl()) {
-      if (auto SF = VD->getInnermostDeclContext()->getParentSourceFile()) {
-        SF->markDeclWithOpaqueResultTypeAsValidated(VD);
-      }
+    auto parentPattern = VD->getParentPattern();
+    if (PBD->isInvalid() || !parentPattern->hasType()) {
+      parentPattern->setType(ErrorType::get(Context));
+      setBoundVarsTypeError(parentPattern, Context);
     }
 
     break;
@@ -4027,7 +3971,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   case DeclKind::Func:
   case DeclKind::Accessor: {
     auto *FD = cast<FuncDecl>(D);
-    assert(!FD->hasInterfaceType());
 
     // Bail out if we're in a recursive validation situation.
     if (auto accessor = dyn_cast<AccessorDecl>(FD)) {
@@ -4130,12 +4073,10 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     
     // We want the function to be available for name lookup as soon
     // as it has a valid interface type.
-    auto resolution = TypeResolution::forInterface(FD,
-                                                   FD->getGenericSignature());
+    auto resolution = TypeResolution::forInterface(FD);
     typeCheckParameterList(FD->getParameters(), resolution,
                            TypeResolverContext::AbstractFunctionDecl);
-    validateResultType(*this, FD, FD->getParameters(),
-                       FD->getBodyResultTypeLoc(), resolution);
+    validateResultType(FD, FD->getBodyResultTypeLoc());
     // FIXME: Roll all of this interface type computation into a request.
     FD->computeType();
 
@@ -4165,13 +4106,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
         }
       }
     }
-
-    // Mark the opaque result type as validated, if there is one.
-    if (FD->getOpaqueResultTypeDecl()) {
-      if (auto sf = FD->getDeclContext()->getParentSourceFile()) {
-        sf->markDeclWithOpaqueResultTypeAsValidated(FD);
-      }
-    }
     
     break;
   }
@@ -4181,7 +4115,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(CD);
 
-    auto res = TypeResolution::forInterface(CD, CD->getGenericSignature());
+    auto res = TypeResolution::forInterface(CD);
     typeCheckParameterList(CD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     CD->computeType();
@@ -4193,7 +4127,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(DD);
 
-    auto res = TypeResolution::forInterface(DD, DD->getGenericSignature());
+    auto res = TypeResolution::forInterface(DD);
     typeCheckParameterList(DD->getParameters(), res,
                            TypeResolverContext::AbstractFunctionDecl);
     DD->computeType();
@@ -4205,18 +4139,11 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     DeclValidationRAII IBV(SD);
 
-    auto res = TypeResolution::forInterface(SD, SD->getGenericSignature());
+    auto res = TypeResolution::forInterface(SD);
     typeCheckParameterList(SD->getIndices(), res,
                            TypeResolverContext::SubscriptDecl);
-    validateResultType(*this, SD, SD->getIndices(),
-                       SD->getElementTypeLoc(), res);
+    validateResultType(SD, SD->getElementTypeLoc());
     SD->computeType();
-
-    if (SD->getOpaqueResultTypeDecl()) {
-      if (auto SF = SD->getInnermostDeclContext()->getParentSourceFile()) {
-        SF->markDeclWithOpaqueResultTypeAsValidated(SD);
-      }
-    }
 
     break;
   }
@@ -4228,22 +4155,12 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     DeclValidationRAII IBV(EED);
 
     if (auto *PL = EED->getParameterList()) {
-      typeCheckParameterList(PL,
-                             TypeResolution::forInterface(
-                                                    EED->getParentEnum(),
-                                                    ED->getGenericSignature()),
+      auto res = TypeResolution::forInterface(ED);
+      typeCheckParameterList(PL, res,
                              TypeResolverContext::EnumElementDecl);
     }
 
-    // Now that we have an argument type we can set the element's declared
-    // type.
     EED->computeType();
-
-    if (auto argTy = EED->getArgumentInterfaceType()) {
-      assert(argTy->isMaterializable());
-      (void) argTy;
-    }
-
     break;
   }
   }

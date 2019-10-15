@@ -119,10 +119,11 @@ IRGenMangler::withSymbolicReferences(IRGenModule &IGM,
         }
       }
 
-      // TODO: ObjectMemoryReader for ELF and PE platforms still does not
+      // TODO: ObjectMemoryReader for PE platforms still does not
       // implement symbol relocations. For now, on non-Mach-O platforms,
       // only symbolic reference things in the same module.
-      if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::MachO) {
+      if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::MachO
+          && IGM.TargetInfo.OutputObjectFormat != llvm::Triple::ELF) {
         auto formalAccessScope = type->getFormalAccessScope(nullptr, true);
         if ((formalAccessScope.isPublic() || formalAccessScope.isInternal()) &&
             (!IGM.CurSourceFile ||

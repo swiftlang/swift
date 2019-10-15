@@ -2416,6 +2416,13 @@ for host in "${ALL_HOSTS[@]}"; do
                     build_tests_this_time=${SWIFT_INCLUDE_TESTS}
                 fi
 
+                if [[ $(is_cross_tools_host ${host}) ]] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
+                    )
+                fi
+
                 # Command-line parameters override any autodetection that we
                 # might have done.
                 if [[ "${NATIVE_LLVM_TOOLS_PATH}" ]] ; then
@@ -2934,6 +2941,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     LIBDISPATCH_BUILD_ARGS=(
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_SOURCE=${LIBDISPATCH_SOURCE_DIR}
                       -DFOUNDATION_PATH_TO_LIBDISPATCH_BUILD=${LIBDISPATCH_BUILD_DIR}
+                      -Ddispatch_DIR=${LIBDISPATCH_BUILD_DIR}/cmake/modules
                     )
                 else
                     LIBDISPATCH_BUILD_ARGS=( -DFOUNDATION_ENABLE_LIBDISPATCH=NO )
