@@ -3054,7 +3054,7 @@ for host in "${ALL_HOSTS[@]}"; do
                 results_dir="${lldb_build_dir}/test-results"
 
                 call mkdir -p "${results_dir}"
-                LLVM_LIT_ARG="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
+                LLVM_LIT_ARGS="${LLVM_LIT_ARGS} --xunit-xml-output=${results_dir}/results.xml"
 
                 if [[ "${ENABLE_ASAN}" ]] ; then
                     # Limit the number of parallel tests
