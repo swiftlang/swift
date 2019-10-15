@@ -5611,28 +5611,29 @@ differentiable_function
                       sil-differentiable-function-derivative-functions-clause?
                       
   sil-differentiable-function-parameter-indices ::=
-      '[' 'wrt' [0-9]+ (' ' [0-9]+)* ']'
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
   sil-differentiable-derivative-functions-clause ::=
-      'with' '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
+      'with_derivative'
+      '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
 
-  differentiable_function [wrt 0] %0 : $(T) -> T \
-    with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
+  differentiable_function [parameters 0] %0 : $(T) -> T \
+    with_derivative {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
 
 Bundles a function with its derivative functions into a ``@differentiable``
 function. There are two derivative functions: a Jacobian-vector products (JVP)
 function and a vector-Jacobian products (VJP) function.
 
-``[wrt ...]`` specifies parameter indices that the original function is
+``[parameters ...]`` specifies parameter indices that the original function is
 differentiable with respect to. When not specified, it defaults to all
 parameters.
 
-A ``with`` clause specifies the differentiation functions associated
-with the original function. When a ``with`` clause is not specified, the first
-operand will be differentiated to produce derivative functions, and a ``with``
-clause will be added to the instruction.
+A ``with_derivative`` clause specifies the differentiation functions associated
+with the original function. When a ``with_derivative`` clause is not specified,
+the first operand will be differentiated to produce derivative functions, and a
+``with_derivative`` clause will be added to the instruction.
 
-In raw SIL, it is optional to provide a derivative function ``with`` clause.
-In canonical SIL, a ``with`` clause is mandatory.
+In raw SIL, it is optional to provide a derivative function ``with_derivative``
+clause. In canonical SIL, a ``with_derivative`` clause is mandatory.
 
 
 linear_function
