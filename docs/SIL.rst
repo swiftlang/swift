@@ -5700,7 +5700,7 @@ linear_function_extract
 
   sil-linear-function-extractee ::=
       '[' sil-linear-function-extractee ']'
-  sil-linear-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
+  sil-linear-function-extractee-name ::= 'original' | 'transpose'
 
   linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
   linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
