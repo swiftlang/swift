@@ -1694,7 +1694,7 @@ bool TempRValueOptPass::collectLoads(
                  "its source" << *user);
       return false;
     }
-    return true;
+    LLVM_FALLTHROUGH;
   }
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst: {
@@ -1713,7 +1713,8 @@ bool TempRValueOptPass::collectLoads(
   }
 
   case SILInstructionKind::LoadInst:
-  case SILInstructionKind::LoadBorrowInst: {
+  case SILInstructionKind::LoadBorrowInst:
+  case SILInstructionKind::WitnessMethodInst: {
     // Loads are the end of the data flow chain. The users of the load can't
     // access the temporary storage.
     loadInsts.insert(user);
