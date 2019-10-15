@@ -577,7 +577,6 @@ DerivedConformance::declareDerivedPropertySetter(VarDecl *property,
   setterDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   setterDecl->computeType();
   setterDecl->copyFormalAccessFrom(property);
-  setterDecl->setValidationToChecked();
 
   C.addSynthesizedDecl(setterDecl);
   return setterDecl;

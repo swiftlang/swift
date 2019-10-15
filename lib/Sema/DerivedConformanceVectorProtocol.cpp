@@ -231,7 +231,6 @@ static ValueDecl *deriveVectorProtocol_method(
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  funcDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({funcDecl});
   C.addSynthesizedDecl(funcDecl);

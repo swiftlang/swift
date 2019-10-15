@@ -4130,18 +4130,6 @@ void TypeChecker::validateDecl(ValueDecl *D) {
     // TODO(TF-789): Figure out the proper way to typecheck these.
     checkDeclDifferentiableAttributes(FD);
 
-    // Member functions need some special validation logic.
-    if (FD->getDeclContext()->isTypeContext()) {
-      if (FD->isOperator() && !isMemberOperator(FD, nullptr)) {
-        auto selfNominal = FD->getDeclContext()->getSelfNominalTypeDecl();
-        auto isProtocol = selfNominal && isa<ProtocolDecl>(selfNominal);
-        // We did not find 'Self'. Complain.
-        diagnose(FD, diag::operator_in_unrelated_type,
-                 FD->getDeclContext()->getDeclaredInterfaceType(), isProtocol,
-                 FD->getFullName());
-      }
-    }
-
     // If the function is exported to C, it must be representable in (Obj-)C.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
       Optional<ForeignErrorConvention> errorConvention;
