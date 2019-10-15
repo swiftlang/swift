@@ -955,14 +955,15 @@ namespace {
         SILBuilder &B, SILLocation loc, SILValue tupleValue,
         LinearDifferentiableFunctionTypeComponent component,
         const TypeLowering &eltLowering) const {
-      // TODO: Handle this once `linear_function_extract` instruction exists.
-      llvm_unreachable("Unhandled");
+      return B.createLinearFunctionExtract(loc, component, tupleValue);
     }
 
     SILValue rebuildAggregate(SILBuilder &B, SILLocation loc,
                               ArrayRef<SILValue> values) const override {
-      // TODO: Handle this once `linear_function` instruction exists.
-      llvm_unreachable("Unhandled");
+      assert(values.size() == 3);
+      auto fnTy = getLoweredType().castTo<SILFunctionType>();
+      auto paramIndices = fnTy->getDifferentiationParameterIndices();
+      return B.createLinearFunction(loc, paramIndices, values[0], values[1]);
     }
 
     void lowerChildren(TypeConverter &TC,

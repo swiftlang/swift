@@ -166,6 +166,7 @@ CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, StructExtract)
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, TupleExtract)
 // SWIFT_ENABLE_TENSORFLOW
 CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, DifferentiableFunctionExtract)
+CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Guaranteed, LinearFunctionExtract)
 // OpenExistentialValue opens the boxed value inside an existential
 // CoW box. The semantics of an existential CoW box implies that we
 // can only consume the projected value inside the box if the box is
@@ -257,6 +258,7 @@ FORWARDING_OWNERSHIP_INST(SelectEnum)
 FORWARDING_OWNERSHIP_INST(Enum)
 // SWIFT_ENABLE_TENSORFLOW
 FORWARDING_OWNERSHIP_INST(DifferentiableFunction)
+FORWARDING_OWNERSHIP_INST(LinearFunction)
 #undef FORWARDING_OWNERSHIP_INST
 
 ValueOwnershipKind

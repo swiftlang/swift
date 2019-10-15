@@ -39,10 +39,10 @@ class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
-enum class DifferentiabilityKind : uint8_t {
-  NonDifferentiable = 0b00,
-  Normal = 0b01,
-  Linear = 0b11
+enum class DifferentiabilityKind: uint8_t {
+  NonDifferentiable = 0,
+  Normal = 1,
+  Linear = 2
 };
 
 // TODO(TF-904): Replace `DifferentiableFunctionExtractInst::Extractee`.
@@ -52,9 +52,19 @@ enum class NormalDifferentiableFunctionTypeComponent : uint8_t {
   VJP = 2
 };
 
-enum class LinearDifferentiableFunctionTypeComponent : uint8_t {
-  Original = 0,
-  Transpose = 1
+struct LinearDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    Transpose = 1,
+  } rawValue;
+
+  LinearDifferentiableFunctionTypeComponent() = default;
+  LinearDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(unsigned rawValue) :
+      LinearDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit LinearDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
 };
 
 class ParsedAutoDiffParameter {

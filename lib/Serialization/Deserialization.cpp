@@ -4428,8 +4428,8 @@ getActualSILParameterDifferentiability(uint8_t raw) {
     return swift::SILParameterDifferentiability::ID;
   CASE(DifferentiableOrNotApplicable)
   CASE(NotDifferentiable)
-  }
 #undef CASE
+  }
   return None;
 }
 

@@ -32,6 +32,16 @@ AutoDiffDerivativeFunctionKind(StringRef string) {
   rawValue = *result;
 }
 
+LinearDifferentiableFunctionTypeComponent::
+LinearDifferentiableFunctionTypeComponent(StringRef string) {
+  Optional<innerty> result =
+      llvm::StringSwitch<Optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("transpose", Transpose);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
 // TODO(TF-874): This helper is inefficient and should be removed. Unwrapping at
 // most once (for curried method types) is sufficient.
 static void unwrapCurryLevels(AnyFunctionType *fnTy,

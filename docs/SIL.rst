@@ -5607,18 +5607,13 @@ differentiable_function
 
   sil-instruction ::= 'differentiable_function'
                       sil-differentiable-function-parameter-indices?
-                      sil-differentiable-function-order?
                       sil-value ':' sil-type
                       sil-differentiable-function-derivative-functions-clause?
                       
   sil-differentiable-function-parameter-indices ::=
-      '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
-  sil-differentiable-function-order ::= '[' 'order' [0-9]+ ']'
+      '[' 'wrt' [0-9]+ (' ' [0-9]+)* ']'
   sil-differentiable-derivative-functions-clause ::=
-      'with' sil-differentiable-derivative-function-list
-      (',' sil-differentiable-derivative-function-list)*
-  sil-differentiable-function-derivative-function-list ::=
-      '{' sil-value ',' sil-value '}'
+      'with' '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
 
   differentiable_function [wrt 0] %0 : $(T) -> T \
     with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
@@ -5640,6 +5635,38 @@ In raw SIL, it is optional to provide a derivative function ``with`` clause.
 In canonical SIL, a ``with`` clause is mandatory.
 
 
+linear_function
+```````````````
+
+::
+
+  sil-instruction ::= 'linear_function'
+                      sil-linear-function-parameter-indices?
+                      sil-value ':' sil-type
+                      sil-linear-function-transpose-function-clause?
+
+  sil-linear-function-parameter-indices ::=
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
+  sil-linear-transpose-function-clause ::=
+      with_transpose sil-value ':' sil-type
+
+  linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
+
+Bundles a function with its transpose function into a
+``@differentiable(linear)`` function.
+
+``[parameters ...]`` specifies parameter indices that the original function is
+linear with respect to. When not specified, it defaults to all parameters.
+
+A ``with_transpose`` clause specifies the transpose function associated
+with the original function. When a ``with_transpose`` clause is not specified,
+the mandatory differentiation transform  will add a ``with_transpose`` clause to
+the instruction.
+
+In raw SIL, it is optional to provide a transpose function ``with`` clause.
+In canonical SIL, a ``with`` clause is mandatory.
+
+
 differentiable_function_extract
 ```````````````````````````````
 
@@ -5647,13 +5674,11 @@ differentiable_function_extract
 
   sil-instruction ::= 'differentiable_function_extract'
                       sil-differentiable-function-extractee
-                      sil-differentiable-function-order?
                       sil-value ':' sil-type
 
   sil-differentiable-function-extractee ::=
       '[' sil-differentiable-function-extractee ']'
   sil-differentiable-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
-  sil-differentiable-function-differentiation-order ::= '[' 'order' [0-9]+ ']'
 
   differentiable_function_extract [original] %0 : $@differentiable (T) -> T
   differentiable_function_extract [jvp] %0 : $@differentiable (T) -> T
@@ -5662,6 +5687,27 @@ differentiable_function_extract
 Extracts the original function or a derivative function from the given
 ``@differentiable`` function. It must be provided with an extractee:
 ``[original]``, ``[jvp]`` or ``[vjp]``.
+
+
+linear_function_extract
+```````````````````````
+
+::
+
+  sil-instruction ::= 'linear_function_extract'
+                      sil-linear-function-extractee
+                      sil-value ':' sil-type
+
+  sil-linear-function-extractee ::=
+      '[' sil-linear-function-extractee ']'
+  sil-linear-function-extractee-name ::= 'original' | 'jvp' | 'vjp'
+
+  linear_function_extract [original] %0 : $@differentiable(linear) (T) -> T
+  linear_function_extract [transpose] %0 : $@differentiable(linear) (T) -> T
+
+Extracts the original function or a transpose function from the given
+``@differentiable(linear)`` function. It must be provided with an extractee:
+``[original]`` or ``[transpose]``.
 
 
 Assertion configuration

@@ -981,11 +981,33 @@ void SILCloner<ImplClass>::visitDifferentiableFunctionInst(
 }
 
 template<typename ImplClass>
+void SILCloner<ImplClass>::visitLinearFunctionInst(LinearFunctionInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto transpose = Inst->getOptionalTransposeFunction();
+  if (transpose)
+    transpose = getOpValue(*transpose);
+  recordClonedInstruction(
+      Inst, getBuilder().createLinearFunction(
+                getOpLocation(Inst->getLoc()), Inst->getParameterIndices(),
+                getOpValue(Inst->getOriginalFunction()), transpose));
+}
+
+template<typename ImplClass>
 void SILCloner<ImplClass>::
 visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
       Inst, getBuilder().createDifferentiableFunctionExtract(
+                getOpLocation(Inst->getLoc()), Inst->getExtractee(),
+                getOpValue(Inst->getFunctionOperand())));
+}
+
+template<typename ImplClass>
+void SILCloner<ImplClass>::
+visitLinearFunctionExtractInst(LinearFunctionExtractInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createLinearFunctionExtract(
                 getOpLocation(Inst->getLoc()), Inst->getExtractee(),
                 getOpValue(Inst->getFunctionOperand())));
 }

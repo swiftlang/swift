@@ -14,7 +14,7 @@ bb0(%0 : $@differentiable(linear) (Float) -> Float):
   return %0 : $@differentiable(linear) (Float) -> Float
 }
 
-// CHECK-LABEL: sil @takeAndReturnLinear : $@convention(thin) (@differentiable(linear) (Float) -> Float) -> @differentiable(linear) (Float) -> Float {
+// CHECK-SIL-LABEL: sil @takeAndReturnLinear : $@convention(thin) (@differentiable(linear) (Float) -> Float) -> @differentiable(linear) (Float) -> Float {
 // CHECK-SIL: bb0([[ARG:%.*]] : $@differentiable(linear) (Float) -> Float):
 // CHECK-SIL:   return [[ARG]] : $@differentiable(linear) (Float) -> Float
 // CHECK-SIL: }
@@ -34,7 +34,7 @@ bb0(%0 : $@differentiable (Float) -> Float):
   return %0 : $@differentiable (Float) -> Float
 }
 
-// CHECK-LABEL: sil @takeAndReturnDifferentiable : $@convention(thin) (@differentiable (Float) -> Float) -> @differentiable (Float) -> Float {
+// CHECK-SIL-LABEL: sil @takeAndReturnDifferentiable : $@convention(thin) (@differentiable (Float) -> Float) -> @differentiable (Float) -> Float {
 // CHECK-SIL: bb0([[ARG:%.*]] : $@differentiable (Float) -> Float):
 // CHECK-SIL:   return [[ARG]] : $@differentiable (Float) -> Float
 // CHECK-SIL: }
@@ -73,3 +73,4 @@ bb0(%0 : $@differentiable (Float) -> Float):
 // CHECK-LLVM:   store %swift.refcounted* %7, %swift.refcounted** %.vjp3.data, align 8
 // CHECK-LLVM:   ret void
 // CHECK-LLVM: }
+

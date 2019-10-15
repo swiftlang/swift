@@ -7845,7 +7845,7 @@ class TryApplyInst final
 };
 
 // SWIFT_ENABLE_TENSORFLOW
-/// `differentiable_function` - given a function and differentiation indices and
+/// `differentiable_function` - given a function, differentiation indices and
 /// its derivative functions, create an `@differentiable` function that
 /// represents a bundle of these functions and configurations.
 class DifferentiableFunctionInst final :
@@ -7865,14 +7865,14 @@ private:
       bool HasOwnership);
 
   static SILType getDifferentiableFunctionType(
-      SILValue Original, IndexSubset *ParameterIndices);
+      SILValue OriginalFunction, IndexSubset *ParameterIndices);
 
   static ValueOwnershipKind getMergedOwnershipKind(
-      SILValue Original, ArrayRef<SILValue> DerivativeFunctions);
+      SILValue OriginalFunction, ArrayRef<SILValue> DerivativeFunctions);
 
 public:
   static DifferentiableFunctionInst *create(
-      SILModule &Module, SILDebugLocation DebugLoc,
+      SILModule &Module, SILDebugLocation Loc,
       IndexSubset *ParameterIndices, SILValue OriginalFunction,
       Optional<std::pair<SILValue, SILValue>> VJPAndJVPFunctions,
       bool HasOwnership);
@@ -7917,6 +7917,46 @@ public:
     case AutoDiffDerivativeFunctionKind::JVP: return getJVPFunction();
     case AutoDiffDerivativeFunctionKind::VJP: return getVJPFunction();
     }
+  }
+};
+
+/// `linear_function` - given a function, differentiation parameter indices,
+/// result indices, and its derivative functions, create an `@differentiable`
+/// function that represents a bundle of these functions and configurations.
+class LinearFunctionInst final :
+    public InstructionBaseWithTrailingOperands<
+               SILInstructionKind::LinearFunctionInst,
+               LinearFunctionInst, OwnershipForwardingSingleValueInst> {
+private:
+  friend SILBuilder;
+  /// Parameters to differentiate with respect to.
+  IndexSubset *ParameterIndices;
+  /// Indicates whether a transpose function exists.
+  bool HasTransposeFunction;
+
+  static SILType getLinearFunctionType(
+      SILValue OriginalFunction, IndexSubset *ParameterIndices);
+
+public:
+  LinearFunctionInst(SILDebugLocation Loc, IndexSubset *ParameterIndices,
+                     SILValue OriginalFunction,
+                     Optional<SILValue> TransposeFunction, bool HasOwnership);
+
+  static LinearFunctionInst *create(SILModule &Module, SILDebugLocation Loc,
+                                    IndexSubset *ParameterIndices,
+                                    SILValue OriginalFunction,
+                                    Optional<SILValue> TransposeFunction,
+                                    bool HasOwnership);
+
+  IndexSubset *getParameterIndices() const { return ParameterIndices; }
+  bool hasTransposeFunction() const { return HasTransposeFunction; }
+  SILValue getOriginalFunction() const { return getOperand(0); }
+  Optional<SILValue> getOptionalTransposeFunction() const {
+    return HasTransposeFunction ? Optional<SILValue>(getOperand(1)) : None;
+  }
+  SILValue getTransposeFunction() const {
+    assert(HasTransposeFunction);
+    return getOperand(1);
   }
 };
 
@@ -7974,6 +8014,41 @@ public:
 
 typedef DifferentiableFunctionExtractInst::Extractee
     DifferentiableFunctionExtractee;
+
+/// `linear_function_extract` - given an `@differentiable(linear)` function
+/// representing a bundle of the original function and the transpose function,
+/// extract the specified function.
+class LinearFunctionExtractInst
+    : public InstructionBase<
+          SILInstructionKind::LinearFunctionExtractInst,
+          SingleValueInstruction> {
+private:
+  /// The extractee.
+  LinearDifferentiableFunctionTypeComponent extractee;
+  /// The list containing the `@differentiable(linear)` function operand.
+  FixedOperandList<1> operands;
+
+  static SILType
+  getExtracteeType(SILValue function,
+                   LinearDifferentiableFunctionTypeComponent extractee,
+                   SILModule &module);
+
+public:
+  explicit LinearFunctionExtractInst(
+      SILModule &module, SILDebugLocation debugLoc,
+      LinearDifferentiableFunctionTypeComponent extractee,
+      SILValue theFunction);
+
+  LinearDifferentiableFunctionTypeComponent getExtractee() const {
+    return extractee;
+  }
+
+  SILValue getFunctionOperand() const { return operands[0].get(); }
+  ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
+  MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
+};
+
+typedef LinearDifferentiableFunctionTypeComponent LinearFunctionExtractee;
 // SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on

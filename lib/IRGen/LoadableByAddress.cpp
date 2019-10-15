@@ -2742,9 +2742,22 @@ bool LoadableByAddress::recreateConvInstr(SILInstruction &I,
         instr->getOptionalDerivativeFunctionPair());
     break;
   }
+  case SILInstructionKind::LinearFunctionInst: {
+    auto instr = cast<LinearFunctionInst>(convInstr);
+    newInstr = convBuilder.createLinearFunction(
+        instr->getLoc(), instr->getParameterIndices(),
+        instr->getOriginalFunction(), instr->getOptionalTransposeFunction());
+    break;
+  }
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     auto instr = cast<DifferentiableFunctionExtractInst>(convInstr);
     newInstr = convBuilder.createDifferentiableFunctionExtract(
+        instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
+    break;
+  }
+  case SILInstructionKind::LinearFunctionExtractInst: {
+    auto instr = cast<LinearFunctionExtractInst>(convInstr);
+    newInstr = convBuilder.createLinearFunctionExtract(
         instr->getLoc(), instr->getExtractee(), instr->getFunctionOperand());
     break;
   }
@@ -2840,6 +2853,8 @@ void LoadableByAddress::run() {
               case SILInstructionKind::ThinToThickFunctionInst:
               // SWIFT_ENABLE_TENSORFLOW
               case SILInstructionKind::DifferentiableFunctionInst:
+              case SILInstructionKind::LinearFunctionInst:
+              case SILInstructionKind::LinearFunctionExtractInst:
               case SILInstructionKind::DifferentiableFunctionExtractInst: {
               // SWIFT_ENABLE_TENSORFLOW END
                 conversionInstrs.insert(
@@ -2908,11 +2923,11 @@ void LoadableByAddress::run() {
           if (modApplies.count(PAI) == 0) {
             modApplies.insert(PAI);
           }
-        } else if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(&I)) {
-          conversionInstrs.insert(DFI);
-        } else if (auto *DFEI =
-                       dyn_cast<DifferentiableFunctionExtractInst>(&I)) {
-          conversionInstrs.insert(DFEI);
+        } else if (isa<DifferentiableFunctionInst>(&I) ||
+                   isa<LinearFunctionInst>(&I) ||
+                   isa<DifferentiableFunctionExtractInst>(&I) ||
+                   isa<LinearFunctionExtractInst>(&I)) {
+          conversionInstrs.insert(cast<SingleValueInstruction>(&I));
         }
       }
     }

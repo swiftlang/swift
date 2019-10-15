@@ -1176,6 +1176,20 @@ public:
     }
   }
 
+  void visitLinearFunctionInst(LinearFunctionInst *lfi) {
+    if (!lfi->getParameterIndices()->isEmpty()) {
+      *this << "[parameters";
+      for (auto i : lfi->getParameterIndices()->getIndices())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    *this << getIDAndType(lfi->getOriginalFunction());
+    if (lfi->hasTransposeFunction()) {
+      *this << " with_transpose ";
+      *this << getIDAndType(lfi->getTransposeFunction());
+    }
+  }
+
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     *this << '[';
@@ -1192,6 +1206,20 @@ public:
     }
     *this << "] ";
     *this << getIDAndType(dfei->getFunctionOperand());
+  }
+
+  void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    *this << '[';
+    switch (lfei->getExtractee()) {
+    case LinearFunctionExtractee::Original:
+      *this << "original";
+      break;
+    case LinearFunctionExtractee::Transpose:
+      *this << "transpose";
+      break;
+    }
+    *this << "] ";
+    *this << getIDAndType(lfei->getFunctionOperand());
   }
 
   void visitFunctionRefInst(FunctionRefInst *FRI) {
