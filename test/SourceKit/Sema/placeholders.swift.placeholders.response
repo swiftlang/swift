@@ -16,6 +16,14 @@
   },
   {
     key.line: 4,
+    key.column: 7,
+    key.filepath: placeholders.swift,
+    key.severity: source.diagnostic.severity.error,
+    key.description: "variable '<#name#>' is not bound by any pattern",
+    key.diagnostic_stage: source.diagnostic.stage.swift.sema
+  },
+  {
+    key.line: 4,
     key.column: 19,
     key.filepath: placeholders.swift,
     key.severity: source.diagnostic.severity.error,

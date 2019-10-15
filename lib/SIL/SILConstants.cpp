@@ -126,6 +126,29 @@ void SymbolicValue::print(llvm::raw_ostream &os, unsigned indent) const {
   case RK_Array: {
     os << getArrayType() << ": \n";
     getStorageOfArray().print(os, indent);
+    return;
+  }
+  case RK_Closure: {
+    SymbolicClosure *clo = getClosure();
+    SILFunction *target = clo->getTarget();
+    std::string targetName = target->getName();
+    os << "closure: target: " << targetName;
+    ArrayRef<SymbolicClosureArgument> args = clo->getCaptures();
+    os << " captures [\n";
+    for (SymbolicClosureArgument closureArg : args) {
+      os.indent(indent + 2) << closureArg.first << "\n";
+    }
+    os.indent(indent) << "] values: [\n";
+    for (SymbolicClosureArgument closureArg : args) {
+      Optional<SymbolicValue> value = closureArg.second;
+      if (!value.hasValue()) {
+        os.indent(indent + 2) << "nil\n";
+        continue;
+      }
+      value->print(os, indent + 2);
+    }
+    os.indent(indent) << "]\n";
+    return;
   }
   }
 }
@@ -162,6 +185,8 @@ SymbolicValue::Kind SymbolicValue::getKind() const {
     return ArrayStorage;
   case RK_Array:
     return Array;
+  case RK_Closure:
+    return Closure;
   }
   llvm_unreachable("covered switch");
 }
@@ -218,6 +243,11 @@ SymbolicValue::cloneInto(SymbolicValueAllocator &allocator) const {
   case RK_Array: {
     SymbolicValue clonedStorage = getStorageOfArray().cloneInto(allocator);
     return getArray(getArrayType(), clonedStorage, allocator);
+  }
+  case RK_Closure: {
+    SymbolicClosure *clo = getClosure();
+    ArrayRef<SymbolicClosureArgument> closureArgs = clo->getCaptures();
+    return SymbolicValue::makeClosure(clo->getTarget(), closureArgs, allocator);
   }
   }
   llvm_unreachable("covered switch");
@@ -659,6 +689,44 @@ SymbolicValue SymbolicValue::getStorageOfArray() const {
 Type SymbolicValue::getArrayType() const {
   assert(getKind() == Array);
   return value.array->getType();
+}
+
+//===----------------------------------------------------------------------===//
+// Symbolic Closure
+//===----------------------------------------------------------------------===//
+
+SymbolicValue SymbolicValue::makeClosure(SILFunction *target,
+                                         ArrayRef<SymbolicClosureArgument> args,
+                                         SymbolicValueAllocator &allocator) {
+  auto clo = SymbolicClosure::create(target, args, allocator);
+  SymbolicValue result;
+  result.representationKind = RK_Closure;
+  result.value.closure = clo;
+  return result;
+}
+
+SymbolicClosure *SymbolicClosure::create(SILFunction *target,
+                                         ArrayRef<SymbolicClosureArgument> args,
+                                         SymbolicValueAllocator &allocator) {
+  // Determine whether there are captured arguments without a symbolic value.
+  bool hasNonConstantCapture = false;
+  for (SymbolicClosureArgument closureArg : args) {
+    if (!closureArg.second) {
+      hasNonConstantCapture = true;
+      break;
+    }
+  }
+
+  auto byteSizeOfArgs =
+      SymbolicClosure::totalSizeToAlloc<SymbolicClosureArgument>(args.size());
+  auto rawMem = allocator.allocate(byteSizeOfArgs, alignof(SymbolicClosure));
+  //  Placement initialize the object.
+  auto closure = ::new (rawMem)
+      SymbolicClosure(target, args.size(), hasNonConstantCapture);
+  std::uninitialized_copy(
+      args.begin(), args.end(),
+      closure->getTrailingObjects<SymbolicClosureArgument>());
+  return closure;
 }
 
 //===----------------------------------------------------------------------===//

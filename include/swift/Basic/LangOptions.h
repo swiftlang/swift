@@ -202,9 +202,6 @@ namespace swift {
     /// before termination of the shrink phrase of the constraint solver.
     unsigned SolverShrinkUnsolvedThreshold = 10;
 
-    /// Enable one-way constraints in function builders.
-    bool FunctionBuilderOneWayConstraints = true;
-
     /// Disable the shrink phase of the expression type checker.
     bool SolverDisableShrink = false;
 

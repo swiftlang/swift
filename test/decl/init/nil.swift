@@ -10,8 +10,6 @@ var b: () -> Void = nil
 
 var c, d: Int = nil
 // expected-error@-1 {{type annotation missing in pattern}}
-// expected-error@-2 {{'nil' cannot initialize specified type 'Int'}}
-// expected-note@-3 {{add '?' to form the optional type 'Int?'}} {{14-14=?}}
 
 var (e, f): (Int, Int) = nil
 // expected-error@-1 {{'nil' cannot initialize specified type '(Int, Int)'}}

@@ -472,8 +472,8 @@ protected:
       : ConstraintFix(cs, FixKind::ContextualMismatch, locator), LHS(lhs),
         RHS(rhs) {}
   ContextualMismatch(ConstraintSystem &cs, FixKind kind, Type lhs, Type rhs,
-                     ConstraintLocator *locator)
-      : ConstraintFix(cs, kind, locator), LHS(lhs), RHS(rhs) {}
+                     ConstraintLocator *locator, bool warning = false)
+      : ConstraintFix(cs, kind, locator, warning), LHS(lhs), RHS(rhs) {}
 
 public:
   std::string getName() const override { return "fix contextual mismatch"; }
@@ -1332,8 +1332,9 @@ protected:
                               paramType, locator) {}
 
   AllowArgumentMismatch(ConstraintSystem &cs, FixKind kind, Type argType,
-                        Type paramType, ConstraintLocator *locator)
-      : ContextualMismatch(cs, kind, argType, paramType, locator) {}
+                        Type paramType, ConstraintLocator *locator,
+                        bool warning = false)
+      : ContextualMismatch(cs, kind, argType, paramType, locator, warning) {}
 
 public:
   std::string getName() const override {

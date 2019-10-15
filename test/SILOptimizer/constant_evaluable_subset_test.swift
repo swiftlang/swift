@@ -784,3 +784,52 @@ func testArrayAppendNonEmpty(_ x: String) -> [String] {
 func interpretArrayAppendNonEmpty() -> [String] {
   return testArrayAppendNonEmpty("mkdir")
 }
+
+// CHECK-LABEL: @testClosureInit
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureInit(_ x: Int) -> () -> Int {
+  return { x }
+}
+
+@_semantics("test_driver")
+func interpretClosureCreation() -> () -> Int {
+  return testClosureInit(19)
+}
+
+// CHECK-LABEL: @testClosureChaining
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureChaining(_ x: Int, _ y: Int) -> () -> Int {
+  let clo: (Int) -> Int = { $0 + x }
+  return { clo(y) }
+}
+
+@_semantics("test_driver")
+func interpretClosureChains() -> () -> Int {
+  return testClosureChaining(191, 201)
+}
+
+// CHECK-LABEL: @testClosureWithNonConstantCaptures
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testClosureWithNonConstantCaptures(_ x: @escaping () -> Int) -> () -> Int {
+  return x
+}
+
+@_semantics("test_driver")
+func interpretClosureWithNonConstantCaptures(_ x: Int) -> () -> Int {
+  return testClosureWithNonConstantCaptures({ x })
+}
+
+// CHECK-LABEL: @testAutoClosure
+// CHECK-NOT: error:
+@_semantics("constant_evaluable")
+func testAutoClosure(_ x: @escaping @autoclosure () -> Int) -> () -> Int {
+  return x
+}
+
+@_semantics("test_driver")
+func interpretAutoClosure(_ x: Int) -> () -> Int {
+  return testAutoClosure(x)
+}

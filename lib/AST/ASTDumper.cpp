@@ -725,7 +725,7 @@ namespace {
 
       if (auto *var = dyn_cast<VarDecl>(VD)) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
-        if (var->hasType())
+        if (auto varTy = var->hasInterfaceType())
           var->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         else
           PrintWithColorRAII(OS, TypeColor) << "<null type>";
@@ -954,13 +954,11 @@ namespace {
         PrintWithColorRAII(OS, IdentifierColor)
           << " apiName=" << P->getArgumentName();
 
-      if (P->hasType()) {
+      if (P->hasInterfaceType()) {
         PrintWithColorRAII(OS, TypeColor) << " type='";
         P->getType().print(PrintWithColorRAII(OS, TypeColor).getOS());
         PrintWithColorRAII(OS, TypeColor) << "'";
-      }
 
-      if (P->hasInterfaceType()) {
         PrintWithColorRAII(OS, InterfaceTypeColor) << " interface type='";
         P->getInterfaceType().print(
             PrintWithColorRAII(OS, InterfaceTypeColor).getOS());
@@ -2956,13 +2954,6 @@ public:
       printRec(elem.Type);
     }
     PrintWithColorRAII(OS, ParenthesisColor) << ')';
-  }
-
-  void visitImplicitlyUnwrappedOptionalTypeRepr(
-      ImplicitlyUnwrappedOptionalTypeRepr *T) {
-    printCommon("implicitly_unwrapped_optional");
-    OS << "\n";
-    printRec(T->getBase());
   }
 
   void visitCompositionTypeRepr(CompositionTypeRepr *T) {

@@ -94,6 +94,54 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
   }
 }
 
+unsigned LocatorPathElt::getNewSummaryFlags() const {
+  switch (getKind()) {
+  case ConstraintLocator::ApplyArgument:
+  case ConstraintLocator::ApplyFunction:
+  case ConstraintLocator::ApplyArgToParam:
+  case ConstraintLocator::SequenceElementType:
+  case ConstraintLocator::ClosureResult:
+  case ConstraintLocator::ConstructorMember:
+  case ConstraintLocator::InstanceType:
+  case ConstraintLocator::AutoclosureResult:
+  case ConstraintLocator::OptionalPayload:
+  case ConstraintLocator::Member:
+  case ConstraintLocator::MemberRefBase:
+  case ConstraintLocator::UnresolvedMember:
+  case ConstraintLocator::ParentType:
+  case ConstraintLocator::ExistentialSuperclassType:
+  case ConstraintLocator::LValueConversion:
+  case ConstraintLocator::RValueAdjustment:
+  case ConstraintLocator::SubscriptMember:
+  case ConstraintLocator::OpenedGeneric:
+  case ConstraintLocator::GenericParameter:
+  case ConstraintLocator::GenericArgument:
+  case ConstraintLocator::NamedTupleElement:
+  case ConstraintLocator::TupleElement:
+  case ConstraintLocator::ProtocolRequirement:
+  case ConstraintLocator::Witness:
+  case ConstraintLocator::KeyPathComponent:
+  case ConstraintLocator::ConditionalRequirement:
+  case ConstraintLocator::TypeParameterRequirement:
+  case ConstraintLocator::ImplicitlyUnwrappedDisjunctionChoice:
+  case ConstraintLocator::DynamicLookupResult:
+  case ConstraintLocator::ContextualType:
+  case ConstraintLocator::SynthesizedArgument:
+  case ConstraintLocator::KeyPathDynamicMember:
+  case ConstraintLocator::KeyPathType:
+  case ConstraintLocator::KeyPathRoot:
+  case ConstraintLocator::KeyPathValue:
+  case ConstraintLocator::KeyPathComponentResult:
+    return 0;
+
+  case ConstraintLocator::FunctionArgument:
+  case ConstraintLocator::FunctionResult:
+    return IsFunctionConversion;
+  }
+
+  llvm_unreachable("Unhandled PathElementKind in switch.");
+}
+
 bool LocatorPathElt::isResultOfSingleExprFunction() const {
   if (auto elt = getAs<ContextualType>())
     return elt->isForSingleExprFunction();

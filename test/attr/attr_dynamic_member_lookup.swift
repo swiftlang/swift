@@ -603,7 +603,8 @@ func keypath_with_incorrect_return_type(_ arr: Lens<Array<Int>>) {
     // expected-error@-1 {{operator function '..<' requires that 'Lens<Int>' conform to 'Strideable'}}
     // expected-error@-2 {{operator function '..<' requires that 'Lens<Int>.Stride' conform to 'SignedInteger'}}
     // expected-error@-3 {{cannot convert value of type 'Int' to expected argument type 'Lens<Int>'}}
-    // expected-error@-4 {{argument type 'Lens<Int>' does not conform to expected type 'Comparable'}}
+    // expected-error@-4 {{referencing operator function '..<' on 'Comparable' requires that 'Lens<Int>' conform to 'Comparable'}}
+    // expected-error@-5 {{variable 'idx' is not bound by any pattern}}
     let _ = arr[idx]
   }
 }

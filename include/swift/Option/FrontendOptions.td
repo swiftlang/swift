@@ -41,6 +41,9 @@ def emit_module_doc_path
 def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
   HelpText<"Output module source info file">;
 
+def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
+  HelpText<"Avoid getting source location from .swiftsourceinfo files">;
+
 def merge_modules
   : Flag<["-"], "merge-modules">, ModeOpt,
     HelpText<"Merge the input modules without otherwise processing them">;
@@ -413,14 +416,6 @@ def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;
 
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
-
-def enable_function_builder_one_way_constraints : Flag<["-"],
-  "enable-function-builder-one-way-constraints">,
-  HelpText<"Enable one-way constraints in the function builder transformation">;
-
-def disable_function_builder_one_way_constraints : Flag<["-"],
-  "disable-function-builder-one-way-constraints">,
-  HelpText<"Disable one-way constraints in the function builder transformation">;
 
 def solver_disable_shrink :
   Flag<["-"], "solver-disable-shrink">,

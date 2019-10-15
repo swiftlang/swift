@@ -420,7 +420,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   }
 }
 
-void SILGenFunction::emitProlog(const CaptureInfo &captureInfo,
+void SILGenFunction::emitProlog(CaptureInfo captureInfo,
                                 ParameterList *paramList,
                                 ParamDecl *selfParam,
                                 DeclContext *DC,

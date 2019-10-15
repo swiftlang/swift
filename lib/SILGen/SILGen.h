@@ -444,7 +444,7 @@ public:
   /// Emit a `mark_function_escape` instruction for top-level code when a
   /// function or closure at top level refers to script globals.
   void emitMarkFunctionEscapeForTopLevelCodeGlobals(SILLocation loc,
-                                                const CaptureInfo &captureInfo);
+                                                    CaptureInfo captureInfo);
 
   /// Map the substitutions for the original declaration to substitutions for
   /// the overridden declaration.

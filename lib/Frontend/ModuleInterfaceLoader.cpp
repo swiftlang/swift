@@ -764,6 +764,7 @@ class ModuleInterfaceLoaderImpl {
       }
     }
 
+    // [Note: ModuleInterfaceLoader-defer-to-SerializedModuleLoader]
     // Finally, if there's a module adjacent to the .swiftinterface that we can
     // _likely_ load (it validates OK and is up to date), bail early with
     // errc::not_supported, so the next (serialized) loader in the chain will

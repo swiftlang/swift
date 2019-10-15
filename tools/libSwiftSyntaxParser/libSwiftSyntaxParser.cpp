@@ -155,7 +155,6 @@ private:
     node.present = true;
   }
 
-public:
   OpaqueSyntaxNode recordToken(tok tokenKind,
                                ArrayRef<ParsedTriviaPiece> leadingTrivia,
                                ArrayRef<ParsedTriviaPiece> trailingTrivia,
@@ -190,10 +189,6 @@ public:
     return getNodeHandler()(&node);
   }
 
-  void discardRecordedNode(OpaqueSyntaxNode node) override {
-    // FIXME: This method should not be called at all.
-  }
-
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, SyntaxKind kind) override {
     auto NodeLookup = getNodeLookup();
@@ -205,10 +200,6 @@ public:
     assert(ckind == numValue && "syntax kind value is too large");
     auto result = NodeLookup(lexerOffset, ckind);
     return {result.length, result.node};
-  }
-
-  OpaqueSyntaxNodeKind getOpaqueKind() override {
-    return OpaqueSyntaxNodeKind::SwiftSyntax;
   }
 };
 

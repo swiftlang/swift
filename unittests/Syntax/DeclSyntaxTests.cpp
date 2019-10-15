@@ -550,11 +550,11 @@ GenericWhereClauseSyntax getCannedWhereClause() {
   auto T = SyntaxFactory::makeTypeIdentifier("T", {}, Trivia::spaces(1));
   auto EqualEqual = SyntaxFactory::makeEqualityOperator({}, Trivia::spaces(1));
   auto Int = SyntaxFactory::makeTypeIdentifier("Int", {}, Trivia::spaces(1));
-  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int);
-  auto Req = SyntaxFactory::makeGenericRequirement(SameType, None);
+  auto SameType = SyntaxFactory::makeSameTypeRequirement(T, EqualEqual, Int,
+                                                         None);
 
   auto Requirements = SyntaxFactory::makeBlankGenericRequirementList()
-    .appending(Req);
+    .appending(SameType);
 
   return SyntaxFactory::makeBlankGenericWhereClause()
     .withWhereKeyword(WhereKW)

@@ -71,6 +71,7 @@ namespace swift {
   class GenericTypeParamDecl;
   class GenericTypeParamType;
   class ModuleDecl;
+  class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
   class ParameterList;
@@ -2021,8 +2022,8 @@ public:
   /// from the source range.
   SourceRange getSourceRange(bool omitAccessors = false) const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
 private:
   SourceLoc getLastAccessorEndLoc() const;
@@ -2126,11 +2127,11 @@ public:
     return getPatternList()[i].getInitContext();
   }
 
-  const CaptureInfo &getCaptureInfo(unsigned i) const {
+  CaptureInfo getCaptureInfo(unsigned i) const {
     return getPatternList()[i].getCaptureInfo();
   }
 
-  void setCaptureInfo(unsigned i, const CaptureInfo &captures) {
+  void setCaptureInfo(unsigned i, CaptureInfo captures) {
     getMutablePatternList()[i].setCaptureInfo(captures);
   }
 
@@ -3218,6 +3219,14 @@ static inline bool isRawPointerKind(PointerTypeKind PTK) {
 
   llvm_unreachable("Unhandled PointerTypeKind in switch.");
 }
+
+// Kinds of buffer pointer types.
+enum BufferPointerTypeKind : unsigned {
+  BPTK_UnsafeMutableRawBufferPointer,
+  BPTK_UnsafeRawBufferPointer,
+  BPTK_UnsafeMutableBufferPointer,
+  BPTK_UnsafeBufferPointer,
+};
 
 enum KeyPathTypeKind : unsigned char {
   KPTK_AnyKeyPath,
@@ -4773,6 +4782,8 @@ enum class PropertyWrapperSynthesizedPropertyKind {
 
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
+  NamedPattern *NamingPattern = nullptr;
+
 public:
   enum class Introducer : uint8_t {
     Let = 0,
@@ -4785,10 +4796,6 @@ protected:
   VarDecl(DeclKind kind, bool isStatic, Introducer introducer,
           bool issCaptureList, SourceLoc nameLoc, Identifier name,
           DeclContext *dc, StorageIsMutable_t supportsMutation);
-
-  TypeRepr *ParentRepr = nullptr;
-
-  Type typeInContext;
 
 public:
   VarDecl(bool isStatic, Introducer introducer, bool isCaptureList,
@@ -4806,25 +4813,9 @@ public:
     return hasName() ? getBaseName().getIdentifier().str() : "_";
   }
 
-  /// Retrieve the TypeRepr corresponding to the parsed type of the parent
-  /// pattern, if it exists.
-  TypeRepr *getTypeRepr() const { return ParentRepr; }
-  void setTypeRepr(TypeRepr *repr) { ParentRepr = repr; }
-
-  bool hasType() const {
-    // We have a type if either the type has been computed already or if
-    // this is a deserialized declaration with an interface type.
-    return !typeInContext.isNull();
-  }
-
   /// Get the type of the variable within its context. If the context is generic,
   /// this will use archetypes.
   Type getType() const;
-
-  /// Set the type of the variable within its context.
-  void setType(Type t);
-
-  void markInvalid();
 
   /// Retrieve the source range of the variable type, or an invalid range if the
   /// variable's type is not explicitly written in the source.
@@ -4863,6 +4854,14 @@ public:
   /// returns null.
   ///
   Pattern *getParentPattern() const;
+
+  /// Returns the parsed type of this variable declaration.  For parameters, this
+  /// is the parsed type the user explicitly wrote.  For variables, this is the
+  /// type the user wrote in the typed pattern that binds this variable.
+  ///
+  /// Note that there are many cases where the user may elide types.  This will
+  /// return null in those cases.
+  TypeRepr *getTypeReprOrParentPatternTypeRepr() const;
 
   /// Return the statement that owns the pattern associated with this VarDecl,
   /// if one exists.
@@ -4903,6 +4902,9 @@ public:
     assert(v && v != this);
     Parent = v;
   }
+
+  NamedPattern *getNamingPattern() const { return NamingPattern; }
+  void setNamingPattern(NamedPattern *Pat) { NamingPattern = Pat; }
 
   /// If this is a VarDecl that does not belong to a CaseLabelItem's pattern,
   /// return this. Otherwise, this VarDecl must belong to a CaseStmt's
@@ -5158,6 +5160,8 @@ class ParamDecl : public VarDecl {
   SourceLoc ArgumentNameLoc;
   SourceLoc SpecifierLoc;
 
+  TypeRepr *TyRepr = nullptr;
+
   struct StoredDefaultArgument {
     PointerUnion<Expr *, VarDecl *> DefaultArg;
     Initializer *InitContext = nullptr;
@@ -5203,6 +5207,10 @@ public:
 
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
 
+  /// Retrieve the TypeRepr corresponding to the parsed type of the parameter, if it exists.
+  TypeRepr *getTypeRepr() const { return TyRepr; }
+  void setTypeRepr(TypeRepr *repr) { TyRepr = repr; }
+
   DefaultArgumentKind getDefaultArgumentKind() const {
     return static_cast<DefaultArgumentKind>(Bits.ParamDecl.defaultArgumentKind);
   }
@@ -5237,12 +5245,12 @@ public:
 
   void setDefaultArgumentInitContext(Initializer *initContext);
 
-  const CaptureInfo &getDefaultArgumentCaptureInfo() const {
+  CaptureInfo getDefaultArgumentCaptureInfo() const {
     assert(DefaultValueAndFlags.getPointer());
     return DefaultValueAndFlags.getPointer()->Captures;
   }
 
-  void setDefaultArgumentCaptureInfo(const CaptureInfo &captures);
+  void setDefaultArgumentCaptureInfo(CaptureInfo captures);
 
   /// Extracts the text of the default argument attached to the provided
   /// ParamDecl, removing all inactive #if clauses and providing only the
@@ -5814,8 +5822,8 @@ public:
   /// Retrieve the source range of the function declaration name + patterns.
   SourceRange getSignatureSourceRange() const;
 
-  const CaptureInfo &getCaptureInfo() const { return Captures; }
-  void setCaptureInfo(const CaptureInfo &captures) { Captures = captures; }
+  CaptureInfo getCaptureInfo() const { return Captures; }
+  void setCaptureInfo(CaptureInfo captures) { Captures = captures; }
 
   /// Retrieve the Objective-C selector that names this method.
   ObjCSelector getObjCSelector(DeclName preferredName = DeclName(),

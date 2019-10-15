@@ -2,7 +2,7 @@
 
 infix operator +++
 
-protocol ConcatToAnything {
+protocol ConcatToAnything { // expected-note {{where 'Self' = 'U'}}
   static func +++ <T>(lhs: Self, other: T)
 }
 
@@ -14,7 +14,7 @@ func min<T : Comparable>(_ x: T, y: T) -> T {
 func weirdConcat<T : ConcatToAnything, U>(_ t: T, u: U) {
   t +++ u
   t +++ 1
-  u +++ t // expected-error{{argument type 'U' does not conform to expected type 'ConcatToAnything'}}
+  u +++ t // expected-error{{referencing operator function '+++' on 'ConcatToAnything' requires that 'U' conform to 'ConcatToAnything'}}
 }
 
 // Make sure that the protocol operators don't get in the way.
@@ -647,7 +647,7 @@ struct BottleLayout {
 }
 let arr = [BottleLayout]()
 let layout = BottleLayout(count:1)
-let ix = arr.firstIndex(of:layout) // expected-error {{argument type 'BottleLayout' does not conform to expected type 'Equatable'}}
+let ix = arr.firstIndex(of:layout) // expected-error {{referencing instance method 'firstIndex(of:)' on 'Collection' requires that 'BottleLayout' conform to 'Equatable'}}
 
 let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
 

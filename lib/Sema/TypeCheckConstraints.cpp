@@ -1119,7 +1119,8 @@ namespace {
         return finish(walkToClosureExprPre(closure), expr);
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        TC.checkForForbiddenPrefix(unresolved);
+        TypeChecker::checkForForbiddenPrefix(
+            TC.Context, unresolved->getName().getBaseName());
         return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
       }
 
@@ -2819,12 +2820,12 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
     pattern->forEachVariable([&](VarDecl *var) {
       // Don't change the type of a variable that we've been able to
       // compute a type for.
-      if (var->hasType() &&
+      if (var->hasInterfaceType() &&
           !var->getType()->hasUnboundGenericType() &&
           !var->getType()->hasError())
         return;
 
-      var->markInvalid();
+      var->setInterfaceType(ErrorType::get(Context));
     });
   }
 
@@ -3031,9 +3032,9 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
       elt.getPattern()->forEachVariable([&](VarDecl *var) {
         // Don't change the type of a variable that we've been able to
         // compute a type for.
-        if (var->hasType() && !var->getType()->hasError())
+        if (var->hasInterfaceType() && !var->getType()->hasError())
           return;
-        var->markInvalid();
+        var->setInterfaceType(ErrorType::get(Context));
       });
     };
 
@@ -3088,7 +3089,6 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                          EP->getLoc(),
                                          Context.getIdentifier("$match"),
                                          DC);
-  matchVar->setType(rhsType);
   matchVar->setInterfaceType(rhsType->mapTypeOutOfContext());
 
   matchVar->setImplicit();

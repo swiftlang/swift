@@ -134,8 +134,9 @@ class ModuleInterfaceLoader : public SerializedModuleLoaderBase {
       ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
       DependencyTracker *tracker, ModuleLoadingMode loadMode,
       ArrayRef<std::string> PreferInterfaceForModules,
-      bool RemarkOnRebuildFromInterface)
-  : SerializedModuleLoaderBase(ctx, tracker, loadMode),
+      bool RemarkOnRebuildFromInterface, bool IgnoreSwiftSourceInfoFile)
+  : SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                               IgnoreSwiftSourceInfoFile),
   CacheDir(cacheDir), PrebuiltCacheDir(prebuiltCacheDir),
   RemarkOnRebuildFromInterface(RemarkOnRebuildFromInterface),
   PreferInterfaceForModules(PreferInterfaceForModules)
@@ -161,12 +162,14 @@ public:
   create(ASTContext &ctx, StringRef cacheDir, StringRef prebuiltCacheDir,
          DependencyTracker *tracker, ModuleLoadingMode loadMode,
          ArrayRef<std::string> PreferInterfaceForModules = {},
-         bool RemarkOnRebuildFromInterface = false) {
+         bool RemarkOnRebuildFromInterface = false,
+         bool IgnoreSwiftSourceInfoFile = false) {
     return std::unique_ptr<ModuleInterfaceLoader>(
       new ModuleInterfaceLoader(ctx, cacheDir, prebuiltCacheDir,
                                          tracker, loadMode,
                                          PreferInterfaceForModules,
-                                         RemarkOnRebuildFromInterface));
+                                         RemarkOnRebuildFromInterface,
+                                         IgnoreSwiftSourceInfoFile));
   }
 
   /// Append visible module names to \p names. Note that names are possibly

@@ -1,13 +1,6 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_TOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_NONTOP | %FileCheck %s -check-prefix=IN_CLOSURE_TOP
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=IN_CLOSURE_COLOR_CONTEXT_DOT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT_DOT
-
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_1 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_2 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_3 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_4 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_VALID
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -disable-function-builder-one-way-constraints -code-completion-token=CONTEXTUAL_TYPE_5 | %FileCheck %s -check-prefix=CONTEXTUAL_TYPE_INVALID
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_CLOSURE_COLOR_CONTEXT | %FileCheck %s -check-prefix=IN_CLOSURE_COLOR_CONTEXT
 
 struct Tagged<Tag, Entity> {
   let tag: Tag
@@ -80,22 +73,11 @@ func testAcceptColorTagged(paramIntVal: Int, paramStringVal: String) {
   acceptColorTagged { color in
     paramIntVal.tag(#^IN_CLOSURE_COLOR_CONTEXT^#)
 // IN_CLOSURE_COLOR_CONTEXT: Begin completions
-// IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[InstanceMethod]/CurrNominal:   ['(']{#(tag): Color#}[')'][#Tagged<Color, Int>#]; name=tag: Color
-// IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[LocalVar]/Local/TypeRelation[Identical]: color[#Color#]; name=color
+// IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[LocalVar]/Local:               color; name=color
 // IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[LocalVar]/Local:               taggedValue[#Tagged<Color, Int>#]; name=taggedValue
 // IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[LocalVar]/Local:               paramIntVal[#Int#]; name=paramIntVal
 // IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[LocalVar]/Local:               paramStringVal[#String#]; name=paramStringVal
-// IN_CLOSURE_COLOR_CONTEXT-DAG: Decl[Enum]/CurrModule/TypeRelation[Identical]: Color[#Color#]; name=Color
 // IN_CLOSURE_COLOR_CONTEXT: End completions
-  }
-
-  acceptColorTagged { color in
-    paramIntVal.tag(.#^IN_CLOSURE_COLOR_CONTEXT_DOT^#)
-// IN_CLOSURE_COLOR_CONTEXT_DOT: Begin completions, 3 items
-// IN_CLOSURE_COLOR_CONTEXT_DOT-DAG: Decl[EnumElement]/ExprSpecific:     red[#Color#]; name=red
-// IN_CLOSURE_COLOR_CONTEXT_DOT-DAG: Decl[EnumElement]/ExprSpecific:     green[#Color#]; name=green
-// IN_CLOSURE_COLOR_CONTEXT_DOT-DAG: Decl[EnumElement]/ExprSpecific:     blue[#Color#]; name=blue
-// IN_CLOSURE_COLOR_CONTEXT_DOT: End completions
   }
 }
 
@@ -111,38 +93,3 @@ struct EnumToVoidBuilder {
   static func buildBlock(_ :MyEnum, _: MyEnum, _: MyEnum) {}
 }
 func acceptBuilder(@EnumToVoidBuilder body: () -> Void) {}
-
-// CONTEXTUAL_TYPE_INVALID-NOT: Begin completions
-
-// CONTEXTUAL_TYPE_VALID: Begin completions, 4 items
-// CONTEXTUAL_TYPE_VALID-DAG: Decl[EnumElement]/ExprSpecific:     east[#MyEnum#]; name=east
-// CONTEXTUAL_TYPE_VALID-DAG: Decl[EnumElement]/ExprSpecific:     west[#MyEnum#]; name=west
-// CONTEXTUAL_TYPE_VALID-DAG: Decl[EnumElement]/ExprSpecific:     north[#MyEnum#]; name=north
-// CONTEXTUAL_TYPE_VALID-DAG: Decl[EnumElement]/ExprSpecific:     south[#MyEnum#]; name=south
-// CONTEXTUAL_TYPE_VALID: End completions 
-
-func testContextualType() {
-  acceptBuilder {
-    .#^CONTEXTUAL_TYPE_1^#
-  }
-  acceptBuilder {
-    .#^CONTEXTUAL_TYPE_2^#;
-    .north;
-  }
-  acceptBuilder {
-    .north;
-    .#^CONTEXTUAL_TYPE_3^#;
-  }
-  acceptBuilder {
-    .north;
-    .east;
-    .#^CONTEXTUAL_TYPE_4^#
-  }
-  acceptBuilder {
-    .north;
-    .east;
-    .south;
-// NOTE: Invalid because 'EnumToVoidBuilder' doesn't have 4 params overload.
-    .#^CONTEXTUAL_TYPE_5^#
-  }
-}
