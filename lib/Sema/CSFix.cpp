@@ -153,21 +153,12 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                               cs.DC, coerceExpr->getLoc(), subExpr,
                               coerceExpr->getCastTypeLoc().getSourceRange());
 
-  switch (castKind) {
   // Invalid cast.
-  case CheckedCastKind::Unresolved:
+  if (castKind == CheckedCastKind::Unresolved)
     return nullptr;
-  case CheckedCastKind::Coercion:
-  case CheckedCastKind::BridgingCoercion:
-  case CheckedCastKind::ArrayDowncast:
-  case CheckedCastKind::DictionaryDowncast:
-  case CheckedCastKind::SetDowncast:
-  case CheckedCastKind::ValueCast:
-    return new (cs.getAllocator())
-        CoerceToCheckedCast(cs, fromType, toType, locator);
-  }
 
-  return nullptr;
+  return new (cs.getAllocator())
+      CoerceToCheckedCast(cs, fromType, toType, locator);
 }
 
 bool MarkExplicitlyEscaping::diagnose(Expr *root, bool asNote) const {
