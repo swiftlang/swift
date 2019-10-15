@@ -3702,7 +3702,7 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
   }
 
   case DeclKind::Var:
-    // FIXME: See the comment in validateTypedPattern().
+    TyR = cast<VarDecl>(decl)->getTypeReprOrParentPatternTypeRepr();
     break;
 
   default:
