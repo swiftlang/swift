@@ -6955,7 +6955,6 @@ public:
       auto tan = *allResultsIt++;
       if (tan->getType().isAddress()) {
         addToAdjointBuffer(bb, origArg, tan, loc);
-        builder.emitDestroyAddrAndFold(loc, tan);
       } else {
         if (origArg->getType().isAddress()) {
           auto *tmpBuf = builder.createAllocStack(loc, tan->getType());
@@ -6971,9 +6970,11 @@ public:
         }
       }
     }
-    // Deallocate pullback indirect results.
-    for (auto *alloc : reversed(pullbackIndirectResults))
+    // Destroy and deallocate pullback indirect results.
+    for (auto *alloc : reversed(pullbackIndirectResults)) {
+      builder.emitDestroyAddrAndFold(loc, alloc);
       builder.createDeallocStack(loc, alloc);
+    }
   }
 
   /// Handle `struct` instruction.
