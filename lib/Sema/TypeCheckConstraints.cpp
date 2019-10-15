@@ -1119,7 +1119,8 @@ namespace {
         return finish(walkToClosureExprPre(closure), expr);
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-        TC.checkForForbiddenPrefix(unresolved);
+        TypeChecker::checkForForbiddenPrefix(
+            TC.Context, unresolved->getName().getBaseName());
         return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
       }
 

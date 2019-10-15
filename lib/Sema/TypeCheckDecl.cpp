@@ -2211,6 +2211,8 @@ public:
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       auto &Context = TC.Context;
+      TypeChecker::checkForForbiddenPrefix(Context, VD->getBaseName());
+      
       checkRedeclaration(Context, VD);
 
       // Force some requests, which can produce diagnostics.
@@ -3594,7 +3596,6 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 }
 
 void TypeChecker::typeCheckDecl(Decl *D) {
-  checkForForbiddenPrefix(D);
   DeclChecker(*this).visit(D);
 }
 
@@ -4127,7 +4128,7 @@ void TypeChecker::validateDecl(ValueDecl *D) {
   PrettyStackTraceDecl StackTrace("validating", D);
   FrontendStatsTracer StatsTracer(Context.Stats, "validate-decl", D);
 
-  checkForForbiddenPrefix(D);
+  TypeChecker::checkForForbiddenPrefix(Context, D->getBaseName());
 
   if (Context.Stats)
     Context.Stats->getFrontendCounters().NumDeclsValidated++;
