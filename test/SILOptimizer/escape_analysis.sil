@@ -119,7 +119,7 @@ bb0(%0 : $*Y, %1 : $X):
 // CHECK-LABEL: CG of deferringEdge
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%3.1)
 // CHECK-NEXT:    Arg %1 Esc: A, Succ:
-// CHECK-NEXT:    Val %3 Esc: %0,%3, Succ: (%3.1), %0
+// CHECK-NEXT:    Val %3 Esc: %3, Succ: (%3.1), %0
 // CHECK-NEXT:    Con %3.1 Esc: A, Succ: (%3.2)
 // CHECK-NEXT:    Con %3.2 Esc: A, Succ: %1
 // CHECK-NEXT:    Ret Esc: R, Succ: %0
@@ -153,8 +153,8 @@ bb0:
 // CHECK-NEXT:    Val %1 Esc: A, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: A, Succ: (%11.1)
 // CHECK-NEXT:    Val %4 Esc: A, Succ: (%1.1)
-// CHECK-NEXT:    Val %7 Esc: %0,%11, Succ: (%1.1)
-// CHECK-NEXT:    Val %11 Esc: %0,%11, Succ: (%1.1), %7, %11.1
+// CHECK-NEXT:    Val %7 Esc: %11, Succ: (%1.1)
+// CHECK-NEXT:    Val %11 Esc: %11, Succ: (%1.1), %7, %11.1
 // CHECK-NEXT:    Con %11.1 Esc: A, Succ: (%1.1), %0, %1, %4
 // CHECK-NEXT:    Ret Esc: R, Succ: %11.1
 // CHECK-NEXT:  End
@@ -212,7 +212,7 @@ bb0(%0 : $LinkedNode):
 
 // CHECK-LABEL: CG of loadNext
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%2.1)
-// CHECK-NEXT:    Val %2 Esc: %0,%2, Succ: (%2.1), %0, %2.2
+// CHECK-NEXT:    Val %2 Esc: %2, Succ: (%2.1), %0, %2.2
 // CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
 // CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%2.1)
 // CHECK-NEXT:    Ret Esc: R, Succ: %2.2
@@ -406,12 +406,12 @@ sil @call_copy_addr_content : $@convention(thin) () -> () {
 // CHECK-LABEL: CG of test_partial_apply
 // CHECK-NEXT:    Arg %1 Esc: G, Succ:
 // CHECK-NEXT:    Arg %2 Esc: A, Succ: (%6.3)
-// CHECK-NEXT:    Val %3 Esc: %14,%15,%16,%17, Succ: (%6.1)
-// CHECK-NEXT:    Val %6 Esc: %14,%15,%16,%17, Succ: (%6.1)
+// CHECK-NEXT:    Val %3 Esc: %14,%15,%17, Succ: (%6.1)
+// CHECK-NEXT:    Val %6 Esc: %14,%15,%16, Succ: (%6.1)
 // CHECK-NEXT:    Con %6.1 Esc: %14,%15,%16,%17, Succ: (%6.2)
-// CHECK-NEXT:    Con %6.2 Esc: %2,%14,%15,%16,%17, Succ: %2
+// CHECK-NEXT:    Con %6.2 Esc: %14,%15,%16,%17, Succ: %2
 // CHECK-NEXT:    Con %6.3 Esc: G, Succ:
-// CHECK-NEXT:    Val %12 Esc: %14,%15,%16,%17, Succ: %3, %6
+// CHECK-NEXT:    Val %12 Esc: %14,%15, Succ: %3, %6
 // CHECK-NEXT:  End
 sil @test_partial_apply : $@convention(thin) (Int64, @owned X, @owned Y) -> Int64 {
 bb0(%0 : $Int64, %1 : $X, %2 : $Y):
@@ -443,7 +443,7 @@ bb0(%0 : $Int64, %1 : $X, %2 : $Y):
 // CHECK-NEXT:    Con %2.1 Esc: A, Succ: (%2.2)
 // CHECK-NEXT:    Con %2.2 Esc: A, Succ: (%2.3)
 // CHECK-NEXT:    Con %2.3 Esc: G, Succ:
-// CHECK-NEXT:    Val %7 Esc: %2,%8, Succ: %2
+// CHECK-NEXT:    Val %7 Esc: %8, Succ: %2
 // CHECK-NEXT:  End
 sil @closure1 : $@convention(thin) (@owned X, @owned <τ_0_0> { var τ_0_0 } <Int64>, @owned <τ_0_0> { var τ_0_0 } <Y>) -> Int64 {
 bb0(%0 : $X, %1 : $<τ_0_0> { var τ_0_0 } <Int64>, %2 : $<τ_0_0> { var τ_0_0 } <Y>):
@@ -761,7 +761,7 @@ sil @unknown_throwing_func : $@convention(thin) (@owned X) -> (@owned X, @error 
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%1.3)
 // CHECK-NEXT:    Val %1 Esc: %6, Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: %6, Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: %0,%6, Succ: %0
+// CHECK-NEXT:    Con %1.2 Esc: %6, Succ: %0
 // CHECK-NEXT:    Con %1.3 Esc: G, Succ:
 // CHECK-NEXT:    Val %5 Esc: %6, Succ: %1
 // CHECK-NEXT:  End
@@ -969,7 +969,7 @@ bb0(%0 : $Builtin.Int64, %1 : $X, %2 : $X, %3 : $X):
 // CHECK-NEXT:    Arg %0 Esc: A, Succ:
 // CHECK-NEXT:    Val %1 Esc: , Succ: (%1.1)
 // CHECK-NEXT:    Con %1.1 Esc: , Succ: (%1.2)
-// CHECK-NEXT:    Con %1.2 Esc: %0, Succ: %0
+// CHECK-NEXT:    Con %1.2 Esc: , Succ: %0
 // CHECK-NEXT:  End
 sil @test_existential_addr : $@convention(thin) (@owned Pointer) -> () {
 bb0(%0 : $Pointer):
@@ -1181,7 +1181,7 @@ bb0(%0 : $*Array<X>):
 // CHECK-LABEL: CG of arraysemantics_get_element_address
 // CHECK-NEXT:    Arg %0 Esc: A, Succ: (%0.1)
 // CHECK-NEXT:    Con %0.1 Esc: A, Succ:
-// CHECK-NEXT:    Val %4 Esc: %0,%4, Succ: %0.1
+// CHECK-NEXT:    Val %4 Esc: , Succ: %0.1
 // CHECK-NEXT:  End
 sil @arraysemantics_get_element_address : $@convention(thin) (Array<X>) -> () {
 bb0(%0 : $Array<X>):
