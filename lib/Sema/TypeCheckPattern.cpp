@@ -1006,9 +1006,9 @@ recur:
     P->setType(type);
     var->setNamingPattern(NP);
 
-    // FIXME: Should probably just remove the forbidden prefix stuff, it no
-    // longer makes a lot of sense in a request-based world.
-    checkForForbiddenPrefix(var);
+    // FIXME: This call can be removed once pattern binding validation is
+    // sufficiently requestified.
+    TypeChecker::checkForForbiddenPrefix(Context, var->getBaseName());
 
     // If we are inferring a variable to have type AnyObject.Type,
     // "()", an uninhabited type, or optional thereof, emit a diagnostic.

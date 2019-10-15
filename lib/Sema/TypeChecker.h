@@ -1883,16 +1883,9 @@ public:
   /// @}
 
   /// If LangOptions::DebugForbidTypecheckPrefix is set and the given decl
-  /// has a name with that prefix, an llvm fatal_error is triggered.
+  /// name starts with that prefix, an llvm fatal_error is triggered.
   /// This is for testing purposes.
-  void checkForForbiddenPrefix(const Decl *D);
-  void checkForForbiddenPrefix(const UnresolvedDeclRefExpr *E);
-  void checkForForbiddenPrefix(Identifier Ident);
-  void checkForForbiddenPrefix(StringRef Name);
-
-  bool hasEnabledForbiddenTypecheckPrefix() const {
-    return !Context.LangOpts.DebugForbidTypecheckPrefix.empty();
-  }
+  static void checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name);
 
   /// Check error handling in the given type-checked top-level code.
   void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
