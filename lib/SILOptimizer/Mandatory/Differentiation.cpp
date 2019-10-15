@@ -1149,6 +1149,8 @@ public:
   /// Finds the `[differentiable]` attribute on the specified original function
   /// whose parameter indices are a minimal superset of the specified parameter
   /// indices. Returns nullptr if no such attribute exists.
+  // NOTE: This utility should be removed. "Minimal lookup" should be done
+  // based on AST attributes.
   SILDifferentiabilityWitness *lookUpMinimalDifferentiabilityWitness(
       SILFunction *original, const AutoDiffConfig &config) const {
     auto *minimalIndexSet = IndexSubset::getDefault(
@@ -1228,7 +1230,6 @@ public:
     auto derivativeConstrainedGenSig = getConstrainedDerivativeGenericSignature(
         original->getLoweredFunctionType(), config.parameterIndices,
         config.derivativeGenericSignature);
-    llvm::errs() << "ADContext::getOrCreateDifferentiabilityWitness\n";
     auto *diffWitness = SILDifferentiabilityWitness::create(
         getModule(), original->getLinkage(), original, config.parameterIndices,
         config.resultIndices, derivativeConstrainedGenSig,
@@ -1242,7 +1243,10 @@ public:
       SILFunction *original, const AutoDiffConfig &config) {
     if (auto *attr = lookUpDifferentiabilityWitness(original, config))
       return attr;
+#if 0
+    // NOTE: This assertion should be removed.
     assert(original->isDefinition());
+#endif
     return createDifferentiabilityWitness(original, config);
   }
 
@@ -2787,24 +2791,23 @@ emitDerivativeFunctionReference(
       }
       // Check and diagnose external declarations.
       if (originalFn->isExternalDeclaration()) {
-        llvm::errs() << "EXTERNAL DECLARATION! ORIG DECL CONTEXT: " << originalFn->getDeclContext() << "\n";
+        bool found = false;
         if (auto *DC = originalFn->getDeclContext()) {
-          DC->dumpContext();
           auto *origAFD = DC->getAsDecl();
           for (auto pair : context.getASTContext().DifferentiableAttrs) {
             auto origPair = pair.first;
             auto origDecl = origPair.first;
             if (origDecl != origAFD)
               continue;
-            llvm::errs() << "FOUND ATTRIBUTE!\n";
-            pair.second->print(llvm::errs(), origAFD);
-            llvm::errs() << "\n";
+            found = true;
           }
         }
-        context.emitNondifferentiabilityError(
-            original, invoker,
-            diag::autodiff_external_nondifferentiable_function);
-        return None;
+        if (!found) {
+          context.emitNondifferentiabilityError(
+              original, invoker,
+              diag::autodiff_external_nondifferentiable_function);
+          return None;
+        }
       }
       // Sanity check passed. Create a new SIL differentiability witness and
       // process it.
@@ -2829,6 +2832,15 @@ emitDerivativeFunctionReference(
     if (context.processDifferentiableAttribute(
             originalFn, minimalWitness, invoker))
       return None;
+
+    // NOTE: Test `differentiability_witness_function generation.
+#if 0
+    auto *derivativeFnRef2 = builder.createDifferentiabilityWitnessFunction(
+        loc, originalFn, DifferentiabilityKind::Normal, kind,
+        minimalWitness->getParameterIndices(),
+        minimalWitness->getResultIndices(),
+        minimalWitness->getDerivativeGenericSignature());
+#endif
     auto *derivativeFn = minimalWitness->getDerivative(kind);
     auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
@@ -8162,10 +8174,6 @@ static SILFunction *createEmptyJVP(
 bool ADContext::processDifferentiableAttribute(
     SILFunction *original, SILDifferentiabilityWitness *witness,
     DifferentiationInvoker invoker) {
-  llvm::errs() << "PROCESS DIFFERENTIABLE WITNESS: " << witness << ", GEN SIG: " << witness->getDerivativeGenericSignature() << "!\n";
-  witness->dump();
-  if (witness->getDerivativeGenericSignature())
-    witness->getDerivativeGenericSignature()->dump();
   auto &module = getModule();
   // Try to look up JVP only if attribute specifies JVP name or if original
   // function is an external declaration. If JVP function cannot be found,
@@ -8983,6 +8991,8 @@ void Differentiation::run() {
   auto &module = *getModule();
   auto &astCtx = module.getASTContext();
   debugDump(module);
+  // FIXME: TEMPORARY HACK
+  module.getSILLoader();
 
   // A global differentiation context.
   ADContext context(*this);

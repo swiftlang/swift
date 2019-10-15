@@ -474,12 +474,12 @@ class LinkEntity {
   }
 
   void setForDifferentiabilityWitness(
-      Kind kind, SILFunction *f, const SILDifferentiabilityWitnessKey key) {
+      Kind kind, SILFunction *f, const AutoDiffConfig config) {
     // assert(isProtocolConformanceKind(kind) && !isTypeKind(kind));
     Pointer = f;
-    // TODO: Make this robust.
+    // TODO(!!!): Make this robust. We need to store a pointer to AutoDiffConfig.
     SecondaryPointer =
-        const_cast<void*>(static_cast<const void*>(key.second.parameterIndices));
+        const_cast<void*>(static_cast<const void*>(config.parameterIndices));
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
@@ -865,9 +865,9 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   static LinkEntity forDifferentiabilityWitness(
-      SILFunction *f, const SILDifferentiabilityWitnessKey key) {
+      SILFunction *f, const AutoDiffConfig config) {
     LinkEntity entity;
-    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness, f, key);
+    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness, f, config);
     return entity;
   }
   // SWIFT_ENABLE_TENSORFLOW END
@@ -1065,6 +1065,11 @@ public:
   SILGlobalVariable *getSILGlobalVariable() const {
     assert(getKind() == Kind::SILGlobalVariable);
     return reinterpret_cast<SILGlobalVariable*>(Pointer);
+  }
+
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
+    assert(getKind() == Kind::DifferentiabilityWitness);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {

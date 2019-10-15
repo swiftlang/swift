@@ -1928,42 +1928,7 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   (void)diffFnExp.claimAll();
   setLoweredExplosion(i, e);
 }
-
-void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
-    DifferentiabilityWitnessFunctionInst *i) {
-#if 0
-  CanType baseTy = i->getLookupType();
-  ProtocolConformanceRef conformance = i->getConformance();
-  SILDeclRef member = i->getMember();
-
-  assert(member.requiresNewWitnessTableEntry());
-
-  if (IGM.isResilient(conformance.getRequirement(),
-                      ResilienceExpansion::Maximal)) {
-    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
-    auto fnType = IGM.getSILTypes().getConstantFunctionType(member);
-    auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnPtr, sig);
-
-    setLoweredFunctionPointer(i, fn);
-    return;
-  }
-#endif
-  AutoDiffConfig config{i->getParameterIndices(), i->getResultIndices(),
-                        i->getWitnessGenericSignature()};
-  SILDifferentiabilityWitnessKey key{i->getOriginalFunction()->getName(),
-                                     config};
-  // It would be nice if this weren't discarded.
-  llvm::Value *baseMetadataCache = nullptr;
-
-  FunctionPointer fn;
-#if 0
-  auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache,
-                                   member, conformance);
-#endif
-
-  setLoweredFunctionPointer(i, fn);
-}
+// SWIFT_ENABLE_TENSORFLOW
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
@@ -5549,6 +5514,64 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
                                    member, conformance);
   
   setLoweredFunctionPointer(i, fn);
+}
+
+void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
+    DifferentiabilityWitnessFunctionInst *i) {
+#if 0
+#if 0
+  CanType baseTy = i->getLookupType();
+  ProtocolConformanceRef conformance = i->getConformance();
+  SILDeclRef member = i->getMember();
+
+  assert(member.requiresNewWitnessTableEntry());
+
+  if (IGM.isResilient(conformance.getRequirement(),
+                      ResilienceExpansion::Maximal)) {
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
+    auto fnType = IGM.getSILTypes().getConstantFunctionType(member);
+    auto sig = IGM.getSignature(fnType);
+    auto fn = FunctionPointer::forDirect(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
+
+  auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache,
+                                   member, conformance);
+  setLoweredFunctionPointer(i, fn);
+#endif
+
+  auto *original = i->getOriginalFunction();
+  AutoDiffConfig config{i->getParameterIndices(), i->getResultIndices(),
+                        i->getWitnessGenericSignature()};
+  SILDifferentiabilityWitnessKey key{i->getOriginalFunction()->getName(),
+                                     config};
+
+  auto *diffWitness = IGM.getAddrOfDifferentiabilityWitness(original, config);
+  unsigned offset = 0;
+  switch (i->getDifferentiabilityKind()) {
+  case DifferentiabilityKind::Normal:
+    switch (i->getDerivativeKind()) {
+    case AutoDiffDerivativeFunctionKind::JVP:
+      offset = 0;
+      break;
+    case AutoDiffDerivativeFunctionKind::VJP:
+      offset = 1;
+      break;
+    }
+    break;
+  case DifferentiabilityKind::Linear:
+    llvm_unreachable("Not yet implemented");
+  case DifferentiabilityKind::NonDifferentiable:
+    llvm_unreachable("Differentiability kind must not be non-differentiable");
+    break;
+  }
+#if 0
+  auto fn = emitDifferentiabilityWitnessMethodValue(*this, diffWitness, i);
+  setLoweredFunctionPointer(i, fn);
+#endif
+#endif
 }
 
 void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,

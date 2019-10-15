@@ -18,6 +18,9 @@
 #define SWIFT_IRGEN_GENPROTO_H
 
 #include "swift/SIL/SILFunction.h"
+// SWIFT_ENABLE_TENSORFLOW
+#include "swift/SIL/SILDifferentiabilityWitness.h"
+// SWIFT_ENABLE_TENSORFLOW END
 
 #include "Fulfillment.h"
 #include "GenericRequirement.h"

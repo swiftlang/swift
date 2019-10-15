@@ -132,8 +132,8 @@ func vjpFooExtraGenericRequirements<T : FloatingPoint & Differentiable & BinaryI
 
 // Test static methods.
 
+/*
 extension AdditiveArithmetic where Self : Differentiable {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
   @differentiating(+)
   static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self.TangentVector) -> (Self.TangentVector, Self.TangentVector)) {
     return (x + y, { v in (v, v) })
@@ -141,12 +141,12 @@ extension AdditiveArithmetic where Self : Differentiable {
 }
 
 extension FloatingPoint where Self : Differentiable, Self == Self.TangentVector {
-  // expected-error @+1 {{derivative not in the same file as the original function}}
   @differentiating(+)
   static func vjpPlus(x: Self, y: Self) -> (value: Self, pullback: (Self) -> (Self, Self)) {
     return (x + y, { v in (v, v) })
   }
 }
+*/
 
 extension Differentiable where Self : AdditiveArithmetic {
   // expected-error @+1 {{'+' is not defined in the current type context}}
@@ -302,7 +302,6 @@ struct PropertyDiff : Differentiable & AdditiveArithmetic {
     @differentiable(vjp: vjpPropertyA)
     var a: Float = 1
     typealias TangentVector = PropertyDiff
-    typealias AllDifferentiableVariables = PropertyDiff
     func vjpPropertyA() -> (Float, (Float) -> PropertyDiff) {
         (.zero, { _ in .zero })
     }

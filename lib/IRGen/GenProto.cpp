@@ -2207,7 +2207,24 @@ void IRGenModule::emitSILDifferentiabilityWitness(
 
   // Build the witness table.
   ConstantInitBuilder builder(*this);
-  auto diffWitnessContents = builder.beginArray(Int8PtrTy);
+  auto diffWitnessContents = builder.beginStruct();
+  auto *origFnAddr = getAddrOfSILFunction(dw->getOriginalFunction(), NotForDefinition);
+  auto *jvpFnAddr = getAddrOfSILFunction(dw->getJVP(), NotForDefinition);
+  auto *vjpFnAddr = getAddrOfSILFunction(dw->getVJP(), NotForDefinition);
+  llvm::errs() << "DIFF WITNESS REFERENCES\n";
+  origFnAddr->dump();
+  jvpFnAddr->dump();
+  vjpFnAddr->dump();
+  diffWitnessContents.addRelativeAddress(origFnAddr);
+  diffWitnessContents.addRelativeAddress(jvpFnAddr);
+  diffWitnessContents.addRelativeAddress(vjpFnAddr);
+  auto diffWitnessGlobal =
+    diffWitnessContents.finishAndCreateGlobal("differentiability_witness",
+                                              getPointerAlignment(),
+                                              /*constant*/ true);
+  llvm::errs() << "DIFF WITNESS GLOBAL\n";
+  diffWitnessGlobal->dump();
+  // getAddrOfDifferentiabilityWitness(<#SILFunction *original#>, <#const AutoDiffConfig config#>)
 #if 0
   WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
   wtableBuilder.build();

@@ -1063,6 +1063,18 @@ void IRGenerator::emitGlobalTopLevel() {
     CurrentIGMPtr IGM = getGenModule(prop.getDecl()->getInnermostDeclContext());
     IGM->emitSILProperty(&prop);
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  // Emit differentiability witnesses.
+  for (auto &dw : PrimaryIGM->getSILModule().getDifferentiabilityWitnessList()) {
+    // NOTE: Uncommenting this will cause test failures
+#if 0
+    // TODO: Which IRGenModule to use? The one containing JVP or VJP
+    CurrentIGMPtr IGM = getGenModule(dw.getOriginalFunction()->getDeclContext());
+    IGM->emitSILDifferentiabilityWitness(&dw);
+#endif
+  }
+  // SWIFT_ENABLE_TENSORFLOW
   
   // Emit code coverage mapping data.
   PrimaryIGM->emitCoverageMapping();
@@ -4390,11 +4402,11 @@ IRGenModule::getAddrOfWitnessTablePattern(const NormalProtocolConformance *conf,
 ///
 /// This can only be used with non-dependent conformances.
 llvm::Constant *IRGenModule::getAddrOfDifferentiabilityWitness(
-    const SILDifferentiabilityWitnessKey key, ConstantInit definition) {
+    SILFunction *original, const AutoDiffConfig config, ConstantInit definition) {
 #if 0
   IRGen.addLazyWitnessTable(conf);
 #endif
-  auto entity = LinkEntity::forDifferentiabilityWitness(key);
+  auto entity = LinkEntity::forDifferentiabilityWitness(original, config);
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 // SWIFT_ENABLE_TENSORFLOW

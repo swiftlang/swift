@@ -3435,7 +3435,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Derivation failed.
   diagnoseOrDefer(requirement, true,
-    [](NormalProtocolConformance *conformance) {
+    [&](NormalProtocolConformance *conformance) {
       auto proto = conformance->getProtocol();
       auto &diags = proto->getASTContext().Diags;
       diags.diagnose(conformance->getLoc(), diag::protocol_derivation_is_broken,

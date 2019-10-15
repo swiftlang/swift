@@ -1242,6 +1242,14 @@ public:
     case DifferentiabilityKind::NonDifferentiable:
       llvm_unreachable("Differentiability kind must be normal or linear");
     }
+    *this << "] [parameters";
+    for (auto i : dwfi->getParameterIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] [results";
+    for (auto i : dwfi->getResultIndices()->getIndices())
+      *this << ' ' << i;
+    *this << "] ";
+#if 0
     *this << "] ";
     if (dwfi->getParameterIndices()->isEmpty()) {
       *this << "[parameters";
@@ -1255,6 +1263,7 @@ public:
         *this << ' ' << i;
       *this << "] ";
     }
+#endif
     dwfi->getOriginalFunction()->printName(PrintState.OS);
     *this << " : " << dwfi->getOriginalFunction()->getLoweredType();
   }

@@ -842,11 +842,6 @@ void SILGenModule::emitDifferentiabilityWitness(
     auto vjpCanGenSig = vjp->getLoweredFunctionType()->getGenericSignature();
     if (!derivativeCanGenSig && vjpCanGenSig)
       derivativeCanGenSig = vjpCanGenSig;
-    if (derivativeCanGenSig != vjp->getLoweredFunctionType()->getGenericSignature()) {
-      llvm::errs() << "DERIVATIVE CAN GEN SIG MISMATCH: " << derivativeCanGenSig << " " << vjpCanGenSig << "\n";
-      derivativeCanGenSig->dump();
-      vjpCanGenSig->dump();
-    }
     assert(derivativeCanGenSig == vjpCanGenSig);
   }
   auto *resultIndices = IndexSubset::get(getASTContext(), 1, {0});
