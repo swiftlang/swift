@@ -720,27 +720,6 @@ static bool validateTypedPattern(TypeChecker &TC,
 
   assert(!dyn_cast_or_null<SpecifierTypeRepr>(TL.getTypeRepr()));
 
-  // Track whether the decl in this typed pattern should be
-  // implicitly unwrapped as needed during expression type checking.
-  if (TL.getTypeRepr() && TL.getTypeRepr()->getKind() ==
-      TypeReprKind::ImplicitlyUnwrappedOptional) {
-    auto *subPattern = TP->getSubPattern();
-
-    while (auto *parenPattern = dyn_cast<ParenPattern>(subPattern))
-      subPattern = parenPattern->getSubPattern();
-
-    if (auto *namedPattern = dyn_cast<NamedPattern>(subPattern)) {
-      // FIXME: This needs to be done as part of
-      // IsImplicitlyUnwrappedOptionalRequest::evaluate(); we just
-      // need to find the right TypedPattern there for the VarDecl
-      // in order to recover it's TypeRepr.
-      namedPattern->getDecl()->setImplicitlyUnwrappedOptional(true);
-    } else {
-      assert(isa<AnyPattern>(subPattern) &&
-             "Unexpected pattern nested in typed pattern!");
-    }
-  }
-
   return hadError;
 }
 
