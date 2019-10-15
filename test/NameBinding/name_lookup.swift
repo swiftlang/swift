@@ -614,6 +614,7 @@ _ = ShadowingGenericParameter<String>().foo(t: "hi")
 // rdar://problem/51266778
 struct PatternBindingWithTwoVars1 { var x = 3, y = x }
 // expected-error@-1 {{cannot use instance member 'x' within property initializer; property initializers run before 'self' is available}}
+// expected-error@-2 {{property 'x' references itself}}
 
 struct PatternBindingWithTwoVars2 { var x = y, y = 3 }
 // expected-error@-1 {{property 'y' references itself}}
