@@ -1,4 +1,4 @@
-# Differentiable Programming Mega-Proposal
+# Differentiable Programming Manifesto
 
 * Authors: [Richard Wei], [Dan Zheng], [Marc Rasi], [Bart Chrzaszcz]
 * Status: Partially implemented
