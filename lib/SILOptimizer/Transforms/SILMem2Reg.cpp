@@ -973,17 +973,6 @@ void MemoryToRegisters::promoteAllocs(ArrayRef<AllocStackInst*> allocs) {
   }
 }
 
-/// Attempt to promote the specified array of stack allocations to SSA
-/// registers.  Promotion can fail if the allocation escapes.
-void swift::promoteAllocsToSSA(ArrayRef<AllocStackInst*> allocs,
-                               DominanceInfo *domInfo) {
-  if (allocs.empty()) return;
-
-  auto *fn = allocs.front()->getFunction();
-  assert(fn && "Shouldn't have alloc stacks in global var initializers");
-  MemoryToRegisters(*fn, domInfo).promoteAllocs(allocs);
-}
-
 
 namespace {
 class SILMem2Reg : public SILFunctionTransform {
