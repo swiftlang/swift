@@ -123,10 +123,9 @@ bool constraints::doesMemberRefApplyCurriedSelf(Type baseTy,
   return true;
 }
 
-static bool
-areConservativelyCompatibleArgumentLabels(OverloadChoice choice,
-                                          ArrayRef<FunctionType::Param> args,
-                                          bool hasTrailingClosure) {
+static bool areConservativelyCompatibleArgumentLabels(
+    OverloadChoice choice, SmallVectorImpl<FunctionType::Param> &args,
+    bool hasTrailingClosure) {
   ValueDecl *decl = nullptr;
   switch (choice.getKind()) {
   case OverloadChoiceKind::Decl:
@@ -217,7 +216,7 @@ static bool acceptsTrailingClosure(const AnyFunctionType::Param &param) {
 // FIXME: This should return ConstraintSystem::TypeMatchResult instead
 //        to give more information to the solver about the failure.
 bool constraints::
-matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
+matchCallArguments(SmallVectorImpl<AnyFunctionType::Param> &args,
                    ArrayRef<AnyFunctionType::Param> params,
                    const ParameterListInfo &paramInfo,
                    bool hasTrailingClosure,
@@ -571,8 +570,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
         if (listener.extraArgument(index))
           return true;
       }
-
-      return false;
     }
 
     // FIXME: If we had the actual parameters and knew the body names, those
@@ -582,7 +579,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
   // If we have any unfulfilled parameters, check them now.
   if (haveUnfulfilledParams) {
-    bool hasSynthesizedArgs = false;
     for (paramIdx = 0; paramIdx != numParams; ++paramIdx) {
       // If we have a binding for this parameter, we're done.
       if (!parameterBindings[paramIdx].empty())
@@ -600,17 +596,11 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
 
       if (auto newArgIdx = listener.missingArgument(paramIdx)) {
         parameterBindings[paramIdx].push_back(*newArgIdx);
-        hasSynthesizedArgs = true;
         continue;
       }
 
       return true;
     }
-
-    // If all of the missing arguments have been synthesized,
-    // let's stop since we have found the problem.
-    if (hasSynthesizedArgs)
-      return false;
   }
 
   // If any arguments were provided out-of-order, check whether we have
@@ -873,6 +863,15 @@ public:
 
   bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
     if (CS.shouldAttemptFixes()) {
+      // If some of the arguments are missing/extraneous, no reason to
+      // record a fix for this, increase the score so there is a way
+      // to identify that there is something going on besides just missing
+      // arguments.
+      if (NumSynthesizedArgs || !ExtraArguments.empty()) {
+        CS.increaseScore(SK_Fix);
+        return false;
+      }
+
       auto *fix = MoveOutOfOrderArgument::create(
           CS, argIdx, prevArgIdx, Bindings, CS.getConstraintLocator(Locator));
       return CS.recordFix(fix);
@@ -885,31 +884,42 @@ public:
     if (!CS.shouldAttemptFixes())
       return true;
 
+    // TODO(diagnostics): If re-labeling is mixed with extra arguments,
+    // let's produce a fix only for extraneous arguments for now,
+    // because they'd share a locator path which (currently) means
+    // one fix would overwrite another.
+    if (!ExtraArguments.empty()) {
+      CS.increaseScore(SK_Fix);
+      return false;
+    }
+
     auto *anchor = Locator.getBaseLocator()->getAnchor();
-    if (!anchor)
+    if (!anchor || Arguments.size() != newLabels.size())
       return true;
 
     unsigned numExtraneous = 0;
-    for (unsigned paramIdx = 0, n = Bindings.size(); paramIdx != n;
-         ++paramIdx) {
-      if (Bindings[paramIdx].empty())
+    unsigned numRenames = 0;
+    for (unsigned i : indices(newLabels)) {
+      auto argLabel = Arguments[i].getLabel();
+      auto paramLabel = newLabels[i];
+
+      if (argLabel == paramLabel)
         continue;
 
-      const auto paramLabel = Parameters[paramIdx].getLabel();
-      for (auto argIdx : Bindings[paramIdx]) {
-        auto argLabel = Arguments[argIdx].getLabel();
-        if (paramLabel.empty() && !argLabel.empty())
+      if (!argLabel.empty()) {
+        if (paramLabel.empty())
           ++numExtraneous;
+        else
+          ++numRenames;
       }
     }
 
     auto *locator = CS.getConstraintLocator(Locator);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
-    CS.recordFix(fix);
-    // Re-labeling fixes with extraneous labels should take
-    // lower priority vs. other fixes on same/different
-    // overload(s) where labels did line up correctly.
-    CS.increaseScore(ScoreKind::SK_Fix, numExtraneous);
+    // Re-labeling fixes with extraneous/incorrect labels should be
+    // lower priority vs. other fixes on same/different overload(s)
+    // where labels did line up correctly.
+    CS.recordFix(fix, /*impact=*/1 + numExtraneous * 2 + numRenames * 3);
     return false;
   }
 
