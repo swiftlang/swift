@@ -486,14 +486,14 @@ case DeclKind::ID: return cast<ID##Decl>(this)->getLocFromSource();
   llvm_unreachable("Unknown decl kind");
 }
 
-Decl::CachedExternalSourceLocs*
-Decl::calculateSerializedLocs() const {
-  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
+const Decl::CachedExternalSourceLocs *Decl::calculateSerializedLocs() const {
   auto *File = cast<FileUnit>(getDeclContext()->getModuleScopeContext());
   auto Locs = File->getBasicLocsForDecl(this);
   if (!Locs.hasValue()) {
-    return Result;
+    static const Decl::CachedExternalSourceLocs NullLocs;
+    return &NullLocs;
   }
+  auto *Result = getASTContext().Allocate<Decl::CachedExternalSourceLocs>();
   auto &SM = getASTContext().SourceMgr;
 #define CASE(X)                                                               \
 Result->X = SM.getLocFromExternalSource(Locs->SourceFilePath, Locs->X.Line,   \

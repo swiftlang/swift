@@ -672,8 +672,8 @@ private:
     SourceLoc StartLoc;
     SourceLoc EndLoc;
   };
-  mutable CachedExternalSourceLocs *CachedLocs = nullptr;
-  CachedExternalSourceLocs *calculateSerializedLocs() const;
+  mutable CachedExternalSourceLocs const *CachedLocs = nullptr;
+  const CachedExternalSourceLocs *calculateSerializedLocs() const;
 protected:
 
   Decl(DeclKind kind, llvm::PointerUnion<DeclContext *, ASTContext *> context)
