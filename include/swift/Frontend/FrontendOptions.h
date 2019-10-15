@@ -156,6 +156,9 @@ public:
   /// Indicates that the input(s) should be parsed as the Swift stdlib.
   bool ParseStdlib = false;
 
+  /// Ignore .swiftsourceinfo file when trying to get source locations from module imported decls.
+  bool IgnoreSwiftSourceInfo = false;
+
   /// When true, emitted module files will always contain options for the
   /// debugger to use. When unset, the options will only be present if the
   /// module appears to not be a public module.

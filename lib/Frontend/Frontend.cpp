@@ -363,10 +363,11 @@ bool CompilerInstance::setUpModuleLoaders() {
       return true;
     }
   }
-
+  auto IgnoreSourceInfoFile =
+    Invocation.getFrontendOptions().IgnoreSwiftSourceInfo;
   if (Invocation.getLangOptions().EnableMemoryBufferImporter) {
     auto MemoryBufferLoader = MemoryBufferSerializedModuleLoader::create(
-        *Context, getDependencyTracker());
+        *Context, getDependencyTracker(), MLM, IgnoreSourceInfoFile);
     this->MemoryBufferLoader = MemoryBufferLoader.get();
     Context->addModuleLoader(std::move(MemoryBufferLoader));
   }
@@ -390,12 +391,13 @@ bool CompilerInstance::setUpModuleLoaders() {
     auto PIML = ModuleInterfaceLoader::create(
         *Context, ModuleCachePath, PrebuiltModuleCachePath,
         getDependencyTracker(), MLM, FEOpts.PreferInterfaceForModules,
-        FEOpts.RemarkOnRebuildFromModuleInterface);
+        FEOpts.RemarkOnRebuildFromModuleInterface, IgnoreSourceInfoFile);
     Context->addModuleLoader(std::move(PIML));
   }
 
   std::unique_ptr<SerializedModuleLoader> SML =
-    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM);
+    SerializedModuleLoader::create(*Context, getDependencyTracker(), MLM,
+                                   IgnoreSourceInfoFile);
   this->SML = SML.get();
   Context->addModuleLoader(std::move(SML));
 

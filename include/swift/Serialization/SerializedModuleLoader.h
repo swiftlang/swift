@@ -43,8 +43,10 @@ class SerializedModuleLoaderBase : public ModuleLoader {
 protected:
   ASTContext &Ctx;
   ModuleLoadingMode LoadMode;
+  bool IgnoreSwiftSourceInfoFile;
   SerializedModuleLoaderBase(ASTContext &ctx, DependencyTracker *tracker,
-                             ModuleLoadingMode LoadMode);
+                             ModuleLoadingMode LoadMode,
+                             bool IgnoreSwiftSourceInfoFile);
 
   void collectVisibleTopLevelModuleNamesImpl(SmallVectorImpl<Identifier> &names,
                                              StringRef extension) const;
@@ -168,8 +170,8 @@ public:
 class SerializedModuleLoader : public SerializedModuleLoaderBase {
 
   SerializedModuleLoader(ASTContext &ctx, DependencyTracker *tracker,
-                         ModuleLoadingMode loadMode)
-    : SerializedModuleLoaderBase(ctx, tracker, loadMode)
+                         ModuleLoadingMode loadMode, bool IgnoreSwiftSourceInfo)
+    : SerializedModuleLoaderBase(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
   {}
 
   std::error_code findModuleFilesInDirectory(
@@ -197,9 +199,10 @@ public:
   /// into the given ASTContext.
   static std::unique_ptr<SerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
-         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
+         bool IgnoreSwiftSourceInfo = false) {
     return std::unique_ptr<SerializedModuleLoader>{
-      new SerializedModuleLoader(ctx, tracker, loadMode)
+      new SerializedModuleLoader(ctx, tracker, loadMode, IgnoreSwiftSourceInfo)
     };
   }
 };
@@ -211,8 +214,10 @@ class MemoryBufferSerializedModuleLoader : public SerializedModuleLoaderBase {
 
   MemoryBufferSerializedModuleLoader(ASTContext &ctx,
                                      DependencyTracker *tracker,
-                                     ModuleLoadingMode loadMode)
-      : SerializedModuleLoaderBase(ctx, tracker, loadMode) {}
+                                     ModuleLoadingMode loadMode,
+                                     bool IgnoreSwiftSourceInfo)
+      : SerializedModuleLoaderBase(ctx, tracker, loadMode,
+                                   IgnoreSwiftSourceInfo) {}
 
   std::error_code findModuleFilesInDirectory(
       AccessPathElem ModuleID, StringRef DirPath, StringRef ModuleFilename,
@@ -253,9 +258,11 @@ public:
   /// into the given ASTContext.
   static std::unique_ptr<MemoryBufferSerializedModuleLoader>
   create(ASTContext &ctx, DependencyTracker *tracker = nullptr,
-         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized) {
+         ModuleLoadingMode loadMode = ModuleLoadingMode::PreferSerialized,
+         bool IgnoreSwiftSourceInfo = false) {
     return std::unique_ptr<MemoryBufferSerializedModuleLoader>{
-        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode)};
+        new MemoryBufferSerializedModuleLoader(ctx, tracker, loadMode,
+                                               IgnoreSwiftSourceInfo)};
   }
 };
 

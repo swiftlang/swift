@@ -104,8 +104,10 @@ Optional<bool> forEachModuleSearchPath(
 
 // Defined out-of-line so that we can see ~ModuleFile.
 SerializedModuleLoaderBase::SerializedModuleLoaderBase(
-    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode)
-    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode) {}
+    ASTContext &ctx, DependencyTracker *tracker, ModuleLoadingMode loadMode,
+    bool IgnoreSwiftSourceInfoFile)
+    : ModuleLoader(tracker), Ctx(ctx), LoadMode(loadMode),
+      IgnoreSwiftSourceInfoFile(IgnoreSwiftSourceInfoFile) {}
 
 SerializedModuleLoaderBase::~SerializedModuleLoaderBase() = default;
 SerializedModuleLoader::~SerializedModuleLoader() = default;
@@ -326,11 +328,12 @@ std::error_code SerializedModuleLoaderBase::openModuleFiles(
       FS.getBufferForFile(ModulePath);
   if (!ModuleOrErr)
     return ModuleOrErr.getError();
-
-  // Open .swiftsourceinfo file if it's present.
-  openModuleSourceInfoFileIfPresent(ModuleID, ModulePath,
-                                    ModuleSourceInfoFileName,
-                                    ModuleSourceInfoBuffer);
+  if (!IgnoreSwiftSourceInfoFile) {
+    // Open .swiftsourceinfo file if it's present.
+    openModuleSourceInfoFileIfPresent(ModuleID, ModulePath,
+                                      ModuleSourceInfoFileName,
+                                      ModuleSourceInfoBuffer);
+  }
   auto ModuleDocErr =
     openModuleDocFile(ModuleID, ModuleDocPath, ModuleDocBuffer);
   if (ModuleDocErr)
