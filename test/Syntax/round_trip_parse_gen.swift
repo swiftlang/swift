@@ -143,9 +143,6 @@ typealias H = () rethrows -> ()
 typealias I = (A & B<C>) -> C & D
 typealias J = inout @autoclosure () -> Int
 typealias K = (@invalidAttr Int, inout Int, __shared Int, __owned Int) -> ()
-typealias L = (inout Int) -> Int
-typealias M = (inout arg: Int) -> Int
-typealias N = (inout _ arg: @objc Int) -> Int
 
 @objc private typealias T<a,b> = Int
 @objc private typealias T<a,b>

@@ -233,10 +233,6 @@ SYNTAX_NODE_SERIALIZATION_CODES = {
     'PoundAssertStmt': 229,
     'SomeType': 230,
     'CustomAttribute': 231,
-    'GenericRequirement': 232,
-    'LayoutRequirement': 233,
-    'LayoutConstraint': 234,
-    'OpaqueReturnTypeOfAttributeArguments': 235,
 }
 
 
