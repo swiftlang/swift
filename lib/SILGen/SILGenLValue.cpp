@@ -3927,8 +3927,7 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
   bool isRValue = component.isRValue();
   ManagedValue addr = std::move(component).project(SGF, loc, base);
 
-  if (!SGF.getASTContext().LangOpts.DisableTsanInoutInstrumentation &&
-      (SGF.getModule().getOptions().Sanitizers & SanitizerKind::Thread) &&
+  if ((SGF.getModule().getOptions().Sanitizers & SanitizerKind::Thread) &&
       tsanKind == TSanKind::InoutAccess && !isRValue) {
     emitTsanInoutAccess(SGF, loc, addr);
   }

@@ -352,10 +352,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def disable_tsan_inout_instrumentation : Flag<["-"],
-  "disable-tsan-inout-instrumentation">,
-  HelpText<"Disable treatment of inout parameters as Thread Sanitizer accesses">;
-
 def report_errors_to_debugger : Flag<["-"], "report-errors-to-debugger">,
   HelpText<"Deprecated, will be removed in future versions.">;
 

@@ -292,9 +292,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
 
-  Opts.DisableTsanInoutInstrumentation |=
-      Args.hasArg(OPT_disable_tsan_inout_instrumentation);
-
   if (FrontendOpts.InputKind == InputFileKind::SIL)
     Opts.DisableAvailabilityChecking = true;
   
