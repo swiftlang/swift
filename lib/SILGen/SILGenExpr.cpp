@@ -2401,36 +2401,19 @@ emitInterpolationBuilderInit(RValueEmitter &RVE,
 RValue RValueEmitter::
 visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
                                    SGFContext C) {
-  RValue interpolation;
-  {
-    TapExpr *ETap = E->getAppendingExpr();
+  // Create the builder.
+  RValue builderInit = emitInterpolationBuilderInit(*this, E, SGFContext());
+  auto VarAddress = std::move(builderInit).materialize(SGF, SILLocation(E));
 
-    // Inlined from TapExpr:
-    // TODO: This is only necessary because constant evaluation requires that
-    // the box for the var gets defined before the initializer happens.
+  // Append the segments to it.
+  SILGenFunction::OpaqueValueRAII temporaryRef(SGF, E->getInterpolationExpr(),
+                                               VarAddress);
+  RValue interpolation = visitTapExpr(E->getAppendingExpr(), SGFContext());
 
-    Scope outerScope(SGF, CleanupLocation(ETap));
-
-    // Modified from TapExpr to evaluate the SubExpr directly rather than
-    // indirectly through the OpaqueValue system.
-    RValue builderInit = emitInterpolationBuilderInit(*this, E, SGFContext());
-
-    auto VarAddress = std::move(builderInit).materialize(SGF, SILLocation(E));
-    SILGenFunction::OpaqueValueRAII temporaryRef(SGF, ETap->getTemporaryRef(),
-                                                 VarAddress);
-
-    // Emit the body and let it mutate the var if it chooses.
-    SGF.emitStmt(ETap->getBody());
-
-    // Retrieve and return the var, making it +1 so it survives the scope.
-    interpolation = outerScope.popPreservingValue(
-        RValue(SGF, ETap, VarAddress).ensurePlusOne(SGF, ETap));
-  }
-
+  // Pass the builder to the initializer.
   PreparedArguments resultInitArgs;
   resultInitArgs.emplace(AnyFunctionType::Param(interpolation.getType()));
   resultInitArgs.add(E, std::move(interpolation));
-
   return SGF.emitApplyAllocatingInitializer(
       E, E->getResultInit(), std::move(resultInitArgs), Type(), C);
 }
