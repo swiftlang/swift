@@ -618,7 +618,8 @@ public:
 
   /// Returns true if there exists at least one differentiability witness for
   /// the given original function.
-  bool hasDifferentiabilityWitnesses(StringRef originalFunctionName);
+  bool hasDifferentiabilityWitnesses(StringRef originalFunctionName,
+                                     bool deserializeLazily=true);
 
   /// Look up the differentiability witnesses corresponding to the given
   /// original function name.

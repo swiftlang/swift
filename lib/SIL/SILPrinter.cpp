@@ -3085,6 +3085,46 @@ void SILDefaultWitnessTable::dump() const {
   print(llvm::errs());
 }
 
+// TODO(TF-893): Use this helper to dedupe the same logic in
+// `SILFunction::print`.
+static void printSILFunctionType(llvm::raw_ostream &OS, SILFunction *function) {
+  llvm::DenseMap<CanType, Identifier> Aliases;
+  llvm::DenseSet<Identifier> UsedNames;
+  auto sig = function->getLoweredFunctionType()->getGenericSignature();
+  auto *env = function->getGenericEnvironment();
+  if (sig && env) {
+    llvm::SmallString<16> disambiguatedNameBuf;
+    unsigned disambiguatedNameCounter = 1;
+    for (auto *paramTy : sig->getGenericParams()) {
+      auto sugaredTy = env->getSugaredType(paramTy);
+      Identifier name = sugaredTy->getName();
+      while (!UsedNames.insert(name).second) {
+        disambiguatedNameBuf.clear();
+        {
+          llvm::raw_svector_ostream names(disambiguatedNameBuf);
+          names << sugaredTy->getName() << disambiguatedNameCounter++;
+        }
+        name = function->getASTContext().getIdentifier(disambiguatedNameBuf);
+      }
+      if (name != sugaredTy->getName()) {
+        Aliases[paramTy->getCanonicalType()] = name;
+
+        // Also for the archetype
+        auto archetypeTy = env->mapTypeIntoContext(paramTy)
+            ->getAs<ArchetypeType>();
+        if (archetypeTy)
+          Aliases[archetypeTy->getCanonicalType()] = name;
+      }
+    }
+  }
+
+  PrintOptions withGenericEnvironment = PrintOptions::printSIL();
+  withGenericEnvironment.GenericEnv = env;
+  withGenericEnvironment.AlternativeTypeNames =
+    Aliases.empty() ? nullptr : &Aliases;
+  function->getLoweredFunctionType()->print(OS, withGenericEnvironment);
+}
+
 // SWIFT_ENABLE_TENSORFLOW
 void SILDifferentiabilityWitness::print(
     llvm::raw_ostream &OS, bool verbose) const {
@@ -3125,6 +3165,7 @@ void SILDifferentiabilityWitness::print(
     if (!requirements.empty()) {
       OS << " [where ";
       auto subPrinter = PrintOptions::printSIL();
+      subPrinter.GenericEnv = origGenEnv;
       interleave(requirements,
                  [&](Requirement req) {
                    req.print(OS, subPrinter);
@@ -3134,8 +3175,9 @@ void SILDifferentiabilityWitness::print(
     }
   }
   // @original-function-name : $original-sil-type
-  OS << " @" << originalFunction->getName() << " : "
-     << originalFunction->getLoweredType();
+  OS << " @" << originalFunction->getName() << " : $";
+  printSILFunctionType(OS, originalFunction);
+
   // {
   //   jvp: @jvp-function-name : $jvp-sil-type
   //   vjp: @vjp-function-name : $vjp-sil-type

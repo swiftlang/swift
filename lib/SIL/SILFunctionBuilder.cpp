@@ -107,6 +107,15 @@ void SILFunctionBuilder::addFunctionAttributes(SILFunction *F,
                 constant.mangle(), AutoDiffDerivativeFunctionKind::VJP,
                 indices)).str();
       }
+#if 0
+      llvm::errs() << "SILFunctionBuilder::addFunctionAttributes\n";
+      auto *resultIndices = IndexSubset::get(ctx, 1, {0});
+      SILDifferentiabilityWitness::create(M, F->getLinkage(), F, paramIndices,
+                                          resultIndices,
+                                          A->getDerivativeGenericSignature(),
+                                          /*jvp*/ nullptr, /*vjp*/ nullptr,
+                                          F->isSerialized());
+#endif
       auto *silDiffAttr = SILDifferentiableAttr::create(
           M, indices, M.allocateCopy(jvpName), M.allocateCopy(vjpName),
           A->getDerivativeGenericSignature());

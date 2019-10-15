@@ -3411,6 +3411,11 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));
 
+  llvm::errs() << "DESERIALIZING DIFF WITNESS: " << originalName << "\n";
+#if 0
+  AutoDiffConfig config{parameterIndices, resultIndices, derivativeGenSig};
+  config.print(llvm::errs()); llvm::errs() << "\n";
+#endif
   auto *diffWitness = SILDifferentiabilityWitness::create(
       SILMod, *linkage, original, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized);

@@ -273,9 +273,9 @@ static GenericSignature *getConstrainedDerivativeGenericSignature(
 ///   it exists.
 /// - Otherwise, return the original function's generic signature.
 static CanGenericSignature getDerivativeGenericSignature(
-    SILDifferentiableAttr *attr, SILFunction *original) {
-  if (auto *attrDerivativeGenSig = attr->getDerivativeGenericSignature())
-    return attrDerivativeGenSig->getCanonicalSignature();
+    SILDifferentiabilityWitness *witness, SILFunction *original) {
+  if (auto *witnessDerivativeGenSig = witness->getDerivativeGenericSignature())
+    return witnessDerivativeGenSig->getCanonicalSignature();
   return original->getLoweredFunctionType()->getGenericSignature();
 }
 
@@ -343,10 +343,10 @@ public:
     // associated original `apply` instruction and `[differentiable]` attribute.
     IndirectDifferentiation,
 
-    // Invoker by a `[differentiable]` attribute in SIL **without** being linked
-    // to a Swift AST attribute. This case has an associated `[differentiable]`
-    // attribute.
-    SILDifferentiableAttribute
+    // Invoker by a SIL differentiability witness (lowered from an AST
+    // `@differentiable` or `@differentiating attribute). This case has an
+    // associated SIL differentiability witness.
+    SILDifferentiabilityWitness
   };
 
 private:
@@ -356,17 +356,18 @@ private:
     DifferentiableFunctionInst *diffFuncInst;
     Value(DifferentiableFunctionInst *inst) : diffFuncInst(inst) {}
 
-    /// The parent `apply` instruction and `[differentiable]` attribute
+    /// The parent `apply` instruction and SIL differentiability witness
     /// associated with the `IndirectDifferentiation` case.
-    std::pair<ApplyInst *, SILDifferentiableAttr *>
+    std::pair<ApplyInst *, SILDifferentiabilityWitness *>
         indirectDifferentiation;
-    Value(ApplyInst *applyInst, SILDifferentiableAttr *attr)
-        : indirectDifferentiation({applyInst, attr}) {}
+    Value(ApplyInst *applyInst, SILDifferentiabilityWitness *witness)
+        : indirectDifferentiation({applyInst, witness}) {}
 
-    /// The `[differentiable]` attribute associated with the
-    /// `SILDifferentiableAttribute` case.
-    SILDifferentiableAttr *silDifferentiableAttribute;
-    Value(SILDifferentiableAttr *attr) : silDifferentiableAttribute(attr) {}
+    /// The SIL differentiability witness associated with the
+    /// `SILDifferentiabilityWitness` case.
+    SILDifferentiabilityWitness *differentiabilityWitness;
+    Value(SILDifferentiabilityWitness *witness)
+        : differentiabilityWitness(witness) {}
   } value;
 
   /*implicit*/
@@ -375,11 +376,11 @@ private:
 public:
   DifferentiationInvoker(DifferentiableFunctionInst *inst)
       : kind(Kind::DifferentiableFunctionInst), value(inst) {}
-  DifferentiationInvoker(ApplyInst *applyInst, SILDifferentiableAttr *attr)
-      : kind(Kind::IndirectDifferentiation),
-        value({applyInst, attr}) {}
-  DifferentiationInvoker(SILDifferentiableAttr *attr)
-      : kind(Kind::SILDifferentiableAttribute), value(attr) {}
+  DifferentiationInvoker(ApplyInst *applyInst,
+                         SILDifferentiabilityWitness *witness)
+      : kind(Kind::IndirectDifferentiation), value({applyInst, witness}) {}
+  DifferentiationInvoker(SILDifferentiabilityWitness *witness)
+      : kind(Kind::SILDifferentiabilityWitness), value(witness) {}
 
   Kind getKind() const { return kind; }
 
@@ -388,16 +389,16 @@ public:
     return value.diffFuncInst;
   }
 
-  std::pair<ApplyInst *, SILDifferentiableAttr *>
+  std::pair<ApplyInst *, SILDifferentiabilityWitness *>
   getIndirectDifferentiation() const {
     assert(kind == Kind::IndirectDifferentiation);
     return value.indirectDifferentiation;
   }
 
 
-  SILDifferentiableAttr *getSILDifferentiableAttribute() const {
-    assert(kind == Kind::SILDifferentiableAttribute);
-    return value.silDifferentiableAttribute;
+  SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
+    assert(kind == Kind::SILDifferentiabilityWitness);
+    return value.differentiabilityWitness;
   }
 
   SourceLoc getLocation() const {
@@ -406,9 +407,10 @@ public:
       return getDifferentiableFunctionInst()->getLoc().getSourceLoc();
     case Kind::IndirectDifferentiation:
       return getIndirectDifferentiation().first->getLoc().getSourceLoc();
-    case Kind::SILDifferentiableAttribute:
-      return getSILDifferentiableAttribute()->getOriginal()
-          ->getLocation().getSourceLoc();
+    case Kind::SILDifferentiabilityWitness:
+      if (auto *attr = getSILDifferentiabilityWitness()->getAttribute())
+        return attr->getLocation();
+      return SourceLoc();
     }
   }
 
@@ -440,8 +442,8 @@ private:
   /// Activity info of the original function.
   const DifferentiableActivityInfo &activityInfo;
 
-  /// Differentiation indices of the function.
-  const SILAutoDiffIndices &indices;
+  /// Autodiff configuration.
+  const AutoDiffConfig &config;
 
   /// Mapping from original basic blocks to linear map structs.
   DenseMap<SILBasicBlock *, StructDecl *> linearMapStructs;
@@ -543,8 +545,8 @@ private:
   /// whose cases represent the predecessors/successors of the given original
   /// block.
   EnumDecl *createBranchingTraceDecl(SILBasicBlock *originalBB,
-                                     SILAutoDiffIndices indices,
-                                     CanGenericSignature genericSig,
+                                     const AutoDiffConfig &config,
+                                     CanGenericSignature derivativeCanGenSig,
                                      SILLoopInfo *loopInfo) {
     assert(originalBB->getParent() == original);
     auto &astCtx = original->getASTContext();
@@ -557,28 +559,33 @@ private:
       enumName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
-          "__Succ__" + indices.mangle();
+          "__Succ__" + config.mangle();
       break;
     case AutoDiffLinearMapKind::Pullback:
       enumName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
-          "__Pred__" + indices.mangle();
+          "__Pred__" + config.mangle();
       break;
     }
     auto enumId = astCtx.getIdentifier(enumName);
     auto loc = original->getLocation().getSourceLoc();
+#if 0
+    CanGenericSignature derivativeCanGenSig;
+    if (auto *derivativeGenSig = config.derivativeGenericSignature)
+      derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+#endif
     GenericParamList *genericParams = nullptr;
-    if (genericSig)
-      genericParams = cloneGenericParameters(astCtx, &file, genericSig);
+    if (derivativeCanGenSig)
+      genericParams = cloneGenericParameters(astCtx, &file, derivativeCanGenSig);
     auto *branchingTraceDecl = new (astCtx) EnumDecl(
         /*EnumLoc*/ SourceLoc(), /*Name*/ enumId, /*NameLoc*/ loc,
         /*Inherited*/ {}, /*GenericParams*/ genericParams, /*DC*/ &file);
     // Note: must mark enum as implicit to satisfy assertion in
     // `Parser::parseDeclListDelayed`.
     branchingTraceDecl->setImplicit();
-    if (genericSig)
-      branchingTraceDecl->setGenericSignature(genericSig);
+    if (derivativeCanGenSig)
+      branchingTraceDecl->setGenericSignature(derivativeCanGenSig);
     computeAccessLevel(branchingTraceDecl,
                        original->getEffectiveSymbolLinkage());
     branchingTraceDecl->computeType();
@@ -625,8 +632,8 @@ private:
   /// storing the linear map values and predecessor/successor basic block of the
   /// given original block.
   StructDecl *
-  createLinearMapStruct(SILBasicBlock *originalBB, SILAutoDiffIndices indices,
-                        CanGenericSignature genericSig) {
+  createLinearMapStruct(SILBasicBlock *originalBB, const AutoDiffConfig &config,
+                        CanGenericSignature derivativeCanGenSig) {
     assert(originalBB->getParent() == original);
     auto *original = originalBB->getParent();
     auto &astCtx = original->getASTContext();
@@ -637,27 +644,32 @@ private:
       structName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
-          "__DF__" + indices.mangle();
+          "__DF__" + config.mangle();
       break;
     case swift::AutoDiffLinearMapKind::Pullback:
       structName =
           "_AD__" + original->getName().str() +
           "_bb" + std::to_string(originalBB->getDebugID()) +
-          "__PB__" + indices.mangle();
+          "__PB__" + config.mangle();
       break;
     }
     auto structId = astCtx.getIdentifier(structName);
+#if 0
+    CanGenericSignature derivativeCanGenSig;
+    if (auto *derivativeGenSig = config.derivativeGenericSignature)
+      derivativeCanGenSig = derivativeGenSig->getCanonicalSignature();
+#endif
     GenericParamList *genericParams = nullptr;
-    if (genericSig)
-      genericParams = cloneGenericParameters(astCtx, &file, genericSig);
+    if (derivativeCanGenSig)
+      genericParams = cloneGenericParameters(astCtx, &file, derivativeCanGenSig);
     auto *linearMapStruct = new (astCtx) StructDecl(
         /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
         /*Inherited*/ {}, /*GenericParams*/ genericParams, /*DC*/ &file);
     // Note: must mark struct as implicit to satisfy assertion in
     // `Parser::parseDeclListDelayed`.
     linearMapStruct->setImplicit();
-    if (genericSig)
-      linearMapStruct->setGenericSignature(genericSig);
+    if (derivativeCanGenSig)
+      linearMapStruct->setGenericSignature(derivativeCanGenSig);
     computeAccessLevel(
         linearMapStruct, original->getEffectiveSymbolLinkage());
     linearMapStruct->computeType();
@@ -702,13 +714,13 @@ private:
   /// Given an `apply` instruction, conditionally adds its linear map function
   /// to the linear map struct if it is active.
   void addLinearMapToStruct(ADContext &context, ApplyInst *ai,
-                            const SILAutoDiffIndices &indices);
+                            const AutoDiffConfig &config);
 
   /// Generate linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
   /// branching enum field.
   void generateDifferentiationDataStructures(
-      ADContext &context, const SILAutoDiffIndices &indices,
+      ADContext &context, const AutoDiffConfig &config,
       SILFunction *derivative);
 
 public:
@@ -721,7 +733,7 @@ public:
   explicit LinearMapInfo(ADContext &context,
                          AutoDiffLinearMapKind kind,
                          SILFunction *original, SILFunction *derivative,
-                         const SILAutoDiffIndices &indices,
+                         const AutoDiffConfig &config,
                          const DifferentiableActivityInfo &activityInfo);
 
   /// Returns the linear map struct associated with the given original block.
@@ -807,7 +819,7 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
   switch (kind) {
   case Kind::DifferentiableFunctionInst:
     os << "differentiable_function_inst=(" << *getDifferentiableFunctionInst()
-       << ")";
+       << ')';
     break;
   case Kind::IndirectDifferentiation: {
     auto indDiff = getIndirectDifferentiation();
@@ -824,11 +836,11 @@ void DifferentiationInvoker::print(llvm::raw_ostream &os) const {
     */
     break;
   }
-  case Kind::SILDifferentiableAttribute: {
-    auto diffAttr = getSILDifferentiableAttribute();
-    os << "sil_differentiable_attribute=(attr=(";
-    diffAttr->print(os);
-    os << ") function=" << diffAttr->getOriginal()->getName();
+  case Kind::SILDifferentiabilityWitness: {
+    auto *diffWitness = getSILDifferentiabilityWitness();
+    os << "sil_differentiabilityWitness=(";
+    diffWitness->print(os);
+    os << ')';
     break;
   }
   }
@@ -862,9 +874,9 @@ private:
   SmallPtrSet<DifferentiableFunctionInst *, 32>
       processedDifferentiableFunctionInsts;
 
-  /// Mapping from `[differentiable]` attributes to invokers.
+  /// Mapping from SIL differentiability witnesses to invokers.
   /// `SmallMapVector` is used for deterministic insertion order iteration.
-  SmallMapVector<SILDifferentiableAttr *, DifferentiationInvoker, 32>
+  SmallMapVector<SILDifferentiabilityWitness *, DifferentiationInvoker, 32>
       invokers;
 
   /// Mapping from `differentiable_function` instructions to result indices.
@@ -916,7 +928,8 @@ public:
     return processedDifferentiableFunctionInsts;
   }
 
-  llvm::SmallMapVector<SILDifferentiableAttr *, DifferentiationInvoker, 32> &
+  llvm::SmallMapVector<SILDifferentiabilityWitness *, DifferentiationInvoker,
+                       32> &
   getInvokers() {
     return invokers;
   }
@@ -961,12 +974,12 @@ public:
 
   void cleanUp() {
     for (auto invokerPair : invokers) {
-      auto *attr = std::get<0>(invokerPair);
-      auto *original = attr->getOriginal();
+      auto *witness = std::get<0>(invokerPair);
+      auto *original = witness->getOriginalFunction();
       LLVM_DEBUG(getADDebugStream()
-                 << "Removing [differentiable] attribute for "
+                 << "Removing differentiability witness for "
                  << original->getName() << '\n');
-      original->removeDifferentiableAttr(attr);
+      getModule().deleteDifferentiabilityWitness(witness);
     }
     // Delete all references to generated functions.
     for (auto derivativeFn : generatedDerivativeFunctionReferences) {
@@ -991,6 +1004,7 @@ public:
   // `[differentiable]` attribute lookup and registration
   //--------------------------------------------------------------------------//
 
+#if 0
   /// Finds the `[differentiable]` attribute on the specified original function
   /// with the exact specified parameter indices. Returns nullptr if no such
   /// attribute exists.
@@ -1101,6 +1115,136 @@ public:
     return createDifferentiableAttr(original, indices,
                                     derivativeGenericSignature);
   }
+#endif
+
+  /// Finds the `[differentiable]` attribute on the specified original function
+  /// with the exact specified parameter indices. Returns nullptr if no such
+  /// attribute exists.
+  SILDifferentiabilityWitness *lookUpDifferentiabilityWitness(
+      SILFunction *original, const AutoDiffConfig &config) const {
+    if (!getModule().hasDifferentiabilityWitnesses(original->getName()))
+      return nullptr;
+#if 0
+    llvm::errs() << "FOUND DIFF WITNESSES FOR ORIGINAL " << original->getName() << ": " << getModule().lookUpDifferentiabilityWitnesses(original->getName()).size() << "\n";
+    config.print(llvm::errs());  llvm::errs() << "\n";
+#endif
+    for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName())) {
+      auto *diffWitness = pair.second;
+#if 0
+      diffWitness->dump();
+      diffWitness->getAutoDiffConfig().print(llvm::errs());  llvm::errs() << "\n";
+#endif
+      if (diffWitness->getResultIndices() == config.resultIndices &&
+          diffWitness->getParameterIndices() == config.parameterIndices)
+        return diffWitness;
+    }
+    return nullptr;
+#if 0
+    // NOTE: Doesn't quite work if derivative generic signature
+    auto key = std::make_pair(original->getName(), config);
+    return getModule().lookUpDifferentiabilityWitness(key);
+#endif
+  }
+
+  /// Finds the `[differentiable]` attribute on the specified original function
+  /// whose parameter indices are a minimal superset of the specified parameter
+  /// indices. Returns nullptr if no such attribute exists.
+  SILDifferentiabilityWitness *lookUpMinimalDifferentiabilityWitness(
+      SILFunction *original, const AutoDiffConfig &config) const {
+    auto *minimalIndexSet = IndexSubset::getDefault(
+        getASTContext(),
+        original->getLoweredFunctionType()->getNumParameters(), false);
+    auto *indexSet = config.parameterIndices;
+    if (auto *exactWitness = lookUpDifferentiabilityWitness(original, config))
+      return exactWitness;
+    SILDifferentiabilityWitness *minimalWitness = nullptr;
+    if (!getModule().hasDifferentiabilityWitnesses(original->getName()))
+      return nullptr;
+    for (auto &pair : getModule().lookUpDifferentiabilityWitnesses(original->getName())) {
+      auto *diffWitness = pair.second;
+      if (diffWitness->getResultIndices() != config.resultIndices)
+        continue;
+      auto *diffWitnessIndexSet = diffWitness->getParameterIndices();
+      // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
+      // indices than our current candidate and a primitive VJP, then `da` is
+      // our new candidate.
+      //
+      // NOTE(TF-642): `da` may come from a un-partial-applied function and
+      // have larger capacity than the desired indices. We expect this logic to
+      // go away when `partial_apply` supports `@differentiable` callees.
+      if (diffWitnessIndexSet->isSupersetOf(indexSet->extendingCapacity(
+              getASTContext(), diffWitnessIndexSet->getCapacity())) &&
+          // fewer parameters than before
+          (minimalIndexSet->isEmpty() ||
+           diffWitnessIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
+        minimalWitness = diffWitness;
+        minimalIndexSet = diffWitnessIndexSet;
+      }
+    }
+    return minimalWitness;
+  }
+
+  /// Finds the `@differentiable` attribute (and its parameter indices) on the
+  /// specified original function whose parameter indices are a minimal
+  /// superset of the specified parameter indices. Returns nullptr if no such
+  /// attribute exists.
+  std::pair<const DifferentiableAttr *, IndexSubset *>
+  lookUpMinimalASTDifferentiableAttrAndIndexSubset(
+      SILDeclRef originalDeclRef, CanSILFunctionType originalFnType,
+      const AutoDiffConfig &config) {
+    auto *original = originalDeclRef.getDecl();
+    const DifferentiableAttr *minimalAttr = nullptr;
+    auto *minimalIndexSet = IndexSubset::getDefault(
+        getASTContext(), originalFnType->getNumParameters(), false);
+    auto *indexSet = config.parameterIndices;
+    for (auto *da : original->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto *daParamIndices = da->getParameterIndices();
+      auto *daIndexSet = autodiff::getLoweredParameterIndices(
+          daParamIndices, original->getInterfaceType()->castTo<AnyFunctionType>());
+      // If all indices in `indexSet` are in `daIndexSet`, and it has fewer
+      // indices than our current candidate and a primitive VJP, then `da` is
+      // our new candidate.
+      //
+      // NOTE(TF-642): `da` may come from a un-partial-applied function and
+      // have larger capacity than the desired indices. We expect this logic to
+      // go away when `partial_apply` supports `@differentiable` callees.
+      if (daIndexSet->isSupersetOf(indexSet->extendingCapacity(getASTContext(),
+              daIndexSet->getCapacity())) &&
+          // fewer parameters than before
+          (minimalIndexSet->isEmpty() ||
+           daIndexSet->getNumIndices() < minimalIndexSet->getNumIndices())) {
+        minimalAttr = da;
+        minimalIndexSet = daIndexSet;
+      }
+    }
+    return std::make_pair(minimalAttr, minimalIndexSet);
+  }
+
+  /// Creates a `[differentiable]` attribute on the specified original function
+  /// with the specified parameter indices.
+  SILDifferentiabilityWitness *createDifferentiabilityWitness(
+      SILFunction *original, const AutoDiffConfig &config) const {
+    assert(!lookUpDifferentiabilityWitness(original, config));
+    auto derivativeConstrainedGenSig = getConstrainedDerivativeGenericSignature(
+        original->getLoweredFunctionType(), config.parameterIndices,
+        config.derivativeGenericSignature);
+    llvm::errs() << "ADContext::getOrCreateDifferentiabilityWitness\n";
+    auto *diffWitness = SILDifferentiabilityWitness::create(
+        getModule(), original->getLinkage(), original, config.parameterIndices,
+        config.resultIndices, derivativeConstrainedGenSig,
+        /*jvp*/ nullptr, /*vjp*/ nullptr, /*isSerialized*/ true);
+    return diffWitness;
+  }
+
+  /// Finds or creates a `[differentiable]` attribute on the specified
+  /// original function corresponding to the specified parameter indices.
+  SILDifferentiabilityWitness *getOrCreateDifferentiabilityWitness(
+      SILFunction *original, const AutoDiffConfig &config) {
+    if (auto *attr = lookUpDifferentiabilityWitness(original, config))
+      return attr;
+    assert(original->isDefinition());
+    return createDifferentiabilityWitness(original, config);
+  }
 
   /// Creates an `differentiable_function` instruction using the given builder
   /// and arguments. Erase the newly created instruction from the processed set,
@@ -1124,10 +1268,10 @@ private:
       DifferentiationInvoker invoker);
 
 public:
-  /// Process the given `[differentiable]` attribute, filling in JVP/VJPs if
+  /// Process the given SIL differentiability witness, filling in JVP/VJPs if
   /// missing.
   bool processDifferentiableAttribute(
-      SILFunction *original, SILDifferentiableAttr *attr,
+      SILFunction *original, SILDifferentiabilityWitness *witness,
       DifferentiationInvoker invoker);
 
   /// Process the given `differentiable_function` instruction, filling in
@@ -1175,7 +1319,8 @@ public:
   /// function kind.
   SILFunction *
   declareExternalDerivativeFunction(SILFunction *original,
-                                    SILDifferentiableAttr *attr, StringRef name,
+                                    SILDifferentiabilityWitness *witness,
+                                    StringRef name,
                                     AutoDiffDerivativeFunctionKind kind);
 
   template <typename ...T, typename ...U>
@@ -1275,9 +1420,9 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   // and `@differentiable` attribute. If they are found, emit an error on the
   // `@differentiable` attribute; otherwise, emit an error on the SIL function.
   // Emit a note at the non-differentiable operation.
-  case DifferentiationInvoker::Kind::SILDifferentiableAttribute: {
-    auto *attr = invoker.getSILDifferentiableAttribute();
-    auto *original = attr->getOriginal();
+  case DifferentiationInvoker::Kind::SILDifferentiabilityWitness: {
+    auto *witness = invoker.getSILDifferentiabilityWitness();
+    auto *original = witness->getOriginalFunction();
     bool foundAttr = false;
     if (auto *declContext = original->getDeclContext()) {
       if (auto *fnDecl = declContext->getInnermostDeclarationDeclContext()) {
@@ -1305,9 +1450,9 @@ ADContext::emitNondifferentiabilityError(SourceLoc loc,
   // invoker.
   case DifferentiationInvoker::Kind::IndirectDifferentiation: {
     SILInstruction *inst;
-    SILDifferentiableAttr *attr;
-    std::tie(inst, attr) = invoker.getIndirectDifferentiation();
-    auto invokerLookup = invokers.find(attr);
+    SILDifferentiabilityWitness *witness;
+    std::tie(inst, witness) = invoker.getIndirectDifferentiation();
+    auto invokerLookup = invokers.find(witness);
     assert(invokerLookup != invokers.end() && "Expected parent invoker");
     emitNondifferentiabilityError(inst, invokerLookup->second,
         diag::autodiff_expression_not_differentiable_note);
@@ -1438,14 +1583,14 @@ public:
       DifferentiableActivityCollection &parent, GenericSignature *assocGenSig);
 
   bool isVaried(SILValue value, unsigned independentVariableIndex) const;
-  bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
   bool isVaried(SILValue value, IndexSubset *parameterIndices) const;
-  bool isActive(SILValue value, const SILAutoDiffIndices &indices) const;
+  bool isUseful(SILValue value, unsigned dependentVariableIndex) const;
+  bool isUseful(SILValue value, IndexSubset *resultIndices) const;
+  bool isActive(SILValue value, const AutoDiffConfig &config) const;
 
-  Activity getActivity(SILValue value,
-                       const SILAutoDiffIndices &indices) const;
+  Activity getActivity(SILValue value, const AutoDiffConfig &config) const;
   Activity getActivity(SILInstruction *inst,
-                       const SILAutoDiffIndices &indices) const;
+                       const AutoDiffConfig &config) const;
 };
 
 /// Given a parameter argument (not indirect result) and some differentiation
@@ -1467,7 +1612,7 @@ static bool isDifferentiationParameter(SILArgument *argument,
 /// - The set of minimal parameter and result indices for differentiating the
 ///   `apply` instruction.
 static void collectMinimalIndicesForFunctionCall(
-    ApplyInst *ai, const SILAutoDiffIndices &parentIndices,
+    ApplyInst *ai, const AutoDiffConfig &parentConfig,
     const DifferentiableActivityInfo &activityInfo,
     SmallVectorImpl<SILValue> &results, SmallVectorImpl<unsigned> &paramIndices,
     SmallVectorImpl<unsigned> &resultIndices) {
@@ -1478,9 +1623,9 @@ static void collectMinimalIndicesForFunctionCall(
   // Record all parameter indices in type order.
   unsigned currentParamIdx = 0;
   for (auto applyArg : ai->getArgumentsWithoutIndirectResults()) {
-    if (activityInfo.isVaried(applyArg, parentIndices.parameters) ||
+    if (activityInfo.isVaried(applyArg, parentConfig.parameterIndices) ||
         isDifferentiationParameter(dyn_cast<SILArgument>(applyArg),
-                                   parentIndices.parameters))
+                                   parentConfig.parameterIndices))
       paramIndices.push_back(currentParamIdx);
     ++currentParamIdx;
   }
@@ -1501,13 +1646,13 @@ static void collectMinimalIndicesForFunctionCall(
     if (res.isFormalDirect()) {
       results.push_back(directResults[dirResIdx]);
       if (auto dirRes = directResults[dirResIdx])
-        if (dirRes && activityInfo.isUseful(dirRes, parentIndices.source))
+        if (dirRes && activityInfo.isUseful(dirRes, parentConfig.resultIndices))
           resultIndices.push_back(idx);
       ++dirResIdx;
     } else {
       results.push_back(indirectResults[indResIdx]);
       if (activityInfo.isUseful(indirectResults[indResIdx],
-                                parentIndices.source))
+                                parentConfig.resultIndices))
         resultIndices.push_back(idx);
       ++indResIdx;
     }
@@ -1515,19 +1660,19 @@ static void collectMinimalIndicesForFunctionCall(
   // Make sure the function call has active results.
   assert(results.size() == calleeFnTy->getNumResults());
   assert(llvm::any_of(results, [&](SILValue result) {
-    return activityInfo.isActive(result, parentIndices);
+    return activityInfo.isActive(result, parentConfig);
   }));
 }
 
 LinearMapInfo::LinearMapInfo(ADContext &context,
                              AutoDiffLinearMapKind kind,
                              SILFunction *original, SILFunction *derivative,
-                             const SILAutoDiffIndices &indices,
+                             const AutoDiffConfig &config,
                              const DifferentiableActivityInfo &activityInfo)
     : kind(kind), original(original), derivative(derivative),
-      activityInfo(activityInfo), indices(indices),
+      activityInfo(activityInfo), config(config),
       typeConverter(context.getTypeConverter()) {
-  generateDifferentiationDataStructures(context, indices, derivative);
+  generateDifferentiationDataStructures(context, config, derivative);
 }
 
 /// Returns a flag that indicates whether the `apply` instruction should be
@@ -1546,15 +1691,15 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
   auto arguments = ai->getArgumentsWithoutIndirectResults();
   for (auto i : swift::indices(paramInfos))
     if (paramInfos[i].isIndirectInOut() &&
-        activityInfo.isActive(arguments[i], indices))
+        activityInfo.isActive(arguments[i], config))
       return true;
 
   bool hasActiveDirectResults = false;
   forEachApplyDirectResult(ai, [&](SILValue directResult) {
-    hasActiveDirectResults |= activityInfo.isActive(directResult, indices);
+    hasActiveDirectResults |= activityInfo.isActive(directResult, config);
   });
   bool hasActiveIndirectResults = llvm::any_of(ai->getIndirectSILResults(),
-      [&](SILValue result) { return activityInfo.isActive(result, indices); });
+      [&](SILValue result) { return activityInfo.isActive(result, config); });
   bool hasActiveResults = hasActiveDirectResults || hasActiveIndirectResults;
 
   // TODO: Pattern match to make sure there is at least one `store` to the
@@ -1563,7 +1708,7 @@ bool LinearMapInfo::shouldDifferentiateApplyInst(ApplyInst *ai) {
     return true;
 
   bool hasActiveArguments = llvm::any_of(arguments,
-      [&](SILValue arg) { return activityInfo.isActive(arg, indices); });
+      [&](SILValue arg) { return activityInfo.isActive(arg, config); });
   return hasActiveResults && hasActiveArguments;
 }
 
@@ -1587,9 +1732,9 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // Anything with an active result and an active operand should be
   // differentiated.
   auto hasActiveOperands = llvm::any_of(inst->getAllOperands(),
-      [&](Operand &op) { return activityInfo.isActive(op.get(), indices); });
+      [&](Operand &op) { return activityInfo.isActive(op.get(), config); });
   auto hasActiveResults = llvm::any_of(inst->getResults(),
-      [&](SILValue val) { return activityInfo.isActive(val, indices); });
+      [&](SILValue val) { return activityInfo.isActive(val, config); });
   if (hasActiveOperands && hasActiveResults)
     return true;
   // A `store`-like instruction does not have an SSA result, but has two
@@ -1597,7 +1742,7 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // the input and the output, respectively.
 #define CHECK_INST_TYPE_ACTIVE_DEST(INST) \
   if (auto *castInst = dyn_cast<INST##Inst>(inst)) \
-    return activityInfo.isActive(castInst->getDest(), indices);
+    return activityInfo.isActive(castInst->getDest(), config);
   CHECK_INST_TYPE_ACTIVE_DEST(Store)
   CHECK_INST_TYPE_ACTIVE_DEST(StoreBorrow)
   CHECK_INST_TYPE_ACTIVE_DEST(CopyAddr)
@@ -1624,22 +1769,22 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
 /// Takes an `apply` instruction and adds its linear map function to the
 /// linear map struct if it is active.
 void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
-                                         const SILAutoDiffIndices &indices) {
+                                         const AutoDiffConfig &config) {
   SmallVector<SILValue, 4> allResults;
   SmallVector<unsigned, 8> activeParamIndices;
   SmallVector<unsigned, 8> activeResultIndices;
   collectMinimalIndicesForFunctionCall(
-      ai, indices, activityInfo, allResults, activeParamIndices,
+      ai, config, activityInfo, allResults, activeParamIndices,
       activeResultIndices);
 
   // Check if there are any active results or arguments. If not, skip
   // this instruction.
   auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
-    return activityInfo.isActive(res, indices);
+    return activityInfo.isActive(res, config);
   });
   auto hasActiveArguments = llvm::any_of(
       ai->getArgumentsWithoutIndirectResults(), [&](SILValue arg) {
-    return activityInfo.isActive(arg, indices);
+    return activityInfo.isActive(arg, config);
   });
   if (!hasActiveResults || !hasActiveArguments)
     return;
@@ -1694,7 +1839,6 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
 
   auto derivativeFnResultTypes =
       derivativeFnType->getAllResultsType().castTo<TupleType>();
-  derivativeFnResultTypes->getElement(derivativeFnResultTypes->getElements().size() - 1);
   auto linearMapSILType = SILType::getPrimitiveObjectType(
       derivativeFnResultTypes
           ->getElement(derivativeFnResultTypes->getElements().size() - 1)
@@ -1704,22 +1848,21 @@ void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai,
 }
 
 void LinearMapInfo::generateDifferentiationDataStructures(
-    ADContext &context, const SILAutoDiffIndices &indices,
-    SILFunction *derivativeFn) {
+    ADContext &context, const AutoDiffConfig &config, SILFunction *derivative) {
   auto &astCtx = original->getASTContext();
   auto *loopAnalysis = context.getPassManager().getAnalysis<SILLoopAnalysis>();
   auto *loopInfo = loopAnalysis->get(original);
 
   // Get the derivative function generic signature.
-  CanGenericSignature derivativeFnGenSig = nullptr;
-  if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
-    derivativeFnGenSig =
-        derivativeFnGenEnv->getGenericSignature()->getCanonicalSignature();
+  CanGenericSignature derivativeGenSig = nullptr;
+  if (auto *derivativeGenEnv = derivative->getGenericEnvironment())
+    derivativeGenSig =
+        derivativeGenEnv->getGenericSignature()->getCanonicalSignature();
 
   // Create linear map struct for each original block.
   for (auto &origBB : *original) {
-    auto *linearMapStruct =
-        createLinearMapStruct(&origBB, indices, derivativeFnGenSig);
+    auto *linearMapStruct = createLinearMapStruct(
+        &origBB, config, derivativeGenSig);
     linearMapStructs.insert({&origBB, linearMapStruct});
   }
 
@@ -1735,8 +1878,8 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     break;
   }
   for (auto &origBB : *original) {
-    auto *traceEnum =
-        createBranchingTraceDecl(&origBB, indices, derivativeFnGenSig, loopInfo);
+    auto *traceEnum = createBranchingTraceDecl(
+        &origBB, config, derivativeGenSig, loopInfo);
     branchingTraceDecls.insert({&origBB, traceEnum});
     if (origBB.isEntry())
       continue;
@@ -1759,7 +1902,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
         for (unsigned i : swift::indices(paramInfos)) {
           if (paramInfos[i].isIndirectInOut() &&
               activityInfo.isActive(ai->getArgumentsWithoutIndirectResults()[i],
-                                    indices)) {
+                                    config)) {
             // Reject functions with active inout arguments. It's not yet
             // supported.
             isInout = true;
@@ -1777,7 +1920,7 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 
         LLVM_DEBUG(getADDebugStream() << "Adding linear map struct field for "
                                       << *ai);
-        addLinearMapToStruct(context, ai, indices);
+        addLinearMapToStruct(context, ai, config);
       }
     }
   }
@@ -2194,35 +2337,43 @@ bool DifferentiableActivityInfo::isUseful(
   return set.count(value);
 }
 
+bool DifferentiableActivityInfo::isUseful(
+    SILValue value, IndexSubset *resultIndices) const {
+  for (auto resultIdx : resultIndices->getIndices())
+    if (isUseful(value, resultIdx))
+      return true;
+  return false;
+}
+
 bool DifferentiableActivityInfo::isActive(
-    SILValue value, const SILAutoDiffIndices &indices) const {
-  return isVaried(value, indices.parameters) && isUseful(value, indices.source);
+    SILValue value, const AutoDiffConfig &config) const {
+  return isVaried(value, config.parameterIndices) &&
+         isUseful(value, config.resultIndices);
 }
 
 Activity DifferentiableActivityInfo::getActivity(
-    SILValue value, const SILAutoDiffIndices &indices) const {
+    SILValue value, const AutoDiffConfig &config) const {
   Activity activity;
-  if (isVaried(value, indices.parameters))
+  if (isVaried(value, config.parameterIndices))
     activity |= ActivityFlags::Varied;
-  if (isUseful(value, indices.source))
+  if (isUseful(value, config.resultIndices))
     activity |= ActivityFlags::Useful;
   return activity;
 }
 
 Activity DifferentiableActivityInfo::getActivity(
-    SILInstruction *inst, const SILAutoDiffIndices &indices) const {
+    SILInstruction *inst, const AutoDiffConfig &config) const {
   Activity activity;
   for (auto result : inst->getResults())
-    activity |= getActivity(result, indices);
+    activity |= getActivity(result, config);
   return activity;
 }
 
-static void dumpActivityInfo(SILValue value,
-                             const SILAutoDiffIndices &indices,
+static void dumpActivityInfo(SILValue value, const AutoDiffConfig &config,
                              const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
   s << '[';
-  auto activity = activityInfo.getActivity(value, indices);
+  auto activity = activityInfo.getActivity(value, config);
   switch (activity.toRaw()) {
   case 0: s << "NONE"; break;
   case (unsigned)ActivityFlags::Varied: s << "VARIED"; break;
@@ -2232,18 +2383,17 @@ static void dumpActivityInfo(SILValue value,
   s << "] " << value;
 }
 
-static void dumpActivityInfo(SILFunction &fn,
-                             const SILAutoDiffIndices &indices,
+static void dumpActivityInfo(SILFunction &fn, const AutoDiffConfig &config,
                              const DifferentiableActivityInfo &activityInfo,
                              llvm::raw_ostream &s = llvm::dbgs()) {
-  s << "Activity info for " << fn.getName() << " at " << indices << '\n';
+  s << "Activity info for " << fn.getName() << " at " << config << '\n';
   for (auto &bb : fn) {
     s << "bb" << bb.getDebugID() << ":\n";
     for (auto *arg : bb.getArguments())
-      dumpActivityInfo(arg, indices, activityInfo, s);
+      dumpActivityInfo(arg, config, activityInfo, s);
     for (auto &inst : bb)
       for (auto res : inst.getResults())
-        dumpActivityInfo(res, indices, activityInfo, s);
+        dumpActivityInfo(res, config, activityInfo, s);
     s << '\n';
   }
 }
@@ -2548,17 +2698,17 @@ static SubstitutionMap getSubstitutionMap(
 /// that the task actually gets executed.
 ///
 /// FIXME: This is too complicated and needs to be rewritten.
-static Optional<std::pair<SILValue, SILAutoDiffIndices>>
+static Optional<std::pair<SILValue, AutoDiffConfig>>
 emitDerivativeFunctionReference(
-    ADContext &context, SILBuilder &builder, SILAutoDiffIndices desiredIndices,
-    AutoDiffDerivativeFunctionKind kind, SILValue original,
-    DifferentiationInvoker invoker,
+    ADContext &context, SILBuilder &builder,
+    const AutoDiffConfig &desiredConfig, AutoDiffDerivativeFunctionKind kind,
+    SILValue original, DifferentiationInvoker invoker,
     SmallVectorImpl<AllocStackInst *> &newBuffersToDealloc) {
 
   SILValue functionSource = original;
 
-  // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind matches
-  // the given kind and desired differentiation parameter indices, simply
+  // If `original` is itself an `DifferentiableFunctionExtractInst` whose kind
+  // matches given kind and desired differentiation parameter indices, simply
   // extract the derivative function of its function operand, retain the
   // derivative function, and return it.
   if (auto *inst = original->getDefiningInstruction())
@@ -2572,7 +2722,7 @@ emitDerivativeFunctionReference(
           functionSource->getType().castTo<SILFunctionType>()) {
     if (diffableFnType->isDifferentiable()) {
       auto paramIndices = diffableFnType->getDifferentiationParameterIndices();
-      for (auto i : desiredIndices.parameters->getIndices()) {
+      for (auto i : desiredConfig.parameterIndices->getIndices()) {
         if (!paramIndices->contains(i)) {
           context.emitNondifferentiabilityError(functionSource, invoker,
               diag::autodiff_function_nondiff_parameter_not_differentiable);
@@ -2586,8 +2736,10 @@ emitDerivativeFunctionReference(
       derivativeFn =
           builder.emitCopyValueOperation(functionSource.getLoc(), derivativeFn);
       builder.emitEndBorrowOperation(functionSource.getLoc(), borrowedDiffFunc);
-      SILAutoDiffIndices indices(0, desiredIndices.parameters);
-      return std::make_pair(derivativeFn, indices);
+#if 0
+      SILAutoDiffIndices indices(0, desiredConfig.parameterIndices);
+#endif
+      return std::make_pair(derivativeFn, desiredConfig);
     }
   }
 
@@ -2599,12 +2751,12 @@ emitDerivativeFunctionReference(
     auto substMap = getSubstitutionMap(original);
     // Attempt to look up a `[differentiable]` attribute that minimally
     // satisfies the specified indices.
-    // TODO(TF-482): Change `lookUpMinimalDifferentiableAttr` to additionally
-    // check whether `[differentiable]` attribute generic requirements are
-    // satisfied.
-    auto *minimalAttr =
-        context.lookUpMinimalDifferentiableAttr(originalFn, desiredIndices);
-    if (!minimalAttr) {
+    // TODO(TF-482): Change `lookUpMinimalDifferentiabilityWitness` to
+    // additionally check whether `[differentiable]` attribute generic
+    // requirements are satisfied.
+    auto *minimalWitness = context.lookUpMinimalDifferentiabilityWitness(
+        originalFn, desiredConfig);
+    if (!minimalWitness) {
       // If the function is intentionally marked as being opaque to
       // differentiation, then we should not create a task for it.
       if (originalFn->hasSemanticsAttr("autodiff.opaque")) {
@@ -2615,7 +2767,8 @@ emitDerivativeFunctionReference(
       // Check and diagnose non-differentiable arguments.
       auto originalFnTy = originalFn->getLoweredFunctionType();
       for (unsigned paramIndex : range(originalFnTy->getNumParameters())) {
-        if (desiredIndices.isWrtParameter(paramIndex) &&
+        if (paramIndex < desiredConfig.parameterIndices->getCapacity() &&
+            desiredConfig.parameterIndices->contains(paramIndex) &&
             !originalFnTy->getParameters()[paramIndex]
                  .getSILStorageType()
                  .isDifferentiable(context.getModule())) {
@@ -2625,7 +2778,7 @@ emitDerivativeFunctionReference(
         }
       }
       // Check and diagnose non-differentiable results.
-      if (!originalFnTy->getResults()[desiredIndices.source]
+      if (!originalFnTy->getResults()[*desiredConfig.resultIndices->begin()]
                .getSILStorageType()
                .isDifferentiable(context.getModule())) {
         context.emitNondifferentiabilityError(
@@ -2646,33 +2799,23 @@ emitDerivativeFunctionReference(
           DifferentiationInvoker::Kind::IndirectDifferentiation)
         contextualDerivativeGenSig = invoker.getIndirectDifferentiation().second
             ->getDerivativeGenericSignature();
-      auto *newAttr = context.getOrCreateDifferentiableAttr(
-          originalFn, desiredIndices, contextualDerivativeGenSig);
-      if (context.processDifferentiableAttribute(originalFn, newAttr, invoker))
+      auto *newWitness = context.getOrCreateDifferentiabilityWitness(
+          originalFn, desiredConfig);
+      if (context.processDifferentiableAttribute(originalFn, newWitness, invoker))
         return None;
-      minimalAttr = newAttr;
+      minimalWitness = newWitness;
     }
-    assert(minimalAttr);
+    assert(minimalWitness);
     // TODO(TF-482): Move generic requirement checking logic to
     // `lookUpMinimalDifferentiableAttr`.
     if (diagnoseUnsatisfiedRequirements(
-            context, minimalAttr->getDerivativeGenericSignature(), originalFn,
+            context, minimalWitness->getDerivativeGenericSignature(), originalFn,
             substMap, invoker, original.getLoc().getSourceLoc()))
       return None;
     if (context.processDifferentiableAttribute(
-            originalFn, minimalAttr, invoker))
+            originalFn, minimalWitness, invoker))
       return None;
-    SILFunction *derivativeFn = nullptr;
-    switch (kind) {
-    case AutoDiffDerivativeFunctionKind::JVP:
-      assert(!minimalAttr->getJVPName().empty() && "Expected JVP name");
-      derivativeFn = context.getModule().lookUpFunction(minimalAttr->getJVPName());
-      break;
-    case AutoDiffDerivativeFunctionKind::VJP:
-      assert(!minimalAttr->getVJPName().empty() && "Expected VJP name");
-      derivativeFn = context.getModule().lookUpFunction(minimalAttr->getVJPName());
-      break;
-    }
+    auto *derivativeFn = minimalWitness->getDerivative(kind);
     auto *derivativeFnRef = builder.createFunctionRef(loc, derivativeFn);
     // FIXME(TF-201): Handle direct differentiation of reabstraction thunks.
     // Tentative solution: clone a new reabstraction thunk where function
@@ -2684,7 +2827,7 @@ emitDerivativeFunctionReference(
         derivativeFnRef, originalFRI, original, builder, loc,
         newBuffersToDealloc,
         derivativeFn->getLoweredFunctionType()->getGenericSignature());
-    return std::make_pair(convertedRef, minimalAttr->getIndices());
+    return std::make_pair(convertedRef, minimalWitness->getAutoDiffConfig());
   }
 
   // Find witness method retrieval.
@@ -2706,8 +2849,13 @@ emitDerivativeFunctionReference(
     IndexSubset *minimalParamIndexSet;
     std::tie(minimalAttr, minimalParamIndexSet) =
         context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
-            requirementDeclRef, witnessMethodType, desiredIndices);
+            requirementDeclRef, witnessMethodType, desiredConfig);
+#if 0
     SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
+#endif
+    auto *resultIndices = IndexSubset::get(context.getASTContext(), 1, {0});
+    AutoDiffConfig minimalConfig{minimalParamIndexSet, resultIndices,
+                                 minimalAttr->getDerivativeGenericSignature()};
     // If minimal `@differentiable` attribute does not exist, then no attribute
     // exists with a superset of the desired indices. Produce an error.
     if (!minimalAttr) {
@@ -2719,7 +2867,7 @@ emitDerivativeFunctionReference(
     // Emit a `witness_method` instruction for the derivative function.
     auto originalType = witnessMethod->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source,
+        minimalConfig.parameterIndices, *minimalConfig.resultIndices->begin(),
         kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
@@ -2731,7 +2879,7 @@ emitDerivativeFunctionReference(
     auto convertedRef =
         reapplyFunctionConversion(ref, witnessMethod, original, builder, loc,
                                   newBuffersToDealloc);
-    return std::make_pair(convertedRef, minimalIndices);
+    return std::make_pair(convertedRef, minimalConfig);
   }
 
   // Find class method.
@@ -2753,8 +2901,12 @@ emitDerivativeFunctionReference(
     IndexSubset *minimalParamIndexSet;
     std::tie(minimalAttr, minimalParamIndexSet) =
         context.lookUpMinimalASTDifferentiableAttrAndIndexSubset(
-            methodDeclRef, classMethodType, desiredIndices);
+            methodDeclRef, classMethodType, desiredConfig);
+#if 0
     SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
+#endif
+    IndexSubset *resultIndices = IndexSubset::get(context.getASTContext(), 1, {0});
+    AutoDiffConfig minimalConfig{minimalParamIndexSet, resultIndices, minimalAttr->getDerivativeGenericSignature()};
     // If minimal `@differentiable` attribute does not exist, then no attribute
     // exists with a superset of the desired indices. Produce an error.
     if (!minimalAttr) {
@@ -2766,7 +2918,7 @@ emitDerivativeFunctionReference(
     // Emit a `class_method` instruction for the derivative function.
     auto originalType = classMethodInst->getType().castTo<SILFunctionType>();
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
-        minimalIndices.parameters, minimalIndices.source,
+        minimalConfig.parameterIndices, *minimalConfig.resultIndices->begin(),
         kind, context.getTypeConverter(),
         LookUpConformanceInModule(builder.getModule().getSwiftModule()));
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
@@ -2779,7 +2931,7 @@ emitDerivativeFunctionReference(
     auto convertedRef =
         reapplyFunctionConversion(ref, classMethodInst, original, builder, loc,
                                   newBuffersToDealloc);
-    return std::make_pair(convertedRef, minimalIndices);
+    return std::make_pair(convertedRef, minimalConfig);
   }
 
   // Emit the general opaque function error.
@@ -3254,8 +3406,8 @@ private:
   /// The original function.
   SILFunction *const original;
 
-  /// The `[differentiable]` attribute.
-  SILDifferentiableAttr *const attr;
+  /// The SIL differentiability witness.
+  SILDifferentiabilityWitness *const witness;
 
   /// The VJP function.
   SILFunction *const vjp;
@@ -3297,7 +3449,18 @@ private:
 
   ASTContext &getASTContext() const { return vjp->getASTContext(); }
   SILModule &getModule() const { return vjp->getModule(); }
+  IndexSubset *getParameterIndices() const {
+    return witness->getParameterIndices();
+  }
+  IndexSubset *getResultIndices() const {
+    return witness->getResultIndices();
+  }
+#if 0
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
+#endif
+  const AutoDiffConfig &getConfig() const {
+    return witness->getAutoDiffConfig();
+  }
 
   static SubstitutionMap getSubstitutionMap(SILFunction *original,
                                             SILFunction *vjp) {
@@ -3312,8 +3475,8 @@ private:
   }
 
   static const DifferentiableActivityInfo &getActivityInfo(
-      ADContext &context, SILFunction *original,
-      const SILAutoDiffIndices &indices, SILFunction *vjp) {
+      ADContext &context, SILFunction *original, const AutoDiffConfig &config,
+      SILFunction *vjp) {
     // Get activity info of the original function.
     auto &passManager = context.getPassManager();
     auto *activityAnalysis =
@@ -3323,20 +3486,20 @@ private:
         vjp->getLoweredFunctionType()->getGenericSignature(),
         AutoDiffDerivativeFunctionKind::VJP);
     LLVM_DEBUG(
-        dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
+        dumpActivityInfo(*original, config, activityInfo, getADDebugStream()));
     return activityInfo;
   }
 
 public:
   explicit VJPEmitter(ADContext &context, SILFunction *original,
-                      SILDifferentiableAttr *attr, SILFunction *vjp,
+                      SILDifferentiabilityWitness *witness, SILFunction *vjp,
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*vjp, *original, getSubstitutionMap(original, vjp)),
-        context(context), original(original), attr(attr), vjp(vjp),
+        context(context), original(original), witness(witness), vjp(vjp),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), vjp)),
+                              context, original, witness->getAutoDiffConfig(), vjp)),
         pullbackInfo(context, AutoDiffLinearMapKind::Pullback, original, vjp,
-                     attr->getIndices(), activityInfo) {
+                     witness->getAutoDiffConfig(), activityInfo) {
     // Create empty pullback function.
     pullback = createEmptyPullback();
     context.getGeneratedFunctions().push_back(pullback);
@@ -3410,7 +3573,8 @@ public:
     SmallVector<SILParameterInfo, 8> pbParams;
     SmallVector<SILResultInfo, 8> adjResults;
     auto origParams = origTy->getParameters();
-    auto indices = attr->getIndices();
+    SILAutoDiffIndices indices(*witness->getResultIndices()->begin(),
+                               witness->getParameterIndices());
 
     // Add pullback parameter for the seed.
     auto origResInfo = origTy->getResults()[indices.source];
@@ -3441,7 +3605,7 @@ public:
         mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffLinearMapKind::Pullback,
             indices)).str();
-    auto pbGenericSig = getDerivativeGenericSignature(attr, original);
+    auto pbGenericSig = getDerivativeGenericSignature(witness, original);
     auto *pbGenericEnv =
         pbGenericSig ? pbGenericSig->getGenericEnvironment() : nullptr;
     auto pbType = SILFunctionType::get(
@@ -3726,7 +3890,7 @@ public:
     auto paramArgs = ai->getArgumentsWithoutIndirectResults();
     for (unsigned i : swift::indices(paramInfos)) {
       if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(paramArgs[i], getIndices())) {
+          activityInfo.isActive(paramArgs[i], getConfig())) {
         context.emitNondifferentiabilityError(ai, invoker,
             diag::autodiff_cannot_differentiate_through_inout_arguments);
         errorOccurred = true;
@@ -3741,7 +3905,7 @@ public:
     SmallVector<SILValue, 4> allResults;
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, getIndices(), activityInfo,
+    collectMinimalIndicesForFunctionCall(ai, getConfig(), activityInfo,
                                          allResults, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
@@ -4139,8 +4303,8 @@ private:
   /// The original function.
   SILFunction *const original;
 
-  /// The `[differentiable]` attribute.
-  SILDifferentiableAttr *const attr;
+  /// The SIL differentiability witness.
+  SILDifferentiabilityWitness *const witness;
 
   /// The JVP function.
   SILFunction *const jvp;
@@ -4202,7 +4366,12 @@ private:
 
   ASTContext &getASTContext() const { return jvp->getASTContext(); }
   SILModule &getModule() const { return jvp->getModule(); }
+#if 0
   const SILAutoDiffIndices &getIndices() const { return attr->getIndices(); }
+#endif
+  const AutoDiffConfig &getConfig() const {
+    return witness->getAutoDiffConfig();
+  }
   SILBuilder &getDifferentialBuilder() { return differentialBuilder; }
   SILFunction &getDifferential() {
     return differentialBuilder.getFunction();
@@ -4232,10 +4401,12 @@ private:
     return substMap;
   }
 
-  /// Returns the activity info about the SILValues in the original function.
+
+  /// Returns the activity info for the given original function and autodiff
+  /// configuration.
   static const DifferentiableActivityInfo &getActivityInfo(
-      ADContext &context, SILFunction *original,
-      const SILAutoDiffIndices &indices, SILFunction *jvp) {
+      ADContext &context, SILFunction *original, const AutoDiffConfig &config,
+      SILFunction *jvp) {
     // Get activity info of the original function.
     auto &passManager = context.getPassManager();
     auto *activityAnalysis =
@@ -4243,9 +4414,9 @@ private:
     auto &activityCollection = *activityAnalysis->get(original);
     auto &activityInfo = activityCollection.getActivityInfo(
         jvp->getLoweredFunctionType()->getGenericSignature(),
-        AutoDiffDerivativeFunctionKind::JVP);
+        AutoDiffDerivativeFunctionKind::VJP);
     LLVM_DEBUG(
-        dumpActivityInfo(*original, indices, activityInfo, getADDebugStream()));
+        dumpActivityInfo(*original, config, activityInfo, getADDebugStream()));
     return activityInfo;
   }
 
@@ -4906,7 +5077,7 @@ public:
     SmallVector<SILValue, 2> activeOrigResults;
     bool hasActiveResult = false;
     for (auto result : dti->getResults()) {
-      if (activityInfo.isActive(result, getIndices())) {
+      if (activityInfo.isActive(result, getConfig())) {
         activeOrigResults.push_back(result);
         hasActiveResult = true;
         break;
@@ -4959,7 +5130,7 @@ public:
       // If the argument is not active:
       // - Skip the element, if it is not differentiable.
       // - Otherwise, add a zero value to that location.
-      if (!activityInfo.isActive(origArg, getIndices())) {
+      if (!activityInfo.isActive(origArg, getConfig())) {
         auto origCalleeType = ai->getSubstCalleeType();
         if (!origCalleeType->isDifferentiable())
           continue;
@@ -5046,7 +5217,7 @@ public:
       } else if (auto *dti = getSingleDestructureTupleUser(ai)) {
         bool notSetValue = true;
         for (auto result : dti->getResults()) {
-          if (activityInfo.isActive(result, getIndices())) {
+          if (activityInfo.isActive(result, getConfig())) {
             assert(notSetValue &&
                    "This was incorrectly set, should only have one active "
                    "result from the tuple.");
@@ -5079,7 +5250,7 @@ public:
       assert(origResult->getType().isObject() &&
              "Should only be handling direct results for 'return' "
              "instruction.");
-      if (activityInfo.isActive(origResult, getIndices())) {
+      if (activityInfo.isActive(origResult, getConfig())) {
         activeResults.push_back(origResult);
       }
     };
@@ -5090,7 +5261,7 @@ public:
 
     if (activeResults.empty() && !originalResults.empty()) {
       // Create zero tangent value for direct result.
-      auto origResult = originalResults[getIndices().source];
+      auto origResult = originalResults[*getConfig().resultIndices->begin()];
       assert(origResult->getType().isObject() &&
              "Should only be handling direct results for 'return' "
              "instruction.");
@@ -5165,7 +5336,7 @@ private:
     auto diffParamArgs =
         differential.getArgumentsWithoutIndirectResults().drop_back();
     assert(diffParamArgs.size() ==
-           attr->getIndices().parameters->getNumIndices());
+           witness->getParameterIndices()->getNumIndices());
     auto origParamArgs = original->getArgumentsWithoutIndirectResults();
 
     // TODO(TF-788): Re-enable non-varied result warning.
@@ -5173,10 +5344,10 @@ private:
     // Check if result is not varied.
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(*original, origFormalResults);
-    auto origResult = origFormalResults[getIndices().source];
+    auto origResult = origFormalResults[*getConfig().resultIndices->begin()];
     // Emit warning if original result is not varied, because it will always
     // have a zero derivative.
-    if (!activityInfo.isVaried(origResult, getIndices().parameters)) {
+    if (!activityInfo.isVaried(origResult, getConfig().parameterIndices)) {
       // Emit fixit if original result has a valid source location.
       auto startLoc = origResult.getLoc().getStartSourceLoc();
       auto endLoc = origResult.getLoc().getEndSourceLoc();
@@ -5189,7 +5360,7 @@ private:
     */
 
     // Initialize tangent mapping for parameters.
-    auto diffParamsIt = getIndices().parameters->begin();
+    auto diffParamsIt = getConfig().parameterIndices->begin();
     for (auto index : range(diffParamArgs.size())) {
       auto *diffArg = diffParamArgs[index];
       auto *origArg = origParamArgs[*diffParamsIt];
@@ -5217,25 +5388,24 @@ private:
 
 public:
   explicit JVPEmitter(ADContext &context, SILFunction *original,
-                      SILDifferentiableAttr *attr, SILFunction *jvp,
+                      SILDifferentiabilityWitness *witness, SILFunction *jvp,
                       DifferentiationInvoker invoker)
       : TypeSubstCloner(*jvp, *original, getSubstitutionMap(original, jvp)),
-        context(context), original(original), attr(attr), jvp(jvp),
+        context(context), original(original), witness(witness), jvp(jvp),
         invoker(invoker), activityInfo(getActivityInfo(
-                              context, original, attr->getIndices(), jvp)),
+                              context, original, witness->getAutoDiffConfig(), jvp)),
         differentialInfo(context, AutoDiffLinearMapKind::Differential, original,
-                         jvp, attr->getIndices(), activityInfo),
+                         jvp, witness->getAutoDiffConfig(), activityInfo),
         differentialBuilder(SILBuilder(*createEmptyDifferential(
-            context, original, attr, &differentialInfo))),
+            context, original, witness, &differentialInfo))),
         diffLocalAllocBuilder(getDifferential()) {
     // Create empty differential function.
     context.getGeneratedFunctions().push_back(&getDifferential());
   }
 
-  static SILFunction *createEmptyDifferential(ADContext &context,
-                                              SILFunction *original,
-                                              SILDifferentiableAttr *attr,
-                                              LinearMapInfo *linearMapInfo) {
+  static SILFunction *createEmptyDifferential(
+      ADContext &context, SILFunction *original,
+      SILDifferentiabilityWitness *witness, LinearMapInfo *linearMapInfo) {
     auto &module = context.getModule();
     auto origTy = original->getLoweredFunctionType();
     auto lookupConformance = LookUpConformanceInModule(module.getSwiftModule());
@@ -5254,7 +5424,8 @@ public:
     SmallVector<SILParameterInfo, 8> dfParams;
     SmallVector<SILResultInfo, 8> dfResults;
     auto origParams = origTy->getParameters();
-    auto indices = attr->getIndices();
+    SILAutoDiffIndices indices(*witness->getResultIndices()->begin(),
+                               witness->getParameterIndices());
 
     // Add differential results.
     auto origResInfo = origTy->getResults()[indices.source];
@@ -5287,7 +5458,7 @@ public:
         mangler.mangleAutoDiffLinearMapHelper(
             original->getName(), AutoDiffLinearMapKind::Differential,
             indices)).str();
-    auto diffGenericSig = getDerivativeGenericSignature(attr, original);
+    auto diffGenericSig = getDerivativeGenericSignature(witness, original);
     auto *diffGenericEnv =
         diffGenericSig ? diffGenericSig->getGenericEnvironment() : nullptr;
     auto diffType = SILFunctionType::get(
@@ -5405,7 +5576,7 @@ public:
     auto paramArgs = ai->getArgumentsWithoutIndirectResults();
     for (unsigned i : swift::indices(paramInfos)) {
       if (paramInfos[i].isIndirectInOut() &&
-          activityInfo.isActive(paramArgs[i], getIndices())) {
+          activityInfo.isActive(paramArgs[i], getConfig())) {
         context.emitNondifferentiabilityError(ai, invoker,
             diag::autodiff_cannot_differentiate_through_inout_arguments);
         errorOccurred = true;
@@ -5420,7 +5591,7 @@ public:
     SmallVector<SILValue, 4> allResults;
     SmallVector<unsigned, 8> activeParamIndices;
     SmallVector<unsigned, 8> activeResultIndices;
-    collectMinimalIndicesForFunctionCall(ai, getIndices(), activityInfo,
+    collectMinimalIndicesForFunctionCall(ai, getConfig(), activityInfo,
                                          allResults, activeParamIndices,
                                          activeResultIndices);
     assert(!activeParamIndices.empty() && "Parameter indices cannot be empty");
@@ -5767,11 +5938,19 @@ private:
   ASTContext &getASTContext() const { return getPullback().getASTContext(); }
   SILFunction &getOriginal() const { return *vjpEmitter.original; }
   SILFunction &getPullback() const { return *vjpEmitter.pullback; }
+#if 0
   SILDifferentiableAttr *getAttr() const { return vjpEmitter.attr; }
+#endif
+  SILDifferentiabilityWitness *getWitness() const { return vjpEmitter.witness; }
   DifferentiationInvoker getInvoker() const { return vjpEmitter.invoker; }
   LinearMapInfo &getPullbackInfo() { return vjpEmitter.pullbackInfo; }
+#if 0
   const SILAutoDiffIndices &getIndices() const {
     return vjpEmitter.getIndices();
+  }
+#endif
+  const AutoDiffConfig &getConfig() const {
+    return getWitness()->getAutoDiffConfig();
   }
   const DifferentiableActivityInfo &getActivityInfo() const {
     return vjpEmitter.activityInfo;
@@ -6175,7 +6354,7 @@ public:
 
     SmallVector<SILValue, 8> origFormalResults;
     collectAllFormalResultsInTypeOrder(original, origFormalResults);
-    auto origResult = origFormalResults[getIndices().source];
+    auto origResult = origFormalResults[*getConfig().resultIndices->begin()];
 
     // If original result is non-varied, it will always have a zero derivative.
     // Skip full pullback generation and simply emit zero derivatives for wrt
@@ -6185,7 +6364,7 @@ public:
     // returning non-varied result with >1 basic block where some basic blocks
     // have no dominated active values; control flow differentiation does not
     // handle this case. See TF-876 for context.
-    if (!getActivityInfo().isVaried(origResult, getIndices().parameters)) {
+    if (!getActivityInfo().isVaried(origResult, getConfig().parameterIndices)) {
       emitZeroDerivativesForNonvariedResult(origResult);
       return false;
     }
@@ -6226,14 +6405,14 @@ public:
       };
       // Register bb arguments and all instruction operands/results.
       for (auto *arg : bb->getArguments())
-        if (getActivityInfo().isActive(arg, getIndices()))
+        if (getActivityInfo().isActive(arg, getConfig()))
           addActiveValue(arg);
       for (auto &inst : *bb) {
         for (auto op : inst.getOperandValues())
-          if (getActivityInfo().isActive(op, getIndices()))
+          if (getActivityInfo().isActive(op, getConfig()))
             addActiveValue(op);
         for (auto result : inst.getResults())
-          if (getActivityInfo().isActive(result, getIndices()))
+          if (getActivityInfo().isActive(result, getConfig()))
             addActiveValue(result);
       }
       domOrder.pushChildren(bb);
@@ -6394,7 +6573,7 @@ public:
       }
     };
     // Collect differentiation parameter adjoints.
-    for (auto i : getIndices().parameters->getIndices())
+    for (auto i : getConfig().parameterIndices->getIndices())
       addRetElt(i);
 
     // Copy them to adjoint indirect results.
@@ -6635,7 +6814,7 @@ public:
     // Propagate adjoint values from active basic block arguments to
     // predecessor terminator operands.
     for (auto *bbArg : bb->getArguments()) {
-      if (!getActivityInfo().isActive(bbArg, getIndices()))
+      if (!getActivityInfo().isActive(bbArg, getConfig()))
         continue;
       // Get predecessor terminator operands.
       SmallVector<std::pair<SILBasicBlock *, SILValue>, 4> incomingValues;
@@ -6867,7 +7046,7 @@ public:
     // differentiated.
     if (applyInfoLookup == nestedApplyInfo.end()) {
       // Must not be active.
-      assert(!getActivityInfo().isActive(ai, getIndices()));
+      assert(!getActivityInfo().isActive(ai, getConfig()));
       return;
     }
     auto applyInfo = applyInfoLookup->getSecond();
@@ -7837,13 +8016,15 @@ bool VJPEmitter::run() {
 
 SILFunction *
 ADContext::declareExternalDerivativeFunction(
-    SILFunction *original, SILDifferentiableAttr *attr, StringRef name,
-    AutoDiffDerivativeFunctionKind kind) {
+    SILFunction *original, SILDifferentiabilityWitness *witness,
+    StringRef name, AutoDiffDerivativeFunctionKind kind) {
   auto &module = getModule();
-  auto &indices = attr->getIndices();
+  auto &config = witness->getAutoDiffConfig();
+  SILAutoDiffIndices indices(*config.resultIndices->begin(),
+                             config.parameterIndices);
   auto originalTy = original->getLoweredFunctionType();
   auto originalLoc = original->getLocation();
-  auto assocGenSig = getDerivativeGenericSignature(attr, original);
+  auto assocGenSig = getDerivativeGenericSignature(witness, original);
   auto derivativeFnTy = originalTy->getAutoDiffDerivativeFunctionType(
       indices.parameters, indices.source, kind, module.Types,
       LookUpConformanceInModule(module.getSwiftModule()), assocGenSig);
@@ -7859,8 +8040,8 @@ ADContext::declareExternalDerivativeFunction(
 }
 
 static SILFunction *createEmptyVJP(
-    ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
-    bool isExported) {
+    ADContext &context, SILFunction *original,
+    SILDifferentiabilityWitness *witness, bool isExported) {
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating VJP:\n\t";
@@ -7869,7 +8050,9 @@ static SILFunction *createEmptyVJP(
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
-  auto indices = attr->getIndices();
+  auto &config = witness->getAutoDiffConfig();
+  SILAutoDiffIndices indices(*config.resultIndices->begin(),
+                             config.parameterIndices);
 
   // === Create an empty VJP. ===
   Mangle::ASTMangler mangler;
@@ -7877,7 +8060,7 @@ static SILFunction *createEmptyVJP(
       mangler.mangleAutoDiffDerivativeFunctionHelper(
           original->getName(), AutoDiffDerivativeFunctionKind::VJP, indices))
               .str();
-  auto vjpGenericSig = getDerivativeGenericSignature(attr, original);
+  auto vjpGenericSig = getDerivativeGenericSignature(witness, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that calls to `module.Types.getTypeLowering()` below
@@ -7901,7 +8084,7 @@ static SILFunction *createEmptyVJP(
                                 IsNotTransparent, original->isSerialized(),
                                 original->isDynamicallyReplaceable());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
-  attr->setVJPName(vjpName);
+  witness->setVJP(vjp);
 
   LLVM_DEBUG(llvm::dbgs() << "VJP type: " << vjp->getLoweredFunctionType()
                           << "\n");
@@ -7909,8 +8092,8 @@ static SILFunction *createEmptyVJP(
 }
 
 static SILFunction *createEmptyJVP(
-    ADContext &context, SILFunction *original, SILDifferentiableAttr *attr,
-    bool isExported) {
+    ADContext &context, SILFunction *original,
+    SILDifferentiabilityWitness *witness, bool isExported) {
   LLVM_DEBUG({
     auto &s = getADDebugStream();
     s << "Creating JVP:\n\t";
@@ -7919,7 +8102,9 @@ static SILFunction *createEmptyJVP(
 
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
-  auto indices = attr->getIndices();
+  auto &config = witness->getAutoDiffConfig();
+  SILAutoDiffIndices indices(*config.resultIndices->begin(),
+                             config.parameterIndices);
 
   // === Create an empty JVP. ===
   Mangle::ASTMangler mangler;
@@ -7927,7 +8112,7 @@ static SILFunction *createEmptyJVP(
       mangler.mangleAutoDiffDerivativeFunctionHelper(
           original->getName(), AutoDiffDerivativeFunctionKind::JVP, indices))
               .str();
-  auto jvpGenericSig = getDerivativeGenericSignature(attr, original);
+  auto jvpGenericSig = getDerivativeGenericSignature(witness, original);
 
   // RAII that pushes the original function's generic signature to
   // `module.Types` so that calls to `module.Types.getTypeLowering()` below
@@ -7951,7 +8136,7 @@ static SILFunction *createEmptyJVP(
                                 IsNotTransparent, original->isSerialized(),
                                 original->isDynamicallyReplaceable());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
-  attr->setJVPName(jvpName);
+  witness->setJVP(jvp);
 
   LLVM_DEBUG(llvm::dbgs() << "JVP type: " << jvp->getLoweredFunctionType()
              << "\n");
@@ -7960,57 +8145,67 @@ static SILFunction *createEmptyJVP(
 
 /// Returns true on error.
 bool ADContext::processDifferentiableAttribute(
-    SILFunction *original, SILDifferentiableAttr *attr,
+    SILFunction *original, SILDifferentiabilityWitness *witness,
     DifferentiationInvoker invoker) {
+  llvm::errs() << "PROCESS DIFFERENTIABLE WITNESS: " << witness << ", GEN SIG: " << witness->getDerivativeGenericSignature() << "!\n";
+  witness->dump();
+  if (witness->getDerivativeGenericSignature())
+    witness->getDerivativeGenericSignature()->dump();
   auto &module = getModule();
   // Try to look up JVP only if attribute specifies JVP name or if original
   // function is an external declaration. If JVP function cannot be found,
   // create an external JVP reference.
   StringRef jvpName;
   SILFunction *jvp = nullptr;
-  if (attr->hasJVP()) {
-    jvpName = attr->getJVPName();
+  if (witness->getJVP()) {
+    jvpName = witness->getJVP()->getName();
+    jvp = witness->getJVP();
   } else if (original->isExternalDeclaration()) {
     Mangle::ASTMangler mangler;
+    SILAutoDiffIndices indices(*witness->getResultIndices()->begin(),
+                               witness->getParameterIndices());
     jvpName = original->getASTContext().getIdentifier(
         mangler.mangleAutoDiffDerivativeFunctionHelper(
             original->getName(), AutoDiffDerivativeFunctionKind::JVP,
-            attr->getIndices())).str();
+            indices)).str();
   }
   if (!jvpName.empty()) {
     jvp = module.lookUpFunction(jvpName);
     if (!jvp)
       jvp = declareExternalDerivativeFunction(
-          original, attr, jvpName, AutoDiffDerivativeFunctionKind::JVP);
-    attr->setJVPName(jvpName);
+          original, witness, jvpName, AutoDiffDerivativeFunctionKind::JVP);
+    witness->setJVP(jvp);
   }
 
   // If differentiation is triggered by `[differentiable]`, derivative function
   // should share linkage of original function.
   auto isDerivativeFnExported =
       invoker.getKind() ==
-          DifferentiationInvoker::Kind::SILDifferentiableAttribute;
+          DifferentiationInvoker::Kind::SILDifferentiabilityWitness;
 
   // Try to look up VJP only if attribute specifies VJP name or if original
   // function is an external declaration. If VJP function cannot be found,
   // create an external VJP reference.
   StringRef vjpName;
   SILFunction *vjp = nullptr;
-  if (attr->hasVJP()) {
-    vjpName = attr->getVJPName();
+  if (witness->getVJP()) {
+    vjpName = witness->getVJP()->getName();
+    vjp = witness->getVJP();
   } else if (original->isExternalDeclaration()) {
     Mangle::ASTMangler mangler;
+    SILAutoDiffIndices indices(*witness->getResultIndices()->begin(),
+                               witness->getParameterIndices());
     vjpName = original->getASTContext().getIdentifier(
         mangler.mangleAutoDiffDerivativeFunctionHelper(
             original->getName(), AutoDiffDerivativeFunctionKind::VJP,
-            attr->getIndices())).str();
+            indices)).str();
   }
   if (!vjpName.empty()) {
     vjp = module.lookUpFunction(vjpName);
     if (!vjp)
       vjp = declareExternalDerivativeFunction(
-          original, attr, vjpName, AutoDiffDerivativeFunctionKind::VJP);
-    attr->setVJPName(vjpName);
+          original, witness, vjpName, AutoDiffDerivativeFunctionKind::VJP);
+    witness->setVJP(vjp);
   }
 
   // If the JVP doesn't exist, need to synthesize it.
@@ -8022,7 +8217,7 @@ bool ADContext::processDifferentiableAttribute(
         diagnoseUnsupportedControlFlow(*this, original, invoker)))
       return true;
 
-    jvp = createEmptyJVP(*this, original, attr, isDerivativeFnExported);
+    jvp = createEmptyJVP(*this, original, witness, isDerivativeFnExported);
     getGeneratedFunctions().push_back(jvp);
 
     // For now, only do JVP generation if the flag is enabled and if custom VJP
@@ -8030,7 +8225,7 @@ bool ADContext::processDifferentiableAttribute(
     // generation because generated JVP may not match semantics of custom VJP.
     // Instead, create an empty JVP.
     if (RunJVPGeneration && !vjp) {
-      JVPEmitter emitter(*this, original, attr, jvp, invoker);
+      JVPEmitter emitter(*this, original, witness, jvp, invoker);
       if (emitter.run())
         return true;
     } else {
@@ -8081,9 +8276,9 @@ bool ADContext::processDifferentiableAttribute(
         diagnoseUnsupportedControlFlow(*this, original, invoker))
       return true;
 
-    vjp = createEmptyVJP(*this, original, attr, isDerivativeFnExported);
+    vjp = createEmptyVJP(*this, original, witness, isDerivativeFnExported);
     getGeneratedFunctions().push_back(vjp);
-    VJPEmitter emitter(*this, original, attr, vjp, invoker);
+    VJPEmitter emitter(*this, original, witness, vjp, invoker);
     return emitter.run();
   }
 
@@ -8584,12 +8779,15 @@ SILValue ADContext::promoteToDifferentiableFunction(
   }
 
   SILAutoDiffIndices desiredIndices(resultIndex, parameterIndices);
+  auto *configResultIndices = IndexSubset::get(getASTContext(), origFnTy->getNumResults(), {resultIndex});
+  AutoDiffConfig desiredConfig{parameterIndices, configResultIndices,
+                               /*derivativeGenericSignature*/ nullptr};
   SmallVector<SILValue, 2> derivativeFns;
   SmallVector<AllocStackInst *, 2> newBuffersToDealloc;
   for (auto derivativeFnKind : {AutoDiffDerivativeFunctionKind::JVP,
                            AutoDiffDerivativeFunctionKind::VJP}) {
     auto derivativeFnAndIndices = emitDerivativeFunctionReference(
-        *this, builder, desiredIndices, derivativeFnKind, origFnOperand, invoker,
+        *this, builder, desiredConfig, derivativeFnKind, origFnOperand, invoker,
         newBuffersToDealloc);
     // Show an error at the operator, highlight the argument, and show a note
     // at the definition site of the argument.
@@ -8605,15 +8803,16 @@ SILValue ADContext::promoteToDifferentiableFunction(
     //   parameters (using `.zero` for the dropped parameters).
     // - For VJPs: the thunked VJP returns a pullback that drops the unused
     //   tangent values.
-    auto actualIndices = derivativeFnAndIndices->second;
+    auto actualConfig = derivativeFnAndIndices->second;
+    SILAutoDiffIndices actualIndices(*actualConfig.resultIndices->begin(), actualConfig.parameterIndices);
     // NOTE: `desiredIndices` may come from a partially-applied function and
     // have smaller capacity than `actualIndices`. We expect this logic to go
     // away when we support `@differentiable` partial apply.
     // if (actualIndices != desiredIndices) { // TODO: Re-enable.
-    auto extendedDesiredIndices = desiredIndices.parameters->extendingCapacity(
-        getASTContext(), actualIndices.parameters->getCapacity());
-    if (actualIndices.source != desiredIndices.source ||
-        !actualIndices.parameters->equals(extendedDesiredIndices)) {
+    auto extendedDesiredIndices = desiredConfig.parameterIndices->extendingCapacity(
+        getASTContext(), actualConfig.parameterIndices->getCapacity());
+    if (!actualConfig.resultIndices->equals(desiredConfig.resultIndices) ||
+        !actualConfig.parameterIndices->equals(extendedDesiredIndices)) {
       // Destroy the already emitted derivative function reference because it
       // is no longer used.
       builder.emitDestroyValueOperation(loc, derivativeFn);
@@ -8637,7 +8836,7 @@ SILValue ADContext::promoteToDifferentiableFunction(
         return nullptr;
       }
       // Create the parameter subset thunk.
-      assert(actualIndices.parameters->isSupersetOf(extendedDesiredIndices));
+      assert(actualConfig.parameterIndices->isSupersetOf(extendedDesiredIndices));
       SILFunction *thunk;
       SubstitutionMap interfaceSubs;
       std::tie(thunk, interfaceSubs) =
@@ -8775,7 +8974,15 @@ void Differentiation::run() {
 
   // Register all `@differentiable` attributes and `differentiable_function`
   // instructions in the module that trigger differentiation.
+  for (auto &diffWitness : module.getDifferentiabilityWitnesses()) {
+    DifferentiationInvoker invoker(&diffWitness);
+    assert(!context.getInvokers().count(&diffWitness) &&
+           "Differentiability witness already has an invoker");
+    context.getInvokers().insert({&diffWitness, invoker});
+    continue;
+  }
   for (SILFunction &f : module) {
+#if 0
     for (auto *diffAttr : f.getDifferentiableAttrs()) {
       DifferentiationInvoker invoker(diffAttr);
       assert(!context.getInvokers().count(diffAttr) &&
@@ -8783,6 +8990,7 @@ void Differentiation::run() {
       context.getInvokers().insert({diffAttr, invoker});
       continue;
     }
+#endif
     for (SILBasicBlock &bb : f)
       for (SILInstruction &i : bb)
         if (auto *dfi = dyn_cast<DifferentiableFunctionInst>(&i))
@@ -8804,13 +9012,13 @@ void Differentiation::run() {
 
   bool errorOccurred = false;
 
-  // Process all `[differentiable]` attributes.
+  // Process all SIL differentiability witnesses.
   for (auto invokerPair : context.getInvokers()) {
-    auto *attr = invokerPair.first;
-    auto *original = attr->getOriginal();
+    auto *witness = invokerPair.first;
+    auto *original = witness->getOriginalFunction();
     auto invoker = invokerPair.second;
     errorOccurred |=
-        context.processDifferentiableAttribute(original, attr, invoker);
+        context.processDifferentiableAttribute(original, witness, invoker);
   }
 
   // Iteratively process `differentiable_function` instruction worklist.

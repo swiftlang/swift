@@ -463,9 +463,11 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
     unsigned differentiableAttrAbbrCode =
         SILAbbrCodes[SILDifferentiableAttrLayout::Code];
 
+#if 0
     if (F.getModule().getStage() == SILStage::Canonical)
       assert(DA->hasJVP() && DA->hasVJP() &&
              "JVP and VJP must exist in canonical SIL");
+#endif
 
     auto &indices = DA->getIndices();
     SmallVector<unsigned, 8> parameters(indices.parameters->begin(),

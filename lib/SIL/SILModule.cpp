@@ -255,13 +255,45 @@ SILModule::lookUpDefaultWitnessTable(const ProtocolDecl *Protocol,
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key,
                                           bool deserializeLazily) {
-  auto found = DifferentiabilityWitnessMap.find(key);
-  if (found != DifferentiabilityWitnessMap.end())
-    return found->second;
+  auto foundWitnesses = DifferentiabilityWitnessMap.find(key.first);
+  if (foundWitnesses != DifferentiabilityWitnessMap.end()) {
+    auto foundWitness = foundWitnesses->second.find(key.second);
+    if (foundWitness != foundWitnesses->second.end())
+      return foundWitness->second;
+  }
   if (deserializeLazily)
     return getSILLoader()->lookupDifferentiabilityWitness(key);
   return nullptr;
 }
+
+bool SILModule::hasDifferentiabilityWitnesses(StringRef originalFunctionName,
+                                              bool deserializeLazily) {
+  if (DifferentiabilityWitnessMap.count(originalFunctionName))
+    return true;
+  if (!deserializeLazily)
+    return false;
+  // TODO: SILLoader support for loading just by original function name
+  getSILLoader()->getAllDifferentiabilityWitnesses();
+  return DifferentiabilityWitnessMap.count(originalFunctionName);
+}
+
+llvm::DenseMap<AutoDiffConfig, SILDifferentiabilityWitness *> &
+SILModule::lookUpDifferentiabilityWitnesses(StringRef originalFunctionName,
+                                            bool deserializeLazily) {
+  assert(hasDifferentiabilityWitnesses(originalFunctionName,
+                                       deserializeLazily));
+  return DifferentiabilityWitnessMap[originalFunctionName];
+}
+
+void SILModule::deleteDifferentiabilityWitness(
+    SILDifferentiabilityWitness *witness) {
+  auto key = witness->getKey();
+  auto *found = lookUpDifferentiabilityWitness(key, /*deserializeLazily*/false);
+  assert(found == witness);
+  DifferentiabilityWitnessMap[key.first].erase(key.second);
+  differentiabilityWitnesses.erase(witness);
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 SILDefaultWitnessTable *
 SILModule::createDefaultWitnessTableDeclaration(const ProtocolDecl *Protocol,

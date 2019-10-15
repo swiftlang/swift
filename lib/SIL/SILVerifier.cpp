@@ -4735,9 +4735,12 @@ public:
     require(!Attr.getIndices().parameters->isEmpty(),
             "Parameter indices cannot be empty");
     // JVP and VJP must be specified in canonical SIL.
+#if 0
+    // TODO: This is a workaround for diff transform revamp
     if (F->getModule().getStage() == SILStage::Canonical)
       require(!Attr.getJVPName().empty() && !Attr.getVJPName().empty(),
               "JVP and VJP must be specified in canonical SIL");
+#endif
     // Verify if specified parameter indices are valid.
     auto numParams = countParams(F->getLoweredFunctionType());
     int lastIndex = -1;

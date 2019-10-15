@@ -238,7 +238,28 @@ struct AutoDiffConfig {
   IndexSubset *parameterIndices;
   IndexSubset *resultIndices;
   GenericSignature *derivativeGenericSignature;
+
+  void print(llvm::raw_ostream &s = llvm::errs()) const;
+
+  std::string mangle() const {
+    std::string result = "src_";
+    interleave(resultIndices->getIndices(),
+               [&](unsigned idx) { result += llvm::utostr(idx); },
+               [&] { result += '_'; });
+    result += "_wrt_";
+    interleave(parameterIndices->getIndices(),
+               [&](unsigned idx) { result += llvm::utostr(idx); },
+               [&] { result += '_'; });
+    // TODO: Derivative generic signature should also be mangled.
+    return result;
+  }
 };
+
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
+                                     const AutoDiffConfig &config) {
+  config.print(s);
+  return s;
+}
 
 /// In conjunction with the original function declaration, identifies an
 /// autodiff derivative function.

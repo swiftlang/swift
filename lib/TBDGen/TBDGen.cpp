@@ -233,10 +233,9 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The Differentiation transform creates an order-1 JVP and VJP for every
-  // function with a `@differentiable` attribute.
-  auto diffAttrs = AFD->getAttrs().getAttributes<DifferentiableAttr>();
-  for (auto *DA : diffAttrs) {
+  // Handle `@differentiable` attributes. SILGen creates a JVP and a VJP for
+  // every function with a `@differentiable` attribute.
+  for (auto *DA : AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
     auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
         AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
         AFD->getASTContext());
@@ -245,6 +244,26 @@ void TBDGenVisitor::visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
         AutoDiffDerivativeFunctionKind::VJP, DA->getParameterIndices(),
         AFD->getASTContext());
     addSymbol(SILDeclRef(AFD).asAutoDiffDerivativeFunction(vjpId));
+  }
+  // Handle `@differentiating` attributes.
+  for (auto *DA : AFD->getAttrs().getAttributes<DifferentiatingAttr>()) {
+    auto *originalFD = DA->getOriginalFunction();
+    auto differentiableAttrs =
+        originalFD->getAttrs().getAttributes<DifferentiableAttr>();
+    // If there is a `@differentiable` attribute with the same parameter
+    // indices, then symbol has already been emitted. Continue.
+    auto differentiableAttrIt =
+        llvm::find_if(differentiableAttrs, [&](const DifferentiableAttr *attr) {
+          return DA->getParameterIndices() == attr->getParameterIndices();
+        });
+    if (differentiableAttrIt != differentiableAttrs.end())
+      continue;
+    // Otherwise, emit symbol.
+    auto *derivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+        DA->getDerivativeKind(), DA->getParameterIndices(),
+        AFD->getASTContext());
+    addSymbol(
+        SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
   }
 
   visitDefaultArguments(AFD, AFD->getParameters());
@@ -296,10 +315,9 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
   }
 
   // SWIFT_ENABLE_TENSORFLOW
-  // The Differentiation transform creates an order-1 JVP and VJP for every
-  // var/subscript with a `@differentiable` attribute.
-  auto diffAttrs = ASD->getAttrs().getAttributes<DifferentiableAttr>();
-  for (auto *DA : diffAttrs) {
+  // Handle `@differentiable` attributes. SILGen creates a JVP and a VJP for
+  // every function with a `@differentiable` attribute.
+  for (auto *DA : ASD->getAttrs().getAttributes<DifferentiableAttr>()) {
     auto *jvpId = AutoDiffDerivativeFunctionIdentifier::get(
         AutoDiffDerivativeFunctionKind::JVP, DA->getParameterIndices(),
         ASD->getASTContext());
@@ -310,6 +328,26 @@ void TBDGenVisitor::visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
         ASD->getASTContext());
     addSymbol(SILDeclRef(ASD->getAccessor(AccessorKind::Get))
                   .asAutoDiffDerivativeFunction(vjpId));
+  }
+  // Handle `@differentiating` attributes.
+  for (auto *DA : ASD->getAttrs().getAttributes<DifferentiatingAttr>()) {
+    auto *originalFD = DA->getOriginalFunction();
+    auto differentiableAttrs =
+        originalFD->getAttrs().getAttributes<DifferentiableAttr>();
+    // If there is a `@differentiable` attribute with the same parameter
+    // indices, then symbol has already been emitted. Continue.
+    auto differentiableAttrIt =
+        llvm::find_if(differentiableAttrs, [&](const DifferentiableAttr *attr) {
+          return DA->getParameterIndices() == attr->getParameterIndices();
+        });
+    if (differentiableAttrIt != differentiableAttrs.end())
+      continue;
+    // Otherwise, emit symbol.
+    auto *derivativeId = AutoDiffDerivativeFunctionIdentifier::get(
+        DA->getDerivativeKind(), DA->getParameterIndices(),
+        ASD->getASTContext());
+    addSymbol(
+        SILDeclRef(originalFD).asAutoDiffDerivativeFunction(derivativeId));
   }
 
   // Explicitly look at each accessor here: see visitAccessorDecl.

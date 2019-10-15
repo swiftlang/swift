@@ -26,15 +26,23 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
       module, linkage, originalFunction, parameterIndices, resultIndices,
       derivativeGenSig, jvp, vjp, isSerialized, attribute);
   // Register the differentiability witness in the module.
-  assert(!module.DifferentiabilityWitnessMap.count(diffWitness->getKey()) &&
+  auto config = diffWitness->getAutoDiffConfig();
+// #if 0
+  llvm::errs() << "SILDifferentiabilityWitness::create\n";
+  config.print(llvm::errs()); llvm::errs() << "\n";
+// #endif
+  assert(!module.DifferentiabilityWitnessMap[originalFunction->getName()].count(config) &&
          "Cannot create duplicate differentiability witness in a module");
-  module.DifferentiabilityWitnessMap[diffWitness->getKey()] = diffWitness;
+  module.DifferentiabilityWitnessMap[originalFunction->getName()]
+                                    [diffWitness->getAutoDiffConfig()] =
+      diffWitness;
   module.getDifferentiabilityWitnessList().push_back(diffWitness);
+// #if 0
+  diffWitness->dump();
+// #endif
   return diffWitness;
 }
 
 SILDifferentiabilityWitnessKey SILDifferentiabilityWitness::getKey() const {
-  AutoDiffConfig config{parameterIndices, resultIndices,
-                        derivativeGenericSignature};
-  return std::make_pair(originalFunction->getName(), config);
+  return std::make_pair(originalFunction->getName(), autoDiffConfig);
 }

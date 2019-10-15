@@ -48,12 +48,9 @@ private:
   SILLinkage linkage;
   /// The original function.
   SILFunction *originalFunction;
-  /// The parameter indices.
-  IndexSubset *parameterIndices;
-  /// The result indices.
-  IndexSubset *resultIndices;
-  /// The derivative generic signature (optional).
-  GenericSignature *derivativeGenericSignature;
+  /// The autodiff configuration: parameter indices, result indices, derivative
+  /// generic signature (optional).
+  AutoDiffConfig autoDiffConfig;
   /// The JVP (Jacobian-vector products) derivative function.
   SILFunction *jvp;
   /// The VJP (vector-Jacobian products) derivative function.
@@ -75,9 +72,8 @@ private:
                               SILFunction *jvp, SILFunction *vjp,
                               bool isSerialized, DeclAttribute *attribute)
     : module(module), linkage(linkage), originalFunction(originalFunction),
-      parameterIndices(parameterIndices), resultIndices(resultIndices),
-      derivativeGenericSignature(derivativeGenSig), jvp(jvp), vjp(vjp),
-      serialized(isSerialized), attribute(attribute) {}
+      autoDiffConfig({parameterIndices, resultIndices, derivativeGenSig}),
+      jvp(jvp), vjp(vjp), serialized(isSerialized), attribute(attribute) {}
 
 public:
   static SILDifferentiabilityWitness *create(
@@ -90,14 +86,15 @@ public:
   SILModule &getModule() const { return module; }
   SILLinkage getLinkage() const { return linkage; }
   SILFunction *getOriginalFunction() const { return originalFunction; }
+  const AutoDiffConfig &getAutoDiffConfig() const { return autoDiffConfig; }
   IndexSubset *getParameterIndices() const {
-    return parameterIndices;
+    return autoDiffConfig.parameterIndices;
   }
   IndexSubset *getResultIndices() const {
-    return resultIndices;
+    return autoDiffConfig.resultIndices;
   }
   GenericSignature *getDerivativeGenericSignature() const {
-    return derivativeGenericSignature;
+    return autoDiffConfig.derivativeGenericSignature;
   }
   SILFunction *getJVP() const { return jvp; }
   SILFunction *getVJP() const { return vjp; }
