@@ -5611,9 +5611,9 @@ differentiable_function
                       sil-differentiable-function-derivative-functions-clause?
                       
   sil-differentiable-function-parameter-indices ::=
-      '[' 'wrt' [0-9]+ (',', [0-9]+)* ']'
+      '[' 'wrt' [0-9]+ (' ' [0-9]+)* ']'
   sil-differentiable-derivative-functions-clause ::=
-      'with' '{' sil-value ',' sil-value '}'
+      'with' '{' sil-value ':' sil-type ',' sil-value ':' sil-type '}'
 
   differentiable_function [wrt 0] %0 : $(T) -> T \
     with {%1 : $(T) -> (T, (T) -> T), %2 : $(T) -> (T, (T) -> T)}
@@ -5646,9 +5646,9 @@ linear_function
                       sil-linear-function-transpose-function-clause?
 
   sil-linear-function-parameter-indices ::=
-      '[' 'parameters' [0-9]+ (',', [0-9]+)* ']'
+      '[' 'parameters' [0-9]+ (' ' [0-9]+)* ']'
   sil-linear-transpose-function-clause ::=
-      with_transpose '{' sil-value ',' sil-value '}'
+      with_transpose sil-value ':' sil-type
 
   linear_function [parameters 0] %0 : $(T) -> T with_transpose %1 : $(T) -> T
 
