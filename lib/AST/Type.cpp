@@ -645,6 +645,37 @@ Type TypeBase::wrapInPointer(PointerTypeKind kind) {
   return BoundGenericType::get(pointerDecl, /*parent*/nullptr, Type(this));
 }
 
+Type TypeBase::getAnyBufferPointerElementType(BufferPointerTypeKind &BPTK) {
+  auto &C = getASTContext();
+  if (auto nominalTy = getAs<NominalType>()) {
+    if (nominalTy->getDecl() == C.getUnsafeMutableRawBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeMutableRawBufferPointer;
+    } else if (nominalTy->getDecl() == C.getUnsafeRawBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeRawBufferPointer;
+    } else {
+      return Type();
+    }
+    return C.TheEmptyTupleType;
+  }
+  if (auto boundTy = getAs<BoundGenericType>()) {
+    if (boundTy->getDecl() == C.getUnsafeMutableBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeMutableBufferPointer;
+    } else if (boundTy->getDecl() == C.getUnsafeBufferPointerDecl()) {
+      BPTK = BPTK_UnsafeBufferPointer;
+    } else {
+      return Type();
+    }
+    return boundTy->getGenericArgs()[0];
+  }
+  return Type();
+}
+
+Type TypeBase::lookThroughSingleOptionalType() {
+  Type type(this);
+  if (auto objType = type->getOptionalObjectType())
+    type = objType;
+  return type;
+}
 
 Type TypeBase::lookThroughAllOptionalTypes() {
   Type type(this);
