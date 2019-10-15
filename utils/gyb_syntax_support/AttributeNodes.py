@@ -201,24 +201,6 @@ ATTRIBUTE_NODES = [
     # objc-selector -> objc-selector-piece objc-selector?
     Node('ObjCSelector', kind='SyntaxCollection', element='ObjCSelectorPiece'),
 
-    # opaque-return-type-of-attr-arguments -> string-literal ','
-    # integer-literal
-    Node('OpaqueReturnTypeOfAttributeArguments', kind='Syntax',
-         description='''
-         The argument for the `@_opaqueReturnTypeOf` type attribute of the \
-         form `<mangled name>, <index number>`.
-         ''',
-         children=[
-             Child('MangledName', kind='StringLiteralToken', description='''
-                   The mangled name of the opaque function/property which the
-                   the type represents.
-                   '''),
-             Child('Comma', kind='CommaToken'),
-             Child('Index', kind='IntegerLiteralToken', description='''
-                   The index of the return type.
-                   '''),
-         ]),
-
     # The argument of '@differentiable(...)'.
     # differentiable-attr-arguments ->
     #     differentiation-params-clause? ','?
