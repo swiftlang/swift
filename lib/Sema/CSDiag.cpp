@@ -998,7 +998,6 @@ namespace {
     llvm::DenseMap<Expr*, Type> ExprTypes;
     llvm::DenseMap<TypeLoc*, Type> TypeLocTypes;
     llvm::DenseMap<Pattern*, Type> PatternTypes;
-    llvm::DenseMap<ParamDecl*, Type> ParamDeclTypes;
     llvm::DenseMap<ParamDecl*, Type> ParamDeclInterfaceTypes;
     llvm::DenseSet<ValueDecl*> PossiblyInvalidDecls;
     ExprTypeSaverAndEraser(const ExprTypeSaverAndEraser&) = delete;
@@ -1045,10 +1044,6 @@ namespace {
           // associated TypeLocs or resynthesized as fresh typevars.
           if (auto *CE = dyn_cast<ClosureExpr>(expr))
             for (auto P : *CE->getParameters()) {
-              if (P->hasType()) {
-                TS->ParamDeclTypes[P] = P->getType();
-                P->setType(Type());
-              }
               if (P->hasInterfaceType()) {
                 TS->ParamDeclInterfaceTypes[P] = P->getInterfaceType();
                 P->setInterfaceType(Type());
@@ -1100,13 +1095,7 @@ namespace {
       
       for (auto patternElt : PatternTypes)
         patternElt.first->setType(patternElt.second);
-      
-      for (auto paramDeclElt : ParamDeclTypes) {
-        assert(!paramDeclElt.first->isImmutable() ||
-               !paramDeclElt.second->is<InOutType>());
-        paramDeclElt.first->setType(paramDeclElt.second->getInOutObjectType());
-      }
-      
+
       for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes) {
         assert(!paramDeclIfaceElt.first->isImmutable() ||
                !paramDeclIfaceElt.second->is<InOutType>());
@@ -1144,11 +1133,6 @@ namespace {
       for (auto patternElt : PatternTypes)
         if (!patternElt.first->hasType())
           patternElt.first->setType(patternElt.second);
-      
-      for (auto paramDeclElt : ParamDeclTypes)
-        if (!paramDeclElt.first->hasType()) {
-          paramDeclElt.first->setType(getParamBaseType(paramDeclElt));
-        }
 
       for (auto paramDeclIfaceElt : ParamDeclInterfaceTypes)
         if (!paramDeclIfaceElt.first->hasInterfaceType()) {
@@ -3762,10 +3746,9 @@ bool FailureDiagnosis::diagnoseClosureExpr(
   //
   // Handle this by rewriting the arguments to UnresolvedType().
   for (auto VD : *CE->getParameters()) {
-    if (VD->hasType() && (VD->getType()->hasTypeVariable() ||
-                          VD->getType()->hasError())) {
-      VD->setType(CS.getASTContext().TheUnresolvedType);
-      VD->setInterfaceType(VD->getType());
+    if (VD->hasInterfaceType() && (VD->getType()->hasTypeVariable() ||
+                                   VD->getType()->hasError())) {
+      VD->setInterfaceType(CS.getASTContext().TheUnresolvedType);
     }
   }
 

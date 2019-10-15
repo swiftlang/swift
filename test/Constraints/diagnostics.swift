@@ -86,7 +86,7 @@ struct A : P2 {
   func wonka() {}
 }
 let a = A()
-for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}
+for j in i.wibble(a, a) { // expected-error {{type 'A' does not conform to protocol 'Sequence'}}  expected-error{{variable 'j' is not bound by any pattern}}
 }
 
 // Generic as part of function/tuple types

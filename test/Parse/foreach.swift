@@ -36,5 +36,6 @@ func for_each(r: Range<Int>, iir: IntRange<Int>) { // expected-note {{'r' declar
             // expected-note @-2 {{join the identifiers together with camel-case}}
             // expected-error @-3 {{expected 'in' after for-each pattern}}
             // expected-error @-4 {{expected Sequence expression for for-each loop}}
+            // expected-error @-5 {{variable 'i' is not bound by any pattern}}
   for i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
 }

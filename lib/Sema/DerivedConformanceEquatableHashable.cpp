@@ -186,7 +186,7 @@ static VarDecl *indexedVarDecl(char prefixChar, int index, Type type,
                                  /*IsCaptureList*/true, SourceLoc(),
                                  C.getIdentifier(indexStrRef),
                                  varContext);
-  varDecl->setType(type);
+  varDecl->setInterfaceType(type);
   varDecl->setHasNonPatternBindingInit(true);
   return varDecl;
 }
@@ -1225,7 +1225,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
     new (C) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
                     /*IsCaptureList*/false, SourceLoc(),
                     C.Id_hashValue, parentDC);
-  hashValueDecl->setType(intType);
+  hashValueDecl->setInterfaceType(intType);
 
   ParameterList *params = ParameterList::createEmpty(C);
 

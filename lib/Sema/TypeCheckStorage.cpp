@@ -39,10 +39,11 @@ void swift::setBoundVarsTypeError(Pattern *pattern, ASTContext &ctx) {
   pattern->forEachVariable([&](VarDecl *var) {
     // Don't change the type of a variable that we've been able to
     // compute a type for.
-    if (var->hasType() && !var->getType()->hasError())
+    if (var->hasInterfaceType() && !var->getType()->hasError())
       return;
 
-    var->markInvalid();
+    var->setInterfaceType(ErrorType::get(var->getASTContext()));
+    var->setInvalid();
   });
 }
 
@@ -2421,7 +2422,7 @@ static void finishProtocolStorageImplInfo(AbstractStorageDecl *storage,
                                           StorageImplInfo &info) {
   if (auto *var = dyn_cast<VarDecl>(storage)) {
     SourceLoc typeLoc;
-    if (auto *repr = var->getTypeRepr())
+    if (auto *repr = var->getTypeReprOrParentPatternTypeRepr())
       typeLoc = repr->getLoc();
     
     if (info.hasStorage()) {

@@ -2077,7 +2077,7 @@ public:
     
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
-    if (VD->isInvalid() || !VD->hasType()) {
+    if (!VD->getInterfaceType() || VD->isInvalid()) {
       sawError = true;
       return false;
     }
