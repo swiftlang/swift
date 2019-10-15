@@ -1060,6 +1060,28 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         rawExtractee);
     break;
   }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
+    addReferencedSILFunction(dwfi->getOriginalFunction(), /*DeclOnly*/ true);
+    auto origName = S.addUniquedString(dwfi->getOriginalFunction()->getName());
+    auto rawDiffKind = (unsigned)dwfi->getDifferentiabilityKind();
+    auto rawDerivKind = (unsigned)dwfi->getDerivativeKind();
+    SmallVector<unsigned, 8> parameterAndResultIndices(
+        dwfi->getParameterIndices()->begin(),
+        dwfi->getParameterIndices()->end());
+    parameterAndResultIndices.append(dwfi->getResultIndices()->begin(),
+                                     dwfi->getResultIndices()->end());
+    SILInstDifferentiabilityWitnessFunctionLayout::emitRecord(
+        Out, ScratchRecord,
+        SILAbbrCodes[SILInstDifferentiabilityWitnessFunctionLayout::Code],
+        origName, rawDiffKind, rawDerivKind,
+        S.addGenericSignatureRef(dwfi->getWitnessGenericSignature()),
+        dwfi->getParameterIndices()->getNumIndices(),
+        dwfi->getResultIndices()->getNumIndices(),
+        parameterAndResultIndices);
+    break;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
   case SILInstructionKind::ApplyInst: {
     // Format: attributes such as transparent and number of substitutions,
     // the callee's substituted and unsubstituted types, a value for

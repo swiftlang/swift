@@ -109,9 +109,12 @@ namespace swift {
   class TypeAliasDecl;
   class VarDecl;
   class UnifiedStatsReporter;
+  // SWIFT_ENABLE_TENSORFLOW
   class IndexSubset;
   class VectorSpace;
+  struct ASTAutoDiffConfig;
   class DifferentiableAttr;
+  // SWIFT_ENABLE_TENSORFLOW END
 
   enum class KnownProtocolKind : uint8_t;
 
@@ -275,6 +278,10 @@ public:
 
   /// Cache of autodiff-associated vector spaces.
   llvm::DenseMap<Type, Optional<VectorSpace>> AutoDiffVectorSpaces;
+
+  /// Cache of from original function declarations to 
+  llvm::DenseMap<AbstractFunctionDecl *, ASTAutoDiffConfig>
+      DifferentiableDeclarationMap;
 
   /// Cache of `@differentiable` attributes keyed by parameter indices. This
   /// helps us diagnose multiple `@differentiable`s that are with respect to the

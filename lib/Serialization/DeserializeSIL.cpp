@@ -693,7 +693,7 @@ SILDeserializer::readSILFunctionChecked(DeclID FID, SILFunction *existingFn,
     StringRef jvpName = MF->getIdentifier(jvpNameId).str();
     StringRef vjpName = MF->getIdentifier(vjpNameId).str();
 
-    auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
+    auto *derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
     SmallVector<unsigned, 8> parameterIndices(rawParameterIndices.begin(),
                                               rawParameterIndices.end());
@@ -1029,8 +1029,9 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
   Builder.setCurrentDebugScope(Fn->getDebugScope());
   unsigned RawOpCode = 0, TyCategory = 0, TyCategory2 = 0, TyCategory3 = 0,
            // SWIFT_ENABLE_TENSORFLOW
-           Attr = 0, Attr2 = 0, NumSubs = 0, NumConformances = 0,
-           IsNonThrowingApply = 0;
+           Attr = 0, Attr2 = 0, Attr3 = 0, Attr4 = 0, NumSubs = 0,
+           NumConformances = 0, IsNonThrowingApply = 0;
+           // SWIFT_ENABLE_TENSORFLOW END
   ValueID ValID, ValID2, ValID3;
   TypeID TyID, TyID2, TyID3;
   TypeID ConcreteTyID;
@@ -1154,6 +1155,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
         scratch, TyID, TyCategory, ValID, /*extractee*/ Attr);
     RawOpCode = (unsigned)SILInstructionKind::LinearFunctionExtractInst;
     break;
+  case SIL_INST_DIFFERENTIABILITY_WITNESS_FUNCTION:
+    SILInstDifferentiabilityWitnessFunctionLayout::readRecord(
+        scratch, /*originalFunctionName*/ ValID, /*diffKind*/ Attr,
+        /*derivKind*/ Attr2, /*witnessGenSig*/ ValID2, /*numParams*/ Attr3,
+        /*numResults*/ Attr4, ListOfValues);
+    RawOpCode =
+        (unsigned)SILInstructionKind::DifferentiabilityWitnessFunctionInst;
+    break;
+  // SWIFT_ENABLE_TENSORFLOW END
   case SIL_INST_NO_OPERAND:
     SILInstNoOperandLayout::readRecord(scratch, RawOpCode);
     break;
@@ -1610,6 +1620,33 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto val = getLocalValue(ValID, silTy);
     LinearFunctionExtractee extractee(Attr);
     ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
+    break;
+  }
+  case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
+    auto originalName = MF->getIdentifierText(ValID);
+    auto *original = getFuncForReference(originalName);
+    assert(original && "Original function must be found");
+    DifferentiabilityKind diffKind(Attr);
+    AutoDiffDerivativeFunctionKind derivKind(Attr2);
+    auto numParameterIndices = Attr3;
+    auto numResultIndices = Attr4;
+    SmallVector<unsigned, 8> parameterAndResultIndices(ListOfValues.begin(),
+                                                       ListOfValues.end());
+    assert(parameterAndResultIndices.size() ==
+               numParameterIndices + numResultIndices &&
+           "Parameter/result indices count mismatch");
+    auto *parameterIndices = IndexSubset::get(
+        MF->getContext(), original->getLoweredFunctionType()->getNumParameters(),
+        ArrayRef<unsigned>(parameterAndResultIndices)
+            .take_front(numParameterIndices));
+    auto *resultIndices = IndexSubset::get(
+        MF->getContext(), original->getLoweredFunctionType()->getNumResults(),
+        ArrayRef<unsigned>(parameterAndResultIndices)
+            .take_back(numResultIndices));
+    auto *witnessGenSig = MF->getGenericSignature(ValID2);
+    ResultVal = Builder.createDifferentiabilityWitnessFunction(
+        Loc, original, diffKind, derivKind, parameterIndices, resultIndices,
+        witnessGenSig);
     break;
   }
   // SWIFT_ENABLE_TENSORFLOW END
@@ -3394,7 +3431,7 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
   auto *vjp = getFuncForReference(vjpName);
   if (!vjpName.empty())
     assert(vjp && "VJP function must be found if VJP name is not empty");
-  auto derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
+  auto *derivativeGenSig = MF->getGenericSignature(derivativeGenSigID);
 
   SmallVector<unsigned, 8> parameterAndResultIndices(
       rawParameterAndResultIndices.begin(),
@@ -3411,8 +3448,8 @@ SILDeserializer::readDifferentiabilityWitness(DeclID DId) {
       ArrayRef<unsigned>(parameterAndResultIndices)
           .take_back(numResultIndices));
 
-  llvm::errs() << "DESERIALIZING DIFF WITNESS: " << originalName << "\n";
 #if 0
+  llvm::errs() << "DESERIALIZING DIFF WITNESS: " << originalName << "\n";
   AutoDiffConfig config{parameterIndices, resultIndices, derivativeGenSig};
   config.print(llvm::errs()); llvm::errs() << "\n";
 #endif

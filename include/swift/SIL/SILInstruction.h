@@ -8049,6 +8049,65 @@ public:
 };
 
 typedef LinearDifferentiableFunctionTypeComponent LinearFunctionExtractee;
+
+class DifferentiabilityWitnessFunctionInst
+    : public UnaryInstructionBase<SILInstructionKind::DifferentiabilityWitnessFunctionInst,
+                                  SingleValueInstruction> {
+private:
+  friend SILBuilder;
+  /// The original function.
+  SILFunction *originalFunction;
+  /// The differentiability kind.
+  DifferentiabilityKind differentiabilityKind;
+  /// The derivative kind.
+  // TODO(TF-???): When VJPs are removed and JVP is the only derivative kind,
+  // remove this field.
+  AutoDiffDerivativeFunctionKind derivativeKind;
+  /// The parameter indices to differentiate with respect to.
+  IndexSubset *parameterIndices;
+  /// The result indices to differentiate with respect to.
+  IndexSubset *resultIndices;
+  /// The witness generic signature.
+  GenericSignature *witnessGenericSignature;
+
+  static SILType getDifferentiabilityWitnessType(
+      SILModule &module, SILFunction *originalFunction,
+      DifferentiabilityKind differentiabilityKind,
+      AutoDiffDerivativeFunctionKind derivativeKind,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature *witnessGenericSignature);
+
+public:
+  DifferentiabilityWitnessFunctionInst(
+      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      DifferentiabilityKind differentiabilityKind,
+      AutoDiffDerivativeFunctionKind derivativeKind,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature *witnessGenericSignature);
+
+  static DifferentiabilityWitnessFunctionInst *create(
+      SILModule &module, SILDebugLocation loc, SILFunction *originalFunction,
+      DifferentiabilityKind differentiabilityKind,
+      AutoDiffDerivativeFunctionKind derivativeKind,
+      IndexSubset *parameterIndices, IndexSubset *resultIndices,
+      GenericSignature *witnessGenericSignature);
+
+  DifferentiabilityKind getDifferentiabilityKind() const {
+    return differentiabilityKind;
+  }
+  AutoDiffDerivativeFunctionKind getDerivativeKind() const {
+    assert(differentiabilityKind == DifferentiabilityKind::Normal &&
+           "Derivative kind is defined only when differentiability kind is "
+           "normal");
+    return derivativeKind;
+  }
+  SILFunction *getOriginalFunction() const { return originalFunction; }
+  IndexSubset *getParameterIndices() const { return parameterIndices; }
+  IndexSubset *getResultIndices() const { return resultIndices; }
+  GenericSignature *getWitnessGenericSignature() const {
+    return witnessGenericSignature;
+  }
+};
 // SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on

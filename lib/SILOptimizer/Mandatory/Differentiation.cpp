@@ -2787,6 +2787,20 @@ emitDerivativeFunctionReference(
       }
       // Check and diagnose external declarations.
       if (originalFn->isExternalDeclaration()) {
+        llvm::errs() << "EXTERNAL DECLARATION! ORIG DECL CONTEXT: " << originalFn->getDeclContext() << "\n";
+        if (auto *DC = originalFn->getDeclContext()) {
+          DC->dumpContext();
+          auto *origAFD = DC->getAsDecl();
+          for (auto pair : context.getASTContext().DifferentiableAttrs) {
+            auto origPair = pair.first;
+            auto origDecl = origPair.first;
+            if (origDecl != origAFD)
+              continue;
+            llvm::errs() << "FOUND ATTRIBUTE!\n";
+            pair.second->print(llvm::errs(), origAFD);
+            llvm::errs() << "\n";
+          }
+        }
         context.emitNondifferentiabilityError(
             original, invoker,
             diag::autodiff_external_nondifferentiable_function);

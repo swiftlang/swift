@@ -1222,6 +1222,44 @@ public:
     *this << getIDAndType(lfei->getFunctionOperand());
   }
 
+  void visitDifferentiabilityWitnessFunctionInst(
+       DifferentiabilityWitnessFunctionInst *dwfi) {
+    *this << '[';
+    switch (dwfi->getDifferentiabilityKind()) {
+    case DifferentiabilityKind::Normal:
+      switch (dwfi->getDerivativeKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        *this << "jvp";
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        *this << "vjp";
+        break;
+      }
+      break;
+    case DifferentiabilityKind::Linear:
+        *this << "linear";
+      break;
+    case DifferentiabilityKind::NonDifferentiable:
+      llvm_unreachable("Differentiability kind must be normal or linear");
+    }
+    *this << "] ";
+    if (dwfi->getParameterIndices()->isEmpty()) {
+      *this << "[parameters";
+      for (auto i : dwfi->getParameterIndices()->getIndices())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    if (dwfi->getResultIndices()->isEmpty()) {
+      *this << "[results";
+      for (auto i : dwfi->getResultIndices()->getIndices())
+        *this << ' ' << i;
+      *this << "] ";
+    }
+    dwfi->getOriginalFunction()->printName(PrintState.OS);
+    *this << " : " << dwfi->getOriginalFunction()->getLoweredType();
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
+
   void visitFunctionRefInst(FunctionRefInst *FRI) {
     FRI->getInitiallyReferencedFunction()->printName(PrintState.OS);
     *this << " : " << FRI->getType();

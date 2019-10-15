@@ -39,10 +39,25 @@ class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
+#if 0
 enum class DifferentiabilityKind: uint8_t {
   NonDifferentiable = 0,
   Normal = 1,
   Linear = 2
+};
+#endif
+struct DifferentiabilityKind {
+  enum innerty : unsigned {
+    NonDifferentiable = 0,
+    Normal = 1,
+    Linear = 2
+  } rawValue;
+
+  DifferentiabilityKind() = default;
+  DifferentiabilityKind(innerty rawValue) : rawValue(rawValue) {}
+  explicit DifferentiabilityKind(unsigned rawValue) :
+      DifferentiabilityKind((innerty)rawValue) {}
+  operator innerty() const { return rawValue; }
 };
 
 // TODO(TF-904): Replace `DifferentiableFunctionExtractInst::Extractee`.
@@ -223,11 +238,23 @@ struct AutoDiffDerivativeFunctionKind {
   AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
   AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
       : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
+  explicit AutoDiffDerivativeFunctionKind(unsigned rawValue) :
+      AutoDiffDerivativeFunctionKind((innerty)rawValue) {}
   explicit AutoDiffDerivativeFunctionKind(StringRef string);
   operator innerty() const { return rawValue; }
   AutoDiffLinearMapKind getLinearMapKind() {
     return (AutoDiffLinearMapKind::innerty)rawValue;
   }
+};
+
+/// Identifies an autodiff derivative function configuration:
+/// - Parameter indices.
+/// - Result indices.
+/// - Derivative generic signature (optional).
+struct ASTAutoDiffConfig {
+  // Parameter indices for an AST function.
+  IndexSubset *parameterIndices;
+  GenericSignature *derivativeGenericSignature;
 };
 
 /// Identifies an autodiff derivative function configuration:

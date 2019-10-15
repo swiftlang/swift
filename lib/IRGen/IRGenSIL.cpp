@@ -925,6 +925,8 @@ public:
   void visitDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *i);
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *i);
+  void visitDifferentiabilityWitnessFunctionInst(
+      DifferentiabilityWitnessFunctionInst *i);
   // SWIFT_ENABLE_TENSORFLOW END
 
   void visitFunctionRefBaseInst(FunctionRefBaseInst *i);
@@ -1925,6 +1927,11 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
   e.add(diffFnExp.getRange(structFieldOffset, structFieldOffset + fieldSize));
   (void)diffFnExp.claimAll();
   setLoweredExplosion(i, e);
+}
+
+void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
+    DifferentiabilityWitnessFunctionInst *i) {
+  llvm_unreachable("Unimplemented");
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {

@@ -3561,6 +3561,10 @@ void AttributeChecker::visitDifferentiableAttr(DifferentiableAttr *attr) {
                 diag::differentiable_attr_duplicate_note);
     return;
   }
+/*
+  ASTAutoDiffConfig config{attr->getParameterIndices(), };
+  ctx.DifferentiableDeclarationMap
+*/
 }
 
 // SWIFT_ENABLE_TENSORFLOW
@@ -3808,6 +3812,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
     return;
   }
 
+#if 0
   // Reject different-file retroactive derivatives.
   // TODO(TF-136): Full support for cross-file/cross-module retroactive
   // differentiability will require SIL differentiability witnesses and lots of
@@ -3817,6 +3822,7 @@ void AttributeChecker::visitDifferentiatingAttr(DifferentiatingAttr *attr) {
         attr, diag::differentiating_attr_not_in_same_file_as_original);
     return;
   }
+#endif
 
   // Try to find a `@differentiable` attribute on the original function with the
   // same differentiation parameters.

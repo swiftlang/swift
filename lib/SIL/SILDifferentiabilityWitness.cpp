@@ -27,19 +27,19 @@ SILDifferentiabilityWitness *SILDifferentiabilityWitness::create(
       derivativeGenSig, jvp, vjp, isSerialized, attribute);
   // Register the differentiability witness in the module.
   auto config = diffWitness->getAutoDiffConfig();
-// #if 0
+#if 0
   llvm::errs() << "SILDifferentiabilityWitness::create\n";
   config.print(llvm::errs()); llvm::errs() << "\n";
-// #endif
+#endif
   assert(!module.DifferentiabilityWitnessMap[originalFunction->getName()].count(config) &&
          "Cannot create duplicate differentiability witness in a module");
   module.DifferentiabilityWitnessMap[originalFunction->getName()]
                                     [diffWitness->getAutoDiffConfig()] =
       diffWitness;
   module.getDifferentiabilityWitnessList().push_back(diffWitness);
-// #if 0
+#if 0
   diffWitness->dump();
-// #endif
+#endif
   return diffWitness;
 }
 

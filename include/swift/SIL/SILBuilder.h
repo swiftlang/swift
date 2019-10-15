@@ -549,6 +549,19 @@ public:
         DifferentiableFunctionExtractee::Original, TheFunction));
   }
 
+  DifferentiabilityWitnessFunctionInst *
+  createDifferentiabilityWitnessFunction(
+      SILLocation Loc, SILFunction *OriginalFunction,
+      DifferentiabilityKind DiffKind, AutoDiffDerivativeFunctionKind DerivKind,
+      IndexSubset *ParameterIndices, IndexSubset *ResultIndices,
+      GenericSignature *DerivativeGenericSignature) {
+    return insert(new (getModule()) DifferentiabilityWitnessFunctionInst(
+        getModule(), getSILDebugLocation(Loc),
+        OriginalFunction, DiffKind, DerivKind, ParameterIndices, ResultIndices,
+        DerivativeGenericSignature));
+  }
+  // SWIFT_ENABLE_TENSORFLOW
+
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {

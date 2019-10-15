@@ -743,6 +743,45 @@ LinearFunctionExtractInst::LinearFunctionExtractInst(
     : InstructionBase(debugLoc,
                       getExtracteeType(theFunction, extractee, module)),
       extractee(extractee), operands(this, theFunction) {}
+
+SILType DifferentiabilityWitnessFunctionInst::getDifferentiabilityWitnessType(
+    SILModule &module, SILFunction *originalFunction,
+    DifferentiabilityKind diffKind, AutoDiffDerivativeFunctionKind derivKind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    GenericSignature *witnessGenSig) {
+  auto fnTy = originalFunction->getLoweredFunctionType();
+  CanGenericSignature witnessCanGenSig;
+  if (witnessGenSig)
+    witnessCanGenSig = witnessGenSig->getCanonicalSignature();
+  switch (diffKind) {
+  case DifferentiabilityKind::Normal: {
+    auto diffFnTy = fnTy->getAutoDiffDerivativeFunctionType(
+       parameterIndices, *resultIndices->begin(), derivKind, module.Types,
+       LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+    return SILType::getPrimitiveObjectType(diffFnTy);
+  }
+  case DifferentiabilityKind::Linear: {
+    auto transposeFnTy = fnTy->getAutoDiffTransposeFunctionType(
+        parameterIndices, module.Types,
+        LookUpConformanceInModule(module.getSwiftModule()), witnessCanGenSig);
+    return SILType::getPrimitiveObjectType(transposeFnTy);
+  }
+  case DifferentiabilityKind::NonDifferentiable:
+    llvm_unreachable("Differentiability kind must be normal or linear");
+  }
+}
+
+DifferentiabilityWitnessFunctionInst::DifferentiabilityWitnessFunctionInst(
+    SILModule &module, SILDebugLocation debugLoc, SILFunction *originalFunction,
+    DifferentiabilityKind diffKind, AutoDiffDerivativeFunctionKind derivKind,
+    IndexSubset *parameterIndices, IndexSubset *resultIndices,
+    GenericSignature *witnessGenSig)
+    : InstructionBase(debugLoc, getDifferentiabilityWitnessType(
+          module, originalFunction, diffKind, derivKind, parameterIndices,
+          resultIndices, witnessGenSig)),
+      originalFunction(originalFunction), differentiabilityKind(diffKind),
+      derivativeKind(derivKind), parameterIndices(parameterIndices),
+      resultIndices(resultIndices), witnessGenericSignature(witnessGenSig) {}
 // SWIFT_ENABLE_TENSORFLOW END
 
 FunctionRefBaseInst::FunctionRefBaseInst(SILInstructionKind Kind,
