@@ -8030,6 +8030,15 @@ bool ADContext::processDifferentiableAttribute(
     // generation because generated JVP may not match semantics of custom VJP.
     // Instead, create an empty JVP.
     if (RunJVPGeneration && !vjp) {
+      // JVP and differential generation do not currently support functions with
+      // multiple basic blocks.
+      if (original->getBlocks().size() > 1) {
+        emitNondifferentiabilityError(
+            original->getLocation().getSourceLoc(), invoker,
+            diag::autodiff_jvp_control_flow_not_supported);
+        return true;
+      }
+
       JVPEmitter emitter(*this, original, attr, jvp, invoker);
       if (emitter.run())
         return true;

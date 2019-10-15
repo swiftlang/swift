@@ -94,3 +94,18 @@ func nondiff(_ f: @differentiable (Float, @nondiff Float) -> Float) -> Float {
   // expected-error @+1 {{function is not differentiable}}
   return derivative(at: 2, 3) { (x, y) in f(x * x, y) }
 }
+
+//===----------------------------------------------------------------------===//
+// Control flow
+//===----------------------------------------------------------------------===//
+
+// expected-error @+1 {{function is not differentiable}}
+@differentiable
+// expected-note @+2 {{when differentiating this function definition}}
+// expected-note @+1 {{forward-mode differentiation does not yet support control flow}}
+func cond(_ x: Float) -> Float {
+  if x > 0 {
+    return x * x
+  }
+  return x + x
+}
