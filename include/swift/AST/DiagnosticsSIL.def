@@ -445,6 +445,9 @@ ERROR(constexpr_imported_func_not_onone, none, "imported constant evaluable "
 // Automatic differentiation diagnostics
 ERROR(autodiff_internal_swift_not_imported,none,
       "AD internal error: the Swift module is not imported", ())
+ERROR(autodiff_conversion_to_linear_function_not_supported,none,
+      "conversion to '@differentiable(linear)' function type is not yet "
+      "supported", ())
 ERROR(autodiff_function_not_differentiable_error,none,
       "function is not differentiable", ())
 ERROR(autodiff_expression_not_differentiable_error,none,

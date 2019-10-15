@@ -521,7 +521,7 @@ public:
 
   LinearFunctionInst *createLinearFunction(
       SILLocation Loc, IndexSubset *ParameterIndices, SILValue OriginalFunction,
-      Optional<SILValue> TransposeFunction) {
+      Optional<SILValue> TransposeFunction = None) {
     return insert(LinearFunctionInst::create(
         getModule(), getSILDebugLocation(Loc), ParameterIndices,
         OriginalFunction, TransposeFunction, hasOwnership()));

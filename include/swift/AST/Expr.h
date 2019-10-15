@@ -3034,6 +3034,16 @@ public:
   }
 };
 
+class LinearFunctionExpr : public ImplicitConversionExpr {
+public:
+  LinearFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::LinearFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearFunction;
+  }
+};
+
 class DifferentiableFunctionExtractOriginalExpr
     : public ImplicitConversionExpr {
 public:
@@ -3043,6 +3053,28 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DifferentiableFunctionExtractOriginal;
+  }
+};
+
+class LinearFunctionExtractOriginalExpr : public ImplicitConversionExpr {
+public:
+  LinearFunctionExtractOriginalExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(ExprKind::LinearFunctionExtractOriginal,
+                               subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearFunctionExtractOriginal;
+  }
+};
+
+class LinearToDifferentiableFunctionExpr : public ImplicitConversionExpr {
+public:
+  LinearToDifferentiableFunctionExpr(Expr *subExpr, Type ty)
+      : ImplicitConversionExpr(
+            ExprKind::LinearToDifferentiableFunction, subExpr, ty) {}
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::LinearToDifferentiableFunction;
   }
 };
 // SWIFT_ENABLE_TENSORFLOW END
