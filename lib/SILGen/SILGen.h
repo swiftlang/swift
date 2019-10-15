@@ -320,13 +320,12 @@ public:
 
   // SWIFT_ENABLE_TENSORFLOW
   /// Emit the differentiability witness for the given original function
-  /// declaration and SIL function, parameter indices, and JVP and VJP
+  /// declaration and SIL function, autodiff configuration, and JVP and VJP
   /// functions (null if undefined).
   void emitDifferentiabilityWitness(AbstractFunctionDecl *originalAFD,
                                     SILFunction *originalFunction,
-                                    IndexSubset *parameterIndices,
-                                    SILFunction *jvp, SILFunction *vjp,
-                                    GenericSignature *derivativeGenSig);
+                                    const AutoDiffConfig &config,
+                                    SILFunction *jvp, SILFunction *vjp);
   // SWIFT_ENABLE_TENSORFLOW END
 
   /// Emit the lazy initializer function for a global pattern binding
