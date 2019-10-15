@@ -35,6 +35,7 @@ class ModuleDecl;
 class NominalTypeDecl;
 class OperatorDecl;
 class OpaqueTypeDecl;
+class PatternBindingEntry;
 class ParamDecl;
 enum class ParamSpecifier : uint8_t;
 class PrecedenceGroupDecl;

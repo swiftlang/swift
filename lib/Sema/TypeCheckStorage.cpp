@@ -163,21 +163,23 @@ StoredPropertiesAndMissingMembersRequest::evaluate(Evaluator &evaluator,
 }
 
 /// Validate the \c entryNumber'th entry in \c binding.
-static void validatePatternBindingEntry(TypeChecker &tc,
-                                        PatternBindingDecl *binding,
-                                        unsigned entryNumber) {
-  // If the pattern already has a type, we're done.
-  if (binding->getPattern(entryNumber)->hasType())
-    return;
+llvm::Expected<const PatternBindingEntry *>
+PatternBindingEntryRequest::evaluate(Evaluator &eval,
+                                     PatternBindingDecl *binding,
+                                     unsigned entryNumber) const {
+  const auto &pbe = binding->getPatternList()[entryNumber];
+  auto &Context = binding->getASTContext();
 
   // Resolve the pattern.
-  auto *pattern = tc.resolvePattern(binding->getPattern(entryNumber),
-                                    binding->getDeclContext(),
-                                    /*isStmtCondition*/true);
+  auto *TC =
+      static_cast<TypeChecker *>(binding->getASTContext().getLazyResolver());
+  auto *pattern = TC->resolvePattern(binding->getPattern(entryNumber),
+                                     binding->getDeclContext(),
+                                     /*isStmtCondition*/ true);
   if (!pattern) {
     binding->setInvalid();
-    binding->getPattern(entryNumber)->setType(ErrorType::get(tc.Context));
-    return;
+    binding->getPattern(entryNumber)->setType(ErrorType::get(Context));
+    return &pbe;
   }
 
   binding->setPattern(entryNumber, pattern,
@@ -190,9 +192,9 @@ static void validatePatternBindingEntry(TypeChecker &tc,
     if (auto *NTD = binding->getDeclContext()->getSelfNominalTypeDecl()) {
       if (!isa<ClassDecl>(NTD)) {
         if (StaticSpelling == StaticSpellingKind::KeywordClass) {
-          tc.diagnose(binding, diag::class_var_not_in_class, false)
-            .fixItReplace(binding->getStaticLoc(), "static");
-          tc.diagnose(NTD, diag::extended_type_declared_here);
+          binding->diagnose(diag::class_var_not_in_class, false)
+              .fixItReplace(binding->getStaticLoc(), "static");
+          NTD->diagnose(diag::extended_type_declared_here);
         }
       }
     }
@@ -213,33 +215,65 @@ static void validatePatternBindingEntry(TypeChecker &tc,
     options |= TypeResolutionFlags::AllowUnboundGenerics;
   }
 
-  if (tc.typeCheckPattern(pattern, binding->getDeclContext(), options)) {
-    setBoundVarsTypeError(pattern, tc.Context);
+  if (TC->typeCheckPattern(pattern, binding->getDeclContext(), options)) {
+    swift::setBoundVarsTypeError(pattern, Context);
+    setBoundVarsTypeError(pattern, Context);
     binding->setInvalid();
-    pattern->setType(ErrorType::get(tc.Context));
-    return;
+    pattern->setType(ErrorType::get(Context));
+    return &pbe;
+  }
+
+  // If we have a type but no initializer, check whether the type is
+  // default-initializable. If so, do it.
+  if (!pbe.isInitialized() &&
+      binding->isDefaultInitializable(entryNumber) &&
+      pattern->hasStorage() &&
+      !pattern->getType()->hasError()) {
+    auto type = pattern->getType();
+    if (auto defaultInit = TC->buildDefaultInitializer(type)) {
+      // If we got a default initializer, install it and re-type-check it
+      // to make sure it is properly coerced to the pattern type.
+      binding->setInit(entryNumber, defaultInit);
+    }
+  }
+
+  if (pbe.isInitialized()) {
+    // Add the attribute that preserves the "has an initializer" value across
+    // module generation, as required for TBDGen.
+    pattern->forEachVariable([&](VarDecl *VD) {
+      if (VD->hasStorage() &&
+          !VD->getAttrs().hasAttribute<HasInitialValueAttr>()) {
+        auto *attr = new (Context) HasInitialValueAttr(/*IsImplicit=*/true);
+        VD->getAttrs().add(attr);
+      }
+    });
   }
 
   // If the pattern didn't get a type or if it contains an unbound generic type,
   // we'll need to check the initializer.
   if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType()) {
-    if (tc.typeCheckPatternBinding(binding, entryNumber))
-      return;
-    
+    if (TC->typeCheckPatternBinding(binding, entryNumber)) {
+      swift::setBoundVarsTypeError(pattern, Context);
+      setBoundVarsTypeError(pattern, Context);
+      binding->setInvalid();
+      pattern->setType(ErrorType::get(Context));
+      return &pbe;
+    }
+
     // A pattern binding at top level is not allowed to pick up another decl's
     // opaque result type as its type by type inference.
-    if (!binding->getDeclContext()->isLocalContext()
-        && binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
+    if (!binding->getDeclContext()->isLocalContext() &&
+        binding->getInit(entryNumber)->getType()->hasOpaqueArchetype()) {
       // TODO: Check whether the type is the pattern binding's own opaque type.
-      tc.diagnose(binding, diag::inferred_opaque_type,
-                  binding->getInit(entryNumber)->getType());
+      binding->diagnose(diag::inferred_opaque_type,
+                        binding->getInit(entryNumber)->getType());
     }
   }
 
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    llvm::SmallVector<VarDecl*, 2> vars;
+    llvm::SmallVector<VarDecl *, 2> vars;
     binding->getPattern(entryNumber)->collectVariables(vars);
     if (vars.empty()) {
       // Selector for error message.
@@ -247,24 +281,14 @@ static void validatePatternBindingEntry(TypeChecker &tc,
         Property,
         GlobalVariable,
       };
-      tc.diagnose(binding->getPattern(entryNumber)->getLoc(),
-                  diag::pattern_binds_no_variables,
-                  binding->getDeclContext()->isTypeContext()
-                                                   ? Property : GlobalVariable);
+      Context.Diags.diagnose(binding->getPattern(entryNumber)->getLoc(),
+                             diag::pattern_binds_no_variables,
+                             binding->getDeclContext()->isTypeContext()
+                                 ? Property
+                                 : GlobalVariable);
     }
   }
-}
-
-/// Validate the entries in the given pattern binding declaration.
-void swift::validatePatternBindingEntries(TypeChecker &tc,
-                                          PatternBindingDecl *binding) {
-  if (binding->hasValidationStarted())
-    return;
-
-  DeclValidationRAII IBV(binding);
-
-  for (unsigned i = 0, e = binding->getNumPatternEntries(); i != e; ++i)
-    validatePatternBindingEntry(tc, binding, i);
+  return &pbe;
 }
 
 llvm::Expected<bool>

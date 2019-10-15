@@ -1427,14 +1427,14 @@ bb0(%0 : @guaranteed $@convention(block) () -> ()):
 // make assumptions about the accesses in the callee function.
 
 struct TestDynamic {
-  @_hasStorage @_hasInitialValue var x: Builtin.Int64 { get set }
-  @_hasStorage @_hasInitialValue var y: Builtin.Int64 { get set }
+  @_hasInitialValue @_hasStorage var x: Builtin.Int64 { get set }
+  @_hasInitialValue @_hasStorage var y: Builtin.Int64 { get set }
   public mutating func foo()
   init(x: Builtin.Int64, y: Builtin.Int64)
   init()
 }
 
-@_hasStorage @_hasInitialValue var s: S { get set }
+@_hasInitialValue @_hasStorage var s: S { get set }
 
 sil hidden [ossa] @testCallDynamic : $@convention(method) (@inout TestDynamic) -> () {
 bb0(%0 : $*TestDynamic):

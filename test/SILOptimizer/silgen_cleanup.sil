@@ -90,9 +90,9 @@ bb0(%0 : $*(Builtin.Int8, Builtin.Int8)):
 // Handle a combination of trivial and nontrivial elements.
 
 struct X1 {
-  @_hasStorage @_hasInitialValue let a: Int { get }
-  @_hasStorage @_hasInitialValue var obj1: AnyObject { get set }
-  @_hasStorage @_hasInitialValue var obj2: AnyObject { get set }
+  @_hasInitialValue @_hasStorage let a: Int { get }
+  @_hasInitialValue @_hasStorage var obj1: AnyObject { get set }
+  @_hasInitialValue @_hasStorage var obj2: AnyObject { get set }
   init(a: Int, obj1: AnyObject, obj2: AnyObject)
 }
 
@@ -141,11 +141,11 @@ bb0(%0 : $*X1):
 }
 
 struct X2 {
-  @_hasStorage @_hasInitialValue var obj: AnyObject { get set }
+  @_hasInitialValue @_hasStorage var obj: AnyObject { get set }
 }
 
 struct X3 {
-  @_hasStorage @_hasInitialValue var x2: X2 { get set }
+  @_hasInitialValue @_hasStorage var x2: X2 { get set }
 }
 
 // CHECK-LABEL: sil private [ossa] @testStoreNontrivial : $@convention(thin) (@inout X3, @guaranteed AnyObject) -> () {

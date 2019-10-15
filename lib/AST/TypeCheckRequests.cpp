@@ -963,3 +963,24 @@ Optional<Type> ResultTypeRequest::getCachedResult() const {
 void ResultTypeRequest::cacheResult(Type type) const {
   getResultTypeLoc().setType(type);
 }
+
+//----------------------------------------------------------------------------//
+// PatternBindingEntryRequest computation.
+//----------------------------------------------------------------------------//
+
+Optional<const PatternBindingEntry *>
+PatternBindingEntryRequest::getCachedResult() const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  if (!PBD->getPatternList()[idx].isFullyValidated()) {
+    return None;
+  }
+  return &PBD->getPatternList()[idx];
+}
+
+void PatternBindingEntryRequest::cacheResult(
+    const PatternBindingEntry *value) const {
+  auto *PBD = std::get<0>(getStorage());
+  auto idx = std::get<1>(getStorage());
+  PBD->getMutablePatternList()[idx].setFullyValidated();
+}

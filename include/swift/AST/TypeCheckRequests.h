@@ -1385,6 +1385,28 @@ public:
   void cacheResult(Type value) const;
 };
 
+class PatternBindingEntryRequest
+    : public SimpleRequest<PatternBindingEntryRequest,
+                           const PatternBindingEntry *(PatternBindingDecl *,
+                                                       unsigned),
+                           CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  llvm::Expected<const PatternBindingEntry *>
+  evaluate(Evaluator &evaluator, PatternBindingDecl *PBD, unsigned i) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  Optional<const PatternBindingEntry *> getCachedResult() const;
+  void cacheResult(const PatternBindingEntry *value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

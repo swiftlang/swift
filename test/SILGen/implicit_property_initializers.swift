@@ -1,10 +1,10 @@
 // RUN: %target-swift-emit-silgen -module-name implicit_property_initializers -Xllvm -sil-full-demangle -enable-testing %s | %FileCheck %s
 
 // CHECK: struct HasDefaultTupleOfNils {
-// CHECK:   @_hasStorage @_hasInitialValue var x: (Int?, Int?)
-// CHECK:   @_hasStorage @_hasInitialValue var y: Int?
+// CHECK:   @_hasInitialValue @_hasStorage var x: (Int?, Int?)
+// CHECK:   @_hasInitialValue @_hasStorage var y: Int?
 // CHECK:   @_hasStorage var z: Int
-// CHECK:   @_hasStorage @_hasInitialValue var w: ((Int?, (), Int?), (Int?, Int?))
+// CHECK:   @_hasInitialValue @_hasStorage var w: ((Int?, (), Int?), (Int?, Int?))
 // CHECK:   init(x: (Int?, Int?) = (nil, nil),
 // CHECK-SAME:   y: Int? = nil,
 // CHECK-SAME:   z: Int,

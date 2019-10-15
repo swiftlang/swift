@@ -1892,7 +1892,7 @@ class PatternBindingEntry {
     /// Whether the contents of this initializer were subsumed by
     /// some other initialization, e.g., a lazy property's initializer
     /// gets subsumed by the getter body.
-    Subsumed    = 1 << 2
+    Subsumed    = 1 << 2,
   };
   llvm::PointerIntPair<Pattern *, 3, OptionSet<Flags>> PatternAndFlags;
 
@@ -1925,6 +1925,8 @@ class PatternBindingEntry {
   CaptureInfo Captures;
 
   friend class PatternBindingInitializer;
+
+  bool IsFullyValidated = false;
 
 public:
   /// \p E is the initializer as parsed.
@@ -1995,6 +1997,13 @@ public:
     PatternAndFlags.setInt(PatternAndFlags.getInt() | Flags::Checked);
   }
 
+  bool isFullyValidated() const {
+    return IsFullyValidated;
+  }
+  void setFullyValidated() {
+    IsFullyValidated = true;
+  }
+
   bool isInitializerSubsumed() const {
     return PatternAndFlags.getInt().contains(Flags::Subsumed);
   }
@@ -2052,6 +2061,8 @@ class PatternBindingDecl final : public Decl,
     private llvm::TrailingObjects<PatternBindingDecl, PatternBindingEntry> {
   friend TrailingObjects;
   friend class Decl;
+  friend class PatternBindingEntryRequest;
+
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 

@@ -1596,7 +1596,7 @@ bb3(%1 : $*X):
 // cannot be merged without introducing a false conflict.
 
 public class TestClass {
-  @_hasStorage @_hasInitialValue var flags: Int64 { get set }
+  @_hasInitialValue @_hasStorage var flags: Int64 { get set }
 }
 
 // CHECK-LABEL: sil hidden [noinline] @readFlags : $@convention(method) (Int64, @guaranteed TestClass) -> Bool {

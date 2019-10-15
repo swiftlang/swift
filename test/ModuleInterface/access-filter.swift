@@ -109,7 +109,7 @@ extension UFIProto {
 
 // CHECK: extension PublicStruct {{[{]$}}
 extension PublicStruct {
-  // CHECK: @_hasInitialValue public static var secretlySettable: Swift.Int {
+  // CHECK: @_hasInitialValue @_hasStorage public static var secretlySettable: Swift.Int {
   // CHECK-NEXT: get
   // CHECK-NEXT: }
   public private(set) static var secretlySettable: Int = 0

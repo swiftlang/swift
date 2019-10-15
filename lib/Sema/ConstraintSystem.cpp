@@ -1461,16 +1461,6 @@ Type ConstraintSystem::getEffectiveOverloadType(const OverloadChoice &overload,
   if (decl->isImplicitlyUnwrappedOptional())
     return Type();
 
-  // In a pattern binding initializer, all of its bound variables have no
-  // effective overload type.
-  if (auto *PBI = dyn_cast<PatternBindingInitializer>(useDC)) {
-    if (auto *VD = dyn_cast<VarDecl>(decl)) {
-      if (PBI->getBinding() == VD->getParentPatternBinding()) {
-        return Type();
-      }
-    }
-  }
-
   // Retrieve the interface type.
   auto type = decl->getInterfaceType();
   if (!type || type->hasError()) {
