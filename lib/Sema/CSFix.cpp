@@ -751,8 +751,15 @@ bool AllowTupleSplatForSingleParameter::attempt(
     //
     // We'd want to suggest argument list to be `x: (0, 1)` instead
     // of `(x: 0, 1)` which would be incorrect.
-    if (index == 0 && param.getLabel() == label)
-      label = Identifier();
+    if (param.hasLabel() && label == param.getLabel()) {
+      if (index == 0) {
+        label = Identifier();
+      } else {
+        // If label match anything other than first argument,
+        // this can't be a tuple splat.
+        return true;
+      }
+    }
 
     // Tuple can't have `inout` elements.
     if (flags.isInOut())
