@@ -19,15 +19,20 @@ using namespace llvm;
 
 ParsedRawSyntaxNode
 ParsedRawSyntaxNode::makeDeferred(SyntaxKind k,
-                                  ArrayRef<ParsedRawSyntaxNode> deferredNodes,
+                                  MutableArrayRef<ParsedRawSyntaxNode> deferredNodes,
                                   SyntaxParsingContext &ctx) {
   if (deferredNodes.empty()) {
     return ParsedRawSyntaxNode(k, {});
   }
   ParsedRawSyntaxNode *newPtr =
     ctx.getScratchAlloc().Allocate<ParsedRawSyntaxNode>(deferredNodes.size());
-  std::uninitialized_copy(deferredNodes.begin(), deferredNodes.end(), newPtr);
-  return ParsedRawSyntaxNode(k, makeArrayRef(newPtr, deferredNodes.size()));
+
+  // uninitialized move;
+  auto ptr = newPtr;
+  for (auto &node : deferredNodes)
+    :: new (static_cast<void *>(ptr++)) ParsedRawSyntaxNode(std::move(node));
+
+  return ParsedRawSyntaxNode(k, makeMutableArrayRef(newPtr, deferredNodes.size()));
 }
 
 ParsedRawSyntaxNode

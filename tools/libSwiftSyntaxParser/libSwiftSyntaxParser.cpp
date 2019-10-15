@@ -189,6 +189,10 @@ private:
     return getNodeHandler()(&node);
   }
 
+  void discardRecordedNode(OpaqueSyntaxNode node) override {
+    // FIXME: This method should not be called at all.
+  }
+
   std::pair<size_t, OpaqueSyntaxNode>
   lookupNode(size_t lexerOffset, SyntaxKind kind) override {
     auto NodeLookup = getNodeLookup();
