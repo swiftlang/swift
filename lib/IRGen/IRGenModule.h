@@ -95,6 +95,9 @@ namespace swift {
   class RootProtocolConformance;
   struct SILDeclRef;
   class SILDefaultWitnessTable;
+  // SWIFT_ENABLE_TENSORFLOW
+  class SILDifferentiabilityWitness;
+  // SWIFT_ENABLE_TENSORFLOW END
   class SILGlobalVariable;
   class SILModule;
   class SILProperty;
@@ -374,6 +377,10 @@ public:
   void ensureRelativeSymbolCollocation(SILWitnessTable &wt);
 
   void ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt);
+
+  // SWIFT_ENABLE_TENSORFLOW
+  void ensureRelativeSymbolCollocation(SILDifferentiabilityWitness &dw);
+  // SWIFT_ENABLE_TENSORFLOW END
 
   void noteUseOfTypeMetadata(NominalTypeDecl *type) {
     noteUseOfTypeGlobals(type, true, RequireMetadata);
@@ -1232,6 +1239,9 @@ public:
   void emitSILFunction(SILFunction *f);
   void emitSILWitnessTable(SILWitnessTable *wt);
   void emitSILProperty(SILProperty *prop);
+  // SWIFT_ENABLE_TENSORFLOW
+  void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
+  // SWIFT_ENABLE_TENSORFLOW END
   void emitSILStaticInitializers();
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
@@ -1409,6 +1419,9 @@ public:
   llvm::Constant *getAddrOfWitnessTablePattern(
                                       const NormalProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
+  llvm::Constant *getAddrOfDifferentiabilityWitness(
+      const SILDifferentiabilityWitnessKey key,
+      ConstantInit definition = ConstantInit());
 
   llvm::Function *
   getAddrOfGenericWitnessTableInstantiationFunction(

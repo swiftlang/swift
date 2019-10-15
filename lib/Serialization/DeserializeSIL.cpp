@@ -1626,7 +1626,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto originalName = MF->getIdentifierText(ValID);
     auto *original = getFuncForReference(originalName);
     assert(original && "Original function must be found");
-    DifferentiabilityKind diffKind(Attr);
+    DifferentiabilityKind diffKind(static_cast<DifferentiabilityKind>(Attr));
     AutoDiffDerivativeFunctionKind derivKind(Attr2);
     auto numParameterIndices = Attr3;
     auto numResultIndices = Attr4;

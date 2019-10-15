@@ -2806,8 +2806,8 @@ emitDerivativeFunctionReference(
             diag::autodiff_external_nondifferentiable_function);
         return None;
       }
-      // Sanity check passed. Create a new `[differentiable]` attribute and
-      // process it it.
+      // Sanity check passed. Create a new SIL differentiability witness and
+      // process it.
       GenericSignature *contextualDerivativeGenSig = nullptr;
       if (invoker.getKind() ==
           DifferentiationInvoker::Kind::IndirectDifferentiation)
@@ -2821,7 +2821,7 @@ emitDerivativeFunctionReference(
     }
     assert(minimalWitness);
     // TODO(TF-482): Move generic requirement checking logic to
-    // `lookUpMinimalDifferentiableAttr`.
+    // `lookUpMinimalDifferentiabilityWitness`.
     if (diagnoseUnsatisfiedRequirements(
             context, minimalWitness->getDerivativeGenericSignature(), originalFn,
             substMap, invoker, original.getLoc().getSourceLoc()))
@@ -2920,7 +2920,8 @@ emitDerivativeFunctionReference(
     SILAutoDiffIndices minimalIndices(/*source*/ 0, minimalParamIndexSet);
 #endif
     IndexSubset *resultIndices = IndexSubset::get(context.getASTContext(), 1, {0});
-    AutoDiffConfig minimalConfig{minimalParamIndexSet, resultIndices, minimalAttr->getDerivativeGenericSignature()};
+    AutoDiffConfig minimalConfig{minimalParamIndexSet, resultIndices,
+                                 minimalAttr->getDerivativeGenericSignature()};
     // If minimal `@differentiable` attribute does not exist, then no attribute
     // exists with a superset of the desired indices. Produce an error.
     if (!minimalAttr) {

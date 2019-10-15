@@ -8051,8 +8051,9 @@ public:
 typedef LinearDifferentiableFunctionTypeComponent LinearFunctionExtractee;
 
 class DifferentiabilityWitnessFunctionInst
-    : public UnaryInstructionBase<SILInstructionKind::DifferentiabilityWitnessFunctionInst,
-                                  SingleValueInstruction> {
+    : public InstructionBase<
+          SILInstructionKind::DifferentiabilityWitnessFunctionInst,
+          SingleValueInstruction> {
 private:
   friend SILBuilder;
   /// The original function.
@@ -8107,6 +8108,9 @@ public:
   GenericSignature *getWitnessGenericSignature() const {
     return witnessGenericSignature;
   }
+
+  ArrayRef<Operand> getAllOperands() const { return {}; }
+  MutableArrayRef<Operand> getAllOperands() { return {}; }
 };
 // SWIFT_ENABLE_TENSORFLOW END
 

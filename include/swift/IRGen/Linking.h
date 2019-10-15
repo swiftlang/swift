@@ -346,6 +346,11 @@ class LinkEntity {
     /// ProtocolConformance*.
     ProtocolWitnessTableLazyCacheVariable,
 
+    // SWIFT_ENABLE_TENSORFLOW
+    /// A SIL differentiability witness.
+    DifferentiabilityWitness,
+    // SWIFT_ENABLE_TENSORFLOW END
+
     // Everything following this is a type kind.
 
     /// A value witness for a type.
@@ -466,6 +471,16 @@ class LinkEntity {
            LINKENTITY_SET_FIELD(AssociatedConformanceIndex,
                                 getAssociatedConformanceIndex(c, associatedType,
                                                           associatedProtocol));
+  }
+
+  void setForDifferentiabilityWitness(
+      Kind kind, SILFunction *f, const SILDifferentiabilityWitnessKey key) {
+    // assert(isProtocolConformanceKind(kind) && !isTypeKind(kind));
+    Pointer = f;
+    // TODO: Make this robust.
+    SecondaryPointer =
+        const_cast<void*>(static_cast<const void*>(key.second.parameterIndices));
+    Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
   // We store associated types using their index in their parent protocol
@@ -847,6 +862,15 @@ public:
     entity.setForProtocolConformance(Kind::ProtocolWitnessTablePattern, C);
     return entity;
   }
+
+  // SWIFT_ENABLE_TENSORFLOW
+  static LinkEntity forDifferentiabilityWitness(
+      SILFunction *f, const SILDifferentiabilityWitnessKey key) {
+    LinkEntity entity;
+    entity.setForDifferentiabilityWitness(Kind::DifferentiabilityWitness, f, key);
+    return entity;
+  }
+  // SWIFT_ENABLE_TENSORFLOW END
 
   static LinkEntity
   forGenericProtocolWitnessTableInstantiationFunction(

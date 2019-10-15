@@ -1970,6 +1970,23 @@ void IRGenerator::ensureRelativeSymbolCollocation(SILDefaultWitnessTable &wt) {
   }
 }
 
+// SWIFT_ENABLE_TENSORFLOW
+void IRGenerator::ensureRelativeSymbolCollocation(
+    SILDifferentiabilityWitness &dw) {
+  if (!CurrentIGM)
+    return;
+
+  if (isAvailableExternally(dw.getLinkage()))
+    return;
+
+  forceLocalEmitOfLazyFunction(dw.getOriginalFunction());
+  if (auto *jvp = dw.getJVP())
+    forceLocalEmitOfLazyFunction(jvp);
+  if (auto *vjp = dw.getJVP())
+    forceLocalEmitOfLazyFunction(vjp);
+}
+// SWIFT_ENABLE_TENSORFLOW END
+
 /// Do a memoized witness-table layout for a protocol.
 const ProtocolInfo &IRGenModule::getProtocolInfo(ProtocolDecl *protocol,
                                                  ProtocolInfoKind kind) {
@@ -2163,6 +2180,83 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   IRGen.noteUseOfTypeContextDescriptor(conf->getType()->getAnyNominal(),
                                        RequireMetadata);
 }
+
+// SWIFT_ENABLE_TENSORFLOW END
+void IRGenModule::emitSILDifferentiabilityWitness(
+    SILDifferentiabilityWitness *dw) {
+#if 0
+  // Don't emit a witness table if it is a declaration.
+  if (wt->isDeclaration())
+    return;
+#endif
+
+  // Don't emit a witness table that is available externally.
+  // It can end up in having duplicate symbols for generated associated type
+  // metadata access functions.
+  // Also, it is not a big benefit for LLVM to emit such witness tables.
+  if (isAvailableExternally(dw->getLinkage()))
+    return;
+
+  // Ensure that relatively-referenced symbols for witness thunks are collocated
+  // in the same LLVM module.
+  IRGen.ensureRelativeSymbolCollocation(*dw);
+
+  auto key = dw->getKey();
+  PrettyStackTraceDifferentiabilityWitness _st(
+      Context, "emitting differentiability witness for", key);
+
+  // Build the witness table.
+  ConstantInitBuilder builder(*this);
+  auto diffWitnessContents = builder.beginArray(Int8PtrTy);
+#if 0
+  WitnessTableBuilder wtableBuilder(*this, wtableContents, wt);
+  wtableBuilder.build();
+#endif
+
+#if 0
+  SmallVector<llvm::Constant *, 4> resilientWitnesses;
+  // Collect the resilient witnesses to go into the conformance descriptor.
+  wtableBuilder.collectResilientWitnesses(resilientWitnesses);
+
+  // Produce the initializer value.
+  auto initializer = wtableContents.finishAndCreateFuture();
+
+  bool isDependent = isDependentConformance(conf);
+
+  llvm::GlobalVariable *global = nullptr;
+  unsigned tableSize;
+  if (!isResilientConformance(conf)) {
+    global = cast<llvm::GlobalVariable>(
+      (isDependent && conf->getDeclContext()->isGenericContext())
+        ? getAddrOfWitnessTablePattern(cast<NormalProtocolConformance>(conf),
+                                       initializer)
+        : getAddrOfWitnessTable(conf, initializer));
+    global->setConstant(isConstantWitnessTable(wt));
+    global->setAlignment(getWitnessTableAlignment().getValue());
+    tableSize = wtableBuilder.getTableSize();
+  } else {
+    initializer.abandon();
+    tableSize = 0;
+  }
+
+  // Collect the information that will go into the protocol conformance
+  // descriptor.
+  ConformanceDescription description(conf, wt, global, tableSize,
+                                     wtableBuilder.getTablePrivateSize(),
+                                     isDependent);
+
+  // Build the instantiation function, we if need one.
+  description.instantiationFn = wtableBuilder.buildInstantiationFunction();
+  description.resilientWitnesses = std::move(resilientWitnesses);
+
+  // Record this conformance descriptor.
+  addProtocolConformance(std::move(description));
+
+  IRGen.noteUseOfTypeContextDescriptor(conf->getType()->getAnyNominal(),
+                                       RequireMetadata);
+#endif
+}
+// SWIFT_ENABLE_TENSORFLOW END
 
 /// True if a function's signature in LLVM carries polymorphic parameters.
 /// Generic functions and protocol witnesses carry polymorphic parameters.

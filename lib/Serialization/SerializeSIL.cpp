@@ -1063,7 +1063,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DifferentiabilityWitnessFunctionInst: {
     auto *dwfi = cast<DifferentiabilityWitnessFunctionInst>(&SI);
     addReferencedSILFunction(dwfi->getOriginalFunction(), /*DeclOnly*/ true);
-    auto origName = S.addUniquedString(dwfi->getOriginalFunction()->getName());
+    auto originalFnName =
+        S.addUniquedStringRef(dwfi->getOriginalFunction()->getName());
     auto rawDiffKind = (unsigned)dwfi->getDifferentiabilityKind();
     auto rawDerivKind = (unsigned)dwfi->getDerivativeKind();
     SmallVector<unsigned, 8> parameterAndResultIndices(
@@ -1074,7 +1075,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     SILInstDifferentiabilityWitnessFunctionLayout::emitRecord(
         Out, ScratchRecord,
         SILAbbrCodes[SILInstDifferentiabilityWitnessFunctionLayout::Code],
-        origName, rawDiffKind, rawDerivKind,
+        originalFnName, rawDiffKind, rawDerivKind,
         S.addGenericSignatureRef(dwfi->getWitnessGenericSignature()),
         dwfi->getParameterIndices()->getNumIndices(),
         dwfi->getResultIndices()->getNumIndices(),

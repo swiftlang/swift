@@ -39,13 +39,12 @@ class SILFunctionType;
 typedef CanTypeWrapper<SILFunctionType> CanSILFunctionType;
 enum class SILLinkage : uint8_t;
 
-#if 0
 enum class DifferentiabilityKind: uint8_t {
   NonDifferentiable = 0,
   Normal = 1,
   Linear = 2
 };
-#endif
+#if 0
 struct DifferentiabilityKind {
   enum innerty : unsigned {
     NonDifferentiable = 0,
@@ -59,6 +58,7 @@ struct DifferentiabilityKind {
       DifferentiabilityKind((innerty)rawValue) {}
   operator innerty() const { return rawValue; }
 };
+#endif
 
 // TODO(TF-904): Replace `DifferentiableFunctionExtractInst::Extractee`.
 enum class NormalDifferentiableFunctionTypeComponent : uint8_t {

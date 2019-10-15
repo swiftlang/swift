@@ -1931,7 +1931,38 @@ visitLinearFunctionExtractInst(LinearFunctionExtractInst *i) {
 
 void IRGenSILFunction::visitDifferentiabilityWitnessFunctionInst(
     DifferentiabilityWitnessFunctionInst *i) {
-  llvm_unreachable("Unimplemented");
+#if 0
+  CanType baseTy = i->getLookupType();
+  ProtocolConformanceRef conformance = i->getConformance();
+  SILDeclRef member = i->getMember();
+
+  assert(member.requiresNewWitnessTableEntry());
+
+  if (IGM.isResilient(conformance.getRequirement(),
+                      ResilienceExpansion::Maximal)) {
+    auto *fnPtr = IGM.getAddrOfDispatchThunk(member, NotForDefinition);
+    auto fnType = IGM.getSILTypes().getConstantFunctionType(member);
+    auto sig = IGM.getSignature(fnType);
+    auto fn = FunctionPointer::forDirect(fnPtr, sig);
+
+    setLoweredFunctionPointer(i, fn);
+    return;
+  }
+#endif
+  AutoDiffConfig config{i->getParameterIndices(), i->getResultIndices(),
+                        i->getWitnessGenericSignature()};
+  SILDifferentiabilityWitnessKey key{i->getOriginalFunction()->getName(),
+                                     config};
+  // It would be nice if this weren't discarded.
+  llvm::Value *baseMetadataCache = nullptr;
+
+  FunctionPointer fn;
+#if 0
+  auto fn = emitWitnessMethodValue(*this, baseTy, &baseMetadataCache,
+                                   member, conformance);
+#endif
+
+  setLoweredFunctionPointer(i, fn);
 }
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
