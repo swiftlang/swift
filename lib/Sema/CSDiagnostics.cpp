@@ -4310,11 +4310,16 @@ bool ExtraneousArgumentsFailure::diagnoseAsError() {
 }
 
 bool ExtraneousArgumentsFailure::diagnoseAsNote() {
+  auto overload = getChoiceFor(getLocator());
+  if (!(overload && overload->choice.isDecl()))
+    return false;
+
+  auto *decl = overload->choice.getDecl();
   auto *anchor = getAnchor();
   auto numArgs = getTotalNumArguments();
-  emitDiagnostic(anchor->getLoc(), diag::candidate_with_extraneous_args,
-                 ContextualType, ContextualType->getNumParams(), numArgs,
-                 (numArgs == 1), isa<ClosureExpr>(anchor));
+  emitDiagnostic(decl, diag::candidate_with_extraneous_args, ContextualType,
+                 ContextualType->getNumParams(), numArgs, (numArgs == 1),
+                 isa<ClosureExpr>(anchor));
   return true;
 }
 
