@@ -411,6 +411,16 @@ public:
         return false;
       return true;
     }
+
+    /// Returns true if the node has any predecessors with link to this node
+    /// with a defer-edge.
+    bool hasDeferPredecessors() const {
+      for (Predecessor Pred : Preds) {
+        if (Pred.getInt() == EdgeType::Defer)
+          return true;
+      }
+      return false;
+    }
     
     friend class CGNodeMap;
     friend class ConnectionGraph;
@@ -631,19 +641,7 @@ public:
     }
 
     /// Adds an argument/instruction in which the node's value is used.
-    int addUsePoint(CGNode *Node, SILNode *User) {
-      if (Node->getEscapeState() >= EscapeState::Global)
-        return -1;
-
-      User = User->getRepresentativeSILNodeInObject();
-      int Idx = (int)UsePoints.size();
-      assert(UsePoints.count(User) == 0 && "value is already a use-point");
-      UsePoints[User] = Idx;
-      UsePointTable.push_back(User);
-      assert(UsePoints.size() == UsePointTable.size());
-      Node->setUsePointBit(Idx);
-      return Idx;
-    }
+    int addUsePoint(CGNode *Node, SILNode *User);
 
     /// Specifies that the node's value escapes to global or unidentified
     /// memory.

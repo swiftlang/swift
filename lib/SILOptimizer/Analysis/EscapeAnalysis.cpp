@@ -376,6 +376,27 @@ updatePointsTo(CGNode *InitialNode, CGNode *pointsTo) {
   clearWorkListFlags(WorkList);
 }
 
+int EscapeAnalysis::ConnectionGraph::addUsePoint(CGNode *Node, SILNode *User) {
+  // For escaping nodes we have to make worst case assumptions anyway. So no
+  // need to store use point information.
+  if (Node->getEscapeState() >= EscapeState::Global &&
+      // ... except it has defer predecessor edges, which are (potentially) not
+      // escaping: use-points are propagated in reverse direction along defer
+      // edges!
+      !Node->hasDeferPredecessors()) {
+    return -1;
+  }
+
+  User = User->getRepresentativeSILNodeInObject();
+  int Idx = (int)UsePoints.size();
+  assert(UsePoints.count(User) == 0 && "value is already a use-point");
+  UsePoints[User] = Idx;
+  UsePointTable.push_back(User);
+  assert(UsePoints.size() == UsePointTable.size());
+  Node->setUsePointBit(Idx);
+  return Idx;
+}
+
 void EscapeAnalysis::ConnectionGraph::propagateEscapeStates() {
   bool Changed = false;
   do {
@@ -448,6 +469,10 @@ void EscapeAnalysis::ConnectionGraph::computeUsePoints() {
       }
       for (CGNode *Def : Node->defersTo) {
         Changed |= Def->mergeUsePoints(Node);
+      }
+      for (Predecessor Pred : Node->Preds) {
+        if (Pred.getInt() == EdgeType::Defer)
+          Changed |= Pred.getPointer()->mergeUsePoints(Node);
       }
     }
   } while (Changed);
@@ -1858,23 +1883,28 @@ bool EscapeAnalysis::canEscapeToUsePoint(SILValue V, SILNode *UsePoint,
   if (ConGraph->isUsePoint(UsePoint, Node))
     return true;
 
-  assert(isPointer(V) && "should not have a node for a non-pointer");
+  if (V->getType().hasReferenceSemantics()) {
+    // In case V is the result of getUnderlyingObject, we also have to check
+    // the content node. Example:
+    //
+    //   %a = ref_element %r
+    //   apply %f(%a)
+    //
+    // The reference %r does not actually escape to the function call. But in
+    // case this API is called like
+    //
+    //   canEscapeToUsePoint(getUnderlyingObject(applyArgument))
+    //
+    // it would yield false, although the projected object address is passed to
+    // the function.
 
-  // Check if the object "content" can escape to the called function.
-  // This will catch cases where V is a reference and a pointer to a stored
-  // property escapes.
-  // It's also important in case of a pointer assignment, e.g.
-  //    V = V1
-  //    apply(V1)
-  // In this case the apply is only a use-point for V1 and V1's content node.
-  // As V1's content node is the same as V's content node, we also make the
-  // check for the content node.
-  CGNode *ContentNode = ConGraph->getContentNode(Node);
-  if (ContentNode->escapesInsideFunction(false))
-    return true;
+    CGNode *ContentNode = ConGraph->getContentNode(Node);
+    if (ContentNode->escapesInsideFunction(false))
+      return true;
 
-  if (ConGraph->isUsePoint(UsePoint, ContentNode))
-    return true;
+    if (ConGraph->isUsePoint(UsePoint, ContentNode))
+      return true;
+  }
 
   return false;
 }
