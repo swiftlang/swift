@@ -660,11 +660,16 @@ llvm::Constant *swift::getRuntimeFn(llvm::Module &Module,
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  cache =
-      cast<llvm::Function>(Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee());
+  auto addr = Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee();
+  auto fnptr = addr;
+  // Strip off any bitcast we might have due to this function being declared of
+  // a different type previously.
+  if (auto bitcast = dyn_cast<llvm::BitCastInst>(fnptr))
+    fnptr = cast<llvm::Constant>(bitcast->getOperand(0));
+  cache = cast<llvm::Constant>(addr);
 
   // Add any function attributes and set the calling convention.
-  if (auto fn = dyn_cast<llvm::Function>(cache)) {
+  if (auto fn = dyn_cast<llvm::Function>(fnptr)) {
     fn->setCallingConv(cc);
 
     bool IsExternal =

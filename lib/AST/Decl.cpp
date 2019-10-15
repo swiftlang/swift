@@ -2715,13 +2715,37 @@ bool ValueDecl::hasInterfaceType() const {
   return !TypeAndAccess.getPointer().isNull();
 }
 
+bool ValueDecl::isRecursiveValidation() const {
+  if (hasValidationStarted() && !hasInterfaceType())
+    return true;
+
+  if (auto *vd = dyn_cast<VarDecl>(this))
+    if (auto *pbd = vd->getParentPatternBinding())
+      if (pbd->isBeingValidated())
+        return true;
+
+  auto *dc = getDeclContext();
+  while (isa<NominalTypeDecl>(dc))
+    dc = dc->getParent();
+
+  if (auto *ext = dyn_cast<ExtensionDecl>(dc)) {
+    if (ext->isComputingGenericSignature())
+      return true;
+  }
+
+  return false;
+}
+
 Type ValueDecl::getInterfaceType() const {
   if (!hasInterfaceType()) {
     // Our clients that don't register the lazy resolver are relying on the
     // fact that they can't pull an interface type out to avoid doing work.
     // This is a necessary evil until we can wean them off.
-    if (auto resolver = getASTContext().getLazyResolver())
+    if (auto resolver = getASTContext().getLazyResolver()) {
       resolver->resolveDeclSignature(const_cast<ValueDecl *>(this));
+      if (!hasInterfaceType())
+        return ErrorType::get(getASTContext());
+    }
   }
   return TypeAndAccess.getPointer();
 }
@@ -2730,13 +2754,7 @@ void ValueDecl::setInterfaceType(Type type) {
   if (type) {
     assert(!type->hasTypeVariable() && "Type variable in interface type");
     assert(!type->is<InOutType>() && "Interface type must be materializable");
-
-    // ParamDecls in closure contexts can have type variables
-    // archetype in them during constraint generation.
-    if (!(isa<ParamDecl>(this) && isa<AbstractClosureExpr>(getDeclContext()))) {
-      assert(!type->hasArchetype() &&
-             "Archetype in interface type");
-    }
+    assert(!type->hasArchetype() && "Archetype in interface type");
 
     if (type->hasError())
       setInvalid();
@@ -5029,7 +5047,7 @@ getNameFromObjcAttribute(const ObjCAttr *attr, DeclName preferredName) {
 ObjCSelector
 AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
   // If the getter has an @objc attribute with a name, use that.
-  if (auto getter = getParsedAccessor(AccessorKind::Get)) {
+  if (auto getter = getOpaqueAccessor(AccessorKind::Get)) {
       if (auto name = getNameFromObjcAttribute(getter->getAttrs().
           getAttribute<ObjCAttr>(), preferredName))
         return *name;
@@ -5059,7 +5077,7 @@ AbstractStorageDecl::getObjCGetterSelector(Identifier preferredName) const {
 ObjCSelector
 AbstractStorageDecl::getObjCSetterSelector(Identifier preferredName) const {
   // If the setter has an @objc attribute with a name, use that.
-  auto setter = getParsedAccessor(AccessorKind::Set);
+  auto setter = getOpaqueAccessor(AccessorKind::Set);
   auto objcAttr = setter ? setter->getAttrs().getAttribute<ObjCAttr>()
                          : nullptr;
   if (auto name = getNameFromObjcAttribute(objcAttr, DeclName(preferredName))) {
@@ -6605,81 +6623,12 @@ bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
 }
 
-static bool requiresNewVTableEntry(const AbstractFunctionDecl *decl) {
-  auto *dc = decl->getDeclContext();
-
-  if (!isa<ClassDecl>(dc))
-    return true;
-
-  assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
-
-  // Final members are always be called directly.
-  // Dynamic methods are always accessed by objc_msgSend().
-  if (decl->isFinal() || decl->isObjCDynamic() || decl->hasClangNode())
-    return false;
-
-  auto &ctx = dc->getASTContext();
-
-  // Initializers are not normally inherited, but required initializers can
-  // be overridden for invocation from dynamic types, and convenience initializers
-  // are conditionally inherited when all designated initializers are available,
-  // working by dynamically invoking the designated initializer implementation
-  // from the subclass. Convenience initializers can also override designated
-  // initializer implementations from their superclass.
-  if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
-    if (!ctor->isRequired() && !ctor->isDesignatedInit()) {
-      return false;
-    }
-  }
-
-  if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
-    // Check to see if it's one of the opaque accessors for the declaration.
-    auto storage = accessor->getStorage();
-    if (!storage->requiresOpaqueAccessor(accessor->getAccessorKind()))
-      return false;
-  }
-
-  auto base = decl->getOverriddenDecl();
-
-  if (!base || base->hasClangNode() || base->isObjCDynamic())
-    return true;
-
-  // As above, convenience initializers are not formally overridable in Swift
-  // vtables, although same-named initializers are modeled as overriding for
-  // various QoI and objc interop reasons. Even if we "override" a non-required
-  // convenience init, we still need a distinct vtable entry.
-  if (auto baseCtor = dyn_cast<ConstructorDecl>(base)) {
-    if (!baseCtor->isRequired() && !baseCtor->isDesignatedInit()) {
-      return true;
-    }
-  }
-
-  // If the base is less visible than the override, we might need a vtable
-  // entry since callers of the override might not be able to see the base
-  // at all.
-  if (decl->isEffectiveLinkageMoreVisibleThan(base))
-    return true;
-
-  using Direction = ASTContext::OverrideGenericSignatureReqCheck;
-  if (!ctx.overrideGenericSignatureReqsSatisfied(
-          base, decl, Direction::BaseReqSatisfiedByDerived)) {
-    return true;
-  }
-
-  // If this method is an ABI compatible override, then we don't need a new
-  // vtable entry. Otherwise, if it's not ABI compatible, for example if the
-  // base has a more general AST type, then we need a new entry. Note that an
-  // abstraction change is OK; we don't want to add a whole new vtable entry
-  // just because an @in parameter becomes @owned, or whatever.
-  auto isABICompatibleOverride = evaluateOrDefault(
+bool AbstractFunctionDecl::needsNewVTableEntry() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
       ctx.evaluator,
-      IsABICompatibleOverrideRequest{const_cast<AbstractFunctionDecl *>(decl)},
+      NeedsNewVTableEntryRequest{const_cast<AbstractFunctionDecl *>(this)},
       false);
-  return !isABICompatibleOverride;
-}
-
-void AbstractFunctionDecl::computeNeedsNewVTableEntry() {
-  setNeedsNewVTableEntry(requiresNewVTableEntry(this));
 }
 
 ParamDecl *AbstractFunctionDecl::getImplicitSelfDecl(bool createIfNeeded) {
@@ -6967,7 +6916,14 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                              const_cast<FuncDecl *>(this)
                            },
                            nullptr);
- }
+}
+
+bool FuncDecl::isStatic() const {
+  ASTContext &ctx = getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+    IsStaticRequest{const_cast<FuncDecl *>(this)},
+    false);
+}
 
 AccessorDecl *AccessorDecl::createImpl(ASTContext &ctx,
                                        SourceLoc declLoc,

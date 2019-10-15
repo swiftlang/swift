@@ -902,9 +902,9 @@ public:
   bool parseUnsignedInteger(unsigned &Result, SourceLoc &Loc,
                             const Diagnostic &D);
 
-  llvm::Optional<ParsedTokenSyntax>
-  parseMatchingTokenSyntax(tok K, SourceLoc &TokLoc, Diag<> ErrorDiag,
-                           SourceLoc OtherLoc);
+  ParsedSyntaxResult<ParsedTokenSyntax>
+  parseMatchingTokenSyntax(tok K, Diag<> ErrorDiag, SourceLoc OtherLoc,
+                           bool silenceDiag = false);
 
   /// Returns the proper location for a missing right brace, parenthesis, etc.
   SourceLoc getLocForMissingMatchingToken() const;
@@ -926,7 +926,6 @@ public:
                          llvm::function_ref<ParserStatus()> callback);
   ParserStatus parseListSyntax(tok RightK, SourceLoc LeftLoc,
                                llvm::Optional<ParsedTokenSyntax> &LastComma,
-                               SourceLoc &RightLoc,
                                llvm::Optional<ParsedTokenSyntax> &Right,
                                llvm::SmallVectorImpl<ParsedSyntax>& Junk,
                                bool AllowSepAfterLast, Diag<> ErrorDiag,
@@ -1535,6 +1534,8 @@ public:
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
   void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  bool parseOptionalArgumentLabelSyntax(Optional<ParsedTokenSyntax> &name,
+                                        Optional<ParsedTokenSyntax> &colon);
 
   /// Parse an unqualified-decl-name.
   ///
@@ -1553,10 +1554,20 @@ public:
                                     bool allowOperators=false,
                                     bool allowZeroArgCompoundNames=false,
                                     bool allowDeinitAndSubscript=false);
+  ParserStatus
+  parseUnqualifiedDeclNameSyntax(Optional<ParsedTokenSyntax> &identTok,
+                                 Optional<ParsedDeclNameArgumentsSyntax> &declNameArg,
+                                 bool afterDot, const Diagnostic &diag,
+                                 bool allowOperators=false,
+                                 bool allowZeroArgCompoundNames=false,
+                                 bool allowDeinitAndSubscript=false);
+
+  ParsedSyntaxResult<ParsedExprSyntax> parseExprIdentifierSyntax();
+  ParsedSyntaxResult<ParsedExprSyntax>
+  parseExprSpecializeSyntax(ParsedExprSyntax &&);
 
   Expr *parseExprIdentifier();
-  Expr *parseExprEditorPlaceholder(Token PlaceholderTok,
-                                   Identifier PlaceholderId);
+  Expr *parseExprEditorPlaceholder(SourceLoc loc, StringRef text);
 
   /// Parse a closure expression after the opening brace.
   ///

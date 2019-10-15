@@ -74,8 +74,8 @@ protocol Overload {
   associatedtype B
   func getA() -> A
   func getB() -> B
-  func f1(_: A) -> A // expected-note {{candidate expects value of type 'OtherOvl.A' at position #0}}
-  func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' at position #0}}
+  func f1(_: A) -> A // expected-note {{candidate expects value of type 'OtherOvl.A' for parameter #1}}
+  func f1(_: B) -> B // expected-note {{candidate expects value of type 'OtherOvl.B' for parameter #1}}
   func f2(_: Int) -> A // expected-note{{found this candidate}}
   func f2(_: Int) -> B // expected-note{{found this candidate}}
   func f3(_: Int) -> Int // expected-note {{found this candidate}}

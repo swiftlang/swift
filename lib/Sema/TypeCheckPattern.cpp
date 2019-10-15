@@ -794,8 +794,10 @@ static bool validateParameterType(ParamDecl *decl, TypeResolution resolution,
 
 /// Type check a parameter list.
 bool TypeChecker::typeCheckParameterList(ParameterList *PL,
-                                         TypeResolution resolution,
+                                         DeclContext *dc,
                                          TypeResolutionOptions options) {
+  auto resolution = TypeResolution::forInterface(dc);
+
   bool hadError = false;
   
   for (auto param : *PL) {

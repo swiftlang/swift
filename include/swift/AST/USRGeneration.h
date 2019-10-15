@@ -9,6 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+//
+// Unique Symbol References (USRs) provide a textual encoding for
+// declarations. These are used for indexing, analogous to how mangled names
+// are used in object files.
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_AST_USRGENERATION_H
 #define SWIFT_AST_USRGENERATION_H

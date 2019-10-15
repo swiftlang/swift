@@ -798,12 +798,6 @@ namespace {
           auto children = E->getAllElements();
           std::transform(children.begin(), children.end(),
                          std::back_inserter(arr), [&](EnumElementDecl *eed) {
-            // If there's still no interface type then there's
-            // not much else we can do here.
-            if (!eed->getInterfaceType()) {
-              return Space();
-            }
-
             // Don't force people to match unavailable cases; they can't even
             // write them.
             if (AvailableAttr::isUnavailable(eed)) {

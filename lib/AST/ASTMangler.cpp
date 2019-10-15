@@ -2444,13 +2444,9 @@ CanType ASTMangler::getDeclTypeForMangling(
   }
 
 
-  Type type = decl->getInterfaceType()
-                  ->getReferenceStorageReferent();
-  if (type->hasArchetype()) {
-    assert(isa<ParamDecl>(decl) && "Only ParamDecl's still have archetypes");
-    type = type->mapTypeOutOfContext();
-  }
-  CanType canTy = type->getCanonicalType();
+  auto canTy = decl->getInterfaceType()
+                   ->getReferenceStorageReferent()
+                   ->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();
