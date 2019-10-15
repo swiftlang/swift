@@ -5466,7 +5466,8 @@ RValue RValueEmitter::visitLinearFunctionExtractOriginalExpr(
   auto diffFunc = SGF.emitRValueAsSingleValue(E->getSubExpr());
   auto borrowedDiffFunc = diffFunc.borrow(SGF, E);
   auto *borrowedOrigFunc = SGF.B.createLinearFunctionExtract(
-      E, LinearFunctionExtractee::Original, borrowedDiffFunc.getValue());
+      E, LinearDifferentiableFunctionTypeComponent::Original,
+      borrowedDiffFunc.getValue());
   auto ownedOrigFunc = SGF.B.emitCopyValueOperation(E, borrowedOrigFunc);
   return RValue(SGF, E, SGF.emitManagedRValueWithCleanup(ownedOrigFunc));
 }
