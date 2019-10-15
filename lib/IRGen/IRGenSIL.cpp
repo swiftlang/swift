@@ -1646,9 +1646,6 @@ void IRGenSILFunction::emitSILFunction() {
   
   assert(!CurSILFn->empty() && "function has no basic blocks?!");
 
-  if (CurSILFn->isThunk())
-    IGM.setHasFramePointer(CurFn, false);
-  
   if (CurSILFn->getDynamicallyReplacedFunction())
     IGM.IRGen.addDynamicReplacement(CurSILFn);
 

@@ -50,6 +50,13 @@ public:
   bool didErrorOccur() {
     return DidErrorOccur;
   }
+
+private:
+  void printDiagnostic(SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+                       StringRef FormatString,
+                       ArrayRef<DiagnosticArgument> FormatArgs,
+                       const DiagnosticInfo &Info,
+                       SourceLoc bufferIndirectlyCausingDiagnostic);
 };
   
 }

@@ -25,6 +25,7 @@ class AbstractFunctionDecl;
 class BraceStmt;
 class CustomAttr;
 class Decl;
+class EnumDecl;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;

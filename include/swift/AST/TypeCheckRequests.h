@@ -1237,6 +1237,31 @@ public:
   bool isCached() const { return true; }
 };
 
+class EnumRawValuesRequest :
+    public SimpleRequest<EnumRawValuesRequest,
+                         bool (EnumDecl *, TypeResolutionStage),
+                         CacheKind::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  
+private:
+  friend SimpleRequest;
+  
+  // Evaluation.
+  llvm::Expected<bool>
+  evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
+  
+public:
+  // Cycle handling.
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+  void noteCycleStep(DiagnosticEngine &diags) const;
+                           
+  // Separate caching.
+  bool isCached() const;
+  Optional<bool> getCachedResult() const;
+  void cacheResult(bool value) const;
+};
+
 // Allow AnyValue to compare two Type values, even though Type doesn't
 // support ==.
 template<>

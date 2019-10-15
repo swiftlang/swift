@@ -87,10 +87,13 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
-#include "swift/SILOptimizer/Utils/Local.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "llvm/ADT/MapVector.h"
+#include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/CFG.h"
+#include "llvm/ADT/BreadthFirstIterator.h"
 
 using namespace swift;
 
@@ -661,52 +664,99 @@ static void constantFold(SILInstruction *start,
 static SILInstruction *beginOfInterpolation(ApplyInst *oslogInit) {
   auto oslogInitCallSite = FullApplySite(oslogInit);
   SILFunction *callee = oslogInitCallSite.getCalleeFunction();
-  auto &astContext = oslogInit->getFunction()->getASTContext();
 
+  assert (callee->hasSemanticsAttrThatStartsWith("oslog.message.init"));
   // The initializer must return the OSLogMessage instance directly.
   assert(oslogInitCallSite.getNumArguments() >= 1 &&
          oslogInitCallSite.getNumIndirectSILResults() == 0);
 
-  SILInstruction *firstArgumentInst =
-      oslogInitCallSite.getArgument(0)->getDefiningInstruction();
-  if (!firstArgumentInst) {
-    // oslogInit call does not correspond to  an auto-generated initialization
-    // done by the compiler on seeing a string interpolation. Ignore this.
-    return nullptr;
+  // List of backward dependencies that needs to be analyzed.
+  SmallVector<SILInstruction *, 4> worklist = { oslogInit };
+  SmallPtrSet<SILInstruction *, 4> seenInstructions = { oslogInit };
+  // List of instructions that could potentially mark the beginning of the
+  // interpolation.
+  SmallPtrSet<SILInstruction *, 4> candidateStartInstructions;
+
+  unsigned i = 0;
+  while (i < worklist.size()) {
+    SILInstruction *inst = worklist[i++];
+
+    if (isa<PartialApplyInst>(inst)) {
+      // Partial applies are used to capture the dynamic arguments passed to
+      // the string interpolation. Their arguments are not required to be
+      // known at compile time and they need not be constant evaluated.
+      // Therefore, do not follow this dependency chain.
+      continue;
+    }
+
+    for (Operand &operand : inst->getAllOperands()) {
+      if (SILInstruction *definingInstruction =
+            operand.get()->getDefiningInstruction()) {
+        if (seenInstructions.count(definingInstruction))
+          continue;
+        worklist.push_back(definingInstruction);
+        seenInstructions.insert(definingInstruction);
+        candidateStartInstructions.insert(definingInstruction);
+      }
+      // If there is no definining instruction for this operand, it could be a
+      // basic block or function parameter. Such operands are not considered
+      // in the backward slice. Dependencies through them are safe to ignore
+      // in this context.
+    }
+
+    // If the instruction: `inst` has an operand, its definition should precede
+    // `inst` in the control-flow order. Therefore, remove `inst` from the
+    // candidate start instructions.
+    if (inst->getNumOperands() > 0) {
+      candidateStartInstructions.erase(inst);
+    }
+
+    if (!isa<AllocStackInst>(inst)) {
+      continue;
+    }
+
+    // If we have an alloc_stack instruction, include stores into it into the
+    // backward dependency list. However, whether alloc_stack precedes its in
+    // control-flow order can only be determined by traversing the instrutions
+    // in the control-flow order.
+    AllocStackInst *allocStackInst = cast<AllocStackInst>(inst);
+    for (StoreInst *storeInst : allocStackInst->getUsersOfType<StoreInst>()) {
+      worklist.push_back(storeInst);
+      candidateStartInstructions.insert(storeInst);
+    }
   }
 
+  // Find the first basic block in the control-flow order. TODO: if we do not
+  // madatorily inline appendLiteral/Interpolation functions of
+  // OSLogInterpolation, we can expect all candidate instructions to be in the
+  // same basic block. Once @_transparent is removed from those functions,
+  // simplify this code.
+  SmallPtrSet<SILBasicBlock *, 4> candidateBBs;
+  for (auto *candidate: candidateStartInstructions) {
+    SILBasicBlock *candidateBB = candidate->getParent();
+    candidateBBs.insert(candidateBB);
+  }
+
+  SILBasicBlock *firstBB = nullptr;
+  SILBasicBlock *entryBB = oslogInit->getFunction()->getEntryBlock();
+  for (SILBasicBlock *bb: llvm::breadth_first<SILBasicBlock *>(entryBB)) {
+    if (candidateBBs.count(bb)) {
+      firstBB = bb;
+      break;
+    }
+  }
+  assert(firstBB);
+
+  // Iterate over the instructions in the firstBB and find the instruction that
+  // starts the interpolation.
   SILInstruction *startInst = nullptr;
-
-  // If this is an initialization from string interpolation, the first argument
-  // to the  initializer is a load of an auto-generated alloc-stack of
-  // OSLogInterpolation:
-  //  'alloc_stack $OSLogInterpolation, var, name $interpolation'
-  // If no such instruction exists, ignore this call as this is not a
-  // OSLogMessage instantiation through string interpolation.
-  if (callee->hasSemanticsAttr("oslog.message.init_interpolation")) {
-    auto *loadInst = dyn_cast<LoadInst>(firstArgumentInst);
-    if (!loadInst)
-      return nullptr;
-
-    auto *allocStackInst = dyn_cast<AllocStackInst>(loadInst->getOperand());
-    if (!allocStackInst)
-      return nullptr;
-
-    Optional<SILDebugVariable> varInfo = allocStackInst->getVarInfo();
-    if (!varInfo && varInfo->Name != astContext.Id_dollarInterpolation.str())
-      return nullptr;
-
-    startInst = allocStackInst;
+  for (SILInstruction &inst : *firstBB) {
+    if (candidateStartInstructions.count(&inst)) {
+      startInst = &inst;
+      break;
+    }
   }
-
-  // If this is an initialization from a string literal, the first argument
-  // should be the creation of the string literal.
-  if (callee->hasSemanticsAttr("oslog.message.init_stringliteral")) {
-    if (!getStringMakeUTF8Init(firstArgumentInst))
-      return nullptr;
-    startInst = firstArgumentInst;
-  }
-
+  assert(startInst);
   return startInst;
 }
 
@@ -733,6 +783,27 @@ static ApplyInst *getAsOSLogMessageInit(SILInstruction *inst) {
   return nullptr;
 }
 
+/// Return true iff this function is a protocol witness for
+/// ExpressibleByStringInterpolation.init(stringInterpolation:) in OSLogMessage.
+bool isAutoGeneratedInitOfOSLogMessage(SILFunction &fun) {
+  DeclContext *declContext = fun.getDeclContext();
+  if (!declContext)
+    return false;
+  Decl *decl = declContext->getAsDecl();
+  if (!decl)
+    return false;
+  ConstructorDecl *cdecl = dyn_cast<ConstructorDecl>(decl);
+  if (!cdecl)
+    return false;
+  DeclContext *parentContext = cdecl->getParent();
+  if (!parentContext)
+    return false;
+  NominalTypeDecl *typeDecl = parentContext->getSelfNominalTypeDecl();
+  if (!typeDecl)
+    return false;
+  return typeDecl->getName() == fun.getASTContext().Id_OSLogMessage;
+}
+
 class OSLogOptimization : public SILFunctionTransform {
 
   ~OSLogOptimization() override {}
@@ -744,6 +815,14 @@ class OSLogOptimization : public SILFunctionTransform {
 
     // Don't rerun optimization on deserialized functions or stdlib functions.
     if (fun.wasDeserializedCanonical()) {
+      return;
+    }
+
+    // Skip the auto-generated (transparent) witness method of OSLogMessage,
+    // which ends up invoking the OSLogMessage initializer:
+    // "oslog.message.init_interpolation" but without an interpolated
+    // string literal.
+    if (isAutoGeneratedInitOfOSLogMessage(fun)) {
       return;
     }
 

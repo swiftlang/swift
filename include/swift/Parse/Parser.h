@@ -1020,6 +1020,11 @@ public:
                                 Optional<ParsedAttributeListSyntax> attrs,
                                 Optional<ParsedModifierListSyntax> modifiers);
 
+  ParsedSyntaxResult<ParsedDeclSyntax>
+  parseDeclTypeAliasSyntax(ParseDeclOptions flags,
+                           Optional<ParsedAttributeListSyntax> attrs,
+                           Optional<ParsedModifierListSyntax> modifiers);
+
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes,
                                             SourceLoc leadingLoc);
@@ -1686,6 +1691,9 @@ public:
   ParserStatus parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams);
   ParserResult<GenericParamList> maybeParseGenericParams();
+  void
+  diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams,
+                                        SourceLoc whereLoc);
   void
   diagnoseWhereClauseInGenericParamList(const GenericParamList *GenericParams);
 

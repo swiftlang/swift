@@ -869,8 +869,10 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
                         current->getFullName(),
                         otherInit->isMemberwiseInitializer());
         } else {
-          tc.diagnose(current, diag::invalid_redecl, current->getFullName());
-          tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+          tc.diagnoseWithNotes(tc.diagnose(current, diag::invalid_redecl,
+                                           current->getFullName()), [&]() {
+            tc.diagnose(other, diag::invalid_redecl_prev, other->getFullName());
+          });
         }
         markInvalid();
       }
@@ -1382,40 +1384,37 @@ namespace {
 /// Given the raw value literal expression for an enum case, produces the
 /// auto-incremented raw value for the subsequent case, or returns null if
 /// the value is not auto-incrementable.
-static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
-                                             AutomaticEnumValueKind valueKind,
+static LiteralExpr *getAutomaticRawValueExpr(AutomaticEnumValueKind valueKind,
                                              EnumElementDecl *forElt,
                                              LiteralExpr *prevValue) {
+  auto &Ctx = forElt->getASTContext();
   switch (valueKind) {
   case AutomaticEnumValueKind::None:
-    TC.diagnose(forElt->getLoc(),
-                diag::enum_non_integer_convertible_raw_type_no_value);
+    Ctx.Diags.diagnose(forElt->getLoc(),
+                       diag::enum_non_integer_convertible_raw_type_no_value);
     return nullptr;
 
   case AutomaticEnumValueKind::String:
-    return new (TC.Context) StringLiteralExpr(forElt->getNameStr(), SourceLoc(),
+    return new (Ctx) StringLiteralExpr(forElt->getNameStr(), SourceLoc(),
                                               /*Implicit=*/true);
 
   case AutomaticEnumValueKind::Integer:
     // If there was no previous value, start from zero.
     if (!prevValue) {
-      return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
+      return new (Ctx) IntegerLiteralExpr("0", SourceLoc(),
                                                  /*Implicit=*/true);
     }
-    // If the prevValue is not a well-typed integer, then break.
-    if (!prevValue->getType())
-      return nullptr;
 
     if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
-      APInt nextVal = intLit->getValue().sextOrSelf(128) + 1;
+      APInt nextVal = intLit->getRawValue().sextOrSelf(128) + 1;
       bool negative = nextVal.slt(0);
       if (negative)
         nextVal = -nextVal;
 
       llvm::SmallString<10> nextValStr;
       nextVal.toStringSigned(nextValStr);
-      auto expr = new (TC.Context)
-        IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
+      auto expr = new (Ctx)
+        IntegerLiteralExpr(Ctx.AllocateCopy(StringRef(nextValStr)),
                            forElt->getLoc(), /*Implicit=*/true);
       if (negative)
         expr->setNegative(forElt->getLoc());
@@ -1423,8 +1422,8 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
       return expr;
     }
 
-    TC.diagnose(forElt->getLoc(),
-                diag::enum_non_integer_raw_value_auto_increment);
+    Ctx.Diags.diagnose(forElt->getLoc(),
+                       diag::enum_non_integer_raw_value_auto_increment);
     return nullptr;
   }
 
@@ -1432,7 +1431,7 @@ static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
 }
 
 static Optional<AutomaticEnumValueKind>
-computeAutomaticEnumValueKind(TypeChecker &TC, EnumDecl *ED) {
+computeAutomaticEnumValueKind(EnumDecl *ED) {
   Type rawTy = ED->getRawType();
   assert(rawTy && "Cannot compute value kind without raw type!");
   
@@ -1442,7 +1441,7 @@ computeAutomaticEnumValueKind(TypeChecker &TC, EnumDecl *ED) {
   // Swift enums require that the raw type is convertible from one of the
   // primitive literal protocols.
   auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
-    ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
+    ProtocolDecl *proto = ED->getASTContext().getProtocol(protoKind);
     return TypeChecker::conformsToProtocol(rawTy, proto,
                                            ED->getDeclContext(), None);
   };
@@ -1466,22 +1465,19 @@ computeAutomaticEnumValueKind(TypeChecker &TC, EnumDecl *ED) {
   }
 }
 
-static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
+llvm::Expected<bool>
+EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
+                               TypeResolutionStage stage) const {
   Type rawTy = ED->getRawType();
   if (!rawTy) {
-    return;
+    return true;
   }
 
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
   if (rawTy->hasError())
-    return;
+    return true;
 
-  // If we don't have a value kind, the decl checker will provide a diagnostic.
-  auto valueKind = computeAutomaticEnumValueKind(TC, ED);
-  if (!valueKind.hasValue())
-    return;
-  
   // Check the raw values of the cases.
   LiteralExpr *prevValue = nullptr;
   EnumElementDecl *lastExplicitValueElt = nullptr;
@@ -1489,38 +1485,67 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   // Keep a map we can use to check for duplicate case values.
   llvm::SmallDenseMap<RawValueKey, RawValueSource, 8> uniqueRawValues;
 
+  // Make the raw member accesses explicit.
+  auto uncheckedRawValueOf = [](EnumElementDecl *EED) -> LiteralExpr * {
+    return EED->RawValueExpr;
+  };
+  
+  Optional<AutomaticEnumValueKind> valueKind;
   for (auto elt : ED->getAllElements()) {
-    // Skip if the raw value expr has already been checked.
-    if (elt->hasRawValueExpr() && elt->getRawValueExpr()->getType()) {
-      prevValue = elt->getRawValueExpr();
-      continue;
-    }
-
-    // Make sure the element is checked out before we poke at it.
-    // FIXME: Make isInvalid work with interface types
+    // If the element has been diagnosed up to now, skip it.
     (void)elt->getInterfaceType();
     if (elt->isInvalid())
       continue;
-    
-    if (elt->hasRawValueExpr()) {
-      lastExplicitValueElt = elt;
-    } else {
+
+    if (uncheckedRawValueOf(elt)) {
+      if (!uncheckedRawValueOf(elt)->isImplicit())
+        lastExplicitValueElt = elt;
+    } else if (!ED->LazySemanticInfo.hasFixedRawValues()) {
+      // Try to pull out the automatic enum value kind.  If that fails, bail.
+      if (!valueKind) {
+        valueKind = computeAutomaticEnumValueKind(ED);
+        if (!valueKind) {
+          elt->setInvalid();
+          return true;
+        }
+      }
+      
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
-      auto nextValue = getAutomaticRawValueExpr(TC, *valueKind, elt, prevValue);
+      auto nextValue = getAutomaticRawValueExpr(*valueKind, elt, prevValue);
       if (!nextValue) {
         elt->setInvalid();
         break;
       }
       elt->setRawValueExpr(nextValue);
     }
-    prevValue = elt->getRawValueExpr();
+    prevValue = uncheckedRawValueOf(elt);
     assert(prevValue && "continued without setting raw value of enum case");
+
+    switch (stage) {
+    case TypeResolutionStage::Structural:
+      // We're only interested in computing the complete set of raw values,
+      // so we can skip type checking.
+      continue;
+    default:
+      // Continue on to type check the raw value.
+      break;
+    }
+
+    
+    {
+      auto *TC = static_cast<TypeChecker *>(ED->getASTContext().getLazyResolver());
+      assert(TC && "Must have a lazy resolver set");
+      Expr *exprToCheck = prevValue;
+      if (TC->typeCheckExpression(exprToCheck, ED, TypeLoc::withoutLoc(rawTy),
+                                  CTP_EnumCaseRawValue)) {
+        TC->checkEnumElementErrorHandling(elt, exprToCheck);
+      }
+    }
 
     // If we didn't find a valid initializer (maybe the initial value was
     // incompatible with the raw value type) mark the entry as being erroneous.
-    TC.checkRawValueExpr(ED, elt);
     if (!prevValue->getType() || prevValue->getType()->hasError()) {
       elt->setInvalid();
       continue;
@@ -1535,34 +1560,36 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       continue;
 
     // Diagnose the duplicate value.
-    SourceLoc diagLoc = elt->getRawValueExpr()->isImplicit()
-        ? elt->getLoc() : elt->getRawValueExpr()->getLoc();
-    TC.diagnose(diagLoc, diag::enum_raw_value_not_unique);
+    auto &Diags = ED->getASTContext().Diags;
+    SourceLoc diagLoc = uncheckedRawValueOf(elt)->isImplicit()
+        ? elt->getLoc() : uncheckedRawValueOf(elt)->getLoc();
+    Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
     assert(lastExplicitValueElt &&
            "should not be able to have non-unique raw values when "
            "relying on autoincrement");
     if (lastExplicitValueElt != elt &&
         valueKind == AutomaticEnumValueKind::Integer) {
-      TC.diagnose(lastExplicitValueElt->getRawValueExpr()->getLoc(),
-                  diag::enum_raw_value_incrementing_from_here);
+      Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
+                     diag::enum_raw_value_incrementing_from_here);
     }
 
     RawValueSource prevSource = insertIterPair.first->second;
     auto foundElt = prevSource.sourceElt;
-    diagLoc = foundElt->getRawValueExpr()->isImplicit()
-        ? foundElt->getLoc() : foundElt->getRawValueExpr()->getLoc();
-    TC.diagnose(diagLoc, diag::enum_raw_value_used_here);
+    diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
+        ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
+    Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
     if (foundElt != prevSource.lastExplicitValueElt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
-        TC.diagnose(prevSource.lastExplicitValueElt
-                      ->getRawValueExpr()->getLoc(),
-                    diag::enum_raw_value_incrementing_from_here);
+        Diags.diagnose(uncheckedRawValueOf(prevSource.lastExplicitValueElt)
+                         ->getLoc(),
+                       diag::enum_raw_value_incrementing_from_here);
       else
-        TC.diagnose(ED->getAllElements().front()->getLoc(),
-                    diag::enum_raw_value_incrementing_from_zero);
+        Diags.diagnose(ED->getAllElements().front()->getLoc(),
+                       diag::enum_raw_value_incrementing_from_zero);
     }
   }
+  return true;
 }
 
 const ConstructorDecl *
@@ -2606,7 +2633,7 @@ public:
     
     if (auto rawTy = ED->getRawType()) {
       // The raw type must be one of the blessed literal convertible types.
-      if (!computeAutomaticEnumValueKind(TC, ED)) {
+      if (!computeAutomaticEnumValueKind(ED)) {
         TC.diagnose(ED->getInherited().front().getSourceRange().Start,
                     diag::raw_type_not_literal_convertible,
                     rawTy);
@@ -2618,11 +2645,6 @@ public:
         TC.diagnose(ED->getInherited().front().getSourceRange().Start,
                     diag::empty_enum_raw_type);
       }
-      
-      // ObjC enums have already had their raw values checked, but pure Swift
-      // enums haven't.
-      if (!ED->isObjC())
-        checkEnumRawValues(TC, ED);
     }
 
     checkExplicitAvailability(ED);
@@ -3116,13 +3138,13 @@ public:
       }
     }
 
-    // Yell if our parent doesn't have a raw type but we have a raw value.
-    if (EED->hasRawValueExpr() && !ED->hasRawType()) {
-      TC.diagnose(EED->getRawValueExpr()->getLoc(),
-                  diag::enum_raw_value_without_raw_type);
+    // Force the raw value expr then yell if our parent doesn't have a raw type.
+    Expr *RVE = EED->getRawValueExpr();
+    if (RVE && !ED->hasRawType()) {
+      TC.diagnose(RVE->getLoc(), diag::enum_raw_value_without_raw_type);
       EED->setInvalid();
     }
-    
+
     checkAccessControl(TC, EED);
   }
 
@@ -3196,13 +3218,6 @@ public:
     }
 
     checkInheritanceClause(ED);
-
-    // Check the raw values of an enum, since we might synthesize
-    // RawRepresentable while checking conformances on this extension.
-    if (auto enumDecl = dyn_cast<EnumDecl>(nominal)) {
-      if (enumDecl->hasRawType())
-        checkEnumRawValues(TC, enumDecl);
-    }
 
     // Only generic and protocol types are permitted to have
     // trailing where clauses.
@@ -3922,9 +3937,15 @@ void TypeChecker::validateDecl(ValueDecl *D) {
 
     if (auto *ED = dyn_cast<EnumDecl>(nominal)) {
       // @objc enums use their raw values as the value representation, so we
-      // need to force the values to be checked.
-      if (ED->isObjC())
-        checkEnumRawValues(*this, ED);
+      // need to force the values to be checked even in non-primaries.
+      //
+      // FIXME: This check can be removed once IRGen can be made tolerant of
+      // semantic failures post-Sema.
+      if (ED->isObjC()) {
+        (void)evaluateOrDefault(
+            Context.evaluator,
+            EnumRawValuesRequest{ED, TypeResolutionStage::Interface}, true);
+      }
     }
 
     break;

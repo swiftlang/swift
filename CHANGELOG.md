@@ -4,27 +4,27 @@ CHANGELOG
 <details>
 <summary>Note: This is in reverse chronological order, so newer entries are added to the top.</summary>
 
-| Contents               |
-| :--------------------- |
-| [Swift Next](#swift-next) |
-| [Swift 5.1](#swift-51) |
-| [Swift 5.0](#swift-50) |
-| [Swift 4.2](#swift-42) |
-| [Swift 4.1](#swift-41) |
-| [Swift 4.0](#swift-40) |
-| [Swift 3.1](#swift-31) |
-| [Swift 3.0](#swift-30) |
-| [Swift 2.2](#swift-22) |
-| [Swift 2.1](#swift-21) |
-| [Swift 2.0](#swift-20) |
-| [Swift 1.2](#swift-12) |
-| [Swift 1.1](#swift-11) |
-| [Swift 1.0](#swift-10) |
+| Version                | Released   | Toolchain   |
+| :--------------------- | :--------- | :---------- |
+| [Swift 5.2](#swift-52) |            |             |
+| [Swift 5.1](#swift-51) | 2019-09-20 | Xcode 11.0  |
+| [Swift 5.0](#swift-50) | 2019-03-25 | Xcode 10.2  |
+| [Swift 4.2](#swift-42) | 2018-09-17 | Xcode 10.0  |
+| [Swift 4.1](#swift-41) | 2018-03-29 | Xcode 9.3   |
+| [Swift 4.0](#swift-40) | 2017-09-19 | Xcode 9.0   |
+| [Swift 3.1](#swift-31) | 2017-03-27 | Xcode 8.3   |
+| [Swift 3.0](#swift-30) | 2016-09-13 | Xcode 8.0   |
+| [Swift 2.2](#swift-22) | 2016-03-21 | Xcode 7.3   |
+| [Swift 2.1](#swift-21) | 2015-10-21 | Xcode 7.1   |
+| [Swift 2.0](#swift-20) | 2015-09-17 | Xcode 7.0   |
+| [Swift 1.2](#swift-12) | 2015-04-08 | Xcode 6.3   |
+| [Swift 1.1](#swift-11) | 2014-12-02 | Xcode 6.1.1 |
+| [Swift 1.0](#swift-10) | 2014-09-15 | Xcode 6.0   |
 
 </details>
 
-Swift Next
-----------
+Swift 5.2
+---------
 
 * [SR-11429][]:
 
