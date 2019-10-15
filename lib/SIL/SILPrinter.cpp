@@ -1194,13 +1194,13 @@ public:
       DifferentiableFunctionExtractInst *dfei) {
     *this << '[';
     switch (dfei->getExtractee()) {
-    case DifferentiableFunctionExtractee::Original:
+    case NormalDifferentiableFunctionTypeComponent::Original:
       *this << "original";
       break;
-    case DifferentiableFunctionExtractee::JVP:
+    case NormalDifferentiableFunctionTypeComponent::JVP:
       *this << "jvp";
       break;
-    case DifferentiableFunctionExtractee::VJP:
+    case NormalDifferentiableFunctionTypeComponent::VJP:
       *this << "vjp";
       break;
     }
@@ -1211,10 +1211,10 @@ public:
   void visitLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
     *this << '[';
     switch (lfei->getExtractee()) {
-    case LinearFunctionExtractee::Original:
+    case LinearDifferentiableFunctionTypeComponent::Original:
       *this << "original";
       break;
-    case LinearFunctionExtractee::Transpose:
+    case LinearDifferentiableFunctionTypeComponent::Transpose:
       *this << "transpose";
       break;
     }

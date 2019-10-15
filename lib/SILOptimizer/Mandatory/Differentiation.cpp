@@ -2563,7 +2563,8 @@ emitDerivativeFunctionReference(
   // derivative function, and return it.
   if (auto *inst = original->getDefiningInstruction())
     if (auto *dfei = dyn_cast<DifferentiableFunctionExtractInst>(inst))
-      if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original)
+      if (dfei->getExtractee() ==
+              NormalDifferentiableFunctionTypeComponent::Original)
         functionSource = dfei->getFunctionOperand();
 
   // If `functionSource` is a `@differentiable` function, just extract the
@@ -3787,7 +3788,7 @@ public:
       }
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
       vjpValue = builder.createDifferentiableFunctionExtract(
-          loc, DifferentiableFunctionExtractInst::Extractee::VJP,
+          loc, NormalDifferentiableFunctionTypeComponent::VJP,
           borrowedDiffFunc);
       vjpValue = builder.emitCopyValueOperation(loc, vjpValue);
     }
@@ -3870,7 +3871,7 @@ public:
       auto borrowedADFunc =
           builder.emitBeginBorrowOperation(loc, diffFuncInst);
       auto extractedVJP = getBuilder().createDifferentiableFunctionExtract(
-          loc, DifferentiableFunctionExtractInst::Extractee::VJP,
+          loc, NormalDifferentiableFunctionTypeComponent::VJP,
           borrowedADFunc);
       vjpValue = builder.emitCopyValueOperation(loc, extractedVJP);
       builder.emitEndBorrowOperation(loc, borrowedADFunc);
@@ -5465,7 +5466,7 @@ public:
       }
       auto borrowedDiffFunc = builder.emitBeginBorrowOperation(loc, original);
       jvpValue = builder.createDifferentiableFunctionExtract(
-          loc, DifferentiableFunctionExtractInst::Extractee::JVP,
+          loc, NormalDifferentiableFunctionTypeComponent::JVP,
           borrowedDiffFunc);
       jvpValue = builder.emitCopyValueOperation(loc, jvpValue);
     }
@@ -5544,7 +5545,7 @@ public:
       auto borrowedADFunc =
           builder.emitBeginBorrowOperation(loc, diffFuncInst);
       auto extractedJVP = builder.createDifferentiableFunctionExtract(
-          loc, DifferentiableFunctionExtractInst::Extractee::JVP,
+          loc, NormalDifferentiableFunctionTypeComponent::JVP,
           borrowedADFunc);
       jvpValue = builder.emitCopyValueOperation(loc, extractedJVP);
       builder.emitEndBorrowOperation(loc, borrowedADFunc);
@@ -8712,7 +8713,8 @@ void ADContext::foldDifferentiableFunctionExtraction(
     if (!dfei)
       continue;
     // Fold original function extractors.
-    if (dfei->getExtractee() == DifferentiableFunctionExtractee::Original) {
+    if (dfei->getExtractee() ==
+            NormalDifferentiableFunctionTypeComponent::Original) {
       auto originalFnValue = source->getOriginalFunction();
       dfei->replaceAllUsesWith(originalFnValue);
       dfei->eraseFromParent();

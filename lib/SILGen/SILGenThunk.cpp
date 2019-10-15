@@ -146,7 +146,8 @@ SILFunction *SILGenModule::getOrCreateAutoDiffClassMethodThunk(
   auto diffFn = SGF.B.createDifferentiableFunction(
       loc, loweredIndices, originalFnRef);
   auto diffDerivativeFn = SGF.B.createDifferentiableFunctionExtract(
-      loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()), diffFn);
+      loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
+      diffFn);
   auto autoDiffDerivativeFnSILTy = SILType::getPrimitiveObjectType(constantTy);
   SmallVector<SILValue, 4> args(thunk->getArguments().begin(),
                                 thunk->getArguments().end());

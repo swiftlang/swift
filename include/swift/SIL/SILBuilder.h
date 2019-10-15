@@ -528,7 +528,7 @@ public:
   }
   
   DifferentiableFunctionExtractInst *createDifferentiableFunctionExtract(
-      SILLocation Loc, DifferentiableFunctionExtractee Extractee,
+      SILLocation Loc, NormalDifferentiableFunctionTypeComponent Extractee,
       SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc), Extractee, TheFunction));
@@ -546,7 +546,7 @@ public:
                                               SILValue TheFunction) {
     return insert(new (getModule()) DifferentiableFunctionExtractInst(
         getModule(), getSILDebugLocation(Loc),
-        DifferentiableFunctionExtractee::Original, TheFunction));
+        NormalDifferentiableFunctionTypeComponent::Original, TheFunction));
   }
 
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,

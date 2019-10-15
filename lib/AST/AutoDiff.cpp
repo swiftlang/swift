@@ -32,6 +32,33 @@ AutoDiffDerivativeFunctionKind(StringRef string) {
   rawValue = *result;
 }
 
+NormalDifferentiableFunctionTypeComponent::
+NormalDifferentiableFunctionTypeComponent(AutoDiffDerivativeFunctionKind kind) {
+  switch (kind) {
+  case AutoDiffDerivativeFunctionKind::JVP: rawValue = JVP; return;
+  case AutoDiffDerivativeFunctionKind::VJP: rawValue = VJP; return;
+  }
+}
+
+NormalDifferentiableFunctionTypeComponent::
+NormalDifferentiableFunctionTypeComponent(StringRef string) {
+  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
+      .Case("original", Original)
+      .Case("jvp", JVP)
+      .Case("vjp", VJP);
+  assert(result && "Invalid string");
+  rawValue = *result;
+}
+
+Optional<AutoDiffDerivativeFunctionKind>
+NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
+  switch (rawValue) {
+  case Original: return None;
+  case JVP: return {AutoDiffDerivativeFunctionKind::JVP};
+  case VJP: return {AutoDiffDerivativeFunctionKind::VJP};
+  }
+}
+
 LinearDifferentiableFunctionTypeComponent::
 LinearDifferentiableFunctionTypeComponent(StringRef string) {
   Optional<innerty> result =

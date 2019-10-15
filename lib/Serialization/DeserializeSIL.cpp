@@ -1599,7 +1599,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto astTy = MF->getType(TyID);
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
-    DifferentiableFunctionExtractee extractee(Attr);
+    NormalDifferentiableFunctionTypeComponent extractee(Attr);
     ResultVal =
         Builder.createDifferentiableFunctionExtract(Loc, extractee, val);
     break;
@@ -1608,7 +1608,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
     auto astTy = MF->getType(TyID);
     auto silTy = getSILType(astTy, SILValueCategory::Object);
     auto val = getLocalValue(ValID, silTy);
-    LinearFunctionExtractee extractee(Attr);
+    LinearDifferentiableFunctionTypeComponent extractee(Attr);
     ResultVal = Builder.createLinearFunctionExtract(Loc, extractee, val);
     break;
   }

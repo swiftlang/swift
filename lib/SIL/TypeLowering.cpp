@@ -892,14 +892,14 @@ namespace {
   class NormalDifferentiableSILFunctionTypeLowering final
       : public LoadableAggTypeLowering<
                    NormalDifferentiableSILFunctionTypeLowering,
-                   DifferentiableFunctionExtractee> {
+                   NormalDifferentiableFunctionTypeComponent> {
   public:
     using LoadableAggTypeLowering::LoadableAggTypeLowering;
 
-    SILValue emitRValueProject(SILBuilder &B, SILLocation loc,
-                               SILValue tupleValue,
-                               DifferentiableFunctionExtractee extractee,
-                               const TypeLowering &eltLowering) const {
+    SILValue emitRValueProject(
+        SILBuilder &B, SILLocation loc, SILValue tupleValue,
+        NormalDifferentiableFunctionTypeComponent extractee,
+        const TypeLowering &eltLowering) const {
       return B.createDifferentiableFunctionExtract(
           loc, extractee, tupleValue);
     }
@@ -921,7 +921,7 @@ namespace {
       auto origFnTy = fnTy->getWithoutDifferentiability();
       auto paramIndices = fnTy->getDifferentiationParameterIndices();
       children.push_back(Child{
-        DifferentiableFunctionExtractee::Original,
+        NormalDifferentiableFunctionTypeComponent::Original,
         TC.getTypeLowering(origFnTy, getResilienceExpansion())
       });
       for (AutoDiffDerivativeFunctionKind kind :
@@ -931,12 +931,12 @@ namespace {
             paramIndices, 0, kind, TC,
             LookUpConformanceInModule(&TC.M));
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
-        DifferentiableFunctionExtractee extractee(kind);
+        NormalDifferentiableFunctionTypeComponent extractee(kind);
         // Assert that we have the right extractee. A terrible bug in the past
         // was caused by implicit conversions from `unsigned` to
-        // `DifferentiableFunctionExtractee` which resulted into a wrong
-        // extractee.
-        assert(extractee.getExtracteeAsDerivativeFunction() == kind);
+        // `NormalDifferentiableFunctionTypeComponent` which resulted into a
+        // wrong extractee.
+        assert(extractee.getAsDerivativeFunctionKind() == kind);
         children.push_back(Child{
             extractee, TC.getTypeLowering(silTy, getResilienceExpansion())});
       }
