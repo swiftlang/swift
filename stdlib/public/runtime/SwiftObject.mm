@@ -1271,7 +1271,7 @@ Class swift::swift_getInitializedObjCClass(Class c) {
   // Send a message that's likely not to be overridden to minimize potential
   // side effects. Ignore the return value in case it is overridden to
   // return something different. See SR-10463 for an example.
-  [c self];
+  //[c self];
   return c;
 }
 
