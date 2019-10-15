@@ -41,24 +41,24 @@ class DifferentiableFuncFieldInfo final
     : public RecordField<DifferentiableFuncFieldInfo> {
 public:
   DifferentiableFuncFieldInfo(
-      DifferentiableFunctionExtractee component, const TypeInfo &type,
+      NormalDifferentiableFunctionTypeComponent component, const TypeInfo &type,
       IndexSubset *parameterIndices)
       : RecordField(type), component(component),
         parameterIndices(parameterIndices) {}
 
   /// The field index.
-  const DifferentiableFunctionExtractee component;
+  const NormalDifferentiableFunctionTypeComponent component;
 
   /// The parameter indices.
   IndexSubset *parameterIndices;
 
   std::string getFieldName() const {
     switch (component) {
-    case DifferentiableFunctionExtractee::Original:
+    case NormalDifferentiableFunctionTypeComponent::Original:
       return "original";
-    case DifferentiableFunctionExtractee::JVP:
+    case NormalDifferentiableFunctionTypeComponent::JVP:
       return "jvp";
-    case DifferentiableFunctionExtractee::VJP:
+    case NormalDifferentiableFunctionTypeComponent::VJP:
       return "vjp";
     }
   }
@@ -66,9 +66,9 @@ public:
   SILType getType(IRGenModule &IGM, SILType t) const {
     auto fnTy = t.castTo<SILFunctionType>();
     auto origFnTy = fnTy->getWithoutDifferentiability();
-    if (component == DifferentiableFunctionExtractee::Original)
+    if (component == NormalDifferentiableFunctionTypeComponent::Original)
       return SILType::getPrimitiveObjectType(origFnTy);
-    auto kind = *component.getExtracteeAsDerivativeFunction();
+    auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, /*resultIndex*/ 0, kind,
         IGM.getSILTypes(), LookUpConformanceInModule(IGM.getSwiftModule()));
@@ -79,8 +79,8 @@ public:
 class DifferentiableFuncTypeInfo final
     : public RecordTypeInfo<DifferentiableFuncTypeInfo, LoadableTypeInfo,
                             DifferentiableFuncFieldInfo> {
-  using super =
-      RecordTypeInfo<DifferentiableFuncTypeInfo, LoadableTypeInfo, DifferentiableFuncFieldInfo>;
+  using super = RecordTypeInfo<DifferentiableFuncTypeInfo, LoadableTypeInfo,
+                               DifferentiableFuncFieldInfo>;
 
 public:
   DifferentiableFuncTypeInfo(
@@ -117,7 +117,7 @@ public:
 
 class DifferentiableFuncTypeBuilder
     : public RecordTypeBuilder<DifferentiableFuncTypeBuilder, DifferentiableFuncFieldInfo,
-                               DifferentiableFunctionExtractee> {
+                               NormalDifferentiableFunctionTypeComponent> {
 
   SILFunctionType *originalType;
   IndexSubset *parameterIndices;
@@ -151,15 +151,15 @@ public:
   }
 
   DifferentiableFuncFieldInfo getFieldInfo(
-      unsigned index, DifferentiableFunctionExtractee component,
+      unsigned index, NormalDifferentiableFunctionTypeComponent component,
       const TypeInfo &fieldTI) {
     return DifferentiableFuncFieldInfo(component, fieldTI, parameterIndices);
   }
 
-  SILType getType(DifferentiableFunctionExtractee component) {
-    if (component == DifferentiableFunctionExtractee::Original)
+  SILType getType(NormalDifferentiableFunctionTypeComponent component) {
+    if (component == NormalDifferentiableFunctionTypeComponent::Original)
       return SILType::getPrimitiveObjectType(originalType->getCanonicalType());
-    auto kind = *component.getExtracteeAsDerivativeFunction();
+    auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
         parameterIndices, /*resultIndex*/ 0, kind, IGM.getSILTypes(),
         LookUpConformanceInModule(IGM.getSwiftModule()));
@@ -320,9 +320,9 @@ public:
 const TypeInfo *
 TypeConverter::convertNormalDifferentiableFunctionType(SILFunctionType *type) {
   DifferentiableFuncTypeBuilder builder(IGM, type);
-  return builder.layout({DifferentiableFunctionExtractee::Original,
-                         DifferentiableFunctionExtractee::JVP,
-                         DifferentiableFunctionExtractee::VJP});
+  return builder.layout({NormalDifferentiableFunctionTypeComponent::Original,
+                         NormalDifferentiableFunctionTypeComponent::JVP,
+                         NormalDifferentiableFunctionTypeComponent::VJP});
 }
 
 const TypeInfo *

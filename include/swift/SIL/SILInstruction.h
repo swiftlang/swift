@@ -7967,42 +7967,29 @@ class DifferentiableFunctionExtractInst
     : public InstructionBase<
           SILInstructionKind::DifferentiableFunctionExtractInst,
           SingleValueInstruction> {
-public:
-  struct Extractee {
-    enum innerty : unsigned {
-      Original = 0,
-      JVP = 1,
-      VJP = 2
-    } rawValue;
-    Extractee() = default;
-    Extractee(innerty rawValue) : rawValue(rawValue) {}
-    explicit Extractee(unsigned rawValue) : Extractee((innerty)rawValue) {}
-    Extractee(AutoDiffDerivativeFunctionKind kind);
-    explicit Extractee(StringRef name);
-    operator innerty() const { return rawValue; }
-
-    Optional<AutoDiffDerivativeFunctionKind>
-    getExtracteeAsDerivativeFunction() const;
-  };
-
 private:
   /// The extractee.
-  Extractee extractee;
+  NormalDifferentiableFunctionTypeComponent extractee;
   /// The list containing the `@differentiable` function operand.
   FixedOperandList<1> operands;
 
   static SILType
-  getExtracteeType(SILValue function, Extractee extractee, SILModule &module);
+  getExtracteeType(
+      SILValue function, NormalDifferentiableFunctionTypeComponent extractee,
+      SILModule &module);
 
 public:
   explicit DifferentiableFunctionExtractInst(
-      SILModule &module, SILDebugLocation debugLoc, Extractee extractee,
+      SILModule &module, SILDebugLocation debugLoc,
+      NormalDifferentiableFunctionTypeComponent extractee,
       SILValue theFunction);
 
-  Extractee getExtractee() const { return extractee; }
+  NormalDifferentiableFunctionTypeComponent getExtractee() const {
+      return extractee;
+  }
 
   AutoDiffDerivativeFunctionKind getDerivativeFunctionKind() const {
-    auto kind = extractee.getExtracteeAsDerivativeFunction();
+    auto kind = extractee.getAsDerivativeFunctionKind();
     assert(kind);
     return *kind;
   }
@@ -8011,9 +7998,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
-
-typedef DifferentiableFunctionExtractInst::Extractee
-    DifferentiableFunctionExtractee;
 
 /// `linear_function_extract` - given an `@differentiable(linear)` function
 /// representing a bundle of the original function and the transpose function,
@@ -8047,8 +8031,6 @@ public:
   ArrayRef<Operand> getAllOperands() const { return operands.asArray(); }
   MutableArrayRef<Operand> getAllOperands() { return operands.asArray(); }
 };
-
-typedef LinearDifferentiableFunctionTypeComponent LinearFunctionExtractee;
 // SWIFT_ENABLE_TENSORFLOW END
 
 // This is defined out of line to work around the fact that this depends on

@@ -4312,7 +4312,7 @@ getWitnessFunctionRef(SILGenFunction &SGF,
       auto autoDiffFn = SGF.B.createDifferentiableFunction(
           loc, loweredIndices, originalFn);
       return SGF.B.createDifferentiableFunctionExtract(
-          loc, DifferentiableFunctionExtractee(autoDiffFuncId->getKind()),
+          loc, NormalDifferentiableFunctionTypeComponent(autoDiffFuncId->getKind()),
           autoDiffFn);
     }
 

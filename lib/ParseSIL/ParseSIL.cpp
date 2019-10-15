@@ -3041,7 +3041,7 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
   case SILInstructionKind::DifferentiableFunctionExtractInst: {
     // Parse the rest of the instruction: an extractee, a differentiable
     // function operand, and a debug location.
-    DifferentiableFunctionExtractee extractee;
+    NormalDifferentiableFunctionTypeComponent extractee;
     StringRef extracteeNames[3] = {"original", "jvp", "vjp"};
     SILValue functionOperand;
     SourceLoc lastLoc;

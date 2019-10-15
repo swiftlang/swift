@@ -45,11 +45,58 @@ enum class DifferentiabilityKind: uint8_t {
   Linear = 2
 };
 
-// TODO(TF-904): Replace `DifferentiableFunctionExtractInst::Extractee`.
-enum class NormalDifferentiableFunctionTypeComponent : uint8_t {
-  Original = 0,
-  JVP = 1,
-  VJP = 2
+/// The kind of an linear map.
+struct AutoDiffLinearMapKind {
+  enum innerty : uint8_t {
+    // The differential function.
+    Differential = 0,
+    // The pullback function.
+    Pullback = 1
+  } rawValue;
+
+  AutoDiffLinearMapKind() = default;
+  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
+  operator innerty() const { return rawValue; }
+};
+
+/// The kind of a derivative function.
+struct AutoDiffDerivativeFunctionKind {
+  enum innerty : uint8_t {
+   // The Jacobian-vector products function.
+   JVP = 0,
+   // The vector-Jacobian products function.
+   VJP = 1
+  } rawValue;
+
+  AutoDiffDerivativeFunctionKind() = default;
+  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
+  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
+      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
+  explicit AutoDiffDerivativeFunctionKind(StringRef string);
+  operator innerty() const { return rawValue; }
+  AutoDiffLinearMapKind getLinearMapKind() {
+    return (AutoDiffLinearMapKind::innerty)rawValue;
+  }
+};
+
+struct NormalDifferentiableFunctionTypeComponent {
+  enum innerty : unsigned {
+    Original = 0,
+    JVP = 1,
+    VJP = 2
+  } rawValue;
+
+  NormalDifferentiableFunctionTypeComponent() = default;
+  NormalDifferentiableFunctionTypeComponent(innerty rawValue)
+      : rawValue(rawValue) {}
+  NormalDifferentiableFunctionTypeComponent(
+      AutoDiffDerivativeFunctionKind kind);
+  explicit NormalDifferentiableFunctionTypeComponent(unsigned rawValue) :
+      NormalDifferentiableFunctionTypeComponent((innerty)rawValue) {}
+  explicit NormalDifferentiableFunctionTypeComponent(StringRef name);
+  operator innerty() const { return rawValue; }
+
+  Optional<AutoDiffDerivativeFunctionKind> getAsDerivativeFunctionKind() const;
 };
 
 struct LinearDifferentiableFunctionTypeComponent {
@@ -195,40 +242,6 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &s,
   indices.print(s);
   return s;
 }
-
-/// The kind of an linear map.
-struct AutoDiffLinearMapKind {
-  enum innerty : uint8_t {
-    // The differential function.
-    Differential = 0,
-    // The pullback function.
-    Pullback = 1
-  } rawValue;
-
-  AutoDiffLinearMapKind() = default;
-  AutoDiffLinearMapKind(innerty rawValue) : rawValue(rawValue) {}
-  operator innerty() const { return rawValue; }
-};
-
-/// The kind of a derivative function.
-struct AutoDiffDerivativeFunctionKind {
-  enum innerty : uint8_t {
-   // The Jacobian-vector products function.
-   JVP = 0,
-   // The vector-Jacobian products function.
-   VJP = 1
-  } rawValue;
-
-  AutoDiffDerivativeFunctionKind() = default;
-  AutoDiffDerivativeFunctionKind(innerty rawValue) : rawValue(rawValue) {}
-  AutoDiffDerivativeFunctionKind(AutoDiffLinearMapKind linMapKind)
-      : rawValue(static_cast<innerty>(linMapKind.rawValue)) {}
-  explicit AutoDiffDerivativeFunctionKind(StringRef string);
-  operator innerty() const { return rawValue; }
-  AutoDiffLinearMapKind getLinearMapKind() {
-    return (AutoDiffLinearMapKind::innerty)rawValue;
-  }
-};
 
 /// Identifies an autodiff derivative function configuration:
 /// - Parameter indices.
