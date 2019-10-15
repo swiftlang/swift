@@ -92,7 +92,7 @@
             }
         },
         "master-llvm-monorepo": {
-            "aliases": ["master-llvm-monorepo"],
+            "aliases": ["master-llvm-monorepo", "swift/master"],
             "repos": {
                 "llvm-project": "swift/master",
                 "swift": "master",
@@ -409,16 +409,17 @@
                 "sourcekit-lsp": "swift-5.1-branch"
             }
         },
-        "master-rebranch" : {
+        "master-20190619" : {
             "aliases": ["apple/stable/20190619",
-                        "master-rebranch-apple-stable-20190619",
-                        "master-rebranch"],
+                        "master-apple-stable-20190619",
+                        "master-20190619"
+                       ],
             "repos": {
                 "llvm": "apple/stable/20190619",
                 "clang": "apple/stable/20190619",
                 "compiler-rt": "apple/stable/20190619",
-                "swift": "master-rebranch",
-                "lldb": "master-rebranch",
+                "swift": "master",
+                "lldb": "stable",
                 "cmark": "master",
                 "llbuild": "master",
                 "swiftpm": "master",
@@ -427,7 +428,7 @@
                 "swift-corelibs-xctest": "master",
                 "swift-corelibs-foundation": "master",
                 "swift-corelibs-libdispatch": "master",
-                "swift-integration-tests": "master-rebranch",
+                "swift-integration-tests": "master",
                 "swift-xcode-playground-support": "master",
                 "ninja": "release",
                 "icu": "release-61-1",
@@ -435,7 +436,8 @@
                 "clang-tools-extra": "apple/stable/20190619",
                 "libcxx": "apple/stable/20190619",
                 "indexstore-db": "master",
-                "sourcekit-lsp": "master"
+                "sourcekit-lsp": "master",
+                "swift-format": "master"
             }
         },
         "stdlib_standalone" : {
@@ -470,7 +472,7 @@
                 "llvm": "swift-DEVELOPMENT-SNAPSHOT-2019-10-08-a",
                 "clang": "0c249864907e436c81b75007c2f9f251d0326c29",
                 "swift": "tensorflow",
-                "lldb": "4268a3e961a61b42fa4175b409b5680b10bfc192",
+                "lldb": "fd2dcd9a5997dba12b938cf8e2002508ff6c333e",
                 "cmark": "swift-DEVELOPMENT-SNAPSHOT-2019-10-08-a",
                 "llbuild": "swift-DEVELOPMENT-SNAPSHOT-2019-10-08-a",
                 "swiftpm": "swift-DEVELOPMENT-SNAPSHOT-2019-10-08-a",

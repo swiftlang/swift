@@ -20,7 +20,6 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
-#include "swift/Basic/TransformArrayRef.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/BranchPropagatedUser.h"
@@ -569,12 +568,18 @@ bool SILValueOwnershipChecker::checkUses() {
 //===----------------------------------------------------------------------===//
 
 void SILInstruction::verifyOperandOwnership() const {
-#ifndef NDEBUG
   if (DisableOwnershipVerification)
     return;
 
   if (isStaticInitializerInst())
     return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  if (!getModule().getOptions().VerifyAll)
+    return;
+#endif
 
   // If SILOwnership is not enabled, do not perform verification.
   if (!getModule().getOptions().VerifySILOwnership)
@@ -631,13 +636,36 @@ void SILInstruction::verifyOperandOwnership() const {
            "At this point, we are expected to assert");
     llvm_unreachable("triggering standard assertion failure routine");
   }
-#endif
 }
 
 void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-#ifndef NDEBUG
   if (DisableOwnershipVerification)
     return;
+
+  // Do not validate SILUndef values.
+  if (isa<SILUndef>(Value))
+    return;
+
+#ifdef NDEBUG
+  // When compiling without asserts enabled, only verify ownership if
+  // -sil-verify-all is set.
+  //
+  // NOTE: We purposely return if we do can not look up a module here to ensure
+  // that if we run into something that we do not understand, we do not assert
+  // in user code even tohugh we aren't going to actually verify (the default
+  // behavior when -sil-verify-all is disabled).
+  auto *Mod = Value->getModule();
+  if (!Mod || !Mod->getOptions().VerifyAll)
+    return;
+#endif
+
+  // Make sure that we are not a value of an instruction in a SILGlobalVariable
+  // block.
+  if (auto *definingInst = getDefiningInstruction()) {
+    if (definingInst->isStaticInitializerInst()) {
+      return;
+    }
+  }
 
   // Since we do not have SILUndef, we now know that getFunction() should return
   // a real function. Assert in case this assumption is no longer true.
@@ -667,5 +695,4 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
                              liveBlocks)
         .check();
   }
-#endif
 }

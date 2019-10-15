@@ -1550,6 +1550,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn) {
 Optional<ASTMangler::SpecialContext>
 ASTMangler::getSpecialManglingContext(const ValueDecl *decl,
                                       bool useObjCProtocolNames) {
+  #if SWIFT_BUILD_ONLY_SYNTAXPARSERLIB
+    return None; // not needed for the parser library.
+  #endif
+
   // Declarations provided by a C module have a special context mangling.
   //   known-context ::= 'So'
   //
@@ -2440,13 +2444,9 @@ CanType ASTMangler::getDeclTypeForMangling(
   }
 
 
-  Type type = decl->getInterfaceType()
-                  ->getReferenceStorageReferent();
-  if (type->hasArchetype()) {
-    assert(isa<ParamDecl>(decl) && "Only ParamDecl's still have archetypes");
-    type = type->mapTypeOutOfContext();
-  }
-  CanType canTy = type->getCanonicalType();
+  auto canTy = decl->getInterfaceType()
+                   ->getReferenceStorageReferent()
+                   ->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
     genericSig = gft.getGenericSignature();

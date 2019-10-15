@@ -403,7 +403,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       visit(PL);
     }
 
-    if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
+    if (auto *rawLiteralExpr = ED->getRawValueUnchecked()) {
       Expr *newRawExpr = doIt(rawLiteralExpr);
       if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
         ED->setRawValueExpr(newRawLiteralExpr);

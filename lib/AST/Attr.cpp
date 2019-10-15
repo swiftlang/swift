@@ -539,13 +539,15 @@ static void printDifferentiableAttrArguments(
   ArrayRef<Requirement> derivativeRequirements;
   if (auto derivativeGenSig = attr->getDerivativeGenericSignature())
     derivativeRequirements = derivativeGenSig->getRequirements();
-  auto requirementsToPrint =
-      makeFilterRange(derivativeRequirements, [&](Requirement req) {
-        if (auto originalGenSig = original->getGenericSignature())
-          if (originalGenSig->isRequirementSatisfied(req))
-            return false;
-        return true;
-      });
+  llvm::SmallVector<Requirement, 8> requirementsToPrint;
+  std::copy_if(derivativeRequirements.begin(), derivativeRequirements.end(),
+               std::back_inserter(requirementsToPrint),
+               [&](Requirement req) {
+                 if (auto originalGenSig = original->getGenericSignature())
+                   if (originalGenSig->isRequirementSatisfied(req))
+                     return false;
+                 return true;
+               });
   if (!requirementsToPrint.empty()) {
     if (!isLeadingClause)
       stream << ' ';

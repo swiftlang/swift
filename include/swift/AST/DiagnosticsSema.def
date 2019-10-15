@@ -381,7 +381,7 @@ ERROR(cannot_convert_argument_value,none,
       (Type,Type))
 
 NOTE(candidate_has_invalid_argument_at_position,none,
-     "candidate expects value of type %0 at position #%1",
+     "candidate expects value of type %0 for parameter #%1",
      (Type, unsigned))
 
 ERROR(cannot_convert_array_to_variadic,none,

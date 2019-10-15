@@ -68,6 +68,25 @@ void PrintingDiagnosticConsumer::handleDiagnostic(
     StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
     const DiagnosticInfo &Info,
     const SourceLoc bufferIndirectlyCausingDiagnostic) {
+  if (Info.IsChildNote)
+    return;
+
+  printDiagnostic(SM, Loc, Kind, FormatString, FormatArgs, Info,
+                  bufferIndirectlyCausingDiagnostic);
+
+  for (auto ChildInfo : Info.ChildDiagnosticInfo) {
+    printDiagnostic(SM, ChildInfo->Loc, ChildInfo->Kind,
+                    ChildInfo->FormatString, ChildInfo->FormatArgs, *ChildInfo,
+                    ChildInfo->BufferIndirectlyCausingDiagnostic);
+  }
+}
+
+void PrintingDiagnosticConsumer::printDiagnostic(
+    SourceManager &SM, SourceLoc Loc, DiagnosticKind Kind,
+    StringRef FormatString, ArrayRef<DiagnosticArgument> FormatArgs,
+    const DiagnosticInfo &Info,
+    const SourceLoc bufferIndirectlyCausingDiagnostic) {
+
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Kind) {

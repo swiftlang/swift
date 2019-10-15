@@ -1261,7 +1261,7 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     auto name = getIdentifier(DefiningDeclNameID);
     pathTrace.addOpaqueReturnType(name);
     
-    if (auto opaque = baseModule->lookupOpaqueResultType(name.str(), nullptr)) {
+    if (auto opaque = baseModule->lookupOpaqueResultType(name.str())) {
       values.push_back(opaque);
     }
     break;
@@ -1664,8 +1664,7 @@ giveUpFastPath:
       pathTrace.addOpaqueReturnType(name);
     
       auto lookupModule = M ? M : baseModule;
-      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str(),
-                                                               nullptr)) {
+      if (auto opaqueTy = lookupModule->lookupOpaqueResultType(name.str())) {
         values.push_back(opaqueTy);
       }
       break;
@@ -2245,8 +2244,6 @@ public:
       if (!filenameForPrivate.empty())
         MF.FilenamesForPrivateValues[value] = filenameForPrivate;
     }
-
-    decl->setValidationToChecked();
   }
 
   /// Deserializes decl attribute and attribute-like records from
@@ -2297,7 +2294,6 @@ public:
     auto underlying = MF.getType(underlyingTypeID);
     alias->setUnderlyingType(underlying);
     alias->computeType();
-    alias->setValidationToChecked();
     
     if (auto accessLevel = getActualAccessLevel(rawAccessLevel))
       alias->setAccess(*accessLevel);
@@ -2556,7 +2552,8 @@ public:
     if (initKind.hasValue())
       ctx.evaluator.cacheOutput(InitKindRequest{ctor},
                                 std::move(initKind.getValue()));
-    ctor->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{ctor},
+                              std::move(needsNewVTableEntry));
 
     ctor->setOverriddenDecl(cast_or_null<ConstructorDecl>(overridden.get()));
     if (auto *overridden = ctor->getOverriddenDecl()) {
@@ -2717,8 +2714,9 @@ public:
       AddAttribute(new (ctx) HasStorageAttr(/*isImplicit:*/true));
 
     if (opaqueReturnTypeID) {
-      var->setOpaqueResultTypeDecl(
-                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{var},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
 
     // If this is a lazy property, record its backing storage.
@@ -2827,7 +2825,7 @@ public:
     DeclID overriddenID;
     DeclID accessorStorageDeclID;
     bool needsNewVTableEntry, isTransparent;
-    DeclID opaqueResultTypeDeclID;
+    DeclID opaqueReturnTypeID;
     ArrayRef<uint64_t> nameAndDependencyIDs;
 
     if (!isAccessor) {
@@ -2842,7 +2840,7 @@ public:
                                           numNameComponentsBiased,
                                           rawAccessLevel,
                                           needsNewVTableEntry,
-                                          opaqueResultTypeDeclID,
+                                          opaqueReturnTypeID,
                                           nameAndDependencyIDs);
     } else {
       decls_block::AccessorLayout::readRecord(scratch, contextID, isImplicit,
@@ -3031,11 +3029,14 @@ public:
       fn->setImplicit();
     fn->setIsObjC(isObjC);
     fn->setForcedStaticDispatch(hasForcedStaticDispatch);
-    fn->setNeedsNewVTableEntry(needsNewVTableEntry);
+    ctx.evaluator.cacheOutput(NeedsNewVTableEntryRequest{fn},
+                              std::move(needsNewVTableEntry));
 
-    if (opaqueResultTypeDeclID)
-      fn->setOpaqueResultTypeDecl(
-                     cast<OpaqueTypeDecl>(MF.getDecl(opaqueResultTypeDeclID)));
+    if (opaqueReturnTypeID) {
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{fn},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+    }
 
     // Set the interface type.
     fn->computeType();
@@ -3487,6 +3488,11 @@ public:
       MF.fatal();
 
     theEnum->setAddedImplicitInitializers();
+    // @objc enums have all their raw values checked.
+    if (isObjC) {
+      theEnum->setHasFixedRawValues();
+    }
+    
     if (isImplicit)
       theEnum->setImplicit();
     theEnum->setIsObjC(isObjC);
@@ -3705,8 +3711,9 @@ public:
       AddAttribute(new (ctx) OverrideAttr(SourceLoc()));
     
     if (opaqueReturnTypeID) {
-      subscript->setOpaqueResultTypeDecl(
-                         cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
+      ctx.evaluator.cacheOutput(
+          OpaqueResultTypeRequest{subscript},
+          cast<OpaqueTypeDecl>(MF.getDecl(opaqueReturnTypeID)));
     }
     
     return subscript;

@@ -94,18 +94,19 @@ Expr *FailureDiagnostic::findParentExpr(Expr *subExpr) const {
   return E ? E->getParentMap()[subExpr] : nullptr;
 }
 
-Expr *FailureDiagnostic::getArgumentExprFor(Expr *anchor) const {
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
-    if (auto *call = dyn_cast_or_null<CallExpr>(findParentExpr(UDE)))
-      return call->getArg();
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
-    return UME->getArgument();
-  } else if (auto *call = dyn_cast<CallExpr>(anchor)) {
-    return call->getArg();
-  } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
-    return SE->getIndex();
-  }
-  return nullptr;
+Expr *
+FailureDiagnostic::getArgumentListExprFor(ConstraintLocator *locator) const {
+  auto path = locator->getPath();
+  auto iter = path.begin();
+  if (!locator->findFirst<LocatorPathElt::ApplyArgument>(iter))
+    return nullptr;
+
+  // Form a new locator that ends at the ApplyArgument element, then simplify
+  // to get the argument list.
+  auto newPath = ArrayRef<LocatorPathElt>(path.begin(), iter + 1);
+  auto &cs = getConstraintSystem();
+  auto argListLoc = cs.getConstraintLocator(locator->getAnchor(), newPath);
+  return simplifyLocatorToAnchor(argListLoc);
 }
 
 Expr *FailureDiagnostic::getBaseExprFor(Expr *anchor) const {
@@ -220,20 +221,28 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   if (!argExpr)
     return None;
 
-  ValueDecl *callee = nullptr;
+  Optional<OverloadChoice> choice;
   Type rawFnType;
   if (auto overload = getChoiceFor(argLocator)) {
     // If we have resolved an overload for the callee, then use that to get the
     // function type and callee.
-    callee = overload->choice.getDeclOrNull();
+    choice = overload->choice;
     rawFnType = overload->openedType;
   } else {
-    // If we didn't resolve an overload for the callee, we must be dealing with
-    // a call of an arbitrary function expr.
-    auto *call = cast<CallExpr>(anchor);
-    assert(!shouldHaveDirectCalleeOverload(call) &&
-           "Should we have resolved a callee for this?");
-    rawFnType = cs.getType(call->getFn());
+    // If we didn't resolve an overload for the callee, we should be dealing
+    // with a call of an arbitrary function expr.
+    if (auto *call = dyn_cast<CallExpr>(anchor)) {
+      assert(!shouldHaveDirectCalleeOverload(call) &&
+             "Should we have resolved a callee for this?");
+      rawFnType = cs.getType(call->getFn());
+    } else {
+      // FIXME: ArgumentMismatchFailure is currently used from CSDiag, meaning
+      // we can end up a BinaryExpr here with an unresolved callee. It should be
+      // possible to remove this once we've gotten rid of the old CSDiag logic
+      // and just assert that we have a CallExpr.
+      auto *apply = cast<ApplyExpr>(anchor);
+      rawFnType = cs.getType(apply->getFn());
+    }
   }
 
   // Try to resolve the function type by loading lvalues and looking through
@@ -248,6 +257,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   // Resolve the interface type for the function. Note that this may not be a
   // function type, for example it could be a generic parameter.
   Type fnInterfaceType;
+  auto *callee = choice ? choice->getDeclOrNull() : nullptr;
   if (callee && callee->hasInterfaceType()) {
     // If we have a callee with an interface type, we can use it. This is
     // preferable to resolveInterfaceType, as this will allow us to get a
@@ -260,7 +270,7 @@ FailureDiagnostic::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
-    if (callee->hasCurriedSelf())
+    if (hasAppliedSelf(cs, *choice))
       fnInterfaceType = fnInterfaceType->castTo<AnyFunctionType>()->getResult();
 
     if (auto *fn = fnInterfaceType->getAs<AnyFunctionType>()) {
@@ -838,21 +848,18 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
 }
 
 bool LabelingFailure::diagnoseAsError() {
-  auto &cs = getConstraintSystem();
-  auto *anchor = getRawAnchor();
-
-  auto *argExpr = getArgumentExprFor(anchor);
+  auto *argExpr = getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
+  auto &cs = getConstraintSystem();
+  auto *anchor = getRawAnchor();
   return diagnoseArgumentLabelError(cs.getASTContext(), argExpr, CorrectLabels,
                                     isa<SubscriptExpr>(anchor));
 }
 
 bool LabelingFailure::diagnoseAsNote() {
-  auto *anchor = getRawAnchor();
-
-  auto *argExpr = getArgumentExprFor(anchor);
+  auto *argExpr = getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
@@ -4183,7 +4190,8 @@ bool ClosureParamDestructuringFailure::diagnoseAsError() {
 
 bool OutOfOrderArgumentFailure::diagnoseAsError() {
   auto *anchor = getRawAnchor();
-  auto *argExpr = isa<TupleExpr>(anchor) ? anchor : getArgumentExprFor(anchor);
+  auto *argExpr = isa<TupleExpr>(anchor) ? anchor
+                                         : getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
@@ -4832,7 +4840,7 @@ bool InvalidTupleSplatWithSingleParameterFailure::diagnoseAsError() {
 
   auto *choice = selectedOverload->choice.getDecl();
 
-  auto *argExpr = getArgumentExprFor(getRawAnchor());
+  auto *argExpr = getArgumentListExprFor(getLocator());
   if (!argExpr)
     return false;
 
@@ -5036,13 +5044,9 @@ bool ArgumentMismatchFailure::diagnoseAsError() {
 }
 
 bool ArgumentMismatchFailure::diagnoseAsNote() {
-  auto *locator = getLocator();
-  auto argToParam = locator->findFirst<LocatorPathElt::ApplyArgToParam>();
-  assert(argToParam);
-
-  if (auto *decl = getDecl()) {
-    emitDiagnostic(decl, diag::candidate_has_invalid_argument_at_position,
-                   getToType(), argToParam->getParamIdx());
+  if (auto *callee = getCallee()) {
+    emitDiagnostic(callee, diag::candidate_has_invalid_argument_at_position,
+                   getToType(), getParamPosition());
     return true;
   }
 
@@ -5069,11 +5073,10 @@ bool ArgumentMismatchFailure::diagnoseUseOfReferenceEqualityOperator() const {
   // one would cover both arguments.
   if (getAnchor() == rhs && rhsType->is<FunctionType>()) {
     auto &cs = getConstraintSystem();
-    auto info = getFunctionArgApplyInfo(locator);
-    if (info && cs.hasFixFor(cs.getConstraintLocator(
-                    binaryOp, {ConstraintLocator::ApplyArgument,
-                               LocatorPathElt::ApplyArgToParam(
-                                   0, 0, info->getParameterFlagsAtIndex(0))})))
+    if (cs.hasFixFor(cs.getConstraintLocator(
+            binaryOp, {ConstraintLocator::ApplyArgument,
+                       LocatorPathElt::ApplyArgToParam(
+                           0, 0, getParameterFlagsAtIndex(0))})))
       return true;
   }
 
@@ -5231,14 +5234,12 @@ bool ArgumentMismatchFailure::diagnoseMisplacedMissingArgument() const {
   if (!MissingArgumentsFailure::isMisplacedMissingArgument(cs, locator))
     return false;
 
-  auto info = *getFunctionArgApplyInfo(locator);
-
   auto *argType = cs.createTypeVariable(
       cs.getConstraintLocator(locator, LocatorPathElt::SynthesizedArgument(1)),
       /*flags=*/0);
 
   // Assign new type variable to a type of a parameter.
-  auto *fnType = info.getFnType();
+  auto *fnType = getFnType();
   const auto &param = fnType->getParams()[0];
   cs.assignFixedType(argType, param.getOldType());
 

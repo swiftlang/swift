@@ -728,21 +728,6 @@ matchCallArguments(ArrayRef<AnyFunctionType::Param> args,
   return listener.relabelArguments(actualArgNames);
 }
 
-static bool hasAppliedSelf(ConstraintSystem &cs, const OverloadChoice &choice) {
-  auto *decl = choice.getDeclOrNull();
-  if (!decl)
-    return false;
-
-  auto baseType = choice.getBaseType();
-  if (baseType)
-    baseType = cs.getFixedTypeRecursive(baseType, /*wantRValue=*/true);
-
-  // In most cases where we reference a declaration with a curried self
-  // parameter, it gets dropped from the type of the reference.
-  return decl->hasCurriedSelf() &&
-         doesMemberRefApplyCurriedSelf(baseType, decl);
-}
-
 /// Find the callee declaration and uncurry level for a given call
 /// locator.
 static std::tuple<ValueDecl *, bool, ArrayRef<Identifier>, bool,
@@ -902,7 +887,7 @@ public:
       }
     }
 
-    auto *locator = CS.getConstraintLocator(anchor);
+    auto *locator = CS.getConstraintLocator(Locator);
     auto *fix = RelabelArguments::create(CS, newLabels, locator);
     CS.recordFix(fix);
     // Re-labeling fixes with extraneous labels should take

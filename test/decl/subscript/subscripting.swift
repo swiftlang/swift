@@ -393,9 +393,9 @@ func testSubscript1(_ s1 : SubscriptTest1) {
 }
 
 struct SubscriptTest2 {
-  subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' at position #1}}
+  subscript(a : String, b : Int) -> Int { return 0 } // expected-note {{candidate expects value of type 'Int' for parameter #2}}
   // expected-note@-1 {{declared here}}
-    subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' at position #1}}
+    subscript(a : String, b : String) -> Int { return 0 } // expected-note {{candidate expects value of type 'String' for parameter #2}}
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {

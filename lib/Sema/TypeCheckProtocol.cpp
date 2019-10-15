@@ -334,7 +334,7 @@ swift::matchWitness(
     return RequirementMatch(witness, MatchKind::WitnessInvalid);
 
   // If we're currently validating the witness, bail out.
-  if (!witness->getInterfaceType())
+  if (witness->isRecursiveValidation())
     return RequirementMatch(witness, MatchKind::Circularity);
 
   // Get the requirement and witness attributes.
@@ -2553,7 +2553,6 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     DC);
     aliasDecl->setGenericSignature(DC->getGenericSignatureOfContext());
     aliasDecl->setUnderlyingType(type);
-    aliasDecl->setValidationToChecked();
     aliasDecl->computeType();
     
     aliasDecl->setImplicit();

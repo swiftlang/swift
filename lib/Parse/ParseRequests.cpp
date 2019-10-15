@@ -70,6 +70,7 @@ BraceStmt *ParseAbstractFunctionBodyRequest::evaluate(
 
     std::tie(body, isTypeChecked) = (afd->Synthesizer.Fn)(
         afd, afd->Synthesizer.Context);
+    assert(body && "cannot synthesize a null body");
     afd->setBodyKind(isTypeChecked ? BodyKind::TypeChecked : BodyKind::Parsed);
     return body;
   }

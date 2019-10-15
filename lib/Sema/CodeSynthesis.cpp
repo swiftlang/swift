@@ -698,8 +698,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   ctor->setImplicitlyUnwrappedOptional(
     superclassCtor->isImplicitlyUnwrappedOptional());
 
-  ctor->setValidationToChecked();
-
   configureInheritedDesignatedInitAttributes(classDecl, ctor,
                                              superclassCtor, ctx);
 
@@ -710,8 +708,6 @@ createDesignatedInitOverride(ClassDecl *classDecl,
     // Note that this is a stub implementation.
     ctor->setStubImplementation(true);
 
-    // Stub constructors don't appear in the vtable.
-    ctor->setNeedsNewVTableEntry(false);
     return ctor;
   }
 
@@ -851,18 +847,6 @@ static void addImplicitConstructorsToStruct(StructDecl *decl, ASTContext &ctx) {
   assert(!decl->hasUnreferenceableStorage() &&
          "User-defined structs cannot have unreferenceable storage");
 
-  // Bail out if we're validating one of our stored properties already;
-  // we'll revisit the issue later.
-  for (auto member : decl->getMembers()) {
-    if (auto var = dyn_cast<VarDecl>(member)) {
-      if (!var->isMemberwiseInitialized(/*preferDeclaredProperties=*/true))
-        continue;
-
-      if (!var->getInterfaceType())
-        return;
-    }
-  }
-
   decl->setAddedImplicitInitializers();
 
   // Check whether there is a user-declared constructor or an instance
@@ -923,7 +907,7 @@ static void addImplicitConstructorsToClass(ClassDecl *decl, ASTContext &ctx) {
   if (!decl->hasClangNode()) {
     for (auto member : decl->getMembers()) {
       if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
-        if (!ctor->getInterfaceType())
+        if (ctor->isRecursiveValidation())
           return;
       }
     }

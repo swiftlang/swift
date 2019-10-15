@@ -303,7 +303,6 @@ ElementaryFunction op) {
   operatorDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   operatorDecl->computeType();
   operatorDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  operatorDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({operatorDecl});
   C.addSynthesizedDecl(operatorDecl);

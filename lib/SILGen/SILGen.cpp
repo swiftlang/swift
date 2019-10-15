@@ -107,8 +107,6 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
-    assert(fd->hasInterfaceType() && "bridging functions must be type-checked");
-
     // Check that the function takes the expected arguments and returns the
     // expected result type.
     SILDeclRef c(fd);

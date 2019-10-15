@@ -71,7 +71,7 @@ func testFastRuncible<T: Runcible, U: FastRuncible>(_ t: T, u: U)
   U.RuncerType.Runcee.accelerate()
 }
 
-// CHECK: define hidden swiftcc void @"$s16associated_types16testFastRuncible_1uyx_q_tAA0E0RzAA0dE0R_10RuncerTypeQy_AFRtzr0_lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s16associated_types16testFastRuncible_1uyx_q_tAA0E0RzAA0dE0R_10RuncerTypeQy_AFRtzr0_lF"(%swift.opaque* noalias nocapture, %swift.opaque* noalias nocapture, %swift.type* %T, %swift.type* %U, i8** %T.Runcible, i8** %U.FastRuncible) #0 {
 //   1. Get the type metadata for U.RuncerType.Runcee.
 //     1a. Get the type metadata for U.RuncerType.
 //         Note that we actually look things up in T, which is going to prove unfortunate.

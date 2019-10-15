@@ -346,7 +346,6 @@ static ValueDecl *deriveDifferentiable_method(
   funcDecl->setGenericSignature(parentDC->getGenericSignatureOfContext());
   funcDecl->computeType();
   funcDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  funcDecl->setValidationToChecked();
 
   derived.addMembersToConformanceContext({funcDecl});
   C.addSynthesizedDecl(funcDecl);
@@ -614,7 +613,6 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     structDecl->addMember(newMember);
     structDecl->addMember(memberBinding);
     newMember->copyFormalAccessFrom(member, /*sourceIsParentContext*/ true);
-    newMember->setValidationToChecked();
     newMember->setSetterAccess(member->getFormalAccess());
     C.addSynthesizedDecl(newMember);
     C.addSynthesizedDecl(memberBinding);
@@ -701,7 +699,6 @@ static void addAssociatedTypeAliasDecl(Identifier name,
   aliasDecl->setGenericSignature(sourceDC->getGenericSignatureOfContext());
   cast<IterableDeclContext>(sourceDC->getAsDecl())->addMember(aliasDecl);
   aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-  aliasDecl->setValidationToChecked();
   aliasDecl->computeType();
   TC.validateDecl(aliasDecl);
   C.addSynthesizedDecl(aliasDecl);
@@ -848,7 +845,6 @@ deriveDifferentiable_TangentVectorStruct(DerivedConformance &derived) {
     aliasDecl->setUnderlyingType(selfType);
     aliasDecl->setImplicit();
     aliasDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
-    aliasDecl->setValidationToChecked();
     aliasDecl->computeType();
     TC.validateDecl(aliasDecl);
     derived.addMembersToConformanceContext({aliasDecl});
