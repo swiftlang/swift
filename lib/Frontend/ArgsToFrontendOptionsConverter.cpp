@@ -110,6 +110,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
 
+  Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
   computeHelpOptions();
 
   if (const Arg *A = Args.getLastArg(OPT_verify_generic_signatures)) {
