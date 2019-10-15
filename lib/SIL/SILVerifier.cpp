@@ -1526,13 +1526,43 @@ public:
                       "VJP type does not match expected VJP type");
     }
   }
+
+  void checkLinearFunctionInst(LinearFunctionInst *lfi) {
+    auto origTy =
+        lfi->getOriginalFunction()->getType().getAs<SILFunctionType>();
+    require(origTy, "The original function must have a function type");
+    require(!origTy->isDifferentiable(),
+            "The original function must not be differentiable");
+    if (F.getModule().getStage() == SILStage::Canonical ||
+        lfi->hasTransposeFunction()) {
+      auto transpose = lfi->getTransposeFunction();
+      auto transposeType = transpose->getType().getAs<SILFunctionType>();
+      require(transposeType,
+              "The transpose function must have a function type");
+      require(!transposeType->isDifferentiable(),
+              "The transpose function must not be differentiable");
+      auto expectedTransposeType = origTy->getAutoDiffTransposeFunctionType(
+          lfi->getParameterIndices(), TC, LookUpConformanceInModule(M));
+      requireSameType(SILType::getPrimitiveObjectType(transposeType),
+                      SILType::getPrimitiveObjectType(expectedTransposeType),
+                      "Transpose type does not match expected transpose type");
+    }
+  }
   
   void checkDifferentiableFunctionExtractInst(
       DifferentiableFunctionExtractInst *dfei) {
     auto fnTy = dfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
     require(fnTy, "The function operand must have a function type");
-    require(fnTy->isDifferentiable(),
-            "The function operand must be an '@differentiable' function");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Normal,
+            "The function operand must be a '@differentiable' function");
+  }
+
+  void checkLinearFunctionExtractInst(LinearFunctionExtractInst *lfei) {
+    auto fnTy = lfei->getFunctionOperand()->getType().getAs<SILFunctionType>();
+    require(fnTy, "The function operand must have a function type");
+    require(fnTy->getDifferentiabilityKind() == DifferentiabilityKind::Linear,
+            "The function operand must be a '@differentiable(linear)' "
+            "function");
   }
   // SWIFT_ENABLE_TENSORFLOW END
 
@@ -5084,8 +5114,8 @@ public:
     verifySILFunctionType(FTy);
 
     // SWIFT_ENABLE_TENSORFLOW
-    for (auto *RDiffAttr : F->getDifferentiableAttrs())
-      verifyDifferentiableAttr(F, *RDiffAttr);
+    for (auto *DiffAttr : F->getDifferentiableAttrs())
+      verifyDifferentiableAttr(F, *DiffAttr);
 
     if (F->isExternalDeclaration()) {
       if (F->hasForeignBody())
