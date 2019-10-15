@@ -133,7 +133,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
 
   @inlinable
   internal var objCInstance: ObjC {
-    @inline(__always) get {
+    @inline(never) get {
       _internalInvariant(isObjC)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }
