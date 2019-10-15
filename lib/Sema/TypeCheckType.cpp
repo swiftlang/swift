@@ -2062,7 +2062,7 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
   static const TypeAttrKind FunctionAttrs[] = {
     TAK_convention, TAK_pseudogeneric,
     TAK_callee_owned, TAK_callee_guaranteed, TAK_noescape, TAK_autoclosure,
-    TAK_escaping, TAK_yield_once, TAK_yield_many
+    TAK_differentiable, TAK_escaping, TAK_yield_once, TAK_yield_many
   };
 
   auto checkUnsupportedAttr = [&](TypeAttrKind attr) {
@@ -2209,6 +2209,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
                                          : diag::attr_only_on_parameters,
                  "@autoclosure");
         attrs.clearAttribute(TAK_autoclosure);
+      }
+
+      if (attrs.has(TAK_differentiable) &&
+          !Context.LangOpts.EnableExperimentalDifferentiableProgramming) {
+        diagnose(attrs.getLoc(TAK_differentiable),
+                 diag::experimental_differentiable_programming_disabled);
       }
 
       // Resolve the function type directly with these attributes.

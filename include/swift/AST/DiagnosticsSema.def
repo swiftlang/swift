@@ -4683,6 +4683,13 @@ NOTE(previous_function_builder_here, none,
 ERROR(function_builder_arguments, none,
       "function builder attributes cannot have arguments", ())
 
+//------------------------------------------------------------------------------
+// MARK: differentiable programming diagnostics
+//------------------------------------------------------------------------------
+ERROR(experimental_differentiable_programming_disabled, none,
+      "differentiable programming is an experimental feature that is "
+      "currently disabled", ())
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG
