@@ -2922,17 +2922,17 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
 
   // SWIFT_ENABLE_TENSORFLOW
   case SILInstructionKind::DifferentiableFunctionInst: {
-    // e.g. differentiable_function [wrt 0 1 2] %0 : $T
+    // e.g. differentiable_function [parameters 0 1 2] %0 : $T
     //
-    // e.g. differentiable_function [wrt 0 1 2] %0 : $T with
+    // e.g. differentiable_function [parameters 0 1 2] %0 : $T with_derivative
     //      {%1 : $T, %2 : $T}
     //        ^ jvp    ^ vjp
     SourceLoc lastLoc;
     SmallVector<unsigned, 8> parameterIndices;
-    // Parse optional `[wrt <integer_literal>...]`
+    // Parse optional `[parameters <integer_literal>...]`
     if (P.Tok.is(tok::l_square) &&
         P.peekToken().is(tok::identifier) &&
-        P.peekToken().getText() == "wrt") {
+        P.peekToken().getText() == "parameters") {
       P.consumeToken(tok::l_square);
       P.consumeToken(tok::identifier);
       // Parse indices.
@@ -2960,8 +2960,9 @@ bool SILParser::parseSILInstruction(SILBuilder &B) {
       return true;
     }
     Optional<std::pair<SILValue, SILValue>> derivativeFunctions = None;
-    // Parse an optional operand list `with { <operand> , <operand> }`.
-    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with") {
+    // Parse an optional operand list
+    //   `with_derivative { <operand> , <operand> }`.
+    if (P.Tok.is(tok::identifier) && P.Tok.getText() == "with_derivative") {
       P.consumeToken(tok::identifier);
       // Parse derivative function values as an operand list.
       // FIXME(rxwei): Change this to *not* require a type signature once

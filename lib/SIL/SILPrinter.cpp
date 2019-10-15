@@ -1163,14 +1163,14 @@ public:
   // SWIFT_ENABLE_TENSORFLOW
   void visitDifferentiableFunctionInst(DifferentiableFunctionInst *dfi) {
     if (!dfi->getParameterIndices()->isEmpty()) {
-      *this << "[wrt";
+      *this << "[parameters";
       for (auto i : dfi->getParameterIndices()->getIndices())
         *this << ' ' << i;
       *this << "] ";
     }
     *this << getIDAndType(dfi->getOriginalFunction());
     if (dfi->hasDerivativeFunctions()) {
-      *this << " with ";
+      *this << " with_derivative ";
       *this << '{' << getIDAndType(dfi->getJVPFunction()) << ", "
             << getIDAndType(dfi->getVJPFunction()) << '}';
     }
