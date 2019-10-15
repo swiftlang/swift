@@ -225,10 +225,6 @@ namespace swift {
     /// Enable experimental #assert feature.
     bool EnableExperimentalStaticAssert = false;
 
-    /// Staging flag for treating inout parameters as Thread Sanitizer
-    /// accesses.
-    bool DisableTsanInoutInstrumentation = false;
-
     /// Should we check the target OSs of serialized modules to see that they're
     /// new enough?
     bool EnableTargetOSChecking = true;
