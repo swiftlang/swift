@@ -513,6 +513,7 @@ namespace {
         LinearFunctionExtractOriginalExpr *E, SGFContext C);
     RValue visitLinearToDifferentiableFunctionExpr(
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
+    // SWIFT_ENABLE_TENSORFLOW END
   };
 } // end anonymous namespace
 
