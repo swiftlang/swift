@@ -1892,13 +1892,11 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
   if (Tok.is(tok::kw_catch)) {
     SyntaxParsingContext CatchListCtxt(SyntaxContext,
                                        SyntaxKind::CatchClauseList);
-    // Parse 'catch' clauses
-    SmallVector<CaseStmt *, 4> allClauses;
+    // Parse 'catch' clauses 
+    SmallVector<CatchStmt*, 4> allClauses;
     do {
-      ParserResult<CaseStmt> clause =
-          parseStmtCase(false, CaseParentKind::DoCatch);
+      ParserResult<CatchStmt> clause = parseStmtCatch();
       status |= clause;
-      // consumeToken(tok::r_brace);
       if (status.hasCodeCompletion() && clause.isNull())
         return makeParserResult<Stmt>(status, nullptr);
 
@@ -1951,6 +1949,45 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
       status,
       new (Context) RepeatWhileStmt(labelInfo, doLoc, condition.get(), whileLoc,
                                 body.get()));
+}
+
+///  stmt-catch:
+///    'catch' pattern ('where' expr)? stmt-brace
+///
+/// Note that this is not a "first class" statement; it can only
+/// appear following a 'do' statement.
+///
+/// This routine promises to return a non-null result unless there was
+/// a code-completion token in the pattern.
+ParserResult<CatchStmt> Parser::parseStmtCatch() {
+  SyntaxParsingContext CatchClauseCtxt(SyntaxContext, SyntaxKind::CatchClause);
+  // A catch block has its own scope for variables bound out of the pattern.
+  Scope S(this, ScopeKind::CatchVars);
+
+  SourceLoc catchLoc = consumeToken(tok::kw_catch);
+
+  SmallVector<VarDecl*, 4> boundDecls;
+
+  ParserStatus status;
+  GuardedPattern pattern;
+  parseGuardedPattern(*this, pattern, status, boundDecls,
+                      GuardedPatternContext::Catch, /* isFirst */ true);
+  if (status.hasCodeCompletion()) {
+    return makeParserCodeCompletionResult<CatchStmt>();
+  }
+
+  auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
+  status |= bodyResult;
+  if (bodyResult.isNull()) {
+    bodyResult = makeParserErrorResult(BraceStmt::create(Context, PreviousLoc,
+                                                         {}, PreviousLoc,
+                                                         /*implicit=*/ true));
+  }
+
+  auto result =
+    new (Context) CatchStmt(catchLoc, pattern.ThePattern, pattern.WhereLoc,
+                            pattern.Guard, bodyResult.get());
+  return makeParserResult(status, result);
 }
 
 static bool isStmtForCStyle(Parser &P) {
@@ -2172,8 +2209,7 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
   while (Tok.isNot(tok::r_brace, tok::eof,
                    tok::pound_endif, tok::pound_elseif, tok::pound_else)) {
     if (isAtStartOfSwitchCase(*this)) {
-      ParserResult<CaseStmt> Case =
-          parseStmtCase(IsActive, CaseParentKind::Switch);
+      ParserResult<CaseStmt> Case = parseStmtCase(IsActive);
       Status |= Case;
       if (Case.isNonNull())
         cases.emplace_back(Case.get());
@@ -2227,32 +2263,16 @@ Parser::parseStmtCases(SmallVectorImpl<ASTNode> &cases, bool IsActive) {
 }
 
 static ParserStatus
-parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
+parseStmtCase(Parser &P, SourceLoc &CaseLoc,
               SmallVectorImpl<CaseLabelItem> &LabelItems,
               SmallVectorImpl<VarDecl *> &BoundDecls, SourceLoc &ColonLoc,
               Optional<MutableArrayRef<VarDecl *>> &CaseBodyDecls) {
-  tok introducerToken;
-  tok terminatorToken;
-  GuardedPatternContext patternContext;
-  switch (ParentKind) {
-  case CaseParentKind::Switch:
-    introducerToken = tok::kw_case;
-    terminatorToken = tok::colon;
-    patternContext = GuardedPatternContext::Case;
-    break;
-  case CaseParentKind::DoCatch:
-    introducerToken = tok::kw_catch;
-    terminatorToken = tok::l_brace;
-    patternContext = GuardedPatternContext::Catch;
-  }
   SyntaxParsingContext CaseContext(P.SyntaxContext,
                                    SyntaxKind::SwitchCaseLabel);
-  if (ParentKind == CaseParentKind::DoCatch)
-    CaseContext.setDiscard();
   ParserStatus Status;
   bool isFirst = true;
-  // TODO(owen) diags
-  CaseLoc = P.consumeToken(introducerToken);
+  
+  CaseLoc = P.consumeToken(tok::kw_case);
 
   {
     SyntaxParsingContext ListContext(P.SyntaxContext, SyntaxKind::CaseItemList);
@@ -2260,8 +2280,8 @@ parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
     while (true) {
       SyntaxParsingContext ItemContext(P.SyntaxContext, SyntaxKind::CaseItem);
       GuardedPattern PatternResult;
-      parseGuardedPattern(P, PatternResult, Status, BoundDecls, patternContext,
-                          isFirst);
+      parseGuardedPattern(P, PatternResult, Status, BoundDecls,
+                          GuardedPatternContext::Case, isFirst);
       LabelItems.emplace_back(PatternResult.ThePattern, PatternResult.WhereLoc,
                               PatternResult.Guard);
       isFirst = false;
@@ -2287,11 +2307,11 @@ parseStmtCase(Parser &P, CaseParentKind ParentKind, SourceLoc &CaseLoc,
   }
 
   ColonLoc = P.Tok.getLoc();
-  if (!P.Tok.is(terminatorToken)) {
+  if (!P.Tok.is(tok::colon)) {
     P.diagnose(P.Tok, diag::expected_case_colon, "case");
     Status.setIsParseError();
-  } else if (ParentKind == CaseParentKind::Switch)
-    P.consumeToken(terminatorToken);
+  } else
+    P.consumeToken(tok::colon);
 
   return Status;
 }
@@ -2369,23 +2389,8 @@ struct FallthroughFinder : ASTWalker {
 
 } // end anonymous namespace
 
-ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
-                                             CaseParentKind ParentKind) {
-  SyntaxKind syntaxKind;
-  tok introducerToken;
-  BraceItemListKind braceItemListKind;
-  switch (ParentKind) {
-  case CaseParentKind::Switch:
-    syntaxKind = SyntaxKind::SwitchCase;
-    introducerToken = tok::kw_case;
-    braceItemListKind = BraceItemListKind::Case;
-    break;
-  case CaseParentKind::DoCatch:
-    syntaxKind = SyntaxKind::CatchClause;
-    introducerToken = tok::kw_catch;
-    braceItemListKind = BraceItemListKind::Brace;
-  }
-  SyntaxParsingContext CaseContext(SyntaxContext, syntaxKind);
+ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive) {
+  SyntaxParsingContext CaseContext(SyntaxContext, SyntaxKind::SwitchCase);
   // A case block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CaseVars, !IsActive);
 
@@ -2395,7 +2400,7 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
   SmallVector<VarDecl *, 4> BoundDecls;
 
   SourceLoc UnknownAttrLoc;
-  while (Tok.is(tok::at_sign) && ParentKind == CaseParentKind::Switch) {
+  while (Tok.is(tok::at_sign)) {
     SyntaxParsingContext AttrCtx(SyntaxContext, SyntaxKind::Attribute);
 
     if (peekToken().isContextualKeyword("unknown")) {
@@ -2424,18 +2429,17 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
     }
   }
 
-  SourceLoc IntroducerLoc;
-  SourceLoc TerminatorLoc;
+  SourceLoc CaseLoc;
+  SourceLoc ColonLoc;
   Optional<MutableArrayRef<VarDecl *>> CaseBodyDecls;
-  if (Tok.is(introducerToken)) {
-    Status |= ::parseStmtCase(*this, ParentKind, IntroducerLoc, CaseLabelItems,
-                              BoundDecls, TerminatorLoc, CaseBodyDecls);
+  if (Tok.is(tok::kw_case)) {
+    Status |= ::parseStmtCase(*this, CaseLoc, CaseLabelItems, BoundDecls,
+                              ColonLoc, CaseBodyDecls);
   } else if (Tok.is(tok::kw_default)) {
-    Status |= parseStmtCaseDefault(*this, IntroducerLoc, CaseLabelItems,
-                                   TerminatorLoc);
+    Status |= parseStmtCaseDefault(*this, CaseLoc, CaseLabelItems, ColonLoc);
   } else {
     llvm_unreachable("isAtStartOfSwitchCase() lied.");
-  } // TODO(owen) better recovery
+  }
 
   assert(!CaseLabelItems.empty() && "did not parse any labels?!");
 
@@ -2456,37 +2460,27 @@ ParserResult<CaseStmt> Parser::parseStmtCase(bool IsActive,
   SmallVector<ASTNode, 8> BodyItems;
 
   SourceLoc StartOfBody = Tok.getLoc();
-  BraceStmt *Body;
-
-  switch (ParentKind) {
-  case CaseParentKind::Switch: {
-    if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
-      Status |= parseBraceItems(BodyItems, braceItemListKind);
-    } else if (Status.isSuccess() && ParentKind == CaseParentKind::Switch) {
-      diagnose(IntroducerLoc, diag::case_stmt_without_body,
-               CaseLabelItems.back().isDefault())
-          .highlight(SourceRange(IntroducerLoc, TerminatorLoc))
-          .fixItInsertAfter(TerminatorLoc, " break");
-    }
-    if (BodyItems.empty()) {
-      Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
-                               PreviousLoc, /*implicit=*/true);
-    } else {
-      Body = BraceStmt::create(Context, StartOfBody, BodyItems, PreviousLoc,
-                               /*implicit=*/true);
-    }
-    break;
+  if (Tok.isNot(tok::r_brace) && !isAtStartOfSwitchCase(*this)) {
+    Status |= parseBraceItems(BodyItems, BraceItemListKind::Case);
+  } else if (Status.isSuccess()) {
+    diagnose(CaseLoc, diag::case_stmt_without_body,
+             CaseLabelItems.back().isDefault())
+        .highlight(SourceRange(CaseLoc, ColonLoc))
+        .fixItInsertAfter(ColonLoc, " break");
   }
-  case CaseParentKind::DoCatch:
-    Body = parseBraceItemList(diag::docatch_not_trycatch).get();
-    break;
+  BraceStmt *Body;
+  if (BodyItems.empty()) {
+    Body = BraceStmt::create(Context, PreviousLoc, ArrayRef<ASTNode>(),
+                             PreviousLoc, /*implicit=*/true);
+  } else {
+    Body = BraceStmt::create(Context, StartOfBody, BodyItems,
+                             PreviousLoc, /*implicit=*/true);
   }
 
   return makeParserResult(
-      Status,
-      CaseStmt::create(Context, ParentKind, IntroducerLoc, CaseLabelItems,
-                       UnknownAttrLoc, TerminatorLoc, Body, CaseBodyDecls, None,
-                       FallthroughFinder::findFallthrough(Body)));
+      Status, CaseStmt::create(Context, CaseLoc, CaseLabelItems, UnknownAttrLoc,
+                               ColonLoc, Body, CaseBodyDecls, None,
+                               FallthroughFinder::findFallthrough(Body)));
 }
 
 /// stmt-pound-assert:
