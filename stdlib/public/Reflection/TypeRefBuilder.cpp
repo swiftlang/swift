@@ -356,7 +356,7 @@ void TypeRefBuilder::dumpFieldSection(FILE *file) {
       for (auto &fieldRef : *descriptor.getLocalBuffer()) {
         auto field = descriptor.getField(fieldRef);
         auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
-        fprintf(file, "%s", std::string(fieldName.begin(), fieldName.end()).c_str());
+        fprintf(file, "%*s", (int)fieldName.size(), fieldName.data());
         if (field->hasMangledTypeName()) {
           fprintf(file, ": ");
           dumpTypeRef(readTypeRef(field, field->MangledTypeName), file);
