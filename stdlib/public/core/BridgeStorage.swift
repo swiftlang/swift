@@ -131,9 +131,10 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     return _isUnique_native(&rawValue)
   }
 
-  @inlinable
+  // ABI: USED TO BE @inlinable
+  @usableFromInline
   internal var objCInstance: ObjC {
-    @inline(__always) get {
+    get {
       _internalInvariant(isObjC)
       return Builtin.castReferenceFromBridgeObject(rawValue)
     }

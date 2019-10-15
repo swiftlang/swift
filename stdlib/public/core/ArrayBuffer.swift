@@ -508,9 +508,9 @@ extension _ArrayBuffer {
     return NativeBuffer(_storage.unflaggedNativeInstance)
   }
 
-  @inlinable
+  // ABI: USED TO BE @inlinable
+  @usableFromInline
   internal var _nonNative: _CocoaArrayWrapper {
-    @inline(__always)
     get {
       _internalInvariant(_isClassOrObjCExistential(Element.self))
       return _CocoaArrayWrapper(_storage.objCInstance)

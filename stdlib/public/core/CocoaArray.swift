@@ -33,25 +33,28 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
   @usableFromInline
   internal var buffer: AnyObject
 
-  @usableFromInline @_transparent
+  @usableFromInline
   internal init(_ buffer: AnyObject) {
     self.buffer = buffer
   }
 
   internal var core: _NSArrayCore {
-    @inline(__always) get {
-      return unsafeBitCast(buffer, to: _NSArrayCore.self)
-    }
+	  // ABI: USED TO BE @inlinable
+	  @usableFromInline
+	  get {
+	  	unsafeBitCast(buffer, to: _NSArrayCore.self)  	
+	  }
   }
 
-  @inlinable
+  // ABI: USED TO BE @inlinable
+  @usableFromInline
   internal var startIndex: Int {
     return 0
   }
 
   @usableFromInline
   internal var endIndex: Int {
-    return core.count
+    core.count
   }
 
   @usableFromInline
@@ -105,8 +108,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
   /// implementation of countByEnumerating.
   internal func contiguousStorage(
     _ subRange: Range<Int>
-  ) -> UnsafeMutablePointer<AnyObject>?
-  {
+  ) -> UnsafeMutablePointer<AnyObject>? {
     _internalInvariant(!subRange.isEmpty)
     var enumerationState = _makeSwiftNSFastEnumerationState()
 
