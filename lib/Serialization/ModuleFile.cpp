@@ -1411,13 +1411,24 @@ ModuleFile::readDeclUSRsTable(ArrayRef<uint64_t> fields, StringRef blobData) {
 }
 
 bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
-  cursor.EnterSubBlock(DECL_LOCS_BLOCK_ID);
+  if (llvm::Error Err = cursor.EnterSubBlock(DECL_LOCS_BLOCK_ID)) {
+    // FIXME this drops the error on the floor.
+    consumeError(std::move(Err));
+    return false;
+  }
 
   SmallVector<uint64_t, 4> scratch;
   StringRef blobData;
 
   while (!cursor.AtEndOfStream()) {
-    auto entry = cursor.advance();
+    Expected<llvm::BitstreamEntry> maybeNext = cursor.advance();
+    if (!maybeNext) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeNext.takeError());
+      return false;
+    }
+
+    llvm::BitstreamEntry entry = maybeNext.get();
     switch (entry.Kind) {
     case llvm::BitstreamEntry::EndBlock:
       return true;
@@ -1433,7 +1444,14 @@ bool ModuleFile::readDeclLocsBlock(llvm::BitstreamCursor &cursor) {
 
     case llvm::BitstreamEntry::Record:
       scratch.clear();
-      unsigned kind = cursor.readRecord(entry.ID, scratch, &blobData);
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
+      if (!maybeKind) {
+        // FIXME this drops the error on the floor.
+        consumeError(maybeKind.takeError());
+        return false;
+      }
+      unsigned kind = maybeKind.get();
 
       switch (kind) {
       case decl_locs_block::BASIC_DECL_LOCS:
@@ -1473,13 +1491,25 @@ bool ModuleFile::readModuleSourceInfoIfPresent() {
   ValidationInfo info;
 
   while (!infoCursor.AtEndOfStream()) {
-    topLevelEntry = infoCursor.advance(AF_DontPopBlockAtEnd);
+    Expected<llvm::BitstreamEntry> maybeNext =
+        infoCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeNext) {
+      // FIXME this drops the error on the floor.
+      consumeError(maybeNext.takeError());
+      return false;
+    }
+
+    topLevelEntry = maybeNext.get();
     if (topLevelEntry.Kind != llvm::BitstreamEntry::SubBlock)
       break;
 
     switch (topLevelEntry.ID) {
     case CONTROL_BLOCK_ID: {
-      infoCursor.EnterSubBlock(CONTROL_BLOCK_ID);
+      if (llvm::Error Err = infoCursor.EnterSubBlock(CONTROL_BLOCK_ID)) {
+        // FIXME this drops the error on the floor.
+        consumeError(std::move(Err));
+        return false;
+      }
 
       info = validateControlBlock(infoCursor, scratch,
                                   {SWIFTSOURCEINFO_VERSION_MAJOR,
