@@ -5628,7 +5628,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
         !FD->getDeclContext()->getDeclaredInterfaceType()
                  ->hasReferenceSemantics()) {
-      // Do not suggest the fix it in implicit getters
+      // Do not suggest the fix-it in implicit getters
       if (auto AD = dyn_cast<AccessorDecl>(FD)) {
         if (AD->isGetter() && !AD->getAccessorKeywordLoc().isValid())
           return;

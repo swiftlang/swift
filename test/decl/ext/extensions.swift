@@ -126,31 +126,202 @@ struct WrapperContext {
 }
 
 // Class-constrained extension where protocol does not impose class requirement
+// SR-11298
 
 protocol DoesNotImposeClassReq_1 {}
-	
+
 class JustAClass: DoesNotImposeClassReq_1 {
   var property: String = ""
 }
 
 extension DoesNotImposeClassReq_1 where Self: JustAClass {
-  var wrappingProperty: String {
+  var wrappingProperty1: String {
     get { return property }
-    set { property = newValue }
+    set { property = newValue } // Okay
+  }
+  
+  var wrappingProperty2: String {
+    get { return property }
+    nonmutating set { property = newValue } // Okay
+  }
+  
+  var wrappingProperty3: String {
+    get { return property }
+    mutating set { property = newValue } // Okay
+  }
+  
+  mutating func foo() {
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay
+    wrappingProperty2 = "" // Okay
+    wrappingProperty3 = "" // Okay
+  }
+  
+  func bar() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay
+    wrappingProperty2 = "" // Okay
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  nonmutating func baz() { // expected-note {{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay
+    wrappingProperty2 = "" // Okay
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 }
-	
-let instanceOfJustAClass = JustAClass() // expected-note {{change 'let' to 'var' to make it mutable}}
-instanceOfJustAClass.wrappingProperty = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass' is a 'let' constant}}
+
+let instanceOfJustAClass1 = JustAClass() // expected-note 2{{change 'let' to 'var' to make it mutable}}
+instanceOfJustAClass1.wrappingProperty1 = "" // Okay
+instanceOfJustAClass1.wrappingProperty2 = "" // Okay
+instanceOfJustAClass1.wrappingProperty3 = "" // expected-error {{cannot assign to property: 'instanceOfJustAClass1' is a 'let' constant}}
+instanceOfJustAClass1.foo() // expected-error {{cannot use mutating member on immutable value: 'instanceOfJustAClass1' is a 'let' constant}}
+instanceOfJustAClass1.bar() // Okay
+instanceOfJustAClass1.baz() // Okay
+
+var instanceOfJustAClass2 = JustAClass()
+instanceOfJustAClass2.foo() // Okay
 
 protocol DoesNotImposeClassReq_2 {
   var property: String { get set }
 }
 
 extension DoesNotImposeClassReq_2 where Self : AnyObject {
-  var wrappingProperty: String {
+  var wrappingProperty1: String {
     get { property }
-    set { property = newValue } // Okay
+    set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-5=mutating }}
+  }
+  
+  var wrappingProperty2: String {
+    get { property }
+    nonmutating set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
+    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+  }
+  
+  var wrappingProperty3: String {
+    get { property }
+    mutating set { property = newValue } // Okay
+  }
+  
+  mutating func foo() {
+    property = "" // Okay
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty3 = "" // Okay
+  }
+  
+  func bar() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{3-3=mutating }}
+    property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+  
+  nonmutating func baz() { // expected-note 2{{mark method 'mutating' to make 'self' mutable}}{{3-14=mutating}}
+    property = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+    wrappingProperty1 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty2 = "" // Okay (the error is on the setter declaration above)
+    wrappingProperty3 = "" // expected-error {{cannot assign to property: 'self' is immutable}}
+  }
+}
+
+protocol DoesNotImposeClassReq_3 {
+  var someProperty: Int { get set }
+}
+
+class JustAClass1: DoesNotImposeClassReq_3 {
+  var someProperty = 0
+}
+
+extension DoesNotImposeClassReq_3 where Self: JustAClass1 {
+  var anotherProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue } // Okay
+  }
+
+  var anotherProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // Okay
+  }
+}
+
+let justAClass1 = JustAClass1() // expected-note {{change 'let' to 'var' to make it mutable}}
+justAClass1.anotherProperty1 = 1234 // Okay
+justAClass1.anotherProperty2 = 4321 // expected-error {{cannot assign to property: 'justAClass1' is a 'let' constant}}
+
+protocol ImposeClassReq1: AnyObject {
+  var someProperty: Int { get set }
+}
+
+class JustAClass2: ImposeClassReq1 {
+  var someProperty = 0
+}
+
+extension ImposeClassReq1 where Self: AnyObject {
+  var wrappingProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+
+  var wrappingProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+  }
+
+  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 1
+  }
+
+  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 2
+  }
+
+  func baz() { // Okay
+    someProperty = 3
+  }
+}
+
+extension ImposeClassReq1 {
+  var wrappingProperty3: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+}
+
+let justAClass2 = JustAClass2() // expected-note {{change 'let' to 'var' to make it mutable}}
+justAClass2.wrappingProperty1 = 9876 // Okay
+justAClass2.wrappingProperty3 = 0987 // Okay
+justAClass2.foo() // expected-error {{cannot use mutating member on immutable value: 'justAClass2' is a 'let' constant}}
+justAClass2.bar() // Okay as well (complains about explicit nonmutating on decl)
+justAClass2.baz() // Okay
+
+protocol ImposeClassReq2: AnyObject {
+  var someProperty: Int { get set }
+}
+
+extension ImposeClassReq2 {
+  var wrappingProperty1: Int {
+    get { return someProperty }
+    set { someProperty = newValue }
+  }
+
+  var wrappingProperty2: Int {
+    get { return someProperty }
+    mutating set { someProperty = newValue } // expected-error {{'mutating' isn't valid on methods in classes or class-bound protocols}}
+  }
+
+  mutating func foo() { // expected-error {{mutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 1
+  }
+
+  nonmutating func bar() { // expected-error {{'nonmutating' isn't valid on methods in classes or class-bound protocols}}
+    someProperty = 2
+  }
+
+  func baz() { // Okay
+    someProperty = 3
   }
 }
 
