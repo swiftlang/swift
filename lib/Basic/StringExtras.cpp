@@ -920,7 +920,8 @@ camel_case::toLowercaseInitialisms(StringRef string,
 
   // Lowercase until we hit the an uppercase letter followed by a
   // non-uppercase letter.
-  llvm::SmallString<32> scratchStr;
+  scratch.clear();
+  scratch.reserve(string.size());
   for (unsigned i = 0, n = string.size(); i != n; ++i) {
     // If the next character is not uppercase, stop.
     if (i < n - 1 && !clang::isUppercase(string[i+1])) {
@@ -929,19 +930,18 @@ camel_case::toLowercaseInitialisms(StringRef string,
       // lowercase the character we're on.
       if (i == 0 || !clang::isLetter(string[i+1]) ||
           isPluralSuffix(camel_case::getFirstWord(string.substr(i+1)))) {
-        scratchStr.push_back(clang::toLowercase(string[i]));
+        scratch.push_back(clang::toLowercase(string[i]));
         ++i;
       }
 
-      scratchStr.append(string.substr(i));
+      scratch.append(string.substr(i).begin(), string.substr(i).end());
       break;
     }
 
-    scratchStr.push_back(clang::toLowercase(string[i]));
+    scratch.push_back(clang::toLowercase(string[i]));
   }
 
-  scratch = scratchStr;
-  return {scratch.begin(), scratch.size()};
+  return {scratch.data(), scratch.size()};
 }
 
 /// Determine whether the given word occurring before the given
