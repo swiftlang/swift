@@ -2156,57 +2156,6 @@ public:
         ParamInfo(paramInfo), Arguments(args), CandidateInfo(CCI),
         IsSubscript(isSubscript) {}
 
-  bool extraArgument(unsigned extraArgIdx) override {
-    auto name = Arguments[extraArgIdx].getLabel();
-    Expr *arg = ArgExpr;
-
-    auto tuple = dyn_cast<TupleExpr>(ArgExpr);
-    if (tuple)
-      arg = tuple->getElement(extraArgIdx);
-
-    auto loc = arg->getLoc();
-    if (tuple && extraArgIdx == tuple->getNumElements() - 1 &&
-        tuple->hasTrailingClosure())
-      TC.diagnose(loc, diag::extra_trailing_closure_in_call)
-          .highlight(arg->getSourceRange());
-    else if (Parameters.empty()) {
-      auto Paren = dyn_cast<ParenExpr>(ArgExpr);
-      Expr *SubExpr = nullptr;
-      if (Paren) {
-        SubExpr = Paren->getSubExpr();
-      }
-
-      if (SubExpr && CandidateInfo.CS.getType(SubExpr) &&
-          CandidateInfo.CS.getType(SubExpr)->isVoid()) {
-        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-            .fixItRemove(SubExpr->getSourceRange());
-      } else {
-        TC.diagnose(loc, diag::extra_argument_to_nullary_call)
-            .highlight(ArgExpr->getSourceRange());
-      }
-    } else if (name.empty())
-      TC.diagnose(loc, diag::extra_argument_positional)
-          .highlight(arg->getSourceRange());
-    else
-      TC.diagnose(loc, diag::extra_argument_named, name)
-          .highlight(arg->getSourceRange());
-
-    Diagnosed = true;
-    return true;
-  }
-
-  bool missingLabel(unsigned paramIdx) override {
-    return false;
-  }
-
-  bool extraneousLabel(unsigned paramIdx) override {
-    return false;
-  }
-
-  bool incorrectLabel(unsigned paramIdx) override {
-    return false;
-  }
-
   bool outOfOrderArgument(unsigned argIdx, unsigned prevArgIdx) override {
     auto &cs = CandidateInfo.CS;
     OutOfOrderArgumentFailure failure(nullptr, cs, argIdx, prevArgIdx, Bindings,
