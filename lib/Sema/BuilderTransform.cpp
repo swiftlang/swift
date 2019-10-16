@@ -169,8 +169,15 @@ public:
       }
 
       auto expr = node.get<Expr *>();
-      if (wantExpr)
-        expr = new (ctx) OneWayExpr(expr);
+      if (wantExpr) {
+        if (builderSupports(ctx.Id_buildExpression)) {
+          expr = buildCallIfWanted(expr->getLoc(), ctx.Id_buildExpression,
+                                   { expr }, { Identifier() },
+                                   /*allowOneWay=*/true);
+        } else {
+          expr = new (ctx) OneWayExpr(expr);
+        }
+      }
 
       expressions.push_back(expr);
     }
