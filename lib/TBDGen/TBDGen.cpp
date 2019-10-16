@@ -34,6 +34,7 @@
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/Process.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/TextAPI/MachO/InterfaceFile.h"
 #include "llvm/TextAPI/MachO/TextAPIReader.h"
@@ -597,7 +598,10 @@ convertToPacked(const version::Version &version) {
 }
 
 static bool isApplicationExtensionSafe(const LangOptions &LangOpts) {
-  return LangOpts.EnableAppExtensionRestrictions;
+  // Existing linkers respect these flags to determine app extension safety.
+  return LangOpts.EnableAppExtensionRestrictions ||
+         llvm::sys::Process::GetEnv("LD_NO_ENCRYPT") ||
+         llvm::sys::Process::GetEnv("LD_APPLICATION_EXTENSION_SAFE");
 }
 
 static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
@@ -615,8 +619,12 @@ static void enumeratePublicSymbolsAndWrite(ModuleDecl *M, FileUnit *singleFile,
   file.setApplicationExtensionSafe(
     isApplicationExtensionSafe(M->getASTContext().LangOpts));
   file.setInstallName(opts.InstallName);
-  file.setCurrentVersion(convertToPacked(opts.CurrentVersion));
-  file.setCompatibilityVersion(convertToPacked(opts.CompatibilityVersion));
+  if (auto currentVersion = opts.CurrentVersion) {
+    file.setCurrentVersion(convertToPacked(*currentVersion));
+  }
+  if (auto compatibilityVersion = opts.CompatibilityVersion) {
+    file.setCompatibilityVersion(convertToPacked(*compatibilityVersion));
+  }
   file.setTwoLevelNamespace();
   file.setSwiftABIVersion(irgen::getSwiftABIVersion());
   file.setInstallAPI(opts.IsInstallAPI);
